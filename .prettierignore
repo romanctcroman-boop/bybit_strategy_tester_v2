@@ -1,0 +1,14 @@
+# build artefacts
+dist/
+build/
+coverage/
+logs/
+*.log
+
+# environments and dependencies
+.venv/
+node_modules/
+
+# generated outputs
+results/
+frontend/electron/dist/

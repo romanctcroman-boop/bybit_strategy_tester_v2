@@ -1,0 +1,130 @@
+2025-10-18 20:02:39.994 | INFO     | backend.middleware.logging:setup_structured_logging:112 - Structured logging enabled
+2025-10-18 20:02:42.229 | INFO     | backend.database:<module>:173 - \u2705 Асинхронные модули работы с PostgreSQL загружены
+2025-10-18 20:02:47.504 | INFO     | backend.celery_app:<module>:60 - \u2705 Celery app configured
+2025-10-18 20:02:47.567 | INFO     | backend.celery_app:<module>:61 -    Broker: amqp://bybit:bybitpassword@localhost:5672//
+2025-10-18 20:02:47.608 | INFO     | backend.celery_app:<module>:62 -    Backend: redis://localhost:6379/0
+2025-10-18 20:02:47.837 | INFO     | backend.main:<module>:132 - \u2705 PostgreSQL database routers registered
+2025-10-18 20:02:47.900 | INFO     | backend.main:<module>:136 - \u2705 Optimization API router registered
+2025-10-18 20:02:47.905 | INFO     | backend.main:<module>:137 - \u2705 Live Data WebSocket router registered
+INFO:     Started server process [22120]
+INFO:     Waiting for application startup.
+2025-10-18 20:02:47.914 | INFO     | backend.main:startup_event:107 - \U0001f680 Starting Bybit Strategy Tester API
+2025-10-18 20:02:47.917 | INFO     | backend.main:startup_event:108 - \U0001f4da API Documentation: http://localhost:8000/docs
+2025-10-18 20:02:47.930 | INFO     | backend.main:startup_event:109 - \U0001f4d6 ReDoc: http://localhost:8000/redoc
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     ('127.0.0.1', 61487) - "WebSocket /api/v1/live/ws/candles/BTCUSDT/1" [accepted]
+2025-10-18 20:03:09.137 | INFO     | backend.api.routers.live:websocket_candles:340 - \U0001f50c WebSocket connected: BTCUSDT 1m
+INFO:     connection open
+2025-10-18 20:03:09.145 | INFO     | backend.api.routers.live:websocket_candles:354 - \U0001f4e1 Listening Redis stream: stream:candles:BTCUSDT:1
+2025-10-18 20:03:09.245 | INFO     | backend.api.routers.live:_worker:84 - Starting stream worker for stream:candles:BTCUSDT:1 group=live_group consumer=ROMAX-MSI-01:22120:00091d00
+2025-10-18 20:03:09.247 | INFO     | backend.api.routers.live:_pending_scavenger:169 - Starting pending scavenger for stream:candles:BTCUSDT:1 (claim_idle_ms=60000)
+2025-10-18 20:03:09.252 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:03:14.247 | INFO     | backend.api.routers.live:websocket_candles:400 - \U0001f50c WebSocket disconnected: BTCUSDT 1m
+INFO:     connection closed
+2025-10-18 20:03:14.251 | INFO     | backend.api.routers.live:websocket_candles:431 - \u2705 Cleanup completed for BTCUSDT 1m
+2025-10-18 20:03:39.262 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:04:09.266 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:04:39.565 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:05:09.871 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:05:40.165 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:06:10.469 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:06:40.769 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:07:10.783 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:07:40.797 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+INFO:     ('127.0.0.1', 61700) - "WebSocket /api/v1/live/ws/candles/BTCUSDT/1" [accepted]
+2025-10-18 20:07:53.102 | INFO     | backend.api.routers.live:websocket_candles:340 - \U0001f50c WebSocket connected: BTCUSDT 1m
+INFO:     connection open
+2025-10-18 20:07:53.106 | INFO     | backend.api.routers.live:websocket_candles:354 - \U0001f4e1 Listening Redis stream: stream:candles:BTCUSDT:1
+2025-10-18 20:07:58.706 | INFO     | backend.api.routers.live:websocket_candles:400 - \U0001f50c WebSocket disconnected: BTCUSDT 1m
+INFO:     connection closed
+2025-10-18 20:07:58.714 | INFO     | backend.api.routers.live:websocket_candles:431 - \u2705 Cleanup completed for BTCUSDT 1m
+2025-10-18 20:08:11.108 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:08:41.117 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:09:11.421 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:09:41.719 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:10:11.735 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:10:41.745 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:11:12.065 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:11:42.367 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:12:12.668 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:12:42.966 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:13:13.263 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+INFO:     ('127.0.0.1', 49488) - "WebSocket /api/v1/live/ws/candles/BTCUSDT/1" [accepted]
+2025-10-18 20:13:15.151 | INFO     | backend.api.routers.live:websocket_candles:340 - \U0001f50c WebSocket connected: BTCUSDT 1m
+INFO:     connection open
+2025-10-18 20:13:15.156 | INFO     | backend.api.routers.live:websocket_candles:354 - \U0001f4e1 Listening Redis stream: stream:candles:BTCUSDT:1
+2025-10-18 20:13:43.355 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:14:13.362 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:14:43.372 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:15:13.664 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:15:43.671 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:16:13.978 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:16:43.991 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:17:14.005 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:17:44.018 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:18:14.036 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:18:14.666 | INFO     | backend.api.routers.live:websocket_candles:400 - \U0001f50c WebSocket disconnected: BTCUSDT 1m
+INFO:     connection closed
+2025-10-18 20:18:14.670 | INFO     | backend.api.routers.live:websocket_candles:431 - \u2705 Cleanup completed for BTCUSDT 1m
+2025-10-18 20:18:44.041 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:19:14.345 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:19:44.661 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:20:14.965 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:20:45.262 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:21:15.648 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:21:45.661 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:22:15.968 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:22:45.978 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:23:16.274 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:23:46.289 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:24:16.295 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:24:46.300 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:25:16.314 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:25:46.619 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:26:16.629 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:26:46.933 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:27:17.261 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:27:47.574 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:28:17.580 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:28:47.591 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:29:17.893 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:29:48.211 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:30:18.521 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:30:48.826 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:31:19.142 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:31:49.458 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:32:19.765 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:32:50.067 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:33:20.358 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:33:50.370 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:34:20.391 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:34:50.407 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:35:20.710 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:35:51.018 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:36:21.321 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:36:51.630 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:37:21.928 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:37:52.235 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:38:22.547 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:38:52.843 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:39:23.145 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:39:53.446 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:40:23.745 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:40:54.053 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:41:24.362 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:41:54.370 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:42:24.673 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:42:54.686 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:43:24.997 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:43:55.295 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:44:25.595 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:44:55.719 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+2025-10-18 20:45:25.725 | DEBUG    | backend.api.routers.live:_pending_scavenger:176 - XPENDING failed for stream:candles:BTCUSDT:1: list index out of range
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2025-10-18 20:45:47.242 | INFO     | backend.main:shutdown_event:116 - \U0001f6d1 Shutting down Bybit Strategy Tester API
+INFO:     Application shutdown complete.
+INFO:     Finished server process [22120]
+2025-10-18 20:45:47.251 | INFO     | backend.api.routers.live:_pending_scavenger:253 - Stopped pending scavenger for stream:candles:BTCUSDT:1
+2025-10-18 20:45:47.255 | INFO     | backend.api.routers.live:_worker:159 - Stopped stream worker for stream:candles:BTCUSDT:1

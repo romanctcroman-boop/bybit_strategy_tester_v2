@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Bybit Strategy Tester - API Test</h1>
+    
+    <h2>Test Endpoints:</h2>
+    
+    <button onclick="testHealth()">Test Health</button>
+    <button onclick="testSymbols()">Test Symbols</button>
+    <button onclick="testQuickBacktest()">Test Quick Backtest</button>
+    <button onclick="testStrategies()">Test Strategies</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        
+        function showResult(data, isError = false) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = JSON.stringify(data, null, 2);
+            resultDiv.className = isError ? 'error' : 'success';
+        }
+        
+        async function testHealth() {
+            try {
+                console.log('Testing /health...');
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                console.log('Health response:', data);
+                showResult(data);
+            } catch (error) {
+                console.error('Health error:', error);
+                showResult({ error: error.message }, true);
+            }
+        }
+        
+        async function testSymbols() {
+            try {
+                console.log('Testing /api/v1/data/symbols...');
+                const response = await fetch(`${API_BASE}/api/v1/data/symbols`);
+                const data = await response.json();
+                console.log('Symbols response:', data);
+                showResult(data);
+            } catch (error) {
+                console.error('Symbols error:', error);
+                showResult({ error: error.message }, true);
+            }
+        }
+        
+        async function testQuickBacktest() {
+            try {
+                console.log('Testing /api/v1/backtest/quick/BTCUSDT/D...');
+                const response = await fetch(`${API_BASE}/api/v1/backtest/quick/BTCUSDT/D?days=30&strategy=rsi`);
+                const data = await response.json();
+                console.log('Backtest response:', data);
+                showResult(data);
+            } catch (error) {
+                console.error('Backtest error:', error);
+                showResult({ error: error.message }, true);
+            }
+        }
+        
+        async function testStrategies() {
+            try {
+                console.log('Testing /api/v1/backtest/strategies...');
+                const response = await fetch(`${API_BASE}/api/v1/backtest/strategies`);
+                const data = await response.json();
+                console.log('Strategies response:', data);
+                showResult(data);
+            } catch (error) {
+                console.error('Strategies error:', error);
+                showResult({ error: error.message }, true);
+            }
+        }
+        
+        // Auto-test on load
+        window.onload = () => {
+            console.log('Page loaded, testing health endpoint...');
+            testHealth();
+        };
+    </script>
+</body>
+</html>

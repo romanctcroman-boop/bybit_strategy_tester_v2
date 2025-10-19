@@ -1,0 +1,13 @@
+[Unit]
+Description=Bybit WS Publisher
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/bybit_strategy_tester_v2
+ExecStart=/usr/bin/env python -m backend.workers.ws_publisher --redis redis://localhost:6379/0
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bybit Strategy Tester - Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+        }
+        
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .results.active {
+            display: block;
+        }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .metric-card h3 {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .metric-card p {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .metric-card.positive {
+            border-left-color: #28a745;
+        }
+        
+        .metric-card.positive p {
+            color: #28a745;
+        }
+        
+        .metric-card.negative {
+            border-left-color: #dc3545;
+        }
+        
+        .metric-card.negative p {
+            color: #dc3545;
+        }
+        
+        .trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .trades-table th,
+        .trades-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .trades-table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .trades-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .profit {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .loss {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Bybit Strategy Tester</h1>
+            <p>Professional Cryptocurrency Trading Strategy Backtesting Platform</p>
+        </div>
+        
+        <div class="content">
+            <!-- Data Loading Section -->
+            <div class="section">
+                <h2>📊 Load Market Data</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Symbol</label>
+                        <select id="dataSymbol">
+                            <option value="BTCUSDT">BTCUSDT</option>
+                            <option value="ETHUSDT">ETHUSDT</option>
+                            <option value="BNBUSDT">BNBUSDT</option>
+                            <option value="SOLUSDT">SOLUSDT</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Interval</label>
+                        <select id="dataInterval">
+                            <option value="1">1 minute</option>
+                            <option value="5">5 minutes</option>
+                            <option value="15" selected>15 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="D">1 day</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Days Back</label>
+                        <input type="number" id="daysBack" value="30" min="1" max="365">
+                    </div>
+                </div>
+                <button class="btn" onclick="loadData()">Load Data from Bybit</button>
+                <button class="btn btn-secondary" onclick="getLatestCandles()">Get Latest 100 Candles</button>
+            </div>
+            
+            <!-- Backtest Section -->
+            <div class="section">
+                <h2>🎯 Run Backtest</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Symbol</label>
+                        <select id="backtestSymbol">
+                            <option value="BTCUSDT">BTCUSDT</option>
+                            <option value="ETHUSDT">ETHUSDT</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Interval</label>
+                        <select id="backtestInterval">
+                            <option value="15" selected>15 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="D">1 day</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Days to Test</label>
+                        <input type="number" id="backtestDays" value="30" min="1" max="365">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Strategy</label>
+                        <select id="strategy">
+                            <option value="rsi">RSI Mean Reversion</option>
+                            <option value="sma">SMA Crossover</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Initial Capital ($)</label>
+                        <input type="number" id="capital" value="10000" min="100" step="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Leverage</label>
+                        <input type="number" id="leverage" value="1" min="1" max="100" step="0.1">
+                    </div>
+                </div>
+                <button class="btn" onclick="runBacktest()">Run Backtest</button>
+                <button class="btn btn-secondary" onclick="quickBacktest()">Quick Test (Default Settings)</button>
+            </div>
+            
+            <!-- Loading -->
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processing... Please wait</p>
+            </div>
+            
+            <!-- Results -->
+            <div class="results" id="results">
+                <h2>📈 Results</h2>
+                <div id="resultsContent"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        
+        function showLoading() {
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('results').classList.remove('active');
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('active');
+        }
+        
+        function showResults(html) {
+            document.getElementById('resultsContent').innerHTML = html;
+            document.getElementById('results').classList.add('active');
+        }
+        
+        async function loadData() {
+            showLoading();
+            
+            const symbol = document.getElementById('dataSymbol').value;
+            const interval = document.getElementById('dataInterval').value;
+            const daysBack = parseInt(document.getElementById('daysBack').value);
+            
+            try {
+                const response = await fetch(`${API_BASE}/data/load`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({symbol, interval, days_back: daysBack})
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResults(`
+                        <div class="metric-grid">
+                            <div class="metric-card positive">
+                                <h3>Candles Loaded</h3>
+                                <p>${data.candles_loaded}</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>Symbol</h3>
+                                <p>${data.symbol}</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>Interval</h3>
+                                <p>${data.interval}</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>Start Date</h3>
+                                <p>${new Date(data.start_time).toLocaleDateString()}</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>End Date</h3>
+                                <p>${new Date(data.end_time).toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                        <p style="text-align:center; color: green; font-weight: bold; margin-top: 20px;">
+                            ✅ ${data.message}
+                        </p>
+                    `);
+                } else {
+                    showResults(`<p style="color: red;">Error: ${data.detail}</p>`);
+                }
+            } catch (error) {
+                showResults(`<p style="color: red;">Error: ${error.message}</p>`);
+            }
+            
+            hideLoading();
+        }
+        
+        async function getLatestCandles() {
+            showLoading();
+            
+            const symbol = document.getElementById('dataSymbol').value;
+            const interval = document.getElementById('dataInterval').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/data/latest/${symbol}/${interval}?limit=100`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const candles = data.candles;
+                    const latest = candles[candles.length - 1];
+                    
+                    showResults(`
+                        <div class="metric-grid">
+                            <div class="metric-card">
+                                <h3>Latest Close</h3>
+                                <p>$${latest.close.toFixed(2)}</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>24h High</h3>
+                                <p>$${Math.max(...candles.map(c => c.high)).toFixed(2)}</p>
+                            </div>
+                            <div class="metric-card">
+                                <h3>24h Low</h3>
+                                <p>$${Math.min(...candles.map(c => c.low)).toFixed(2)}</p>
+                            </div>
+                            <div class="metric-card positive">
+                                <h3>Candles</h3>
+                                <p>${data.count}</p>
+                            </div>
+                        </div>
+                        <h3>Latest Candles:</h3>
+                        <pre>${JSON.stringify(candles.slice(-5), null, 2)}</pre>
+                    `);
+                } else {
+                    showResults(`<p style="color: red;">Error: ${data.detail}</p>`);
+                }
+            } catch (error) {
+                showResults(`<p style="color: red;">Error: ${error.message}</p>`);
+            }
+            
+            hideLoading();
+        }
+        
+        async function runBacktest() {
+            showLoading();
+            
+            const symbol = document.getElementById('backtestSymbol').value;
+            const interval = document.getElementById('backtestInterval').value;
+            const days = parseInt(document.getElementById('backtestDays').value);
+            const capital = parseFloat(document.getElementById('capital').value);
+            const leverage = parseFloat(document.getElementById('leverage').value);
+            const strategy = document.getElementById('strategy').value;
+            
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - days);
+            
+            try {
+                const response = await fetch(`${API_BASE}/backtest/run`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        symbol,
+                        interval,
+                        start_date: startDate.toISOString(),
+                        end_date: endDate.toISOString(),
+                        strategy_name: strategy === 'rsi' ? 'RSI Mean Reversion' : 'SMA Crossover',
+                        strategy_type: 'indicator',
+                        initial_capital: capital,
+                        leverage: leverage,
+                        commission_rate: 0.0006,
+                        slippage_rate: 0.0001,
+                        strategy_params: {
+                            rsi_period: 14,
+                            rsi_oversold: 30,
+                            rsi_overbought: 70
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayBacktestResults(data);
+                } else {
+                    showResults(`<p style="color: red;">Error: ${data.detail}</p>`);
+                }
+            } catch (error) {
+                showResults(`<p style="color: red;">Error: ${error.message}</p>`);
+            }
+            
+            hideLoading();
+        }
+        
+        async function quickBacktest() {
+            showLoading();
+            
+            const symbol = document.getElementById('backtestSymbol').value;
+            const interval = document.getElementById('backtestInterval').value;
+            const days = parseInt(document.getElementById('backtestDays').value);
+            
+            try {
+                const response = await fetch(
+                    `${API_BASE}/backtest/quick/${symbol}/${interval}?days=${days}&strategy=rsi`
+                );
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayBacktestResults(data);
+                } else {
+                    showResults(`<p style="color: red;">Error: ${data.detail}</p>`);
+                }
+            } catch (error) {
+                showResults(`<p style="color: red;">Error: ${error.message}</p>`);
+            }
+            
+            hideLoading();
+        }
+        
+        function displayBacktestResults(data) {
+            const metrics = data.metrics;
+            const isProfit = data.total_return > 0;
+            
+            let tradesHtml = '';
+            if (data.trades && data.trades.length > 0) {
+                tradesHtml = `
+                    <h3>Trades (${data.total_trades})</h3>
+                    <table class="trades-table">
+                        <thead>
+                            <tr>
+                                <th>Entry</th>
+                                <th>Exit</th>
+                                <th>Side</th>
+                                <th>Entry Price</th>
+                                <th>Exit Price</th>
+                                <th>PnL</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.trades.slice(0, 10).map(t => `
+                                <tr>
+                                    <td>${new Date(t.entry_time).toLocaleString()}</td>
+                                    <td>${new Date(t.exit_time).toLocaleString()}</td>
+                                    <td>${t.side}</td>
+                                    <td>$${t.entry_price.toFixed(2)}</td>
+                                    <td>$${t.exit_price.toFixed(2)}</td>
+                                    <td class="${t.pnl >= 0 ? 'profit' : 'loss'}">
+                                        $${t.pnl.toFixed(2)}
+                                    </td>
+                                    <td class="${t.pnl_percentage >= 0 ? 'profit' : 'loss'}">
+                                        ${t.pnl_percentage.toFixed(2)}%
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    ${data.trades.length > 10 ? `<p style="text-align:center; margin-top: 10px; color: #666;">Showing first 10 of ${data.total_trades} trades</p>` : ''}
+                `;
+            } else {
+                tradesHtml = '<p style="text-align:center; color: #666;">No trades executed</p>';
+            }
+            
+            showResults(`
+                <div class="metric-grid">
+                    <div class="metric-card ${isProfit ? 'positive' : 'negative'}">
+                        <h3>Total Return</h3>
+                        <p>${data.total_return.toFixed(2)}%</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Final Capital</h3>
+                        <p>$${data.final_capital.toFixed(2)}</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Sharpe Ratio</h3>
+                        <p>${metrics.sharpe_ratio.toFixed(2)}</p>
+                    </div>
+                    <div class="metric-card ${metrics.max_drawdown < 0 ? 'negative' : ''}">
+                        <h3>Max Drawdown</h3>
+                        <p>${metrics.max_drawdown.toFixed(2)}%</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Win Rate</h3>
+                        <p>${metrics.win_rate.toFixed(1)}%</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Total Trades</h3>
+                        <p>${metrics.total_trades}</p>
+                    </div>
+                    <div class="metric-card positive">
+                        <h3>Winning Trades</h3>
+                        <p>${metrics.winning_trades}</p>
+                    </div>
+                    <div class="metric-card negative">
+                        <h3>Losing Trades</h3>
+                        <p>${metrics.losing_trades}</p>
+                    </div>
+                </div>
+                
+                ${tradesHtml}
+                
+                <div style="margin-top: 20px; padding: 15px; background: white; border-radius: 10px;">
+                    <p><strong>Execution Time:</strong> ${data.execution_time.toFixed(2)}s</p>
+                    <p><strong>Candles Processed:</strong> ${data.candles_processed}</p>
+                    <p><strong>Strategy:</strong> ${data.strategy_name}</p>
+                    <p><strong>Period:</strong> ${new Date(data.start_date).toLocaleDateString()} - ${new Date(data.end_date).toLocaleDateString()}</p>
+                </div>
+            `);
+        }
+    </script>
+</body>
+</html>

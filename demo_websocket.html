@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 1.7 - Live WebSocket Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .status.connected {
+            background: #10b981;
+            color: white;
+        }
+        
+        .status.disconnected {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .candle-data {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        
+        .data-item {
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 5px;
+        }
+        
+        .data-label {
+            font-size: 0.85em;
+            color: #6b7280;
+            margin-bottom: 5px;
+        }
+        
+        .data-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        
+        .price-up {
+            color: #10b981;
+        }
+        
+        .price-down {
+            color: #ef4444;
+        }
+        
+        .log {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+            border-bottom: 1px solid #374151;
+        }
+        
+        .timestamp {
+            color: #9ca3af;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-right: 10px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Phase 1.7 - WebSocket Live Data Demo</h1>
+            <p>Real-time cryptocurrency data from Bybit via WebSocket</p>
+            <span class="status disconnected" id="status">Disconnected</span>
+        </div>
+        
+        <div class="controls">
+            <button onclick="connect()" id="connectBtn">Connect</button>
+            <button onclick="disconnect()" id="disconnectBtn" disabled>Disconnect</button>
+            <button onclick="clearLog()">Clear Log</button>
+            
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="updateCount">0</div>
+                    <div class="stat-label">Updates</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="messageCount">0</div>
+                    <div class="stat-label">Messages</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="uptime">00:00</div>
+                    <div class="stat-label">Uptime</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="cards">
+            <div class="card">
+                <h2>📊 Current Candle (BTCUSDT 1m)</h2>
+                <div class="candle-data">
+                    <div class="data-item">
+                        <div class="data-label">Open</div>
+                        <div class="data-value" id="open">-</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">High</div>
+                        <div class="data-value price-up" id="high">-</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Low</div>
+                        <div class="data-value price-down" id="low">-</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Close</div>
+                        <div class="data-value" id="close">-</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Volume</div>
+                        <div class="data-value" id="volume">-</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Status</div>
+                        <div class="data-value" id="candleStatus">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📝 Message Log</h2>
+                <div class="log" id="log"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let updateCount = 0;
+        let messageCount = 0;
+        let startTime = null;
+        let uptimeInterval = null;
+        let lastClose = null;
+        
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#10b981';
+            
+            entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> <span style="color: ${color}">${message}</span>`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            if (connected) {
+                status.textContent = '✅ Connected';
+                status.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                status.textContent = '❌ Disconnected';
+                status.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+        
+        function updateCandle(candle) {
+            document.getElementById('open').textContent = parseFloat(candle.open).toFixed(2);
+            document.getElementById('high').textContent = parseFloat(candle.high).toFixed(2);
+            document.getElementById('low').textContent = parseFloat(candle.low).toFixed(2);
+            
+            const closeValue = parseFloat(candle.close);
+            const closeElement = document.getElementById('close');
+            closeElement.textContent = closeValue.toFixed(2);
+            
+            if (lastClose !== null) {
+                if (closeValue > lastClose) {
+                    closeElement.className = 'data-value price-up';
+                } else if (closeValue < lastClose) {
+                    closeElement.className = 'data-value price-down';
+                }
+            }
+            lastClose = closeValue;
+            
+            document.getElementById('volume').textContent = parseFloat(candle.volume).toFixed(3);
+            document.getElementById('candleStatus').textContent = candle.confirm ? '✅ Closed' : '⏳ Ongoing';
+        }
+        
+        function updateUptime() {
+            if (startTime) {
+                const seconds = Math.floor((Date.now() - startTime) / 1000);
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                document.getElementById('uptime').textContent = 
+                    `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+        
+        function connect() {
+            if (ws) return;
+            
+            const wsUrl = 'ws://localhost:8000/api/v1/live/ws/candles/BTCUSDT/1';
+            
+            addLog('🔌 Connecting to ' + wsUrl, 'info');
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                addLog('✅ WebSocket connected!', 'success');
+                updateStatus(true);
+                startTime = Date.now();
+                uptimeInterval = setInterval(updateUptime, 1000);
+            };
+            
+            ws.onmessage = (event) => {
+                messageCount++;
+                document.getElementById('messageCount').textContent = messageCount;
+                
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'update') {
+                    updateCount++;
+                    document.getElementById('updateCount').textContent = updateCount;
+                    updateCandle(data.candle);
+                    addLog(`📊 Update #${updateCount}: Close=${data.candle.close}`, 'success');
+                } else if (data.type === 'heartbeat') {
+                    addLog('💓 Heartbeat', 'info');
+                } else if (data.message) {
+                    addLog(`ℹ️  ${data.message}`, 'info');
+                }
+            };
+            
+            ws.onerror = (error) => {
+                addLog('❌ WebSocket error!', 'error');
+                console.error(error);
+            };
+            
+            ws.onclose = () => {
+                addLog('🔌 WebSocket closed', 'error');
+                updateStatus(false);
+                ws = null;
+                
+                if (uptimeInterval) {
+                    clearInterval(uptimeInterval);
+                    uptimeInterval = null;
+                }
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Auto-connect on page load
+        window.onload = () => {
+            addLog('🚀 Phase 1.7 Demo Ready', 'info');
+            addLog('💡 Click "Connect" to start receiving live data', 'info');
+        };
+    </script>
+</body>
+</html>

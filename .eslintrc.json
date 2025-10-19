@@ -1,0 +1,4 @@
+{
+  "root": true,
+  "ignorePatterns": ["node_modules/", "dist/", "build/", "coverage/", "frontend/node_modules/"]
+}
