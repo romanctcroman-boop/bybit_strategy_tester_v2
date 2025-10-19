@@ -5,7 +5,7 @@ Celery задачи для оптимизации стратегий (grid searc
 """
 
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import product
 
 from celery import Task
@@ -33,7 +33,7 @@ class OptimizationTask(Task):
                 if opt:
                     opt.status = "failed"
                     opt.error_message = str(exc)
-                    opt.updated_at = datetime.utcnow()
+                    opt.updated_at = datetime.now(timezone.utc)
                     db.commit()
                 db.close()
             except Exception as e:
@@ -88,7 +88,8 @@ def grid_search_task(
         opt = data_service.get_optimization(optimization_id)
         if not opt:
             raise ValueError(f"Optimization {optimization_id} not found")
-        data_service.update_optimization(optimization_id, status="running", started_at=datetime.utcnow())
+
+        data_service.update_optimization(optimization_id, status="running", started_at=datetime.now(timezone.utc))
         
         # Загрузить данные
         logger.info("📥 Loading market data...")
@@ -179,7 +180,7 @@ def grid_search_task(
         data_service.update_optimization(
             optimization_id,
             status="completed",
-            completed_at=datetime.utcnow(),
+            completed_at=datetime.now(timezone.utc),
             best_params=best_params,
             best_score=best_score,
             results={
@@ -208,7 +209,7 @@ def grid_search_task(
         logger.error(f"❌ Grid search failed: {e}")
         
         try:
-            data_service.update_optimization(optimization_id, status="failed", error_message=str(e), completed_at=datetime.utcnow())
+            data_service.update_optimization(optimization_id, status="failed", error_message=str(e), completed_at=datetime.now(timezone.utc))
         except Exception as db_error:
             logger.error(f"Failed to update optimization status: {db_error}")
         
@@ -373,7 +374,7 @@ def walk_forward_task(
             },
             "results": results,
             "status": "completed",
-            "completed_at": datetime.utcnow().isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
         }
         
     except Exception as e:
@@ -553,7 +554,7 @@ def bayesian_optimization_task(
             },
             "results": results,
             "status": "completed",
-            "completed_at": datetime.utcnow().isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
         }
         
     except Exception as e:

@@ -1,0 +1,4 @@
+testcontainers
+redis
+psycopg2-binary
+pytest
