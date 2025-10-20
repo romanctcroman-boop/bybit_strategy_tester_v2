@@ -1,0 +1,50 @@
+name: Integration - Postgres Migrations & Tests
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches:
+      - main
+      - 'integration/*'
+
+jobs:
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bybit
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+          python -m pip install alembic psycopg2-binary
+
+      - name: Run alembic migrations against Postgres
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/bybit
+        run: |
+          alembic upgrade head
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/bybit
+        run: |
+          pytest -q
