@@ -14,6 +14,27 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
 
+# Optional: support loading SQLAlchemy metadata from an environment variable to
+# enable `alembic revision --autogenerate` without editing this file.
+# Set ALEMBIC_TARGET_METADATA to a value like 'backend.models:Base' (module:attribute).
+def _load_target_metadata_from_env():
+    spec = os.environ.get('ALEMBIC_TARGET_METADATA')
+    if not spec:
+        return None
+    if ':' not in spec:
+        logger.warning('ALEMBIC_TARGET_METADATA must be in module:attribute form')
+        return None
+    module_name, attr = spec.split(':', 1)
+    try:
+        module = __import__(module_name, fromlist=[attr])
+        return getattr(module, attr).metadata
+    except Exception as e:
+        logger.exception('Failed to import target metadata from %s: %s', spec, e)
+        return None
+
+# Allow autogenerate to pick up metadata if ALEMBIC_TARGET_METADATA is set.
+target_metadata = _load_target_metadata_from_env()
+
 
 def run_migrations_offline():
     """Run migrations in 'offline' mode.

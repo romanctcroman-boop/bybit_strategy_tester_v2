@@ -221,9 +221,9 @@ class DataService:
             status=status
         )
         self.db.add(backtest)
-    self.db.commit()
-    self.db.refresh(backtest)
-    return backtest
+        self.db.commit()
+        self.db.refresh(backtest)
+        return backtest
     
     def get_backtest(self, backtest_id: int) -> Optional[Backtest]:
         """Получить бэктест по ID"""
