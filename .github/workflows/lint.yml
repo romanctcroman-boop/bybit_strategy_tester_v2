@@ -36,4 +36,4 @@ jobs:
       - name: Install deps
         run: npm ci
       - name: ESLint
-        run: npm run lint
+        run: npm run lint:ci
