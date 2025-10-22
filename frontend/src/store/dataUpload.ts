@@ -17,7 +17,8 @@ export const useDataUploadStore = create<DataUploadState>((set) => ({
       set({ uploading: false });
       return r;
     } catch (e: any) {
-      set({ error: e?.message || String(e), uploading: false });
+      set({ error: e?.friendlyMessage || e?.message || String(e), uploading: false });
+      throw e;
     }
   },
 }));

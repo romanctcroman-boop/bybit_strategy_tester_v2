@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Snackbar, Alert } from '@mui/material';
+import { setGlobalNotifier } from '../services/notifications';
 
 type Severity = 'success' | 'info' | 'warning' | 'error';
 
@@ -24,6 +25,12 @@ const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNote(n);
     setOpen(true);
   };
+
+  useEffect(() => {
+    // Register global notifier so non-React modules (e.g., axios interceptors) can emit notifications
+    setGlobalNotifier((n) => notify(n));
+    return () => setGlobalNotifier(undefined as any);
+  }, []);
 
   return (
     <NotificationsContext.Provider value={notify}>

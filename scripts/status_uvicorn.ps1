@@ -1,2 +1,2 @@
 Param()
-./start_uvicorn.ps1 status
+& (Join-Path $PSScriptRoot 'start_uvicorn.ps1') status

@@ -58,14 +58,21 @@ switch ($Action) {
         }
 
         $uvicornExe = Join-Path $PWD '.venv\Scripts\uvicorn.exe'
-        if (-not (Test-Path $uvicornExe)) {
-            Write-Error "uvicorn executable not found at $uvicornExe"
-            break
+        $pythonExe = Join-Path $PWD '.venv\Scripts\python.exe'
+        $proc = $null
+        if (Test-Path $uvicornExe) {
+            $uvArgs = @($AppModule, '--host', $BindHost, '--port', $Port)
+            $proc = Start-Process -FilePath $uvicornExe -ArgumentList $uvArgs -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru
         }
-
-    $uvArgs = @($AppModule, '--host', $BindHost, '--port', $Port)
-
-    $proc = Start-Process -FilePath $uvicornExe -ArgumentList $uvArgs -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru
+        elseif (Test-Path $pythonExe) {
+            $uvArgs = @('-m', 'uvicorn', $AppModule, '--host', $BindHost, '--port', $Port)
+            $proc = Start-Process -FilePath $pythonExe -ArgumentList $uvArgs -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru
+        }
+        else {
+            Write-Warning "Neither $uvicornExe nor $pythonExe found. Falling back to system 'python -m uvicorn'"
+            $uvArgs = @('-m', 'uvicorn', $AppModule, '--host', $BindHost, '--port', $Port)
+            $proc = Start-Process -FilePath 'python' -ArgumentList $uvArgs -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru
+        }
         Start-Sleep -Milliseconds 800
         $proc.Id | Out-File -FilePath $PidFile -Encoding ascii
         Write-Output "Started uvicorn (PID $($proc.Id)). Logs: $OutLog, $ErrLog"

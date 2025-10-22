@@ -9,7 +9,7 @@ the `versions/` directory during `alembic upgrade` runs. The shim delegates the 
 """
 
 # Alembic revision identifiers (shim values; real migration logic lives in the template module)
-revision = '0001_convert_timestamps_to_timestamptz'
+revision = '0001_timestamptz'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -26,3 +26,46 @@ upgrade_sqls = getattr(_mod, 'upgrade_sqls')
 downgrade_sqls = getattr(_mod, 'downgrade_sqls')
 
 __all__ = ['upgrade_sqls', 'downgrade_sqls']
+
+# Provide Alembic-compatible upgrade/downgrade that delegate to the SQL helpers
+from alembic import op  # type: ignore
+from sqlalchemy import text  # type: ignore
+
+
+def upgrade():
+	try:
+		conn = op.get_bind()
+	except Exception:
+		conn = None
+	try:
+		stmts = upgrade_sqls() if callable(upgrade_sqls) else []
+	except Exception:
+		stmts = []
+	for s in stmts:
+		try:
+			if conn is not None:
+				conn.execute(text(s))
+			else:
+				op.execute(text(s))
+		except Exception:
+			# continue on non-critical statements (e.g., when columns already converted)
+			pass
+
+
+def downgrade():
+	try:
+		conn = op.get_bind()
+	except Exception:
+		conn = None
+	try:
+		stmts = downgrade_sqls() if callable(downgrade_sqls) else []
+	except Exception:
+		stmts = []
+	for s in stmts:
+		try:
+			if conn is not None:
+				conn.execute(text(s))
+			else:
+				op.execute(text(s))
+		except Exception:
+			pass

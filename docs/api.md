@@ -61,11 +61,9 @@ POST /backtests/{id}/results
 
 ## Trades
 
-GET /trades?backtest_id={id}
-- Response: { items: Trade[] }
-
-GET /trades/{id}
-- Response: Trade
+GET /backtests/{id}/trades
+- Query params: side?=buy|sell|LONG|SHORT, limit?, offset?
+- Response: Trade[] (normalized fields: price=entry_price, qty=quantity, side=buy/sell)
 
 ---
 
@@ -80,14 +78,18 @@ GET /optimizations/{id}/results
 
 ## Market data
 
-GET /market_data?symbol={symbol}&from={iso}&to={iso}&limit={n}
-- Response: { items: MarketDataPoint[] }
+GET /marketdata/bybit/klines
+- Query: symbol, limit?, start_time?
+- Response: normalized rows read from audit table (most recent first)
 
-GET /market_data/{id}/latest_candle
+GET /marketdata/bybit/klines/fetch
+- Query: symbol, interval ('1','3','60','D'...), limit (<=1000), persist (0|1)
+- Response: normalized rows [{ open_time(ms), open, high, low, close, volume, turnover }]
 
 ---
 
 Data shapes (summary)
+_All time-related fields below are expressed in ISO 8601 UTC._
 - Strategy: { id, name, description, strategy_type, config, is_active, created_at, updated_at }
 - Backtest: { id, strategy_id, symbol, timeframe, start_date, end_date, initial_capital, leverage, commission, config, status, created_at, started_at, completed_at, final_capital, metrics... }
 - Trade: { id, backtest_id, entry_time, exit_time, price, qty, side, pnl, created_at }
@@ -97,4 +99,55 @@ Data shapes (summary)
 ---
 
 Notes
-- These API endpoints are a thin HTTP layer on top of `DataService` and the Celery tasks. Implementations should validate input, return consistent error shapes, and use timezone-aware ISO8601 datetimes (UTC).
+- These API endpoints are a thin HTTP layer on top of `DataService` and the Celery tasks. Implementations should validate input, return consistent error shapes, and use timezone-aware ISO8601 datetimes.
+
+---
+
+## Timezones
+
+- Standard: UTC across storage and API. All datetime fields are returned as ISO 8601 in UTC (with trailing "Z" or explicit +00:00 offset).
+- Exchanges: Bybit timestamps are UTC; TradingView charting assumes UTC and aligns candle buckets to UTC boundaries. This API follows the same rule for kline alignment and time-based calculations.
+- Database: Timestamp columns are stored as timestamptz (UTC). Any naive datetimes from legacy data are treated as UTC on read.
+- Clients: Convert to a local timezone only for display purposes; avoid sending local-time values without timezone info.
+
+---
+
+## Live market stream (WebSocket)
+
+Endpoint: `GET /api/v1/live` (WebSocket)
+
+Purpose
+- Relays real-time messages from Redis Pub/Sub to connected WebSocket clients.
+- When the optional Bybit WS manager is enabled, normalized trade and kline events are published to Redis channels and will appear on this stream.
+
+Query params
+- `channel`: Redis channel to subscribe to. Default: `bybit:ticks`
+- `pattern`: `1` to use pattern subscription (psubscribe). Default: `0`
+
+Behavior
+- On connect, the server immediately sends a JSON message confirming the subscription:
+	- `{ "status": "subscribed", "channel": "bybit:ticks", "url": "redis://..." }`
+- Subsequent messages are forwarded as text frames; if the Redis payload is JSON, clients should `JSON.parse` it.
+
+Example messages (normalized schema v=1)
+- Trade (ticks channel: `bybit:ticks`):
+	- `{ "v":1, "type":"trade", "source":"bybit", "symbol":"BTCUSDT", "ts_ms": 1712345678901, "price": 65000.5, "qty": 0.001, "side": "buy" }`
+- Kline (klines channel: `bybit:klines`):
+	- `{ "v":1, "type":"kline", "source":"bybit", "symbol":"BTCUSDT", "interval":"1", "open_time":1712345678000, "open":64990.0, "high":65050.0, "low":64900.0, "close":65010.0, "volume":12.34, "turnover":803210.12 }`
+
+Configuration
+- Redis location defaults to `REDIS_URL` (e.g. `redis://127.0.0.1:6379/0`).
+- Optional overrides for channels and streams:
+	- `REDIS_CHANNEL_TICKS`, `REDIS_CHANNEL_KLINES`, `REDIS_STREAM_TICKS`, `REDIS_STREAM_KLINES`
+
+Bybit WS background manager (optional)
+- Enable to auto-connect to Bybit public WS and publish normalized events into Redis:
+	- `BYBIT_WS_ENABLED=1`
+	- `BYBIT_WS_SYMBOLS=BTCUSDT,ETHUSDT`
+	- `BYBIT_WS_INTERVALS=1,5`
+- Reconnect backoff tunables:
+	- `WS_RECONNECT_DELAY_SEC` (default 1.5), `WS_RECONNECT_DELAY_MAX_SEC` (default 15)
+
+Notes
+- The WebSocket sends the initial subscription confirmation as JSON; subsequent frames are text and may contain JSON strings.
+- When `pattern=1`, the server uses Redis `psubscribe` with the given pattern and forwards matching messages.

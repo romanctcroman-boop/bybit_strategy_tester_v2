@@ -2,3 +2,9 @@ fastapi
 uvicorn
 sqlalchemy
 psycopg2-binary
+requests
+prometheus-client
+pyarrow
+redis
+websockets
+pydantic-settings

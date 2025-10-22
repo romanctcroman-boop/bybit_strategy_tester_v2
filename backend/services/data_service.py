@@ -126,6 +126,22 @@ class DataService:
             query = query.filter(Strategy.strategy_type == strategy_type)
         
         return query.offset(offset).limit(limit).all()
+
+    def count_strategies(
+        self,
+        is_active: Optional[bool] = None,
+        strategy_type: Optional[str] = None,
+    ) -> int:
+        """Подсчитать количество стратегий с теми же фильтрами, что и get_strategies."""
+        query = self.db.query(Strategy)
+
+        if is_active is not None:
+            query = query.filter(Strategy.is_active == is_active)
+
+        if strategy_type:
+            query = query.filter(Strategy.strategy_type == strategy_type)
+
+        return query.count()
     
     def update_strategy(
         self,
@@ -273,6 +289,26 @@ class DataService:
             query = query.order_by(asc(order_field))
         
         return query.offset(offset).limit(limit).all()
+
+    def count_backtests(
+        self,
+        strategy_id: Optional[int] = None,
+        symbol: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> int:
+        """Подсчитать количество бэктестов с теми же фильтрами, что и get_backtests."""
+        query = self.db.query(Backtest)
+
+        if strategy_id:
+            query = query.filter(Backtest.strategy_id == strategy_id)
+
+        if symbol:
+            query = query.filter(Backtest.symbol == symbol)
+
+        if status:
+            query = query.filter(Backtest.status == status)
+
+        return query.count()
     
     def update_backtest(
         self,

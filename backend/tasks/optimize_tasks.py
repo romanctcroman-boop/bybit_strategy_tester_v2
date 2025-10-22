@@ -44,6 +44,28 @@ class OptimizationTask(Task):
         logger.info(f"✅ Optimization task {task_id} completed")
 
 
+def _parse_dt(value: Any) -> datetime:
+    """Parse ISO-like datetime strings to datetime; pass through if already datetime.
+
+    Falls back to naive fromisoformat when possible.
+    """
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            # Support 'YYYY-MM-DD' or full ISO strings
+            if len(value) == 10:
+                return datetime.fromisoformat(value)
+            return datetime.fromisoformat(value)
+        except Exception:
+            # Last resort: try common format
+            try:
+                return datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S")
+            except Exception:
+                pass
+    raise ValueError(f"Invalid datetime value: {value!r}")
+
+
 @celery_app.task(
     bind=True,
     base=OptimizationTask,
@@ -94,17 +116,34 @@ def grid_search_task(
         # Загрузить данные
         logger.info("📥 Loading market data...")
         data_service = DataService(db)
+        start_dt = _parse_dt(start_date)
+        end_dt = _parse_dt(end_date)
         candles = data_service.get_market_data(
             symbol=symbol,
             timeframe=interval,
-            start_time=start_date,
-            end_time=end_date
+            start_time=start_dt,
+            end_time=end_dt,
         )
-        
-        if candles.empty:
+        if not candles or len(candles) == 0:
             raise ValueError(f"No data for {symbol} {interval}")
         
         logger.info(f"📊 Loaded {len(candles)} candles")
+
+        # Normalize ORM objects to a list[dict] the engine can consume
+        try:
+            def _to_row(x):
+                if isinstance(x, dict):
+                    return x
+                # hasattr path for ORM model attributes
+                row = {}
+                for key in ("timestamp", "open", "high", "low", "close", "volume", "quote_volume"):
+                    if hasattr(x, key):
+                        row[key] = getattr(x, key)
+                return row
+
+            norm_candles = [_to_row(c) for c in candles]
+        except Exception:
+            norm_candles = candles  # fallback
         
         # Генерация всех комбинаций параметров
         param_names = list(param_space.keys())
@@ -123,7 +162,7 @@ def grid_search_task(
         best_params = None
         best_result = None
 
-        engine = get_engine(None, initial_capital=10000.0, commission=0.0006)
+        engine = get_engine(None, initial_capital=10000.0, commission=0.0006, data_service=data_service)
 
         for idx, params in enumerate(combinations, 1):
             # Обновить конфигурацию стратегии
@@ -133,7 +172,7 @@ def grid_search_task(
             
             # Запустить бэктест
             try:
-                result = engine.run(data=candles, strategy_config=test_config)
+                result = engine.run(data=norm_candles, strategy_config=test_config)
                 score = result.get(metric, 0)
                 
                 results.append({
@@ -184,13 +223,17 @@ def grid_search_task(
             best_params=best_params,
             best_score=best_score,
             results={
+                "method": "grid_search",
                 "metric": metric,
+                "symbol": symbol,
+                "interval": interval,
+                "period": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
                 "total_combinations": total_combinations,
                 "best_params": best_params,
                 "best_score": best_score,
                 "best_metrics": best_result,
                 "top_10": results[:10],
-            }
+            },
         )
         
         logger.info(f"✅ Grid search completed")
@@ -284,17 +327,17 @@ def walk_forward_task(
             }
         )
         
-        data_service = DataService()
-        data = data_service.get_candles(
+        ds = DataService()
+        start_dt = _parse_dt(start_date)
+        end_dt = _parse_dt(end_date)
+        data = ds.get_market_data(
             symbol=symbol,
-            interval=interval,
-            start_date=start_date,
-            end_date=end_date
+            timeframe=interval,
+            start_time=start_dt,
+            end_time=end_dt,
         )
-        
         if data is None or len(data) == 0:
             raise ValueError(f"No data available for {symbol} {interval}")
-        
         logger.info(f"📊 Loaded {len(data)} candles")
         
         # 2. Создаём Walk-Forward Analyzer
@@ -340,9 +383,30 @@ def walk_forward_task(
             analyzer.run_async(
                 strategy_config=strategy_config,
                 param_space=param_space,
-                metric=metric
+                metric=metric,
             )
         )
+
+        # Persist results via DataService
+        with DataService() as _ds:
+            _ds.update_optimization(
+                optimization_id,
+                status="completed",
+                completed_at=datetime.now(timezone.utc),
+                results={
+                    "method": "walk_forward",
+                    "metric": metric,
+                    "symbol": symbol,
+                    "interval": interval,
+                    "period": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
+                    "config": {
+                        "train_size": train_size,
+                        "test_size": test_size,
+                        "step_size": step_size,
+                    },
+                    "results": results,
+                },
+            )
         
         # 4. Формируем результат
         self.update_state(
@@ -454,17 +518,17 @@ def bayesian_optimization_task(
             }
         )
         
-        data_service = DataService()
-        data = data_service.get_candles(
+        ds = DataService()
+        start_dt = _parse_dt(start_date)
+        end_dt = _parse_dt(end_date)
+        data = ds.get_market_data(
             symbol=symbol,
-            interval=interval,
-            start_date=start_date,
-            end_date=end_date
+            timeframe=interval,
+            start_time=start_dt,
+            end_time=end_dt,
         )
-        
         if data is None or len(data) == 0:
             raise ValueError(f"No data available for {symbol} {interval}")
-        
         logger.info(f"📊 Loaded {len(data)} candles")
         
         # 2. Создаём Bayesian Optimizer
@@ -511,7 +575,7 @@ def bayesian_optimization_task(
                 param_space=param_space,
                 metric=metric,
                 direction=direction,
-                show_progress=False  # Не показываем progress bar в Celery
+                show_progress=False,  # Не показываем progress bar в Celery
             )
         )
         
@@ -539,7 +603,7 @@ def bayesian_optimization_task(
             f"completed trials={results['statistics']['completed_trials']}/{n_trials}"
         )
         
-        return {
+        payload = {
             "optimization_id": optimization_id,
             "method": "bayesian",
             "symbol": symbol,
@@ -556,6 +620,25 @@ def bayesian_optimization_task(
             "status": "completed",
             "completed_at": datetime.now(timezone.utc).isoformat(),
         }
+
+        # Persist via DataService
+        with DataService() as _ds:
+            _ds.update_optimization(
+                optimization_id,
+                status="completed",
+                completed_at=datetime.now(timezone.utc),
+                results={
+                    "method": "bayesian",
+                    "metric": metric,
+                    "symbol": symbol,
+                    "interval": interval,
+                    "period": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
+                    "config": payload["config"],
+                    "results": results,
+                },
+            )
+
+        return payload
         
     except Exception as e:
         logger.error(f"❌ Bayesian optimization failed: {optimization_id}, error: {e}")

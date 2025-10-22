@@ -45,6 +45,8 @@ class BybitAdapter:
         self._instruments_cache_at: Optional[float] = None
         # cache TTL in seconds
         self._instruments_cache_ttl = 60 * 5
+        # last HTTP status observed (for observability/backoff tuning)
+        self._last_status: Optional[int] = None
 
     def get_klines(self, symbol: str, interval: str = "1", limit: int = 200) -> List[Dict]:
         """Fetch kline/candle data. interval is minutes as string in Bybit public API mapping.
@@ -79,162 +81,92 @@ class BybitAdapter:
             except Exception:
                 logger.exception("pybit client kline failed, falling back to REST")
 
-        # Prefer perpetual/linear futures (category='linear') — discover available instruments first
-        v5_url_info = "https://api.bybit.com/v5/market/instruments-info"
-        # Ensure the audit table exists on the target engine (helps tests using in-memory sqlite)
-        try:
-            target_bind = None
-            try:
-                if db is not None and hasattr(db, 'get_bind'):
-                    target_bind = db.get_bind()
-            except Exception:
-                target_bind = None
-            if target_bind is None:
-                target_bind = _engine
-            try:
-                # create table if missing (checkfirst=True)
-                BybitKlineAudit.__table__.create(bind=target_bind, checkfirst=True)
-            except Exception:
-                # best-effort: ignore if create fails (we'll surface DB error below)
-                pass
-        except Exception:
-            # swallow any issues; this is a best-effort helper block
-            pass
-
-        try:
-            r = requests.get(v5_url_info, params={"category": "linear"}, timeout=self.timeout)
-            r.raise_for_status()
-            info = r.json()
-            instruments = info.get('result', {}).get('list', []) if isinstance(info.get('result'), dict) else info.get('result') or []
-            # Build a mapping of symbol -> instrument metadata for smarter selection
-            available_meta = {itm.get('symbol'): itm for itm in instruments if isinstance(itm, dict) and itm.get('symbol')}
-            available = set(available_meta.keys())
-        except Exception:
-            logger.debug('Could not discover linear instruments via instruments-info; will still try kline endpoints', exc_info=True)
-            available = set()
-
+        # FAST PATH: Try direct v5 kline endpoint first (2 second timeout, no instrument discovery)
+        v5_kline_url = "https://api.bybit.com/v5/market/kline"
         candidates = [symbol, symbol.upper()]
         # common heuristics: add USDT suffix if missing (most linear perpetuals are SYMBOLUSDT)
         if not symbol.upper().endswith('USDT'):
             candidates.append(symbol.upper() + 'USDT')
-
-        # Prefer instrument discovery picks that look like normal USDT perpetuals and are trading
-        chosen = None
-        # candidate list first (explicit symbol requested by caller)
-        for c in candidates:
-            if not available or c in available:
-                chosen = c
-                break
-
-        # If discovery returned many instruments, try to pick a sane default: Trading, not pre-listing,
-        # and symbol matching common pattern (letters then USDT), prefer BTC/ETH if present.
-        if not chosen and available:
-            # prefer canonical pairs
-            prefer_order = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT']
-            for p in prefer_order:
-                if p in available:
-                    chosen = p
-                    break
-
-        if not chosen and available:
-            # filter Trading & not pre-listing & symbol looks like LETTERS+USDT
-            pattern = re.compile(r'^[A-Z]{3,}USDT$')
-            for sym, meta in available_meta.items():
-                try:
-                    if meta.get('status') == 'Trading' and not meta.get('isPreListing') and pattern.match(sym):
-                        chosen = sym
-                        break
-                except Exception:
-                    continue
-
-        # final fallback: pick any available symbol reported by instruments-info
-        if not chosen and available:
-            chosen = next(iter(available))
-
-        v5_kline_url = "https://api.bybit.com/v5/market/kline"
-        if chosen:
-            params = {"category": "linear", "symbol": chosen, "interval": interval_norm, "limit": limit}
-            # persist which symbol we chose for this request (useful for callers)
-            self.last_chosen_symbol = chosen
-            # validate chosen symbol against instruments cache (auto-refresh if needed)
+        
+        for chosen_symbol in candidates:
             try:
-                valid = self.validate_symbol(chosen)
-                if valid != chosen:
-                    # use normalized/validated symbol
-                    chosen = valid
-                    params['symbol'] = chosen
-                    self.last_chosen_symbol = chosen
-            except Exception:
-                # validation failed; continue and let the request proceed (we still try)
-                logger.debug('Symbol validation failed for %s', chosen, exc_info=True)
-            try:
-                r = requests.get(v5_kline_url, params=params, timeout=self.timeout)
+                params = {"category": "linear", "symbol": chosen_symbol, "interval": interval_norm, "limit": limit}
+                r = requests.get(v5_kline_url, params=params, timeout=2)  # SHORT timeout: 2 seconds
                 r.raise_for_status()
                 payload = r.json()
-                # Persist raw payload for audit (append JSONL)
-                try:
-                    logs_dir = os.path.join(os.getcwd(), 'logs')
-                    os.makedirs(logs_dir, exist_ok=True)
-                    log_path = os.path.join(logs_dir, 'bybit_kline_raw.jsonl')
-                    with open(log_path, 'a', encoding='utf-8') as fh:
-                        entry = {'fetched_at': int(time.time() * 1000), 'category': 'linear', 'symbol': chosen, 'params': params, 'payload': payload}
-                        fh.write(json.dumps(entry, ensure_ascii=False) + '\n')
-                except Exception:
-                    logger.exception('Failed to write raw bybit payload to logs')
+                self._last_status = r.status_code
                 result = payload.get('result') or payload.get('data') or payload
                 if isinstance(result, dict) and 'list' in result:
                     data = result['list']
                 elif isinstance(result, list):
                     data = result
-                elif isinstance(result, dict) and 'data' in result:
-                    data = result['data']
                 else:
                     data = []
+                
                 if data:
+                    logger.info(f"Successfully fetched {len(data)} klines from Bybit for {chosen_symbol}")
                     normalized = [self._normalize_kline_row(d) for d in data]
                     # attempt to persist normalized candles to audit table (best-effort)
                     try:
-                        self._persist_klines_to_db(chosen, normalized)
+                        self._persist_klines_to_db(chosen_symbol, normalized)
                     except Exception:
                         logger.exception('Failed to persist klines to DB')
                     return normalized
-            except Exception:
-                logger.debug('Bybit linear kline probe failed for %s', chosen, exc_info=True)
+            except Exception as ex:
+                try:
+                    # record status code if available
+                    self._last_status = getattr(ex.response, 'status_code', None) if hasattr(ex, 'response') else None
+                except Exception:
+                    pass
+                logger.debug(f'Bybit v5 kline fetch failed for {chosen_symbol}, trying next candidate...', exc_info=False)
+                continue
 
-        # If we reach here, try the legacy/public endpoints as fallback (best-effort)
 
         # Try spot quote v1 endpoint (older path)
         try:
             url_spot = "https://api.bybit.com/spot/quote/v1/kline"
             params = {"symbol": symbol, "interval": interval_norm, "limit": limit}
-            r = requests.get(url_spot, params=params, timeout=self.timeout)
+            r = requests.get(url_spot, params=params, timeout=2)
             r.raise_for_status()
             payload = r.json()
+            self._last_status = r.status_code
             data = payload.get('result') or payload.get('data') or payload.get('list') or []
             if isinstance(data, dict) and 'list' in data:
                 data = data['list']
             if data:
-                    normalized = [self._normalize_kline_row(d) for d in data]
-                    try:
-                        self._persist_klines_to_db(chosen, normalized)
-                    except Exception:
-                        logger.exception('Failed to persist klines to DB')
-                    return normalized
-        except Exception:
-            logger.debug("Bybit spot quote probe failed, falling back to legacy/public endpoints", exc_info=True)
+                logger.info(f"Successfully fetched {len(data)} klines from Bybit Spot")
+                normalized = [self._normalize_kline_row(d) for d in data]
+                try:
+                    self._persist_klines_to_db(symbol, normalized)
+                except Exception:
+                    logger.exception('Failed to persist klines to DB')
+                return normalized
+        except Exception as ex:
+            try:
+                self._last_status = getattr(ex.response, 'status_code', None) if hasattr(ex, 'response') else None
+            except Exception:
+                pass
+            logger.debug("Bybit spot quote probe failed, trying legacy endpoint...", exc_info=False)
 
         # Legacy / older linear kline endpoint fallback
         try:
             url = "https://api.bybit.com/public/linear/kline"
             params = {"symbol": symbol, "interval": interval_norm.replace('m',''), "limit": limit}
-            r = requests.get(url, params=params, timeout=self.timeout)
+            r = requests.get(url, params=params, timeout=2)
             r.raise_for_status()
             payload = r.json()
+            self._last_status = r.status_code
             data = payload.get('result') or payload.get('data') or []
             if isinstance(data, dict) and 'list' in data:
                 data = data['list']
-            return [self._normalize_kline_row(d) for d in data]
-        except Exception:
+            if data:
+                logger.info(f"Successfully fetched {len(data)} klines from legacy endpoint")
+                return [self._normalize_kline_row(d) for d in data]
+        except Exception as ex:
+            try:
+                self._last_status = getattr(ex.response, 'status_code', None) if hasattr(ex, 'response') else None
+            except Exception:
+                pass
             logger.exception("All Bybit probes failed")
             raise
 
@@ -577,6 +509,53 @@ class BybitAdapter:
             self._instruments_cache_at = now
         except Exception:
             logger.exception('Failed to refresh instruments cache')
+
+    def get_recent_trades(self, symbol: str, limit: int = 250) -> List[Dict]:
+        """Fetch recent trades/ticks for a symbol.
+        
+        Returns list of dicts with keys: time, price, qty, side
+        This provides real-time data that updates every tick (not every minute like candles).
+        """
+        # Try v5 public trades endpoint
+        v5_trades_url = "https://api.bybit.com/v5/market/recent-trade"
+        candidates = [symbol, symbol.upper()]
+        if not symbol.upper().endswith('USDT'):
+            candidates.append(symbol.upper() + 'USDT')
+        
+        for chosen_symbol in candidates:
+            try:
+                params = {"category": "linear", "symbol": chosen_symbol, "limit": limit}
+                r = requests.get(v5_trades_url, params=params, timeout=2)
+                r.raise_for_status()
+                payload = r.json()
+                result = payload.get('result') or payload.get('data') or payload
+                if isinstance(result, dict) and 'list' in result:
+                    data = result['list']
+                elif isinstance(result, list):
+                    data = result
+                else:
+                    data = []
+                
+                if data:
+                    logger.info(f"Successfully fetched {len(data)} trades from Bybit for {chosen_symbol}")
+                    # Normalize trades
+                    normalized = []
+                    for trade in data:
+                        if isinstance(trade, dict):
+                            normalized.append({
+                                'time': int(trade.get('execTime', trade.get('time', 0))),
+                                'price': float(trade.get('price', 0)),
+                                'qty': float(trade.get('size', trade.get('qty', 0))),
+                                'side': trade.get('side', 'Unknown').lower(),  # 'Buy' or 'Sell'
+                            })
+                    return normalized
+            except Exception:
+                logger.debug(f'Bybit v5 trades fetch failed for {chosen_symbol}', exc_info=False)
+                continue
+        
+        # Fallback: return empty list if all failed
+        logger.warning(f"Could not fetch recent trades for {symbol}")
+        return []
 
     def validate_symbol(self, symbol: str) -> str:
         """Validate and normalize a symbol. Returns the canonical symbol if valid, else raises ValueError.

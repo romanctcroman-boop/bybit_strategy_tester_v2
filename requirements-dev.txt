@@ -2,3 +2,6 @@ testcontainers
 redis
 psycopg2-binary
 pytest
+pandas
+celery
+loguru

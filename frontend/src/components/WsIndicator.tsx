@@ -2,7 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Chip, Tooltip } from '@mui/material';
 import WSClient from '../services/ws';
 
-const WS_URL = (window as any).__env?.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+const defaultWsUrl = (() => {
+  const envUrl = (window as any).__env?.REACT_APP_WS_URL as string | undefined;
+  if (envUrl) return envUrl;
+  // Prefer same-origin ws via Vite proxy when available
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${window.location.host}/ws`;
+})();
+
+const WS_URL = defaultWsUrl;
 const ws = new WSClient(WS_URL);
 
 export const WsIndicator: React.FC = () => {
@@ -12,12 +20,10 @@ export const WsIndicator: React.FC = () => {
   useEffect(() => {
     ws.connect();
     const unsub = ws.onMessage((m) => setLast(m));
-    const interval = setInterval(() => {
-      setConnected(Boolean((ws as any).ws && (ws as any).ws.readyState === WebSocket.OPEN));
-    }, 500);
+    const unsubStatus = ws.onStatus((s) => setConnected(s === 'open'));
     return () => {
       unsub();
-      clearInterval(interval);
+      unsubStatus();
       ws.close();
     };
   }, []);

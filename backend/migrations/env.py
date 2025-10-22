@@ -36,6 +36,16 @@ def _load_target_metadata_from_env():
 target_metadata = _load_target_metadata_from_env()
 
 
+# Sanitize helper reused in both offline/online modes
+def _sanitize_url(url: str) -> str:
+    try:
+        for ch in ("\u00A0", "\u2007", "\u202F"):
+            url = url.replace(ch, "")
+        return url.strip()
+    except Exception:
+        return url
+
+
 def run_migrations_offline():
     """Run migrations in 'offline' mode.
 
@@ -71,6 +81,10 @@ def run_migrations_offline():
         return raw
 
     url = os.environ.get('DATABASE_URL') or _read_config_url()
+    if url:
+        url = _sanitize_url(url)
+        if url.startswith('postgresql://') and '+' not in url:
+            url = url.replace('postgresql://', 'postgresql+psycopg://', 1)
     # Basic validation to provide a helpful error if the URL is still a placeholder
     if not url:
         raise RuntimeError(
@@ -112,6 +126,10 @@ def run_migrations_online():
         return raw
 
     url = os.environ.get('DATABASE_URL') or _read_config_url()
+    if url:
+        url = _sanitize_url(url)
+        if url.startswith('postgresql://') and '+' not in url:
+            url = url.replace('postgresql://', 'postgresql+psycopg://', 1)
     if not url:
         raise RuntimeError(
             "DATABASE_URL is not set or alembic.ini contains a placeholder.\n"

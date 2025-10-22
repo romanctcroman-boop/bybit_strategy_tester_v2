@@ -4,24 +4,52 @@ import { StrategiesApi } from '../services/api';
 
 interface StrategiesState {
   items: Strategy[];
+  total: number;
+  limit: number;
+  offset: number;
   loading: boolean;
   error?: string;
-  fetchAll: () => Promise<void>;
+  // filters & selection
+  isActive?: boolean;
+  strategyType?: string;
+  selectedId: number | null;
+  setFilters: (f: { isActive?: boolean; strategyType?: string }) => void;
+  select: (id: number | null) => void;
+  // data actions
+  fetchAll: (opts?: { limit?: number; offset?: number; isActive?: boolean; strategyType?: string }) => Promise<void>;
+  setPage: (page: number, pageSize?: number) => Promise<void>;
   add: (s: Partial<Strategy>) => Promise<Strategy | void>;
 }
 
 export const useStrategiesStore = create<StrategiesState>((set, get) => ({
   items: [],
+  total: 0,
+  limit: 20,
+  offset: 0,
   loading: false,
   error: undefined,
-  fetchAll: async () => {
+  isActive: undefined,
+  strategyType: undefined,
+  selectedId: null,
+  setFilters: (f) => set({ isActive: f.isActive, strategyType: f.strategyType }),
+  select: (id) => set({ selectedId: id }),
+  fetchAll: async (opts) => {
+    const limit = opts?.limit ?? get().limit;
+    const offset = opts?.offset ?? get().offset;
+    const isActive = opts?.isActive ?? get().isActive;
+    const strategyType = opts?.strategyType ?? get().strategyType;
     set({ loading: true, error: undefined });
     try {
-      const res = await StrategiesApi.list();
-      set({ items: res.items, loading: false });
+      const res = await StrategiesApi.list({ limit, offset, is_active: isActive, strategy_type: strategyType });
+      set({ items: res.items, total: res.total ?? res.items.length, limit, offset, loading: false });
     } catch (e: any) {
       set({ error: e?.message || String(e), loading: false });
     }
+  },
+  setPage: async (page, pageSize) => {
+    const size = pageSize ?? get().limit;
+    const offset = (page - 1) * size;
+    await get().fetchAll({ limit: size, offset });
   },
   add: async (s) => {
     set({ loading: true, error: undefined });
