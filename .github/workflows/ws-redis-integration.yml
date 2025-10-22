@@ -11,10 +11,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ '3.13', '3.14' ]
+        python-version: [ '3.12', '3.13', '3.14' ]
+        redis-version: [ '6', '7' ]
     services:
       redis:
-        image: redis:7
+        image: redis:${{ matrix.redis-version }}
         ports:
           - 6379:6379
         options: >-
@@ -42,17 +43,30 @@ jobs:
         env:
           REDIS_URL: redis://localhost:6379/0
         run: |
-          pytest -q tests/integration/test_ws_live.py tests/integration/test_redis_streams_live.py
+          set -o pipefail
+          mkdir -p artifacts
+          pytest -q tests/integration/test_ws_live.py tests/integration/test_redis_streams_live.py \
+            --junitxml=artifacts/junit.xml | tee artifacts/pytest.log
+
+      - name: Upload WS test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ws-integration_py${{ matrix.python-version }}_redis${{ matrix.redis-version }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 7
 
   ws-integration-redis-only:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ '3.13', '3.14' ]
+        python-version: [ '3.12', '3.13', '3.14' ]
+        redis-version: [ '6', '7' ]
     services:
       redis:
-        image: redis:7
+        image: redis:${{ matrix.redis-version }}
         ports:
           - 6379:6379
         options: >-
@@ -79,4 +93,15 @@ jobs:
         env:
           REDIS_URL: redis://localhost:6379/0
         run: |
-          pytest -q tests/integration/test_redis_streams_live.py
+          set -o pipefail
+          mkdir -p artifacts
+          pytest -q tests/integration/test_redis_streams_live.py --junitxml=artifacts/junit.xml | tee artifacts/pytest.log
+
+      - name: Upload Redis-only test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ws-redis-only_py${{ matrix.python-version }}_redis${{ matrix.redis-version }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 7

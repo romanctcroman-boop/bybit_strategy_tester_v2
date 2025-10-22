@@ -1,11 +1,11 @@
 [tool.black]
 line-length = 100
 target-version = ["py313"]
-include = '\.pyi?$'
+include = '\\.pyi?$'
 
+# Ruff >=0.6 moved linter options under [tool.ruff.lint]. Update to avoid deprecation warnings.
 [tool.ruff]
 line-length = 100
-# Python version for linting
 target-version = "py313"
 exclude = [
 	"tests",
@@ -16,10 +16,13 @@ exclude = [
 	"venv",
 	".venv",
 ]
-# Enable common rule sets (pyflakes, pycodestyle, isort). Keep it strict but pragmatic.
+
+[tool.ruff.lint]
+# Explicit, pinned ruleset (pycodestyle E, pyflakes F, import sorting I).
+# We can expand later (e.g., UP, B, SIM) when we're ready to fix violations across the codebase.
 select = ["E", "F", "I"]
-# Ignore long lines and import-at-top constraints to avoid churn in tests/scripts for now
+# Deliberately ignore long line limit and import-at-top to reduce churn in scripts for now.
 ignore = ["E501", "E402"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["backend", "tests"]
