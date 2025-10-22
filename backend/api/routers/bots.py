@@ -13,6 +13,7 @@ router = APIRouter()
 class BotStatus(str, Enum):
     running = "running"
     stopped = "stopped"
+    awaiting_signal = "awaiting_signal"
     awaiting_start = "awaiting_start"
     awaiting_stop = "awaiting_stop"
     error = "error"
@@ -57,7 +58,7 @@ def _seed():
             strategy="swing_v2",
             symbols=["ETHUSDT"],
             capital_allocated=750.0,
-            status=BotStatus.stopped,
+            status=BotStatus.awaiting_signal,
             created_at=now,
         ),
         Bot(

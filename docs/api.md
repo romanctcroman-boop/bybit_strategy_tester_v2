@@ -180,7 +180,7 @@ Bot shape (mock):
 	"strategy": "scalper_v1",
 	"symbols": ["BTCUSDT"],
 	"capital_allocated": 1000.0,
-	"status": "running|stopped|awaiting_start|awaiting_stop|error",
+	"status": "awaiting_signal|awaiting_start|running|awaiting_stop|stopped|error",
 	"created_at": "2025-10-22T12:00:00Z"
 }
 ```

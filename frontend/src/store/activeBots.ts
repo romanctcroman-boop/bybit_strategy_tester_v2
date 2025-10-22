@@ -9,6 +9,7 @@ export interface ActiveBot {
   name: string;
   side: Side;
   symbol?: string;
+  qty?: number;
   orderProgress?: string; // e.g., '1 / 5'
   // price levels for visualization
   min: number; // left bound of scale
@@ -51,6 +52,7 @@ function mapDealToActiveBot(d: ActiveDeal): ActiveBot {
     name: `${d.symbol} • ${d.bot_id}`,
     side: 'LONG',
     symbol: d.symbol,
+    qty: d.quantity,
     orderProgress: undefined,
     min,
     entry,
