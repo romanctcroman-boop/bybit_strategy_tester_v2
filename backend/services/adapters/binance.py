@@ -4,14 +4,15 @@ Behavior:
  - If `python-binance` is installed, it will be used for API calls.
  - Otherwise, the adapter uses public REST endpoints via `requests` for klines and ping.
 """
-from typing import List, Dict, Optional
+
 import logging
-import time
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 try:
     from binance.client import Client as BinanceClient  # type: ignore
+
     _HAS_BINANCE = True
 except Exception:
     BinanceClient = None
@@ -23,7 +24,9 @@ import requests
 class BinanceAdapter:
     BASE = "https://api.binance.com"
 
-    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None, timeout: int = 10):
+    def __init__(
+        self, api_key: Optional[str] = None, api_secret: Optional[str] = None, timeout: int = 10
+    ):
         self.timeout = timeout
         if _HAS_BINANCE and api_key and api_secret:
             try:
@@ -62,11 +65,10 @@ class BinanceAdapter:
     def _normalize_kline_row(self, row: List) -> Dict:
         # Binance returns list-based rows: [Open time, Open, High, Low, Close, Volume, ...]
         return {
-            'open_time': int(row[0]),
-            'open': float(row[1]),
-            'high': float(row[2]),
-            'low': float(row[3]),
-            'close': float(row[4]),
-            'volume': float(row[5])
+            "open_time": int(row[0]),
+            "open": float(row[1]),
+            "high": float(row[2]),
+            "low": float(row[3]),
+            "close": float(row[4]),
+            "volume": float(row[5]),
         }
-

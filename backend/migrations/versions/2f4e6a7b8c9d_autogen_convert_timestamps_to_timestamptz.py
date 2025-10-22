@@ -10,12 +10,12 @@ Revision ID: 2f4e6a7b8c9d
 Revises: 1a2b3c4d5e6f
 Create Date: 2025-10-20
 """
+
 from alembic import op
-import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '2f4e6a7b8c9d'
-down_revision = '1a2b3c4d5e6f'
+revision = "2f4e6a7b8c9d"
+down_revision = "1a2b3c4d5e6f"
 branch_labels = None
 depends_on = None
 
@@ -32,11 +32,11 @@ def downgrade():
 
 def upgrade_sqls():
     candidates = {
-        'backtests': ['started_at', 'updated_at', 'completed_at', 'created_at'],
-        'optimizations': ['started_at', 'updated_at', 'completed_at', 'created_at'],
-        'trades': ['entry_time', 'exit_time', 'created_at'],
-        'market_data': ['timestamp'],
-        'strategies': ['created_at', 'updated_at'],
+        "backtests": ["started_at", "updated_at", "completed_at", "created_at"],
+        "optimizations": ["started_at", "updated_at", "completed_at", "created_at"],
+        "trades": ["entry_time", "exit_time", "created_at"],
+        "market_data": ["timestamp"],
+        "strategies": ["created_at", "updated_at"],
     }
 
     stmts = []
@@ -59,11 +59,11 @@ END$$;
 
 def downgrade_sqls():
     candidates = {
-        'backtests': ['started_at', 'updated_at', 'completed_at', 'created_at'],
-        'optimizations': ['started_at', 'updated_at', 'completed_at', 'created_at'],
-        'trades': ['entry_time', 'exit_time', 'created_at'],
-        'market_data': ['timestamp'],
-        'strategies': ['created_at', 'updated_at'],
+        "backtests": ["started_at", "updated_at", "completed_at", "created_at"],
+        "optimizations": ["started_at", "updated_at", "completed_at", "created_at"],
+        "trades": ["entry_time", "exit_time", "created_at"],
+        "market_data": ["timestamp"],
+        "strategies": ["created_at", "updated_at"],
     }
 
     stmts = []

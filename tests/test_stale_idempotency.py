@@ -1,9 +1,7 @@
-import pytest
-from datetime import datetime, timedelta, timezone
-
 # Small shims to import project modules without DB
 import sys
 import types
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 # celery app shim
@@ -13,35 +11,56 @@ sys.modules["backend.celery_app"] = mod
 
 # database shim
 mod_db = types.ModuleType("backend.database")
+
+
 def _session_local():
     return None
+
+
 mod_db.SessionLocal = _session_local
+
+
 class _Backtest:
     pass
+
+
 mod_db.Backtest = _Backtest
 sys.modules["backend.database"] = mod_db
 
 # backtest engine shim
 mod_be = types.ModuleType("backend.core.backtest_engine")
+
+
 class _BE:
     def __init__(self, **kwargs):
         pass
+
     def run(self, data, strategy_config):
         return {"final_capital": 1.0}
+
+
 mod_be.BacktestEngine = _BE
 sys.modules["backend.core.backtest_engine"] = mod_be
 
 # engine adapter shim
 mod_ea = types.ModuleType("backend.core.engine_adapter")
+
+
 def _get_engine(name=None, **kwargs):
     return _BE()
+
+
 mod_ea.get_engine = _get_engine
 sys.modules["backend.core.engine_adapter"] = mod_ea
 
 # services shim (will be monkeypatched in tests)
 mod_ds = types.ModuleType("backend.services.data_service")
+
+
 def _placeholder(ds):
     return None
+
+
 mod_ds.DataService = _placeholder
 sys.modules["backend.services.data_service"] = mod_ds
 
@@ -80,6 +99,7 @@ def make_task(backtest):
     class T:
         request = types.SimpleNamespace(retries=0)
         max_retries = 3
+
     return T(), DummyDS(backtest)
 
 

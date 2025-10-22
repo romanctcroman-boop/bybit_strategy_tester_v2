@@ -1,5 +1,5 @@
 import React from 'react';
-import { List, ListItem, ListItemText, Pagination, Stack } from '@mui/material';
+import { List, Pagination, Stack } from '@mui/material';
 
 export interface PaginatedListProps<T> {
   items: T[];

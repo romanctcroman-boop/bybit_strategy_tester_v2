@@ -10,11 +10,13 @@ Notes:
 - Minimal implementation using 'websockets' and asyncio Redis.
 - Production hardening (re-auth, backoff, resubscribe) is sketched with retries.
 """
+
 from __future__ import annotations
+
 import asyncio
 import json
-from typing import Iterable, Optional, List
 import logging
+from typing import Iterable, List, Optional
 
 try:
     # We'll publish to Redis using asyncio client
@@ -23,6 +25,23 @@ except Exception:  # pragma: no cover
     Redis = None  # type: ignore
 
 logger = logging.getLogger(__name__)
+
+# Optional Prometheus metrics
+try:  # pragma: no cover
+    from prometheus_client import Counter
+
+    WS_CONNECTS = Counter("bybit_ws_connects_total", "WS successful connections")
+    WS_RECONNECTS = Counter("bybit_ws_reconnects_total", "WS reconnect attempts")
+    WS_MESSAGES = Counter("bybit_ws_messages_total", "WS messages received")
+    WS_PINGS = Counter("bybit_ws_pings_total", "WS ping frames received")
+    WS_PUBLISHED = Counter(
+        "bybit_ws_published_total",
+        "Messages published to Redis",
+        labelnames=("type",),
+    )
+    WS_ERRORS = Counter("bybit_ws_errors_total", "WS errors")
+except Exception:  # pragma: no cover
+    WS_CONNECTS = WS_RECONNECTS = WS_MESSAGES = WS_PINGS = WS_PUBLISHED = WS_ERRORS = None  # type: ignore
 
 BYBIT_PUBLIC_WS = "wss://stream.bybit.com/v5/public/linear"
 
@@ -36,7 +55,9 @@ class BybitWsManager:
         self._closed = asyncio.Event()
         self._subs: List[str] = []
 
-    async def start(self, symbols: Iterable[str] = ("BTCUSDT",), intervals: Iterable[str] = ("1",)) -> None:
+    async def start(
+        self, symbols: Iterable[str] = ("BTCUSDT",), intervals: Iterable[str] = ("1",)
+    ) -> None:
         """Start background loop: connect, subscribe, consume, publish to Redis."""
         if self._task and not self._task.done():
             return
@@ -69,16 +90,40 @@ class BybitWsManager:
         backoff = 1.0
         while not self._closed.is_set():
             try:
-                async with websockets.connect(BYBIT_PUBLIC_WS, ping_interval=20, ping_timeout=20) as ws:
+                async with websockets.connect(
+                    BYBIT_PUBLIC_WS, ping_interval=20, ping_timeout=20
+                ) as ws:
+                    if WS_CONNECTS:
+                        WS_CONNECTS.inc()
                     await self._subscribe(ws, subs)
                     backoff = 1.0
                     while not self._closed.is_set():
                         raw = await asyncio.wait_for(ws.recv(), timeout=60)
+                        # Fast-path ping/pong handling
+                        try:
+                            _txt = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
+                            msg = json.loads(_txt)
+                        except Exception:
+                            msg = None
+                        if msg and isinstance(msg, dict) and msg.get("op") == "ping":
+                            if WS_PINGS:
+                                WS_PINGS.inc()
+                            try:
+                                await ws.send(json.dumps({"op": "pong"}))
+                            except Exception:
+                                pass
+                            continue
+                        if WS_MESSAGES:
+                            WS_MESSAGES.inc()
                         await self._handle_message(raw)
             except asyncio.TimeoutError:
                 logger.info("WS recv timeout; reconnecting")
+                if WS_RECONNECTS:
+                    WS_RECONNECTS.inc()
             except Exception as e:
                 logger.warning(f"WS error: {e}; reconnecting in {backoff:.1f}s")
+                if WS_ERRORS:
+                    WS_ERRORS.inc()
             await asyncio.sleep(backoff)
             backoff = min(backoff * 1.8, 20.0)
 
@@ -117,6 +162,8 @@ class BybitWsManager:
                     "side": t.get("S").lower() if t.get("S") else None,
                 }
                 await self._publish_json(self._chan_ticks, payload)
+                if WS_PUBLISHED:
+                    WS_PUBLISHED.labels(type="trade").inc()
             return
         # Normalize kline
         if topic.startswith("kline."):
@@ -143,6 +190,8 @@ class BybitWsManager:
                     "turnover": float(k.get("turnover")) if k.get("turnover") is not None else None,
                 }
                 await self._publish_json(self._chan_klines, payload)
+                if WS_PUBLISHED:
+                    WS_PUBLISHED.labels(type="kline").inc()
 
     async def _publish_json(self, channel: str, payload: dict) -> None:
         if not self._redis:

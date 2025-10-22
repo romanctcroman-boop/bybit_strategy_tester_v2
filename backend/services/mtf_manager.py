@@ -10,19 +10,18 @@ This service relies on CandleCache for data access and provides a simple API for
 backtester/ML modules to consume MTF inputs consistently across any trading pair.
 """
 
-from typing import Dict, List, Optional, Iterable
 from dataclasses import dataclass
-from math import floor
 from datetime import datetime, timezone
+from typing import Dict, Iterable, List, Optional
 
 from backend.services.candle_cache import CANDLE_CACHE
 
 
 def interval_to_minutes(interval: str) -> int:
     s = str(interval).upper()
-    if s == 'D':
+    if s == "D":
         return 24 * 60
-    if s == 'W':
+    if s == "W":
         return 7 * 24 * 60
     try:
         return int(s)  # minutes
@@ -39,11 +38,11 @@ def window_start_seconds(ts_sec: int, interval: str) -> int:
     - For W: align to the start of ISO week (Monday 00:00:00 UTC).
     """
     iv = str(interval).upper()
-    if iv == 'D':
+    if iv == "D":
         dt = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
         aligned = datetime(dt.year, dt.month, dt.day, tzinfo=timezone.utc)
         return int(aligned.timestamp())
-    if iv == 'W':
+    if iv == "W":
         dt = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
         # ISO weekday: Monday=1 ... Sunday=7
         delta_days = dt.isoweekday() - 1
@@ -68,7 +67,7 @@ def aggregate_from_base(base: List[dict], target_interval: str) -> List[dict]:
     cur_start: Optional[int] = None
     cur: Optional[dict] = None
     for c in base:
-        t = int(c['time'])
+        t = int(c["time"])
         ws = window_start_seconds(t, target_interval)
         if cur_start is None or ws != cur_start:
             # push previous
@@ -77,19 +76,19 @@ def aggregate_from_base(base: List[dict], target_interval: str) -> List[dict]:
             # start new window
             cur_start = ws
             cur = {
-                'time': ws,
-                'open': float(c['open']),
-                'high': float(c['high']),
-                'low': float(c['low']),
-                'close': float(c['close']),
-                'volume': float(c.get('volume') or 0.0),
+                "time": ws,
+                "open": float(c["open"]),
+                "high": float(c["high"]),
+                "low": float(c["low"]),
+                "close": float(c["close"]),
+                "volume": float(c.get("volume") or 0.0),
             }
         else:
             # extend window
-            cur['high'] = max(cur['high'], float(c['high']))
-            cur['low'] = min(cur['low'], float(c['low']))
-            cur['close'] = float(c['close'])
-            cur['volume'] = float(cur.get('volume') or 0.0) + float(c.get('volume') or 0.0)
+            cur["high"] = max(cur["high"], float(c["high"]))
+            cur["low"] = min(cur["low"], float(c["low"]))
+            cur["close"] = float(c["close"])
+            cur["volume"] = float(cur.get("volume") or 0.0) + float(c.get("volume") or 0.0)
     if cur is not None:
         out.append(cur)
     return out
@@ -109,7 +108,9 @@ class MTFManager:
     - get_aligned: resample higher frames from a base interval
     """
 
-    def get_working_sets(self, symbol: str, intervals: Iterable[str], load_limit: int = 1000) -> MTFResult:
+    def get_working_sets(
+        self, symbol: str, intervals: Iterable[str], load_limit: int = 1000
+    ) -> MTFResult:
         ivs = [str(x) for x in intervals]
         out: Dict[str, List[dict]] = {}
         for itv in ivs:
@@ -118,11 +119,11 @@ class MTFManager:
             if not data:
                 data = CANDLE_CACHE.load_initial(symbol, itv, load_limit=load_limit, persist=True)
             # ensure ascending order and dedup (safety)
-            data_sorted = sorted(data, key=lambda x: int(x['time']))
+            data_sorted = sorted(data, key=lambda x: int(x["time"]))
             dedup: List[dict] = []
             last_t: Optional[int] = None
             for d in data_sorted:
-                t = int(d['time'])
+                t = int(d["time"])
                 if last_t is None or t > last_t:
                     dedup.append(d)
                     last_t = t
@@ -131,13 +132,19 @@ class MTFManager:
             out[itv] = dedup
         return MTFResult(symbol=symbol.upper(), intervals=ivs, data=out)
 
-    def get_aligned(self, symbol: str, intervals: Iterable[str], base_interval: Optional[str] = None, load_limit: int = 1000) -> MTFResult:
+    def get_aligned(
+        self,
+        symbol: str,
+        intervals: Iterable[str],
+        base_interval: Optional[str] = None,
+        load_limit: int = 1000,
+    ) -> MTFResult:
         ivs = sorted([str(x) for x in intervals], key=lambda v: interval_to_minutes(v))
         base = base_interval or ivs[0]
         raw = self.get_working_sets(symbol, ivs, load_limit=load_limit)
         base_set = raw.data.get(base, [])
         # ensure base sorted
-        base_sorted = sorted(base_set, key=lambda x: int(x['time']))
+        base_sorted = sorted(base_set, key=lambda x: int(x["time"]))
         out: Dict[str, List[dict]] = {base: base_sorted}
         for itv in ivs:
             if itv == base:

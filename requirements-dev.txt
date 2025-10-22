@@ -5,3 +5,6 @@ pytest
 pandas
 celery
 loguru
+httpx
+black
+ruff

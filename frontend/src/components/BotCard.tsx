@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Box,
   Card,
-  CardActionArea,
   CardContent,
   Chip,
   IconButton,
@@ -82,9 +81,18 @@ const BotCard: React.FC<BotCardProps> = ({ bot }) => {
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                   {bot.name}
                 </Typography>
-                <Chip label={bot.direction} size="small" sx={{ bgcolor: labelBg, color: labelColor }} />
+                <Chip
+                  label={bot.direction}
+                  size="small"
+                  sx={{ bgcolor: labelBg, color: labelColor }}
+                />
                 {bot.label && (
-                  <Chip label={bot.label} size="small" variant="outlined" sx={{ borderStyle: 'dashed' }} />
+                  <Chip
+                    label={bot.label}
+                    size="small"
+                    variant="outlined"
+                    sx={{ borderStyle: 'dashed' }}
+                  />
                 )}
               </Stack>
               <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -118,7 +126,13 @@ const BotCard: React.FC<BotCardProps> = ({ bot }) => {
             </Stack>
 
             {/* Stats row */}
-            <Stack direction="row" spacing={4} mt={1.25} alignItems="center" sx={{ color: 'text.secondary' }}>
+            <Stack
+              direction="row"
+              spacing={4}
+              mt={1.25}
+              alignItems="center"
+              sx={{ color: 'text.secondary' }}
+            >
               <Stack spacing={0.3}>
                 <Typography variant="caption">СТАТУС</Typography>
                 <Chip

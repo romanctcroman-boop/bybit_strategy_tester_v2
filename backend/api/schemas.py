@@ -1,7 +1,10 @@
 from __future__ import annotations
-from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
-from pydantic import BaseModel, Field, ConfigDict
+
 from datetime import datetime
+from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
+
+from enum import Enum
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StrategyOut(BaseModel):
@@ -28,7 +31,13 @@ class BacktestOut(BaseModel):
     leverage: Optional[int] = None
     commission: Optional[float] = None
     config: Optional[Dict[str, Any]] = None
-    status: str
+    class BacktestStatus(str, Enum):
+        queued = "queued"
+        running = "running"
+        completed = "completed"
+        failed = "failed"
+
+    status: BacktestStatus
     created_at: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
@@ -63,6 +72,7 @@ class ApiListResponse(BaseModel, Generic[T]):
 # ========================
 # Marketdata Schemas
 # ========================
+
 
 class BybitKlineAuditOut(BaseModel):
     symbol: str
@@ -112,6 +122,7 @@ class MtfResponseOut(BaseModel):
 # ========================
 # Admin Schemas
 # ========================
+
 
 class BackfillAsyncResponse(BaseModel):
     mode: str
@@ -185,7 +196,14 @@ class BackfillRunOut(BaseModel):
     task_id: Optional[str] = None
     symbol: str
     interval: str
-    status: str
+    class BackfillStatus(str, Enum):
+        PENDING = "PENDING"
+        RUNNING = "RUNNING"
+        SUCCEEDED = "SUCCEEDED"
+        FAILED = "FAILED"
+        CANCELED = "CANCELED"
+
+    status: BackfillStatus
     upserts: Optional[int] = None
     pages: Optional[int] = None
     started_at: Optional[str] = None
@@ -197,6 +215,7 @@ class BackfillRunOut(BaseModel):
 # ========================
 # Request Schemas (create/update)
 # ========================
+
 
 class StrategyCreate(BaseModel):
     name: str
@@ -262,6 +281,7 @@ class BacktestClaimResponse(BaseModel):
 # Optimization Schemas (future HTTP exposure)
 # ========================
 
+
 class OptimizationOut(BaseModel):
     id: int
     strategy_id: int
@@ -274,7 +294,13 @@ class OptimizationOut(BaseModel):
     metric: str
     initial_capital: float
     total_combinations: int
-    status: str
+    class OptimizationStatus(str, Enum):
+        queued = "queued"
+        running = "running"
+        completed = "completed"
+        failed = "failed"
+
+    status: OptimizationStatus
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     started_at: Optional[str] = None
@@ -298,22 +324,28 @@ class OptimizationCreate(BaseModel):
     initial_capital: float
     total_combinations: int
     config: Optional[Dict[str, Any]] = None
-    
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "strategy_id": 1,
-            "optimization_type": "grid_search",
-            "symbol": "BTCUSDT",
-            "timeframe": "15",
-            "start_date": "2024-01-01T00:00:00Z",
-            "end_date": "2024-01-31T23:59:59Z",
-            "param_ranges": {"rsi_period": [7, 14, 21], "ema_fast": [9, 12], "ema_slow": [26, 30]},
-            "metric": "sharpe_ratio",
-            "initial_capital": 10000.0,
-            "total_combinations": 18,
-            "config": {"commission": 0.0006}
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "strategy_id": 1,
+                "optimization_type": "grid_search",
+                "symbol": "BTCUSDT",
+                "timeframe": "15",
+                "start_date": "2024-01-01T00:00:00Z",
+                "end_date": "2024-01-31T23:59:59Z",
+                "param_ranges": {
+                    "rsi_period": [7, 14, 21],
+                    "ema_fast": [9, 12],
+                    "ema_slow": [26, 30],
+                },
+                "metric": "sharpe_ratio",
+                "initial_capital": 10000.0,
+                "total_combinations": 18,
+                "config": {"commission": 0.0006},
+            }
         }
-    })
+    )
 
 
 class OptimizationUpdate(BaseModel):
@@ -324,16 +356,18 @@ class OptimizationUpdate(BaseModel):
     config: Optional[Dict[str, Any]] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "status": "completed",
-            "best_params": {"rsi_period": 14, "ema_fast": 12, "ema_slow": 26},
-            "best_score": 1.23,
-            "results": {"top_10": [{"params": {"rsi_period": 14}, "score": 1.2}]},
-            "completed_at": "2024-02-01T00:00:00Z"
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "completed",
+                "best_params": {"rsi_period": 14, "ema_fast": 12, "ema_slow": 26},
+                "best_score": 1.23,
+                "results": {"top_10": [{"params": {"rsi_period": 14}, "score": 1.2}]},
+                "completed_at": "2024-02-01T00:00:00Z",
+            }
         }
-    })
+    )
 
 
 class OptimizationResultOut(BaseModel):
@@ -355,20 +389,26 @@ class OptimizationResultOut(BaseModel):
 # Optimization Run Request/Response Schemas
 # ========================
 
+
 class OptimizationEnqueueResponse(BaseModel):
     task_id: str
     optimization_id: int
     queue: str = Field(default="optimizations")
-    status: str = Field(default="queued")
+    class EnqueueStatus(str, Enum):
+        queued = "queued"
 
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "task_id": "5f1b7a34-2e40-4f7e-9f07-f2b17b8f5e4a",
-            "optimization_id": 42,
-            "queue": "optimizations",
-            "status": "queued"
+    status: EnqueueStatus = Field(default=EnqueueStatus.queued)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "task_id": "5f1b7a34-2e40-4f7e-9f07-f2b17b8f5e4a",
+                "optimization_id": 42,
+                "queue": "optimizations",
+                "status": "queued",
+            }
         }
-    })
+    )
 
 
 class OptimizationRunGridRequest(BaseModel):
@@ -377,14 +417,16 @@ class OptimizationRunGridRequest(BaseModel):
     metric: Optional[str] = Field(default="sharpe_ratio")
     queue: Optional[str] = Field(default="optimizations")
 
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "strategy_config": {"initial_capital": 10000, "commission": 0.0006},
-            "param_space": {"rsi_period": [7, 14, 21], "ema_fast": [9, 12]},
-            "metric": "sharpe_ratio",
-            "queue": "optimizations"
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "strategy_config": {"initial_capital": 10000, "commission": 0.0006},
+                "param_space": {"rsi_period": [7, 14, 21], "ema_fast": [9, 12]},
+                "metric": "sharpe_ratio",
+                "queue": "optimizations",
+            }
         }
-    })
+    )
 
 
 class OptimizationRunWalkForwardRequest(BaseModel):
@@ -396,17 +438,19 @@ class OptimizationRunWalkForwardRequest(BaseModel):
     metric: Optional[str] = Field(default="sharpe_ratio")
     queue: Optional[str] = Field(default="optimizations")
 
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "strategy_config": {"initial_capital": 10000, "commission": 0.0006},
-            "param_space": {"rsi_period": [7, 14], "ema_fast": [9, 12]},
-            "train_size": 120,
-            "test_size": 60,
-            "step_size": 30,
-            "metric": "sharpe_ratio",
-            "queue": "optimizations"
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "strategy_config": {"initial_capital": 10000, "commission": 0.0006},
+                "param_space": {"rsi_period": [7, 14], "ema_fast": [9, 12]},
+                "train_size": 120,
+                "test_size": 60,
+                "step_size": 30,
+                "metric": "sharpe_ratio",
+                "queue": "optimizations",
+            }
         }
-    })
+    )
 
 
 class OptimizationRunBayesianRequest(BaseModel):
@@ -419,47 +463,53 @@ class OptimizationRunBayesianRequest(BaseModel):
     random_state: Optional[int] = None
     queue: Optional[str] = Field(default="optimizations")
 
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "strategy_config": {"initial_capital": 10000, "commission": 0.0006},
-            "param_space": {
-                "rsi_period": {"type": "int", "low": 7, "high": 21},
-                "ema_fast": {"type": "int", "low": 8, "high": 15}
-            },
-            "n_trials": 50,
-            "metric": "sharpe_ratio",
-            "direction": "maximize",
-            "n_jobs": 1,
-            "queue": "optimizations"
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "strategy_config": {"initial_capital": 10000, "commission": 0.0006},
+                "param_space": {
+                    "rsi_period": {"type": "int", "low": 7, "high": 21},
+                    "ema_fast": {"type": "int", "low": 8, "high": 15},
+                },
+                "n_trials": 50,
+                "metric": "sharpe_ratio",
+                "direction": "maximize",
+                "n_jobs": 1,
+                "queue": "optimizations",
+            }
         }
-    })
+    )
 
 
 # ========================
 # Admin/Backfill examples (OpenAPI)
 # ========================
 
-BackfillAsyncResponse.model_config = ConfigDict(json_schema_extra={
-    "example": {"mode": "async", "task_id": "1e2d3c"}
-})
-BackfillSyncResponse.model_config = ConfigDict(json_schema_extra={
-    "example": {
-        "mode": "sync",
-        "symbol": "BTCUSDT",
-        "interval": "1",
-        "upserts": 1000,
-        "pages": 10,
-        "elapsed_sec": 2.34,
-        "rows_per_sec": 427.35
+BackfillAsyncResponse.model_config = ConfigDict(
+    json_schema_extra={"example": {"mode": "async", "task_id": "1e2d3c"}}
+)
+BackfillSyncResponse.model_config = ConfigDict(
+    json_schema_extra={
+        "example": {
+            "mode": "sync",
+            "symbol": "BTCUSDT",
+            "interval": "1",
+            "upserts": 1000,
+            "pages": 10,
+            "elapsed_sec": 2.34,
+            "rows_per_sec": 427.35,
+        }
     }
-})
-TaskStatusOut.model_config = ConfigDict(json_schema_extra={
-    "example": {
-        "task_id": "abc-123",
-        "state": "PROGRESS",
-        "ready": False,
-        "successful": False,
-        "failed": False,
-        "info": {"current": 20, "total": 100}
+)
+TaskStatusOut.model_config = ConfigDict(
+    json_schema_extra={
+        "example": {
+            "task_id": "abc-123",
+            "state": "PROGRESS",
+            "ready": False,
+            "successful": False,
+            "failed": False,
+            "info": {"current": 20, "total": 100},
+        }
     }
-})
+)

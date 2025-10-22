@@ -31,7 +31,8 @@ const StrategyDetailPage: React.FC = () => {
     if (sErr) errs.startDate = sErr;
     const eErr = validateIsoUtc(endDate);
     if (eErr) errs.endDate = eErr;
-    if (startDate && endDate && Date.parse(startDate) >= Date.parse(endDate)) errs.endDate = 'End must be after Start';
+    if (startDate && endDate && Date.parse(startDate) >= Date.parse(endDate))
+      errs.endDate = 'End must be after Start';
     if (!initialCap || initialCap <= 0) errs.initialCap = 'Must be > 0';
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
@@ -39,7 +40,8 @@ const StrategyDetailPage: React.FC = () => {
 
   useEffect(() => {
     (async () => {
-      setLoading(true); setError(undefined);
+      setLoading(true);
+      setError(undefined);
       try {
         const s = await StrategiesApi.get(strategyId);
         setStrategy(s);
@@ -51,7 +53,7 @@ const StrategyDetailPage: React.FC = () => {
         setLoading(false);
       }
     })();
-  }, [strategyId]);
+  }, [strategyId, notify]);
 
   return (
     <Container>
@@ -70,11 +72,17 @@ const StrategyDetailPage: React.FC = () => {
             </div>
             <div>
               <Typography variant="h6">Config</Typography>
-              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(strategy.config, null, 2)}</pre>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                {JSON.stringify(strategy.config, null, 2)}
+              </pre>
             </div>
             <div>
-              <Button href={`#/optimizations`} variant="outlined">Go to Optimizations</Button>
-              <Button href={`#/`} sx={{ ml: 1 }}>Back to Strategies</Button>
+              <Button href={`#/optimizations`} variant="outlined">
+                Go to Optimizations
+              </Button>
+              <Button href={`#/`} sx={{ ml: 1 }}>
+                Back to Strategies
+              </Button>
             </div>
           </Stack>
         </Paper>
@@ -84,13 +92,59 @@ const StrategyDetailPage: React.FC = () => {
         <Paper sx={{ mt: 2, p: 2 }}>
           <Typography variant="h6">Run Quick Backtest</Typography>
           <Stack direction="row" spacing={2} sx={{ mt: 1, flexWrap: 'wrap' }}>
-            <TextField label="Symbol" size="small" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} sx={{ width: 160 }} error={!!formErrors.symbol} helperText={formErrors.symbol} />
-            <TextField label="Timeframe" size="small" select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} sx={{ width: 160 }} error={!!formErrors.timeframe} helperText={formErrors.timeframe}>
-              {['1','3','5','15','60','240','D','W'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+            <TextField
+              label="Symbol"
+              size="small"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+              sx={{ width: 160 }}
+              error={!!formErrors.symbol}
+              helperText={formErrors.symbol}
+            />
+            <TextField
+              label="Timeframe"
+              size="small"
+              select
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value)}
+              sx={{ width: 160 }}
+              error={!!formErrors.timeframe}
+              helperText={formErrors.timeframe}
+            >
+              {['1', '3', '5', '15', '60', '240', 'D', 'W'].map((v) => (
+                <MenuItem key={v} value={v}>
+                  {v}
+                </MenuItem>
+              ))}
             </TextField>
-            <TextField label="Start (ISO UTC)" size="small" value={startDate} onChange={(e) => setStartDate(e.target.value)} sx={{ width: 260 }} error={!!formErrors.startDate} helperText={formErrors.startDate} />
-            <TextField label="End (ISO UTC)" size="small" value={endDate} onChange={(e) => setEndDate(e.target.value)} sx={{ width: 260 }} error={!!formErrors.endDate} helperText={formErrors.endDate} />
-            <TextField label="Initial Capital" size="small" type="number" value={initialCap} onChange={(e) => setInitialCap(Number(e.target.value) || 0)} sx={{ width: 180 }} error={!!formErrors.initialCap} helperText={formErrors.initialCap} />
+            <TextField
+              label="Start (ISO UTC)"
+              size="small"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              sx={{ width: 260 }}
+              error={!!formErrors.startDate}
+              helperText={formErrors.startDate}
+            />
+            <TextField
+              label="End (ISO UTC)"
+              size="small"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              sx={{ width: 260 }}
+              error={!!formErrors.endDate}
+              helperText={formErrors.endDate}
+            />
+            <TextField
+              label="Initial Capital"
+              size="small"
+              type="number"
+              value={initialCap}
+              onChange={(e) => setInitialCap(Number(e.target.value) || 0)}
+              sx={{ width: 180 }}
+              error={!!formErrors.initialCap}
+              helperText={formErrors.initialCap}
+            />
             <Button
               variant="contained"
               disabled={queueing}
@@ -118,8 +172,12 @@ const StrategyDetailPage: React.FC = () => {
                   setQueueing(false);
                 }
               }}
-            >Run</Button>
-            <Button href={`#/optimizations?strategy_id=${strategyId}`} variant="outlined">Open Optimizations</Button>
+            >
+              Run
+            </Button>
+            <Button href={`#/optimizations?strategy_id=${strategyId}`} variant="outlined">
+              Open Optimizations
+            </Button>
           </Stack>
         </Paper>
       )}

@@ -1,9 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Container, Typography, Paper, Stack, TextField, MenuItem, Button, Divider } from '@mui/material';
+import {
+  Container,
+  Typography,
+  Paper,
+  Stack,
+  TextField,
+  MenuItem,
+  Button,
+  Divider,
+} from '@mui/material';
 import { OptimizationsApi } from '../services/api';
 import type { Optimization, OptimizationResult } from '../types/api';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ScatterChart, Scatter, ZAxis } from 'recharts';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+} from 'recharts';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useNotify } from '../components/NotificationsProvider';
 
@@ -14,7 +34,9 @@ const OptimizationDetailPage: React.FC = () => {
   const [best, setBest] = useState<OptimizationResult | null>(null);
   const [results, setResults] = useState<OptimizationResult[]>([]);
   const [topN, setTopN] = useState<number>(20);
-  const [sortBy, setSortBy] = useState<'score' | 'sharpe_ratio' | 'max_drawdown' | 'total_trades'>('score');
+  const [sortBy, setSortBy] = useState<'score' | 'sharpe_ratio' | 'max_drawdown' | 'total_trades'>(
+    'score'
+  );
   const notify = useNotify();
 
   useEffect(() => {
@@ -29,10 +51,10 @@ const OptimizationDetailPage: React.FC = () => {
         if (b) setBest(b as any);
         setResults(r);
       } catch (e: any) {
-        notify({ message: `Failed to load optimization: ${e?.message || e}` , severity: 'error' });
+        notify({ message: `Failed to load optimization: ${e?.message || e}`, severity: 'error' });
       }
     })();
-  }, [optimizationId]);
+  }, [optimizationId, notify]);
 
   const topResults = useMemo(() => {
     const sorted = [...results].sort((a, b) => {
@@ -44,8 +66,32 @@ const OptimizationDetailPage: React.FC = () => {
   }, [results, sortBy, topN]);
 
   const exportCsv = () => {
-    const headers = ['id','optimization_id','score','total_return','sharpe_ratio','max_drawdown','win_rate','total_trades','params'];
-    const lines = [headers.join(',')].concat(results.map(r => [r.id, r.optimization_id, r.score, r.total_return ?? '', r.sharpe_ratio ?? '', r.max_drawdown ?? '', r.win_rate ?? '', r.total_trades ?? '', JSON.stringify(r.params)].join(',')));
+    const headers = [
+      'id',
+      'optimization_id',
+      'score',
+      'total_return',
+      'sharpe_ratio',
+      'max_drawdown',
+      'win_rate',
+      'total_trades',
+      'params',
+    ];
+    const lines = [headers.join(',')].concat(
+      results.map((r) =>
+        [
+          r.id,
+          r.optimization_id,
+          r.score,
+          r.total_return ?? '',
+          r.sharpe_ratio ?? '',
+          r.max_drawdown ?? '',
+          r.win_rate ?? '',
+          r.total_trades ?? '',
+          JSON.stringify(r.params),
+        ].join(',')
+      )
+    );
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -59,13 +105,16 @@ const OptimizationDetailPage: React.FC = () => {
 
   const scoreHistogram = useMemo(() => {
     if (!results.length) return [] as Array<{ bin: string; count: number }>;
-    const vals = results.map(r => r.score).filter(v => typeof v === 'number' && isFinite(v)) as number[];
+    const vals = results
+      .map((r) => r.score)
+      .filter((v) => typeof v === 'number' && isFinite(v)) as number[];
     if (!vals.length) return [];
-    const min = Math.min(...vals), max = Math.max(...vals);
+    const min = Math.min(...vals),
+      max = Math.max(...vals);
     const bins = 20;
     const step = (max - min) / bins || 1;
     const counts = new Array(bins).fill(0);
-    vals.forEach(v => {
+    vals.forEach((v) => {
       const idx = Math.min(bins - 1, Math.max(0, Math.floor((v - min) / step)));
       counts[idx]++;
     });
@@ -73,13 +122,16 @@ const OptimizationDetailPage: React.FC = () => {
   }, [results]);
 
   const sharpeHistogram = useMemo(() => {
-    const vals = results.map(r => r.sharpe_ratio).filter(v => typeof v === 'number' && isFinite(v as number)) as number[];
+    const vals = results
+      .map((r) => r.sharpe_ratio)
+      .filter((v) => typeof v === 'number' && isFinite(v as number)) as number[];
     if (!vals.length) return [] as Array<{ bin: string; count: number }>;
-    const min = Math.min(...vals), max = Math.max(...vals);
+    const min = Math.min(...vals),
+      max = Math.max(...vals);
     const bins = 20;
     const step = (max - min) / bins || 1;
     const counts = new Array(bins).fill(0);
-    vals.forEach(v => {
+    vals.forEach((v) => {
       const idx = Math.min(bins - 1, Math.max(0, Math.floor((v - min) / step)));
       counts[idx]++;
     });
@@ -111,7 +163,13 @@ const OptimizationDetailPage: React.FC = () => {
             </div>
             <div style={{ flex: 1 }}>
               <Typography variant="h6">Best Params</Typography>
-              {best ? <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(best, null, 2)}</pre> : <em>No best result yet.</em>}
+              {best ? (
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {JSON.stringify(best, null, 2)}
+                </pre>
+              ) : (
+                <em>No best result yet.</em>
+              )}
             </div>
           </Stack>
         </Paper>
@@ -121,11 +179,31 @@ const OptimizationDetailPage: React.FC = () => {
         <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
           <Typography variant="h6">Top Results</Typography>
           <Stack direction="row" spacing={2}>
-            <TextField label="Top N" size="small" type="number" value={topN} onChange={(e) => setTopN(Math.max(5, Math.min(200, Number(e.target.value) || 20)))} sx={{ width: 120 }} />
-            <TextField label="Sort by" size="small" select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} sx={{ width: 180 }}>
-              {['score','sharpe_ratio','max_drawdown','total_trades'].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
+            <TextField
+              label="Top N"
+              size="small"
+              type="number"
+              value={topN}
+              onChange={(e) => setTopN(Math.max(5, Math.min(200, Number(e.target.value) || 20)))}
+              sx={{ width: 120 }}
+            />
+            <TextField
+              label="Sort by"
+              size="small"
+              select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              sx={{ width: 180 }}
+            >
+              {['score', 'sharpe_ratio', 'max_drawdown', 'total_trades'].map((v) => (
+                <MenuItem key={v} value={v}>
+                  {v}
+                </MenuItem>
+              ))}
             </TextField>
-            <Button variant="outlined" onClick={exportCsv}>Export CSV</Button>
+            <Button variant="outlined" onClick={exportCsv}>
+              Export CSV
+            </Button>
           </Stack>
         </Stack>
         <Divider sx={{ my: 2 }} />
@@ -152,7 +230,10 @@ const OptimizationDetailPage: React.FC = () => {
               <YAxis dataKey="y" name="Score" />
               <ZAxis range={[60]} />
               <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-              <Scatter data={results.map(r => ({ x: r.total_trades ?? 0, y: r.score }))} fill="#82ca9d" />
+              <Scatter
+                data={results.map((r) => ({ x: r.total_trades ?? 0, y: r.score }))}
+                fill="#82ca9d"
+              />
             </ScatterChart>
           </ResponsiveContainer>
         </div>

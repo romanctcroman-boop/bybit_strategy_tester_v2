@@ -5,20 +5,25 @@ Expose a unified SETTINGS object used across the backend. This file prefers
 pydantic-settings when installed (for validation and .env parsing), and
 falls back to a minimal environment loader otherwise.
 """
+
 from __future__ import annotations
-from typing import List, Optional
+
 import os
+from typing import List, Optional
 
 try:
-    from pydantic_settings import BaseSettings, SettingsConfigDict
     from pydantic import BaseModel, Field
+    from pydantic_settings import BaseSettings, SettingsConfigDict
 except Exception:  # pragma: no cover
     BaseSettings = None  # type: ignore
     BaseModel = object  # type: ignore
-    Field = lambda *a, **k: None  # type: ignore
+
+    def Field(*a, **k):  # type: ignore
+        return None
 
 
 if BaseSettings is not None:
+
     class DatabaseSettings(BaseSettings):
         url: Optional[str] = None
         model_config = SettingsConfigDict(env_prefix="", env_file=".env", extra="ignore")
@@ -88,29 +93,33 @@ else:
 
     class _WS:
         def __init__(self) -> None:
-            self.enabled = (os.environ.get("BYBIT_WS_ENABLED", "0").lower() in ("1", "true", "yes"))
+            self.enabled = os.environ.get("BYBIT_WS_ENABLED", "0").lower() in ("1", "true", "yes")
             self.symbols = os.environ.get("BYBIT_WS_SYMBOLS", "BTCUSDT")
             self.intervals = os.environ.get("BYBIT_WS_INTERVALS", "1")
             self.reconnect_delay_sec = float(os.environ.get("WS_RECONNECT_DELAY_SEC", "1.5") or 1.5)
-            self.max_reconnect_delay_sec = float(os.environ.get("WS_RECONNECT_DELAY_MAX_SEC", "15") or 15.0)
+            self.max_reconnect_delay_sec = float(
+                os.environ.get("WS_RECONNECT_DELAY_MAX_SEC", "15") or 15.0
+            )
 
         @property
         def symbols_list(self) -> List[str]:
-            return [s.strip().upper() for s in self.symbols.split(',') if s.strip()]
+            return [s.strip().upper() for s in self.symbols.split(",") if s.strip()]
 
         @property
         def intervals_list(self) -> List[str]:
-            return [s.strip().upper() for s in self.intervals.split(',') if s.strip()]
+            return [s.strip().upper() for s in self.intervals.split(",") if s.strip()]
 
     class _Celery:
         def __init__(self) -> None:
-            self.eager = (os.environ.get("CELERY_EAGER", "0").lower() in ("1", "true", "yes"))
+            self.eager = os.environ.get("CELERY_EAGER", "0").lower() in ("1", "true", "yes")
             self.broker_url = os.environ.get("CELERY_BROKER_URL")
             self.result_backend = os.environ.get("CELERY_RESULT_BACKEND")
             self.task_default_queue = os.environ.get("CELERY_TASK_DEFAULT_QUEUE", "default")
-            self.acks_late = (os.environ.get("CELERY_ACKS_LATE", "1").lower() in ("1", "true", "yes"))
+            self.acks_late = os.environ.get("CELERY_ACKS_LATE", "1").lower() in ("1", "true", "yes")
             self.prefetch_multiplier = int(os.environ.get("CELERY_PREFETCH_MULTIPLIER", "4") or 4)
-            self.task_default_retry_delay = int(os.environ.get("CELERY_TASK_DEFAULT_RETRY_DELAY", "5") or 5)
+            self.task_default_retry_delay = int(
+                os.environ.get("CELERY_TASK_DEFAULT_RETRY_DELAY", "5") or 5
+            )
             self.task_max_retries = int(os.environ.get("CELERY_TASK_MAX_RETRIES", "3") or 3)
             self.queue_grid = os.environ.get("CELERY_QUEUE_GRID", "optimizations.grid")
             self.queue_walk = os.environ.get("CELERY_QUEUE_WALK", "optimizations.walk")

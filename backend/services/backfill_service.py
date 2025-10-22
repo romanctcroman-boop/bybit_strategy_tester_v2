@@ -7,17 +7,16 @@ Historical Backfill Service
 - Persists into BybitKlineAudit idempotently (UNIQUE(symbol, open_time))
 - Supports lookback minutes or explicit date range
 """
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Iterable, List, Optional, Tuple
 import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import List, Optional
 
 from loguru import logger
 
-from backend.services.adapters.bybit import BybitAdapter
-from backend.database import SessionLocal, Base, engine
-from backend.models.bybit_kline_audit import BybitKlineAudit
+from backend.database import Base, SessionLocal, engine
 from backend.models.backfill_progress import BackfillProgress
+from backend.services.adapters.bybit import BybitAdapter
 
 
 def utc_ms(dt: datetime) -> int:
@@ -71,11 +70,19 @@ class BackfillService:
             try:
                 s = SessionLocal()
                 try:
-                    rec = s.query(BackfillProgress).filter(
-                        BackfillProgress.symbol == cfg.symbol,
-                        BackfillProgress.interval == cfg.interval,
-                    ).one_or_none()
-                    if rec and rec.current_cursor_ms is not None and rec.current_cursor_ms < current_cursor:
+                    rec = (
+                        s.query(BackfillProgress)
+                        .filter(
+                            BackfillProgress.symbol == cfg.symbol,
+                            BackfillProgress.interval == cfg.interval,
+                        )
+                        .one_or_none()
+                    )
+                    if (
+                        rec
+                        and rec.current_cursor_ms is not None
+                        and rec.current_cursor_ms < current_cursor
+                    ):
                         current_cursor = rec.current_cursor_ms
                 finally:
                     s.close()
@@ -87,14 +94,16 @@ class BackfillService:
         while pages < cfg.max_pages:
             pages += 1
             # Fetch a page from adapter (most recent page up to current_cursor)
-            rows = self._fetch_page_with_retries(cfg.symbol, cfg.interval, cfg.page_limit, current_cursor)
+            rows = self._fetch_page_with_retries(
+                cfg.symbol, cfg.interval, cfg.page_limit, current_cursor
+            )
             if not rows:
                 logger.info("No more rows from adapter; stop")
                 break
 
             # Filter by start_ms if given
             if start_ms is not None:
-                rows = [r for r in rows if r.get('open_time') and r['open_time'] >= start_ms]
+                rows = [r for r in rows if r.get("open_time") and r["open_time"] >= start_ms]
                 if not rows:
                     logger.info("Reached start boundary; stop")
                     break
@@ -104,7 +113,7 @@ class BackfillService:
             done += inserted
 
             # Move cursor back by one bar from the oldest row in this page
-            oldest_ms = min(r['open_time'] for r in rows if r.get('open_time'))
+            oldest_ms = min(r["open_time"] for r in rows if r.get("open_time"))
             # subtract 1 ms to avoid including the same oldest row next page
             current_cursor = oldest_ms - 1
 
@@ -112,12 +121,20 @@ class BackfillService:
             try:
                 s = SessionLocal()
                 try:
-                    rec = s.query(BackfillProgress).filter(
-                        BackfillProgress.symbol == cfg.symbol,
-                        BackfillProgress.interval == cfg.interval,
-                    ).one_or_none()
+                    rec = (
+                        s.query(BackfillProgress)
+                        .filter(
+                            BackfillProgress.symbol == cfg.symbol,
+                            BackfillProgress.interval == cfg.interval,
+                        )
+                        .one_or_none()
+                    )
                     if not rec:
-                        rec = BackfillProgress(symbol=cfg.symbol, interval=cfg.interval, current_cursor_ms=current_cursor)
+                        rec = BackfillProgress(
+                            symbol=cfg.symbol,
+                            interval=cfg.interval,
+                            current_cursor_ms=current_cursor,
+                        )
                         s.add(rec)
                     else:
                         rec.current_cursor_ms = current_cursor
@@ -138,13 +155,17 @@ class BackfillService:
                     ms_left = max(current_cursor - start_ms, 0)
                     # approx span per page based on current page
                     try:
-                        span_ms = rows[-1]['open_time'] - rows[0]['open_time']
+                        span_ms = rows[-1]["open_time"] - rows[0]["open_time"]
                         if span_ms <= 0:
                             span_ms = 60_000
                     except Exception:
                         span_ms = 60_000
                     est_pages_left = int(ms_left / max(span_ms, 1))
-                    eta = (elapsed / max(pages, 1)) * est_pages_left if est_pages_left is not None else None
+                    eta = (
+                        (elapsed / max(pages, 1)) * est_pages_left
+                        if est_pages_left is not None
+                        else None
+                    )
 
             logger.info(
                 f"Backfill page {pages}: {len(rows)} rows, total upserts {done}, rps={rps:.1f}, est_pages_left={est_pages_left}, eta={eta and round(eta,1)}s"
@@ -155,7 +176,9 @@ class BackfillService:
             return done, pages, eta, est_pages_left
         return done, pages
 
-    def _fetch_page(self, symbol: str, interval: str, limit: int, end_open_time_ms: Optional[int]) -> List[dict]:
+    def _fetch_page(
+        self, symbol: str, interval: str, limit: int, end_open_time_ms: Optional[int]
+    ) -> List[dict]:
         """
         Adapter currently does not expose time-bounded params. We'll fetch `limit` most-recent
         and then rely on DB idempotency and the moving cursor to walk back. If adapter later supports
@@ -164,17 +187,19 @@ class BackfillService:
         try:
             rows = self.adapter.get_klines(symbol=symbol, interval=interval, limit=limit)
             # Adapter returns newest-first or oldest-first depending on endpoint; sort asc by open_time
-            rows = [r for r in rows if r.get('open_time')]
-            rows.sort(key=lambda r: r['open_time'])
+            rows = [r for r in rows if r.get("open_time")]
+            rows.sort(key=lambda r: r["open_time"])
             # If end_open_time_ms is given, drop rows newer than it
             if end_open_time_ms is not None:
-                rows = [r for r in rows if r['open_time'] <= end_open_time_ms]
+                rows = [r for r in rows if r["open_time"] <= end_open_time_ms]
             return rows
         except Exception as e:
             logger.error(f"Adapter fetch failed: {e}")
             return []
 
-    def _fetch_page_with_retries(self, symbol: str, interval: str, limit: int, end_open_time_ms: Optional[int]) -> List[dict]:
+    def _fetch_page_with_retries(
+        self, symbol: str, interval: str, limit: int, end_open_time_ms: Optional[int]
+    ) -> List[dict]:
         max_attempts = 6
         base_backoff = 0.5
         for attempt in range(1, max_attempts + 1):
@@ -188,18 +213,24 @@ class BackfillService:
                 if attempt >= 2:
                     return []
                 delay = base_backoff * (2 ** (attempt - 1))
-                logger.warning(f"Empty page (status={status}), retrying briefly in {delay:.1f}s (attempt {attempt}/{max_attempts})")
+                logger.warning(
+                    f"Empty page (status={status}), retrying briefly in {delay:.1f}s (attempt {attempt}/{max_attempts})"
+                )
                 time.sleep(delay)
                 continue
             # 429 or 5xx -> exponential backoff and keep trying a few times
             if status == 429 or 500 <= status < 600:
                 delay = min(8.0, base_backoff * (2 ** (attempt - 1)))
-                logger.warning(f"HTTP {status} from adapter; backoff {delay:.1f}s (attempt {attempt}/{max_attempts})")
+                logger.warning(
+                    f"HTTP {status} from adapter; backoff {delay:.1f}s (attempt {attempt}/{max_attempts})"
+                )
                 time.sleep(delay)
                 continue
             # Other 4xx -> likely fatal for this request; stop early
             if 400 <= status < 500:
-                logger.error(f"HTTP {status} from adapter; treating as terminal error/end-of-data for this window")
+                logger.error(
+                    f"HTTP {status} from adapter; treating as terminal error/end-of-data for this window"
+                )
                 return []
             # Fallback generic small backoff
             delay = base_backoff * (2 ** (attempt - 1))

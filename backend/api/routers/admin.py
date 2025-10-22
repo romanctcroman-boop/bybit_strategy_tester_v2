@@ -1,21 +1,21 @@
-from fastapi import APIRouter, HTTPException, Depends, status
-from pydantic import BaseModel, Field
-from typing import Optional
-import os
-import time
-from loguru import logger
-from pathlib import Path
-
-from backend.services.backfill_service import BackfillService, BackfillConfig
-from backend.celery_app import celery_app
-from sqlalchemy import desc
 import json
+import os
+import secrets
+import time
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
 
 # Optional Basic Auth for admin endpoints (enabled if ADMIN_USER/ADMIN_PASS set)
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-import secrets
+from loguru import logger
+from pydantic import BaseModel, Field
+from sqlalchemy import desc, text
 
+from backend.celery_app import celery_app
+from backend.services.backfill_service import BackfillConfig, BackfillService
 
 security = HTTPBasic()
 
@@ -47,7 +47,9 @@ class BackfillRequest(BaseModel):
 
 class ArchiveRequest(BaseModel):
     output_dir: str = Field("archives")
-    before_iso: Optional[str] = Field(None, description="Archive rows with open_time <= this ISO timestamp (UTC recommended)")
+    before_iso: Optional[str] = Field(
+        None, description="Archive rows with open_time <= this ISO timestamp (UTC recommended)"
+    )
     symbol: Optional[str] = Field(None, description="Optional symbol filter")
     interval_for_partition: str = Field("1", description="Used only for partition path naming")
     batch_size: int = Field(5000, ge=100, le=100000)
@@ -63,28 +65,28 @@ def _check_allowlist(symbol: str, interval: str):
     symbols = os.environ.get("ADMIN_BACKFILL_ALLOWED_SYMBOLS")
     intervals = os.environ.get("ADMIN_BACKFILL_ALLOWED_INTERVALS")
     if symbols:
-        allowed_syms = {s.strip().upper() for s in symbols.split(',') if s.strip()}
+        allowed_syms = {s.strip().upper() for s in symbols.split(",") if s.strip()}
         if allowed_syms and symbol.upper() not in allowed_syms:
             raise HTTPException(status_code=403, detail="symbol not allowed")
     if intervals:
-        allowed_iv = {s.strip().upper() for s in intervals.split(',') if s.strip()}
+        allowed_iv = {s.strip().upper() for s in intervals.split(",") if s.strip()}
         if allowed_iv and interval.upper() not in allowed_iv:
             raise HTTPException(status_code=403, detail="interval not allowed")
 
 
-from typing import Union, List, Dict, Any
+from typing import List, Union
+
 from backend.api.schemas import (
-    BackfillAsyncResponse,
-    BackfillSyncResponse,
     ArchiveAsyncResponse,
+    ArchivesListOut,
     ArchiveSyncResponse,
+    BackfillAsyncResponse,
+    BackfillRunOut,
+    BackfillSyncResponse,
+    DeleteArchiveResponse,
     RestoreAsyncResponse,
     RestoreSyncResponse,
-    ArchivesListOut,
-    ArchiveFileOut,
-    DeleteArchiveResponse,
     TaskStatusOut,
-    BackfillRunOut,
 )
 
 
@@ -95,22 +97,26 @@ def trigger_backfill(req: BackfillRequest, _: bool = Depends(_admin_auth)):
     if req.mode.lower() == "async":
         # Lazy import to avoid import-time issues during modules import in tests
         from backend.tasks.backfill_tasks import backfill_symbol_task
+
         # create a BackfillRun row with PENDING, then enqueue task
         try:
             from backend.database import Base, engine
+
             Base.metadata.create_all(bind=engine)
         except Exception:
             pass
         run_id = None
         from backend.database import SessionLocal
+
         s = SessionLocal()
         try:
             from backend.models.backfill_run import BackfillRun
+
             run = BackfillRun(
                 symbol=req.symbol,
                 interval=req.interval,
                 params=json.dumps(req.dict(), ensure_ascii=False),
-                status='PENDING',
+                status="PENDING",
             )
             s.add(run)
             s.commit()
@@ -130,13 +136,15 @@ def trigger_backfill(req: BackfillRequest, _: bool = Depends(_admin_auth)):
         )
         # update run with task_id and RUNNING
         from backend.database import SessionLocal
+
         s = SessionLocal()
         try:
             from backend.models.backfill_run import BackfillRun
+
             run = s.query(BackfillRun).get(run_id)
             if run:
                 run.task_id = res.id
-                run.status = 'RUNNING'
+                run.status = "RUNNING"
                 s.commit()
         finally:
             s.close()
@@ -147,11 +155,13 @@ def trigger_backfill(req: BackfillRequest, _: bool = Depends(_admin_auth)):
     # Ensure table exists
     try:
         from backend.database import Base, engine
+
         Base.metadata.create_all(bind=engine)
     except Exception:
         pass
     svc = BackfillService()
     from datetime import datetime, timezone
+
     def _parse(ts: Optional[str]):
         if not ts:
             return None
@@ -168,15 +178,17 @@ def trigger_backfill(req: BackfillRequest, _: bool = Depends(_admin_auth)):
     )
     # Create BackfillRun row
     from backend.database import SessionLocal
+
     s = SessionLocal()
     run_id = None
     try:
         from backend.models.backfill_run import BackfillRun
+
         run = BackfillRun(
             symbol=req.symbol,
             interval=req.interval,
             params=json.dumps(cfg.__dict__, default=str, ensure_ascii=False),
-            status='RUNNING',
+            status="RUNNING",
         )
         s.add(run)
         s.commit()
@@ -188,34 +200,45 @@ def trigger_backfill(req: BackfillRequest, _: bool = Depends(_admin_auth)):
     # Metrics: mark RUNNING
     try:
         from backend.api.app import metrics_inc_run_status
-        metrics_inc_run_status('RUNNING')
+
+        metrics_inc_run_status("RUNNING")
     except Exception:
         pass
     t0 = time.perf_counter()
     upserts, pages, eta, est_left = svc.backfill(cfg, return_stats=True)
     dt = max(time.perf_counter() - t0, 1e-6)
     rps = upserts / dt
-    logger.info(f"Admin backfill sync done: {req.symbol} {req.interval} upserts={upserts} pages={pages} elapsed={dt:.3f}s rps={rps:.1f}")
+    logger.info(
+        f"Admin backfill sync done: {req.symbol} {req.interval} upserts={upserts} pages={pages} elapsed={dt:.3f}s rps={rps:.1f}"
+    )
     # Prometheus metrics
     try:
-        from backend.api.app import metrics_inc_upserts, metrics_inc_pages, metrics_observe_duration, metrics_inc_run_status
+        from backend.api.app import (
+            metrics_inc_pages,
+            metrics_inc_run_status,
+            metrics_inc_upserts,
+            metrics_observe_duration,
+        )
+
         metrics_inc_upserts(req.symbol, req.interval, upserts)
         metrics_inc_pages(req.symbol, req.interval, pages)
         metrics_observe_duration(dt)
-        metrics_inc_run_status('SUCCEEDED')
+        metrics_inc_run_status("SUCCEEDED")
     except Exception:
         pass
     # finalize run row
     from backend.database import SessionLocal
+
     s = SessionLocal()
     try:
         from backend.models.backfill_run import BackfillRun
+
         run = s.query(BackfillRun).get(run_id)
         if run:
             run.upserts = upserts
             run.pages = pages
-            run.status = 'SUCCEEDED'
-            run.finished_at = __import__('datetime').datetime.utcnow()
+            run.status = "SUCCEEDED"
+            run.finished_at = __import__("datetime").datetime.utcnow()
             s.commit()
     finally:
         s.close()
@@ -247,6 +270,7 @@ def trigger_archive(req: ArchiveRequest, _: bool = Depends(_admin_auth)):
     if req.mode.lower() == "async":
         try:
             from backend.tasks.backfill_tasks import archive_candles_task
+
             res = archive_candles_task.delay(
                 output_dir=req.output_dir,
                 before_ms=before_ms,
@@ -261,8 +285,14 @@ def trigger_archive(req: ArchiveRequest, _: bool = Depends(_admin_auth)):
     # sync
     try:
         from backend.services.archival_service import ArchivalService, ArchiveConfig
+
         svc = ArchivalService(req.output_dir)
-        cfg = ArchiveConfig(output_dir=req.output_dir, before_ms=before_ms, symbol=req.symbol, batch_size=req.batch_size)
+        cfg = ArchiveConfig(
+            output_dir=req.output_dir,
+            before_ms=before_ms,
+            symbol=req.symbol,
+            batch_size=req.batch_size,
+        )
         total = svc.archive(cfg, interval_for_partition=req.interval_for_partition)
         return {"mode": "sync", "archived_rows": total, "output_dir": req.output_dir}
     except Exception as e:
@@ -274,6 +304,7 @@ def trigger_restore(req: RestoreRequest, _: bool = Depends(_admin_auth)):
     if req.mode.lower() == "async":
         try:
             from backend.tasks.backfill_tasks import restore_archives_task
+
             res = restore_archives_task.delay(input_dir=req.input_dir)
             return {"mode": "async", "task_id": res.id}
         except Exception as e:
@@ -281,6 +312,7 @@ def trigger_restore(req: RestoreRequest, _: bool = Depends(_admin_auth)):
 
     try:
         from backend.services.archival_service import ArchivalService
+
         svc = ArchivalService(req.input_dir)
         total = svc.restore_from_dir(req.input_dir)
         return {"mode": "sync", "restored_rows": total, "input_dir": req.input_dir}
@@ -294,28 +326,32 @@ def list_archives(dir: str = "archives", _: bool = Depends(_admin_auth)):
     if not base.exists():
         return {"dir": str(base), "files": []}
     files = []
-    for p in base.rglob('*.parquet'):
+    for p in base.rglob("*.parquet"):
         try:
             stat = p.stat()
-            files.append({
-                "path": str(p),
-                "size": stat.st_size,
-                "modified": stat.st_mtime,
-            })
+            files.append(
+                {
+                    "path": str(p),
+                    "size": stat.st_size,
+                    "modified": stat.st_mtime,
+                }
+            )
         except Exception:
             pass
-    return {"dir": str(base), "files": sorted(files, key=lambda x: x["path"]) }
+    return {"dir": str(base), "files": sorted(files, key=lambda x: x["path"])}
 
 
 class DeleteArchiveRequest(BaseModel):
-    path: str = Field(..., description="Absolute path to a parquet file or a directory under archives")
+    path: str = Field(
+        ..., description="Absolute path to a parquet file or a directory under archives"
+    )
 
 
 @router.delete("/archives", response_model=DeleteArchiveResponse)
 def delete_archive(req: DeleteArchiveRequest, _: bool = Depends(_admin_auth)):
     p = Path(req.path).resolve()
     # Safety: only allow deletion under the configured archives root or current working dir/archives
-    allowed_root = Path(os.environ.get('ARCHIVE_DIR', 'archives')).resolve()
+    allowed_root = Path(os.environ.get("ARCHIVE_DIR", "archives")).resolve()
     try:
         p.relative_to(allowed_root)
     except Exception:
@@ -327,12 +363,12 @@ def delete_archive(req: DeleteArchiveRequest, _: bool = Depends(_admin_auth)):
         if p.is_dir():
             # Remove empty dir only to avoid accidental tree wipe
             removed = []
-            for child in sorted(p.rglob('*'), reverse=True):
+            for child in sorted(p.rglob("*"), reverse=True):
                 if child.is_file():
                     child.unlink()
                     removed.append(str(child))
             # Try remove directories if empty
-            for child in sorted(p.rglob('*'), reverse=True):
+            for child in sorted(p.rglob("*"), reverse=True):
                 if child.is_dir():
                     try:
                         child.rmdir()
@@ -391,13 +427,16 @@ def task_status(task_id: str, _: bool = Depends(_admin_auth)):
 def list_runs(limit: int = 50, _: bool = Depends(_admin_auth)):
     try:
         from backend.database import Base, engine
+
         Base.metadata.create_all(bind=engine)
     except Exception:
         pass
     from backend.database import SessionLocal
+
     s = SessionLocal()
     try:
         from backend.models.backfill_run import BackfillRun
+
         q = s.query(BackfillRun).order_by(desc(BackfillRun.started_at)).limit(int(limit)).all()
         return [
             {
@@ -408,8 +447,10 @@ def list_runs(limit: int = 50, _: bool = Depends(_admin_auth)):
                 "status": r.status,
                 "upserts": r.upserts,
                 "pages": r.pages,
-                "started_at": r.started_at.isoformat() if getattr(r, 'started_at', None) else None,
-                "finished_at": r.finished_at.isoformat() if getattr(r, 'finished_at', None) else None,
+                "started_at": r.started_at.isoformat() if getattr(r, "started_at", None) else None,
+                "finished_at": (
+                    r.finished_at.isoformat() if getattr(r, "finished_at", None) else None
+                ),
                 "error": r.error,
             }
             for r in q
@@ -422,13 +463,16 @@ def list_runs(limit: int = 50, _: bool = Depends(_admin_auth)):
 def get_run(run_id: int, _: bool = Depends(_admin_auth)):
     try:
         from backend.database import Base, engine
+
         Base.metadata.create_all(bind=engine)
     except Exception:
         pass
     from backend.database import SessionLocal
+
     s = SessionLocal()
     try:
         from backend.models.backfill_run import BackfillRun
+
         r = s.query(BackfillRun).get(run_id)
         if not r:
             raise HTTPException(status_code=404, detail="not found")
@@ -440,8 +484,8 @@ def get_run(run_id: int, _: bool = Depends(_admin_auth)):
             "status": r.status,
             "upserts": r.upserts,
             "pages": r.pages,
-            "started_at": r.started_at.isoformat() if getattr(r, 'started_at', None) else None,
-            "finished_at": r.finished_at.isoformat() if getattr(r, 'finished_at', None) else None,
+            "started_at": r.started_at.isoformat() if getattr(r, "started_at", None) else None,
+            "finished_at": r.finished_at.isoformat() if getattr(r, "finished_at", None) else None,
             "params": r.params,
             "error": r.error,
         }
@@ -456,9 +500,11 @@ class OkResponse(BaseModel):
 @router.post("/backfill/{run_id}/cancel", response_model=OkResponse)
 def cancel_run(run_id: int, _: bool = Depends(_admin_auth)):
     from backend.database import SessionLocal
+
     s = SessionLocal()
     try:
         from backend.models.backfill_run import BackfillRun
+
         r = s.query(BackfillRun).get(run_id)
         if not r:
             raise HTTPException(status_code=404, detail="not found")
@@ -469,8 +515,8 @@ def cancel_run(run_id: int, _: bool = Depends(_admin_auth)):
             celery_app.control.revoke(r.task_id, terminate=True)
         except Exception as e:
             logger.warning(f"celery revoke failed: {e}")
-        r.status = 'CANCELED'
-        r.finished_at = __import__('datetime').datetime.utcnow()
+        r.status = "CANCELED"
+        r.finished_at = __import__("datetime").datetime.utcnow()
         s.commit()
         return {"ok": True}
     finally:
@@ -487,17 +533,23 @@ class ProgressOut(BaseModel):
 @router.get("/backfill/progress", response_model=ProgressOut)
 def get_progress(symbol: str, interval: str, _: bool = Depends(_admin_auth)):
     from backend.database import SessionLocal
+
     s = SessionLocal()
     try:
         from backend.models.backfill_progress import BackfillProgress
-        rec = s.query(BackfillProgress).filter(BackfillProgress.symbol == symbol, BackfillProgress.interval == interval).one_or_none()
+
+        rec = (
+            s.query(BackfillProgress)
+            .filter(BackfillProgress.symbol == symbol, BackfillProgress.interval == interval)
+            .one_or_none()
+        )
         if not rec:
             return {"symbol": symbol, "interval": interval, "current_cursor_ms": None}
         return {
             "symbol": rec.symbol,
             "interval": rec.interval,
             "current_cursor_ms": rec.current_cursor_ms,
-            "updated_at": rec.updated_at.isoformat() if getattr(rec, 'updated_at', None) else None,
+            "updated_at": rec.updated_at.isoformat() if getattr(rec, "updated_at", None) else None,
         }
     finally:
         s.close()
@@ -506,13 +558,54 @@ def get_progress(symbol: str, interval: str, _: bool = Depends(_admin_auth)):
 @router.delete("/backfill/progress")
 def reset_progress(symbol: str, interval: str, _: bool = Depends(_admin_auth)):
     from backend.database import SessionLocal
+
     s = SessionLocal()
     try:
         from backend.models.backfill_progress import BackfillProgress
-        rec = s.query(BackfillProgress).filter(BackfillProgress.symbol == symbol, BackfillProgress.interval == interval).one_or_none()
+
+        rec = (
+            s.query(BackfillProgress)
+            .filter(BackfillProgress.symbol == symbol, BackfillProgress.interval == interval)
+            .one_or_none()
+        )
         if rec:
             s.delete(rec)
             s.commit()
         return {"ok": True}
     finally:
         s.close()
+
+
+class DBStatusOut(BaseModel):
+    ok: bool
+    connectivity: bool
+    alembic_version: Optional[str] = None
+    info: Optional[str] = None
+
+
+@router.get("/db/status", response_model=DBStatusOut)
+def db_status(_: bool = Depends(_admin_auth)):
+    """Quick DB status: connectivity check and current alembic version.
+
+    Returns:
+      - connectivity: True if a trivial SELECT 1 succeeds
+      - alembic_version: current version from alembic_version table if present
+    """
+    try:
+        from backend.database import engine
+
+        connectivity = False
+        version = None
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("SELECT 1"))
+                connectivity = True
+            except Exception:
+                connectivity = False
+            try:
+                version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+            except Exception:
+                version = None
+        return {"ok": True, "connectivity": connectivity, "alembic_version": version}
+    except Exception as e:
+        return {"ok": False, "connectivity": False, "info": str(e)}

@@ -1,4 +1,4 @@
-from typing import Protocol, Any, TypedDict, Dict
+from typing import Any, Dict, Protocol, TypedDict
 
 from backend.core.backtest_engine import BacktestEngine
 
@@ -18,8 +18,7 @@ class EngineResult(TypedDict, total=False):
 
 
 class IBacktestEngine(Protocol):
-    def run(self, data: Any, strategy_config: dict) -> EngineResult:
-        ...
+    def run(self, data: Any, strategy_config: dict) -> EngineResult: ...
 
 
 def get_engine(name: str | None = None, **kwargs) -> IBacktestEngine:

@@ -23,7 +23,7 @@ class WSClient {
   private scheduleReconnect() {
     if (this.manualClose) return;
     const delay = this.backoffMs + Math.floor(Math.random() * 300);
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+     
     this.reconnectTimer = window.setTimeout(() => {
       this.connect();
     }, delay);

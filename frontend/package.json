@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
     "@emotion/react": "^11.11.3",
@@ -35,6 +36,14 @@
     "babel-plugin-transform-remove-imports": "^1.8.1",
     "rollup": "^4.52.5",
     "typescript": "^5.9.3",
-    "vite": "^5.1.0"
+    "vite": "^5.1.0",
+    "eslint": "^9.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "@typescript-eslint/parser": "^8.12.2",
+    "@typescript-eslint/eslint-plugin": "^8.12.2",
+    "prettier": "^3.3.3",
+    "globals": "^15.11.0"
   }
 }

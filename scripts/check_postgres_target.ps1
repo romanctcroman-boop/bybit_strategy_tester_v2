@@ -23,7 +23,8 @@ if ($Credential) {
 elseif ($Password) {
     try {
         $plainPassword = ([System.Net.NetworkCredential]::new("", $Password)).Password
-    } catch {
+    }
+    catch {
         Write-Warning "Failed to convert SecureString password."
     }
 }

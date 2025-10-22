@@ -1,15 +1,7 @@
 import psycopg2
 from testcontainers.postgres import PostgresContainer
-import importlib.util
-from pathlib import Path
 
-# Load migration module by file path because its filename starts with digits and
-# cannot be imported via a normal dotted import.
-repo_root = Path(__file__).resolve().parents[2]
-mig_path = repo_root / 'backend' / 'migrations' / 'versions' / '0001_convert_timestamps_to_timestamptz.py'
-spec = importlib.util.spec_from_file_location('mig_mod', str(mig_path))
-mig = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mig)
+from backend.migrations.helpers import timestamptz_helpers as mig
 
 
 def get_column_type(conn, table_name, column_name):
@@ -41,33 +33,39 @@ def test_migration_upgrade_and_downgrade():
         cur = conn.cursor()
 
         # Create sample tables
-        cur.execute("DROP TABLE IF EXISTS backtests; DROP TABLE IF EXISTS trades; DROP TABLE IF EXISTS market_data;")
-        cur.execute("CREATE TABLE backtests (id serial primary key, started_at timestamp, updated_at timestamp, completed_at timestamp, created_at timestamp);")
-        cur.execute("CREATE TABLE trades (id serial primary key, entry_time timestamp, exit_time timestamp, created_at timestamp);")
+        cur.execute(
+            "DROP TABLE IF EXISTS backtests; DROP TABLE IF EXISTS trades; DROP TABLE IF EXISTS market_data;"
+        )
+        cur.execute(
+            "CREATE TABLE backtests (id serial primary key, started_at timestamp, updated_at timestamp, completed_at timestamp, created_at timestamp);"
+        )
+        cur.execute(
+            "CREATE TABLE trades (id serial primary key, entry_time timestamp, exit_time timestamp, created_at timestamp);"
+        )
         cur.execute("CREATE TABLE market_data (id serial primary key, timestamp timestamp);")
 
         # Confirm initial types
-        assert 'timestamp without time zone' in get_column_type(conn, 'backtests', 'started_at')
-        assert 'timestamp without time zone' in get_column_type(conn, 'trades', 'entry_time')
-        assert 'timestamp without time zone' in get_column_type(conn, 'market_data', 'timestamp')
+        assert "timestamp without time zone" in get_column_type(conn, "backtests", "started_at")
+        assert "timestamp without time zone" in get_column_type(conn, "trades", "entry_time")
+        assert "timestamp without time zone" in get_column_type(conn, "market_data", "timestamp")
 
         # Run upgrade SQLs
         for sql in mig.upgrade_sqls():
             cur.execute(sql)
 
         # Verify converted
-        assert 'timestamp with time zone' in get_column_type(conn, 'backtests', 'started_at')
-        assert 'timestamp with time zone' in get_column_type(conn, 'trades', 'entry_time')
-        assert 'timestamp with time zone' in get_column_type(conn, 'market_data', 'timestamp')
+        assert "timestamp with time zone" in get_column_type(conn, "backtests", "started_at")
+        assert "timestamp with time zone" in get_column_type(conn, "trades", "entry_time")
+        assert "timestamp with time zone" in get_column_type(conn, "market_data", "timestamp")
 
         # Run downgrade SQLs
         for sql in mig.downgrade_sqls():
             cur.execute(sql)
 
         # Verify reverted
-        assert 'timestamp without time zone' in get_column_type(conn, 'backtests', 'started_at')
-        assert 'timestamp without time zone' in get_column_type(conn, 'trades', 'entry_time')
-        assert 'timestamp without time zone' in get_column_type(conn, 'market_data', 'timestamp')
+        assert "timestamp without time zone" in get_column_type(conn, "backtests", "started_at")
+        assert "timestamp without time zone" in get_column_type(conn, "trades", "entry_time")
+        assert "timestamp without time zone" in get_column_type(conn, "market_data", "timestamp")
 
         cur.close()
         conn.close()

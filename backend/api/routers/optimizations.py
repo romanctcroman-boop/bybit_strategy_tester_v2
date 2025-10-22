@@ -1,23 +1,25 @@
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, HTTPException, Query
 
 from backend.api.schemas import (
     ApiListResponse,
-    OptimizationOut,
     OptimizationCreate,
-    OptimizationUpdate,
+    OptimizationEnqueueResponse,
+    OptimizationOut,
     OptimizationResultOut,
+    OptimizationRunBayesianRequest,
     OptimizationRunGridRequest,
     OptimizationRunWalkForwardRequest,
-    OptimizationRunBayesianRequest,
-    OptimizationEnqueueResponse,
+    OptimizationUpdate,
 )
 
 
 def _get_data_service():
     try:
         from backend.services.data_service import DataService
+
         return DataService
     except Exception:
         return None
@@ -82,7 +84,9 @@ def list_optimizations(
     if DS is None:
         return {"items": [], "total": 0}
     with DS() as ds:
-        items = ds.get_optimizations(strategy_id=strategy_id, status=status, limit=limit, offset=offset)
+        items = ds.get_optimizations(
+            strategy_id=strategy_id, status=status, limit=limit, offset=offset
+        )
         total = len(items)
         return {"items": [_to_iso_dict(i) for i in items], "total": total}
 
@@ -91,7 +95,9 @@ def list_optimizations(
 def get_optimization(optimization_id: int):
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
     with DS() as ds:
         opt = ds.get_optimization(optimization_id)
         if not opt:
@@ -103,7 +109,9 @@ def get_optimization(optimization_id: int):
 def create_optimization(payload: OptimizationCreate):
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
     with DS() as ds:
         opt = ds.create_optimization(**payload.model_dump())
         return _to_iso_dict(opt)
@@ -113,9 +121,13 @@ def create_optimization(payload: OptimizationCreate):
 def update_optimization(optimization_id: int, payload: OptimizationUpdate):
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
     with DS() as ds:
-        opt = ds.update_optimization(optimization_id, **{k: v for k, v in payload.model_dump(exclude_none=True).items()})
+        opt = ds.update_optimization(
+            optimization_id, **{k: v for k, v in payload.model_dump(exclude_none=True).items()}
+        )
         if not opt:
             raise HTTPException(status_code=404, detail="Optimization not found")
         return _to_iso_dict(opt)
@@ -130,7 +142,9 @@ def list_optimization_results(optimization_id: int, limit: int = 100, offset: in
     if DS is None:
         return []
     with DS() as ds:
-        results = ds.get_optimization_results(optimization_id=optimization_id, limit=limit, offset=offset)
+        results = ds.get_optimization_results(
+            optimization_id=optimization_id, limit=limit, offset=offset
+        )
         return [_map_result(r) for r in results]
 
 
@@ -151,7 +165,7 @@ def list_optimization_results(optimization_id: int, limit: int = 100, offset: in
                         "max_drawdown": -0.12,
                         "win_rate": 0.56,
                         "total_trades": 240,
-                        "metrics": {"profit_factor": 1.8}
+                        "metrics": {"profit_factor": 1.8},
                     }
                 }
             }
@@ -161,7 +175,9 @@ def list_optimization_results(optimization_id: int, limit: int = 100, offset: in
 def best_optimization_result(optimization_id: int):
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
     with DS() as ds:
         r = ds.get_best_optimization_result(optimization_id)
         if not r:
@@ -172,6 +188,7 @@ def best_optimization_result(optimization_id: int):
 # ========================
 # Enqueue optimization tasks
 # ========================
+
 
 def _iso(v) -> str:
     if isinstance(v, datetime):
@@ -190,7 +207,7 @@ def _iso(v) -> str:
                         "task_id": "5f1b7a34-2e40-4f7e-9f07-f2b17b8f5e4a",
                         "optimization_id": 42,
                         "queue": "optimizations.grid",
-                        "status": "queued"
+                        "status": "queued",
                     }
                 }
             }
@@ -206,7 +223,9 @@ def enqueue_grid_search(optimization_id: int, payload: OptimizationRunGridReques
 
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
 
     with DS() as ds:
         opt = ds.get_optimization(optimization_id)
@@ -264,7 +283,7 @@ def enqueue_grid_search(optimization_id: int, payload: OptimizationRunGridReques
                         "task_id": "7a2b915a-1c2d-4f89-9a0e-3e6d0e2b1c5f",
                         "optimization_id": 42,
                         "queue": "optimizations.walk",
-                        "status": "queued"
+                        "status": "queued",
                     }
                 }
             }
@@ -279,7 +298,9 @@ def enqueue_walk_forward(optimization_id: int, payload: OptimizationRunWalkForwa
 
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
 
     with DS() as ds:
         opt = ds.get_optimization(optimization_id)
@@ -337,7 +358,7 @@ def enqueue_walk_forward(optimization_id: int, payload: OptimizationRunWalkForwa
                         "task_id": "1a2b3c4d-5e6f-7091-2233-445566778899",
                         "optimization_id": 42,
                         "queue": "optimizations.bayes",
-                        "status": "queued"
+                        "status": "queued",
                     }
                 }
             }
@@ -352,7 +373,9 @@ def enqueue_bayesian(optimization_id: int, payload: OptimizationRunBayesianReque
 
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
 
     with DS() as ds:
         opt = ds.get_optimization(optimization_id)

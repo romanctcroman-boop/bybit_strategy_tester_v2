@@ -1,20 +1,30 @@
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime
-from backend.api.schemas import StrategyOut, ApiListResponse, StrategyCreate, StrategyUpdate
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query
+
+from backend.api.schemas import ApiListResponse, StrategyCreate, StrategyOut, StrategyUpdate
+
 
 def _get_data_service():
     try:
         from backend.services.data_service import DataService
+
         return DataService
     except Exception:
         return None
+
 
 router = APIRouter()
 
 
 @router.get("/", response_model=ApiListResponse[StrategyOut])
-def list_strategies(is_active: Optional[bool] = Query(None), strategy_type: Optional[str] = Query(None), limit: int = 100, offset: int = 0):
+def list_strategies(
+    is_active: Optional[bool] = Query(None),
+    strategy_type: Optional[str] = Query(None),
+    limit: int = 100,
+    offset: int = 0,
+):
     """List strategies
 
     Note: bybit-specific interactions (Bybit API v5) are handled in separate service adapters.
@@ -25,7 +35,9 @@ def list_strategies(is_active: Optional[bool] = Query(None), strategy_type: Opti
         # backend models/database not available — return empty list response
         return {"items": [], "total": 0}
     with DS() as ds:
-        items = ds.get_strategies(is_active=is_active, strategy_type=strategy_type, limit=limit, offset=offset)
+        items = ds.get_strategies(
+            is_active=is_active, strategy_type=strategy_type, limit=limit, offset=offset
+        )
         total = ds.count_strategies(is_active=is_active, strategy_type=strategy_type)
 
         def to_iso(d):
@@ -42,7 +54,9 @@ def list_strategies(is_active: Optional[bool] = Query(None), strategy_type: Opti
 def get_strategy(strategy_id: int):
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
     with DS() as ds:
         s = ds.get_strategy(strategy_id)
         if not s:
@@ -58,7 +72,9 @@ def get_strategy(strategy_id: int):
 def create_strategy(payload: StrategyCreate):
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
     with DS() as ds:
         s = ds.create_strategy(**payload.model_dump())
         d = s.__dict__.copy()
@@ -72,9 +88,13 @@ def create_strategy(payload: StrategyCreate):
 def update_strategy(strategy_id: int, payload: StrategyUpdate):
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
     with DS() as ds:
-        s = ds.update_strategy(strategy_id, **{k: v for k, v in payload.model_dump(exclude_none=True).items()})
+        s = ds.update_strategy(
+            strategy_id, **{k: v for k, v in payload.model_dump(exclude_none=True).items()}
+        )
         if not s:
             raise HTTPException(status_code=404, detail="Strategy not found")
         d = s.__dict__.copy()
@@ -88,7 +108,9 @@ def update_strategy(strategy_id: int, payload: StrategyUpdate):
 def delete_strategy(strategy_id: int):
     DS = _get_data_service()
     if DS is None:
-        raise HTTPException(status_code=501, detail="Backend database not configured in this environment")
+        raise HTTPException(
+            status_code=501, detail="Backend database not configured in this environment"
+        )
     with DS() as ds:
         ok = ds.delete_strategy(strategy_id)
         return {"success": ok}

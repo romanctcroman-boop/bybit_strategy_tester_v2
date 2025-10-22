@@ -3,9 +3,11 @@
 Implements a lightweight async optimize routine returning deterministic results
 and a simple parameter importance mapping to keep Celery tasks operable in dev/CI.
 """
+
 from __future__ import annotations
-from typing import Any, Dict
+
 import asyncio
+from typing import Any, Dict
 
 
 class BayesianOptimizer:
@@ -73,34 +75,3 @@ class BayesianOptimizer:
     def get_importance(self) -> Dict[str, float]:
         # Uniform importance in the stub
         return {"param_importance": 1.0}
-from __future__ import annotations
-from typing import Dict, Any, Optional
-import asyncio
-
-
-class BayesianOptimizer:
-    """Minimal stub for Bayesian optimization to satisfy task imports.
-
-    Real implementation should integrate with Optuna or similar.
-    """
-
-    def __init__(self, data, initial_capital: float, commission: float, n_trials: int, n_jobs: int, random_state: Optional[int]) -> None:
-        self.data = data
-        self.initial_capital = initial_capital
-        self.commission = commission
-        self.n_trials = n_trials
-        self.n_jobs = n_jobs
-        self.random_state = random_state
-
-    async def optimize_async(self, strategy_config: Dict[str, Any], param_space: Dict[str, Dict[str, Any]], metric: str, direction: str, show_progress: bool) -> Dict[str, Any]:
-        await asyncio.sleep(0)
-        # Return synthetic best result
-        return {
-            "best_params": {k: (v.get("low") if v.get("type") == "int" else v.get("low", 0.1)) for k, v in param_space.items()},
-            "best_value": 1.2345,
-            "statistics": {"completed_trials": self.n_trials},
-            "history": [],
-        }
-
-    def get_importance(self) -> Dict[str, float]:
-        return {"param": 1.0}

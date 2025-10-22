@@ -1,10 +1,11 @@
-from fastapi import FastAPI
+import logging
 from contextlib import asynccontextmanager
 
-from backend.api.routers import strategies, backtests, marketdata, admin
-from backend.api.routers import optimizations
-from backend.api.routers import bots as bots_router
+from fastapi import FastAPI
+
 from backend.api.routers import active_deals as active_deals_router
+from backend.api.routers import admin, backtests, marketdata, optimizations, strategies
+from backend.api.routers import bots as bots_router
 from backend.api.routers import live as live_router
 from backend.api.routers import wizard as wizard_router
 from backend.config import CONFIG
@@ -12,6 +13,7 @@ from backend.config import CONFIG
 # Optional: start BybitWsManager on app startup when feature flag is enabled
 try:
     from redis.asyncio import Redis
+
     from backend.services.bybit_ws_manager import BybitWsManager
 except Exception:
     Redis = None  # type: ignore
@@ -20,6 +22,37 @@ except Exception:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Log Alembic DB version vs code head(s) on startup
+    try:
+        from alembic.config import Config as _AlConfig  # type: ignore
+        from alembic.script import ScriptDirectory  # type: ignore
+
+        from backend.database import engine  # lazy to avoid import cycles
+
+        db_rev = None
+        with engine.connect() as conn:
+            try:
+                db_rev = conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar()
+            except Exception:
+                db_rev = None
+
+        code_heads = None
+        try:
+            alembic_cfg = _AlConfig("alembic.ini")
+            script = ScriptDirectory.from_config(alembic_cfg)
+            code_heads = script.get_heads()
+        except Exception:
+            code_heads = None
+
+        logging.getLogger("uvicorn.error").info(
+            "Alembic versions: db=%s code_heads=%s match=%s",
+            db_rev,
+            code_heads,
+            (db_rev in (code_heads or [])),
+        )
+    except Exception as _e:  # best-effort only
+        logging.getLogger("uvicorn.error").warning("Alembic status check failed: %s", _e)
+
     # Startup
     if CONFIG.ws_enabled and Redis is not None and BybitWsManager is not None:
         try:
@@ -63,7 +96,13 @@ app.include_router(active_deals_router.router, prefix="/api/v1/active-deals", ta
 
 # Optional Prometheus metrics (/metrics), minimal text format
 from fastapi import Response
-from prometheus_client import Counter, Histogram, CollectorRegistry, CONTENT_TYPE_LATEST, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 
 # Prometheus metrics registry and metrics
 REGISTRY = CollectorRegistry()

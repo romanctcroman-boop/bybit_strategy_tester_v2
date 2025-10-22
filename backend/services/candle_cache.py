@@ -19,9 +19,9 @@ Design notes:
 This module has no external deps and is safe for use in workers/backtester.
 """
 
-from typing import Dict, List, Tuple, Optional
 import threading
 from datetime import datetime, timezone
+from typing import Dict, List, Optional, Tuple
 
 from backend.services.adapters.bybit import BybitAdapter
 
@@ -50,11 +50,11 @@ class CandleCache:
 
     def _dedup_sort(self, rows: List[dict]) -> List[dict]:
         """Sort ascending by open_time(ms) and deduplicate equal times (keep latest)."""
-        rows_sorted = sorted(rows, key=lambda r: int(r.get('open_time') or 0))
+        rows_sorted = sorted(rows, key=lambda r: int(r.get("open_time") or 0))
         out: List[dict] = []
         last_ms: Optional[int] = None
         for r in rows_sorted:
-            ms = int(r.get('open_time') or 0)
+            ms = int(r.get("open_time") or 0)
             if last_ms is None or ms > last_ms:
                 out.append(r)
                 last_ms = ms
@@ -63,7 +63,9 @@ class CandleCache:
                 out[-1] = r
         return out
 
-    def load_initial(self, symbol: str, interval: str, *, load_limit: Optional[int] = None, persist: bool = True) -> List[dict]:
+    def load_initial(
+        self, symbol: str, interval: str, *, load_limit: Optional[int] = None, persist: bool = True
+    ) -> List[dict]:
         """
         Fetch up to 1000 candles from Bybit, persist to DB, and cache last 500 in RAM.
         Returns the working set (<=500) as chart-friendly dicts with time in seconds.
@@ -79,24 +81,30 @@ class CandleCache:
             # coupling to other model imports that may not exist in all environments.
 
             # Keep only last RAM_LIMIT in memory, mapped to seconds-based time
-            last_n = norm[-self.RAM_LIMIT:] if len(norm) > self.RAM_LIMIT else norm
+            last_n = norm[-self.RAM_LIMIT :] if len(norm) > self.RAM_LIMIT else norm
             working = [
                 {
-                    'time': ms_to_sec(int(r.get('open_time') or 0)),
-                    'open': float(r.get('open') or 0.0),
-                    'high': float(r.get('high') or 0.0),
-                    'low': float(r.get('low') or 0.0),
-                    'close': float(r.get('close') or 0.0),
-                    'volume': float(r.get('volume') or 0.0) if r.get('volume') is not None else None,
+                    "time": ms_to_sec(int(r.get("open_time") or 0)),
+                    "open": float(r.get("open") or 0.0),
+                    "high": float(r.get("high") or 0.0),
+                    "low": float(r.get("low") or 0.0),
+                    "close": float(r.get("close") or 0.0),
+                    "volume": (
+                        float(r.get("volume") or 0.0) if r.get("volume") is not None else None
+                    ),
                 }
                 for r in last_n
             ]
             self._store[self._key(symbol, interval)] = working
             if norm:
-                self._last_loaded_at[self._key(symbol, interval)] = int(norm[-1].get('open_time') or 0)
+                self._last_loaded_at[self._key(symbol, interval)] = int(
+                    norm[-1].get("open_time") or 0
+                )
             return working
 
-    def get_working_set(self, symbol: str, interval: str, *, ensure_loaded: bool = True) -> List[dict]:
+    def get_working_set(
+        self, symbol: str, interval: str, *, ensure_loaded: bool = True
+    ) -> List[dict]:
         key = self._key(symbol, interval)
         with self._lock:
             if key not in self._store and ensure_loaded:
@@ -115,13 +123,13 @@ class CandleCache:
         key = self._key(symbol, interval)
         with self._lock:
             arr = self._store.get(key, [])
-            t = int(candle.get('time'))
-            if arr and int(arr[-1]['time']) == t:
+            t = int(candle.get("time"))
+            if arr and int(arr[-1]["time"]) == t:
                 arr[-1] = candle
             else:
                 arr.append(candle)
                 if len(arr) > self.RAM_LIMIT:
-                    arr = arr[-self.RAM_LIMIT:]
+                    arr = arr[-self.RAM_LIMIT :]
             self._store[key] = arr
             return list(arr)
 

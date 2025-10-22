@@ -4,7 +4,6 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel
 
-
 router = APIRouter()
 
 

@@ -16,7 +16,14 @@ function toPct(value: number, min: number, max: number) {
   return ((value - min) / span) * 100;
 }
 
-const PriceProgressBar: React.FC<PriceProgressBarProps> = ({ min, entry, nextOpen, target, current, side = 'LONG' }) => {
+const PriceProgressBar: React.FC<PriceProgressBarProps> = ({
+  min,
+  entry,
+  nextOpen,
+  target,
+  current,
+  side: _side = 'LONG',
+}) => {
   const max = Math.max(target, entry, nextOpen, current ?? target, min);
   const entryP = toPct(entry, min, max);
   const nextP = toPct(nextOpen, min, max);
@@ -34,36 +41,130 @@ const PriceProgressBar: React.FC<PriceProgressBarProps> = ({ min, entry, nextOpe
   return (
     <Box sx={{ position: 'relative', height: 38, display: 'flex', alignItems: 'center' }}>
       {/* Track */}
-      <Box sx={{ position: 'absolute', left: 0, right: 0, height: 8, bgcolor: lightBg, borderRadius: 2 }} />
+      <Box
+        sx={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          height: 8,
+          bgcolor: lightBg,
+          borderRadius: 2,
+        }}
+      />
       {/* Red segment between entry and nextOpen */}
-      <Box sx={{ position: 'absolute', left: `${redStart}%`, width: `${redWidth}%`, height: 8, bgcolor: primaryRed, borderRadius: 2 }} />
+      <Box
+        sx={{
+          position: 'absolute',
+          left: `${redStart}%`,
+          width: `${redWidth}%`,
+          height: 8,
+          bgcolor: primaryRed,
+          borderRadius: 2,
+        }}
+      />
 
       {/* Entry marker (thin) */}
-      <Box sx={{ position: 'absolute', left: `${entryP}%`, transform: 'translateX(-1px)', width: 2, height: 16, bgcolor: primaryRed }} />
+      <Box
+        sx={{
+          position: 'absolute',
+          left: `${entryP}%`,
+          transform: 'translateX(-1px)',
+          width: 2,
+          height: 16,
+          bgcolor: primaryRed,
+        }}
+      />
       {/* Next open marker */}
-      <Box sx={{ position: 'absolute', left: `${nextP}%`, transform: 'translateX(-1px)', width: 2, height: 16, bgcolor: blue }} />
+      <Box
+        sx={{
+          position: 'absolute',
+          left: `${nextP}%`,
+          transform: 'translateX(-1px)',
+          width: 2,
+          height: 16,
+          bgcolor: blue,
+        }}
+      />
       {/* Target marker (green) */}
-      <Box sx={{ position: 'absolute', left: `${targP}%`, transform: 'translateX(-1px)', width: 2, height: 22, bgcolor: green }} />
+      <Box
+        sx={{
+          position: 'absolute',
+          left: `${targP}%`,
+          transform: 'translateX(-1px)',
+          width: 2,
+          height: 22,
+          bgcolor: green,
+        }}
+      />
       {/* Current marker (if any) */}
       {currP !== undefined && (
-        <Box sx={{ position: 'absolute', left: `${currP}%`, transform: 'translateX(-1px)', width: 2, height: 16, bgcolor: '#455a64' }} />
+        <Box
+          sx={{
+            position: 'absolute',
+            left: `${currP}%`,
+            transform: 'translateX(-1px)',
+            width: 2,
+            height: 16,
+            bgcolor: '#455a64',
+          }}
+        />
       )}
 
       {/* Labels (top small) */}
-      <Typography variant="caption" sx={{ position: 'absolute', left: `${entryP}%`, transform: 'translate(-50%, -140%)', color: primaryRed }}>
+      <Typography
+        variant="caption"
+        sx={{
+          position: 'absolute',
+          left: `${entryP}%`,
+          transform: 'translate(-50%, -140%)',
+          color: primaryRed,
+        }}
+      >
         {entry}
       </Typography>
-      <Typography variant="caption" sx={{ position: 'absolute', left: `${nextP}%`, transform: 'translate(-50%, -140%)', color: blue }}>
+      <Typography
+        variant="caption"
+        sx={{
+          position: 'absolute',
+          left: `${nextP}%`,
+          transform: 'translate(-50%, -140%)',
+          color: blue,
+        }}
+      >
         {nextOpen}
       </Typography>
-      <Typography variant="caption" sx={{ position: 'absolute', left: `${targP}%`, transform: 'translate(-50%, -140%)', color: green }}>
+      <Typography
+        variant="caption"
+        sx={{
+          position: 'absolute',
+          left: `${targP}%`,
+          transform: 'translate(-50%, -140%)',
+          color: green,
+        }}
+      >
         {target}
       </Typography>
       {/* Bottom grey numbers for entry/nextOpen (optional for visual richness) */}
-      <Typography variant="caption" sx={{ position: 'absolute', left: `${entryP}%`, transform: 'translate(-50%, 60%)', color: 'text.secondary' }}>
+      <Typography
+        variant="caption"
+        sx={{
+          position: 'absolute',
+          left: `${entryP}%`,
+          transform: 'translate(-50%, 60%)',
+          color: 'text.secondary',
+        }}
+      >
         {entry}
       </Typography>
-      <Typography variant="caption" sx={{ position: 'absolute', left: `${nextP}%`, transform: 'translate(-50%, 60%)', color: 'text.secondary' }}>
+      <Typography
+        variant="caption"
+        sx={{
+          position: 'absolute',
+          left: `${nextP}%`,
+          transform: 'translate(-50%, 60%)',
+          color: 'text.secondary',
+        }}
+      >
         {nextOpen}
       </Typography>
     </Box>

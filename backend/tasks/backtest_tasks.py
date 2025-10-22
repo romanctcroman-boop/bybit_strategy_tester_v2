@@ -4,16 +4,30 @@ Backtest Tasks
 Celery tasks to run backtests in the background.
 """
 
-from typing import Dict, Any
 from datetime import datetime, timedelta, timezone
+import time
+from typing import Any, Dict
 
 from celery import Task
 from loguru import logger
 
 from backend.celery_app import celery_app
-from backend.database import SessionLocal, Backtest
 from backend.core.engine_adapter import get_engine
+from backend.database import Backtest, SessionLocal
 from backend.services.data_service import DataService
+
+# Optional Prometheus metrics
+try:  # pragma: no cover
+    from prometheus_client import Counter, Histogram
+
+    BACKTEST_STARTED = Counter("backtest_runs_started_total", "Backtest runs started")
+    BACKTEST_COMPLETED = Counter("backtest_runs_completed_total", "Backtest runs completed")
+    BACKTEST_FAILED = Counter("backtest_runs_failed_total", "Backtest runs failed")
+    BACKTEST_DURATION = Histogram(
+        "backtest_run_duration_seconds", "Backtest task duration in seconds"
+    )
+except Exception:  # pragma: no cover
+    BACKTEST_STARTED = BACKTEST_COMPLETED = BACKTEST_FAILED = BACKTEST_DURATION = None  # type: ignore
 
 
 class BacktestTask(Task):
@@ -64,6 +78,9 @@ def run_backtest_task(
     logger.info(f"🚀 Starting backtest task: {backtest_id}")
     logger.info(f"   Symbol: {symbol}, Interval: {interval}")
     logger.info(f"   Period: {start_date} → {end_date}")
+    t0 = time.perf_counter()
+    if BACKTEST_STARTED:
+        BACKTEST_STARTED.inc()
 
     db = SessionLocal()
     ds = DataService(db)
@@ -106,7 +123,9 @@ def run_backtest_task(
             ds.update_backtest(backtest_id, status="running", started_at=now)
 
         logger.info("📥 Loading market data...")
-        candles = ds.get_market_data(symbol=symbol, timeframe=interval, start_time=start_date, end_time=end_date)
+        candles = ds.get_market_data(
+            symbol=symbol, timeframe=interval, start_time=start_date, end_time=end_date
+        )
 
         if candles is None:
             raise ValueError(f"No data available for {symbol} {interval}")
@@ -114,7 +133,13 @@ def run_backtest_task(
         logger.info(f"📊 Loaded {len(candles)} candles")
 
         logger.info("⚙️  Running backtest engine...")
-        engine = get_engine(None, data_service=ds, initial_capital=initial_capital, commission=0.0006, slippage=0.0001)
+        engine = get_engine(
+            None,
+            data_service=ds,
+            initial_capital=initial_capital,
+            commission=0.0006,
+            slippage=0.0001,
+        )
         results = engine.run(data=candles, strategy_config=strategy_config)
 
         logger.info("💾 Saving results...")
@@ -134,16 +159,38 @@ def run_backtest_task(
         )
 
         logger.info(f"✅ Backtest {backtest_id} completed")
+        if BACKTEST_COMPLETED:
+            BACKTEST_COMPLETED.inc()
+        if BACKTEST_DURATION:
+            try:
+                BACKTEST_DURATION.observe(max(time.perf_counter() - t0, 0.0))
+            except Exception:
+                pass
         return {"backtest_id": backtest_id, "status": "completed", "results": results}
 
     except Exception as e:
         logger.error(f"❌ Backtest task failed: {e}")
         try:
-            ds.update_backtest(backtest_id, status="failed", error_message=str(e), completed_at=datetime.now(timezone.utc))
+            ds.update_backtest(
+                backtest_id,
+                status="failed",
+                error_message=str(e),
+                completed_at=datetime.now(timezone.utc),
+            )
         except Exception as db_error:
             logger.error(f"Failed to update backtest status: {db_error}")
 
         # Retry if possible (be robust when self is None in tests)
+        if BACKTEST_FAILED:
+            try:
+                BACKTEST_FAILED.inc()
+            except Exception:
+                pass
+        if BACKTEST_DURATION:
+            try:
+                BACKTEST_DURATION.observe(max(time.perf_counter() - t0, 0.0))
+            except Exception:
+                pass
         retries = 0
         max_retries = 0
         if self is not None:
@@ -165,7 +212,6 @@ def run_backtest_task(
         except Exception:
             # best-effort cleanup; nothing we can do here
             pass
-
 
 
 @celery_app.task(name="backend.tasks.backtest_tasks.bulk_backtest")

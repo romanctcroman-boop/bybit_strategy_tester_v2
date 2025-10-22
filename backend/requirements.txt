@@ -1,10 +1,9 @@
 fastapi
 uvicorn
 sqlalchemy
-psycopg2-binary
+psycopg[binary]
 requests
 prometheus-client
-pyarrow
 redis
 websockets
 pydantic-settings

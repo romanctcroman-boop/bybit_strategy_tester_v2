@@ -1,0 +1,25 @@
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 100
+# Python version for linting
+target-version = "py313"
+exclude = [
+	"tests",
+	"scripts",
+	"frontend",
+	"dist",
+	"node_modules",
+	"venv",
+	".venv",
+]
+# Enable common rule sets (pyflakes, pycodestyle, isort). Keep it strict but pragmatic.
+select = ["E", "F", "I"]
+# Ignore long lines and import-at-top constraints to avoid churn in tests/scripts for now
+ignore = ["E501", "E402"]
+
+[tool.ruff.isort]
+known-first-party = ["backend", "tests"]

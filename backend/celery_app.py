@@ -11,14 +11,16 @@ Environment variables:
 - CELERY_TASK_DEFAULT_RETRY_DELAY (seconds, default: 5)
 - CELERY_TASK_MAX_RETRIES (int, default: 3)
 """
-import os
-from celery import Celery
 
+import os
+
+from celery import Celery
 
 broker_url = os.environ.get("CELERY_BROKER_URL", "memory://")
 result_backend = os.environ.get("CELERY_RESULT_BACKEND", "rpc://")
 
 celery_app = Celery("bybit_strategy_tester_v2", broker=broker_url, backend=result_backend)
+
 
 # Reasonable defaults for local dev/tests
 def _get_bool(name: str, default: bool) -> bool:

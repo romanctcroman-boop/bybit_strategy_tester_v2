@@ -1,9 +1,7 @@
-import psycopg2
-import time
 from datetime import datetime, timezone
 
+import psycopg2
 from testcontainers.postgres import PostgresContainer
-from urllib.parse import urlparse
 
 
 def get_column_type(conn, table_name, column_name):
@@ -63,9 +61,15 @@ def test_convert_timestamps_to_timestamptz():
         assert "timestamp without time zone" in t1
 
         # Apply migration SQL (like the Alembic template)
-        cur.execute("ALTER TABLE backtests ALTER COLUMN started_at TYPE timestamptz USING started_at AT TIME ZONE 'UTC';")
-        cur.execute("ALTER TABLE backtests ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE 'UTC';")
-        cur.execute("ALTER TABLE backtests ALTER COLUMN completed_at TYPE timestamptz USING completed_at AT TIME ZONE 'UTC';")
+        cur.execute(
+            "ALTER TABLE backtests ALTER COLUMN started_at TYPE timestamptz USING started_at AT TIME ZONE 'UTC';"
+        )
+        cur.execute(
+            "ALTER TABLE backtests ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE 'UTC';"
+        )
+        cur.execute(
+            "ALTER TABLE backtests ALTER COLUMN completed_at TYPE timestamptz USING completed_at AT TIME ZONE 'UTC';"
+        )
 
         # Verify the column type changed to timestamptz
         t2 = get_column_type(conn, "backtests", "started_at")

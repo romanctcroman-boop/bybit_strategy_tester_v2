@@ -28,6 +28,7 @@ param(
     [string]$AppModule = 'backend.api.app:app',
     [string]$BindHost = '127.0.0.1',
     [int]$Port = 8000,
+    [string]$DatabaseUrl = $null,
     [string]$PidFile = '.uvicorn.pid',
     [string]$OutLog = 'logs/uvicorn.out.log',
     [string]$ErrLog = 'logs/uvicorn.err.log'
@@ -42,7 +43,11 @@ function EnsureLogsDir {
 
 switch ($Action) {
     'start' {
-    EnsureLogsDir
+        EnsureLogsDir
+        if ($DatabaseUrl) {
+            $env:DATABASE_URL = $DatabaseUrl
+            Write-Output "Using DATABASE_URL for uvicorn: $($DatabaseUrl -replace '://([^:]+):([^@]+)@', '://$1:****@')"
+        }
         if (Test-Path $PidFile) {
             try {
                 $oldPid = Get-Content $PidFile -ErrorAction Stop

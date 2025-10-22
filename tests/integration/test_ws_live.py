@@ -1,9 +1,6 @@
 import asyncio
 import json
-import types
-from contextlib import asynccontextmanager
 from threading import Thread
-import time
 
 from fastapi.testclient import TestClient
 
@@ -58,6 +55,7 @@ class FakeRedis:
 def test_ws_live_receives_message(monkeypatch):
     # Patch redis.asyncio.Redis in the live router to our FakeRedis
     import backend.api.routers.live as live
+
     monkeypatch.setattr(live, "Redis", FakeRedis)
 
     client = TestClient(app)

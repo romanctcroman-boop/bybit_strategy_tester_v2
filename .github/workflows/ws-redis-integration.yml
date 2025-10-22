@@ -1,0 +1,45 @@
+name: Integration - Redis WS (clean)
+
+on:
+  pull_request:
+  push:
+    branches: [ main, develop, "untracked/**" ]
+
+jobs:
+  ws-integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ '3.13', '3.14' ]
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run WS integration tests (with Redis service)
+        env:
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest -q tests/integration/test_ws_live.py tests/integration/test_redis_streams_live.py

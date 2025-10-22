@@ -10,23 +10,26 @@ Behavior:
  - Reads DATABASE_URL from env; if missing, falls back to in-memory SQLite for safe imports.
  - Designed to be minimal and non-invasive; replace with production DB config when available.
 """
-from typing import Generator, Optional
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+
 import logging
+import os
+from typing import Generator
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # Load .env file for local development
 try:
     from pathlib import Path
-    env_file = Path(__file__).parent.parent.parent / '.env'
+
+    env_file = Path(__file__).parent.parent.parent / ".env"
     if env_file.exists():
         with open(env_file) as f:
             for line in f:
                 line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, val = line.split('=', 1)
+                if line and not line.startswith("#") and "=" in line:
+                    key, val = line.split("=", 1)
                     os.environ[key.strip()] = val.strip()
 except Exception:
     pass
@@ -36,16 +39,18 @@ logger = logging.getLogger(__name__)
 # Read DATABASE_URL from environment; fallback to in-memory sqlite
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+
 # Sanitize DATABASE_URL to avoid hidden unicode whitespace (e.g. NBSP \u00A0) from shells/copy-paste
 def _sanitize_url(url: str) -> str:
     try:
         # Common problematic unicode spaces that may sneak in
-        bad_spaces = ["\u00A0", "\u2007", "\u202F"]
+        bad_spaces = ["\u00a0", "\u2007", "\u202f"]
         for ch in bad_spaces:
             url = url.replace(ch, "")
         return url.strip()
     except Exception:
         return url
+
 
 if DATABASE_URL:
     DATABASE_URL = _sanitize_url(DATABASE_URL)
@@ -74,7 +79,10 @@ if DATABASE_URL.startswith("sqlite"):
     if DATABASE_URL == "sqlite:///:memory:":
         engine = create_engine(
             DATABASE_URL,
-            connect_args={"check_same_thread": False, **({"detect_types": _detect} if _detect else {})},
+            connect_args={
+                "check_same_thread": False,
+                **({"detect_types": _detect} if _detect else {}),
+            },
             poolclass=StaticPool,
             echo=False,
             pool_pre_ping=False,
@@ -83,7 +91,10 @@ if DATABASE_URL.startswith("sqlite"):
     else:
         engine = create_engine(
             DATABASE_URL,
-            connect_args={"check_same_thread": False, **({"detect_types": _detect} if _detect else {})},
+            connect_args={
+                "check_same_thread": False,
+                **({"detect_types": _detect} if _detect else {}),
+            },
             pool_recycle=3600,
         )
 else:

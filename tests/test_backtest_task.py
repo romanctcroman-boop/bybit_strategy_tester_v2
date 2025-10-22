@@ -1,8 +1,8 @@
 import sys
 import types
-import pytest
 from types import SimpleNamespace
-from datetime import datetime
+
+import pytest
 
 # Create a dummy backend.celery_app module so importing tasks in tests doesn't fail
 mod = types.ModuleType("backend.celery_app")
@@ -11,34 +11,54 @@ sys.modules["backend.celery_app"] = mod
 
 # Provide a dummy backend.database module so tasks can import SessionLocal and Backtest
 mod_db = types.ModuleType("backend.database")
+
+
 def _session_local():
     return SimpleNamespace(close=lambda: None)
+
+
 mod_db.SessionLocal = _session_local
+
+
 class _Backtest:
     pass
+
+
 mod_db.Backtest = _Backtest
 sys.modules["backend.database"] = mod_db
 
 # Provide a dummy backend.core.backtest_engine so engine_adapter imports in tests
 mod_be = types.ModuleType("backend.core.backtest_engine")
+
+
 class _BE:
     def __init__(self, **kwargs):
         pass
+
+
 mod_be.BacktestEngine = _BE
 sys.modules["backend.core.backtest_engine"] = mod_be
 
 # Provide a minimal engine_adapter module used by the tasks (avoids importing real engine)
 mod_ea = types.ModuleType("backend.core.engine_adapter")
+
+
 def _get_engine(name=None, **kwargs):
     return _BE()
+
+
 mod_ea.get_engine = _get_engine
 sys.modules["backend.core.engine_adapter"] = mod_ea
 
 # Provide a dummy backend.services.data_service module
 mod_ds = types.ModuleType("backend.services.data_service")
+
+
 class _DS:
     def __init__(self, db):
         pass
+
+
 mod_ds.DataService = _DS
 sys.modules["backend.services.data_service"] = mod_ds
 

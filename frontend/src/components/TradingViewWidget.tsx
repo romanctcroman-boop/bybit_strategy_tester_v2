@@ -64,7 +64,7 @@ const TradingViewWidget: React.FC<TVWidgetProps> = ({
           details: true,
           studies,
         });
-      } catch (e) {
+      } catch {
         // fail silently; widget can't be rendered in some environments
         // console.warn('TradingView widget render failed', e);
       }
@@ -73,7 +73,7 @@ const TradingViewWidget: React.FC<TVWidgetProps> = ({
     return () => {
       // no-op cleanup
     };
-  }, [symbol, interval, theme, JSON.stringify(studies), timezone, locale, allowSymbolChange, containerId]);
+  }, [symbol, interval, theme, studies, timezone, locale, allowSymbolChange, containerId]);
 
   return <div id={containerId} ref={ref} style={{ width: '100%', height: 500 }} />;
 };

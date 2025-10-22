@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Query
 from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Query
 
 router = APIRouter()
 
@@ -43,7 +44,11 @@ MOCK_PRESETS: Dict[int, List[Dict[str, Any]]] = {
         {"id": 2, "name": "Aggressive", "params": {"rsi_period": 9, "ema_fast": 9, "ema_slow": 21}},
     ],
     102: [
-        {"id": 3, "name": "Conservative", "params": {"rsi_period": 21, "ema_fast": 10, "ema_slow": 30}},
+        {
+            "id": 3,
+            "name": "Conservative",
+            "params": {"rsi_period": 21, "ema_fast": 10, "ema_slow": 30},
+        },
     ],
 }
 
