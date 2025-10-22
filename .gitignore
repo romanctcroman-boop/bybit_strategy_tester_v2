@@ -221,3 +221,14 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.tsbuildinfo
+
+# --- Local runtime artifacts ---
+# PID files and local logs should not be tracked
+*.pid
+.uvicorn.pid
+logs/
+**/logs/
+*.log
+
+# --- Local SQLite databases ---
+*.sqlite3
