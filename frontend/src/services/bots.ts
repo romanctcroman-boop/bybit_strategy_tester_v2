@@ -27,8 +27,8 @@ function mapApiBot(b: ApiBot): Bot {
 }
 
 export const BotsService = {
-  list: async (): Promise<ListResponse<Bot>> => {
-    const r = await api.get<ListResponse<ApiBot>>('/bots');
+  list: async (opts?: { limit?: number; offset?: number }): Promise<ListResponse<Bot>> => {
+    const r = await api.get<ListResponse<ApiBot>>('/bots', { params: { limit: opts?.limit, offset: opts?.offset } });
     const items = (r.data.items || []).map(mapApiBot);
     return { items, total: r.data.total };
   },

@@ -11,9 +11,13 @@ const ActiveBotsPage: React.FC = () => {
   const items = useActiveBots((s) => selectFilteredActive(s));
   const refresh = useActiveBots((s) => s.refresh);
   const load = useActiveBots((s) => s.load);
+  const attachLive = useActiveBots((s) => s.attachLive);
+  const detachLive = useActiveBots((s) => s.detachLive);
 
   React.useEffect(() => {
     load();
+    const t = setTimeout(() => attachLive('1'), 100); // slight delay to ensure items loaded
+    return () => { clearTimeout(t); detachLive(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

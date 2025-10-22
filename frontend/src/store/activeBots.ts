@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { ActiveDealsService, ActiveDeal } from '../services/activeDeals';
+import { subscribeKline } from '../services/bybitWs';
 
 export type Side = 'LONG' | 'SHORT';
 
@@ -22,6 +23,7 @@ export interface ActiveBot {
 type State = {
   items: ActiveBot[];
   filter: string;
+  liveSubs: Record<string, () => void>; // symbol -> unsubscribe
 };
 
 type Actions = {
@@ -31,6 +33,8 @@ type Actions = {
   closeDeal: (id: string) => Promise<void>;
   averageDeal: (id: string) => Promise<void>;
   cancelDeal: (id: string) => Promise<void>;
+  attachLive: (interval?: string) => void;
+  detachLive: () => void;
 };
 
 function mapDealToActiveBot(d: ActiveDeal): ActiveBot {
@@ -46,6 +50,7 @@ function mapDealToActiveBot(d: ActiveDeal): ActiveBot {
     id: d.id,
     name: `${d.symbol} • ${d.bot_id}`,
     side: 'LONG',
+    symbol: d.symbol,
     orderProgress: undefined,
     min,
     entry,
@@ -57,30 +62,73 @@ function mapDealToActiveBot(d: ActiveDeal): ActiveBot {
   };
 }
 
-export const useActiveBots = create<State & Actions>((set, get) => ({
-  items: [],
-  filter: '',
-  setFilter: (q) => set({ filter: q }),
-  load: async () => {
-    const { items } = await ActiveDealsService.list();
-    set({ items: items.map(mapDealToActiveBot) });
-  },
-  refresh: async () => {
-    await get().load();
-  },
-  closeDeal: async (id: string) => {
-    await ActiveDealsService.close(id);
-    await get().load();
-  },
-  averageDeal: async (id: string) => {
-    await ActiveDealsService.average(id);
-    await get().load();
-  },
-  cancelDeal: async (id: string) => {
-    await ActiveDealsService.cancel(id);
-    await get().load();
-  },
-}));
+export const useActiveBots = create<State & Actions>((set, get) => {
+  // simple per-symbol throttle map
+  const lastUpdate: Record<string, number> = {};
+  const THROTTLE_MS = 200;
+
+  function ensureLive(interval: string = '1') {
+    const state = get();
+    const symbols = Array.from(new Set(state.items.map((it) => it.symbol).filter(Boolean))) as string[];
+    const existing = new Set(Object.keys(state.liveSubs));
+    // unsubscribe removed
+    for (const sym of existing) {
+      if (!symbols.includes(sym)) {
+        try { state.liveSubs[sym](); } catch {}
+        delete state.liveSubs[sym];
+      }
+    }
+    // subscribe new
+    for (const sym of symbols) {
+      if (state.liveSubs[sym]) continue;
+      const unsub = subscribeKline(sym, interval, (k) => {
+        const now = Date.now();
+        if ((lastUpdate[sym] ?? 0) + THROTTLE_MS > now) return;
+        lastUpdate[sym] = now;
+        set((prev) => ({
+          items: prev.items.map((it) => (it.symbol === sym ? { ...it, current: k.close } : it)),
+        }));
+      });
+      state.liveSubs[sym] = unsub;
+    }
+  }
+
+  return {
+    items: [],
+    filter: '',
+    liveSubs: {},
+    setFilter: (q) => set({ filter: q }),
+    load: async () => {
+      const { items } = await ActiveDealsService.list();
+      set({ items: items.map(mapDealToActiveBot) });
+    },
+    refresh: async () => {
+      await get().load();
+    },
+    closeDeal: async (id: string) => {
+      await ActiveDealsService.close(id);
+      await get().load();
+    },
+    averageDeal: async (id: string) => {
+      await ActiveDealsService.average(id);
+      await get().load();
+    },
+    cancelDeal: async (id: string) => {
+      await ActiveDealsService.cancel(id);
+      await get().load();
+    },
+    attachLive: (interval = '1') => {
+      ensureLive(interval);
+    },
+    detachLive: () => {
+      const state = get();
+      for (const sym of Object.keys(state.liveSubs)) {
+        try { state.liveSubs[sym](); } catch {}
+        delete state.liveSubs[sym];
+      }
+    },
+  };
+});
 
 export function selectFilteredActive(state: State): ActiveBot[] {
   const q = state.filter.trim().toLowerCase();

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel
 
 
@@ -64,10 +64,15 @@ def _seed():
 
 
 @router.get("/", response_model=DealsListResponse)
-async def list_active_deals() -> DealsListResponse:
+async def list_active_deals(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> DealsListResponse:
     _seed()
-    items = list(_DEALS.values())
-    return DealsListResponse(items=items, total=len(items))
+    all_items = list(_DEALS.values())
+    total = len(all_items)
+    items = all_items[offset : offset + limit]
+    return DealsListResponse(items=items, total=total)
 
 
 class ActionResponse(BaseModel):

@@ -16,8 +16,8 @@ export type ActiveDeal = {
 type ListResponse<T> = { items: T[]; total: number };
 
 export const ActiveDealsService = {
-  list: async (): Promise<ListResponse<ActiveDeal>> => {
-    const r = await api.get<ListResponse<ActiveDeal>>('/active-deals');
+  list: async (opts?: { limit?: number; offset?: number }): Promise<ListResponse<ActiveDeal>> => {
+    const r = await api.get<ListResponse<ActiveDeal>>('/active-deals', { params: { limit: opts?.limit, offset: opts?.offset } });
     return r.data;
   },
   close: async (id: string) => {

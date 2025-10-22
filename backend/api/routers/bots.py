@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Path
 from pydantic import BaseModel
+from fastapi import Query
 
 
 router = APIRouter()
@@ -74,10 +75,15 @@ def _seed():
 
 
 @router.get("/", response_model=BotsListResponse)
-async def list_bots() -> BotsListResponse:
+async def list_bots(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> BotsListResponse:
     _seed()
-    items = list(_BOTS.values())
-    return BotsListResponse(items=items, total=len(items))
+    all_items = list(_BOTS.values())
+    total = len(all_items)
+    items = all_items[offset : offset + limit]
+    return BotsListResponse(items=items, total=total)
 
 
 @router.get("/{bot_id}", response_model=Bot)

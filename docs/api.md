@@ -151,3 +151,65 @@ Bybit WS background manager (optional)
 Notes
 - The WebSocket sends the initial subscription confirmation as JSON; subsequent frames are text and may contain JSON strings.
 - When `pattern=1`, the server uses Redis `psubscribe` with the given pattern and forwards matching messages.
+
+---
+
+## Bots (mock)
+
+GET /bots
+- Query params: limit?: number (default 50, <=500), offset?: number (default 0)
+- Response: { items: Bot[], total: number }
+
+GET /bots/{id}
+- Response: Bot
+
+POST /bots/{id}/start
+- Response: { ok: boolean, status: BotStatus, message?: string }
+
+POST /bots/{id}/stop
+- Response: { ok: boolean, status: BotStatus, message?: string }
+
+POST /bots/{id}/delete
+- Response: { ok: boolean, message?: string }
+
+Bot shape (mock):
+```json
+{
+	"id": "bot_1",
+	"name": "BTC Scalper",
+	"strategy": "scalper_v1",
+	"symbols": ["BTCUSDT"],
+	"capital_allocated": 1000.0,
+	"status": "running|stopped|awaiting_start|awaiting_stop|error",
+	"created_at": "2025-10-22T12:00:00Z"
+}
+```
+
+---
+
+## Active deals (mock)
+
+GET /active-deals
+- Query params: limit?: number (default 50, <=500), offset?: number (default 0)
+- Response: { items: ActiveDeal[], total: number }
+
+POST /active-deals/{id}/close
+POST /active-deals/{id}/average
+POST /active-deals/{id}/cancel
+- Response: { ok: boolean, action: string, message?: string }
+
+ActiveDeal shape (mock):
+```json
+{
+	"id": "deal_1",
+	"bot_id": "bot_1",
+	"symbol": "BTCUSDT",
+	"entry_price": 60000.0,
+	"quantity": 0.02,
+	"next_open_price": 60350.0,
+	"current_price": 60200.0,
+	"pnl_abs": 4.0,
+	"pnl_pct": 0.33,
+	"opened_at": "2025-10-22T12:00:00Z"
+}
+```
