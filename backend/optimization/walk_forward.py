@@ -173,6 +173,13 @@ class WalkForwardOptimizer:
             }
         """
         
+        # Конвертируем list[dict] в DataFrame если необходимо
+        if isinstance(data, list):
+            data = pd.DataFrame(data)
+            if 'timestamp' in data.columns:
+                data['timestamp'] = pd.to_datetime(data['timestamp'], unit='s', errors='coerce')
+                data.set_index('timestamp', inplace=True)
+        
         # Конвертируем ParameterRange в списки
         param_space = {}
         for name, range_def in param_ranges.items():

@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 from pydantic import ValidationError
 
+logger = logging.getLogger(__name__)
+
 # Импорт Pydantic моделей для валидации
 try:
     from backend.models.data_types import (
@@ -30,8 +32,6 @@ try:
 except ImportError:
     logger.warning("Pydantic models not found, validation disabled")
     PYDANTIC_VALIDATION_ENABLED = False
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass

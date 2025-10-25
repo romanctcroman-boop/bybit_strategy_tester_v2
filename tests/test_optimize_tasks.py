@@ -62,10 +62,11 @@ def _prep_sys_modules_for_imports():
             return {"id": optimization_id, **fields}
 
         def get_market_data(self, **kwargs):
-            # return small list of candle dicts
+            # return small list of candle dicts (need at least 3 for WFO with in_sample=2, out_sample=1)
             return [
                 {"timestamp": 0, "open": 1, "high": 1, "low": 1, "close": 1},
                 {"timestamp": 1, "open": 1, "high": 1, "low": 1, "close": 1},
+                {"timestamp": 2, "open": 1, "high": 1, "low": 1, "close": 1},
             ]
 
         # support context manager protocol used by tasks
