@@ -22,6 +22,19 @@ interface OptimizationsState {
     strategy_id?: number;
   }) => Promise<void>;
   setPage: (page: number, pageSize?: number) => Promise<void>;
+  create: (payload: {
+    strategy_id: number;
+    optimization_type: string;
+    symbol: string;
+    timeframe: string;
+    start_date: string;
+    end_date: string;
+    param_ranges: Record<string, any>;
+    metric: string;
+    initial_capital: number;
+    total_combinations: number;
+    config?: Record<string, any>;
+  }) => Promise<Optimization | void>;
   results: (id: number) => Promise<OptimizationResult[] | void>;
   best: (id: number) => Promise<OptimizationResult | void>;
   runGrid: (
@@ -96,6 +109,18 @@ export const useOptimizationsStore = create<OptimizationsState>((set, get) => ({
     const size = pageSize ?? get().limit;
     const offset = (page - 1) * size;
     await get().fetchAll({ limit: size, offset });
+  },
+  create: async (payload) => {
+    set({ loading: true, error: undefined });
+    try {
+      const r = await OptimizationsApi.create(payload);
+      set({ loading: false });
+      // Refresh list after creation
+      await get().fetchAll();
+      return r;
+    } catch (e: any) {
+      set({ error: e?.message || String(e), loading: false });
+    }
   },
   results: async (id) => {
     set({ loading: true, error: undefined });

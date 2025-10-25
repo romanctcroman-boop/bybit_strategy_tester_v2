@@ -440,6 +440,22 @@ export const OptimizationsApi = {
     const r = await api.get(`/optimizations/${id}`);
     return r.data;
   },
+  create: async (payload: {
+    strategy_id: number;
+    optimization_type: string;
+    symbol: string;
+    timeframe: string;
+    start_date: string;
+    end_date: string;
+    param_ranges: Record<string, any>;
+    metric: string;
+    initial_capital: number;
+    total_combinations: number;
+    config?: Record<string, any>;
+  }): Promise<Optimization> => {
+    const r = await api.post('/optimizations', payload);
+    return r.data;
+  },
   results: async (id: number): Promise<OptimizationResult[]> => {
     const r = await api.get(`/optimizations/${id}/results`);
     return r.data;

@@ -53,6 +53,11 @@ interface ParameterRangeInput {
 
 interface NewOptimizationForm {
   strategy_id: string;
+  symbol: string;
+  timeframe: string;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
   tp_range: ParameterRangeInput;
   sl_range: ParameterRangeInput;
   trailing_activation_range: ParameterRangeInput;
@@ -73,6 +78,8 @@ export default function OptimizationsPage() {
     setPage,
     loading,
     error,
+    create,
+    runGrid,
     results,
     best,
     status,
@@ -97,13 +104,18 @@ export default function OptimizationsPage() {
 
   const [newOptForm, setNewOptForm] = useState<NewOptimizationForm>({
     strategy_id: '',
+    symbol: 'BTCUSDT',
+    timeframe: '15',
+    start_date: '2024-01-01',
+    end_date: '2024-12-31',
+    initial_capital: 10000,
     tp_range: { start: 1.0, stop: 5.0, step: 0.5 },
     sl_range: { start: 0.5, stop: 3.0, step: 0.5 },
     trailing_activation_range: { start: 0.0, stop: 2.0, step: 0.5 },
     trailing_distance_range: { start: 0.3, stop: 1.5, step: 0.3 },
     score_function: 'sharpe',
     min_trades: 30,
-    max_drawdown: 0.20,
+    max_drawdown: 0.2,
     n_processes: 4,
   });
 
@@ -144,18 +156,71 @@ export default function OptimizationsPage() {
   const handleCreateOptimization = async () => {
     try {
       const totalCombos = calculateTotalCombinations(newOptForm);
-      
-      notify({ 
-        message: `Form ready: ${totalCombos} combinations. Backend API for creating new optimization not yet implemented.`,
-        severity: 'info' 
+
+      if (totalCombos > 10000) {
+        notify({
+          message: `Warning: ${totalCombos} combinations may take a long time!`,
+          severity: 'warning',
+        });
+      }
+
+      // Step 1: Create optimization record
+      const optimization = await create({
+        strategy_id: parseInt(newOptForm.strategy_id),
+        optimization_type: 'grid_search',
+        symbol: newOptForm.symbol,
+        timeframe: newOptForm.timeframe,
+        start_date: new Date(newOptForm.start_date).toISOString(),
+        end_date: new Date(newOptForm.end_date).toISOString(),
+        param_ranges: {
+          tp_pct: [newOptForm.tp_range.start, newOptForm.tp_range.stop, newOptForm.tp_range.step],
+          sl_pct: [newOptForm.sl_range.start, newOptForm.sl_range.stop, newOptForm.sl_range.step],
+          trailing_activation_pct: [
+            newOptForm.trailing_activation_range.start,
+            newOptForm.trailing_activation_range.stop,
+            newOptForm.trailing_activation_range.step,
+          ],
+          trailing_distance_pct: [
+            newOptForm.trailing_distance_range.start,
+            newOptForm.trailing_distance_range.stop,
+            newOptForm.trailing_distance_range.step,
+          ],
+        },
+        metric: newOptForm.score_function === 'sharpe' ? 'sharpe_ratio' : 'profit_factor',
+        initial_capital: newOptForm.initial_capital,
+        total_combinations: totalCombos,
+        config: {
+          validation_rules: {
+            min_trades: newOptForm.min_trades,
+            max_drawdown: newOptForm.max_drawdown,
+          },
+          n_processes: newOptForm.n_processes,
+        },
       });
-      
-      // TODO: Call backend POST /optimizations to create new optimization record
-      // Then call runGrid(optimization_id, payload) to start the grid search task
-      
+
+      if (!optimization) {
+        throw new Error('Failed to create optimization record');
+      }
+
+      // Step 2: Start grid search task
+      await runGrid(optimization.id, {
+        param_space: {
+          tp_pct: [newOptForm.tp_range.start, newOptForm.tp_range.stop, newOptForm.tp_range.step],
+          sl_pct: [newOptForm.sl_range.start, newOptForm.sl_range.stop, newOptForm.sl_range.step],
+        },
+        metric: newOptForm.score_function === 'sharpe' ? 'sharpe_ratio' : 'profit_factor',
+      });
+
       setOpenNewDialog(false);
-    } catch (err) {
-      notify({ message: `Failed to prepare optimization: ${err}`, severity: 'error' });
+      notify({
+        message: `Grid optimization #${optimization.id} started with ${totalCombos} combinations!`,
+        severity: 'success',
+      });
+
+      // Refresh list
+      await fetchAll();
+    } catch (err: any) {
+      notify({ message: `Failed to start optimization: ${err?.message || err}`, severity: 'error' });
     }
   };
 
@@ -200,8 +265,12 @@ export default function OptimizationsPage() {
   const generateHeatmapData = (results: OptimizationResult[]) => {
     if (!results || results.length === 0) return null;
 
-    const tpValues = [...new Set(results.map((r) => r.params?.tp_pct).filter(Boolean))].sort((a, b) => (a as number) - (b as number));
-    const slValues = [...new Set(results.map((r) => r.params?.sl_pct).filter(Boolean))].sort((a, b) => (a as number) - (b as number));
+    const tpValues = [...new Set(results.map((r) => r.params?.tp_pct).filter(Boolean))].sort(
+      (a, b) => (a as number) - (b as number)
+    );
+    const slValues = [...new Set(results.map((r) => r.params?.sl_pct).filter(Boolean))].sort(
+      (a, b) => (a as number) - (b as number)
+    );
 
     if (tpValues.length === 0 || slValues.length === 0) return null;
 
@@ -210,9 +279,7 @@ export default function OptimizationsPage() {
     for (const slVal of slValues) {
       const row: number[] = [];
       for (const tpVal of tpValues) {
-        const match = results.find(
-          (r) => r.params?.tp_pct === tpVal && r.params?.sl_pct === slVal
-        );
+        const match = results.find((r) => r.params?.tp_pct === tpVal && r.params?.sl_pct === slVal);
         row.push(match?.score ?? NaN);
       }
       zData.push(row);
@@ -270,11 +337,7 @@ export default function OptimizationsPage() {
     <Container maxWidth="xl">
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h4">Optimizations</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setOpenNewDialog(true)}
-        >
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenNewDialog(true)}>
           New Optimization
         </Button>
       </Stack>
@@ -329,11 +392,7 @@ export default function OptimizationsPage() {
         offset={offset}
         onPageChange={(p) => setPage(p)}
         renderItem={(o: Optimization) => (
-          <Accordion
-            key={o.id}
-            expanded={expandedId === o.id}
-            onChange={() => handleExpand(o)}
-          >
+          <Accordion key={o.id} expanded={expandedId === o.id} onChange={() => handleExpand(o)}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Stack direction="row" spacing={2} alignItems="center" sx={{ width: '100%' }}>
                 <Typography sx={{ fontWeight: 'bold' }}>#{o.id}</Typography>
@@ -419,9 +478,7 @@ export default function OptimizationsPage() {
                           {sortResults(resultsMap[o.id]).map((r, idx) => (
                             <TableRow key={idx} hover>
                               <TableCell>{r.score?.toFixed(3) ?? 'N/A'}</TableCell>
-                              <TableCell>
-                                {r.metrics?.sharpe_ratio?.toFixed(2) ?? 'N/A'}
-                              </TableCell>
+                              <TableCell>{r.metrics?.sharpe_ratio?.toFixed(2) ?? 'N/A'}</TableCell>
                               <TableCell>
                                 {r.metrics?.max_drawdown
                                   ? (r.metrics.max_drawdown * 100).toFixed(2) + '%'
@@ -499,12 +556,7 @@ export default function OptimizationsPage() {
       />
 
       {/* New Optimization Dialog */}
-      <Dialog
-        open={openNewDialog}
-        onClose={() => setOpenNewDialog(false)}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={openNewDialog} onClose={() => setOpenNewDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>
           <Stack direction="row" alignItems="center" spacing={1}>
             <TuneIcon />
@@ -514,17 +566,91 @@ export default function OptimizationsPage() {
         <DialogContent dividers>
           <Grid container spacing={3}>
             {/* Strategy ID */}
-            <Grid item xs={12}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Strategy ID"
                 type="number"
                 value={newOptForm.strategy_id}
+                onChange={(e) => setNewOptForm({ ...newOptForm, strategy_id: e.target.value })}
+                required
+              />
+            </Grid>
+
+            {/* Symbol */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Symbol"
+                value={newOptForm.symbol}
+                onChange={(e) => setNewOptForm({ ...newOptForm, symbol: e.target.value })}
+                required
+                placeholder="BTCUSDT"
+              />
+            </Grid>
+
+            {/* Timeframe */}
+            <Grid item xs={12} sm={4}>
+              <FormControl fullWidth>
+                <InputLabel>Timeframe</InputLabel>
+                <Select
+                  value={newOptForm.timeframe}
+                  label="Timeframe"
+                  onChange={(e) => setNewOptForm({ ...newOptForm, timeframe: e.target.value })}
+                >
+                  <MenuItem value="1">1m</MenuItem>
+                  <MenuItem value="5">5m</MenuItem>
+                  <MenuItem value="15">15m</MenuItem>
+                  <MenuItem value="30">30m</MenuItem>
+                  <MenuItem value="60">1h</MenuItem>
+                  <MenuItem value="240">4h</MenuItem>
+                  <MenuItem value="D">1D</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* Start Date */}
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Start Date"
+                type="date"
+                value={newOptForm.start_date}
+                onChange={(e) => setNewOptForm({ ...newOptForm, start_date: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Grid>
+
+            {/* End Date */}
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="End Date"
+                type="date"
+                value={newOptForm.end_date}
+                onChange={(e) => setNewOptForm({ ...newOptForm, end_date: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Grid>
+
+            {/* Initial Capital */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Initial Capital (USDT)"
+                type="number"
+                value={newOptForm.initial_capital}
                 onChange={(e) =>
-                  setNewOptForm({ ...newOptForm, strategy_id: e.target.value })
+                  setNewOptForm({ ...newOptForm, initial_capital: parseFloat(e.target.value) })
                 }
                 required
               />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Divider />
             </Grid>
 
             {/* Take Profit Range */}
@@ -798,9 +924,8 @@ export default function OptimizationsPage() {
                   <strong>{calculateTotalCombinations(newOptForm).toLocaleString()}</strong>
                 </Typography>
                 <Typography variant="caption">
-                  Estimated time: ~
-                  {(calculateTotalCombinations(newOptForm) / 10).toFixed(0)} seconds (assuming 10
-                  backtests/sec)
+                  Estimated time: ~{(calculateTotalCombinations(newOptForm) / 10).toFixed(0)}{' '}
+                  seconds (assuming 10 backtests/sec)
                 </Typography>
               </Alert>
             </Grid>
