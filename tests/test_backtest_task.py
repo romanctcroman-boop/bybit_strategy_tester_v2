@@ -24,7 +24,12 @@ class _Backtest:
     pass
 
 
+class _Base:
+    pass
+
+
 mod_db.Backtest = _Backtest
+mod_db.Base = _Base
 sys.modules["backend.database"] = mod_db
 
 # Provide a dummy backend.core.backtest_engine so engine_adapter imports in tests

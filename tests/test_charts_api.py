@@ -19,9 +19,13 @@ def client():
 @pytest.fixture
 def mock_data_service():
     """Mock DataService for testing"""
-    with patch('backend.api.routers.backtests._get_data_service') as mock:
+    with patch('backend.api.routers.backtests._get_data_service') as mock_get_ds:
         service = MagicMock()
-        mock.return_value = service
+        # Create context manager mock
+        mock_context = MagicMock()
+        mock_context.__enter__.return_value = service
+        mock_context.__exit__.return_value = None
+        mock_get_ds.return_value = lambda: mock_context
         yield service
 
 
@@ -77,7 +81,7 @@ class TestChartsAPI:
         
         mock_data_service.get_backtest.return_value = type('Backtest', (), sample_backtest_with_charts)()
         
-        response = client.get('/backtests/1/charts/equity_curve')
+        response = client.get('/api/v1/backtests/1/charts/equity_curve')
         
         assert response.status_code == 200
         data = response.json()
@@ -96,11 +100,11 @@ class TestChartsAPI:
         mock_data_service.get_backtest.return_value = type('Backtest', (), sample_backtest_with_charts)()
         
         # With drawdown
-        response = client.get('/backtests/1/charts/equity_curve?show_drawdown=true')
+        response = client.get('/api/v1/backtests/1/charts/equity_curve?show_drawdown=true')
         assert response.status_code == 200
         
         # Without drawdown
-        response = client.get('/backtests/1/charts/equity_curve?show_drawdown=false')
+        response = client.get('/api/v1/backtests/1/charts/equity_curve?show_drawdown=false')
         assert response.status_code == 200
     
     def test_drawdown_overlay_endpoint_success(self, client, sample_backtest_with_charts, mock_data_service):
@@ -108,7 +112,7 @@ class TestChartsAPI:
         
         mock_data_service.get_backtest.return_value = type('Backtest', (), sample_backtest_with_charts)()
         
-        response = client.get('/backtests/1/charts/drawdown_overlay')
+        response = client.get('/api/v1/backtests/1/charts/drawdown_overlay')
         
         assert response.status_code == 200
         data = response.json()
@@ -123,7 +127,7 @@ class TestChartsAPI:
         
         mock_data_service.get_backtest.return_value = type('Backtest', (), sample_backtest_with_charts)()
         
-        response = client.get('/backtests/1/charts/pnl_distribution')
+        response = client.get('/api/v1/backtests/1/charts/pnl_distribution')
         
         assert response.status_code == 200
         data = response.json()
@@ -139,15 +143,15 @@ class TestChartsAPI:
         mock_data_service.get_backtest.return_value = type('Backtest', (), sample_backtest_with_charts)()
         
         # Custom bins
-        response = client.get('/backtests/1/charts/pnl_distribution?bins=50')
+        response = client.get('/api/v1/backtests/1/charts/pnl_distribution?bins=50')
         assert response.status_code == 200
         
         # Invalid bins (too small)
-        response = client.get('/backtests/1/charts/pnl_distribution?bins=5')
+        response = client.get('/api/v1/backtests/1/charts/pnl_distribution?bins=5')
         assert response.status_code == 422
         
         # Invalid bins (too large)
-        response = client.get('/backtests/1/charts/pnl_distribution?bins=150')
+        response = client.get('/api/v1/backtests/1/charts/pnl_distribution?bins=150')
         assert response.status_code == 422
     
     def test_charts_backtest_not_found(self, client, mock_data_service):
@@ -155,7 +159,7 @@ class TestChartsAPI:
         
         mock_data_service.get_backtest.return_value = None
         
-        response = client.get('/backtests/999/charts/equity_curve')
+        response = client.get('/api/v1/backtests/999/charts/equity_curve')
         assert response.status_code == 404
         assert 'not found' in response.json()['detail'].lower()
     
@@ -169,7 +173,7 @@ class TestChartsAPI:
         }
         mock_data_service.get_backtest.return_value = type('Backtest', (), backtest)()
         
-        response = client.get('/backtests/1/charts/equity_curve')
+        response = client.get('/api/v1/backtests/1/charts/equity_curve')
         assert response.status_code == 400
         assert 'completed' in response.json()['detail'].lower()
     
@@ -186,7 +190,7 @@ class TestChartsAPI:
         }
         mock_data_service.get_backtest.return_value = type('Backtest', (), backtest)()
         
-        response = client.get('/backtests/1/charts/equity_curve')
+        response = client.get('/api/v1/backtests/1/charts/equity_curve')
         assert response.status_code == 400
         assert 'no equity data' in response.json()['detail'].lower()
     
@@ -203,7 +207,7 @@ class TestChartsAPI:
         }
         mock_data_service.get_backtest.return_value = type('Backtest', (), backtest)()
         
-        response = client.get('/backtests/1/charts/pnl_distribution')
+        response = client.get('/api/v1/backtests/1/charts/pnl_distribution')
         assert response.status_code == 400
         assert 'no trades' in response.json()['detail'].lower()
 
@@ -217,9 +221,9 @@ class TestChartsIntegration:
         mock_data_service.get_backtest.return_value = type('Backtest', (), sample_backtest_with_charts)()
         
         # Get all charts
-        equity_response = client.get('/backtests/1/charts/equity_curve')
-        drawdown_response = client.get('/backtests/1/charts/drawdown_overlay')
-        pnl_response = client.get('/backtests/1/charts/pnl_distribution')
+        equity_response = client.get('/api/v1/backtests/1/charts/equity_curve')
+        drawdown_response = client.get('/api/v1/backtests/1/charts/drawdown_overlay')
+        pnl_response = client.get('/api/v1/backtests/1/charts/pnl_distribution')
         
         # All should succeed
         assert equity_response.status_code == 200
@@ -236,7 +240,7 @@ class TestChartsIntegration:
         
         mock_data_service.get_backtest.return_value = type('Backtest', (), sample_backtest_with_charts)()
         
-        response = client.get('/backtests/1/charts/equity_curve')
+        response = client.get('/api/v1/backtests/1/charts/equity_curve')
         
         assert response.status_code == 200
         data = response.json()

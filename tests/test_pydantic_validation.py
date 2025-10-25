@@ -4,7 +4,19 @@
 """
 
 import sys
+import types
 from pathlib import Path
+
+# Create shim for backend.database to avoid import errors
+mod_db = types.ModuleType("backend.database")
+
+
+class _Base:
+    pass
+
+
+mod_db.Base = _Base
+sys.modules["backend.database"] = mod_db
 
 # Добавить backend в путь
 backend_path = Path(__file__).parent.parent / "backend"
