@@ -22,7 +22,7 @@ interface PlotlyChartProps {
 
 /**
  * Generic Plotly Chart Component
- * 
+ *
  * Renders interactive Plotly charts from JSON received from backend.
  * Uses dynamic import to avoid bundling Plotly.js in main bundle.
  */
@@ -52,25 +52,17 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
           // Render or update plot
           if (plotRef.current) {
             // Update existing plot
-            Plotly.react(
-              containerRef.current,
-              figure.data,
-              figure.layout || {},
-              { responsive: true }
-            );
+            Plotly.react(containerRef.current, figure.data, figure.layout || {}, {
+              responsive: true,
+            });
           } else {
             // Create new plot
-            Plotly.newPlot(
-              containerRef.current,
-              figure.data,
-              figure.layout || {},
-              {
-                responsive: true,
-                displayModeBar: true,
-                modeBarButtonsToRemove: ['toImage'],
-                displaylogo: false,
-              }
-            ).then((plot) => {
+            Plotly.newPlot(containerRef.current, figure.data, figure.layout || {}, {
+              responsive: true,
+              displayModeBar: true,
+              modeBarButtonsToRemove: ['toImage'],
+              displaylogo: false,
+            }).then((plot) => {
               plotRef.current = plot;
             });
           }
@@ -97,12 +89,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
 
   if (loading) {
     return (
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        height={height}
-      >
+      <Box display="flex" alignItems="center" justifyContent="center" height={height}>
         <CircularProgress />
       </Box>
     );
@@ -110,12 +97,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
 
   if (error) {
     return (
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        height={height}
-      >
+      <Box display="flex" alignItems="center" justifyContent="center" height={height}>
         <Typography color="error">{error}</Typography>
       </Box>
     );
@@ -123,15 +105,8 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
 
   if (!plotlyJson) {
     return (
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        height={height}
-      >
-        <Typography color="text.secondary">
-          Нет данных для визуализации
-        </Typography>
+      <Box display="flex" alignItems="center" justifyContent="center" height={height}>
+        <Typography color="text.secondary">Нет данных для визуализации</Typography>
       </Box>
     );
   }

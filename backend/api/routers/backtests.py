@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 from fastapi.responses import Response
 
 from backend.api.schemas import (
@@ -219,7 +219,7 @@ def list_trades(
 @router.get("/{backtest_id}/export/{report_type}")
 def export_csv_report(
     backtest_id: int,
-    report_type: str = Query(..., description="list_of_trades|performance|risk_ratios|trades_analysis|all")
+    report_type: str = Path(..., description="list_of_trades|performance|risk_ratios|trades_analysis|all")
 ):
     """
     Export CSV reports (ТЗ 4)
@@ -319,4 +319,179 @@ def export_csv_report(
                 "Content-Disposition": f"attachment; filename={filename}"
             }
         )
+
+
+# ========================================================================
+# CHARTS API ENDPOINTS (ТЗ 3.7.2)
+# ========================================================================
+
+@router.get("/{backtest_id}/charts/equity_curve")
+def get_equity_curve_chart(
+    backtest_id: int,
+    show_drawdown: bool = Query(True, description="Show drawdown subplot")
+):
+    """
+    Generate Equity Curve chart (ТЗ 3.7.2)
+    
+    Returns Plotly figure as JSON for PlotlyChart component
+    
+    Args:
+        backtest_id: ID бэктеста
+        show_drawdown: Показывать ли subplot с drawdown
+    
+    Returns:
+        {"plotly_json": "<plotly_figure_json>"}
+    """
+    DS = _get_data_service()
+    if DS is None:
+        raise HTTPException(
+            status_code=501,
+            detail="Backend database not configured in this environment"
+        )
+    
+    with DS() as ds:
+        bt = ds.get_backtest(backtest_id)
+        if not bt:
+            raise HTTPException(status_code=404, detail="Backtest not found")
+        
+        if not bt.results or bt.status != 'completed':
+            raise HTTPException(
+                status_code=400,
+                detail="Backtest must be completed to generate charts"
+            )
+        
+        # Extract equity curve from results
+        from backend.visualization.advanced_charts import create_equity_curve
+        import pandas as pd
+        
+        results = bt.results if isinstance(bt.results, dict) else {}
+        equity_data = results.get('equity', [])
+        
+        if not equity_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No equity data available"
+            )
+        
+        # Convert to pandas Series
+        equity_series = pd.Series(
+            [point.get('equity', 0) for point in equity_data],
+            index=pd.to_datetime([point.get('time') for point in equity_data])
+        )
+        
+        # Generate chart
+        fig = create_equity_curve(equity_series, show_drawdown=show_drawdown)
+        
+        # Return Plotly JSON
+        return {"plotly_json": fig.to_json()}
+
+
+@router.get("/{backtest_id}/charts/drawdown_overlay")
+def get_drawdown_overlay_chart(backtest_id: int):
+    """
+    Generate Drawdown Overlay chart (ТЗ 3.7.2)
+    
+    Dual y-axis visualization: equity + drawdown
+    
+    Returns:
+        {"plotly_json": "<plotly_figure_json>"}
+    """
+    DS = _get_data_service()
+    if DS is None:
+        raise HTTPException(
+            status_code=501,
+            detail="Backend database not configured in this environment"
+        )
+    
+    with DS() as ds:
+        bt = ds.get_backtest(backtest_id)
+        if not bt:
+            raise HTTPException(status_code=404, detail="Backtest not found")
+        
+        if not bt.results or bt.status != 'completed':
+            raise HTTPException(
+                status_code=400,
+                detail="Backtest must be completed to generate charts"
+            )
+        
+        from backend.visualization.advanced_charts import create_drawdown_overlay
+        import pandas as pd
+        
+        results = bt.results if isinstance(bt.results, dict) else {}
+        equity_data = results.get('equity', [])
+        
+        if not equity_data:
+            raise HTTPException(
+                status_code=400,
+                detail="No equity data available"
+            )
+        
+        equity_series = pd.Series(
+            [point.get('equity', 0) for point in equity_data],
+            index=pd.to_datetime([point.get('time') for point in equity_data])
+        )
+        
+        fig = create_drawdown_overlay(equity_series)
+        
+        return {"plotly_json": fig.to_json()}
+
+
+@router.get("/{backtest_id}/charts/pnl_distribution")
+def get_pnl_distribution_chart(
+    backtest_id: int,
+    bins: int = Query(30, ge=10, le=100, description="Number of histogram bins")
+):
+    """
+    Generate PnL Distribution histogram (ТЗ 3.7.2)
+    
+    Shows distribution of trade profits/losses with statistics
+    
+    Returns:
+        {"plotly_json": "<plotly_figure_json>"}
+    """
+    DS = _get_data_service()
+    if DS is None:
+        raise HTTPException(
+            status_code=501,
+            detail="Backend database not configured in this environment"
+        )
+    
+    with DS() as ds:
+        bt = ds.get_backtest(backtest_id)
+        if not bt:
+            raise HTTPException(status_code=404, detail="Backtest not found")
+        
+        if not bt.results or bt.status != 'completed':
+            raise HTTPException(
+                status_code=400,
+                detail="Backtest must be completed to generate charts"
+            )
+        
+        from backend.visualization.advanced_charts import create_pnl_distribution
+        import pandas as pd
+        
+        results = bt.results if isinstance(bt.results, dict) else {}
+        trades = results.get('trades', [])
+        
+        if not trades:
+            raise HTTPException(
+                status_code=400,
+                detail="No trades available"
+            )
+        
+        # Convert to DataFrame
+        trades_df = pd.DataFrame(trades)
+        
+        # Filter only completed trades (with exit_price)
+        completed_trades = trades_df[trades_df['exit_price'].notna()]
+        
+        if len(completed_trades) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No completed trades available"
+            )
+        
+        fig = create_pnl_distribution(completed_trades, bins=bins)
+        
+        return {"plotly_json": fig.to_json()}
 

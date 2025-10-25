@@ -187,6 +187,49 @@ export const BacktestsApi = {
     const total = Array.isArray(r.data) ? items.length : r.data.total;
     return { items, total };
   },
+
+  // ========================================================================
+  // Charts API (ТЗ 3.7.2)
+  // ========================================================================
+
+  getEquityCurve: async (
+    backtestId: number,
+    showDrawdown: boolean = true
+  ): Promise<{ plotly_json: string }> => {
+    const r = await api.get(`/backtests/${backtestId}/charts/equity_curve`, {
+      params: { show_drawdown: showDrawdown },
+    });
+    return r.data;
+  },
+
+  getDrawdownOverlay: async (backtestId: number): Promise<{ plotly_json: string }> => {
+    const r = await api.get(`/backtests/${backtestId}/charts/drawdown_overlay`);
+    return r.data;
+  },
+
+  getPnlDistribution: async (
+    backtestId: number,
+    bins: number = 30
+  ): Promise<{ plotly_json: string }> => {
+    const r = await api.get(`/backtests/${backtestId}/charts/pnl_distribution`, {
+      params: { bins },
+    });
+    return r.data;
+  },
+
+  // ========================================================================
+  // CSV Export (ТЗ 4)
+  // ========================================================================
+
+  exportCSV: async (
+    backtestId: number,
+    reportType: 'list_of_trades' | 'performance' | 'risk_ratios' | 'trades_analysis' | 'all'
+  ): Promise<Blob> => {
+    const r = await api.get(`/backtests/${backtestId}/export/${reportType}`, {
+      responseType: 'blob',
+    });
+    return r.data;
+  },
 };
 
 export const DataApi = {

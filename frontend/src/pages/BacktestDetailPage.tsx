@@ -26,7 +26,9 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
 import BacktestEquityChart from '../components/BacktestEquityChart';
+import ChartsTab from '../components/ChartsTab';
 import { useNotify } from '../components/NotificationsProvider';
 import { BacktestsApi } from '../services/api';
 import type { Backtest, Trade } from '../types/api';
@@ -373,6 +375,7 @@ const OverviewTab: React.FC<{
   onTogglePnlBars: (checked: boolean) => void;
   showBuyHold: boolean;
   onToggleBuyHold: (checked: boolean) => void;
+  onDownloadCSV: (reportType: 'performance' | 'risk_ratios' | 'trades_analysis' | 'list_of_trades') => void;
 }> = ({
   backtest,
   results,
@@ -383,6 +386,7 @@ const OverviewTab: React.FC<{
   onTogglePnlBars,
   showBuyHold,
   onToggleBuyHold,
+  onDownloadCSV,
 }) => {
   const overview = results.overview ?? {};
   const statsAll = (results.by_side?.all ?? {}) as Partial<SideStats>;
@@ -454,6 +458,46 @@ const OverviewTab: React.FC<{
               {backtest?.timeframe ?? '—'}
             </Typography>
           </Box>
+        </Stack>
+      </Paper>
+
+      <Paper sx={{ p: 3, borderRadius: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Экспорт отчётов CSV
+        </Typography>
+        <Stack direction="row" spacing={2} flexWrap="wrap" rowGap={1.5}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={() => onDownloadCSV('performance')}
+          >
+            Показатели
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={() => onDownloadCSV('risk_ratios')}
+          >
+            Риск-метрики
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={() => onDownloadCSV('trades_analysis')}
+          >
+            Анализ сделок
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={() => onDownloadCSV('list_of_trades')}
+          >
+            Список сделок
+          </Button>
         </Stack>
       </Paper>
 
@@ -808,6 +852,30 @@ const BacktestDetailPage: React.FC = () => {
     loadBacktest();
   }, [loadBacktest]);
 
+  const handleDownloadCSV = useCallback(
+    async (reportType: 'performance' | 'risk_ratios' | 'trades_analysis' | 'list_of_trades') => {
+      if (backtestId == null) return;
+      try {
+        const blob = await BacktestsApi.exportCSV(backtestId, reportType);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `backtest_${backtestId}_${reportType}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        notify({ message: 'CSV файл успешно загружен', severity: 'success' });
+      } catch (error: any) {
+        notify({
+          message: error?.friendlyMessage || 'Не удалось загрузить CSV',
+          severity: 'error',
+        });
+      }
+    },
+    [backtestId, notify]
+  );
+
   const chartData = useMemo<ChartDatum[]>(() => {
     if (!results) return [];
     const map = new Map<number, ChartDatum>();
@@ -1018,6 +1086,7 @@ const BacktestDetailPage: React.FC = () => {
         <Tab label="Динамика" />
         <Tab label="Анализ сделок" />
         <Tab label="Риск" />
+        <Tab label="Графики" />
         <Tab label="Сделки" />
       </Tabs>
 
@@ -1032,12 +1101,14 @@ const BacktestDetailPage: React.FC = () => {
           onTogglePnlBars={setShowPnlBars}
           showBuyHold={showBuyHold}
           onToggleBuyHold={setShowBuyHold}
+          onDownloadCSV={handleDownloadCSV}
         />
       )}
       {tab === 1 && <DynamicsTab results={resultsSafe} />}
       {tab === 2 && <AnalysisTab results={resultsSafe} />}
       {tab === 3 && <RiskTab results={resultsSafe} />}
-      {tab === 4 && (
+      {tab === 4 && backtestId && <ChartsTab backtestId={backtestId} />}
+      {tab === 5 && (
         <TradesTab
           trades={enhancedTrades}
           total={tradesTotal}

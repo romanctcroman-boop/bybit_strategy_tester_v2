@@ -5,10 +5,12 @@
 ### 1. CSV Export Integration
 
 #### Added CSV Download Buttons
+
 В `BacktestDetailPage.tsx` добавлены кнопки для скачивания CSV отчетов:
 
 **Расположение:** Tab "Обзор" (Overview)  
 **Функциональность:**
+
 - Кнопка "Скачать Performance.csv"
 - Кнопка "Скачать Risk Ratios.csv"
 - Кнопка "Скачать Trades Analysis.csv"
@@ -16,6 +18,7 @@
 - Кнопка "Скачать все отчеты (ZIP)"
 
 **API Endpoints:**
+
 ```typescript
 // Single report download
 GET /backtests/{id}/export/{report_type}
@@ -26,12 +29,11 @@ GET /backtests/{id}/export/all
 ```
 
 #### Implementation Details
+
 ```typescript
 const downloadCSV = async (backtestId: number, reportType: string) => {
-  const response = await fetch(
-    `/backtests/${backtestId}/export/${reportType}`
-  );
-  
+  const response = await fetch(`/backtests/${backtestId}/export/${reportType}`);
+
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -45,9 +47,11 @@ const downloadCSV = async (backtestId: number, reportType: string) => {
 ### 2. Plotly Charts Integration (In Progress)
 
 #### Created PlotlyChart Component
+
 `frontend/src/components/PlotlyChart.tsx` - универсальный компонент для отображения Plotly графиков.
 
 **Особенности:**
+
 - Dynamic import Plotly.js (не увеличивает основной bundle)
 - Responsive дизайн
 - Поддержка темной темы
@@ -55,19 +59,22 @@ const downloadCSV = async (backtestId: number, reportType: string) => {
 - Loading/Error states
 
 **Usage:**
+
 ```tsx
 import PlotlyChart from '../components/PlotlyChart';
 
 <PlotlyChart
-  plotlyJson={chartData}  // JSON string from backend
+  plotlyJson={chartData} // JSON string from backend
   height={400}
   loading={isLoading}
   error={errorMessage}
-/>
+/>;
 ```
 
 #### Added Plotly.js Dependency
+
 `package.json` обновлен:
+
 ```json
 "plotly.js-basic-dist-min": "^2.28.0"
 ```
@@ -77,12 +84,14 @@ import PlotlyChart from '../components/PlotlyChart';
 План реализации вкладки "Графики":
 
 **Charts to Integrate:**
+
 1. **Equity Curve** - График equity с опциональным drawdown
 2. **Drawdown Overlay** - Dual y-axis (equity + drawdown)
 3. **PnL Distribution** - Гистограмма распределения прибыли
 4. **Parameter Heatmap** - Тепловая карта для оптимизации
 
 **Backend Integration:**
+
 ```typescript
 // Fetch Plotly charts from backend
 const response = await BacktestsApi.getCharts(backtestId, chartType);
@@ -90,6 +99,7 @@ const response = await BacktestsApi.getCharts(backtestId, chartType);
 ```
 
 **API Endpoints to Implement:**
+
 ```python
 # backend/api/routers/backtests.py
 
@@ -97,9 +107,9 @@ const response = await BacktestsApi.getCharts(backtestId, chartType);
 def get_chart(backtest_id: int, chart_type: str):
     """
     Generate Plotly chart for backtest
-    
+
     chart_type: equity_curve | drawdown_overlay | pnl_distribution | parameter_heatmap
-    
+
     Returns: {"plotly_json": "<plotly_figure_json>"}
     """
     # Use backend/visualization/advanced_charts.py
@@ -172,9 +182,9 @@ Add new tab to `BacktestDetailPage.tsx`:
   <Tab label="Динамика" />
   <Tab label="Анализ сделок" />
   <Tab label="Риск" />
-  <Tab label="Графики" />  {/* NEW */}
+  <Tab label="Графики" /> {/* NEW */}
   <Tab label="Сделки" />
-</Tabs>
+</Tabs>;
 
 // Add ChartsTab component
 const ChartsTab: React.FC<{ backtestId: number }> = ({ backtestId }) => {
@@ -216,7 +226,7 @@ Add to `frontend/src/services/api.ts`:
 ```typescript
 export const BacktestsApi = {
   // Existing methods...
-  
+
   // Charts endpoints
   getEquityCurve: async (id: number, showDrawdown: boolean = true) => {
     const response = await api.get(
@@ -224,25 +234,22 @@ export const BacktestsApi = {
     );
     return response.data;
   },
-  
+
   getDrawdownOverlay: async (id: number) => {
     const response = await api.get(`/backtests/${id}/charts/drawdown_overlay`);
     return response.data;
   },
-  
+
   getPnlDistribution: async (id: number, bins: number = 30) => {
-    const response = await api.get(
-      `/backtests/${id}/charts/pnl_distribution?bins=${bins}`
-    );
+    const response = await api.get(`/backtests/${id}/charts/pnl_distribution?bins=${bins}`);
     return response.data;
   },
-  
+
   // CSV export (already implemented)
   exportCSV: async (id: number, reportType: string) => {
-    const response = await api.get(
-      `/backtests/${id}/export/${reportType}`,
-      { responseType: 'blob' }
-    );
+    const response = await api.get(`/backtests/${id}/export/${reportType}`, {
+      responseType: 'blob',
+    });
     return response.data;
   },
 };
@@ -287,6 +294,7 @@ npm run dev
 ## 🎯 Session Progress
 
 **Completed:**
+
 - [x] CSV Export backend (ReportGenerator)
 - [x] CSV Export API endpoints
 - [x] CSV Export tests (16/16 PASSED)
@@ -294,12 +302,14 @@ npm run dev
 - [x] package.json update (plotly.js)
 
 **In Progress:**
+
 - [ ] Charts API endpoints
 - [ ] Charts Tab implementation
 - [ ] API service update
 - [ ] Mode switcher
 
 **Estimated Time:**
+
 - Charts API: 1-2 hours
 - Charts Tab: 2-3 hours
 - Full integration: 4-6 hours
