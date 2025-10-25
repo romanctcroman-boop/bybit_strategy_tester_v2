@@ -32,6 +32,8 @@ export type IndicatorsDialogProps = {
   setShowRSI: (v: boolean) => void;
   showMACD: boolean;
   setShowMACD: (v: boolean) => void;
+  showVolume: boolean;
+  setShowVolume: (v: boolean) => void;
   showVWAP: boolean;
   setShowVWAP: (v: boolean) => void;
   showSuperTrend: boolean;
@@ -47,7 +49,17 @@ type IndicatorItem = {
   id: string;
   label: string;
   supported?: boolean;
-  bind?: 'SMA20' | 'EMA50' | 'BB20_2' | 'RSI' | 'MACD' | 'VWAP' | 'SUPER' | 'DONCHIAN' | 'KELTNER';
+  bind?:
+    | 'SMA20'
+    | 'EMA50'
+    | 'BB20_2'
+    | 'RSI'
+    | 'MACD'
+    | 'VOLUME'
+    | 'VWAP'
+    | 'SUPER'
+    | 'DONCHIAN'
+    | 'KELTNER';
   type: 'overlay' | 'oscillator' | 'volume' | 'other';
 };
 
@@ -84,6 +96,7 @@ const ALL_INDICATORS: IndicatorItem[] = [
     type: 'oscillator',
   },
   { id: 'macd', label: 'MACD', supported: true, bind: 'MACD', type: 'oscillator' },
+  { id: 'volume', label: 'Объём (Volume)', supported: true, bind: 'VOLUME', type: 'volume' },
   { id: 'atr', label: 'Средний истинный диапазон (ATR)', type: 'other' },
   { id: 'supertrend', label: 'SuperTrend', supported: true, bind: 'SUPER', type: 'overlay' },
   { id: 'keltner', label: 'Канал Кельтнера', supported: true, bind: 'KELTNER', type: 'overlay' },
@@ -129,6 +142,8 @@ export default function IndicatorsDialog(props: IndicatorsDialogProps) {
     setShowRSI,
     showMACD,
     setShowMACD,
+    showVolume,
+    setShowVolume,
     showVWAP,
     setShowVWAP,
     showSuperTrend,
@@ -153,6 +168,7 @@ export default function IndicatorsDialog(props: IndicatorsDialogProps) {
     else if (item.bind === 'BB20_2') setShowBB(!showBB);
     else if (item.bind === 'RSI') setShowRSI(!showRSI);
     else if (item.bind === 'MACD') setShowMACD(!showMACD);
+    else if (item.bind === 'VOLUME') setShowVolume(!showVolume);
     else if (item.bind === 'VWAP') setShowVWAP(!showVWAP);
     else if (item.bind === 'SUPER') setShowSuperTrend(!showSuperTrend);
     else if (item.bind === 'DONCHIAN') setShowDonchian(!showDonchian);
@@ -166,6 +182,7 @@ export default function IndicatorsDialog(props: IndicatorsDialogProps) {
     if (item.bind === 'BB20_2') return showBB;
     if (item.bind === 'RSI') return showRSI;
     if (item.bind === 'MACD') return showMACD;
+    if (item.bind === 'VOLUME') return showVolume;
     if (item.bind === 'VWAP') return showVWAP;
     if (item.bind === 'SUPER') return showSuperTrend;
     if (item.bind === 'DONCHIAN') return showDonchian;

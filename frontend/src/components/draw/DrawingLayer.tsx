@@ -64,6 +64,7 @@ const DrawingLayer = forwardRef<DrawingLayerHandle, Props>(
     const [draft, setDraft] = useState<Shape | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [hoverHit, setHoverHit] = useState<boolean>(false);
+    const [isDrawing, setIsDrawing] = useState<boolean>(false); // Track active drawing
     const draggingRef = useRef<null | {
       index: number;
       part:
@@ -686,6 +687,12 @@ const DrawingLayer = forwardRef<DrawingLayerHandle, Props>(
 
       const onDown = (e: MouseEvent) => {
         if (e.button !== 0) return; // left only
+
+        // Allow chart drag if Space key is pressed (common in design tools)
+        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+          return; // Let chart handle zoom/scale
+        }
+
         const rect = c.getBoundingClientRect();
         const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
         const point = fromPx(pos);
@@ -701,6 +708,7 @@ const DrawingLayer = forwardRef<DrawingLayerHandle, Props>(
               startMouse: { x: pos.x, y: pos.y, point },
               original: shapes[hit.index],
             };
+            setIsDrawing(true); // Block chart interaction while dragging
           } else {
             setSelectedId(null);
             draggingRef.current = null;
@@ -711,22 +719,31 @@ const DrawingLayer = forwardRef<DrawingLayerHandle, Props>(
         // drawing modes
         if (activeTool === 'trendline') {
           setDraft({ id: 'draft', type: 'trendline', p1: point, p2: point });
+          setIsDrawing(true);
         } else if (activeTool === 'ray') {
           setDraft({ id: 'draft', type: 'ray', p1: point, p2: point } as Shape);
+          setIsDrawing(true);
         } else if (activeTool === 'hline') {
           setDraft({ id: 'draft', type: 'hline', price: point.price });
+          setIsDrawing(true);
         } else if (activeTool === 'hray') {
           setDraft({ id: 'draft', type: 'hray', p: point } as Shape);
+          setIsDrawing(true);
         } else if (activeTool === 'vline') {
           setDraft({ id: 'draft', type: 'vline', time: point.time });
+          setIsDrawing(true);
         } else if (activeTool === 'fib') {
           setDraft({ id: 'draft', type: 'fib', p1: point, p2: point } as Shape);
+          setIsDrawing(true);
         } else if (activeTool === 'rect') {
           setDraft({ id: 'draft', type: 'rect', p1: point, p2: point } as Shape);
+          setIsDrawing(true);
         } else if (activeTool === 'ruler') {
           setDraft({ id: 'draft', type: 'ruler', p1: point, p2: point } as Shape);
+          setIsDrawing(true);
         } else if (activeTool === 'channel') {
           setDraft({ id: 'draft', type: 'channel', p1: point, p2: point, widthPx: 20 } as any);
+          setIsDrawing(true);
         }
       };
 
@@ -901,10 +918,12 @@ const DrawingLayer = forwardRef<DrawingLayerHandle, Props>(
         if (draggingRef.current) {
           undoStack.current.push(shapes);
           draggingRef.current = null;
+          setIsDrawing(false);
           return;
         }
 
         if (!draft) return;
+        setIsDrawing(false);
         if (draft.type === 'trendline') {
           // avoid zero-length lines
           const p1 = toPx(draft.p1);
@@ -937,10 +956,20 @@ const DrawingLayer = forwardRef<DrawingLayerHandle, Props>(
       c.addEventListener('mousedown', onDown);
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
+
+      // Allow mousewheel to pass through to chart for zoom
+      const onWheel = (_e: WheelEvent) => {
+        // Don't prevent default - let chart handle zoom
+        // Canvas is pointer-events:auto but we want wheel to work
+        return true;
+      };
+      c.addEventListener('wheel', onWheel, { passive: true });
+
       return () => {
         c.removeEventListener('mousedown', onDown);
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
+        c.removeEventListener('wheel', onWheel);
       };
     }, [activeTool, draft, shapes, fromPx, toPx, hitTest]);
 
@@ -1000,11 +1029,28 @@ const DrawingLayer = forwardRef<DrawingLayerHandle, Props>(
     return (
       <canvas
         ref={canvasRef}
+        onMouseDown={(_e) => {
+          // Intercept mousedown only for drawing tools
+          // This allows the event handlers to work
+        }}
         style={{
           position: 'absolute',
           inset: 0,
           zIndex: 20,
-          pointerEvents: activeTool === 'select' ? (hoverHit ? 'auto' : 'none') : 'auto',
+          // Smart pointer events logic:
+          // - Select mode: only when hovering over shapes
+          // - Drawing tools: always intercept to catch clicks, but DON'T block wheel
+          // - Active drawing: always intercept all events
+          pointerEvents:
+            isDrawing || draft
+              ? 'auto' // Actively drawing - intercept everything
+              : activeTool === 'select'
+                ? hoverHit
+                  ? 'auto'
+                  : 'none' // Select: only on hover
+                : activeTool
+                  ? 'auto' // Drawing tool selected - need to catch mousedown
+                  : 'none', // No tool - pass through
           cursor:
             activeTool === 'select'
               ? hoverHit

@@ -86,9 +86,9 @@ export const useMarketDataStore = create<MarketDataState>((set, get) => ({
     }
   },
 
-  // Helper: enforce continuity between last closed and forming candle to avoid visual gaps
-  // If forming window immediately follows the last closed bar, force open==prevClose and clamp high/low accordingly.
-  // Works for minute-based and D/W intervals because we compare by window start seconds.
+  // Helper: OPTIONAL continuity enforcement between last closed and forming candle
+  // Only enforce if forming window IMMEDIATELY follows last closed bar
+  // AND open price is within reasonable range (not gap/spike)
   _ensureContinuous(forming: Candle, lastClosed: Candle | undefined, interval: string): Candle {
     if (!lastClosed) return forming;
     const iv = String(interval).toUpperCase();
@@ -98,14 +98,29 @@ export const useMarketDataStore = create<MarketDataState>((set, get) => ({
       const n = parseInt(iv, 10);
       return (isFinite(n) && n > 0 ? n : 1) * 60;
     })();
-    // If forming starts exactly after last closed window, enforce continuity
-    if (forming.time === lastClosed.time + bucketSec) {
-      const prevClose = lastClosed.close;
+
+    // Only apply if forming bar immediately follows last closed bar
+    if (forming.time !== lastClosed.time + bucketSec) {
+      return forming; // Gap detected, don't force continuity
+    }
+
+    // Check if open is reasonable (within 10% of last close) to avoid forcing wrong data
+    const prevClose = lastClosed.close;
+    const openDiff = Math.abs(forming.open - prevClose) / prevClose;
+    if (openDiff > 0.1) {
+      // More than 10% gap - likely real gap, don't force continuity
+      return forming;
+    }
+
+    // Only adjust if open is very close to prevClose (within 0.5%)
+    if (openDiff < 0.005) {
       const open = prevClose;
       const high = Math.max(forming.high, open, forming.close);
       const low = Math.min(forming.low, open, forming.close);
       return { ...forming, open, high, low };
     }
+
+    // Return unchanged if gap is significant
     return forming;
   },
 

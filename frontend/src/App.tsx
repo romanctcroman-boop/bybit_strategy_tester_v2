@@ -1,23 +1,10 @@
 import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Link } from 'react-router-dom';
-const BotsPage = lazy(() => import('./pages/BotsPage'));
-const ActiveBotsPage = lazy(() => import('./pages/ActiveBotsPage'));
-const WizardCreateBot = lazy(() => import('./pages/WizardCreateBot'));
-const AlgoBuilderPage = lazy(() => import('./pages/AlgoBuilderPage'));
-const StrategiesPage = lazy(() => import('./pages/StrategiesPage'));
-const StrategyBuilderPage = lazy(() => import('./pages/StrategyBuilderPage'));
-const OptimizationsPage = lazy(() => import('./pages/OptimizationsPage'));
-const OptimizationDetailPage = lazy(() => import('./pages/OptimizationDetailPage'));
-const DataUploadPage = lazy(() => import('./pages/DataUploadPage'));
-const BacktestsPage = lazy(() => import('./pages/BacktestsPage'));
-const BacktestDetailPage = lazy(() => import('./pages/BacktestDetailPage'));
-const StrategyDetailPage = lazy(() => import('./pages/StrategyDetailPage'));
+
+// Chart Pages
 const TestChartPage = lazy(() => import('./pages/TestChartPage'));
-const DebugPage = lazy(() => import('./pages/DebugPage'));
-const AdminBackfillPage = lazy(() => import('./pages/AdminBackfillPage'));
-const MTFBacktestDemo = lazy(() => import('./pages/MTFBacktestDemo'));
 const TradingViewDemo = lazy(() => import('./pages/TradingViewDemo'));
-const WalkForwardPage = lazy(() => import('./pages/WalkForwardPage'));
+
 import NotificationsProvider from './components/NotificationsProvider';
 import ApiHealthIndicator from './components/ApiHealthIndicator';
 import TopProgressBar from './components/TopProgressBar';
@@ -28,41 +15,35 @@ const App: React.FC = () => {
       <TopProgressBar />
       <HashRouter>
         <nav
-          style={{ padding: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}
+          style={{
+            padding: '12px 20px',
+            display: 'flex',
+            gap: 16,
+            alignItems: 'center',
+            background: '#f5f5f5',
+            borderBottom: '1px solid #ddd',
+          }}
         >
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Link to="/">Bots</Link> | <Link to="/active">Active</Link> |{' '}
-            <Link to="/strategy">Strategy</Link> | <Link to="/bots/create">Create</Link> |{' '}
-            <Link to="/algo">Algo</Link> | <Link to="/strategies">Strategies</Link> |{' '}
-            <Link to="/optimizations">Optimizations</Link> | <Link to="/upload">Uploads</Link> |{' '}
-            <Link to="/backtests">Backtests</Link> | <Link to="/test-chart">Test Chart</Link> |{' '}
-            <Link to="/tv-demo">TV Demo</Link> | <Link to="/mtf-demo">MTF Demo</Link> |{' '}
-            <Link to="/admin/backfill">Admin Backfill</Link> | <Link to="/debug">Debug</Link>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <Link to="/test-chart" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <strong>Test Chart</strong>
+            </Link>
+            <Link to="/tv-demo" style={{ textDecoration: 'none', color: '#666' }}>
+              TradingView Demo
+            </Link>
           </div>
           <div style={{ marginLeft: 'auto' }}>
             <ApiHealthIndicator />
           </div>
         </nav>
-        <Suspense fallback={null}>
+        <Suspense fallback={<div style={{ padding: 20 }}>Loading...</div>}>
           <Routes>
-            <Route path="/" element={<BotsPage />} />
-            <Route path="/active" element={<ActiveBotsPage />} />
-            <Route path="/strategies" element={<StrategiesPage />} />
-            <Route path="/strategy" element={<StrategyBuilderPage />} />
-            <Route path="/strategy/:id" element={<StrategyDetailPage />} />
-            <Route path="/bots/create" element={<WizardCreateBot />} />
-            <Route path="/algo" element={<AlgoBuilderPage />} />
-            <Route path="/optimizations" element={<OptimizationsPage />} />
-            <Route path="/optimization/:id" element={<OptimizationDetailPage />} />
-            <Route path="/walk-forward/:id" element={<WalkForwardPage />} />
-            <Route path="/upload" element={<DataUploadPage />} />
-            <Route path="/backtests" element={<BacktestsPage />} />
-            <Route path="/backtest/:id" element={<BacktestDetailPage />} />
+            {/* Test Chart - Main Page */}
+            <Route path="/" element={<TestChartPage />} />
             <Route path="/test-chart" element={<TestChartPage />} />
+
+            {/* TradingView Demo */}
             <Route path="/tv-demo" element={<TradingViewDemo />} />
-            <Route path="/mtf-demo" element={<MTFBacktestDemo />} />
-            <Route path="/admin/backfill" element={<AdminBackfillPage />} />
-            <Route path="/debug" element={<DebugPage />} />
           </Routes>
         </Suspense>
       </HashRouter>

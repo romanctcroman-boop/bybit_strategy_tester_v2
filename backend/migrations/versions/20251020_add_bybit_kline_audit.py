@@ -32,12 +32,9 @@ def upgrade():
         sa.Column(
             "inserted_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),
-    )
-    op.create_unique_constraint(
-        "uix_symbol_open_time", "bybit_kline_audit", ["symbol", "open_time"]
+        sa.UniqueConstraint("symbol", "open_time", name="uix_symbol_open_time"),
     )
 
 
 def downgrade():
-    op.drop_constraint("uix_symbol_open_time", "bybit_kline_audit", type_="unique")
     op.drop_table("bybit_kline_audit")

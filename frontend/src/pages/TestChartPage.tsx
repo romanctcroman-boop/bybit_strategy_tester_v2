@@ -18,12 +18,10 @@ import SearchIcon from '@mui/icons-material/Search';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import PhotoCameraOutlinedIcon from '@mui/icons-material/PhotoCameraOutlined';
-import ShowChartIcon from '@mui/icons-material/ShowChart';
 import SimpleChart, { type SimpleChartHandle } from '../components/SimpleChart';
 import DrawToolbar from '../components/draw/DrawToolbar';
 import DrawingLayer, { type DrawingLayerHandle } from '../components/draw/DrawingLayer';
 import type { Tool } from '../components/draw/types';
-import IndicatorsDialog from '../components/IndicatorsDialog';
 import { useMarketDataStore } from '../store/marketData';
 import { BYBIT_TOP_TICKERS, fetchTopBybitTickersByVolume } from '../services/topBybitTickers';
 
@@ -51,71 +49,14 @@ const timeframeOptions: Array<{ value: string; label: string }> = [
   { value: 'D', label: '1d' },
 ];
 
-const chartTypeLabels: Record<
-  | 'bars'
-  | 'candles'
-  | 'hollow_candles'
-  | 'line'
-  | 'line_dots'
-  | 'stepline'
-  | 'area'
-  | 'area_hlc'
-  | 'baseline',
-  string
-> = {
-  bars: 'Бары',
-  candles: 'Японские свечи',
-  hollow_candles: 'Пустые свечи',
-  line: 'Линии',
-  line_dots: 'Линии с точками',
-  stepline: 'Ступенчатая линия',
-  area: 'Области',
-  area_hlc: 'Область HLC',
-  baseline: 'Базовая линия',
-};
-
-const chartTypeOrder = [
-  'bars',
-  'candles',
-  'hollow_candles',
-  'line',
-  'line_dots',
-  'stepline',
-  'area',
-  'area_hlc',
-  'baseline',
-] as Array<keyof typeof chartTypeLabels>;
-
 const FAVORITES_LS_KEY = 'bybit:favorites';
 
 const TestChartPage: React.FC = () => {
   const [updateTime, setUpdateTime] = useState<string>('');
-  const [showSMA20, setShowSMA20] = useState<boolean>(true);
-  const [showEMA50, setShowEMA50] = useState<boolean>(false);
-  const [showBB, setShowBB] = useState<boolean>(false);
-  const [showRSI, setShowRSI] = useState<boolean>(false);
-  const [showMACD, setShowMACD] = useState<boolean>(false);
-  const [showVWAP, setShowVWAP] = useState<boolean>(false);
-  const [showSuperTrend, setShowSuperTrend] = useState<boolean>(false);
-  const [showDonchian, setShowDonchian] = useState<boolean>(false);
-  const [showKeltner, setShowKeltner] = useState<boolean>(false);
-  const [indicatorsOpen, setIndicatorsOpen] = useState<boolean>(false);
   const [tfAnchor, setTfAnchor] = useState<HTMLElement | null>(null);
-  const [styleAnchor, setStyleAnchor] = useState<HTMLElement | null>(null);
   const [tool, setTool] = useState<Tool>('select');
   const [hasSelection, setHasSelection] = useState<boolean>(false);
   const [magnet, setMagnet] = useState<boolean>(false);
-  const [chartType, setChartType] = useState<
-    | 'bars'
-    | 'candles'
-    | 'hollow_candles'
-    | 'line'
-    | 'line_dots'
-    | 'stepline'
-    | 'area'
-    | 'area_hlc'
-    | 'baseline'
-  >('hollow_candles');
   const chartRef = React.useRef<SimpleChartHandle>(null);
   const drawRef = React.useRef<DrawingLayerHandle>(null);
   const {
@@ -220,10 +161,10 @@ const TestChartPage: React.FC = () => {
         group: favSet.has(cur) ? 'Избранное' : 'Топ Bybit',
       });
     }
-    // Sort favorites first, then alphabetically
-    return list.sort((a, b) =>
-      a.group === b.group ? a.symbol.localeCompare(b.symbol) : a.group === 'Избранное' ? -1 : 1
-    );
+    // Sort: Favorites first (by trading volume from API), then Top Bybit (preserve API volume order)
+    const favs = list.filter((o) => o.group === 'Избранное');
+    const top = list.filter((o) => o.group === 'Топ Bybit');
+    return [...favs, ...top];
   }, [allTickers, favorites, currentSymbol, currentCategory]);
 
   const changeSymbol = async (symRaw: string) => {
@@ -440,44 +381,8 @@ const TestChartPage: React.FC = () => {
                     ))}
                   </Menu>
 
-                  {/* Chart style selector */}
-                  <Button
-                    size="small"
-                    onClick={(e) => setStyleAnchor(e.currentTarget)}
-                    sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.2)' }}
-                    variant="outlined"
-                  >
-                    {chartTypeLabels[chartType]}
-                  </Button>
-                  <Menu
-                    anchorEl={styleAnchor}
-                    open={Boolean(styleAnchor)}
-                    onClose={() => setStyleAnchor(null)}
-                  >
-                    {chartTypeOrder.map((ct) => (
-                      <MenuItem
-                        key={ct}
-                        selected={ct === chartType}
-                        onClick={() => {
-                          setChartType(ct);
-                          setStyleAnchor(null);
-                        }}
-                      >
-                        {chartTypeLabels[ct]}
-                      </MenuItem>
-                    ))}
-                  </Menu>
-
-                  <Button
-                    size="small"
-                    startIcon={<ShowChartIcon fontSize="small" />}
-                    onClick={() => setIndicatorsOpen(true)}
-                    sx={{ ml: 1, color: '#fff' }}
-                  >
-                    Indicators
-                  </Button>
+                  <PhotoCameraOutlinedIcon fontSize="small" />
                 </Box>
-                <PhotoCameraOutlinedIcon fontSize="small" />
               </Box>
 
               {/* Main area: left tools rail + chart */}
@@ -511,43 +416,9 @@ const TestChartPage: React.FC = () => {
                     candles={candles}
                     datasetKey={`${currentSymbol}:${currentInterval}`}
                     interval={currentInterval}
-                    chartType={chartType}
-                    showSMA20={showSMA20}
-                    showEMA50={showEMA50}
-                    showBB={showBB}
-                    showRSI={showRSI}
-                    showMACD={showMACD}
-                    showVWAP={showVWAP}
-                    showSuperTrend={showSuperTrend}
-                    showDonchian={showDonchian}
-                    showKeltner={showKeltner}
                   />
                 </Box>
               </Box>
-
-              {/* Indicators dialog */}
-              <IndicatorsDialog
-                open={indicatorsOpen}
-                onClose={() => setIndicatorsOpen(false)}
-                showSMA20={showSMA20}
-                setShowSMA20={setShowSMA20}
-                showEMA50={showEMA50}
-                setShowEMA50={setShowEMA50}
-                showBB={showBB}
-                setShowBB={setShowBB}
-                showRSI={showRSI}
-                setShowRSI={setShowRSI}
-                showMACD={showMACD}
-                setShowMACD={setShowMACD}
-                showVWAP={showVWAP}
-                setShowVWAP={setShowVWAP}
-                showSuperTrend={showSuperTrend}
-                setShowSuperTrend={setShowSuperTrend}
-                showDonchian={showDonchian}
-                setShowDonchian={setShowDonchian}
-                showKeltner={showKeltner}
-                setShowKeltner={setShowKeltner}
-              />
             </Box>
           ) : (
             <Alert severity="info">No candles available</Alert>

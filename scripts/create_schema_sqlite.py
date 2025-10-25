@@ -12,6 +12,9 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import models so they are registered with Base.metadata
+import backend.models  # Import main models (Strategy, Backtest, Trade, Optimization, etc.)
+import backend.models.backfill_progress  # noqa: F401
+import backend.models.backfill_run  # noqa: F401
 import backend.models.bybit_kline_audit  # noqa: F401
 from backend.database import Base, engine
 

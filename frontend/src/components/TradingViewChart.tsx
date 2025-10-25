@@ -1,5 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createChart, PriceScaleMode } from 'lightweight-charts';
+import {
+  createChart,
+  PriceScaleMode,
+  CandlestickSeries,
+  LineSeries,
+  AreaSeries,
+  HistogramSeries,
+  BaselineSeries,
+  createSeriesMarkers,
+} from 'lightweight-charts';
 
 interface Candle {
   time: string | number;
@@ -99,6 +108,7 @@ const TradingViewChart: React.FC<Props> = ({
   const roRef = useRef<ResizeObserver | null>(null);
   const volumeRef = useRef<any>(null);
   const priceLinesRef = useRef<any[]>([]);
+  const markersPluginRef = useRef<any>(null); // v5 API: createSeriesMarkers
   const [legend, setLegend] = useState<{
     time: string;
     price: number | { open: number; high: number; low: number; close: number };
@@ -106,74 +116,24 @@ const TradingViewChart: React.FC<Props> = ({
   const loadingMoreRef = useRef<boolean>(false);
   const lastRequestedRef = useRef<number | null>(null);
 
-  // Compatibility helpers for different lightweight-charts major versions
-  const addCandlesCompat = (chart: any, options?: any) => {
-    try {
-      if (typeof chart?.addCandlestickSeries === 'function')
-        return chart.addCandlestickSeries(options);
-    } catch {}
-    try {
-      if (typeof chart?.addSeries === 'function')
-        return chart.addSeries({ type: 'Candlestick', ...(options || {}) });
-    } catch {}
-    throw new Error('Candlestick series API not found on chart object');
-  };
-  const addLineCompat = (chart: any, options?: any) => {
-    try {
-      if (typeof chart?.addLineSeries === 'function') return chart.addLineSeries(options);
-    } catch {}
-    try {
-      if (typeof chart?.addSeries === 'function')
-        return chart.addSeries({ type: 'Line', ...(options || {}) });
-    } catch {}
-    throw new Error('Line series API not found on chart object');
-  };
-  const addAreaCompat = (chart: any, options?: any) => {
-    try {
-      if (typeof chart?.addAreaSeries === 'function') return chart.addAreaSeries(options);
-    } catch {}
-    try {
-      if (typeof chart?.addSeries === 'function')
-        return chart.addSeries({ type: 'Area', ...(options || {}) });
-    } catch {}
-    throw new Error('Area series API not found on chart object');
-  };
-  const addHistogramCompat = (chart: any, options?: any) => {
-    try {
-      if (typeof chart?.addHistogramSeries === 'function') return chart.addHistogramSeries(options);
-    } catch {}
-    try {
-      if (typeof chart?.addSeries === 'function')
-        return chart.addSeries({ type: 'Histogram', ...(options || {}) });
-    } catch {}
-    throw new Error('Histogram series API not found on chart object');
-  };
-  const addBaselineCompat = (chart: any, options?: any) => {
-    try {
-      if (typeof chart?.addBaselineSeries === 'function') return chart.addBaselineSeries(options);
-    } catch {}
-    try {
-      if (typeof chart?.addSeries === 'function')
-        return chart.addSeries({ type: 'Baseline', ...(options || {}) });
-    } catch {}
-    throw new Error('Baseline series API not found on chart object');
-  };
+  // v5 API: No compatibility layer needed - use direct imports
+  // createSeriesMarkers replaces series.setMarkers()
 
   const createSeriesByType = (c: any, t: 'candlestick' | 'line' | 'area' | 'baseline') => {
-    if (t === 'line') return addLineCompat(c, { color: '#90caf9' });
+    if (t === 'line') return c.addSeries(LineSeries, { color: '#90caf9' });
     if (t === 'area')
-      return addAreaCompat(c, {
+      return c.addSeries(AreaSeries, {
         lineColor: '#90caf9',
         topColor: 'rgba(144,202,249,0.2)',
         bottomColor: 'rgba(144,202,249,0.0)',
       });
     if (t === 'baseline')
-      return addBaselineCompat(c, {
+      return c.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: 0 },
         topFillColor1: 'rgba(76,175,80,0.2)',
         bottomFillColor1: 'rgba(244,67,54,0.2)',
       });
-    return addCandlesCompat(c);
+    return c.addSeries(CandlestickSeries);
   };
 
   const priceScaleModeFrom = (m: 'normal' | 'log' | 'percent' | 'index100') => {
@@ -267,7 +227,7 @@ const TradingViewChart: React.FC<Props> = ({
       // Volume histogram (optional)
       if (showVolume) {
         try {
-          volumeRef.current = addHistogramCompat(chart, {
+          volumeRef.current = chart.addSeries(HistogramSeries, {
             priceScaleId: volumeScale === 'left' ? 'left' : 'right',
             color: 'rgba(124,179,66,0.7)',
             base: 0,
@@ -348,7 +308,21 @@ const TradingViewChart: React.FC<Props> = ({
           return markerConfig;
         });
 
-        series.setMarkers(enhancedMarkers as any);
+        // v5 API: Use createSeriesMarkers instead of series.setMarkers
+        if (markersPluginRef.current) {
+          try {
+            markersPluginRef.current.detach();
+          } catch {}
+        }
+        markersPluginRef.current = createSeriesMarkers(series, enhancedMarkers);
+      } else {
+        // Clear markers when no markers present
+        if (markersPluginRef.current) {
+          try {
+            markersPluginRef.current.detach();
+            markersPluginRef.current = null;
+          } catch {}
+        }
       }
 
       // TP/SL Price Lines (ТЗ 9.2)
@@ -516,6 +490,12 @@ const TradingViewChart: React.FC<Props> = ({
           chart.timeScale().unsubscribeVisibleLogicalRangeChange(rangeHandler);
         } catch {}
         try {
+          if (markersPluginRef.current) {
+            markersPluginRef.current.detach();
+            markersPluginRef.current = null;
+          }
+        } catch {}
+        try {
           volumeRef.current = null;
         } catch {}
         chart.remove();
@@ -565,14 +545,20 @@ const TradingViewChart: React.FC<Props> = ({
 
       if (showSMA20) {
         if (!sma20Ref.current)
-          sma20Ref.current = addLineCompat(chartRef.current, { color: '#0288d1', lineWidth: 1 });
+          sma20Ref.current = chartRef.current.addSeries(LineSeries, {
+            color: '#0288d1',
+            lineWidth: 1,
+          });
         sma20Ref.current.setData(toSMA(20) as any);
       } else if (sma20Ref.current) {
         sma20Ref.current.setData([]);
       }
       if (showSMA50) {
         if (!sma50Ref.current)
-          sma50Ref.current = addLineCompat(chartRef.current, { color: '#7b1fa2', lineWidth: 1 });
+          sma50Ref.current = chartRef.current.addSeries(LineSeries, {
+            color: '#7b1fa2',
+            lineWidth: 1,
+          });
         sma50Ref.current.setData(toSMA(50) as any);
       } else if (sma50Ref.current) {
         sma50Ref.current.setData([]);
@@ -658,9 +644,21 @@ const TradingViewChart: React.FC<Props> = ({
           return markerConfig;
         });
 
-        seriesRef.current.setMarkers(enhancedMarkers as any);
+        // v5 API: Use createSeriesMarkers instead of series.setMarkers
+        if (markersPluginRef.current) {
+          try {
+            markersPluginRef.current.detach();
+          } catch {}
+        }
+        markersPluginRef.current = createSeriesMarkers(seriesRef.current, enhancedMarkers);
       } else {
-        seriesRef.current.setMarkers([]);
+        // Clear markers
+        if (markersPluginRef.current) {
+          try {
+            markersPluginRef.current.detach();
+          } catch {}
+          markersPluginRef.current = null;
+        }
       }
     } catch {
       console.error('Failed to update markers');
@@ -783,7 +781,7 @@ const TradingViewChart: React.FC<Props> = ({
         volumeRef.current.applyOptions({ priceScaleId: volumeScale === 'left' ? 'left' : 'right' });
       } else if (showVolume && chartRef.current) {
         try {
-          volumeRef.current = addHistogramCompat(chartRef.current, {
+          volumeRef.current = chartRef.current.addSeries(HistogramSeries, {
             priceScaleId: volumeScale === 'left' ? 'left' : 'right',
             color: 'rgba(124,179,66,0.7)',
             base: 0,
