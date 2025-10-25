@@ -31,6 +31,194 @@ except Exception:  # pragma: no cover
     BACKTEST_STARTED = BACKTEST_COMPLETED = BACKTEST_FAILED = BACKTEST_DURATION = None  # type: ignore
 
 
+def _transform_results_for_frontend(engine_results: dict, initial_capital: float) -> dict:
+    """
+    Transform BacktestEngine output to Frontend-expected BacktestResults format.
+    
+    Frontend expects:
+    - overview: {net_pnl, net_pct, total_trades, wins, losses, max_drawdown_abs/pct, profit_factor}
+    - by_side: {all, long, short} stats
+    - dynamics: {all, long, short} dynamics (unrealized, net, fees, runup, drawdown, buyhold)
+    - risk: {sharpe, sortino, profit_factor}
+    - equity: [{time, equity}]
+    - pnl_bars: [{time, pnl}] (optional, cumulative PnL per bar)
+    """
+    metrics = engine_results.get('metrics', {})
+    trades = engine_results.get('trades', [])
+    
+    # Calculate per-side stats
+    long_trades = [t for t in trades if t.get('side', '').upper() in ('LONG', 'BUY')]
+    short_trades = [t for t in trades if t.get('side', '').upper() in ('SHORT', 'SELL')]
+    
+    def calc_side_stats(trade_list):
+        if not trade_list:
+            return {
+                'total_trades': 0,
+                'open_trades': 0,
+                'wins': 0,
+                'losses': 0,
+                'win_rate': 0.0,
+                'avg_pl': 0.0,
+                'avg_pl_pct': 0.0,
+                'avg_win': 0.0,
+                'avg_win_pct': 0.0,
+                'avg_loss': 0.0,
+                'avg_loss_pct': 0.0,
+                'max_win': 0.0,
+                'max_win_pct': 0.0,
+                'max_loss': 0.0,
+                'max_loss_pct': 0.0,
+                'profit_factor': 0.0,
+                'avg_bars': 0.0,
+                'avg_bars_win': 0.0,
+                'avg_bars_loss': 0.0,
+            }
+        
+        wins = [t for t in trade_list if t.get('pnl', 0) > 0]
+        losses = [t for t in trade_list if t.get('pnl', 0) < 0]
+        
+        total = len(trade_list)
+        num_wins = len(wins)
+        num_losses = len(losses)
+        
+        gross_profit = sum(t.get('pnl', 0) for t in wins)
+        gross_loss = abs(sum(t.get('pnl', 0) for t in losses))
+        
+        return {
+            'total_trades': total,
+            'open_trades': 0,  # All trades are closed after backtest
+            'wins': num_wins,
+            'losses': num_losses,
+            'win_rate': (num_wins / total * 100) if total > 0 else 0.0,
+            'avg_pl': sum(t.get('pnl', 0) for t in trade_list) / total if total > 0 else 0.0,
+            'avg_pl_pct': sum(t.get('pnl_pct', 0) for t in trade_list) / total if total > 0 else 0.0,
+            'avg_win': gross_profit / num_wins if num_wins > 0 else 0.0,
+            'avg_win_pct': sum(t.get('pnl_pct', 0) for t in wins) / num_wins if num_wins > 0 else 0.0,
+            'avg_loss': -gross_loss / num_losses if num_losses > 0 else 0.0,
+            'avg_loss_pct': sum(t.get('pnl_pct', 0) for t in losses) / num_losses if num_losses > 0 else 0.0,
+            'max_win': max((t.get('pnl', 0) for t in wins), default=0.0),
+            'max_win_pct': max((t.get('pnl_pct', 0) for t in wins), default=0.0),
+            'max_loss': min((t.get('pnl', 0) for t in losses), default=0.0),
+            'max_loss_pct': min((t.get('pnl_pct', 0) for t in losses), default=0.0),
+            'profit_factor': (gross_profit / gross_loss) if gross_loss > 0 else 0.0,
+            'avg_bars': sum(t.get('bars_held', 0) for t in trade_list) / total if total > 0 else 0.0,
+            'avg_bars_win': sum(t.get('bars_held', 0) for t in wins) / num_wins if num_wins > 0 else 0.0,
+            'avg_bars_loss': sum(t.get('bars_held', 0) for t in losses) / num_losses if num_losses > 0 else 0.0,
+        }
+    
+    all_stats = calc_side_stats(trades)
+    long_stats = calc_side_stats(long_trades)
+    short_stats = calc_side_stats(short_trades)
+    
+    # Overview section
+    overview = {
+        'net_pnl': metrics.get('net_profit', 0.0),
+        'net_pct': metrics.get('net_profit_pct', 0.0),
+        'total_trades': engine_results.get('total_trades', 0),
+        'wins': engine_results.get('winning_trades', 0),
+        'losses': engine_results.get('losing_trades', 0),
+        'max_drawdown_abs': metrics.get('max_drawdown_abs', 0.0),
+        'max_drawdown_pct': metrics.get('max_drawdown_pct', 0.0),
+        'profit_factor': engine_results.get('profit_factor', 0.0),
+    }
+    
+    # Dynamics section
+    def calc_dynamics(trade_list):
+        if not trade_list:
+            return {
+                'unrealized_abs': 0.0,
+                'unrealized_pct': 0.0,
+                'net_abs': 0.0,
+                'net_pct': 0.0,
+                'gross_profit_abs': 0.0,
+                'gross_profit_pct': 0.0,
+                'gross_loss_abs': 0.0,
+                'gross_loss_pct': 0.0,
+                'fees_abs': 0.0,
+                'fees_pct': 0.0,
+                'max_runup_abs': 0.0,
+                'max_runup_pct': 0.0,
+                'max_drawdown_abs': 0.0,
+                'max_drawdown_pct': 0.0,
+                'buyhold_abs': 0.0,
+                'buyhold_pct': 0.0,
+                'max_contracts': 0,
+            }
+        
+        wins = [t for t in trade_list if t.get('pnl', 0) > 0]
+        losses = [t for t in trade_list if t.get('pnl', 0) < 0]
+        
+        gross_profit = sum(t.get('pnl', 0) for t in wins)
+        gross_loss = abs(sum(t.get('pnl', 0) for t in losses))
+        net = sum(t.get('pnl', 0) for t in trade_list)
+        fees = sum(t.get('commission', 0) for t in trade_list)
+        
+        return {
+            'unrealized_abs': 0.0,  # All trades closed
+            'unrealized_pct': 0.0,
+            'net_abs': net,
+            'net_pct': (net / initial_capital * 100) if initial_capital > 0 else 0.0,
+            'gross_profit_abs': gross_profit,
+            'gross_profit_pct': (gross_profit / initial_capital * 100) if initial_capital > 0 else 0.0,
+            'gross_loss_abs': gross_loss,
+            'gross_loss_pct': (gross_loss / initial_capital * 100) if initial_capital > 0 else 0.0,
+            'fees_abs': fees,
+            'fees_pct': (fees / initial_capital * 100) if initial_capital > 0 else 0.0,
+            'max_runup_abs': max((t.get('run_up', 0) for t in trade_list), default=0.0),
+            'max_runup_pct': max((t.get('run_up_pct', 0) for t in trade_list), default=0.0),
+            'max_drawdown_abs': abs(min((t.get('drawdown', 0) for t in trade_list), default=0.0)),
+            'max_drawdown_pct': abs(min((t.get('drawdown_pct', 0) for t in trade_list), default=0.0)),
+            'buyhold_abs': metrics.get('buy_hold_return', 0.0) if trade_list == trades else 0.0,
+            'buyhold_pct': (metrics.get('buy_hold_return', 0.0) / initial_capital * 100) if initial_capital > 0 and trade_list == trades else 0.0,
+            'max_contracts': 1,  # Simple backtester, 1 position at a time
+        }
+    
+    dynamics = {
+        'all': calc_dynamics(trades),
+        'long': calc_dynamics(long_trades),
+        'short': calc_dynamics(short_trades),
+    }
+    
+    # Risk section
+    risk = {
+        'sharpe': engine_results.get('sharpe_ratio', 0.0),
+        'sortino': engine_results.get('sortino_ratio', 0.0),
+        'profit_factor': engine_results.get('profit_factor', 0.0),
+    }
+    
+    # Equity curve
+    equity_curve = engine_results.get('equity_curve', [])
+    equity = [
+        {
+            'time': point['timestamp'],
+            'equity': point['equity'],
+        }
+        for point in equity_curve
+    ]
+    
+    # PnL bars (cumulative PnL per bar) - optional, can be derived from equity
+    pnl_bars = [
+        {
+            'time': point['timestamp'],
+            'pnl': point['equity'] - initial_capital,
+        }
+        for point in equity_curve
+    ]
+    
+    return {
+        'overview': overview,
+        'by_side': {
+            'all': all_stats,
+            'long': long_stats,
+            'short': short_stats,
+        },
+        'dynamics': dynamics,
+        'risk': risk,
+        'equity': equity,
+        'pnl_bars': pnl_bars,
+    }
+
+
 class BacktestTask(Task):
     """Base Celery Task for backtests with DB failure handling."""
 
@@ -159,6 +347,9 @@ def run_backtest_task(
 
         logger.info("💾 Saving results...")
         
+        # Transform results to frontend-expected format
+        frontend_results = _transform_results_for_frontend(results, initial_capital)
+        
         # Сохраняем результаты бэктеста
         ds.update_backtest_results(
             backtest_id=backtest_id,
@@ -171,7 +362,7 @@ def run_backtest_task(
                 "win_rate": results.get("win_rate", 0),
                 "sharpe_ratio": results.get("sharpe_ratio", 0),
                 "max_drawdown": results.get("max_drawdown", 0),
-                "results": results,
+                "results": frontend_results,  # Frontend-compatible format
             },
         )
         
