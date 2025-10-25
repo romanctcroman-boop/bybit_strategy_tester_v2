@@ -96,6 +96,74 @@ def create_backtest(payload: BacktestCreate):
     return d
 
 
+@router.post("/mtf", response_model=dict)
+def create_mtf_backtest(payload: BacktestCreate):
+    """
+    Create and run a multi-timeframe backtest (ТЗ 3.4.2).
+    
+    MTF parameters:
+    - additional_timeframes: ['60', 'D'] - Higher timeframes for filters
+    - htf_filters: [{'timeframe': '60', 'type': 'trend_ma', 'params': {...}}]
+    
+    Returns immediate results (synchronous execution for now).
+    """
+    from backend.core.mtf_engine import MTFBacktestEngine
+    
+    # Validate MTF params
+    if not payload.additional_timeframes:
+        raise HTTPException(
+            status_code=400,
+            detail="additional_timeframes required for MTF backtest"
+        )
+    
+    # Create MTF engine
+    engine = MTFBacktestEngine(
+        initial_capital=payload.initial_capital,
+        commission=payload.commission or 0.0006,
+        leverage=payload.leverage or 1
+    )
+    
+    # Prepare strategy config
+    strategy_config = payload.config or {}
+    
+    # Add HTF filters if provided
+    if payload.htf_filters:
+        strategy_config['htf_filters'] = payload.htf_filters
+    
+    # Run MTF backtest
+    try:
+        results = engine.run_mtf(
+            central_timeframe=payload.timeframe,
+            additional_timeframes=payload.additional_timeframes,
+            strategy_config=strategy_config,
+            symbol=payload.symbol,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            limit=1000
+        )
+        
+        # Format response
+        response = {
+            'status': 'completed',
+            'symbol': payload.symbol,
+            'central_timeframe': payload.timeframe,
+            'additional_timeframes': payload.additional_timeframes,
+            'initial_capital': payload.initial_capital,
+            'results': results,
+            'htf_indicators': results.get('htf_indicators', {}),
+            'mtf_config': results.get('mtf_config', {})
+        }
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        raise HTTPException(
+            status_code=500,
+            detail=f"MTF backtest failed: {str(e)}\n{traceback.format_exc()}"
+        )
+
+
 @router.put("/{backtest_id}", response_model=BacktestOut)
 def update_backtest(backtest_id: int, payload: BacktestUpdate):
     DS = _get_data_service()

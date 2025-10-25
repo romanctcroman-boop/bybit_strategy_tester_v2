@@ -44,6 +44,16 @@ class BacktestOut(BaseModel):
     completed_at: str | None = None
     final_capital: float | None = None
     results: dict[str, Any] | None = None
+    
+    # MTF support (ТЗ 3.4.2)
+    additional_timeframes: list[str] | None = Field(
+        default=None,
+        description="Additional timeframes used in multi-timeframe analysis"
+    )
+    htf_indicators: dict[str, Any] | None = Field(
+        default=None,
+        description="Higher timeframe indicator values for visualization"
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -280,6 +290,16 @@ class BacktestCreate(BaseModel):
     leverage: int | None = 1
     commission: float | None = 0.0006
     config: dict[str, Any] | None = None
+    
+    # MTF support (ТЗ 3.4.2)
+    additional_timeframes: list[str] | None = Field(
+        default=None,
+        description="Additional timeframes for multi-timeframe analysis (e.g., ['60', 'D'])"
+    )
+    htf_filters: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Higher timeframe filters for entry conditions"
+    )
 
 
 class BacktestUpdate(BaseModel):
