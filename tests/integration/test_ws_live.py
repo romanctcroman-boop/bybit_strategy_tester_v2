@@ -22,7 +22,7 @@ class FakePubSub:
         # Simulate blocking wait with timeout
         try:
             return await asyncio.wait_for(self._queue.get(), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
     async def listen(self):

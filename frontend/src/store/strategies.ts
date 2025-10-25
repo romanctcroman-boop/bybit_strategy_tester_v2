@@ -16,9 +16,16 @@ interface StrategiesState {
   setFilters: (f: { isActive?: boolean; strategyType?: string }) => void;
   select: (id: number | null) => void;
   // data actions
-  fetchAll: (opts?: { limit?: number; offset?: number; isActive?: boolean; strategyType?: string }) => Promise<void>;
+  fetchAll: (opts?: {
+    limit?: number;
+    offset?: number;
+    isActive?: boolean;
+    strategyType?: string;
+  }) => Promise<void>;
   setPage: (page: number, pageSize?: number) => Promise<void>;
   add: (s: Partial<Strategy>) => Promise<Strategy | void>;
+  update: (id: number, s: Partial<Strategy>) => Promise<Strategy | void>;
+  remove: (id: number) => Promise<boolean | void>;
 }
 
 export const useStrategiesStore = create<StrategiesState>((set, get) => ({
@@ -34,15 +41,27 @@ export const useStrategiesStore = create<StrategiesState>((set, get) => ({
   setFilters: (f) => set({ isActive: f.isActive, strategyType: f.strategyType }),
   select: (id) => set({ selectedId: id }),
   fetchAll: async (opts) => {
-    const limit = opts?.limit ?? get().limit;
-    const offset = opts?.offset ?? get().offset;
-    const isActive = opts?.isActive ?? get().isActive;
-    const strategyType = opts?.strategyType ?? get().strategyType;
-    set({ loading: true, error: undefined });
     try {
-      const res = await StrategiesApi.list({ limit, offset, is_active: isActive, strategy_type: strategyType });
-      set({ items: res.items, total: res.total ?? res.items.length, limit, offset, loading: false });
+      const limit = opts?.limit ?? get().limit;
+      const offset = opts?.offset ?? get().offset;
+      const isActive = opts?.isActive ?? get().isActive;
+      const strategyType = opts?.strategyType ?? get().strategyType;
+      set({ loading: true, error: undefined });
+      const res = await StrategiesApi.list({
+        limit,
+        offset,
+        is_active: isActive,
+        strategy_type: strategyType,
+      });
+      set({
+        items: res.items,
+        total: res.total ?? res.items.length,
+        limit,
+        offset,
+        loading: false,
+      });
     } catch (e: any) {
+      console.warn('Failed to load strategies:', e);
       set({ error: e?.message || String(e), loading: false });
     }
   },
@@ -57,6 +76,26 @@ export const useStrategiesStore = create<StrategiesState>((set, get) => ({
       const created = await StrategiesApi.create(s as any);
       set({ items: [...get().items, created], loading: false });
       return created;
+    } catch (e: any) {
+      set({ error: e?.message || String(e), loading: false });
+    }
+  },
+  update: async (id, s) => {
+    set({ loading: true, error: undefined });
+    try {
+      const upd = await StrategiesApi.update(id, s);
+      set({ items: get().items.map((it) => (it.id === id ? upd : it)), loading: false });
+      return upd;
+    } catch (e: any) {
+      set({ error: e?.message || String(e), loading: false });
+    }
+  },
+  remove: async (id) => {
+    set({ loading: true, error: undefined });
+    try {
+      const res = await StrategiesApi.remove(id);
+      set({ items: get().items.filter((it) => it.id !== id), loading: false });
+      return !!res?.success;
     } catch (e: any) {
       set({ error: e?.message || String(e), loading: false });
     }

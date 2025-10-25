@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel
@@ -14,24 +13,24 @@ class ActiveDeal(BaseModel):
     entry_price: float
     quantity: float
     next_open_price: float
-    current_price: Optional[float] = None
+    current_price: float | None = None
     pnl_abs: float
     pnl_pct: float
     opened_at: datetime
 
 
 class DealsListResponse(BaseModel):
-    items: List[ActiveDeal]
+    items: list[ActiveDeal]
     total: int
 
 
-_DEALS: Dict[str, ActiveDeal] = {}
+_DEALS: dict[str, ActiveDeal] = {}
 
 
 def _seed():
     if _DEALS:
         return
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ex = [
         ActiveDeal(
             id="deal_1",
@@ -77,7 +76,7 @@ async def list_active_deals(
 class ActionResponse(BaseModel):
     ok: bool
     action: str
-    message: Optional[str] = None
+    message: str | None = None
 
 
 def _get_deal_or_404(deal_id: str) -> ActiveDeal:

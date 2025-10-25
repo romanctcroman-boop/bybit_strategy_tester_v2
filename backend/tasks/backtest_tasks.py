@@ -5,15 +5,16 @@ Celery tasks to run backtests in the background.
 """
 
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from celery import Task
 from loguru import logger
 
 from backend.celery_app import celery_app
 from backend.core.engine_adapter import get_engine
-from backend.database import Backtest, SessionLocal
+from backend.database import SessionLocal
+from backend.models import Backtest
 from backend.services.data_service import DataService
 
 # Optional Prometheus metrics
@@ -43,7 +44,7 @@ class BacktestTask(Task):
                 if backtest:
                     backtest.status = "failed"
                     backtest.error_message = str(exc)
-                    backtest.updated_at = datetime.now(timezone.utc)
+                    backtest.updated_at = datetime.now(UTC)
                     db.commit()
                 db.close()
             except Exception as e:
@@ -63,13 +64,13 @@ class BacktestTask(Task):
 def run_backtest_task(
     self,
     backtest_id: int,
-    strategy_config: Dict[str, Any],
+    strategy_config: dict[str, Any],
     symbol: str,
     interval: str,
     start_date: str,
     end_date: str,
     initial_capital: float = 10000.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run a backtest task (Celery).
 
     Attempts to claim the backtest row atomically via DataService.claim_backtest_to_run.
@@ -94,7 +95,7 @@ def run_backtest_task(
             logger.info(f"Backtest {backtest_id} already completed; skipping")
             return {"backtest_id": backtest_id, "status": "completed"}
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if hasattr(ds, "claim_backtest_to_run"):
             claimed = ds.claim_backtest_to_run(backtest_id, now, stale_seconds=300)
             status = claimed.get("status") if isinstance(claimed, dict) else None
@@ -115,10 +116,13 @@ def run_backtest_task(
         else:
             # Legacy path: mark running if not already running/recent
             running_since = getattr(backtest, "started_at", None)
-            if getattr(backtest, "status", None) == "running" and running_since:
-                if now - running_since < timedelta(hours=24):
-                    logger.info(f"Backtest {backtest_id} is already running; skipping")
-                    return {"backtest_id": backtest_id, "status": "running"}
+            if (
+                getattr(backtest, "status", None) == "running"
+                and running_since
+                and now - running_since < timedelta(hours=24)
+            ):
+                logger.info(f"Backtest {backtest_id} is already running; skipping")
+                return {"backtest_id": backtest_id, "status": "running"}
 
             ds.update_backtest(backtest_id, status="running", started_at=now)
 
@@ -133,16 +137,29 @@ def run_backtest_task(
         logger.info(f"📊 Loaded {len(candles)} candles")
 
         logger.info("⚙️  Running backtest engine...")
+        
+        # Получаем параметры из strategy_config или используем значения по умолчанию
+        leverage = strategy_config.get("leverage", 1)
+        order_size_usd = strategy_config.get("order_size_usd", None)
+        
+        # Комиссия Bybit = 0.075%
+        commission = 0.075 / 100  # 0.00075
+        slippage_pct = 0.05  # 0.05%
+        
         engine = get_engine(
             None,
-            data_service=ds,
             initial_capital=initial_capital,
-            commission=0.0006,
-            slippage=0.0001,
+            commission=commission,
+            slippage_pct=slippage_pct,
+            leverage=leverage,
+            order_size_usd=order_size_usd,
         )
+        
         results = engine.run(data=candles, strategy_config=strategy_config)
 
         logger.info("💾 Saving results...")
+        
+        # Сохраняем результаты бэктеста
         ds.update_backtest_results(
             backtest_id=backtest_id,
             **{
@@ -157,6 +174,41 @@ def run_backtest_task(
                 "results": results,
             },
         )
+        
+        # Сохраняем трейды в БД
+        trades = results.get("trades", [])
+        if trades:
+            logger.info(f"💾 Saving {len(trades)} trades...")
+            trades_data = []
+            for trade in trades:
+                # Парсим ISO strings обратно в datetime для БД
+                entry_time = trade.get("entry_time")
+                if isinstance(entry_time, str):
+                    entry_time = datetime.fromisoformat(entry_time)
+                
+                exit_time = trade.get("exit_time")
+                if isinstance(exit_time, str):
+                    exit_time = datetime.fromisoformat(exit_time)
+                
+                trade_data = {
+                    "backtest_id": backtest_id,
+                    "entry_time": entry_time,
+                    "exit_time": exit_time,
+                    "side": trade.get("side", "long").upper(),
+                    "entry_price": trade.get("entry_price"),
+                    "exit_price": trade.get("exit_price"),
+                    "quantity": trade.get("quantity"),
+                    "pnl": trade.get("pnl"),
+                    "pnl_pct": trade.get("pnl_pct"),
+                    "run_up": trade.get("run_up"),
+                    "run_up_pct": trade.get("run_up_pct"),
+                    "drawdown": trade.get("drawdown"),
+                    "drawdown_pct": trade.get("drawdown_pct"),
+                    "cumulative_pnl": trade.get("cumulative_pnl"),
+                }
+                trades_data.append(trade_data)
+            
+            ds.create_trades_batch(trades_data)
 
         logger.info(f"✅ Backtest {backtest_id} completed")
         if BACKTEST_COMPLETED:
@@ -175,7 +227,7 @@ def run_backtest_task(
                 backtest_id,
                 status="failed",
                 error_message=str(e),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
         except Exception as db_error:
             logger.error(f"Failed to update backtest status: {db_error}")
@@ -215,7 +267,7 @@ def run_backtest_task(
 
 
 @celery_app.task(name="backend.tasks.backtest_tasks.bulk_backtest")
-def bulk_backtest_task(backtest_configs: list) -> Dict[str, Any]:
+def bulk_backtest_task(backtest_configs: list) -> dict[str, Any]:
     """Run multiple backtests in parallel (delegates to individual tasks)."""
     logger.info(f"🚀 Starting bulk backtest: {len(backtest_configs)} backtests")
     from celery import group

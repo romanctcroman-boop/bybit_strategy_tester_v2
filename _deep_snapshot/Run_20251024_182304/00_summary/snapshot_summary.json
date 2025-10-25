@@ -1,0 +1,90 @@
+﻿{
+    "Sections":  [
+                     {
+                         "Section":  "Backend",
+                         "Value":  0
+                     },
+                     {
+                         "Section":  "Frontend",
+                         "Value":  0
+                     },
+                     {
+                         "Section":  "AI \u0026 ML",
+                         "Value":  0
+                     },
+                     {
+                         "Section":  "Testing",
+                         "Value":  0
+                     },
+                     {
+                         "Section":  "Deployment",
+                         "Value":  45
+                     }
+                 ],
+    "Reports":  {
+                    "Types":  "types.txt",
+                    "Security":  "security.txt",
+                    "Coverage":  "coverage.json",
+                    "Lint":  "lint.txt"
+                },
+    "Metrics":  [
+                    {
+                        "Ext":  "py",
+                        "Files":  95,
+                        "Lines":  73160
+                    },
+                    {
+                        "Ext":  "ts",
+                        "Files":  0,
+                        "Lines":  0
+                    },
+                    {
+                        "Ext":  "tsx",
+                        "Files":  0,
+                        "Lines":  0
+                    },
+                    {
+                        "Ext":  "js",
+                        "Files":  10,
+                        "Lines":  5101
+                    },
+                    {
+                        "Ext":  "sql",
+                        "Files":  0,
+                        "Lines":  0
+                    },
+                    {
+                        "Ext":  "html",
+                        "Files":  1,
+                        "Lines":  873
+                    },
+                    {
+                        "Ext":  "css",
+                        "Files":  0,
+                        "Lines":  0
+                    },
+                    {
+                        "Ext":  "md",
+                        "Files":  13,
+                        "Lines":  53
+                    },
+                    {
+                        "Ext":  "json",
+                        "Files":  64,
+                        "Lines":  111020
+                    },
+                    {
+                        "Ext":  "yaml",
+                        "Files":  0,
+                        "Lines":  0
+                    },
+                    {
+                        "Ext":  "yml",
+                        "Files":  0,
+                        "Lines":  0
+                    }
+                ],
+    "Date":  "2025-10-24 18:24:08",
+    "TotalLines":  190207,
+    "AverageProgress":  9
+}

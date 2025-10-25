@@ -1,5 +1,6 @@
-import docker
 import os
+
+import docker
 import pytest
 import redis
 from testcontainers.postgres import PostgresContainer

@@ -1,7 +1,7 @@
 import importlib
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def setup_module():
@@ -18,7 +18,7 @@ def test_normalize_list_row():
     parsed = b._normalize_kline_row(sample)
     assert parsed["raw"] == sample
     assert parsed["open_time"] == 1670608800000
-    assert parsed["open_time_dt"] == datetime.fromtimestamp(1670608800000 / 1000.0, tz=timezone.utc)
+    assert parsed["open_time_dt"] == datetime.fromtimestamp(1670608800000 / 1000.0, tz=UTC)
     assert parsed["open"] == 17071.0
     assert parsed["high"] == 17073.0
     assert parsed["low"] == 17027.0
@@ -42,7 +42,7 @@ def test_normalize_dict_row():
     parsed = b._normalize_kline_row(sample)
     assert parsed["raw"] == sample
     assert parsed["open_time"] == 1670608800000
-    assert parsed["open_time_dt"] == datetime.fromtimestamp(1670608800000 / 1000.0, tz=timezone.utc)
+    assert parsed["open_time_dt"] == datetime.fromtimestamp(1670608800000 / 1000.0, tz=UTC)
     assert parsed["open"] == 17071.0
     assert parsed["high"] == 17073.0
     assert parsed["low"] == 17027.0

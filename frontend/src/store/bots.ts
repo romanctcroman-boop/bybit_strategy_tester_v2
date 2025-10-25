@@ -49,8 +49,13 @@ export const useBotsStore = create<State & Actions>((set, get) => ({
   filter: '',
   setFilter: (q) => set({ filter: q }),
   load: async () => {
-    const { items } = await BotsService.list();
-    set({ items });
+    try {
+      const { items } = await BotsService.list();
+      set({ items });
+    } catch (e) {
+      // Avoid unhandledrejection on startup if API is unreachable
+      console.warn('Failed to load bots:', e);
+    }
   },
   createBot: (partial) => {
     const bot: Bot = {
@@ -94,6 +99,8 @@ export function selectFilteredBots(state: State): Bot[] {
   const q = state.filter.trim().toLowerCase();
   if (!q) return state.items;
   return state.items.filter((b) =>
-    [b.name, b.label, b.direction, String(b.depositUsd)].some((t) => (t || '').toString().toLowerCase().includes(q))
+    [b.name, b.label, b.direction, String(b.depositUsd)].some((t) =>
+      (t || '').toString().toLowerCase().includes(q)
+    )
   );
 }

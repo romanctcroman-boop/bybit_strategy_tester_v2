@@ -4,9 +4,9 @@ Optimization Tasks
 Celery задачи для оптимизации стратегий (grid search, walk-forward, Bayesian).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from itertools import product
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from celery import Task
 from loguru import logger
@@ -32,7 +32,7 @@ class OptimizationTask(Task):
                 if opt:
                     opt.status = "failed"
                     opt.error_message = str(exc)
-                    opt.updated_at = datetime.now(timezone.utc)
+                    opt.updated_at = datetime.now(UTC)
                     db.commit()
                 db.close()
             except Exception as e:
@@ -71,14 +71,14 @@ def _parse_dt(value: Any) -> datetime:
 def grid_search_task(
     self,
     optimization_id: int,
-    strategy_config: Dict[str, Any],
-    param_space: Dict[str, List],
+    strategy_config: dict[str, Any],
+    param_space: dict[str, list],
     symbol: str,
     interval: str,
     start_date: str,
     end_date: str,
     metric: str = "sharpe_ratio",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Grid Search оптимизация
 
@@ -108,7 +108,7 @@ def grid_search_task(
             raise ValueError(f"Optimization {optimization_id} not found")
 
         data_service.update_optimization(
-            optimization_id, status="running", started_at=datetime.now(timezone.utc)
+            optimization_id, status="running", started_at=datetime.now(UTC)
         )
 
         # Загрузить данные
@@ -168,7 +168,7 @@ def grid_search_task(
         for idx, params in enumerate(combinations, 1):
             # Обновить конфигурацию стратегии
             test_config = strategy_config.copy()
-            for param_name, param_value in zip(param_names, params):
+            for param_name, param_value in zip(param_names, params, strict=True):
                 test_config[param_name] = param_value
 
             # Запустить бэктест
@@ -178,7 +178,7 @@ def grid_search_task(
 
                 results.append(
                     {
-                        "params": dict(zip(param_names, params)),
+                        "params": dict(zip(param_names, params, strict=True)),
                         "score": score,
                         "metrics": {
                             "total_return": result.get("total_return"),
@@ -193,13 +193,13 @@ def grid_search_task(
                 # Обновить лучший результат
                 if score > best_score:
                     best_score = score
-                    best_params = dict(zip(param_names, params))
+                    best_params = dict(zip(param_names, params, strict=True))
                     best_result = result
 
                 # Обновить прогресс
                 if idx % 10 == 0 or idx == total_combinations:
                     logger.info(
-                        f"Progress: {idx}/{total_combinations} ({idx/total_combinations*100:.1f}%)"
+                        f"Progress: {idx}/{total_combinations} ({idx / total_combinations * 100:.1f}%)"
                     )
                     self.update_state(
                         state="PROGRESS",
@@ -224,7 +224,7 @@ def grid_search_task(
         data_service.update_optimization(
             optimization_id,
             status="completed",
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(UTC),
             best_params=best_params,
             best_score=best_score,
             results={
@@ -261,7 +261,7 @@ def grid_search_task(
                 optimization_id,
                 status="failed",
                 error_message=str(e),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
         except Exception as db_error:
             logger.error(f"Failed to update optimization status: {db_error}")
@@ -279,8 +279,8 @@ def grid_search_task(
 def walk_forward_task(
     self,
     optimization_id: int,
-    strategy_config: Dict[str, Any],
-    param_space: Dict[str, List],
+    strategy_config: dict[str, Any],
+    param_space: dict[str, list],
     symbol: str,
     interval: str,
     start_date: str,
@@ -289,7 +289,7 @@ def walk_forward_task(
     test_size: int = 60,  # Testing days (OOS window)
     step_size: int = 30,  # Step size for rolling window
     metric: str = "sharpe_ratio",  # Optimization metric
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Walk-Forward оптимизация
 
@@ -380,11 +380,22 @@ def walk_forward_task(
             },
         )
 
-        # Запускаем асинхронную версию в event loop
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        # Запускаем асинхронную версию в event loop (py3.10+ and 3.14-safe)
+        def _get_loop():
+            try:
+                return asyncio.get_running_loop()
+            except RuntimeError:
+                try:
+                    loop_existing = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop_existing = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop_existing)
+                if loop_existing.is_closed():
+                    loop_existing = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop_existing)
+                return loop_existing
+
+        loop = _get_loop()
 
         results = loop.run_until_complete(
             analyzer.run_async(
@@ -399,7 +410,7 @@ def walk_forward_task(
             _ds.update_optimization(
                 optimization_id,
                 status="completed",
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
                 results={
                     "method": "walk_forward",
                     "metric": metric,
@@ -445,7 +456,7 @@ def walk_forward_task(
             },
             "results": results,
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -466,8 +477,8 @@ def walk_forward_task(
 def bayesian_optimization_task(
     self,
     optimization_id: int,
-    strategy_config: Dict[str, Any],
-    param_space: Dict[str, Dict[str, Any]],  # {param: {type, low, high}}
+    strategy_config: dict[str, Any],
+    param_space: dict[str, dict[str, Any]],  # {param: {type, low, high}}
     symbol: str,
     interval: str,
     start_date: str,
@@ -476,8 +487,8 @@ def bayesian_optimization_task(
     metric: str = "sharpe_ratio",
     direction: str = "maximize",
     n_jobs: int = 1,
-    random_state: Optional[int] = None,
-) -> Dict[str, Any]:
+    random_state: int | None = None,
+) -> dict[str, Any]:
     """
     Bayesian Optimization используя Optuna
 
@@ -569,11 +580,22 @@ def bayesian_optimization_task(
             },
         )
 
-        # Запускаем асинхронную версию в event loop
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        # Запускаем асинхронную версию в event loop (py3.10+ and 3.14-safe)
+        def _get_loop():
+            try:
+                return asyncio.get_running_loop()
+            except RuntimeError:
+                try:
+                    loop_existing = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop_existing = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop_existing)
+                if loop_existing.is_closed():
+                    loop_existing = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop_existing)
+                return loop_existing
+
+        loop = _get_loop()
 
         results = loop.run_until_complete(
             optimizer.optimize_async(
@@ -624,7 +646,7 @@ def bayesian_optimization_task(
             },
             "results": results,
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
         }
 
         # Persist via DataService
@@ -632,7 +654,7 @@ def bayesian_optimization_task(
             _ds.update_optimization(
                 optimization_id,
                 status="completed",
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
                 results={
                     "method": "bayesian",
                     "metric": metric,

@@ -7,7 +7,7 @@ and a simple parameter importance mapping to keep Celery tasks operable in dev/C
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict
+from typing import Any
 
 
 class BayesianOptimizer:
@@ -29,17 +29,17 @@ class BayesianOptimizer:
 
     async def optimize_async(
         self,
-        strategy_config: Dict[str, Any],
-        param_space: Dict[str, Dict[str, Any]],
+        strategy_config: dict[str, Any],
+        param_space: dict[str, dict[str, Any]],
         metric: str = "sharpe_ratio",
         direction: str = "maximize",
         show_progress: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         # Simulate async work
         await asyncio.sleep(0)
 
         # Choose midpoint values deterministically for numeric ranges; first choice for categorical
-        best_params: Dict[str, Any] = {}
+        best_params: dict[str, Any] = {}
         for name, spec in param_space.items():
             typ = spec.get("type")
             if typ in ("int", "float"):
@@ -72,6 +72,6 @@ class BayesianOptimizer:
             "trials": [],
         }
 
-    def get_importance(self) -> Dict[str, float]:
+    def get_importance(self) -> dict[str, float]:
         # Uniform importance in the stub
         return {"param_importance": 1.0}

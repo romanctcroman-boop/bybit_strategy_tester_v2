@@ -15,13 +15,49 @@ interface OptimizationsState {
   selectedId: number | null;
   setFilters: (f: { status?: string; strategyId?: number }) => void;
   select: (id: number | null) => void;
-  fetchAll: (opts?: { limit?: number; offset?: number; status?: string; strategy_id?: number }) => Promise<void>;
+  fetchAll: (opts?: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+    strategy_id?: number;
+  }) => Promise<void>;
   setPage: (page: number, pageSize?: number) => Promise<void>;
   results: (id: number) => Promise<OptimizationResult[] | void>;
   best: (id: number) => Promise<OptimizationResult | void>;
-  runGrid: (id: number, payload: { strategy_config?: Record<string, any>; param_space?: Record<string, any>; metric?: string; queue?: string }) => Promise<OptimizationEnqueueResponse | void>;
-  runWalkForward: (id: number, payload: { strategy_config?: Record<string, any>; param_space?: Record<string, any>; train_size?: number; test_size?: number; step_size?: number; metric?: string; queue?: string }) => Promise<OptimizationEnqueueResponse | void>;
-  runBayesian: (id: number, payload: { strategy_config?: Record<string, any>; param_space: Record<string, any>; n_trials?: number; metric?: string; direction?: string; n_jobs?: number; random_state?: number; queue?: string }) => Promise<OptimizationEnqueueResponse | void>;
+  runGrid: (
+    id: number,
+    payload: {
+      strategy_config?: Record<string, any>;
+      param_space?: Record<string, any>;
+      metric?: string;
+      queue?: string;
+    }
+  ) => Promise<OptimizationEnqueueResponse | void>;
+  runWalkForward: (
+    id: number,
+    payload: {
+      strategy_config?: Record<string, any>;
+      param_space?: Record<string, any>;
+      train_size?: number;
+      test_size?: number;
+      step_size?: number;
+      metric?: string;
+      queue?: string;
+    }
+  ) => Promise<OptimizationEnqueueResponse | void>;
+  runBayesian: (
+    id: number,
+    payload: {
+      strategy_config?: Record<string, any>;
+      param_space: Record<string, any>;
+      n_trials?: number;
+      metric?: string;
+      direction?: string;
+      n_jobs?: number;
+      random_state?: number;
+      queue?: string;
+    }
+  ) => Promise<OptimizationEnqueueResponse | void>;
 }
 
 export const useOptimizationsStore = create<OptimizationsState>((set, get) => ({
@@ -37,15 +73,22 @@ export const useOptimizationsStore = create<OptimizationsState>((set, get) => ({
   setFilters: (f) => set({ status: f.status, strategyId: f.strategyId }),
   select: (id) => set({ selectedId: id }),
   fetchAll: async (opts) => {
-    const limit = opts?.limit ?? get().limit;
-    const offset = opts?.offset ?? get().offset;
-    const status = opts?.status ?? get().status;
-    const strategy_id = opts?.strategy_id ?? get().strategyId;
-    set({ loading: true, error: undefined });
     try {
+      const limit = opts?.limit ?? get().limit;
+      const offset = opts?.offset ?? get().offset;
+      const status = opts?.status ?? get().status;
+      const strategy_id = opts?.strategy_id ?? get().strategyId;
+      set({ loading: true, error: undefined });
       const res = await OptimizationsApi.list({ limit, offset, status, strategy_id });
-      set({ items: res.items, total: res.total ?? res.items.length, limit, offset, loading: false });
+      set({
+        items: res.items,
+        total: res.total ?? res.items.length,
+        limit,
+        offset,
+        loading: false,
+      });
     } catch (e: any) {
+      console.warn('Failed to load optimizations:', e);
       set({ error: e?.message || String(e), loading: false });
     }
   },

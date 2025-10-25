@@ -9,7 +9,6 @@ falls back to a minimal environment loader otherwise.
 from __future__ import annotations
 
 import os
-from typing import List, Optional
 
 try:
     from pydantic import BaseModel, Field
@@ -25,11 +24,11 @@ except Exception:  # pragma: no cover
 if BaseSettings is not None:
 
     class DatabaseSettings(BaseSettings):
-        url: Optional[str] = None
+        url: str | None = None
         model_config = SettingsConfigDict(env_prefix="", env_file=".env", extra="ignore")
 
     class RedisSettings(BaseSettings):
-        url: Optional[str] = None
+        url: str | None = None
         channel_ticks: str = "bybit:ticks"
         channel_klines: str = "bybit:klines"
         stream_ticks: str = "stream:bybit:ticks"
@@ -45,17 +44,17 @@ if BaseSettings is not None:
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
         @property
-        def symbols_list(self) -> List[str]:
+        def symbols_list(self) -> list[str]:
             return [s.strip().upper() for s in (self.symbols or "").split(",") if s.strip()]
 
         @property
-        def intervals_list(self) -> List[str]:
+        def intervals_list(self) -> list[str]:
             return [s.strip().upper() for s in (self.intervals or "").split(",") if s.strip()]
 
     class CelerySettings(BaseSettings):
         eager: bool = Field(False, alias="CELERY_EAGER")
-        broker_url: Optional[str] = Field(None, alias="CELERY_BROKER_URL")
-        result_backend: Optional[str] = Field(None, alias="CELERY_RESULT_BACKEND")
+        broker_url: str | None = Field(None, alias="CELERY_BROKER_URL")
+        result_backend: str | None = Field(None, alias="CELERY_RESULT_BACKEND")
         task_default_queue: str = Field("default", alias="CELERY_TASK_DEFAULT_QUEUE")
         acks_late: bool = Field(True, alias="CELERY_ACKS_LATE")
         prefetch_multiplier: int = Field(4, alias="CELERY_PREFETCH_MULTIPLIER")
@@ -102,11 +101,11 @@ else:
             )
 
         @property
-        def symbols_list(self) -> List[str]:
+        def symbols_list(self) -> list[str]:
             return [s.strip().upper() for s in self.symbols.split(",") if s.strip()]
 
         @property
-        def intervals_list(self) -> List[str]:
+        def intervals_list(self) -> list[str]:
             return [s.strip().upper() for s in self.intervals.split(",") if s.strip()]
 
     class _Celery:

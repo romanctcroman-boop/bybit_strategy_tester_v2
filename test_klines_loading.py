@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test klines loading from backend API"""
+
 from datetime import datetime
 
 import requests
@@ -64,14 +65,16 @@ def test_klines():
         print("\n[4] Data sample:")
         print("    First candle (oldest):")
         print(
-            f"      Time: {first['open_time']} ({datetime.fromtimestamp(first['open_time']/1000)})"
+            f"      Time: {first['open_time']} ({datetime.fromtimestamp(first['open_time'] / 1000)})"
         )
         print(
             f"      OHLCV: {first['open']}, {first['high']}, {first['low']}, {first['close']}, {first['volume']}"
         )
 
         print("\n    Last candle (newest):")
-        print(f"      Time: {last['open_time']} ({datetime.fromtimestamp(last['open_time']/1000)})")
+        print(
+            f"      Time: {last['open_time']} ({datetime.fromtimestamp(last['open_time'] / 1000)})"
+        )
         print(
             f"      OHLCV: {last['open']}, {last['high']}, {last['low']}, {last['close']}, {last['volume']}"
         )

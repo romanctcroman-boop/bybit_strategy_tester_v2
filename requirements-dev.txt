@@ -2,9 +2,11 @@ testcontainers
 redis
 psycopg2-binary
 pytest
+pytest-asyncio
 pandas
 celery
 loguru
 httpx
 black
 ruff
+pre-commit

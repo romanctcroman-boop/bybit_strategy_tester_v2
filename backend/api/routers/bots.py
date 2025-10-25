@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel
@@ -21,25 +20,25 @@ class Bot(BaseModel):
     id: str
     name: str
     strategy: str
-    symbols: List[str]
+    symbols: list[str]
     capital_allocated: float
     status: BotStatus
     created_at: datetime
 
 
 class BotsListResponse(BaseModel):
-    items: List[Bot]
+    items: list[Bot]
     total: int
 
 
 # In-memory mock storage (process-local)
-_BOTS: Dict[str, Bot] = {}
+_BOTS: dict[str, Bot] = {}
 
 
 def _seed():
     if _BOTS:
         return
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     examples = [
         Bot(
             id="bot_1",
@@ -96,8 +95,8 @@ async def get_bot(bot_id: str = Path(..., description="Bot ID")) -> Bot:
 
 class ActionResponse(BaseModel):
     ok: bool
-    status: Optional[BotStatus] = None
-    message: Optional[str] = None
+    status: BotStatus | None = None
+    message: str | None = None
 
 
 @router.post("/{bot_id}/start", response_model=ActionResponse)

@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # ensure repo root on sys.path
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -14,15 +14,15 @@ def test_window_alignment_minute_daily_weekly():
     m = importlib.import_module("backend.services.mtf_manager")
     ws = m.window_start_seconds
     # 2024-01-02 03:04:05 UTC
-    ts = int(datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc).timestamp())
+    ts = int(datetime(2024, 1, 2, 3, 4, 5, tzinfo=UTC).timestamp())
     # 15m -> 03:00:00
-    assert ws(ts, "15") == int(datetime(2024, 1, 2, 3, 0, 0, tzinfo=timezone.utc).timestamp())
+    assert ws(ts, "15") == int(datetime(2024, 1, 2, 3, 0, 0, tzinfo=UTC).timestamp())
     # 60m -> 03:00:00
-    assert ws(ts, "60") == int(datetime(2024, 1, 2, 3, 0, 0, tzinfo=timezone.utc).timestamp())
+    assert ws(ts, "60") == int(datetime(2024, 1, 2, 3, 0, 0, tzinfo=UTC).timestamp())
     # D -> 00:00:00 of same day (UTC)
-    assert ws(ts, "D") == int(datetime(2024, 1, 2, 0, 0, 0, tzinfo=timezone.utc).timestamp())
+    assert ws(ts, "D") == int(datetime(2024, 1, 2, 0, 0, 0, tzinfo=UTC).timestamp())
     # W -> Monday 00:00:00 of that week; 2024-01-02 is Tuesday, Monday was 2024-01-01
-    assert ws(ts, "W") == int(datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc).timestamp())
+    assert ws(ts, "W") == int(datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC).timestamp())
 
 
 def test_aggregate_from_base_minute_to_hour():
@@ -30,7 +30,7 @@ def test_aggregate_from_base_minute_to_hour():
     agg = m.aggregate_from_base
     # build 1m candles from 10:00 to 10:09
     base = []
-    start = int(datetime(2024, 1, 2, 10, 0, 0, tzinfo=timezone.utc).timestamp())
+    start = int(datetime(2024, 1, 2, 10, 0, 0, tzinfo=UTC).timestamp())
     for i in range(10):
         t = start + i * 60
         base.append(

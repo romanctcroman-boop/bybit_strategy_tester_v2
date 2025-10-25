@@ -22,24 +22,34 @@ export interface Backtest {
   leverage?: number;
   commission?: number;
   config?: Record<string, any>;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'queued' | 'running' | 'completed' | 'failed';
   created_at?: string;
   started_at?: string;
   completed_at?: string;
   final_capital?: number;
-  metrics?: Record<string, number>;
+  results?: Record<string, any>;
 }
 
 export interface Trade {
   id: number;
   backtest_id: number;
-  entry_time: string;
-  exit_time?: string;
+  entry_time: string | Date;
+  exit_time?: string | Date;
   price: number;
   qty: number;
   side: 'buy' | 'sell';
   pnl?: number;
   created_at?: string;
+  // Optional enriched analytics fields (mock/router may provide)
+  pnl_pct?: number; // percent PnL for the trade
+  duration_min?: number; // duration in minutes
+  signal?: string; // entry signal/tag
+  position_size?: number; // position size if available
+  peak?: number; // peak run-up during the trade
+  drawdown?: number; // drawdown during the trade
+  mfe?: number; // maximum favorable excursion
+  mae?: number; // maximum adverse excursion
+  bars_held?: number; // bars count held
 }
 
 export interface MarketDataPoint {
@@ -66,12 +76,12 @@ export interface Optimization {
   symbol: string;
   timeframe: string;
   start_date?: string; // ISO 8601 UTC
-  end_date?: string;   // ISO 8601 UTC
+  end_date?: string; // ISO 8601 UTC
   param_ranges?: Record<string, any>;
   metric: string;
   initial_capital: number;
   total_combinations: number;
-  status: string; // pending | queued | running | completed | failed
+  status: string; // queued | running | completed | failed
   created_at?: string;
   updated_at?: string;
   started_at?: string;

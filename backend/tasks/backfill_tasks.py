@@ -2,8 +2,7 @@
 Celery tasks for historical backfill.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -18,18 +17,18 @@ from backend.services.backfill_service import BackfillConfig, BackfillService
 def backfill_symbol_task(
     symbol: str,
     interval: str = "1",
-    lookback_minutes: Optional[int] = None,
-    start_at_iso: Optional[str] = None,
-    end_at_iso: Optional[str] = None,
+    lookback_minutes: int | None = None,
+    start_at_iso: str | None = None,
+    end_at_iso: str | None = None,
     page_limit: int = 1000,
     max_pages: int = 500,
 ):
     svc = BackfillService()
 
-    def _parse(ts: Optional[str]):
+    def _parse(ts: str | None):
         if not ts:
             return None
-        return datetime.fromisoformat(ts).astimezone(timezone.utc)
+        return datetime.fromisoformat(ts).astimezone(UTC)
 
     cfg = BackfillConfig(
         symbol=symbol,
@@ -45,7 +44,11 @@ def backfill_symbol_task(
     s = SessionLocal()
     run = None
     try:
-        run = s.query(BackfillRun).filter(BackfillRun.task_id == backfill_symbol_task.request.id).one_or_none()  # type: ignore[attr-defined]
+        run = (
+            s.query(BackfillRun)
+            .filter(BackfillRun.task_id == backfill_symbol_task.request.id)
+            .one_or_none()
+        )  # type: ignore[attr-defined]
         if run:
             run.status = "RUNNING"
             s.commit()
@@ -68,7 +71,11 @@ def backfill_symbol_task(
         s = SessionLocal()
         try:
             if not run:
-                run = s.query(BackfillRun).filter(BackfillRun.task_id == backfill_symbol_task.request.id).one_or_none()  # type: ignore[attr-defined]
+                run = (
+                    s.query(BackfillRun)
+                    .filter(BackfillRun.task_id == backfill_symbol_task.request.id)
+                    .one_or_none()
+                )  # type: ignore[attr-defined]
             if run:
                 run.upserts = upserts
                 run.pages = pages
@@ -105,7 +112,11 @@ def backfill_symbol_task(
         s = SessionLocal()
         try:
             if not run:
-                run = s.query(BackfillRun).filter(BackfillRun.task_id == backfill_symbol_task.request.id).one_or_none()  # type: ignore[attr-defined]
+                run = (
+                    s.query(BackfillRun)
+                    .filter(BackfillRun.task_id == backfill_symbol_task.request.id)
+                    .one_or_none()
+                )  # type: ignore[attr-defined]
             if run:
                 run.status = "FAILED"
                 run.error = str(e)

@@ -2,9 +2,8 @@ import json
 import os
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -37,9 +36,9 @@ router = APIRouter()
 class BackfillRequest(BaseModel):
     symbol: str = Field(..., description="e.g. BTCUSDT")
     interval: str = Field("1", description="1,3,5,15,60,240,D,W")
-    lookback_minutes: Optional[int] = Field(None, ge=1)
-    start_at_iso: Optional[str] = Field(None, description="ISO datetime, UTC recommended")
-    end_at_iso: Optional[str] = Field(None, description="ISO datetime, UTC recommended")
+    lookback_minutes: int | None = Field(None, ge=1)
+    start_at_iso: str | None = Field(None, description="ISO datetime, UTC recommended")
+    end_at_iso: str | None = Field(None, description="ISO datetime, UTC recommended")
     page_limit: int = Field(1000, ge=1, le=1000)
     max_pages: int = Field(500, ge=1, le=5000)
     mode: str = Field("sync", description="sync | async")
@@ -47,10 +46,10 @@ class BackfillRequest(BaseModel):
 
 class ArchiveRequest(BaseModel):
     output_dir: str = Field("archives")
-    before_iso: Optional[str] = Field(
+    before_iso: str | None = Field(
         None, description="Archive rows with open_time <= this ISO timestamp (UTC recommended)"
     )
-    symbol: Optional[str] = Field(None, description="Optional symbol filter")
+    symbol: str | None = Field(None, description="Optional symbol filter")
     interval_for_partition: str = Field("1", description="Used only for partition path naming")
     batch_size: int = Field(5000, ge=100, le=100000)
     mode: str = Field("sync", description="sync | async")
@@ -74,8 +73,6 @@ def _check_allowlist(symbol: str, interval: str):
             raise HTTPException(status_code=403, detail="interval not allowed")
 
 
-from typing import List, Union
-
 from backend.api.schemas import (
     ArchiveAsyncResponse,
     ArchivesListOut,
@@ -90,7 +87,7 @@ from backend.api.schemas import (
 )
 
 
-@router.post("/backfill", response_model=Union[BackfillAsyncResponse, BackfillSyncResponse])
+@router.post("/backfill", response_model=BackfillAsyncResponse | BackfillSyncResponse)
 def trigger_backfill(req: BackfillRequest, _: bool = Depends(_admin_auth)):
     _check_allowlist(req.symbol, req.interval)
 
@@ -160,12 +157,12 @@ def trigger_backfill(req: BackfillRequest, _: bool = Depends(_admin_auth)):
     except Exception:
         pass
     svc = BackfillService()
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    def _parse(ts: Optional[str]):
+    def _parse(ts: str | None):
         if not ts:
             return None
-        return datetime.fromisoformat(ts).astimezone(timezone.utc)
+        return datetime.fromisoformat(ts).astimezone(UTC)
 
     cfg = BackfillConfig(
         symbol=req.symbol,
@@ -256,13 +253,13 @@ def trigger_backfill(req: BackfillRequest, _: bool = Depends(_admin_auth)):
     }
 
 
-@router.post("/archive", response_model=Union[ArchiveAsyncResponse, ArchiveSyncResponse])
+@router.post("/archive", response_model=ArchiveAsyncResponse | ArchiveSyncResponse)
 def trigger_archive(req: ArchiveRequest, _: bool = Depends(_admin_auth)):
     # Validate and parse time boundary
-    before_ms: Optional[int] = None
+    before_ms: int | None = None
     if req.before_iso:
         try:
-            before_dt = datetime.fromisoformat(req.before_iso).astimezone(timezone.utc)
+            before_dt = datetime.fromisoformat(req.before_iso).astimezone(UTC)
             before_ms = int(before_dt.timestamp() * 1000)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"invalid before_iso: {e}")
@@ -299,7 +296,7 @@ def trigger_archive(req: ArchiveRequest, _: bool = Depends(_admin_auth)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/restore", response_model=Union[RestoreAsyncResponse, RestoreSyncResponse])
+@router.post("/restore", response_model=RestoreAsyncResponse | RestoreSyncResponse)
 def trigger_restore(req: RestoreRequest, _: bool = Depends(_admin_auth)):
     if req.mode.lower() == "async":
         try:
@@ -404,9 +401,7 @@ def task_status(task_id: str, _: bool = Depends(_admin_auth)):
         # include info if it's a dict or short str
         try:
             info = getattr(res, "info", None)
-            if isinstance(info, dict):
-                payload["info"] = info
-            elif isinstance(info, str) and len(info) <= 500:
+            if isinstance(info, dict) or isinstance(info, str) and len(info) <= 500:
                 payload["info"] = info
         except Exception:
             pass
@@ -423,7 +418,7 @@ def task_status(task_id: str, _: bool = Depends(_admin_auth)):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.get("/backfill/runs", response_model=List[BackfillRunOut])
+@router.get("/backfill/runs", response_model=list[BackfillRunOut])
 def list_runs(limit: int = 50, _: bool = Depends(_admin_auth)):
     try:
         from backend.database import Base, engine
@@ -526,8 +521,8 @@ def cancel_run(run_id: int, _: bool = Depends(_admin_auth)):
 class ProgressOut(BaseModel):
     symbol: str
     interval: str
-    current_cursor_ms: Optional[int]
-    updated_at: Optional[str] = None
+    current_cursor_ms: int | None
+    updated_at: str | None = None
 
 
 @router.get("/backfill/progress", response_model=ProgressOut)
@@ -579,8 +574,8 @@ def reset_progress(symbol: str, interval: str, _: bool = Depends(_admin_auth)):
 class DBStatusOut(BaseModel):
     ok: bool
     connectivity: bool
-    alembic_version: Optional[str] = None
-    info: Optional[str] = None
+    alembic_version: str | None = None
+    info: str | None = None
 
 
 @router.get("/db/status", response_model=DBStatusOut)

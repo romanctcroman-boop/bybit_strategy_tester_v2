@@ -20,14 +20,13 @@ This module has no external deps and is safe for use in workers/backtester.
 """
 
 import threading
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from datetime import UTC, datetime
 
 from backend.services.adapters.bybit import BybitAdapter
 
 
 def ms_to_dt(ms: int) -> datetime:
-    return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
+    return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
 
 
 def ms_to_sec(ms: int) -> int:
@@ -41,18 +40,18 @@ class CandleCache:
     def __init__(self):
         self._lock = threading.RLock()
         # key: (symbol_upper, interval)
-        self._store: Dict[Tuple[str, str], List[dict]] = {}
+        self._store: dict[tuple[str, str], list[dict]] = {}
         # marker for last load timestamp (ms) per key
-        self._last_loaded_at: Dict[Tuple[str, str], int] = {}
+        self._last_loaded_at: dict[tuple[str, str], int] = {}
 
-    def _key(self, symbol: str, interval: str) -> Tuple[str, str]:
+    def _key(self, symbol: str, interval: str) -> tuple[str, str]:
         return (symbol.upper(), str(interval))
 
-    def _dedup_sort(self, rows: List[dict]) -> List[dict]:
+    def _dedup_sort(self, rows: list[dict]) -> list[dict]:
         """Sort ascending by open_time(ms) and deduplicate equal times (keep latest)."""
         rows_sorted = sorted(rows, key=lambda r: int(r.get("open_time") or 0))
-        out: List[dict] = []
-        last_ms: Optional[int] = None
+        out: list[dict] = []
+        last_ms: int | None = None
         for r in rows_sorted:
             ms = int(r.get("open_time") or 0)
             if last_ms is None or ms > last_ms:
@@ -64,8 +63,8 @@ class CandleCache:
         return out
 
     def load_initial(
-        self, symbol: str, interval: str, *, load_limit: Optional[int] = None, persist: bool = True
-    ) -> List[dict]:
+        self, symbol: str, interval: str, *, load_limit: int | None = None, persist: bool = True
+    ) -> list[dict]:
         """
         Fetch up to 1000 candles from Bybit, persist to DB, and cache last 500 in RAM.
         Returns the working set (<=500) as chart-friendly dicts with time in seconds.
@@ -104,18 +103,40 @@ class CandleCache:
 
     def get_working_set(
         self, symbol: str, interval: str, *, ensure_loaded: bool = True
-    ) -> List[dict]:
+    ) -> list[dict]:
         key = self._key(symbol, interval)
         with self._lock:
             if key not in self._store and ensure_loaded:
                 return self.load_initial(symbol, interval)
             return list(self._store.get(key, []))
 
-    def refresh(self, symbol: str, interval: str) -> List[dict]:
+    def refresh(self, symbol: str, interval: str) -> list[dict]:
         """Force reload from remote."""
         return self.load_initial(symbol, interval)
 
-    def upsert_closed(self, symbol: str, interval: str, candle: dict) -> List[dict]:
+    def reset(self, symbol: str, interval: str, *, reload: bool = True) -> list[dict] | None:
+        """
+        Reset in-memory working set for (symbol, interval).
+        If reload=True, immediately reload from remote and return the new working set.
+        If reload=False, just clear and return None.
+        """
+        key = self._key(symbol, interval)
+        with self._lock:
+            if key in self._store:
+                try:
+                    del self._store[key]
+                except Exception:
+                    self._store[key] = []
+            if key in self._last_loaded_at:
+                try:
+                    del self._last_loaded_at[key]
+                except Exception:
+                    self._last_loaded_at[key] = 0
+        if reload:
+            return self.load_initial(symbol, interval)
+        return None
+
+    def upsert_closed(self, symbol: str, interval: str, candle: dict) -> list[dict]:
         """
         Append or replace a closed candle in working set. Candle must have 'time' in seconds.
         Returns updated working set.

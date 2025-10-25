@@ -9,9 +9,8 @@ UNIQUE(symbol, open_time) on the destination table.
 """
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -20,21 +19,21 @@ from backend.models.bybit_kline_audit import BybitKlineAudit
 
 
 def ms_to_date(ms: int) -> str:
-    dt = datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
+    dt = datetime.fromtimestamp(ms / 1000.0, tz=UTC)
     return dt.strftime("%Y-%m-%d")
 
 
 @dataclass
 class ArchiveConfig:
     output_dir: str
-    before_ms: Optional[int] = None  # archive rows with open_time <= before_ms
-    symbol: Optional[str] = None
-    interval: Optional[str] = None
+    before_ms: int | None = None  # archive rows with open_time <= before_ms
+    symbol: str | None = None
+    interval: str | None = None
     batch_size: int = 5000
 
 
 class ArchivalService:
-    def __init__(self, output_dir: Optional[str] = None):
+    def __init__(self, output_dir: str | None = None):
         self.output_dir = Path(output_dir or os.environ.get("ARCHIVE_DIR", "archives")).resolve()
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -55,7 +54,7 @@ class ArchivalService:
             offset += len(chunk)
 
     def _write_parquet_partition(
-        self, symbol: str, interval: str, date_str: str, rows: List[BybitKlineAudit]
+        self, symbol: str, interval: str, date_str: str, rows: list[BybitKlineAudit]
     ):
         part_dir = (
             self.output_dir / f"symbol={symbol}" / f"interval={interval}" / f"date={date_str}"
@@ -125,7 +124,7 @@ class ArchivalService:
             s.close()
         return total
 
-    def restore_from_dir(self, dir_path: Optional[str] = None) -> int:
+    def restore_from_dir(self, dir_path: str | None = None) -> int:
         """Load all parquet files under output_dir (or dir_path) back into DB.
         Idempotent due to UNIQUE(symbol, open_time).
         """

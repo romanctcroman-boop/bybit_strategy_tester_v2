@@ -7,3 +7,4 @@ prometheus-client
 redis
 websockets
 pydantic-settings
+python-multipart

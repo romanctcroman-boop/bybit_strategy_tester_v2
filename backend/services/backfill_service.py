@@ -9,8 +9,7 @@ Historical Backfill Service
 """
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -20,27 +19,27 @@ from backend.services.adapters.bybit import BybitAdapter
 
 
 def utc_ms(dt: datetime) -> int:
-    return int(dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
+    return int(dt.replace(tzinfo=UTC).timestamp() * 1000)
 
 
 def ms_to_dt(ms: int) -> datetime:
-    return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
+    return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
 
 
 @dataclass
 class BackfillConfig:
     symbol: str
     interval: str = "1"
-    lookback_minutes: Optional[int] = None
-    start_at: Optional[datetime] = None
-    end_at: Optional[datetime] = None
+    lookback_minutes: int | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
     page_limit: int = 1000
     pause_sec: float = 0.2
     max_pages: int = 500
 
 
 class BackfillService:
-    def __init__(self, adapter: Optional[BybitAdapter] = None):
+    def __init__(self, adapter: BybitAdapter | None = None):
         self.adapter = adapter or BybitAdapter()
 
     def backfill(self, cfg: BackfillConfig, *, resume: bool = True, return_stats: bool = False):
@@ -149,26 +148,25 @@ class BackfillService:
             rps = done / elapsed
             est_pages_left = None
             eta = None
-            if len(rows) > 0 and cfg.page_limit > 0:
-                if start_ms is not None:
-                    # milliseconds remaining until reaching start_ms boundary
-                    ms_left = max(current_cursor - start_ms, 0)
-                    # approx span per page based on current page
-                    try:
-                        span_ms = rows[-1]["open_time"] - rows[0]["open_time"]
-                        if span_ms <= 0:
-                            span_ms = 60_000
-                    except Exception:
+            if len(rows) > 0 and cfg.page_limit > 0 and start_ms is not None:
+                # milliseconds remaining until reaching start_ms boundary
+                ms_left = max(current_cursor - start_ms, 0)
+                # approx span per page based on current page
+                try:
+                    span_ms = rows[-1]["open_time"] - rows[0]["open_time"]
+                    if span_ms <= 0:
                         span_ms = 60_000
-                    est_pages_left = int(ms_left / max(span_ms, 1))
-                    eta = (
-                        (elapsed / max(pages, 1)) * est_pages_left
-                        if est_pages_left is not None
-                        else None
-                    )
+                except Exception:
+                    span_ms = 60_000
+                est_pages_left = int(ms_left / max(span_ms, 1))
+                eta = (
+                    (elapsed / max(pages, 1)) * est_pages_left
+                    if est_pages_left is not None
+                    else None
+                )
 
             logger.info(
-                f"Backfill page {pages}: {len(rows)} rows, total upserts {done}, rps={rps:.1f}, est_pages_left={est_pages_left}, eta={eta and round(eta,1)}s"
+                f"Backfill page {pages}: {len(rows)} rows, total upserts {done}, rps={rps:.1f}, est_pages_left={est_pages_left}, eta={eta and round(eta, 1)}s"
             )
             time.sleep(cfg.pause_sec)
 
@@ -177,8 +175,8 @@ class BackfillService:
         return done, pages
 
     def _fetch_page(
-        self, symbol: str, interval: str, limit: int, end_open_time_ms: Optional[int]
-    ) -> List[dict]:
+        self, symbol: str, interval: str, limit: int, end_open_time_ms: int | None
+    ) -> list[dict]:
         """
         Adapter currently does not expose time-bounded params. We'll fetch `limit` most-recent
         and then rely on DB idempotency and the moving cursor to walk back. If adapter later supports
@@ -198,8 +196,8 @@ class BackfillService:
             return []
 
     def _fetch_page_with_retries(
-        self, symbol: str, interval: str, limit: int, end_open_time_ms: Optional[int]
-    ) -> List[dict]:
+        self, symbol: str, interval: str, limit: int, end_open_time_ms: int | None
+    ) -> list[dict]:
         max_attempts = 6
         base_backoff = 0.5
         for attempt in range(1, max_attempts + 1):
@@ -238,7 +236,7 @@ class BackfillService:
             time.sleep(delay)
         return []
 
-    def _persist(self, symbol: str, rows: List[dict]) -> int:
+    def _persist(self, symbol: str, rows: list[dict]) -> int:
         # Use BybitAdapter persistence helper (idempotent upsert), decoupled from fetch adapter
         try:
             BybitAdapter()._persist_klines_to_db(symbol, rows)

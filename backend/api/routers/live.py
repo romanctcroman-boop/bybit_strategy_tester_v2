@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Optional
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
@@ -20,8 +19,8 @@ async def _pubsub_forward(
     ws: WebSocket,
     channel: str,
     pattern: bool = False,
-    symbol: Optional[str] = None,
-    interval: Optional[str] = None,
+    symbol: str | None = None,
+    interval: str | None = None,
 ) -> None:
     if Redis is None:
         await ws.send_json({"error": "redis-not-installed"})
@@ -84,10 +83,10 @@ async def _pubsub_forward(
 @router.websocket("/live")
 async def live(
     ws: WebSocket,
-    channel: Optional[str] = Query(None),
+    channel: str | None = Query(None),
     pattern: int = Query(0),
-    symbol: Optional[str] = Query(None),
-    interval: Optional[str] = Query(None),
+    symbol: str | None = Query(None),
+    interval: str | None = Query(None),
 ):
     await ws.accept()
     try:
@@ -108,9 +107,9 @@ async def live(
 @router.websocket("/")
 async def live_root(
     ws: WebSocket,
-    channel: Optional[str] = Query(None),
+    channel: str | None = Query(None),
     pattern: int = Query(0),
-    symbol: Optional[str] = Query(None),
-    interval: Optional[str] = Query(None),
+    symbol: str | None = Query(None),
+    interval: str | None = Query(None),
 ):
     await live(ws, channel=channel, pattern=pattern, symbol=symbol, interval=interval)

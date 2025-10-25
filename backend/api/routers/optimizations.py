@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -62,7 +61,7 @@ def _map_result(r) -> dict:
     return d
 
 
-def _choose_queue(default_queue: Optional[str], algo: str) -> str:
+def _choose_queue(default_queue: str | None, algo: str) -> str:
     if default_queue and default_queue.strip():
         return default_queue.strip()
     mapping = {
@@ -75,8 +74,8 @@ def _choose_queue(default_queue: Optional[str], algo: str) -> str:
 
 @router.get("/", response_model=ApiListResponse[OptimizationOut])
 def list_optimizations(
-    strategy_id: Optional[int] = Query(None),
-    status: Optional[str] = Query(None),
+    strategy_id: int | None = Query(None),
+    status: str | None = Query(None),
     limit: int = 100,
     offset: int = 0,
 ):
@@ -135,7 +134,7 @@ def update_optimization(optimization_id: int, payload: OptimizationUpdate):
 
 @router.get(
     "/{optimization_id}/results",
-    response_model=List[OptimizationResultOut],
+    response_model=list[OptimizationResultOut],
 )
 def list_optimization_results(optimization_id: int, limit: int = 100, offset: int = 0):
     DS = _get_data_service()

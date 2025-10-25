@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -20,8 +19,8 @@ router = APIRouter()
 
 @router.get("/", response_model=ApiListResponse[StrategyOut])
 def list_strategies(
-    is_active: Optional[bool] = Query(None),
-    strategy_type: Optional[str] = Query(None),
+    is_active: bool | None = Query(None),
+    strategy_type: str | None = Query(None),
     limit: int = 100,
     offset: int = 0,
 ):

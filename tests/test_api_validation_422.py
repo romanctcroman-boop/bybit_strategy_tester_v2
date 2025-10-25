@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 # Build a minimal app to avoid importing heavy admin/backfill modules
 from backend.api.routers.backtests import router as backtests_router
 
-
 _app = FastAPI()
 _app.include_router(backtests_router, prefix="/api/v1/backtests")
 client = TestClient(_app)

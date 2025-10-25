@@ -8,7 +8,7 @@ if not (importlib.util.find_spec("pyarrow") or importlib.util.find_spec("polars"
         "Skipping archival tests: neither pyarrow nor polars is installed.", allow_module_level=True
     )
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 repo_root = Path(__file__).resolve().parents[2]
@@ -48,7 +48,7 @@ def test_archive_and_restore_idempotent(tmp_path: Path):
     s = SessionLocal()
     try:
         rows = [
-            make_row(sym, int(datetime(2025, 1, 1, 12, i, tzinfo=timezone.utc).timestamp() * 1000))
+            make_row(sym, int(datetime(2025, 1, 1, 12, i, tzinfo=UTC).timestamp() * 1000))
             for i in range(3)
         ]
         for r in rows:
@@ -60,7 +60,7 @@ def test_archive_and_restore_idempotent(tmp_path: Path):
     svc = ArchivalService(output_dir=str(tmp_path))
     cfg = ArchiveConfig(
         output_dir=str(tmp_path),
-        before_ms=int(datetime(2025, 1, 2, tzinfo=timezone.utc).timestamp() * 1000),
+        before_ms=int(datetime(2025, 1, 2, tzinfo=UTC).timestamp() * 1000),
     )
     n = svc.archive(cfg, interval_for_partition="1")
     assert n == 3

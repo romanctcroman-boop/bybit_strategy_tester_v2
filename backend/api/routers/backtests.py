@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -28,9 +27,9 @@ router = APIRouter()
 
 @router.get("/", response_model=ApiListResponse[BacktestOut])
 def list_backtests(
-    strategy_id: Optional[int] = Query(None),
-    symbol: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
+    strategy_id: int | None = Query(None),
+    symbol: str | None = Query(None),
+    status: str | None = Query(None),
     limit: int = 100,
     offset: int = 0,
     order_by: str = "created_at",
@@ -123,7 +122,7 @@ def claim_backtest(backtest_id: int):
         raise HTTPException(
             status_code=501, detail="Backend database not configured in this environment"
         )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with DS() as ds:
         res = ds.claim_backtest_to_run(backtest_id, now)
 
@@ -154,10 +153,10 @@ def update_results(backtest_id: int, payload: BacktestResultsUpdate):
     return d
 
 
-@router.get("/{backtest_id}/trades", response_model=List[TradeOut])
+@router.get("/{backtest_id}/trades", response_model=list[TradeOut])
 def list_trades(
     backtest_id: int,
-    side: Optional[str] = Query(None, description="buy|sell or LONG|SHORT"),
+    side: str | None = Query(None, description="buy|sell or LONG|SHORT"),
     limit: int = 1000,
     offset: int = 0,
 ):
@@ -172,7 +171,7 @@ def list_trades(
     if DS is None:
         return []
     # Normalize side filter to internal representation if provided
-    side_norm: Optional[str] = None
+    side_norm: str | None = None
     if side:
         up = side.upper()
         if up in ("LONG", "SHORT"):

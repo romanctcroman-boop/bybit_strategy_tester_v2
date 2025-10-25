@@ -2,9 +2,6 @@ import sys
 import types
 from types import SimpleNamespace
 
-import pytest
-
-
 # Shim celery app early so module import doesn't fail
 mod_ca = types.ModuleType("backend.celery_app")
 mod_ca.celery_app = SimpleNamespace(task=lambda *a, **k: (lambda f: f))
@@ -42,7 +39,6 @@ def _prep_sys_modules_for_imports():
                 "win_rate": 1.0,
                 "total_trades": 1,
                 "final_capital": 10000.0 + score,
-                "sharpe_ratio": score,
             }
 
     def _get_engine(name=None, **kwargs):
@@ -124,7 +120,9 @@ def test_bayesian_minimal(monkeypatch):
         def __init__(self, **kwargs):
             pass
 
-        async def optimize_async(self, strategy_config, param_space, metric, direction, show_progress):
+        async def optimize_async(
+            self, strategy_config, param_space, metric, direction, show_progress
+        ):
             # return deterministic results
             return {
                 "best_value": 1.23,

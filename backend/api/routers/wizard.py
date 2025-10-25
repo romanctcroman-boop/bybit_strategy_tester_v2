@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Query
 
@@ -11,7 +11,7 @@ MOCK_STRATEGY_VERSIONS = [
     {"id": 102, "strategy_id": 1, "name": "Dimkud BIG2 v1.8"},
 ]
 
-MOCK_SCHEMAS: Dict[int, Dict[str, Any]] = {
+MOCK_SCHEMAS: dict[int, dict[str, Any]] = {
     101: {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "title": "BIG2 Parameters",
@@ -38,7 +38,7 @@ MOCK_SCHEMAS: Dict[int, Dict[str, Any]] = {
     },
 }
 
-MOCK_PRESETS: Dict[int, List[Dict[str, Any]]] = {
+MOCK_PRESETS: dict[int, list[dict[str, Any]]] = {
     101: [
         {"id": 1, "name": "Default", "params": {"rsi_period": 14, "ema_fast": 12, "ema_slow": 26}},
         {"id": 2, "name": "Aggressive", "params": {"rsi_period": 9, "ema_fast": 9, "ema_slow": 21}},
@@ -64,7 +64,7 @@ def get_strategy_version_schema(version_id: int):
 
 
 @router.get("/presets")
-def list_presets(version_id: Optional[int] = Query(None)):
+def list_presets(version_id: int | None = Query(None)):
     if version_id is None:
         all_items = [p for arr in MOCK_PRESETS.values() for p in arr]
         return {"items": all_items, "total": len(all_items)}
@@ -73,7 +73,7 @@ def list_presets(version_id: Optional[int] = Query(None)):
 
 
 @router.post("/backtests/quick")
-def quick_backtest(payload: Dict[str, Any]):
+def quick_backtest(payload: dict[str, Any]):
     # This is a mock. In real impl, call backtest pipeline with limited window to compute metrics quickly.
     return {
         "metrics": {"win_rate": 0.56, "profit_factor": 1.23, "max_dd": 0.12},
@@ -83,6 +83,6 @@ def quick_backtest(payload: Dict[str, Any]):
 
 
 @router.post("/bots")
-def create_bot(payload: Dict[str, Any]):
+def create_bot(payload: dict[str, Any]):
     # return a fake id
     return {"bot_id": 9001, "status": "created"}

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,12 +10,12 @@ from pydantic import BaseModel, ConfigDict, Field
 class StrategyOut(BaseModel):
     id: int
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     strategy_type: str
-    config: Dict[str, Any] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
     is_active: bool = True
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,12 +25,13 @@ class BacktestOut(BaseModel):
     strategy_id: int
     symbol: str
     timeframe: str
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    start_date: str | None = None
+    end_date: str | None = None
     initial_capital: float
-    leverage: Optional[int] = None
-    commission: Optional[float] = None
-    config: Optional[Dict[str, Any]] = None
+    leverage: int | None = None
+    commission: float | None = None
+    config: dict[str, Any] | None = None
+
     class BacktestStatus(str, Enum):
         queued = "queued"
         running = "running"
@@ -38,11 +39,11 @@ class BacktestOut(BaseModel):
         failed = "failed"
 
     status: BacktestStatus
-    created_at: Optional[str] = None
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    final_capital: Optional[float] = None
-    results: Optional[Dict[str, Any]] = None
+    created_at: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    final_capital: float | None = None
+    results: dict[str, Any] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,23 +51,20 @@ class BacktestOut(BaseModel):
 class TradeOut(BaseModel):
     id: int
     backtest_id: int
-    entry_time: Optional[str] = None
-    exit_time: Optional[str] = None
+    entry_time: str | None = None
+    exit_time: str | None = None
     price: float
     qty: float
     side: str
-    pnl: Optional[float] = None
-    created_at: Optional[str] = None
+    pnl: float | None = None
+    created_at: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-T = TypeVar("T")
-
-
-class ApiListResponse(BaseModel, Generic[T]):
-    items: List[T]
-    total: Optional[int] = None
+class ApiListResponse[T](BaseModel):
+    items: list[T]
+    total: int | None = None
 
 
 # ========================
@@ -77,14 +75,14 @@ class ApiListResponse(BaseModel, Generic[T]):
 class BybitKlineAuditOut(BaseModel):
     symbol: str
     open_time: int
-    open_time_dt: Optional[str] = None
-    open: Optional[float] = None
-    high: Optional[float] = None
-    low: Optional[float] = None
-    close: Optional[float] = None
-    volume: Optional[float] = None
-    turnover: Optional[float] = None
-    raw: Optional[str] = None
+    open_time_dt: str | None = None
+    open: float | None = None
+    high: float | None = None
+    low: float | None = None
+    close: float | None = None
+    volume: float | None = None
+    turnover: float | None = None
+    raw: str | None = None
 
 
 class BybitKlineFetchRowOut(BaseModel):
@@ -93,8 +91,8 @@ class BybitKlineFetchRowOut(BaseModel):
     high: float
     low: float
     close: float
-    volume: Optional[float] = None
-    turnover: Optional[float] = None
+    volume: float | None = None
+    turnover: float | None = None
 
 
 class RecentTradeOut(BaseModel):
@@ -110,13 +108,51 @@ class WorkingSetCandleOut(BaseModel):
     high: float
     low: float
     close: float
-    volume: Optional[float] = None
+    volume: float | None = None
 
 
 class MtfResponseOut(BaseModel):
     symbol: str
-    intervals: List[str]
-    data: Dict[str, List[WorkingSetCandleOut]]
+    intervals: list[str]
+    data: dict[str, list[WorkingSetCandleOut]]
+
+
+class DataUploadResponse(BaseModel):
+    """Response returned by the market data upload endpoint."""
+
+    upload_id: str
+    filename: str
+    size: int
+    symbol: str
+    interval: str
+    stored_path: str
+
+
+class UploadItem(BaseModel):
+    upload_id: str
+    filename: str
+    size: int
+    stored_path: str
+    mtime: float | None = None
+
+
+class UploadsListResponse(BaseModel):
+    dir: str
+    items: list[UploadItem]
+
+
+class DataIngestResponse(BaseModel):
+    """Response for uploaded file ingestion."""
+
+    upload_id: str
+    symbol: str
+    interval: str
+    format: str
+    ingested: int
+    skipped: int | None = None
+    earliest_ms: int | None = None
+    latest_ms: int | None = None
+    updated_working_set: int | None = None
 
 
 # ========================
@@ -127,7 +163,7 @@ class MtfResponseOut(BaseModel):
 class BackfillAsyncResponse(BaseModel):
     mode: str
     task_id: str
-    run_id: Optional[int] = None
+    run_id: int | None = None
 
 
 class BackfillSyncResponse(BaseModel):
@@ -138,9 +174,9 @@ class BackfillSyncResponse(BaseModel):
     pages: int
     elapsed_sec: float
     rows_per_sec: float
-    eta_sec: Optional[float] = None
-    est_pages_left: Optional[int] = None
-    run_id: Optional[int] = None
+    eta_sec: float | None = None
+    est_pages_left: int | None = None
+    run_id: int | None = None
 
 
 class ArchiveAsyncResponse(BaseModel):
@@ -173,11 +209,11 @@ class ArchiveFileOut(BaseModel):
 
 class ArchivesListOut(BaseModel):
     dir: str
-    files: List[ArchiveFileOut]
+    files: list[ArchiveFileOut]
 
 
 class DeleteArchiveResponse(BaseModel):
-    deleted: Union[str, List[str]]
+    deleted: str | list[str]
 
 
 class TaskStatusOut(BaseModel):
@@ -186,16 +222,17 @@ class TaskStatusOut(BaseModel):
     ready: bool
     successful: bool
     failed: bool
-    info: Optional[Dict[str, Any]] = None
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    info: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
 
 
 class BackfillRunOut(BaseModel):
     id: int
-    task_id: Optional[str] = None
+    task_id: str | None = None
     symbol: str
     interval: str
+
     class BackfillStatus(str, Enum):
         PENDING = "PENDING"
         RUNNING = "RUNNING"
@@ -204,12 +241,12 @@ class BackfillRunOut(BaseModel):
         CANCELED = "CANCELED"
 
     status: BackfillStatus
-    upserts: Optional[int] = None
-    pages: Optional[int] = None
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
-    params: Optional[str] = None
-    error: Optional[str] = None
+    upserts: int | None = None
+    pages: int | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    params: str | None = None
+    error: str | None = None
 
 
 # ========================
@@ -219,18 +256,18 @@ class BackfillRunOut(BaseModel):
 
 class StrategyCreate(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     strategy_type: str
-    config: Dict[str, Any] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
     is_active: bool = True
 
 
 class StrategyUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    strategy_type: Optional[str] = None
-    config: Optional[Dict[str, Any]] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    description: str | None = None
+    strategy_type: str | None = None
+    config: dict[str, Any] | None = None
+    is_active: bool | None = None
 
 
 class BacktestCreate(BaseModel):
@@ -240,23 +277,23 @@ class BacktestCreate(BaseModel):
     start_date: datetime
     end_date: datetime
     initial_capital: float
-    leverage: Optional[int] = 1
-    commission: Optional[float] = 0.0006
-    config: Optional[Dict[str, Any]] = None
+    leverage: int | None = 1
+    commission: float | None = 0.0006
+    config: dict[str, Any] | None = None
 
 
 class BacktestUpdate(BaseModel):
     # allow partial updates
-    strategy_id: Optional[int] = None
-    symbol: Optional[str] = None
-    timeframe: Optional[str] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    initial_capital: Optional[float] = None
-    leverage: Optional[int] = None
-    commission: Optional[float] = None
-    config: Optional[Dict[str, Any]] = None
-    status: Optional[str] = None
+    strategy_id: int | None = None
+    symbol: str | None = None
+    timeframe: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    initial_capital: float | None = None
+    leverage: int | None = None
+    commission: float | None = None
+    config: dict[str, Any] | None = None
+    status: str | None = None
 
 
 class BacktestResultsUpdate(BaseModel):
@@ -268,13 +305,13 @@ class BacktestResultsUpdate(BaseModel):
     win_rate: float
     sharpe_ratio: float
     max_drawdown: float
-    results: Optional[Dict[str, Any]] = None
+    results: dict[str, Any] | None = None
 
 
 class BacktestClaimResponse(BaseModel):
     status: str
-    backtest: Optional[Dict[str, Any]] = None
-    message: Optional[str] = None
+    backtest: dict[str, Any] | None = None
+    message: str | None = None
 
 
 # ========================
@@ -288,12 +325,13 @@ class OptimizationOut(BaseModel):
     optimization_type: str
     symbol: str
     timeframe: str
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    param_ranges: Optional[Dict[str, Any]] = None
+    start_date: str | None = None
+    end_date: str | None = None
+    param_ranges: dict[str, Any] | None = None
     metric: str
     initial_capital: float
     total_combinations: int
+
     class OptimizationStatus(str, Enum):
         queued = "queued"
         running = "running"
@@ -301,13 +339,13 @@ class OptimizationOut(BaseModel):
         failed = "failed"
 
     status: OptimizationStatus
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    best_params: Optional[Dict[str, Any]] = None
-    best_score: Optional[float] = None
-    results: Optional[Dict[str, Any]] = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    best_params: dict[str, Any] | None = None
+    best_score: float | None = None
+    results: dict[str, Any] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -319,11 +357,11 @@ class OptimizationCreate(BaseModel):
     timeframe: str
     start_date: datetime
     end_date: datetime
-    param_ranges: Dict[str, Any]
+    param_ranges: dict[str, Any]
     metric: str
     initial_capital: float
     total_combinations: int
-    config: Optional[Dict[str, Any]] = None
+    config: dict[str, Any] | None = None
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -349,13 +387,13 @@ class OptimizationCreate(BaseModel):
 
 
 class OptimizationUpdate(BaseModel):
-    status: Optional[str] = None
-    best_params: Optional[Dict[str, Any]] = None
-    best_score: Optional[float] = None
-    results: Optional[Dict[str, Any]] = None
-    config: Optional[Dict[str, Any]] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    status: str | None = None
+    best_params: dict[str, Any] | None = None
+    best_score: float | None = None
+    results: dict[str, Any] | None = None
+    config: dict[str, Any] | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -373,14 +411,14 @@ class OptimizationUpdate(BaseModel):
 class OptimizationResultOut(BaseModel):
     id: int
     optimization_id: int
-    params: Dict[str, Any]
+    params: dict[str, Any]
     score: float
-    total_return: Optional[float] = None
-    sharpe_ratio: Optional[float] = None
-    max_drawdown: Optional[float] = None
-    win_rate: Optional[float] = None
-    total_trades: Optional[int] = None
-    metrics: Optional[Dict[str, Any]] = None
+    total_return: float | None = None
+    sharpe_ratio: float | None = None
+    max_drawdown: float | None = None
+    win_rate: float | None = None
+    total_trades: int | None = None
+    metrics: dict[str, Any] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -394,6 +432,7 @@ class OptimizationEnqueueResponse(BaseModel):
     task_id: str
     optimization_id: int
     queue: str = Field(default="optimizations")
+
     class EnqueueStatus(str, Enum):
         queued = "queued"
 
@@ -412,10 +451,10 @@ class OptimizationEnqueueResponse(BaseModel):
 
 
 class OptimizationRunGridRequest(BaseModel):
-    strategy_config: Dict[str, Any] = Field(default_factory=dict)
-    param_space: Optional[Dict[str, List[Any]]] = None
-    metric: Optional[str] = Field(default="sharpe_ratio")
-    queue: Optional[str] = Field(default="optimizations")
+    strategy_config: dict[str, Any] = Field(default_factory=dict)
+    param_space: dict[str, list[Any]] | None = None
+    metric: str | None = Field(default="sharpe_ratio")
+    queue: str | None = Field(default="optimizations")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -430,13 +469,13 @@ class OptimizationRunGridRequest(BaseModel):
 
 
 class OptimizationRunWalkForwardRequest(BaseModel):
-    strategy_config: Dict[str, Any] = Field(default_factory=dict)
-    param_space: Optional[Dict[str, List[Any]]] = None
+    strategy_config: dict[str, Any] = Field(default_factory=dict)
+    param_space: dict[str, list[Any]] | None = None
     train_size: int = 120
     test_size: int = 60
     step_size: int = 30
-    metric: Optional[str] = Field(default="sharpe_ratio")
-    queue: Optional[str] = Field(default="optimizations")
+    metric: str | None = Field(default="sharpe_ratio")
+    queue: str | None = Field(default="optimizations")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -454,14 +493,14 @@ class OptimizationRunWalkForwardRequest(BaseModel):
 
 
 class OptimizationRunBayesianRequest(BaseModel):
-    strategy_config: Dict[str, Any] = Field(default_factory=dict)
-    param_space: Dict[str, Dict[str, Any]]
+    strategy_config: dict[str, Any] = Field(default_factory=dict)
+    param_space: dict[str, dict[str, Any]]
     n_trials: int = 100
-    metric: Optional[str] = Field(default="sharpe_ratio")
+    metric: str | None = Field(default="sharpe_ratio")
     direction: str = Field(default="maximize")
     n_jobs: int = 1
-    random_state: Optional[int] = None
-    queue: Optional[str] = Field(default="optimizations")
+    random_state: int | None = None
+    queue: str | None = Field(default="optimizations")
 
     model_config = ConfigDict(
         json_schema_extra={

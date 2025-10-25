@@ -1,5 +1,7 @@
 import importlib
 
+import pytest
+
 
 def test_validate_symbol_direct_match():
     m = importlib.import_module("backend.services.adapters.bybit")
@@ -26,8 +28,5 @@ def test_validate_symbol_not_found():
     m = importlib.import_module("backend.services.adapters.bybit")
     b = m.BybitAdapter()
     b._instruments_cache = {}
-    try:
+    with pytest.raises(ValueError):
         b.validate_symbol("NOSYMBOL")
-        assert False, "Expected ValueError"
-    except ValueError:
-        pass

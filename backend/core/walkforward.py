@@ -7,7 +7,7 @@ without a heavy dependency on a full optimization engine.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any
 
 
 class WalkForwardAnalyzer:
@@ -28,17 +28,17 @@ class WalkForwardAnalyzer:
         self.oos_window_days = oos_window_days
         self.step_days = step_days
         # Pretend we built windows; at least one to keep tasks happy
-        self.windows: List[Dict[str, Any]] = [
+        self.windows: list[dict[str, Any]] = [
             {"idx": 0, "is_range": [0, 1], "oos_range": [2, 2]},
             {"idx": 1, "is_range": [3, 4], "oos_range": [5, 5]},
         ]
 
     async def run_async(
         self,
-        strategy_config: Dict[str, Any],
-        param_space: Dict[str, List[Any]],
+        strategy_config: dict[str, Any],
+        param_space: dict[str, list[Any]],
         metric: str = "sharpe_ratio",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         # Simulate async work
         await asyncio.sleep(0)
 

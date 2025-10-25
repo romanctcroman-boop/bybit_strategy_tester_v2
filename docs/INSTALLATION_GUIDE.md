@@ -8,6 +8,7 @@ This guide describes how to run the backend stack (API, Celery worker/beat, Redi
 - Docker Compose v2
 - Git
 - Optional for local dev without Docker: Python 3.13 and Node.js (for frontend)
+  - Note: The codebase uses PEP 695 generics (enabled by Ruff UP046), which requires Python 3.12+; we target 3.13.
 
 ## 1) Configure environment
 
@@ -80,6 +81,9 @@ docker compose exec api alembic upgrade head
   pip install -r requirements-dev.txt
   pip install -r backend/requirements-archival.txt  # optional (pyarrow on 3.13, polars on 3.14)
 
+  # Required for multipart/form-data endpoints (e.g., market data upload)
+  pip install python-multipart
+
   # Set DATABASE_URL and REDIS_URL to your local services
   $env:DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:5432/bybit"
   $env:REDIS_URL = "redis://127.0.0.1:6379/0"
@@ -95,6 +99,59 @@ docker compose exec api alembic upgrade head
   npm run dev
   # Open http://localhost:5173
   ```
+
+### Developer hygiene: pre-commit hooks (Ruff + Black)
+
+To keep the codebase consistently formatted and linted before every commit, enable the local hooks:
+
+```powershell
+# Install dev tools (already included above)
+pip install -r requirements-dev.txt
+
+# Install git hooks
+pre-commit install
+
+# Optional: run on all files once (first pass may modify files)
+pre-commit run --all-files
+```
+
+Notes (Windows):
+- Hooks use local system binaries (ruff, black), so no Git submodule cloning is needed.
+- If you see cache write warnings from Ruff on Windows, they are harmless; the hooks will still pass.
+- The hooks are staged by rule groups: E/F/I, UP (pyupgrade), B (bugbear), SIM (simplify). Some rules are intentionally ignored in pre-commit to avoid churn on long strings or import positioning in tests/scripts.
+- UP specifics: UP046 (PEP 695 generics) and UP035 (prefer builtins over typing.*/PEP 585) are enforced. Target Python 3.13.
+
+### Quick OpenAPI sanity check (PEP 695 generics)
+
+We use PEP 695 generics (enabled by UP046). You can sanity-check FastAPI/Pydantic schema generation locally:
+
+```powershell
+python scripts/check_openapi.py
+```
+
+If you prefer a one-liner, PowerShell quoting can get tricky. Use a here-string to avoid quote mangling:
+
+```powershell
+$code = @'
+from backend.api.app import app
+d = app.openapi()
+print("OPENAPI_OK", bool(d and "components" in d and "schemas" in d["components"]))
+'@
+python -c $code
+```
+
+If the one-liner still misbehaves in your shell profile, stick to the helper script above.
+
+### File uploads (market data)
+
+- Endpoint: `POST /api/v1/marketdata/upload`
+- Requires dependency `python-multipart` (see install step above).
+- Form fields:
+  - `file` (required): CSV/JSONL or any file (stored as-is)
+  - `symbol` (required): e.g., `BTCUSDT`
+  - `interval` (required): e.g., `1,3,5,15,60,240,D,W`
+- Server stores files under `UPLOAD_DIR` (env; defaults to `./uploads/<uuid>/filename`).
+- The endpoint currently stores files only; parsing/ingestion can be triggered later via admin archive/restore tools.
 
 ## 5) Celery tasks (queues)
 

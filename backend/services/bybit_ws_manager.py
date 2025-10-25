@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
 
 try:
     # We'll publish to Redis using asyncio client
@@ -47,13 +47,13 @@ BYBIT_PUBLIC_WS = "wss://stream.bybit.com/v5/public/linear"
 
 
 class BybitWsManager:
-    def __init__(self, redis: Optional["Redis"], channel_ticks: str, channel_klines: str):
+    def __init__(self, redis: Redis | None, channel_ticks: str, channel_klines: str):
         self._redis = redis
         self._chan_ticks = channel_ticks
         self._chan_klines = channel_klines
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._closed = asyncio.Event()
-        self._subs: List[str] = []
+        self._subs: list[str] = []
 
     async def start(
         self, symbols: Iterable[str] = ("BTCUSDT",), intervals: Iterable[str] = ("1",)
@@ -79,7 +79,7 @@ class BybitWsManager:
             logger.error("websockets package not installed; BybitWsManager disabled")
             return
 
-        subs: List[str] = []
+        subs: list[str] = []
         for sym in symbols:
             subs.append(f"publicTrade.{sym}")
         for iv in intervals:
@@ -101,7 +101,11 @@ class BybitWsManager:
                         raw = await asyncio.wait_for(ws.recv(), timeout=60)
                         # Fast-path ping/pong handling
                         try:
-                            _txt = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)
+                            _txt = (
+                                raw.decode("utf-8")
+                                if isinstance(raw, (bytes, bytearray))
+                                else str(raw)
+                            )
                             msg = json.loads(_txt)
                         except Exception:
                             msg = None
@@ -116,7 +120,7 @@ class BybitWsManager:
                         if WS_MESSAGES:
                             WS_MESSAGES.inc()
                         await self._handle_message(raw)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.info("WS recv timeout; reconnecting")
                 if WS_RECONNECTS:
                     WS_RECONNECTS.inc()
@@ -127,7 +131,7 @@ class BybitWsManager:
             await asyncio.sleep(backoff)
             backoff = min(backoff * 1.8, 20.0)
 
-    async def _subscribe(self, ws, subs: List[str]) -> None:
+    async def _subscribe(self, ws, subs: list[str]) -> None:
         msg = {"op": "subscribe", "args": subs}
         await ws.send(json.dumps(msg))
 

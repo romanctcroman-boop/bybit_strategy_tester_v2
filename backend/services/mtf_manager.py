@@ -10,9 +10,9 @@ This service relies on CandleCache for data access and provides a simple API for
 backtester/ML modules to consume MTF inputs consistently across any trading pair.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Dict, Iterable, List, Optional
+from datetime import UTC, datetime
 
 from backend.services.candle_cache import CANDLE_CACHE
 
@@ -39,14 +39,14 @@ def window_start_seconds(ts_sec: int, interval: str) -> int:
     """
     iv = str(interval).upper()
     if iv == "D":
-        dt = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
-        aligned = datetime(dt.year, dt.month, dt.day, tzinfo=timezone.utc)
+        dt = datetime.fromtimestamp(ts_sec, tz=UTC)
+        aligned = datetime(dt.year, dt.month, dt.day, tzinfo=UTC)
         return int(aligned.timestamp())
     if iv == "W":
-        dt = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
+        dt = datetime.fromtimestamp(ts_sec, tz=UTC)
         # ISO weekday: Monday=1 ... Sunday=7
         delta_days = dt.isoweekday() - 1
-        start = datetime(dt.year, dt.month, dt.day, tzinfo=timezone.utc)
+        start = datetime(dt.year, dt.month, dt.day, tzinfo=UTC)
         aligned = start.replace(hour=0, minute=0, second=0, microsecond=0)
         return int((aligned.timestamp()) - delta_days * 86400)
     # minute-based
@@ -55,7 +55,7 @@ def window_start_seconds(ts_sec: int, interval: str) -> int:
     return int(bucket * mins * 60)
 
 
-def aggregate_from_base(base: List[dict], target_interval: str) -> List[dict]:
+def aggregate_from_base(base: list[dict], target_interval: str) -> list[dict]:
     """Aggregate a list of base candles (time=seconds) to the target interval.
 
     Expects base to be sorted ascending by time without duplicate timestamps.
@@ -63,9 +63,9 @@ def aggregate_from_base(base: List[dict], target_interval: str) -> List[dict]:
     """
     if not base:
         return []
-    out: List[dict] = []
-    cur_start: Optional[int] = None
-    cur: Optional[dict] = None
+    out: list[dict] = []
+    cur_start: int | None = None
+    cur: dict | None = None
     for c in base:
         t = int(c["time"])
         ws = window_start_seconds(t, target_interval)
@@ -97,8 +97,8 @@ def aggregate_from_base(base: List[dict], target_interval: str) -> List[dict]:
 @dataclass
 class MTFResult:
     symbol: str
-    intervals: List[str]
-    data: Dict[str, List[dict]]  # interval -> candles (seconds, ohlc[v])
+    intervals: list[str]
+    data: dict[str, list[dict]]  # interval -> candles (seconds, ohlc[v])
 
 
 class MTFManager:
@@ -112,7 +112,7 @@ class MTFManager:
         self, symbol: str, intervals: Iterable[str], load_limit: int = 1000
     ) -> MTFResult:
         ivs = [str(x) for x in intervals]
-        out: Dict[str, List[dict]] = {}
+        out: dict[str, list[dict]] = {}
         for itv in ivs:
             # use cache; load if absent
             data = CANDLE_CACHE.get_working_set(symbol, itv, ensure_loaded=False)
@@ -120,8 +120,8 @@ class MTFManager:
                 data = CANDLE_CACHE.load_initial(symbol, itv, load_limit=load_limit, persist=True)
             # ensure ascending order and dedup (safety)
             data_sorted = sorted(data, key=lambda x: int(x["time"]))
-            dedup: List[dict] = []
-            last_t: Optional[int] = None
+            dedup: list[dict] = []
+            last_t: int | None = None
             for d in data_sorted:
                 t = int(d["time"])
                 if last_t is None or t > last_t:
@@ -136,7 +136,7 @@ class MTFManager:
         self,
         symbol: str,
         intervals: Iterable[str],
-        base_interval: Optional[str] = None,
+        base_interval: str | None = None,
         load_limit: int = 1000,
     ) -> MTFResult:
         ivs = sorted([str(x) for x in intervals], key=lambda v: interval_to_minutes(v))
@@ -145,7 +145,7 @@ class MTFManager:
         base_set = raw.data.get(base, [])
         # ensure base sorted
         base_sorted = sorted(base_set, key=lambda x: int(x["time"]))
-        out: Dict[str, List[dict]] = {base: base_sorted}
+        out: dict[str, list[dict]] = {base: base_sorted}
         for itv in ivs:
             if itv == base:
                 continue

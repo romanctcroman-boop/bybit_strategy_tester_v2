@@ -27,13 +27,26 @@ export type KlineUpdate = {
 
 export type Unsubscribe = () => void;
 
-const WS_ENDPOINT = 'wss://stream.bybit.com/v5/public/linear';
+export type BybitWsCategory = 'linear' | 'spot' | 'inverse';
+
+function endpointFor(category: BybitWsCategory): string {
+  switch (category) {
+    case 'spot':
+      return 'wss://stream.bybit.com/v5/public/spot';
+    case 'inverse':
+      return 'wss://stream.bybit.com/v5/public/inverse';
+    case 'linear':
+    default:
+      return 'wss://stream.bybit.com/v5/public/linear';
+  }
+}
 
 export function subscribeKline(
   symbol: string,
   interval: string,
   onUpdate: (update: KlineUpdate) => void,
-  onStatus?: (status: 'connecting' | 'open' | 'closed' | 'error', info?: any) => void
+  onStatus?: (status: 'connecting' | 'open' | 'closed' | 'error', info?: any) => void,
+  category: BybitWsCategory = 'linear'
 ): Unsubscribe {
   let ws: WebSocket | null = null;
   let closedByUser = false;
@@ -42,7 +55,7 @@ export function subscribeKline(
 
   const connect = () => {
     onStatus?.('connecting');
-    ws = new WebSocket(WS_ENDPOINT);
+    ws = new WebSocket(endpointFor(category));
 
     ws.onopen = () => {
       onStatus?.('open');

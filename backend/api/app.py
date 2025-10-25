@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routers import active_deals as active_deals_router
 from backend.api.routers import admin, backtests, marketdata, optimizations, strategies
@@ -82,8 +83,30 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="bybit_strategy_tester_v2 API", version="0.1", lifespan=lifespan)
 
+# Dev-friendly CORS/preflight handling to avoid 405 on OPTIONS when proxied via Vite
+# In production, tighten allow_origins to specific hosts.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+import os as _os
+
 app.include_router(strategies.router, prefix="/api/v1/strategies", tags=["strategies"])
-app.include_router(backtests.router, prefix="/api/v1/backtests", tags=["backtests"])
+# Conditionally replace real backtests API with mock one if USE_MOCK_BACKTESTS=1
+if (_os.environ.get("USE_MOCK_BACKTESTS", "0").lower() in ("1", "true", "yes")):
+    try:
+        from backend.api.routers import mock_backtests as _mock_bt
+
+        app.include_router(_mock_bt.router, prefix="/api/v1/backtests", tags=["backtests-mock"])
+    except Exception as _e:  # fallback to real if mock import fails
+        logging.getLogger("uvicorn.error").warning("Failed to enable mock backtests: %s", _e)
+        app.include_router(backtests.router, prefix="/api/v1/backtests", tags=["backtests"])
+else:
+    app.include_router(backtests.router, prefix="/api/v1/backtests", tags=["backtests"])
 app.include_router(marketdata.router, prefix="/api/v1/marketdata", tags=["marketdata"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(optimizations.router, prefix="/api/v1/optimizations", tags=["optimizations"])
@@ -179,6 +202,76 @@ def readyz():
 @app.get("/livez")
 def livez():
     return {"status": "alive"}
+
+# Compat: expose health endpoints under /api/v1 for frontend proxy to /api
+@app.get("/api/v1/healthz")
+def healthz_v1():
+    return healthz()
+
+
+@app.get("/api/v1/readyz")
+def readyz_v1():
+    return readyz()
+
+
+@app.get("/api/v1/livez")
+def livez_v1():
+    return livez()
+
+
+# Exchange connectivity health (real Bybit API probe)
+@app.get("/api/v1/exchangez")
+def exchangez():
+    """Probe real Bybit public REST to ensure external connectivity.
+
+    Fast and side-effect free: fetch 1 kline for BTCUSDT (linear) with a tiny timeout.
+    Returns 200 on success, 503 otherwise; body includes brief diagnostics.
+    """
+    import time
+    from typing import Any
+
+    import requests
+
+    t0 = time.perf_counter()
+    url = "https://api.bybit.com/v5/market/kline"
+    params = {"category": "linear", "symbol": "BTCUSDT", "interval": "1", "limit": 1}
+    try:
+        r = requests.get(url, params=params, timeout=2.0)
+        latency = time.perf_counter() - t0
+        status = r.status_code
+        ok = r.ok
+        payload: Any = None
+        try:
+            payload = r.json()
+        except Exception:
+            payload = None
+        # Bybit success usually has retCode == 0
+        ret_code = None
+        if isinstance(payload, dict):
+            ret_code = payload.get("retCode") or payload.get("code")
+        if ok and (ret_code in (0, None)):
+            return {"status": "ok", "latency_ms": round(latency * 1000, 1), "http": status}
+        return Response(
+            content={
+                "status": "down",
+                "latency_ms": round(latency * 1000, 1),
+                "http": status,
+                "retCode": ret_code,
+            }.__str__(),
+            media_type="application/json",
+            status_code=503,
+        )
+    except Exception as e:  # network/DNS/timeout
+        latency = time.perf_counter() - t0
+        return Response(
+            content={
+                "status": "down",
+                "error": str(e),
+                "latency_ms": round(latency * 1000, 1),
+            }.__str__(),
+            media_type="application/json",
+            status_code=503,
+        )
 
 
 # Background Bybit WS manager is handled via the app lifespan above.

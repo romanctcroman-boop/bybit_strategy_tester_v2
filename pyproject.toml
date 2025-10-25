@@ -19,10 +19,15 @@ exclude = [
 
 [tool.ruff.lint]
 # Explicit, pinned ruleset (pycodestyle E, pyflakes F, import sorting I).
-# We can expand later (e.g., UP, B, SIM) when we're ready to fix violations across the codebase.
-select = ["E", "F", "I"]
-# Deliberately ignore long line limit and import-at-top to reduce churn in scripts for now.
-ignore = ["E501", "E402"]
+# Gradually stricter: enable UP (pyupgrade), B (bugbear), SIM (simplify)
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# Pragmatic ignores while we roll in stricter rules:
+# - E501: long lines
+# - E402: module level import not at top
+# - UP035: gradual migration off typing.* to builtins (dict, list, ...)
+# - SIM105: try/except/pass simplifications (we'll convert incrementally)
+# - B904: raise from pattern in except; keep as-is for Celery retry paths
+ignore = ["E501", "E402", "SIM105", "B904"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["backend", "tests"]

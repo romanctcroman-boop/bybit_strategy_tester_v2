@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import psycopg2
 from testcontainers.postgres import PostgresContainer
@@ -50,7 +50,7 @@ def test_convert_timestamps_to_timestamptz():
         )
 
         # Insert a row with timezone-aware UTC datetime (avoid deprecated utcnow usage)
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         cur.execute(
             "INSERT INTO backtests (started_at, updated_at, completed_at) VALUES (%s, %s, %s)",
             (now_utc, now_utc, now_utc),
