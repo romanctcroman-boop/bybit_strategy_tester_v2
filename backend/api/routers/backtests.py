@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
 
 from backend.api.schemas import (
     ApiListResponse,
@@ -209,3 +210,113 @@ def list_trades(
                 }
             )
     return out
+
+
+# ========================================================================
+# CSV EXPORT ENDPOINTS (ТЗ 4)
+# ========================================================================
+
+@router.get("/{backtest_id}/export/{report_type}")
+def export_csv_report(
+    backtest_id: int,
+    report_type: str = Query(..., description="list_of_trades|performance|risk_ratios|trades_analysis|all")
+):
+    """
+    Export CSV reports (ТЗ 4)
+    
+    Args:
+        backtest_id: ID бэктеста
+        report_type: Тип отчета:
+            - list_of_trades: List-of-trades.csv (ТЗ 4.1)
+            - performance: Performance.csv (ТЗ 4.2)
+            - risk_ratios: Risk-performance-ratios.csv (ТЗ 4.3)
+            - trades_analysis: Trades-analysis.csv (ТЗ 4.4)
+            - all: ZIP архив со всеми отчетами
+    
+    Returns:
+        CSV file или ZIP архив
+    """
+    DS = _get_data_service()
+    if DS is None:
+        raise HTTPException(
+            status_code=501, 
+            detail="Backend database not configured in this environment"
+        )
+    
+    with DS() as ds:
+        # Получаем backtest
+        bt = ds.get_backtest(backtest_id)
+        if not bt:
+            raise HTTPException(status_code=404, detail="Backtest not found")
+        
+        # Проверяем, что есть результаты
+        if not bt.results or bt.status != 'completed':
+            raise HTTPException(
+                status_code=400, 
+                detail="Backtest must be completed to export reports"
+            )
+        
+        # Создаем ReportGenerator
+        from backend.services.report_generator import ReportGenerator
+        
+        # Результаты из JSON
+        results = bt.results if isinstance(bt.results, dict) else {}
+        initial_capital = bt.initial_capital or 10000.0
+        
+        generator = ReportGenerator(results, initial_capital)
+        
+        # Генерируем отчет по типу
+        if report_type == "list_of_trades":
+            csv_content = generator.generate_list_of_trades_csv()
+            filename = f"backtest_{backtest_id}_list_of_trades.csv"
+            
+        elif report_type == "performance":
+            csv_content = generator.generate_performance_csv()
+            filename = f"backtest_{backtest_id}_performance.csv"
+            
+        elif report_type == "risk_ratios":
+            csv_content = generator.generate_risk_ratios_csv()
+            filename = f"backtest_{backtest_id}_risk_ratios.csv"
+            
+        elif report_type == "trades_analysis":
+            csv_content = generator.generate_trades_analysis_csv()
+            filename = f"backtest_{backtest_id}_trades_analysis.csv"
+            
+        elif report_type == "all":
+            # Генерируем все отчеты и создаем ZIP
+            import zipfile
+            import io
+            
+            reports = generator.generate_all_reports()
+            
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                zip_file.writestr(f"backtest_{backtest_id}_list_of_trades.csv", reports['list_of_trades'])
+                zip_file.writestr(f"backtest_{backtest_id}_performance.csv", reports['performance'])
+                zip_file.writestr(f"backtest_{backtest_id}_risk_ratios.csv", reports['risk_ratios'])
+                zip_file.writestr(f"backtest_{backtest_id}_trades_analysis.csv", reports['trades_analysis'])
+            
+            zip_buffer.seek(0)
+            return Response(
+                content=zip_buffer.getvalue(),
+                media_type="application/zip",
+                headers={
+                    "Content-Disposition": f"attachment; filename=backtest_{backtest_id}_reports.zip"
+                }
+            )
+        
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid report_type: {report_type}. Must be one of: list_of_trades, performance, risk_ratios, trades_analysis, all"
+            )
+        
+        # Возвращаем CSV
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+
