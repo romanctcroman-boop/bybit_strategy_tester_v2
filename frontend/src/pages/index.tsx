@@ -7,3 +7,5 @@ export { default as BacktestsPage } from './BacktestsPage';
 export { default as TestChartPage } from './TestChartPage';
 export { default as DebugPage } from './DebugPage';
 export { default as MTFBacktestDemo } from './MTFBacktestDemo';
+export { default as TradingViewDemo } from './TradingViewDemo';
+export { default as WalkForwardPage } from './WalkForwardPage';

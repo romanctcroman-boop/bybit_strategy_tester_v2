@@ -29,6 +29,8 @@ import {
 import DownloadIcon from '@mui/icons-material/Download';
 import BacktestEquityChart from '../components/BacktestEquityChart';
 import ChartsTab from '../components/ChartsTab';
+import TradingViewTab from '../components/TradingViewTab';
+import MonteCarloTab from '../components/MonteCarloTab';
 import { useNotify } from '../components/NotificationsProvider';
 import { BacktestsApi } from '../services/api';
 import type { Backtest, Trade } from '../types/api';
@@ -1089,6 +1091,8 @@ const BacktestDetailPage: React.FC = () => {
         <Tab label="Анализ сделок" />
         <Tab label="Риск" />
         <Tab label="Графики" />
+        <Tab label="TradingView" />
+        <Tab label="Monte Carlo" />
         <Tab label="Сделки" />
       </Tabs>
 
@@ -1110,7 +1114,9 @@ const BacktestDetailPage: React.FC = () => {
       {tab === 2 && <AnalysisTab results={resultsSafe} />}
       {tab === 3 && <RiskTab results={resultsSafe} />}
       {tab === 4 && backtestId && <ChartsTab backtestId={backtestId} />}
-      {tab === 5 && (
+      {tab === 5 && backtestId && <TradingViewTab backtestId={backtestId} />}
+      {tab === 6 && backtestId && <MonteCarloTab backtestId={backtestId} />}
+      {tab === 7 && (
         <TradesTab
           trades={enhancedTrades}
           total={tradesTotal}

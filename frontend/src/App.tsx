@@ -15,6 +15,9 @@ const StrategyDetailPage = lazy(() => import('./pages/StrategyDetailPage'));
 const TestChartPage = lazy(() => import('./pages/TestChartPage'));
 const DebugPage = lazy(() => import('./pages/DebugPage'));
 const AdminBackfillPage = lazy(() => import('./pages/AdminBackfillPage'));
+const MTFBacktestDemo = lazy(() => import('./pages/MTFBacktestDemo'));
+const TradingViewDemo = lazy(() => import('./pages/TradingViewDemo'));
+const WalkForwardPage = lazy(() => import('./pages/WalkForwardPage'));
 import NotificationsProvider from './components/NotificationsProvider';
 import ApiHealthIndicator from './components/ApiHealthIndicator';
 import TopProgressBar from './components/TopProgressBar';
@@ -33,6 +36,7 @@ const App: React.FC = () => {
             <Link to="/algo">Algo</Link> | <Link to="/strategies">Strategies</Link> |{' '}
             <Link to="/optimizations">Optimizations</Link> | <Link to="/upload">Uploads</Link> |{' '}
             <Link to="/backtests">Backtests</Link> | <Link to="/test-chart">Test Chart</Link> |{' '}
+            <Link to="/tv-demo">TV Demo</Link> | <Link to="/mtf-demo">MTF Demo</Link> |{' '}
             <Link to="/admin/backfill">Admin Backfill</Link> | <Link to="/debug">Debug</Link>
           </div>
           <div style={{ marginLeft: 'auto' }}>
@@ -50,10 +54,13 @@ const App: React.FC = () => {
             <Route path="/algo" element={<AlgoBuilderPage />} />
             <Route path="/optimizations" element={<OptimizationsPage />} />
             <Route path="/optimization/:id" element={<OptimizationDetailPage />} />
+            <Route path="/walk-forward/:id" element={<WalkForwardPage />} />
             <Route path="/upload" element={<DataUploadPage />} />
             <Route path="/backtests" element={<BacktestsPage />} />
             <Route path="/backtest/:id" element={<BacktestDetailPage />} />
             <Route path="/test-chart" element={<TestChartPage />} />
+            <Route path="/tv-demo" element={<TradingViewDemo />} />
+            <Route path="/mtf-demo" element={<MTFBacktestDemo />} />
             <Route path="/admin/backfill" element={<AdminBackfillPage />} />
             <Route path="/debug" element={<DebugPage />} />
           </Routes>

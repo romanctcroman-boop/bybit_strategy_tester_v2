@@ -26,6 +26,7 @@ import {
 } from 'recharts';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useNotify } from '../components/NotificationsProvider';
+import WFORunButton from '../components/WFORunButton';
 
 const OptimizationDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -148,7 +149,10 @@ const OptimizationDetailPage: React.FC = () => {
 
   return (
     <Container>
-      <Typography variant="h4">Optimization #{optimizationId}</Typography>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+        <Typography variant="h4">Optimization #{optimizationId}</Typography>
+        {opt && opt.status === 'completed' && <WFORunButton optimizationId={optimizationId} />}
+      </Stack>
       {opt && (
         <Paper sx={{ mt: 2, p: 2 }}>
           <Stack direction="row" spacing={4}>

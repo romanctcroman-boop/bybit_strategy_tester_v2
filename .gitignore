@@ -239,3 +239,6 @@ logs/
 _deep_snapshot/
 deep_project_analyzer.ps1
 demo.db
+
+# Test cache files (Parquet)
+data/test_cache/*.parquet

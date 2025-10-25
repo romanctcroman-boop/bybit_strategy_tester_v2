@@ -220,7 +220,10 @@ export default function OptimizationsPage() {
       // Refresh list
       await fetchAll();
     } catch (err: any) {
-      notify({ message: `Failed to start optimization: ${err?.message || err}`, severity: 'error' });
+      notify({
+        message: `Failed to start optimization: ${err?.message || err}`,
+        severity: 'error',
+      });
     }
   };
 
