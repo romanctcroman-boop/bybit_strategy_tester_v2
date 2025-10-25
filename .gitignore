@@ -232,3 +232,9 @@ logs/
 
 # --- Local SQLite databases ---
 *.sqlite3
+
+# Temporary test files
+.pytest-tmp/
+_deep_snapshot/
+deep_project_analyzer.ps1
+demo.db
