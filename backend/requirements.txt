@@ -8,3 +8,4 @@ redis
 websockets
 pydantic-settings
 python-multipart
+plotly
