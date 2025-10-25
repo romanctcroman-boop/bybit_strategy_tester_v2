@@ -4,9 +4,17 @@ import type { PlotlyHTMLElement } from 'plotly.js-basic-dist-min';
 
 interface PlotlyChartProps {
   /**
-   * JSON content from backend (Plotly figure as JSON string)
+   * JSON content from backend (Plotly figure as JSON string) OR direct data/layout objects
    */
-  plotlyJson: string | null;
+  plotlyJson?: string | null;
+  /**
+   * Direct Plotly data array (alternative to plotlyJson)
+   */
+  data?: any[];
+  /**
+   * Direct Plotly layout object (alternative to plotlyJson)
+   */
+  layout?: any;
   /**
    * Optional height in pixels
    */
@@ -29,6 +37,8 @@ interface PlotlyChartProps {
  */
 const PlotlyChart: React.FC<PlotlyChartProps> = ({
   plotlyJson,
+  data,
+  layout,
   height = 400,
   loading = false,
   error = null,
@@ -37,7 +47,8 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
   const plotRef = useRef<PlotlyHTMLElement | null>(null);
 
   useEffect(() => {
-    if (!plotlyJson || !containerRef.current) {
+    // Skip if no data provided
+    if ((!plotlyJson && !data) || !containerRef.current) {
       return;
     }
 
@@ -49,8 +60,16 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
         if (!containerElement) return;
 
         try {
-          // Parse JSON from backend
-          const figure = JSON.parse(plotlyJson);
+          let figure: { data: any[]; layout: any };
+
+          // Support both formats: JSON string or direct data/layout
+          if (plotlyJson) {
+            figure = JSON.parse(plotlyJson);
+          } else if (data) {
+            figure = { data, layout: layout || {} };
+          } else {
+            return;
+          }
 
           // Render or update plot
           if (plotRef.current) {
@@ -90,7 +109,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
         plotRef.current = null;
       }
     };
-  }, [plotlyJson]);
+  }, [plotlyJson, data, layout]);
 
   if (loading) {
     return (
@@ -108,7 +127,7 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
     );
   }
 
-  if (!plotlyJson) {
+  if (!plotlyJson && !data) {
     return (
       <Box display="flex" alignItems="center" justifyContent="center" height={height}>
         <Typography color="text.secondary">Нет данных для визуализации</Typography>
