@@ -35,21 +35,29 @@ export interface Trade {
   backtest_id: number;
   entry_time: string | Date;
   exit_time?: string | Date;
-  price: number;
-  qty: number;
+  entry_price: number;
+  exit_price?: number;
+  quantity: number;
   side: 'buy' | 'sell';
   pnl?: number;
+  pnl_pct?: number;
+  run_up?: number;
+  run_up_pct?: number;
+  drawdown?: number;
+  drawdown_pct?: number;
+  cumulative_pnl?: number;
   created_at?: string;
-  // Optional enriched analytics fields (mock/router may provide)
-  pnl_pct?: number; // percent PnL for the trade
-  duration_min?: number; // duration in minutes
-  signal?: string; // entry signal/tag
-  position_size?: number; // position size if available
-  peak?: number; // peak run-up during the trade
-  drawdown?: number; // drawdown during the trade
-  mfe?: number; // maximum favorable excursion
-  mae?: number; // maximum adverse excursion
-  bars_held?: number; // bars count held
+  // Legacy/optional enriched analytics fields
+  price?: number; // alias for entry_price
+  qty?: number; // alias for quantity
+  duration_min?: number;
+  signal?: string;
+  position_size?: number;
+  peak?: number; // alias for run_up
+  mfe?: number;
+  mae?: number;
+  bars_held?: number;
+  fee?: number;
 }
 
 export interface MarketDataPoint {

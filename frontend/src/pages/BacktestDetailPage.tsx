@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
   Chip,
+  CircularProgress,
   Container,
-  Divider,
   FormControlLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Stack,
@@ -23,26 +25,15 @@ import {
   ToggleButtonGroup,
   Typography,
   useTheme,
-} from "@mui/material";
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  Area,
-  Line,
-  Bar,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip as RechartsTooltip,
-  Cell,
-} from "recharts";
-import { BacktestsApi } from "../services/api";
-import type { Backtest, Trade } from "../types/api";
-import { useNotify } from "../components/NotificationsProvider";
+} from '@mui/material';
+import BacktestEquityChart from '../components/BacktestEquityChart';
+import { useNotify } from '../components/NotificationsProvider';
+import { BacktestsApi } from '../services/api';
+import type { Backtest, Trade } from '../types/api';
 
-type TradeSide = "" | "buy" | "sell";
-type ChartMode = "abs" | "pct";
-type ValueUnit = "usd" | "percent" | "plain";
+type TradeSide = '' | 'buy' | 'sell';
+type ChartMode = 'abs' | 'pct';
+type ValueUnit = 'usd' | 'percent' | 'plain';
 
 type ChartDatum = {
   timestamp: number;
@@ -67,7 +58,7 @@ type BacktestResults = {
     profit_factor?: number;
   };
   by_side?: Record<
-    "all" | "long" | "short",
+    'all' | 'long' | 'short',
     {
       total_trades?: number;
       open_trades?: number;
@@ -91,7 +82,7 @@ type BacktestResults = {
     }
   >;
   dynamics?: Record<
-    "all" | "long" | "short",
+    'all' | 'long' | 'short',
     {
       unrealized_abs?: number;
       unrealized_pct?: number;
@@ -121,9 +112,9 @@ type BacktestResults = {
   pnl_bars?: Array<{ time?: string | number | Date; pnl?: number }>;
 };
 
-type SideKey = "all" | "long" | "short";
-type SideStats = NonNullable<BacktestResults["by_side"]>[SideKey];
-type DynamicsStats = NonNullable<BacktestResults["dynamics"]>[SideKey];
+type SideKey = 'all' | 'long' | 'short';
+type SideStats = NonNullable<BacktestResults['by_side']>[SideKey];
+type DynamicsStats = NonNullable<BacktestResults['dynamics']>[SideKey];
 
 type EnrichedTrade = Trade & {
   cumulative?: number;
@@ -139,14 +130,9 @@ const defaultDigits: Record<ValueUnit, number> = {
 
 const toFiniteNumber = (value: unknown): number | null => {
   if (value == null) return null;
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "string") {
-    if (!value.trim()) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string' && value.trim()) {
     const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  if (value instanceof Date) {
-    const parsed = value.getTime();
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
@@ -154,140 +140,90 @@ const toFiniteNumber = (value: unknown): number | null => {
 
 const toTimestamp = (value: unknown): number | null => {
   if (value == null) return null;
-  if (value instanceof Date) {
-    const ts = value.getTime();
-    return Number.isFinite(ts) ? ts : null;
-  }
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "string") {
-    if (!value.trim()) return null;
-    const ts = Date.parse(value);
-    return Number.isFinite(ts) ? ts : null;
-  }
-  return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const date = new Date(value as any);
+  const ms = date.getTime();
+  return Number.isFinite(ms) ? ms : null;
 };
 
 const formatNumber = (value: number, digits = 2): string =>
-  new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
+  new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: Math.max(0, Math.min(6, digits)),
+    maximumFractionDigits: Math.max(0, Math.min(6, digits)),
   }).format(value);
 
-const formatValueWithUnit = (value: unknown, unit: ValueUnit, digits?: number): string => {
+const formatValueWithUnit = (
+  value: unknown,
+  unit: ValueUnit,
+  digits?: number,
+  fallback = 'вЂ”'
+): string => {
   const numeric = toFiniteNumber(value);
-  if (numeric == null) return "";
-  const resolvedDigits = digits ?? defaultDigits[unit];
-  if (unit === "percent") {
-    const scaled = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
-    return `${formatNumber(scaled, resolvedDigits)}%`;
+  if (numeric == null) return fallback;
+  const precision = digits ?? defaultDigits[unit];
+  const formatted = formatNumber(numeric, precision);
+  switch (unit) {
+    case 'usd':
+      return `${formatted} USDT`;
+    case 'percent':
+      return `${formatted}%`;
+    default:
+      return formatted;
   }
-  if (unit === "usd") {
-    return `${formatNumber(numeric, resolvedDigits)} USDT`;
-  }
-  return formatNumber(numeric, resolvedDigits);
 };
 
-const formatSignedValueWithUnit = (value: unknown, unit: ValueUnit, digits?: number): string => {
+const formatSignedValueWithUnit = (
+  value: unknown,
+  unit: ValueUnit,
+  digits?: number,
+  fallback = 'вЂ”'
+): string => {
   const numeric = toFiniteNumber(value);
-  if (numeric == null) return "";
-  if (numeric === 0) return formatValueWithUnit(0, unit, digits);
-  const prefix = numeric > 0 ? "+" : "-";
-  return `${prefix}${formatValueWithUnit(Math.abs(numeric), unit, digits)}`;
+  if (numeric == null) return fallback;
+  const sign = numeric > 0 ? '+' : numeric < 0 ? 'в€’' : '';
+  return `${sign}${formatValueWithUnit(Math.abs(numeric), unit, digits, fallback)}`;
 };
 
 const formatDateTime = (value: unknown): string => {
   const ts = toTimestamp(value);
-  if (ts == null) return "";
-  return new Intl.DateTimeFormat("ru-RU", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
+  if (ts == null) return 'вЂ”';
+  return new Intl.DateTimeFormat('ru-RU', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
   }).format(new Date(ts));
 };
 
-const formatQuantity = (value: unknown, digits = 4): string => {
-  const numeric = toFiniteNumber(value);
-  if (numeric == null) return "";
-  const absValue = Math.abs(numeric);
-  const hasFraction = Math.abs(absValue - Math.trunc(absValue)) > 1e-8;
-  const minDigits = hasFraction ? Math.min(2, digits) : 0;
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: minDigits,
-    maximumFractionDigits: digits,
-  }).format(numeric);
+const formatDuration = (value: unknown): string => {
+  const minutes = toFiniteNumber(value);
+  if (minutes == null) return 'вЂ”';
+  if (minutes < 60) return `${formatNumber(minutes, 0)} РјРёРЅ`;
+  const hours = Math.floor(minutes / 60);
+  const mins = Math.round(minutes % 60);
+  return `${hours} С‡ ${mins} РјРёРЅ`;
 };
 
-const formatDuration = (minutes: unknown): string => {
-  const numeric = toFiniteNumber(minutes);
-  if (numeric == null) return "";
-  const total = Math.max(0, Math.round(numeric));
-  const hours = Math.floor(total / 60);
-  const mins = total % 60;
-  const parts: string[] = [];
-  if (hours) parts.push(`${hours} ч`);
-  if (mins) parts.push(`${mins} мин`);
-  return parts.length ? parts.join(" ") : "0 мин";
+const formatQuantity = (value: unknown, digits = 2): string => {
+  const numeric = toFiniteNumber(value);
+  if (numeric == null) return 'вЂ”';
+  return formatNumber(numeric, digits);
 };
 
 const DualValue: React.FC<{
   absolute?: unknown;
   percent?: unknown;
-  absDigits?: number;
-  pctDigits?: number;
-}> = ({ absolute, percent, absDigits = 2, pctDigits = 2 }) => {
-  const hasPercent = percent != null && toFiniteNumber(percent) != null;
+}> = ({ absolute, percent }) => {
+  const absoluteText = formatValueWithUnit(absolute, 'usd');
+  const percentText = percent != null ? formatValueWithUnit(percent, 'percent', 2) : null;
+  if (!percentText) return <>{absoluteText}</>;
   return (
-    <Stack spacing={0.25} sx={{ fontSize: 14 }}>
-      <span>{formatValueWithUnit(absolute, "usd", absDigits)}</span>
-      {hasPercent ? (
-        <Typography component="span" variant="caption" color="text.secondary">
-          {formatValueWithUnit(percent, "percent", pctDigits)}
-        </Typography>
-      ) : null}
+    <Stack spacing={0.5} alignItems="center">
+      <span>{absoluteText}</span>
+      <Typography variant="caption" color="text.secondary">
+        {percentText}
+      </Typography>
     </Stack>
   );
 };
-
-const SummaryMetric: React.FC<{ title: string; primary: string; secondary?: string }> = ({
-  title,
-  primary,
-  secondary,
-}) => (
-  <Paper
-    sx={{
-      p: 2,
-      borderRadius: 2,
-      minWidth: 220,
-      background: (theme) =>
-        theme.palette.mode === "dark"
-          ? "linear-gradient(160deg, rgba(8,15,23,0.92) 0%, rgba(12,22,32,0.92) 100%)"
-          : "#101921",
-      color: (theme) => (theme.palette.mode === "dark" ? theme.palette.text.primary : "#e8f1ff"),
-      border: (theme) =>
-        theme.palette.mode === "dark"
-          ? "1px solid rgba(148, 163, 184, 0.18)"
-          : "1px solid rgba(15, 23, 42, 0.18)",
-      boxShadow: (theme) =>
-        theme.palette.mode === "dark"
-          ? "0 18px 48px rgba(8, 15, 23, 0.45)"
-          : "0 18px 36px rgba(15, 23, 42, 0.28)",
-    }}
-  >
-    <Typography variant="subtitle2" sx={{ opacity: 0.7 }}>
-      {title}
-    </Typography>
-    <Typography variant="h5" sx={{ mt: 0.5, fontWeight: 600 }}>
-      {primary}
-    </Typography>
-    {secondary ? (
-      <Typography variant="body2" sx={{ mt: 0.5, opacity: 0.7 }}>
-        {secondary}
-      </Typography>
-    ) : null}
-  </Paper>
-);
 
 const OverviewChart: React.FC<{
   data: ChartDatum[];
@@ -299,18 +235,8 @@ const OverviewChart: React.FC<{
   onToggleBuyHold: (checked: boolean) => void;
 }> = ({ data, mode, onModeChange, showPnlBars, onTogglePnlBars, showBuyHold, onToggleBuyHold }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-  const equityKey = mode === "pct" ? "equityPct" : "equityAbs";
-  const pnlKey = mode === "pct" ? "pnlPct" : "pnlAbs";
-  const buyHoldKey = mode === "pct" ? "buyHoldPct" : "buyHoldAbs";
-
-  const axisColor = isDark ? "rgba(226, 232, 240, 0.72)" : "rgba(30, 41, 59, 0.72)";
-  const gridColor = isDark ? "rgba(148, 163, 184, 0.18)" : "rgba(148, 163, 184, 0.28)";
-  const tooltipBg = isDark ? "#07131b" : "#f8fafc";
-  const tooltipColor = isDark ? "#f8fafc" : "#0f172a";
-  const containerBg = isDark ? "rgba(4, 13, 18, 0.92)" : "#f8fafc";
-  const positiveBar = "#20edb7";
-  const negativeBar = "#f87171";
+  const isDark = theme.palette.mode === 'dark';
+  const axisColor = isDark ? 'rgba(226, 232, 240, 0.82)' : 'rgba(30, 41, 59, 0.78)';
 
   const handleModeChange = (_: React.MouseEvent<HTMLElement>, value: ChartMode | null) => {
     if (value) onModeChange(value);
@@ -323,148 +249,52 @@ const OverviewChart: React.FC<{
         mt: 3,
         borderRadius: 3,
         background: isDark
-          ? "linear-gradient(160deg, rgba(2,8,23,0.92) 0%, rgba(8,15,23,0.92) 100%)"
-          : "#ffffff",
-        border: isDark ? "1px solid rgba(148, 163, 184, 0.18)" : "1px solid rgba(15, 23, 42, 0.08)",
-        boxShadow: isDark ? "0 18px 60px rgba(8, 15, 23, 0.45)" : "0 20px 45px rgba(15, 23, 42, 0.12)",
+          ? 'linear-gradient(160deg, rgba(2,8,23,0.9) 0%, rgba(8,15,23,0.92) 100%)'
+          : '#ffffff',
+        border: isDark ? '1px solid rgba(148, 163, 184, 0.18)' : '1px solid rgba(15, 23, 42, 0.08)',
+        boxShadow: isDark
+          ? '0 18px 60px rgba(8, 15, 23, 0.45)'
+          : '0 20px 45px rgba(15, 23, 42, 0.12)',
       }}
     >
-      <Typography variant="h6">Капитал и динамика сделок</Typography>
+      <Typography variant="h6">РљР°РїРёС‚Р°Р» Рё РґРёРЅР°РјРёРєР° СЃРґРµР»РѕРє</Typography>
 
       {data.length === 0 ? (
         <Box sx={{ py: 6 }}>
           <Typography align="center" color="text.secondary">
-            Нет данных для визуализации.
+            РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ РІРёР·СѓР°Р»РёР·Р°С†РёРё.
           </Typography>
         </Box>
       ) : (
         <>
           <Box
             sx={{
-              width: "100%",
-              height: 380,
               mt: 2,
               borderRadius: 3,
-              background: containerBg,
-              px: 1,
-              pb: 1,
+              overflow: 'hidden',
+              border: '1px solid',
+              borderColor: isDark ? 'rgba(148,163,184,0.16)' : 'rgba(15,23,42,0.08)',
             }}
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data} margin={{ top: 24, right: 28, bottom: 16, left: 0 }}>
-                <defs>
-                  <linearGradient id={`equity-gradient-${mode}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#20edb7" stopOpacity={0.32} />
-                    <stop offset="100%" stopColor="#20edb7" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-                <XAxis
-                  dataKey="timestamp"
-                  type="number"
-                  scale="time"
-                  domain={['auto', 'auto']}
-                  tickFormatter={(ts) =>
-                    new Intl.DateTimeFormat("ru-RU", { month: "short", day: "2-digit" }).format(
-                      new Date(ts as number)
-                    )
-                  }
-                  tick={{ fill: axisColor, fontSize: 12, dy: 4 }}
-                  axisLine={{ stroke: gridColor }}
-                  tickLine={{ stroke: gridColor }}
-                />
-                <YAxis
-                  yAxisId="left"
-                  tickFormatter={(val: number) =>
-                    mode === "pct" ? `${formatNumber(val, 1)}%` : formatNumber(val, 0)
-                  }
-                  tick={{ fill: axisColor, fontSize: 12 }}
-                  axisLine={{ stroke: gridColor }}
-                  tickLine={{ stroke: gridColor }}
-                  width={80}
-                />
-                <RechartsTooltip
-                  cursor={{ stroke: "rgba(148, 163, 184, 0.24)" }}
-                  contentStyle={{
-                    background: tooltipBg,
-                    borderRadius: 12,
-                    borderColor: "rgba(148, 163, 184, 0.22)",
-                    color: tooltipColor,
-                    boxShadow: "0 18px 48px rgba(8, 15, 23, 0.55)",
-                  }}
-                  labelFormatter={(ts) => formatDateTime(Number(ts))}
-                  formatter={(rawValue: unknown, name?: string, payload?: any) => {
-                    if (!name) return null;
-                    const numeric = toFiniteNumber(rawValue);
-                    if (numeric == null) return ["", name];
-                    const key = String(payload?.dataKey ?? "").toLowerCase();
-                    const isPercent = key.includes("pct") || name.includes("%");
-                    const scaled = isPercent && Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
-                    const suffix = isPercent ? "%" : " USDT";
-                    return [`${formatNumber(scaled, 2)}${suffix}`, name];
-                  }}
-                />
-                {showPnlBars ? (
-                  <Bar
-                    yAxisId="left"
-                    dataKey={pnlKey}
-                    name={mode === "pct" ? "PnL (%)" : "PnL"}
-                    barSize={10}
-                    radius={[6, 6, 6, 6]}
-                  >
-                    {data.map((entry) => {
-                      const val = toFiniteNumber((entry as any)[pnlKey]);
-                      const fill = val != null && val < 0 ? negativeBar : positiveBar;
-                      return <Cell key={`pnl-${entry.timestamp}`} fill={fill} />;
-                    })}
-                  </Bar>
-                ) : null}
-                <Area
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey={equityKey}
-                  stroke="none"
-                  fill={`url(#equity-gradient-${mode})`}
-                  isAnimationActive={false}
-                />
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey={equityKey}
-                  name={mode === "pct" ? "Капитал (%)" : "Капитал"}
-                  stroke="#20edb7"
-                  strokeWidth={2.5}
-                  dot={false}
-                  activeDot={{ r: 4, stroke: "#0f172a", strokeWidth: 2, fill: "#20edb7" }}
-                />
-                {showBuyHold ? (
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey={buyHoldKey}
-                    name="Покупка и удержание"
-                    stroke="#facc15"
-                    strokeWidth={1.5}
-                    strokeDasharray="6 4"
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                ) : null}
-              </ComposedChart>
-            </ResponsiveContainer>
+            <BacktestEquityChart
+              data={data}
+              mode={mode}
+              showPnlBars={showPnlBars}
+              showBuyHold={showBuyHold}
+              height={380}
+            />
           </Box>
 
-          <Divider sx={{ my: 2, borderColor: isDark ? "rgba(148, 163, 184, 0.2)" : undefined }} />
-
           <Stack
-            direction={{ xs: "column", sm: "row" }}
+            direction={{ xs: 'column', sm: 'row' }}
             spacing={2}
-            alignItems={{ xs: "flex-start", sm: "center" }}
+            alignItems={{ xs: 'flex-start', sm: 'center' }}
             justifyContent="space-between"
+            sx={{ mt: 2 }}
           >
             <Stack direction="row" spacing={2} flexWrap="wrap" rowGap={1}>
               <FormControlLabel
-                sx={{ color: axisColor, "& .MuiFormControlLabel-label": { color: axisColor } }}
+                sx={{ color: axisColor, '& .MuiFormControlLabel-label': { color: axisColor } }}
                 control={
                   <Checkbox
                     size="small"
@@ -472,16 +302,16 @@ const OverviewChart: React.FC<{
                     onChange={(event) => onToggleBuyHold(event.target.checked)}
                     sx={{
                       color: axisColor,
-                      "&.Mui-checked": {
-                        color: "#facc15",
+                      '&.Mui-checked': {
+                        color: '#facc15',
                       },
                     }}
                   />
                 }
-                label="Покупка и удержание"
+                label="РџРѕРєСѓРїРєР° Рё СѓРґРµСЂР¶Р°РЅРёРµ"
               />
               <FormControlLabel
-                sx={{ color: axisColor, "& .MuiFormControlLabel-label": { color: axisColor } }}
+                sx={{ color: axisColor, '& .MuiFormControlLabel-label': { color: axisColor } }}
                 control={
                   <Checkbox
                     size="small"
@@ -489,13 +319,13 @@ const OverviewChart: React.FC<{
                     onChange={(event) => onTogglePnlBars(event.target.checked)}
                     sx={{
                       color: axisColor,
-                      "&.Mui-checked": {
-                        color: negativeBar,
+                      '&.Mui-checked': {
+                        color: '#f87171',
                       },
                     }}
                   />
                 }
-                label="Нарастание и просадка сделок"
+                label="РќР°СЂР°СЃС‚Р°РЅРёРµ Рё РїСЂРѕСЃР°РґРєР° СЃРґРµР»РѕРє"
               />
             </Stack>
             <ToggleButtonGroup
@@ -505,26 +335,26 @@ const OverviewChart: React.FC<{
               value={mode}
               onChange={handleModeChange}
               sx={{
-                background: isDark ? "#07131b" : "#e2e8f0",
+                background: isDark ? '#07131b' : '#e2e8f0',
                 borderRadius: 999,
                 p: 0.5,
-                "& .MuiToggleButton-root": {
-                  border: "0 !important",
+                '& .MuiToggleButton-root': {
+                  border: '0 !important',
                   borderRadius: 999,
                   color: axisColor,
                   px: 2,
-                  textTransform: "none",
+                  textTransform: 'none',
                   fontWeight: 600,
                 },
-                "& .Mui-selected": {
-                  background: "#2563eb !important",
-                  color: "#f8fafc !important",
-                  boxShadow: "0 10px 28px rgba(37, 99, 235, 0.35)",
+                '& .Mui-selected': {
+                  background: '#2563eb !important',
+                  color: '#f8fafc !important',
+                  boxShadow: '0 10px 28px rgba(37, 99, 235, 0.35)',
                 },
               }}
             >
-              <ToggleButton value="abs">Абсолютные значения</ToggleButton>
-              <ToggleButton value="pct">Проценты</ToggleButton>
+              <ToggleButton value="abs">РђР±СЃРѕР»СЋС‚РЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ</ToggleButton>
+              <ToggleButton value="pct">РџСЂРѕС†РµРЅС‚С‹</ToggleButton>
             </ToggleButtonGroup>
           </Stack>
         </>
@@ -562,34 +392,34 @@ const OverviewTab: React.FC<{
 
   const summary = [
     {
-      title: "Общие ПР/УБ",
-      primary: formatSignedValueWithUnit(overview.net_pnl, "usd"),
-      secondary: formatSignedValueWithUnit(overview.net_pct, "percent", 2),
+      title: 'Р§РёСЃС‚С‹Р№ PnL',
+      primary: formatSignedValueWithUnit(overview.net_pnl, 'usd'),
+      secondary: formatSignedValueWithUnit(overview.net_pct, 'percent', 2),
     },
     {
-      title: "Макс. просадка средств",
-      primary: formatSignedValueWithUnit(overview.max_drawdown_abs, "usd"),
-      secondary: formatSignedValueWithUnit(overview.max_drawdown_pct, "percent", 2),
+      title: 'РњР°РєСЃ. РїСЂРѕСЃР°РґРєР°',
+      primary: formatSignedValueWithUnit(overview.max_drawdown_abs, 'usd'),
+      secondary: formatSignedValueWithUnit(overview.max_drawdown_pct, 'percent', 2),
     },
     {
-      title: "Всего сделок",
-      primary: formatValueWithUnit(totalTrades, "plain", 0),
+      title: 'Р’СЃРµРіРѕ СЃРґРµР»РѕРє',
+      primary: formatValueWithUnit(totalTrades, 'plain', 0),
       secondary:
         wins != null && losses != null
-          ? `${formatValueWithUnit(wins, "plain", 0)} побед / ${formatValueWithUnit(losses, "plain", 0)} убытков`
+          ? `${formatValueWithUnit(wins, 'plain', 0)} РїРѕР±РµРґ / ${formatValueWithUnit(losses, 'plain', 0)} РїРѕСЂР°Р¶РµРЅРёР№`
           : undefined,
     },
     {
-      title: "Прибыльные сделки",
-      primary: formatValueWithUnit(statsAll.win_rate, "percent", 2),
+      title: 'Win Rate',
+      primary: formatValueWithUnit(statsAll.win_rate, 'percent', 2),
       secondary:
         wins != null && totalTrades != null
-          ? `${formatValueWithUnit(wins, "plain", 0)} / ${formatValueWithUnit(totalTrades, "plain", 0)}`
+          ? `${formatValueWithUnit(wins, 'plain', 0)} / ${formatValueWithUnit(totalTrades, 'plain', 0)}`
           : undefined,
     },
     {
-      title: "Фактор прибыли",
-      primary: formatValueWithUnit(overview.profit_factor, "plain", 3),
+      title: 'Profit Factor',
+      primary: formatValueWithUnit(overview.profit_factor, 'plain', 3),
       secondary: undefined,
     },
   ];
@@ -600,97 +430,90 @@ const OverviewTab: React.FC<{
         <Stack direction="row" spacing={4} flexWrap="wrap" rowGap={2}>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Инструмент
+              РўРѕСЂРіРѕРІС‹Р№ РїРµСЂРёРѕРґ
             </Typography>
-            <Typography variant="h6">{backtest?.symbol ?? ""}</Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Таймфрейм
-            </Typography>
-            <Typography variant="h6">
-              {backtest?.timeframe ? `${backtest.timeframe}m` : ""}
+            <Typography variant="h6" sx={{ mt: 0.5 }}>
+              {backtest?.start_date && backtest?.end_date
+                ? `${backtest.start_date} в†’ ${backtest.end_date}`
+                : 'вЂ”'}
             </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Период
+              РЎРёРјРІРѕР»
             </Typography>
-            <Typography variant="h6">
-              {`${formatDateTime(backtest?.start_date)}  ${formatDateTime(backtest?.end_date)}`}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Капитал
-            </Typography>
-            <Typography variant="h6">{formatValueWithUnit(backtest?.initial_capital, "usd")}</Typography>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" color="text.secondary">
-              Плечо
-            </Typography>
-            <Typography variant="h6">
-              {toFiniteNumber(backtest?.leverage) != null
-                ? `x${formatNumber(toFiniteNumber(backtest?.leverage) ?? 0, 1)}`
-                : ""}
+            <Typography variant="h6" sx={{ mt: 0.5 }}>
+              {backtest?.symbol ?? 'вЂ”'}
             </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">
-              Статус
+              РўР°Р№РјС„СЂРµР№Рј
             </Typography>
-            <Chip
-              label={backtest?.status ? backtest.status.toUpperCase() : ""}
-              color={backtest?.status === "completed" ? "success" : "default"}
-            />
+            <Typography variant="h6" sx={{ mt: 0.5 }}>
+              {backtest?.timeframe ?? 'вЂ”'}
+            </Typography>
           </Box>
         </Stack>
       </Paper>
 
-      <Stack direction="row" spacing={2} flexWrap="wrap" rowGap={2}>
-        {summary.map((item) => (
-          <SummaryMetric
-            key={item.title}
-            title={item.title}
-            primary={item.primary}
-            secondary={item.secondary}
-          />
-        ))}
-      </Stack>
+      <Paper sx={{ p: 3, borderRadius: 2 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+          <Stack spacing={1.5} flexShrink={0} minWidth={260}>
+            {summary.map((item) => (
+              <Paper key={item.title} sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  {item.title}
+                </Typography>
+                <Typography variant="h5" sx={{ mt: 0.5 }}>
+                  {item.primary}
+                </Typography>
+                {item.secondary ? (
+                  <Typography variant="body2" color="text.secondary">
+                    {item.secondary}
+                  </Typography>
+                ) : null}
+              </Paper>
+            ))}
+          </Stack>
 
-      <OverviewChart
-        data={chartData}
-        mode={chartMode}
-        onModeChange={onChartModeChange}
-        showPnlBars={showPnlBars}
-        onTogglePnlBars={onTogglePnlBars}
-        showBuyHold={showBuyHold}
-        onToggleBuyHold={onToggleBuyHold}
-      />
+          <Box flexGrow={1}>
+            <OverviewChart
+              data={chartData}
+              mode={chartMode}
+              onModeChange={onChartModeChange}
+              showPnlBars={showPnlBars}
+              onTogglePnlBars={onTogglePnlBars}
+              showBuyHold={showBuyHold}
+              onToggleBuyHold={onToggleBuyHold}
+            />
+          </Box>
+        </Stack>
+      </Paper>
     </Stack>
   );
 };
 
 const DynamicsTab: React.FC<{ results: BacktestResults }> = ({ results }) => {
-  const sides: SideKey[] = ["all", "long", "short"];
+  const sides: SideKey[] = ['all', 'long', 'short'];
   const sideLabels: Record<SideKey, string> = {
-    all: "Все сделки",
-    long: "Длинные",
-    short: "Короткие",
+    all: 'Р’СЃРµ СЃРґРµР»РєРё',
+    long: 'Р”Р»РёРЅРЅС‹Рµ',
+    short: 'РљРѕСЂРѕС‚РєРёРµ',
   };
 
-  const rows: Array<{ label: string; abs: keyof DynamicsStats; pct: keyof DynamicsStats | null }> = [
-    { label: "Нереализованная прибыль", abs: "unrealized_abs", pct: "unrealized_pct" },
-    { label: "Чистая прибыль", abs: "net_abs", pct: "net_pct" },
-    { label: "Валовая прибыль", abs: "gross_profit_abs", pct: "gross_profit_pct" },
-    { label: "Валовый убыток", abs: "gross_loss_abs", pct: "gross_loss_pct" },
-    { label: "Комиссии", abs: "fees_abs", pct: "fees_pct" },
-    { label: "Макс. рост капитала", abs: "max_runup_abs", pct: "max_runup_pct" },
-    { label: "Макс. просадка", abs: "max_drawdown_abs", pct: "max_drawdown_pct" },
-    { label: "Buy & Hold", abs: "buyhold_abs", pct: "buyhold_pct" },
-    { label: "Макс. контракты", abs: "max_contracts", pct: null },
-  ];
+  const rows: Array<{ label: string; abs: keyof DynamicsStats; pct: keyof DynamicsStats | null }> =
+    [
+      { label: 'РќРµСЂРµР°Р»РёР·РѕРІР°РЅРЅС‹Р№ СЂРµР·СѓР»СЊС‚Р°С‚', abs: 'unrealized_abs', pct: 'unrealized_pct' },
+      { label: 'Р§РёСЃС‚С‹Р№ СЂРµР·СѓР»СЊС‚Р°С‚', abs: 'net_abs', pct: 'net_pct' },
+      { label: 'Р’Р°Р»РѕРІР°СЏ РїСЂРёР±С‹Р»СЊ', abs: 'gross_profit_abs', pct: 'gross_profit_pct' },
+      { label: 'Р’Р°Р»РѕРІС‹Р№ СѓР±С‹С‚РѕРє', abs: 'gross_loss_abs', pct: 'gross_loss_pct' },
+      { label: 'РљРѕРјРёСЃСЃРёРё', abs: 'fees_abs', pct: 'fees_pct' },
+      { label: 'РњР°РєСЃ. СЂРѕСЃС‚ РєР°РїРёС‚Р°Р»Р°', abs: 'max_runup_abs', pct: 'max_runup_pct' },
+      { label: 'РњР°РєСЃ. РїСЂРѕСЃР°РґРєР°', abs: 'max_drawdown_abs', pct: 'max_drawdown_pct' },
+      { label: 'Buy & Hold', abs: 'buyhold_abs', pct: 'buyhold_pct' },
+      { label: 'РњР°РєСЃ. РєРѕРЅС‚СЂР°РєС‚РѕРІ', abs: 'max_contracts', pct: null },
+    ];
 
   const getStats = (side: SideKey): Partial<DynamicsStats> =>
     (results.dynamics?.[side] ?? {}) as Partial<DynamicsStats>;
@@ -698,12 +521,12 @@ const DynamicsTab: React.FC<{ results: BacktestResults }> = ({ results }) => {
   return (
     <Paper sx={{ p: 3, mt: 2 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
-        Денежная динамика
+        РўР°Р±Р»РёС†Р° РґРёРЅР°РјРёРєРё
       </Typography>
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Показатель</TableCell>
+            <TableCell>РњРµС‚СЂРёРєР°</TableCell>
             {sides.map((side) => (
               <TableCell key={side} align="center">
                 {sideLabels[side]}
@@ -717,10 +540,10 @@ const DynamicsTab: React.FC<{ results: BacktestResults }> = ({ results }) => {
               <TableCell>{row.label}</TableCell>
               {sides.map((side) => {
                 const data = getStats(side);
-                if (row.abs === "max_contracts") {
+                if (row.abs === 'max_contracts') {
                   return (
                     <TableCell key={side} align="center">
-                      {formatValueWithUnit((data as DynamicsStats).max_contracts, "plain", 0)}
+                      {formatValueWithUnit((data as DynamicsStats).max_contracts, 'plain', 0)}
                     </TableCell>
                   );
                 }
@@ -742,33 +565,33 @@ const DynamicsTab: React.FC<{ results: BacktestResults }> = ({ results }) => {
 };
 
 const AnalysisTab: React.FC<{ results: BacktestResults }> = ({ results }) => {
-  const sides: SideKey[] = ["all", "long", "short"];
+  const sides: SideKey[] = ['all', 'long', 'short'];
   const sideLabels: Record<SideKey, string> = {
-    all: "Все сделки",
-    long: "Длинные",
-    short: "Короткие",
+    all: 'Р’СЃРµ СЃРґРµР»РєРё',
+    long: 'Р”Р»РёРЅРЅС‹Рµ',
+    short: 'РљРѕСЂРѕС‚РєРёРµ',
   };
 
   const fields: Array<{ key: keyof SideStats; label: string; unit: ValueUnit; digits?: number }> = [
-    { key: "total_trades", label: "Всего сделок", unit: "plain" },
-    { key: "open_trades", label: "Открыто сейчас", unit: "plain" },
-    { key: "wins", label: "Побед", unit: "plain" },
-    { key: "losses", label: "Убытков", unit: "plain" },
-    { key: "win_rate", label: "Win Rate", unit: "percent", digits: 2 },
-    { key: "avg_pl", label: "Средний PnL", unit: "usd" },
-    { key: "avg_pl_pct", label: "Средний PnL %", unit: "percent", digits: 2 },
-    { key: "avg_win", label: "Средняя прибыль", unit: "usd" },
-    { key: "avg_win_pct", label: "Средняя прибыль %", unit: "percent", digits: 2 },
-    { key: "avg_loss", label: "Средний убыток", unit: "usd" },
-    { key: "avg_loss_pct", label: "Средний убыток %", unit: "percent", digits: 2 },
-    { key: "max_win", label: "Макс. прибыль", unit: "usd" },
-    { key: "max_win_pct", label: "Макс. прибыль %", unit: "percent", digits: 2 },
-    { key: "max_loss", label: "Макс. убыток", unit: "usd" },
-    { key: "max_loss_pct", label: "Макс. убыток %", unit: "percent", digits: 2 },
-    { key: "profit_factor", label: "Profit Factor", unit: "plain", digits: 3 },
-    { key: "avg_bars", label: "Среднее баров", unit: "plain" },
-    { key: "avg_bars_win", label: "Баров в профите", unit: "plain" },
-    { key: "avg_bars_loss", label: "Баров в убытке", unit: "plain" },
+    { key: 'total_trades', label: 'Р’СЃРµРіРѕ СЃРґРµР»РѕРє', unit: 'plain' },
+    { key: 'open_trades', label: 'РћС‚РєСЂС‹С‚С‹Рµ СЃРґРµР»РєРё', unit: 'plain' },
+    { key: 'wins', label: 'РџРѕР±РµРґС‹', unit: 'plain' },
+    { key: 'losses', label: 'РџРѕСЂР°Р¶РµРЅРёСЏ', unit: 'plain' },
+    { key: 'win_rate', label: 'Win Rate', unit: 'percent', digits: 2 },
+    { key: 'avg_pl', label: 'РЎСЂРµРґРЅРёР№ PnL', unit: 'usd' },
+    { key: 'avg_pl_pct', label: 'РЎСЂРµРґРЅРёР№ PnL %', unit: 'percent', digits: 2 },
+    { key: 'avg_win', label: 'РЎСЂРµРґРЅСЏСЏ РїРѕР±РµРґР°', unit: 'usd' },
+    { key: 'avg_win_pct', label: 'РЎСЂРµРґРЅСЏСЏ РїРѕР±РµРґР° %', unit: 'percent', digits: 2 },
+    { key: 'avg_loss', label: 'РЎСЂРµРґРЅРёР№ РїСЂРѕРёРіСЂС‹С€', unit: 'usd' },
+    { key: 'avg_loss_pct', label: 'РЎСЂРµРґРЅРёР№ РїСЂРѕРёРіСЂС‹С€ %', unit: 'percent', digits: 2 },
+    { key: 'max_win', label: 'РњР°РєСЃ. РїСЂРёР±С‹Р»СЊ', unit: 'usd' },
+    { key: 'max_win_pct', label: 'РњР°РєСЃ. РїСЂРёР±С‹Р»СЊ %', unit: 'percent', digits: 2 },
+    { key: 'max_loss', label: 'РњР°РєСЃ. СѓР±С‹С‚РѕРє', unit: 'usd' },
+    { key: 'max_loss_pct', label: 'РњР°РєСЃ. СѓР±С‹С‚РѕРє %', unit: 'percent', digits: 2 },
+    { key: 'profit_factor', label: 'Profit Factor', unit: 'plain', digits: 3 },
+    { key: 'avg_bars', label: 'РЎСЂРµРґРЅРµРµ Р±Р°СЂРѕРІ', unit: 'plain' },
+    { key: 'avg_bars_win', label: 'Р‘Р°СЂРѕРІ РІ РїРѕР±РµРґРµ', unit: 'plain' },
+    { key: 'avg_bars_loss', label: 'Р‘Р°СЂРѕРІ РІ РїРѕСЂР°Р¶РµРЅРёРё', unit: 'plain' },
   ];
 
   const getSideStats = (side: SideKey): Partial<SideStats> =>
@@ -777,12 +600,12 @@ const AnalysisTab: React.FC<{ results: BacktestResults }> = ({ results }) => {
   return (
     <Paper sx={{ p: 3, mt: 2 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
-        Анализ по направлениям
+        РђРЅР°Р»РёР· РїРѕ РЅР°РїСЂР°РІР»РµРЅРёСЏРј
       </Typography>
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Показатель</TableCell>
+            <TableCell>РњРµС‚СЂРёРєР°</TableCell>
             {sides.map((side) => (
               <TableCell key={side} align="center">
                 {sideLabels[side]}
@@ -810,9 +633,9 @@ const AnalysisTab: React.FC<{ results: BacktestResults }> = ({ results }) => {
 const RiskTab: React.FC<{ results: BacktestResults }> = ({ results }) => {
   const risk = results.risk ?? {};
   const cards = [
-    { title: "Sharpe Ratio", value: risk.sharpe },
-    { title: "Sortino Ratio", value: risk.sortino },
-    { title: "Profit Factor", value: risk.profit_factor },
+    { title: 'Sharpe Ratio', value: risk.sharpe },
+    { title: 'Sortino Ratio', value: risk.sortino },
+    { title: 'Profit Factor', value: risk.profit_factor },
   ];
 
   return (
@@ -823,7 +646,7 @@ const RiskTab: React.FC<{ results: BacktestResults }> = ({ results }) => {
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
               {card.title}
             </Typography>
-            <Typography variant="h5">{formatValueWithUnit(card.value, "plain", 3)}</Typography>
+            <Typography variant="h5">{formatValueWithUnit(card.value, 'plain', 3)}</Typography>
           </Paper>
         ))}
       </Stack>
@@ -845,85 +668,83 @@ const TradesTab: React.FC<{
     <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" rowGap={1.5}>
       <TextField
         select
-        label="Сторона"
+        label="РќР°РїСЂР°РІР»РµРЅРёРµ"
         size="small"
         value={side}
         onChange={(event) => onSideChange(event.target.value as TradeSide)}
         sx={{ width: 200 }}
       >
-        <MenuItem value="">Все</MenuItem>
+        <MenuItem value="">Р’СЃРµ</MenuItem>
         <MenuItem value="buy">Long</MenuItem>
         <MenuItem value="sell">Short</MenuItem>
       </TextField>
-      <Chip label={`Загружено: ${trades.length}${total != null ? ` из ${total}` : ""}`} />
+      <Chip label={`РћС‚РѕР±СЂР°Р¶РµРЅРѕ: ${trades.length}${total != null ? ` РёР· ${total}` : ''}`} />
       <Box flexGrow={1} />
       <Button variant="outlined" onClick={onExport} disabled={loading || trades.length === 0}>
-        Экспорт CSV
+        Р­РєСЃРїРѕСЂС‚ CSV
       </Button>
       <Button variant="contained" onClick={onLoadMore} disabled={loading || !canLoadMore}>
-        {loading ? "Загрузка" : "Загрузить ещё"}
+        {loading ? <CircularProgress size={18} /> : 'Р—Р°РіСЂСѓР·РёС‚СЊ РµС‰С‘'}
       </Button>
     </Stack>
 
     <Paper sx={{ p: 2 }}>
       {trades.length === 0 ? (
-        <Typography color="text.secondary">Нет сделок для отображения.</Typography>
+        <Typography color="text.secondary">РќРµС‚ СЃРґРµР»РѕРє РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ.</Typography>
       ) : (
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell></TableCell>
-              <TableCell>Этап</TableCell>
-              <TableCell>Время</TableCell>
-              <TableCell>Финансы</TableCell>
-              <TableCell>Накопительно</TableCell>
-              <TableCell>Дополнительно</TableCell>
+              <TableCell />
+              <TableCell>Р­С‚Р°Рї</TableCell>
+              <TableCell>Р’СЂРµРјСЏ</TableCell>
+              <TableCell>РџР°СЂР°РјРµС‚СЂС‹</TableCell>
+              <TableCell>РќР°РєРѕРїР»РµРЅРЅС‹Р№ PnL</TableCell>
+              <TableCell>Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕ</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {trades.map((trade, index) => (
               <React.Fragment key={trade.id ?? `${index}-${trade.entry_time}`}>
                 <TableRow hover>
-                  <TableCell rowSpan={2}>{index + 1}</TableCell>
-                  <TableCell>Вход</TableCell>
+                  <TableCell rowSpan={2}>{trades.length - index}</TableCell>
+                  <TableCell>Р’С…РѕРґ</TableCell>
                   <TableCell>{formatDateTime(trade.entry_time)}</TableCell>
                   <TableCell>
                     <Stack spacing={0.5}>
-                      <span>Цена: {formatValueWithUnit(trade.price, "usd")}</span>
-                      <span>Объём: {formatQuantity(trade.qty)}</span>
-                      <span>PnL: {formatValueWithUnit(trade.pnl, "usd")}</span>
-                      <span>PnL%: {formatValueWithUnit(trade.pnl_pct, "percent")}</span>
+                      <span>Р¦РµРЅР°: {formatValueWithUnit(trade.entry_price, 'usd')}</span>
+                      <span>РћР±СЉС‘Рј: {formatQuantity(trade.quantity)}</span>
                     </Stack>
                   </TableCell>
-                  <TableCell>{formatValueWithUnit(trade.cumulative, "usd")}</TableCell>
+                  <TableCell>{formatValueWithUnit(trade.cumulative_pnl, 'usd')}</TableCell>
                   <TableCell>
                     <Stack spacing={0.5}>
-                      <span>Сторона: {trade.side === "buy" ? "Long" : "Short"}</span>
-                      <span>Сигнал: {trade.signal || ""}</span>
+                      <span>РЎС‚РѕСЂРѕРЅР°: {trade.side === 'buy' ? 'Long' : 'Short'}</span>
+                      <span>РЎРёРіРЅР°Р»: {trade.signal || 'вЂ”'}</span>
                     </Stack>
                   </TableCell>
                 </TableRow>
-                <TableRow hover sx={{ backgroundColor: "action.hover" }}>
-                  <TableCell>Выход</TableCell>
+                <TableRow hover sx={{ backgroundColor: 'action.hover' }}>
+                  <TableCell>Р’С‹С…РѕРґ</TableCell>
                   <TableCell>{formatDateTime(trade.exit_time)}</TableCell>
                   <TableCell>
                     <Stack spacing={0.5}>
-                      <span>Комиссия: {formatValueWithUnit((trade as any).fee, "usd")}</span>
-                      <span>MFE: {formatValueWithUnit((trade as any).mfe, "usd")}</span>
-                      <span>MAE: {formatValueWithUnit((trade as any).mae, "usd")}</span>
+                      <span>PnL: {formatValueWithUnit(trade.pnl, 'usd')}</span>
+                      <span>PnL%: {formatValueWithUnit(trade.pnl_pct, 'percent')}</span>
+                      <span>РљРѕРјРёСЃСЃРёСЏ: {formatValueWithUnit((trade as any).fee, 'usd')}</span>
                     </Stack>
                   </TableCell>
                   <TableCell>
                     <Stack spacing={0.5}>
-                      <span>Длительность: {formatDuration((trade as any).duration_min)}</span>
-                      <span>Бары: {formatQuantity((trade as any).bars_held, 0)}</span>
+                      <span>Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ: {formatDuration((trade as any).duration_min)}</span>
+                      <span>Р‘Р°СЂРѕРІ: {formatQuantity((trade as any).bars_held, 0)}</span>
                     </Stack>
                   </TableCell>
                   <TableCell>
                     <Stack spacing={0.5}>
-                      <span>Макс. прибыль: {formatValueWithUnit((trade as any).peak, "usd")}</span>
-                      <span>Макс. просадка: {formatValueWithUnit((trade as any).drawdown, "usd")}</span>
-                      <span>Позиция: {formatQuantity(trade.position_size ?? trade.qty)}</span>
+                      <span>РњР°РєСЃ. РїРёРє: {formatValueWithUnit(trade.run_up, 'usd')}</span>
+                      <span>РњР°РєСЃ. РїСЂРѕСЃР°РґРєР°: {formatValueWithUnit(trade.drawdown, 'usd')}</span>
+                      <span>Р Р°Р·РјРµСЂ РїРѕР·РёС†РёРё: {formatQuantity(trade.quantity)}</span>
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -951,10 +772,10 @@ const BacktestDetailPage: React.FC = () => {
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [tradeLoading, setTradeLoading] = useState(false);
-  const [tradeSide, setTradeSide] = useState<TradeSide>("");
+  const [tradeSide, setTradeSide] = useState<TradeSide>('');
   const [trades, setTrades] = useState<EnrichedTrade[]>([]);
   const [tradesTotal, setTradesTotal] = useState<number | undefined>(undefined);
-  const [chartMode, setChartMode] = useState<ChartMode>("abs");
+  const [chartMode, setChartMode] = useState<ChartMode>('abs');
   const [showPnlBars, setShowPnlBars] = useState(true);
   const [showBuyHold, setShowBuyHold] = useState(true);
 
@@ -974,7 +795,10 @@ const BacktestDetailPage: React.FC = () => {
       const res = (data.results || {}) as BacktestResults;
       setResults(res ?? {});
     } catch (error: any) {
-      notify({ message: error?.friendlyMessage || "Не удалось загрузить тест", severity: "error" });
+      notify({
+        message: error?.friendlyMessage || 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ Р±СЌРєС‚РµСЃС‚',
+        severity: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -985,31 +809,32 @@ const BacktestDetailPage: React.FC = () => {
   }, [loadBacktest]);
 
   const chartData = useMemo<ChartDatum[]>(() => {
+    if (!results) return [];
     const map = new Map<number, ChartDatum>();
-    const equityRows = Array.isArray(results?.equity) ? results.equity : [];
+    const equityRows = Array.isArray(results.equity) ? results.equity : [];
     equityRows.forEach((row) => {
-      const ts = toTimestamp((row as any)?.time);
+      const ts = toTimestamp(row?.time);
       if (ts == null) return;
-      const entry = map.get(ts) ?? { timestamp: ts, label: "" };
-      const equityAbs = toFiniteNumber((row as any)?.equity);
+      const entry = map.get(ts) ?? { timestamp: ts, label: '' };
+      const equityAbs = toFiniteNumber(row?.equity);
       if (equityAbs != null) entry.equityAbs = equityAbs;
       map.set(ts, entry);
     });
 
-    const pnlRows = Array.isArray(results?.pnl_bars) ? results.pnl_bars : [];
+    const pnlRows = Array.isArray(results.pnl_bars) ? results.pnl_bars : [];
     pnlRows.forEach((row) => {
-      const ts = toTimestamp((row as any)?.time);
+      const ts = toTimestamp(row?.time);
       if (ts == null) return;
-      const entry = map.get(ts) ?? { timestamp: ts, label: "" };
-      const pnlAbs = toFiniteNumber((row as any)?.pnl);
+      const entry = map.get(ts) ?? { timestamp: ts, label: '' };
+      const pnlAbs = toFiniteNumber(row?.pnl);
       if (pnlAbs != null) entry.pnlAbs = pnlAbs;
       map.set(ts, entry);
     });
 
     const initial = toFiniteNumber(backtest?.initial_capital);
-    const buyHoldDiffAbs = toFiniteNumber(results?.dynamics?.all?.buyhold_abs);
+    const buyHoldDiffAbs = toFiniteNumber(results.dynamics?.all?.buyhold_abs);
     const buyHoldAbs = initial != null && buyHoldDiffAbs != null ? initial + buyHoldDiffAbs : null;
-    const buyHoldPctRaw = toFiniteNumber(results?.dynamics?.all?.buyhold_pct);
+    const buyHoldPctRaw = toFiniteNumber(results.dynamics?.all?.buyhold_pct);
 
     return Array.from(map.values())
       .sort((a, b) => a.timestamp - b.timestamp)
@@ -1018,18 +843,16 @@ const BacktestDetailPage: React.FC = () => {
           timestamp: entry.timestamp,
           label: formatDateTime(entry.timestamp),
         };
-        const equityAbs = entry.equityAbs;
-        if (equityAbs != null) {
-          datum.equityAbs = equityAbs;
+        if (entry.equityAbs != null) {
+          datum.equityAbs = entry.equityAbs;
           if (initial != null && initial !== 0) {
-            datum.equityPct = ((equityAbs - initial) / initial) * 100;
+            datum.equityPct = ((entry.equityAbs - initial) / initial) * 100;
           }
         }
-        const pnlAbs = entry.pnlAbs;
-        if (pnlAbs != null) {
-          datum.pnlAbs = pnlAbs;
+        if (entry.pnlAbs != null) {
+          datum.pnlAbs = entry.pnlAbs;
           if (initial != null && initial !== 0) {
-            datum.pnlPct = (pnlAbs / initial) * 100;
+            datum.pnlPct = (entry.pnlAbs / initial) * 100;
           }
         }
         if (buyHoldAbs != null) datum.buyHoldAbs = buyHoldAbs;
@@ -1058,22 +881,25 @@ const BacktestDetailPage: React.FC = () => {
         tradesLoadingRef.current = true;
         setTradeLoading(true);
         const offset = reset ? 0 : tradesRef.current.length;
-        const { items, total } = await BacktestsApi.trades(backtestId, {
+        const response = await BacktestsApi.trades(backtestId, {
           limit: TRADE_PAGE_SIZE,
           offset,
           side: tradeSide || undefined,
         });
+        const items = (response?.items ?? []) as Trade[];
         const normalized = items.map((item) => ({ ...item })) as EnrichedTrade[];
-        setTrades((prev) => (reset ? normalized : [...prev, ...normalized]));
-        if (typeof total === "number") {
-          setTradesTotal(total);
+        // Reverse order to show newest trades first
+        const reversed = [...normalized].reverse();
+        setTrades((prev) => (reset ? reversed : [...prev, ...reversed]));
+        if (typeof response?.total === 'number') {
+          setTradesTotal(response.total);
         } else if (reset) {
           setTradesTotal(normalized.length < TRADE_PAGE_SIZE ? normalized.length : undefined);
         }
       } catch (error: any) {
         notify({
-          message: error?.friendlyMessage || "Не удалось загрузить сделки",
-          severity: "error",
+          message: error?.friendlyMessage || 'РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃРґРµР»РєРё',
+          severity: 'error',
         });
       } finally {
         tradesLoadingRef.current = false;
@@ -1104,47 +930,49 @@ const BacktestDetailPage: React.FC = () => {
       let offset = 0;
       const all: EnrichedTrade[] = [];
       for (;;) {
-        const { items } = await BacktestsApi.trades(backtestId, {
+        const response = await BacktestsApi.trades(backtestId, {
           limit: TRADE_PAGE_SIZE,
           offset,
           side: tradeSide || undefined,
         });
-        all.push(...(items as EnrichedTrade[]));
+        const items = (response?.items ?? []) as EnrichedTrade[];
+        if (items.length === 0) break;
+        all.push(...items);
         if (items.length < TRADE_PAGE_SIZE) break;
         offset += items.length;
       }
       if (all.length === 0) {
-        notify({ message: "Нет данных для экспорта", severity: "info" });
+        notify({ message: 'РќРµС‚ СЃРґРµР»РѕРє РґР»СЏ СЌРєСЃРїРѕСЂС‚Р°', severity: 'info' });
         return;
       }
       const header = [
-        "id",
-        "entry_time",
-        "exit_time",
-        "side",
-        "price",
-        "qty",
-        "pnl",
-        "pnl_pct",
-        "fee",
-        "signal",
-        "duration_min",
-        "bars_held",
+        'id',
+        'entry_time',
+        'exit_time',
+        'side',
+        'price',
+        'qty',
+        'pnl',
+        'pnl_pct',
+        'fee',
+        'signal',
+        'duration_min',
+        'bars_held',
       ];
       const rows = all.map((trade) =>
         header
           .map((key) => {
             const val = (trade as any)[key];
-            if (val == null) return "";
+            if (val == null) return '';
             if (val instanceof Date) return val.toISOString();
             return String(val);
           })
-          .join(";")
+          .join(';')
       );
-      const csv = [header.join(";"), ...rows].join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const csv = [header.join(';'), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = url;
       link.download = `backtest-${backtestId}-trades.csv`;
       document.body.appendChild(link);
@@ -1152,34 +980,33 @@ const BacktestDetailPage: React.FC = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error: any) {
-      notify({ message: error?.friendlyMessage || "Ошибка экспорта", severity: "error" });
+      notify({ message: error?.friendlyMessage || 'РћС€РёР±РєР° СЌРєСЃРїРѕСЂС‚Р°', severity: 'error' });
     } finally {
       tradesLoadingRef.current = false;
       setTradeLoading(false);
     }
   }, [backtestId, tradeSide, notify]);
 
-  const resultsSafe = results ?? {};
-
   if (backtestId == null) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Typography variant="h4">Детали теста</Typography>
-        <Typography color="error" sx={{ mt: 2 }}>
-          Некорректный идентификатор теста.
-        </Typography>
+      <Container sx={{ py: 4 }}>
+        <Alert severity="warning">РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р±СЌРєС‚РµСЃС‚Р°.</Alert>
       </Container>
     );
   }
 
+  const resultsSafe = results ?? {};
+
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4">Детали теста</Typography>
-      {loading && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Загрузка данных
-        </Typography>
-      )}
+    <Container sx={{ py: 3 }}>
+      <Stack direction="row" alignItems="center" spacing={2}>
+        <Typography variant="h4">Backtest #{backtestId}</Typography>
+        {loading ? <LinearProgress sx={{ flexGrow: 1, maxWidth: 240 }} /> : null}
+      </Stack>
+      <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 0.5 }}>
+        РЎС‚СЂР°С‚РµРіРёСЏ: {backtest?.strategy_id ?? 'вЂ”'}
+      </Typography>
+
       <Tabs
         value={tab}
         onChange={(_, next) => setTab(next)}
@@ -1187,11 +1014,11 @@ const BacktestDetailPage: React.FC = () => {
         scrollButtons="auto"
         sx={{ mt: 2 }}
       >
-        <Tab label="Обзор" />
-        <Tab label="Динамика" />
-        <Tab label="Анализ сделок" />
-        <Tab label="Коэффициенты риска/эффективности" sx={{ whiteSpace: "nowrap" }} />
-        <Tab label="Список сделок" />
+        <Tab label="РћР±Р·РѕСЂ" />
+        <Tab label="Р”РёРЅР°РјРёРєР°" />
+        <Tab label="РђРЅР°Р»РёР· СЃРґРµР»РѕРє" />
+        <Tab label="Р РёСЃРє" />
+        <Tab label="РЎРґРµР»РєРё" />
       </Tabs>
 
       {tab === 0 && (

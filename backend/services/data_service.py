@@ -198,7 +198,7 @@ class DataService:
         leverage: int = 1,
         commission: float = 0.0006,
         config: dict[str, Any] | None = None,
-        status: str = "pending",
+        status: str = "queued",
     ) -> Backtest:
         """
         Создать новый бэктест
@@ -462,6 +462,11 @@ class DataService:
         exit_price: float | None = None,
         pnl: float | None = None,
         pnl_pct: float | None = None,
+        run_up: float | None = None,
+        run_up_pct: float | None = None,
+        drawdown: float | None = None,
+        drawdown_pct: float | None = None,
+        cumulative_pnl: float | None = None,
         commission: float | None = None,
         exit_reason: str | None = None,
         meta: dict[str, Any] | None = None,
@@ -493,14 +498,17 @@ class DataService:
             side=side,
             entry_price=entry_price,
             quantity=quantity,
-            position_size=position_size,
+            # position_size parameter kept for API compatibility but not stored in DB
             exit_time=exit_time,
             exit_price=exit_price,
             pnl=pnl,
             pnl_pct=pnl_pct,
-            commission=commission,
-            exit_reason=exit_reason,
-            meta=meta,
+            run_up=run_up,
+            run_up_pct=run_up_pct,
+            drawdown=drawdown,
+            drawdown_pct=drawdown_pct,
+            cumulative_pnl=cumulative_pnl,
+            # commission, exit_reason, meta not in model - skipped
         )
         self.db.add(trade)
         self.db.commit()
