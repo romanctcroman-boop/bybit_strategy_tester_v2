@@ -422,7 +422,7 @@ def get_equity_curve_chart(
         if not bt:
             raise HTTPException(status_code=404, detail="Backtest not found")
         
-        if not bt.results or bt.status != 'completed':
+        if bt.status != 'completed':
             raise HTTPException(
                 status_code=400,
                 detail="Backtest must be completed to generate charts"
@@ -476,7 +476,7 @@ def get_drawdown_overlay_chart(backtest_id: int):
         if not bt:
             raise HTTPException(status_code=404, detail="Backtest not found")
         
-        if not bt.results or bt.status != 'completed':
+        if bt.status != 'completed':
             raise HTTPException(
                 status_code=400,
                 detail="Backtest must be completed to generate charts"
@@ -529,7 +529,7 @@ def get_pnl_distribution_chart(
         if not bt:
             raise HTTPException(status_code=404, detail="Backtest not found")
         
-        if not bt.results or bt.status != 'completed':
+        if bt.status != 'completed':
             raise HTTPException(
                 status_code=400,
                 detail="Backtest must be completed to generate charts"
