@@ -25,7 +25,7 @@ from backend.optimization.walk_forward import (
 @pytest.fixture
 def sample_data():
     """Генерирует тестовые OHLCV данные"""
-    dates = pd.date_range(start='2024-01-01', periods=500, freq='1H')
+    dates = pd.date_range(start='2024-01-01', periods=500, freq='1h')
     
     # Генерируем синтетические данные с трендом
     np.random.seed(42)
@@ -172,7 +172,7 @@ def test_wfo_insufficient_data(simple_param_ranges, mock_backtest_engine):
         'low': [99] * 50,
         'close': [100] * 50,
         'volume': [1000] * 50,
-    }, index=pd.date_range('2024-01-01', periods=50, freq='1H'))
+    }, index=pd.date_range('2024-01-01', periods=50, freq='1h'))
     
     config = WFOConfig(
         in_sample_size=100,

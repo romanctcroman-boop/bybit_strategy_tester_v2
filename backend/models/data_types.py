@@ -6,7 +6,7 @@ Pydantic Models для валидации данных
 на входе/выходе всех модулей системы.
 """
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from datetime import datetime
 from typing import Literal, Optional, Any, Dict, List
 from enum import Enum
@@ -42,8 +42,8 @@ class OHLCVCandle(BaseModel):
         
         return self
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "timestamp": 1719847200000,
                 "time": "2025-07-01T16:15:00Z",
@@ -55,6 +55,7 @@ class OHLCVCandle(BaseModel):
                 "turnover": 5678901.23
             }
         }
+    )
 
 
 # ============================================================================
@@ -101,9 +102,9 @@ class TradeEntry(BaseModel):
             raise ValueError('Date must be in format YYYY-MM-DD HH:MM')
         return v
     
-    class Config:
-        use_enum_values = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        use_enum_values=True,
+        json_schema_extra={
             "example": {
                 "trade_number": 1,
                 "type": "Exit long",
@@ -122,6 +123,7 @@ class TradeEntry(BaseModel):
                 "cumulative_pl_percent": 0.08
             }
         }
+    )
 
 
 # ============================================================================
@@ -151,8 +153,8 @@ class PerformanceMetrics(BaseModel):
     max_equity_drawdown_percent: float = Field(..., ge=0)
     max_contracts_held: int = Field(..., ge=0, description="Макс. позиций одновременно")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "open_pl_usdt": -4.22,
                 "open_pl_percent": -0.30,
@@ -172,6 +174,7 @@ class PerformanceMetrics(BaseModel):
                 "max_contracts_held": 18
             }
         }
+    )
 
 
 class RiskPerformanceRatios(BaseModel):
@@ -198,8 +201,8 @@ class RiskPerformanceRatios(BaseModel):
             raise ValueError('Sharpe ratio seems unrealistic (> 10)')
         return v
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "sharpe_ratio": 1.59,
                 "sortino_ratio": 2.13,
@@ -207,6 +210,7 @@ class RiskPerformanceRatios(BaseModel):
                 "margin_calls": 0
             }
         }
+    )
 
 
 class TradesAnalysis(BaseModel):
@@ -245,8 +249,8 @@ class TradesAnalysis(BaseModel):
             )
         return self
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "total_trades": 331,
                 "total_open_trades": 2,
@@ -269,6 +273,7 @@ class TradesAnalysis(BaseModel):
                 "avg_bars_in_losing_trades": 75
             }
         }
+    )
 
 
 # ============================================================================
@@ -290,8 +295,7 @@ class CapitalConfig(BaseModel):
     position_sizing: PositionSizing
     risk_per_trade: float = Field(..., gt=0, le=100, description="Риск на сделку в %")
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class SignalType(str, Enum):
@@ -307,8 +311,7 @@ class Signal(BaseModel):
     type: SignalType
     params: Dict[str, Any] = Field(default_factory=dict)
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class FilterType(str, Enum):
@@ -325,8 +328,7 @@ class Filter(BaseModel):
     type: FilterType
     params: Dict[str, Any] = Field(default_factory=dict)
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class EntryConditions(BaseModel):
@@ -450,8 +452,8 @@ class BacktestResults(BaseModel):
     # Equity curve (list of dicts or floats, flexible)
     equity_curve: List[Any] = Field(default_factory=list)
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "final_capital": 10424.19,
                 "total_return": 0.4242,
@@ -470,3 +472,4 @@ class BacktestResults(BaseModel):
                 }
             }
         }
+    )
