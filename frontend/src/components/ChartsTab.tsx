@@ -21,7 +21,7 @@ type ChartType = 'equity' | 'drawdown' | 'pnl';
 
 /**
  * Charts Tab Component (ТЗ 3.7.2)
- * 
+ *
  * Displays interactive Plotly charts:
  * - Equity Curve (with optional drawdown subplot)
  * - Drawdown Overlay (dual y-axis)
@@ -173,11 +173,7 @@ const ChartsTab: React.FC<ChartsTabProps> = ({ backtestId }) => {
           {errorEquity ? (
             <Alert severity="error">{errorEquity}</Alert>
           ) : (
-            <PlotlyChart
-              plotlyJson={equityData}
-              height={450}
-              loading={loadingEquity}
-            />
+            <PlotlyChart plotlyJson={equityData} height={450} loading={loadingEquity} />
           )}
         </Paper>
       )}
@@ -192,11 +188,7 @@ const ChartsTab: React.FC<ChartsTabProps> = ({ backtestId }) => {
           {errorDrawdown ? (
             <Alert severity="error">{errorDrawdown}</Alert>
           ) : (
-            <PlotlyChart
-              plotlyJson={drawdownData}
-              height={450}
-              loading={loadingDrawdown}
-            />
+            <PlotlyChart plotlyJson={drawdownData} height={450} loading={loadingDrawdown} />
           )}
         </Paper>
       )}
@@ -224,11 +216,7 @@ const ChartsTab: React.FC<ChartsTabProps> = ({ backtestId }) => {
           {errorPnl ? (
             <Alert severity="error">{errorPnl}</Alert>
           ) : (
-            <PlotlyChart
-              plotlyJson={pnlData}
-              height={400}
-              loading={loadingPnl}
-            />
+            <PlotlyChart plotlyJson={pnlData} height={400} loading={loadingPnl} />
           )}
         </Paper>
       )}

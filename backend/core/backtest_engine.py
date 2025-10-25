@@ -15,6 +15,21 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from pydantic import ValidationError
+
+# Импорт Pydantic моделей для валидации
+try:
+    from backend.models.data_types import (
+        BacktestResults,
+        PerformanceMetrics,
+        TradesAnalysis,
+        RiskPerformanceRatios,
+        OHLCVCandle,
+    )
+    PYDANTIC_VALIDATION_ENABLED = True
+except ImportError:
+    logger.warning("Pydantic models not found, validation disabled")
+    PYDANTIC_VALIDATION_ENABLED = False
 
 logger = logging.getLogger(__name__)
 
@@ -634,7 +649,8 @@ class BacktestEngine:
             sortino_ratio = 0.0
         
         # Buy & Hold return
-        buy_hold_return = ((df['close'].iloc[-1] / df['close'].iloc[0]) - 1) * 100.0
+        buy_hold_return_pct = ((df['close'].iloc[-1] / df['close'].iloc[0]) - 1) * 100.0
+        buy_hold_return_usdt = (buy_hold_return_pct / 100.0) * self.initial_capital
         
         # Average stats
         avg_pnl = net_profit / total_trades if total_trades > 0 else 0.0
@@ -649,7 +665,7 @@ class BacktestEngine:
         avg_bars_loss = np.mean([t.bars_held for t in losing_trades]) if losing_trades else 0.0
         
         # Build result matching expected format
-        return {
+        results = {
             'final_capital': float(final_capital),
             'total_return': float(total_return / 100.0),  # as decimal
             'total_trades': int(total_trades),
@@ -672,7 +688,8 @@ class BacktestEngine:
                 'max_drawdown_pct': float(max_drawdown_pct),
                 'max_runup_abs': float(max_runup_abs),
                 'max_runup_pct': float(max_runup_pct),
-                'buy_hold_return': float(buy_hold_return),
+                'buy_hold_return': float(buy_hold_return_usdt),
+                'buy_hold_return_pct': float(buy_hold_return_pct),
                 'avg_pnl': float(avg_pnl),
                 'avg_win': float(avg_win),
                 'avg_loss': float(avg_loss),
@@ -715,6 +732,21 @@ class BacktestEngine:
                 for point in state.equity_curve
             ] if state.equity_curve else [],
         }
+        
+        # Валидация результатов через Pydantic (если включено)
+        if PYDANTIC_VALIDATION_ENABLED:
+            try:
+                validated = BacktestResults(**results)
+                logger.info(f"✓ BacktestResults validation passed: {validated.total_trades} trades, "
+                           f"Win rate {validated.win_rate:.2f}%, Sharpe {validated.sharpe_ratio:.2f}")
+                # Преобразуем обратно в dict для совместимости
+                results = validated.model_dump()
+            except ValidationError as e:
+                logger.error(f"⚠ BacktestResults validation FAILED: {e}")
+                # В продакшене можно вообще raise ValidationError,
+                # но пока просто предупреждаем
+        
+        return results
     
     def _empty_result(self) -> dict[str, Any]:
         """Результат для пустого бэктеста."""

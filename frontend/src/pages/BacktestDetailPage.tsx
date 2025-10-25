@@ -375,7 +375,9 @@ const OverviewTab: React.FC<{
   onTogglePnlBars: (checked: boolean) => void;
   showBuyHold: boolean;
   onToggleBuyHold: (checked: boolean) => void;
-  onDownloadCSV: (reportType: 'performance' | 'risk_ratios' | 'trades_analysis' | 'list_of_trades') => void;
+  onDownloadCSV: (
+    reportType: 'performance' | 'risk_ratios' | 'trades_analysis' | 'list_of_trades'
+  ) => void;
 }> = ({
   backtest,
   results,

@@ -250,8 +250,9 @@ class ReportGenerator:
         ])
         
         # Buy & hold return
-        buy_hold_return = self.results.get('buy_hold_return', 0)
-        buy_hold_pct = self.results.get('buy_hold_return_pct', 0)
+        metrics = self.results.get('metrics', {})
+        buy_hold_return = metrics.get('buy_hold_return', 0)
+        buy_hold_pct = metrics.get('buy_hold_return_pct', 0)
         writer.writerow([
             'Buy & hold return',
             f"{buy_hold_return:.2f}",

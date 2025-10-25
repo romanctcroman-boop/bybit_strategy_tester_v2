@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Box, CircularProgress, Typography } from '@mui/material';
+import type { PlotlyHTMLElement } from 'plotly.js-basic-dist-min';
 
 interface PlotlyChartProps {
   /**
@@ -33,17 +34,19 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
   error = null,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const plotRef = useRef<any>(null);
+  const plotRef = useRef<PlotlyHTMLElement | null>(null);
 
   useEffect(() => {
     if (!plotlyJson || !containerRef.current) {
       return;
     }
 
+    const containerElement = containerRef.current;
+
     // Dynamic import Plotly to reduce bundle size
     import('plotly.js-basic-dist-min')
       .then((Plotly) => {
-        if (!containerRef.current) return;
+        if (!containerElement) return;
 
         try {
           // Parse JSON from backend
@@ -52,17 +55,17 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
           // Render or update plot
           if (plotRef.current) {
             // Update existing plot
-            Plotly.react(containerRef.current, figure.data, figure.layout || {}, {
+            Plotly.react(containerElement, figure.data, figure.layout || {}, {
               responsive: true,
             });
           } else {
             // Create new plot
-            Plotly.newPlot(containerRef.current, figure.data, figure.layout || {}, {
+            Plotly.newPlot(containerElement, figure.data, figure.layout || {}, {
               responsive: true,
               displayModeBar: true,
               modeBarButtonsToRemove: ['toImage'],
               displaylogo: false,
-            }).then((plot) => {
+            }).then((plot: PlotlyHTMLElement) => {
               plotRef.current = plot;
             });
           }
@@ -76,12 +79,14 @@ const PlotlyChart: React.FC<PlotlyChartProps> = ({
 
     // Cleanup on unmount
     return () => {
-      if (plotRef.current && containerRef.current) {
-        import('plotly.js-basic-dist-min').then((Plotly) => {
-          if (containerRef.current) {
-            Plotly.purge(containerRef.current);
-          }
-        });
+      if (plotRef.current && containerElement) {
+        import('plotly.js-basic-dist-min')
+          .then((Plotly) => {
+            Plotly.purge(containerElement);
+          })
+          .catch((err) => {
+            console.error('Error cleaning up Plotly:', err);
+          });
         plotRef.current = null;
       }
     };
