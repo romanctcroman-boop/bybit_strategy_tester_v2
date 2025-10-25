@@ -3,9 +3,11 @@
 ## Changes Made
 
 ### 1. OptimizationsPage.tsx - Complete Redesign
+
 **Location**: `frontend/src/pages/OptimizationsPage.tsx`
 
 **New Features**:
+
 - ✅ **Enhanced Results Table** with sortable columns (Score, Sharpe, Max DD, Trades, Win Rate)
 - ✅ **Heatmap Visualization** using Plotly (TP% vs SL% with Score as color)
 - ✅ **Tabbed Interface** for Results/Heatmap/Best Result views
@@ -16,12 +18,14 @@
 - ✅ **Validation Rules Configuration** (Min Trades, Max Drawdown)
 
 **Components Added**:
+
 - NewOptimizationDialog with full form (Grid layout, MUI components)
 - Sortable TableHead with TableSortLabel for each metric
 - Tabs for switching between Results Table, Heatmap, and Best Result
 - Alert component for combinations preview
 
 **UI/UX Improvements**:
+
 - Sticky table headers for better scrolling
 - Hover effects on table rows
 - Better spacing and typography
@@ -29,40 +33,46 @@
 - MUI "maxWidth=xl" for wider layout
 
 ### 2. PlotlyChart.tsx - Enhanced Component
+
 **Location**: `frontend/src/components/PlotlyChart.tsx`
 
 **Changes**:
+
 - ✅ Support for **both** JSON string (from backend) and direct data/layout objects
 - ✅ New props: `data?: any[]`, `layout?: any`
 - ✅ Backward compatible with existing `plotlyJson` prop
 - ✅ Better error handling and null checks
 
 ### 3. Data Type Fixes
+
 **Fixed API Type Mismatches**:
+
 - Changed `r.parameters` → `r.params` (matches `OptimizationResult` type)
 - Changed `o.method` → `o.optimization_type` (matches `Optimization` type)
 - Added optional chaining (`?.`) for safety
 
 ## Features Implementation Status
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Parameter Range Form | ✅ Complete | Start/Stop/Step for TP, SL, Trailing |
-| Heatmap Visualization | ✅ Complete | Plotly heatmap (TP vs SL) |
-| Sortable Results Table | ✅ Complete | 5 sortable columns with direction toggle |
-| Total Combinations Calculator | ✅ Complete | Real-time calculation with time estimate |
-| Score Function Selection | ✅ Complete | Dropdown with 3 options |
-| Validation Rules | ✅ Complete | Min Trades, Max Drawdown inputs |
-| Create New Optimization | ⏸️ Backend Pending | Form ready, needs POST /optimizations API |
+| Feature                       | Status             | Notes                                     |
+| ----------------------------- | ------------------ | ----------------------------------------- |
+| Parameter Range Form          | ✅ Complete        | Start/Stop/Step for TP, SL, Trailing      |
+| Heatmap Visualization         | ✅ Complete        | Plotly heatmap (TP vs SL)                 |
+| Sortable Results Table        | ✅ Complete        | 5 sortable columns with direction toggle  |
+| Total Combinations Calculator | ✅ Complete        | Real-time calculation with time estimate  |
+| Score Function Selection      | ✅ Complete        | Dropdown with 3 options                   |
+| Validation Rules              | ✅ Complete        | Min Trades, Max Drawdown inputs           |
+| Create New Optimization       | ⏸️ Backend Pending | Form ready, needs POST /optimizations API |
 
 ## Known Limitations
 
 1. **Backend API Missing**: The `handleCreateOptimization()` function currently shows an info message. Need backend endpoint:
+
    ```
    POST /optimizations
    Body: { strategy_id, param_ranges, score_function, validation_rules, ... }
    Response: { id, ... }
    ```
+
    Then call `runGrid(optimization_id, payload)` to start the task.
 
 2. **Heatmap Limited to TP vs SL**: Currently only shows 2D heatmap for TP% vs SL%. Could extend to 3D for trailing parameters.
@@ -80,6 +90,7 @@ frontend/OPTIMIZATION_UI_CHANGES.md             NEW (this file)
 ## Testing Instructions
 
 1. **Start Frontend**:
+
    ```powershell
    cd frontend
    npm run dev
@@ -105,6 +116,7 @@ frontend/OPTIMIZATION_UI_CHANGES.md             NEW (this file)
 ## ТЗ Compliance
 
 **Section 9.1 MVP - Visualization**:
+
 - ✅ Optimization heatmaps implemented
 - ✅ Interactive Plotly charts
 - ✅ Sortable results tables

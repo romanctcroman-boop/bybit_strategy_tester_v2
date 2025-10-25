@@ -13,6 +13,26 @@ interface TradeMarker {
   time: number;
   side: 'buy' | 'sell';
   price: number;
+  tp_price?: number;
+  sl_price?: number;
+  exit_price?: number;
+  exit_time?: number;
+  // Enhanced marker display (ТЗ 9.2 Step 3)
+  pnl?: number; // Profit/Loss amount
+  pnl_percent?: number; // P&L percentage
+  size?: number; // Trade size (for marker scaling)
+  label?: string; // Custom marker label
+  color?: string; // Override marker color
+  is_entry?: boolean; // True for entry, false for exit
+}
+
+interface PriceLine {
+  price: number;
+  color: string;
+  lineWidth?: number;
+  lineStyle?: 'solid' | 'dotted' | 'dashed';
+  axisLabelVisible?: boolean;
+  title?: string;
 }
 interface Props {
   candles: Candle[];
@@ -40,6 +60,13 @@ interface Props {
   volumeScale?: 'left' | 'right';
   // Request more data when user scrolls to edges
   onNeedMore?: (dir: 'left' | 'right', fromTimeSec: number) => void | Promise<void>;
+  // TP/SL price lines (ТЗ 9.2)
+  showTPSL?: boolean;
+  priceLines?: PriceLine[];
+  // Enhanced markers (ТЗ 9.2 Step 3)
+  showMarkerTooltips?: boolean; // Show P&L in tooltips
+  scaleMarkersBySize?: boolean; // Scale marker size by trade size
+  showExitMarkers?: boolean; // Show separate exit markers
 }
 
 const TradingViewChart: React.FC<Props> = ({
@@ -58,6 +85,11 @@ const TradingViewChart: React.FC<Props> = ({
   showVolume = false,
   volumeScale = 'left',
   onNeedMore,
+  showTPSL = false,
+  priceLines = [],
+  showMarkerTooltips = true,
+  scaleMarkersBySize = false,
+  showExitMarkers = true,
 }) => {
   const ref = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<any>(null);
@@ -66,6 +98,7 @@ const TradingViewChart: React.FC<Props> = ({
   const sma50Ref = useRef<any>(null);
   const roRef = useRef<ResizeObserver | null>(null);
   const volumeRef = useRef<any>(null);
+  const priceLinesRef = useRef<any[]>([]);
   const [legend, setLegend] = useState<{
     time: string;
     price: number | { open: number; high: number; low: number; close: number };
@@ -249,17 +282,156 @@ const TradingViewChart: React.FC<Props> = ({
           volumeRef.current.setData(vdata as any);
         } catch {}
       }
+
+      // Enhanced Trade Markers (ТЗ 9.2 Step 3)
       if (markers.length) {
-        series.setMarkers(
-          markers.map((m) => ({
+        const enhancedMarkers = markers.map((m) => {
+          // Determine if this is entry or exit marker
+          const isEntry = m.is_entry !== undefined ? m.is_entry : !m.exit_time;
+
+          // Base marker configuration
+          let markerConfig: any = {
             time: Math.floor(m.time),
             position: m.side === 'buy' ? 'belowBar' : 'aboveBar',
-            color: m.side === 'buy' ? '#2e7d32' : '#c62828',
-            shape: m.side === 'buy' ? 'arrowUp' : 'arrowDown',
-            text: `${m.side.toUpperCase()} ${m.price}`,
-          })) as any
-        );
+          };
+
+          // Color logic
+          if (m.color) {
+            markerConfig.color = m.color;
+          } else if (isEntry) {
+            // Entry markers: green for buy, red for sell
+            markerConfig.color = m.side === 'buy' ? '#2e7d32' : '#c62828';
+          } else {
+            // Exit markers: different shades based on P&L
+            if (m.pnl !== undefined) {
+              markerConfig.color = m.pnl >= 0 ? '#1976d2' : '#d32f2f';
+            } else {
+              markerConfig.color = m.side === 'buy' ? '#1976d2' : '#ff6f00';
+            }
+          }
+
+          // Shape logic
+          if (isEntry) {
+            markerConfig.shape = m.side === 'buy' ? 'arrowUp' : 'arrowDown';
+          } else {
+            // Exit markers: circles for exits
+            markerConfig.shape = showExitMarkers
+              ? 'circle'
+              : m.side === 'buy'
+                ? 'arrowDown'
+                : 'arrowUp';
+          }
+
+          // Size scaling
+          if (scaleMarkersBySize && m.size !== undefined) {
+            // Normalize size: 0.5 to 2.0 scale
+            const normalizedSize = Math.max(0.5, Math.min(2.0, m.size / 1.0));
+            markerConfig.size = normalizedSize;
+          }
+
+          // Text/Tooltip
+          if (m.label) {
+            markerConfig.text = m.label;
+          } else if (showMarkerTooltips) {
+            if (isEntry) {
+              markerConfig.text = `${m.side.toUpperCase()} ${m.price.toFixed(2)}`;
+            } else if (m.pnl !== undefined && m.pnl_percent !== undefined) {
+              const pnlSign = m.pnl >= 0 ? '+' : '';
+              markerConfig.text = `EXIT ${m.price.toFixed(2)} (${pnlSign}${m.pnl_percent.toFixed(2)}%)`;
+            } else {
+              markerConfig.text = `EXIT ${m.price.toFixed(2)}`;
+            }
+          } else {
+            markerConfig.text = `${m.side.toUpperCase()} ${m.price.toFixed(2)}`;
+          }
+
+          return markerConfig;
+        });
+
+        series.setMarkers(enhancedMarkers as any);
       }
+
+      // TP/SL Price Lines (ТЗ 9.2)
+      if (showTPSL && markers.length) {
+        // Clear existing price lines
+        priceLinesRef.current.forEach((line) => {
+          try {
+            series.removePriceLine(line);
+          } catch {}
+        });
+        priceLinesRef.current = [];
+
+        // Add TP/SL lines for each trade marker
+        markers.forEach((marker) => {
+          // Take Profit line
+          if (marker.tp_price) {
+            try {
+              const tpLine = series.createPriceLine({
+                price: marker.tp_price,
+                color: '#4caf50',
+                lineWidth: 2,
+                lineStyle: 2, // Dashed
+                axisLabelVisible: true,
+                title: `TP: ${marker.tp_price.toFixed(2)}`,
+              });
+              priceLinesRef.current.push(tpLine);
+            } catch {}
+          }
+
+          // Stop Loss line
+          if (marker.sl_price) {
+            try {
+              const slLine = series.createPriceLine({
+                price: marker.sl_price,
+                color: '#f44336',
+                lineWidth: 2,
+                lineStyle: 2, // Dashed
+                axisLabelVisible: true,
+                title: `SL: ${marker.sl_price.toFixed(2)}`,
+              });
+              priceLinesRef.current.push(slLine);
+            } catch {}
+          }
+
+          // Exit line (if different from TP/SL)
+          if (
+            marker.exit_price &&
+            marker.exit_price !== marker.tp_price &&
+            marker.exit_price !== marker.sl_price
+          ) {
+            try {
+              const exitLine = series.createPriceLine({
+                price: marker.exit_price,
+                color: '#2196f3',
+                lineWidth: 2,
+                lineStyle: 1, // Dotted
+                axisLabelVisible: true,
+                title: `Exit: ${marker.exit_price.toFixed(2)}`,
+              });
+              priceLinesRef.current.push(exitLine);
+            } catch {}
+          }
+        });
+      }
+
+      // Custom price lines
+      if (priceLines.length) {
+        priceLines.forEach((pl) => {
+          try {
+            const lineStyle = pl.lineStyle === 'dotted' ? 1 : pl.lineStyle === 'dashed' ? 2 : 0;
+            const line = series.createPriceLine({
+              price: pl.price,
+              color: pl.color,
+              lineWidth: pl.lineWidth || 2,
+              lineStyle: lineStyle,
+              axisLabelVisible: pl.axisLabelVisible !== false,
+              title: pl.title || '',
+            });
+            priceLinesRef.current.push(line);
+          } catch {}
+        });
+      }
+
       chart.timeScale().fitContent();
 
       // Track container size changes, including user-resize of wrapper
@@ -418,26 +590,179 @@ const TradingViewChart: React.FC<Props> = ({
     }
   }, [candles, showSMA20, showSMA50, chartType, showVolume]);
 
+  // Enhanced markers update (ТЗ 9.2 Step 3)
   useEffect(() => {
     if (!seriesRef.current) return;
     try {
       if (markers.length) {
-        seriesRef.current.setMarkers(
-          markers.map((m: any) => ({
+        const enhancedMarkers = markers.map((m) => {
+          // Determine if this is entry or exit marker
+          const isEntry = m.is_entry !== undefined ? m.is_entry : !m.exit_time;
+
+          // Base marker configuration
+          let markerConfig: any = {
             time: Math.floor(m.time),
             position: m.side === 'buy' ? 'belowBar' : 'aboveBar',
-            color: m.side === 'buy' ? '#2e7d32' : '#c62828',
-            shape: m.side === 'buy' ? 'arrowUp' : 'arrowDown',
-            text: `${m.side.toUpperCase()} ${m.price}`,
-          })) as any
-        );
+          };
+
+          // Color logic
+          if (m.color) {
+            markerConfig.color = m.color;
+          } else if (isEntry) {
+            // Entry markers: green for buy, red for sell
+            markerConfig.color = m.side === 'buy' ? '#2e7d32' : '#c62828';
+          } else {
+            // Exit markers: different shades based on P&L
+            if (m.pnl !== undefined) {
+              markerConfig.color = m.pnl >= 0 ? '#1976d2' : '#d32f2f';
+            } else {
+              markerConfig.color = m.side === 'buy' ? '#1976d2' : '#ff6f00';
+            }
+          }
+
+          // Shape logic
+          if (isEntry) {
+            markerConfig.shape = m.side === 'buy' ? 'arrowUp' : 'arrowDown';
+          } else {
+            // Exit markers: circles for exits
+            markerConfig.shape = showExitMarkers
+              ? 'circle'
+              : m.side === 'buy'
+                ? 'arrowDown'
+                : 'arrowUp';
+          }
+
+          // Size scaling
+          if (scaleMarkersBySize && m.size !== undefined) {
+            // Normalize size: 0.5 to 2.0 scale
+            const normalizedSize = Math.max(0.5, Math.min(2.0, m.size / 1.0));
+            markerConfig.size = normalizedSize;
+          }
+
+          // Text/Tooltip
+          if (m.label) {
+            markerConfig.text = m.label;
+          } else if (showMarkerTooltips) {
+            if (isEntry) {
+              markerConfig.text = `${m.side.toUpperCase()} ${m.price.toFixed(2)}`;
+            } else if (m.pnl !== undefined && m.pnl_percent !== undefined) {
+              const pnlSign = m.pnl >= 0 ? '+' : '';
+              markerConfig.text = `EXIT ${m.price.toFixed(2)} (${pnlSign}${m.pnl_percent.toFixed(2)}%)`;
+            } else {
+              markerConfig.text = `EXIT ${m.price.toFixed(2)}`;
+            }
+          } else {
+            markerConfig.text = `${m.side.toUpperCase()} ${m.price.toFixed(2)}`;
+          }
+
+          return markerConfig;
+        });
+
+        seriesRef.current.setMarkers(enhancedMarkers as any);
       } else {
         seriesRef.current.setMarkers([]);
       }
     } catch {
       console.error('Failed to update markers');
     }
-  }, [markers]);
+  }, [markers, showMarkerTooltips, scaleMarkersBySize, showExitMarkers]);
+
+  // Update TP/SL price lines when markers or priceLines change (ТЗ 9.2)
+  useEffect(() => {
+    if (!seriesRef.current) return;
+
+    try {
+      // Clear existing price lines
+      priceLinesRef.current.forEach((line) => {
+        try {
+          seriesRef.current.removePriceLine(line);
+        } catch {}
+      });
+      priceLinesRef.current = [];
+
+      // Add TP/SL lines for each trade marker
+      if (showTPSL && markers.length) {
+        markers.forEach((marker) => {
+          // Take Profit line
+          if (marker.tp_price) {
+            try {
+              const tpLine = seriesRef.current.createPriceLine({
+                price: marker.tp_price,
+                color: '#4caf50',
+                lineWidth: 2,
+                lineStyle: 2, // Dashed
+                axisLabelVisible: true,
+                title: `TP: ${marker.tp_price.toFixed(2)}`,
+              });
+              priceLinesRef.current.push(tpLine);
+            } catch (e) {
+              console.debug('Failed to create TP line:', e);
+            }
+          }
+
+          // Stop Loss line
+          if (marker.sl_price) {
+            try {
+              const slLine = seriesRef.current.createPriceLine({
+                price: marker.sl_price,
+                color: '#f44336',
+                lineWidth: 2,
+                lineStyle: 2, // Dashed
+                axisLabelVisible: true,
+                title: `SL: ${marker.sl_price.toFixed(2)}`,
+              });
+              priceLinesRef.current.push(slLine);
+            } catch (e) {
+              console.debug('Failed to create SL line:', e);
+            }
+          }
+
+          // Exit line (if different from TP/SL)
+          if (
+            marker.exit_price &&
+            marker.exit_price !== marker.tp_price &&
+            marker.exit_price !== marker.sl_price
+          ) {
+            try {
+              const exitLine = seriesRef.current.createPriceLine({
+                price: marker.exit_price,
+                color: '#2196f3',
+                lineWidth: 2,
+                lineStyle: 1, // Dotted
+                axisLabelVisible: true,
+                title: `Exit: ${marker.exit_price.toFixed(2)}`,
+              });
+              priceLinesRef.current.push(exitLine);
+            } catch (e) {
+              console.debug('Failed to create Exit line:', e);
+            }
+          }
+        });
+      }
+
+      // Custom price lines
+      if (priceLines.length) {
+        priceLines.forEach((pl) => {
+          try {
+            const lineStyle = pl.lineStyle === 'dotted' ? 1 : pl.lineStyle === 'dashed' ? 2 : 0;
+            const line = seriesRef.current.createPriceLine({
+              price: pl.price,
+              color: pl.color,
+              lineWidth: pl.lineWidth || 2,
+              lineStyle: lineStyle,
+              axisLabelVisible: pl.axisLabelVisible !== false,
+              title: pl.title || '',
+            });
+            priceLinesRef.current.push(line);
+          } catch (e) {
+            console.debug('Failed to create custom price line:', e);
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Failed to update price lines:', e);
+    }
+  }, [markers, priceLines, showTPSL]);
 
   // React to scale mode and interactivity toggles on the fly
   useEffect(() => {

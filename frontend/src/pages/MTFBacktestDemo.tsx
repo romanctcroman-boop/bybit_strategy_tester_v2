@@ -1,6 +1,6 @@
 /**
  * MTF Backtest Demo Page
- * 
+ *
  * Demonstrates Multi-Timeframe backtest functionality (ТЗ 3.4.2)
  */
 import React, { useState } from 'react';
@@ -38,7 +38,7 @@ const MTFBacktestDemo: React.FC = () => {
   const notify = useNotify();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
-  
+
   const [config, setConfig] = useState<MTFBacktestConfig>({
     symbol: 'BTCUSDT',
     centralTimeframe: '15',
@@ -95,7 +95,7 @@ const MTFBacktestDemo: React.FC = () => {
 
       const data = await response.json();
       setResults(data);
-      
+
       notify({
         message: `MTF Backtest completed: ${data.results?.total_trades || 0} trades`,
         severity: 'success',
@@ -116,7 +116,7 @@ const MTFBacktestDemo: React.FC = () => {
       <Typography variant="h4" gutterBottom>
         Multi-Timeframe Backtest Demo
       </Typography>
-      
+
       <Typography variant="body2" color="text.secondary" paragraph>
         Test strategies with higher timeframe filters for better trend alignment (ТЗ 3.4.2)
       </Typography>
@@ -133,7 +133,7 @@ const MTFBacktestDemo: React.FC = () => {
                 <Typography variant="h6" gutterBottom>
                   Basic Configuration
                 </Typography>
-                
+
                 <Stack spacing={2}>
                   <TextField
                     label="Symbol"
@@ -142,7 +142,7 @@ const MTFBacktestDemo: React.FC = () => {
                     fullWidth
                     size="small"
                   />
-                  
+
                   <TextField
                     label="Central Timeframe"
                     value={config.centralTimeframe}
@@ -151,7 +151,7 @@ const MTFBacktestDemo: React.FC = () => {
                     size="small"
                     helperText="Main trading timeframe"
                   />
-                  
+
                   <TextField
                     label="Initial Capital (USDT)"
                     type="number"
@@ -162,29 +162,25 @@ const MTFBacktestDemo: React.FC = () => {
                     fullWidth
                     size="small"
                   />
-                  
+
                   <Divider />
-                  
+
                   <Typography variant="subtitle2">Strategy Parameters</Typography>
-                  
+
                   <TextField
                     label="Fast EMA Period"
                     type="number"
                     value={config.fastEma}
-                    onChange={(e) =>
-                      setConfig({ ...config, fastEma: parseInt(e.target.value) })
-                    }
+                    onChange={(e) => setConfig({ ...config, fastEma: parseInt(e.target.value) })}
                     fullWidth
                     size="small"
                   />
-                  
+
                   <TextField
                     label="Slow EMA Period"
                     type="number"
                     value={config.slowEma}
-                    onChange={(e) =>
-                      setConfig({ ...config, slowEma: parseInt(e.target.value) })
-                    }
+                    onChange={(e) => setConfig({ ...config, slowEma: parseInt(e.target.value) })}
                     fullWidth
                     size="small"
                   />
@@ -200,9 +196,7 @@ const MTFBacktestDemo: React.FC = () => {
               onAdditionalTimeframesChange={(tfs) =>
                 setConfig({ ...config, additionalTimeframes: tfs })
               }
-              onHTFFiltersChange={(filters) =>
-                setConfig({ ...config, htfFilters: filters })
-              }
+              onHTFFiltersChange={(filters) => setConfig({ ...config, htfFilters: filters })}
               disabled={loading}
             />
 
@@ -231,7 +225,7 @@ const MTFBacktestDemo: React.FC = () => {
 
               {!results && !loading && (
                 <Alert severity="info">
-                  Configure MTF parameters and click "Run MTF Backtest" to see results
+                  Configure MTF parameters and click &quot;Run MTF Backtest&quot; to see results
                 </Alert>
               )}
 
@@ -261,12 +255,10 @@ const MTFBacktestDemo: React.FC = () => {
                         <Typography variant="caption" color="text.secondary">
                           Total Trades
                         </Typography>
-                        <Typography variant="h6">
-                          {results.results?.total_trades || 0}
-                        </Typography>
+                        <Typography variant="h6">{results.results?.total_trades || 0}</Typography>
                       </Paper>
                     </Grid>
-                    
+
                     <Grid item xs={6}>
                       <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="caption" color="text.secondary">
@@ -277,7 +269,7 @@ const MTFBacktestDemo: React.FC = () => {
                         </Typography>
                       </Paper>
                     </Grid>
-                    
+
                     <Grid item xs={6}>
                       <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="caption" color="text.secondary">
@@ -288,18 +280,18 @@ const MTFBacktestDemo: React.FC = () => {
                         </Typography>
                       </Paper>
                     </Grid>
-                    
+
                     <Grid item xs={6}>
                       <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="caption" color="text.secondary">
                           Max Drawdown
                         </Typography>
                         <Typography variant="h6" color="error">
-                          {(results.results?.metrics?.max_drawdown_pct?.toFixed(2) || 'N/A')}%
+                          {results.results?.metrics?.max_drawdown_pct?.toFixed(2) || 'N/A'}%
                         </Typography>
                       </Paper>
                     </Grid>
-                    
+
                     <Grid item xs={6}>
                       <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="caption" color="text.secondary">
@@ -310,7 +302,7 @@ const MTFBacktestDemo: React.FC = () => {
                         </Typography>
                       </Paper>
                     </Grid>
-                    
+
                     <Grid item xs={6}>
                       <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography variant="caption" color="text.secondary">
@@ -325,7 +317,7 @@ const MTFBacktestDemo: React.FC = () => {
 
                   {/* MTF Config Info */}
                   <Divider />
-                  
+
                   <Box>
                     <Typography variant="subtitle2" gutterBottom>
                       MTF Configuration
@@ -349,7 +341,10 @@ const MTFBacktestDemo: React.FC = () => {
                       </Typography>
                       {Object.entries(results.htf_indicators).map(([tf, data]: [string, any]) => (
                         <Typography key={tf} variant="body2" color="text.secondary">
-                          {tf}: {Object.keys(data).filter((k) => k !== 'timestamps').join(', ')}
+                          {tf}:{' '}
+                          {Object.keys(data)
+                            .filter((k) => k !== 'timestamps')
+                            .join(', ')}
                         </Typography>
                       ))}
                     </Box>

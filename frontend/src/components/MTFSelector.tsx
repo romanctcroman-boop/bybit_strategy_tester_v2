@@ -1,6 +1,6 @@
 /**
  * Multi-Timeframe Selector Component
- * 
+ *
  * Allows users to select multiple timeframes for MTF analysis (ТЗ 3.4.2)
  * and configure HTF filters.
  */
@@ -95,7 +95,7 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
   const handleMTFToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
     const enabled = event.target.checked;
     setMtfEnabled(enabled);
-    
+
     if (!enabled) {
       onAdditionalTimeframesChange([]);
       onHTFFiltersChange([]);
@@ -110,7 +110,7 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
 
   const handleTimeframeRemove = (tf: string) => {
     onAdditionalTimeframesChange(additionalTimeframes.filter((t) => t !== tf));
-    
+
     // Remove filters for this timeframe
     onHTFFiltersChange(htfFilters.filter((f) => f.timeframe !== tf));
   };
@@ -125,7 +125,7 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
         condition: 'price_above',
       },
     };
-    
+
     onHTFFiltersChange([...htfFilters, newFilter]);
   };
 
@@ -134,17 +134,13 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
   };
 
   const handleFilterChange = (id: string, updates: Partial<HTFFilter>) => {
-    onHTFFiltersChange(
-      htfFilters.map((f) => (f.id === id ? { ...f, ...updates } : f))
-    );
+    onHTFFiltersChange(htfFilters.map((f) => (f.id === id ? { ...f, ...updates } : f)));
   };
 
   const handleFilterParamChange = (id: string, paramKey: string, value: any) => {
     onHTFFiltersChange(
       htfFilters.map((f) =>
-        f.id === id
-          ? { ...f, params: { ...f.params, [paramKey]: value } }
-          : f
+        f.id === id ? { ...f, params: { ...f.params, [paramKey]: value } } : f
       )
     );
   };
@@ -155,25 +151,17 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
         {/* MTF Toggle */}
         <Box display="flex" alignItems="center" justifyContent="space-between">
           <FormControlLabel
-            control={
-              <Switch
-                checked={mtfEnabled}
-                onChange={handleMTFToggle}
-                disabled={disabled}
-              />
-            }
+            control={<Switch checked={mtfEnabled} onChange={handleMTFToggle} disabled={disabled} />}
             label={
               <Box display="flex" alignItems="center" gap={1}>
-                <Typography variant="h6">
-                  Multi-Timeframe Analysis
-                </Typography>
+                <Typography variant="h6">Multi-Timeframe Analysis</Typography>
                 <Tooltip title="Use higher timeframes for trend filtering and confirmation">
                   <InfoIcon fontSize="small" color="action" />
                 </Tooltip>
               </Box>
             }
           />
-          
+
           {mtfEnabled && (
             <Chip
               label={`Central: ${AVAILABLE_TIMEFRAMES.find((t) => t.value === centralTimeframe)?.label || centralTimeframe}`}
@@ -189,7 +177,7 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
             <Typography variant="subtitle2" gutterBottom>
               Additional Timeframes (HTF)
             </Typography>
-            
+
             <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
               {additionalTimeframes.map((tf) => (
                 <Chip
@@ -200,7 +188,7 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
                   disabled={disabled}
                 />
               ))}
-              
+
               <FormControl size="small" sx={{ minWidth: 120 }}>
                 <Select
                   value=""
@@ -213,8 +201,7 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
                   </MenuItem>
                   {AVAILABLE_TIMEFRAMES.filter(
                     (tf) =>
-                      tf.value !== centralTimeframe &&
-                      !additionalTimeframes.includes(tf.value)
+                      tf.value !== centralTimeframe && !additionalTimeframes.includes(tf.value)
                   ).map((tf) => (
                     <MenuItem key={tf.value} value={tf.value}>
                       {tf.label}
@@ -230,9 +217,7 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
         {mtfEnabled && additionalTimeframes.length > 0 && (
           <Accordion defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle2">
-                HTF Filters ({htfFilters.length})
-              </Typography>
+              <Typography variant="subtitle2">HTF Filters ({htfFilters.length})</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Stack spacing={2}>
@@ -313,18 +298,14 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
                             sx={{ width: 150 }}
                             disabled={disabled}
                           />
-                          
+
                           <FormControl size="small" sx={{ minWidth: 200 }}>
                             <InputLabel>Condition</InputLabel>
                             <Select
                               value={filter.params.condition || 'price_above'}
                               label="Condition"
                               onChange={(e) =>
-                                handleFilterParamChange(
-                                  filter.id,
-                                  'condition',
-                                  e.target.value
-                                )
+                                handleFilterParamChange(filter.id, 'condition', e.target.value)
                               }
                               disabled={disabled}
                             >
@@ -355,18 +336,14 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
                             sx={{ width: 150 }}
                             disabled={disabled}
                           />
-                          
+
                           <FormControl size="small" sx={{ minWidth: 200 }}>
                             <InputLabel>Direction</InputLabel>
                             <Select
                               value={filter.params.condition || 'rising'}
                               label="Direction"
                               onChange={(e) =>
-                                handleFilterParamChange(
-                                  filter.id,
-                                  'condition',
-                                  e.target.value
-                                )
+                                handleFilterParamChange(filter.id, 'condition', e.target.value)
                               }
                               disabled={disabled}
                             >
@@ -397,7 +374,7 @@ const MTFSelector: React.FC<MTFSelectorProps> = ({
                             sx={{ width: 150 }}
                             disabled={disabled}
                           />
-                          
+
                           <TextField
                             label="Max RSI"
                             type="number"
