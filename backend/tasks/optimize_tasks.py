@@ -285,16 +285,19 @@ def walk_forward_task(
     interval: str,
     start_date: str,
     end_date: str,
-    train_size: int = 120,  # Training days (IS window)
-    test_size: int = 60,  # Testing days (OOS window)
-    step_size: int = 30,  # Step size for rolling window
+    train_size: int = 252,  # Training bars (IS window)
+    test_size: int = 63,  # Testing bars (OOS window)
+    step_size: int = 63,  # Step size for rolling window
+    mode: str = "rolling",  # 'rolling' or 'anchored'
     metric: str = "sharpe_ratio",  # Optimization metric
+    min_trades: int = 30,  # Минимум сделок для валидности
+    max_drawdown: float = 0.50,  # Максимальная просадка
 ) -> dict[str, Any]:
     """
-    Walk-Forward оптимизация
+    Walk-Forward оптимизация (ТЗ 3.5.2)
 
-    Разделяет данные на периоды train/test, оптимизирует на train,
-    тестирует на test, затем сдвигает окно.
+    Использует новый WalkForwardOptimizer с поддержкой Rolling и Anchored режимов.
+    Рассчитывает efficiency, degradation, robustness_score.
 
     Args:
         optimization_id: ID оптимизации
@@ -304,27 +307,37 @@ def walk_forward_task(
         interval: Таймфрейм
         start_date: Дата начала
         end_date: Дата окончания
-        train_size: Размер окна обучения (в днях, IS window)
-        test_size: Размер окна тестирования (в днях, OOS window)
-        step_size: Шаг сдвига окна (в днях)
+        train_size: Размер окна обучения (в барах, IS window)
+        test_size: Размер окна тестирования (в барах, OOS window)
+        step_size: Шаг сдвига окна (в барах)
+        mode: 'rolling' (фиксированное окно) или 'anchored' (расширяющееся)
         metric: Метрика для оптимизации
+        min_trades: Минимум сделок для валидности
+        max_drawdown: Максимальная просадка
 
     Returns:
-        Результаты walk-forward
+        Результаты walk-forward с degradation и robustness_score
     """
-    import asyncio
     from datetime import datetime
 
-    from backend.core.walkforward import WalkForwardAnalyzer
+    from backend.optimization.walk_forward import (
+        WalkForwardOptimizer,
+        WFOConfig,
+        WFOMode,
+        ParameterRange,
+    )
     from backend.services.data_service import DataService
 
     logger.info(f"🚶 Starting walk-forward optimization: {optimization_id}")
     logger.info(f"   Symbol: {symbol}, Interval: {interval}")
-    logger.info(f"   Train: {train_size}d, Test: {test_size}d, Step: {step_size}d")
+    logger.info(f"   Mode: {mode}, Train: {train_size}, Test: {test_size}, Step: {step_size}")
     logger.info(f"   Metric: {metric}")
 
+    db = SessionLocal()
+    data_service = DataService(db)
+
     try:
-        # 1. Загружаем данные
+        # 1. Обновить статус
         self.update_state(
             state="PROGRESS",
             meta={
@@ -334,20 +347,67 @@ def walk_forward_task(
             },
         )
 
-        ds = DataService()
+        data_service.update_optimization(
+            optimization_id, status="running", started_at=datetime.now(UTC)
+        )
+
+        # 2. Загружаем данные
+        logger.info("📥 Loading market data...")
         start_dt = _parse_dt(start_date)
         end_dt = _parse_dt(end_date)
-        data = ds.get_market_data(
+        candles = data_service.get_market_data(
             symbol=symbol,
             timeframe=interval,
             start_time=start_dt,
             end_time=end_dt,
         )
-        if data is None or len(data) == 0:
-            raise ValueError(f"No data available for {symbol} {interval}")
-        logger.info(f"📊 Loaded {len(data)} candles")
+        if not candles or len(candles) == 0:
+            raise ValueError(f"No data for {symbol} {interval}")
 
-        # 2. Создаём Walk-Forward Analyzer
+        logger.info(f"📊 Loaded {len(candles)} candles")
+
+        # Normalize ORM objects to list[dict]
+        def _to_row(x):
+            if isinstance(x, dict):
+                return x
+            row = {}
+            for key in ("timestamp", "open", "high", "low", "close", "volume", "quote_volume"):
+                if hasattr(x, key):
+                    row[key] = getattr(x, key)
+            return row
+
+        norm_candles = [_to_row(c) for c in candles]
+
+        # 3. Конвертируем param_space в ParameterRange
+        param_ranges = {}
+        for param_name, values in param_space.items():
+            if isinstance(values, list) and len(values) > 0:
+                # Если уже список, оставляем как есть
+                param_ranges[param_name] = values
+            elif isinstance(values, dict) and 'start' in values:
+                # Если это range объект
+                param_ranges[param_name] = ParameterRange(
+                    start=values['start'],
+                    stop=values['stop'],
+                    step=values.get('step', (values['stop'] - values['start']) / 10)
+                )
+            else:
+                param_ranges[param_name] = values
+
+        # 4. Создаём WFO конфигурацию
+        wfo_mode = WFOMode.ROLLING if mode.lower() == "rolling" else WFOMode.ANCHORED
+        config = WFOConfig(
+            in_sample_size=train_size,
+            out_sample_size=test_size,
+            step_size=step_size,
+            mode=wfo_mode,
+            min_trades=min_trades,
+            max_drawdown=max_drawdown,
+        )
+
+        logger.info(f"🔧 WFO Config: {config}")
+
+        # 5. Создаём оптимизатор
         self.update_state(
             state="PROGRESS",
             meta={
@@ -357,88 +417,73 @@ def walk_forward_task(
             },
         )
 
-        analyzer = WalkForwardAnalyzer(
-            data=data,
-            initial_capital=strategy_config.get("initial_capital", 10000.0),
-            commission=strategy_config.get("commission", 0.001),
-            is_window_days=train_size,
-            oos_window_days=test_size,
-            step_days=step_size,
-        )
+        wfo = WalkForwardOptimizer(config=config)
 
-        num_windows = len(analyzer.windows)
-        logger.info(f"🪟 Created {num_windows} windows for analysis")
-
-        # 3. Запускаем Walk-Forward анализ
+        # 6. Запускаем оптимизацию
         self.update_state(
             state="PROGRESS",
             meta={
                 "optimization_id": optimization_id,
                 "status": "optimizing",
                 "progress": 20,
-                "num_windows": num_windows,
             },
         )
 
-        # Запускаем асинхронную версию в event loop (py3.10+ and 3.14-safe)
-        def _get_loop():
-            try:
-                return asyncio.get_running_loop()
-            except RuntimeError:
-                try:
-                    loop_existing = asyncio.get_event_loop()
-                except RuntimeError:
-                    loop_existing = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop_existing)
-                if loop_existing.is_closed():
-                    loop_existing = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop_existing)
-                return loop_existing
-
-        loop = _get_loop()
-
-        results = loop.run_until_complete(
-            analyzer.run_async(
-                strategy_config=strategy_config,
-                param_space=param_space,
-                metric=metric,
-            )
+        engine = get_engine(
+            None, initial_capital=10000.0, commission=0.0006, data_service=data_service
         )
 
-        # Persist results via DataService
-        with DataService() as _ds:
-            _ds.update_optimization(
-                optimization_id,
-                status="completed",
-                completed_at=datetime.now(UTC),
-                results={
-                    "method": "walk_forward",
-                    "metric": metric,
-                    "symbol": symbol,
-                    "interval": interval,
-                    "period": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
-                    "config": {
-                        "train_size": train_size,
-                        "test_size": test_size,
-                        "step_size": step_size,
-                    },
-                    "results": results,
-                },
-            )
+        results = wfo.optimize(
+            data=norm_candles,
+            param_ranges=param_ranges,
+            strategy_config=strategy_config,
+            metric=metric,
+            backtest_engine=engine,
+        )
 
-        # 4. Формируем результат
+        logger.info("✅ Walk-Forward optimization completed")
+        logger.info(f"   Robustness Score: {results['summary']['robustness_score']:.2f}")
+        logger.info(f"   Avg Efficiency: {results['aggregated_metrics']['avg_efficiency']:.3f}")
+        logger.info(f"   Avg Degradation: {results['aggregated_metrics']['avg_degradation']:.3f}")
+
+        # 7. Сохраняем результаты
+        logger.info("💾 Saving optimization results...")
+        data_service.update_optimization(
+            optimization_id,
+            status="completed",
+            completed_at=datetime.now(UTC),
+            best_params=results['summary'].get('recommended_params', {}),
+            best_score=results['summary']['robustness_score'],
+            results={
+                "method": "walk_forward",
+                "metric": metric,
+                "symbol": symbol,
+                "interval": interval,
+                "period": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
+                "config": {
+                    "mode": mode,
+                    "train_size": train_size,
+                    "test_size": test_size,
+                    "step_size": step_size,
+                    "min_trades": min_trades,
+                    "max_drawdown": max_drawdown,
+                },
+                "walk_results": results['walk_results'],
+                "aggregated_metrics": results['aggregated_metrics'],
+                "parameter_stability": results['parameter_stability'],
+                "summary": results['summary'],
+            },
+        )
+
+        # 8. Обновляем прогресс
         self.update_state(
             state="PROGRESS",
             meta={
                 "optimization_id": optimization_id,
                 "status": "completed",
                 "progress": 100,
+                "robustness_score": results['summary']['robustness_score'],
             },
-        )
-
-        logger.success(
-            f"✅ Walk-forward completed: {optimization_id}, "
-            f"processed {len(results['windows'])}/{num_windows} windows"
         )
 
         return {
@@ -449,6 +494,7 @@ def walk_forward_task(
             "start_date": start_date,
             "end_date": end_date,
             "config": {
+                "mode": mode,
                 "train_size": train_size,
                 "test_size": test_size,
                 "step_size": step_size,
@@ -461,6 +507,17 @@ def walk_forward_task(
 
     except Exception as e:
         logger.error(f"❌ Walk-forward failed: {optimization_id}, error: {e}")
+        
+        try:
+            data_service.update_optimization(
+                optimization_id,
+                status="failed",
+                error_message=str(e),
+                completed_at=datetime.now(UTC),
+            )
+        except Exception as db_error:
+            logger.error(f"Failed to update optimization status: {db_error}")
+
         self.update_state(
             state="FAILURE",
             meta={
@@ -468,7 +525,14 @@ def walk_forward_task(
                 "error": str(e),
             },
         )
+
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+            
         raise
+    
+    finally:
+        db.close()
 
 
 @celery_app.task(

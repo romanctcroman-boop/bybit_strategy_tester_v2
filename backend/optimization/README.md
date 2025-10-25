@@ -79,16 +79,60 @@ print(f"Best params: {summary['best_parameters']}")
 
 ---
 
-### ⏳ WalkForwardOptimizer (ТЗ 3.5.2 - Продвинутый уровень)
-**Статус:** Реализован в Celery tasks (частично)
+### ✅ WalkForwardOptimizer (ТЗ 3.5.2 - Продвинутый уровень)
+**Статус:** Реализован и протестирован
 
 **Функционал:**
-- Защита от overfitting
-- Rolling window optimization (in-sample / out-sample)
-- Оценка стабильности параметров
-- Требует дополнительной реализации standalone класса
+- Защита от overfitting через IS/OOS splitting
+- Два режима: Rolling Window и Anchored Window
+- Расширенные метрики:
+  - **Efficiency**: OOS/IS performance ratio
+  - **Degradation**: IS - OOS Sharpe (overfitting measure)
+  - **Robustness Score**: Weighted composite (0-100)
+  - **Consistency Score**: % profitable OOS periods
+  - **Parameter Stability**: Variance analysis across periods
+- Автоматические рекомендации на основе robustness score
 
-**TODO:** Создать `backend/optimization/walk_forward.py` как standalone модуль
+**Пример использования:**
+
+```python
+from backend.optimization import WalkForwardOptimizer, WFOConfig, WFOMode, ParameterRange
+
+# Конфигурация
+config = WFOConfig(
+    in_sample_size=252,      # 252 bars для IS
+    out_sample_size=63,      # 63 bars для OOS
+    step_size=63,            # Сдвиг на 63 bars
+    mode=WFOMode.ROLLING,    # или WFOMode.ANCHORED
+    min_trades=30,
+    max_drawdown=0.50,
+)
+
+# Параметры
+param_ranges = {
+    'tp_pct': ParameterRange(1.0, 3.0, 0.5),
+    'sl_pct': ParameterRange(0.5, 2.0, 0.5),
+}
+
+# Оптимизация
+wfo = WalkForwardOptimizer(config=config)
+results = wfo.optimize(
+    data=candles,
+    param_ranges=param_ranges,
+    strategy_config={'strategy_type': 'breakout'},
+    metric='sharpe_ratio',
+)
+
+# Результаты
+print(f"Robustness Score: {results['summary']['robustness_score']:.2f}")
+print(f"Efficiency: {results['aggregated_metrics']['avg_efficiency']:.3f}")
+print(f"Degradation: {results['aggregated_metrics']['avg_degradation']:.3f}")
+```
+
+**Документация:** `backend/optimization/README_WALK_FORWARD.md`  
+**Тесты:** `tests/test_walk_forward_optimizer.py`
+- ✅ 12/12 тестов пройдено
+- Покрытие: Rolling/Anchored modes, efficiency, degradation, robustness score, parameter stability
 
 ---
 
@@ -159,12 +203,12 @@ tp_percent,sl_percent,metric_total_trades,metric_win_rate,metric_sharpe_ratio,ra
 ## 🎯 Следующие шаги
 
 1. ✅ **GridOptimizer** - DONE
-2. ⏳ **WalkForwardOptimizer** - В разработке
+2. ✅ **WalkForwardOptimizer** - DONE
 3. ⏳ **MonteCarloSimulator** - Запланировано
-4. ⏳ **Frontend UI** - Интеграция с OptimizationsPage.tsx
-5. ⏳ **Heatmap visualization** - Plotly для визуализации результатов
+4. ✅ **Frontend UI** - DONE (OptimizationsPage.tsx с heatmap)
+5. ✅ **Heatmap visualization** - DONE (Plotly интеграция)
 
 ---
 
-**Документация обновлена:** 2025-10-25
-**Статус реализации ТЗ 3.5:** 33% (1/3 модулей)
+**Документация обновлена:** 2025-01-26
+**Статус реализации ТЗ 3.5:** 67% (2/3 модулей)

@@ -8,5 +8,19 @@ Optimization Module
 """
 
 from .grid_optimizer import GridOptimizer
+from .walk_forward import (
+    WalkForwardOptimizer,
+    WFOConfig,
+    WFOMode,
+    WFOPeriod,
+    ParameterRange as WFOParameterRange,
+)
 
-__all__ = ['GridOptimizer']
+__all__ = [
+    'GridOptimizer',
+    'WalkForwardOptimizer',
+    'WFOConfig',
+    'WFOMode',
+    'WFOPeriod',
+    'WFOParameterRange',
+]
