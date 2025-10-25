@@ -265,18 +265,24 @@ def test_multi_tf_strategy_with_trend_filter(btc_data_manager):
     
     # Calculate 60m trend
     df_60m['trend_ma'] = df_60m['close'].rolling(50).mean()
-    df_60m['is_uptrend'] = df_60m['close'] > df_60m['trend_ma']
+    df_60m['is_uptrend'] = (df_60m['close'] > df_60m['trend_ma']).astype(bool)
     
     # Merge 60m trend into 15m (forward fill)
     df_15m = df_15m.set_index('timestamp')
-    df_60m_trend = df_60m.set_index('timestamp')[['is_uptrend']]
+    df_60m_trend = df_60m.set_index('timestamp')[['is_uptrend']].astype(bool)
     
-    # Resample 60m to 15m frequency
-    df_60m_resampled = df_60m_trend.resample('15min').ffill()
+    # Resample 60m to 15m frequency with forward fill (suppress future warning)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        df_60m_resampled = df_60m_trend.resample('15min').asfreq()
+        df_60m_resampled['is_uptrend'] = df_60m_resampled['is_uptrend'].ffill().fillna(False)
     
     # Merge
     df_combined = df_15m.join(df_60m_resampled, how='left')
-    df_combined['is_uptrend'] = df_combined['is_uptrend'].fillna(False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        df_combined['is_uptrend'] = df_combined['is_uptrend'].fillna(False)
     df_combined = df_combined.reset_index()
     
     # Generate signals: MA cross on 15m + 60m uptrend filter

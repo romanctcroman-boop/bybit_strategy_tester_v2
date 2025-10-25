@@ -12,7 +12,7 @@ Key Features:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Optional, List
 import time
@@ -111,7 +111,7 @@ class DataManager:
         
         # Calculate time range
         if end_date is None:
-            end_date = datetime.utcnow()
+            end_date = datetime.now(timezone.utc)
         
         end_ts = int(end_date.timestamp() * 1000)
         
