@@ -44,6 +44,15 @@ def setup_module(module):
 def test_archive_and_restore_idempotent(tmp_path: Path):
     # Use a unique symbol to avoid interference with other tests
     sym = "ARCHIVE_BTCUSDT"
+    
+    # Clean up any existing data for this symbol first
+    s = SessionLocal()
+    try:
+        s.query(BybitKlineAudit).filter(BybitKlineAudit.symbol == sym).delete()
+        s.commit()
+    finally:
+        s.close()
+    
     # Insert a few rows
     s = SessionLocal()
     try:
@@ -61,14 +70,15 @@ def test_archive_and_restore_idempotent(tmp_path: Path):
     cfg = ArchiveConfig(
         output_dir=str(tmp_path),
         before_ms=int(datetime(2025, 1, 2, tzinfo=UTC).timestamp() * 1000),
+        symbol=sym,  # Filter by symbol
     )
     n = svc.archive(cfg, interval_for_partition="1")
     assert n == 3
 
-    # wipe table
+    # wipe table (only this symbol to avoid affecting other tests)
     s = SessionLocal()
     try:
-        s.query(BybitKlineAudit).delete()
+        s.query(BybitKlineAudit).filter(BybitKlineAudit.symbol == sym).delete()
         s.commit()
     finally:
         s.close()

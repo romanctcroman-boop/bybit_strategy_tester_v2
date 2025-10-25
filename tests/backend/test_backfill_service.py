@@ -44,6 +44,17 @@ def make_row(ms, o=1.0, h=2.0, low=0.5, c=1.5, v=1.0):
 
 
 def test_backfill_paging_and_idempotent():
+    # Use unique symbol to avoid conflicts with other tests
+    test_symbol = "BACKFILL_BTCUSDT"
+    
+    # Clean up any existing data for this symbol first
+    db = SessionLocal()
+    try:
+        db.query(BybitKlineAudit).filter(BybitKlineAudit.symbol == test_symbol).delete()
+        db.commit()
+    finally:
+        db.close()
+    
     now = int(datetime(2025, 1, 1, tzinfo=UTC).timestamp() * 1000)
     # Two pages: page1 newer times, page2 older times
     page1 = [make_row(now - 0 * 60000), make_row(now - 1 * 60000)]  # t0, t-1
@@ -53,7 +64,7 @@ def test_backfill_paging_and_idempotent():
     # Bound end_at to the newest row time to keep lookback within our synthetic window
     end_at = datetime.fromtimestamp(now / 1000.0, tz=UTC)
     cfg = BackfillConfig(
-        symbol="BTCUSDT",
+        symbol=test_symbol,
         interval="1",
         lookback_minutes=180,
         end_at=end_at,
@@ -73,7 +84,7 @@ def test_backfill_paging_and_idempotent():
     # Verify DB rows count
     db = SessionLocal()
     try:
-        rows = db.query(BybitKlineAudit).filter(BybitKlineAudit.symbol == "BTCUSDT").all()
+        rows = db.query(BybitKlineAudit).filter(BybitKlineAudit.symbol == test_symbol).all()
         assert len(rows) == 4
     finally:
         db.close()

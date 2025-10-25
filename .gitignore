@@ -235,6 +235,7 @@ logs/
 
 # Temporary test files
 .pytest-tmp/
+.pytest_tmp/
 _deep_snapshot/
 deep_project_analyzer.ps1
 demo.db
