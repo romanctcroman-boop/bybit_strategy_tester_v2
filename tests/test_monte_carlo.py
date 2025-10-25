@@ -12,7 +12,7 @@
 
 import pytest
 import numpy as np
-from backend.core.monte_carlo_simulator import MonteCarloSimulator, MonteCarloResult
+from backend.optimization.monte_carlo import MonteCarloSimulator, MonteCarloResult
 
 
 @pytest.fixture

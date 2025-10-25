@@ -136,16 +136,57 @@ print(f"Degradation: {results['aggregated_metrics']['avg_degradation']:.3f}")
 
 ---
 
-### ⏳ MonteCarloSimulator (ТЗ 3.5.3 - Продвинутый уровень)
-**Статус:** Не реализован
+### ✅ MonteCarloSimulator (ТЗ 3.5.3 - Продвинутый уровень)
+**Статус:** Реализован и протестирован
 
 **Функционал:**
-- Случайная перестановка сделок
-- Расчет probability of ruin
-- Доверительные интервалы для метрик
-- Оценка робастности стратегии
+- Bootstrap permutation (случайная перестановка сделок с возвратом)
+- Расчёт доверительных интервалов для доходности (95%, 90%, etc.)
+- Оценка вероятности прибыли (Probability of Profit)
+- Оценка риска разорения (Probability of Ruin)
+- Распределение Sharpe Ratio и Maximum Drawdown
+- Процентильный ранжинг оригинальной стратегии
 
-**TODO:** Создать `backend/optimization/monte_carlo.py`
+**Пример использования:**
+
+```python
+from backend.optimization import MonteCarloSimulator
+
+# Конфигурация
+mc = MonteCarloSimulator(
+    n_simulations=1000,      # Количество симуляций
+    ruin_threshold=20.0,     # Порог разорения 20% DD
+    random_seed=42,          # Для воспроизводимости
+)
+
+# Запуск симуляции
+result = mc.run(
+    trades=backtest_trades,  # Список сделок с 'pnl', 'pnl_pct'
+    initial_capital=10000,
+)
+
+# Анализ результатов
+print(f"Вероятность прибыли: {result.prob_profit:.1%}")
+print(f"Вероятность разорения: {result.prob_ruin:.1%}")
+print(f"95% CI: [{result.percentile_5:.2f}%, {result.percentile_95:.2f}%]")
+print(f"Средняя доходность: {result.mean_return:.2f}% ± {result.std_return:.2f}%")
+
+# Доверительный интервал
+ci_lower, ci_upper = mc.get_confidence_interval(result, confidence=0.95)
+print(f"95% доверительный интервал: [{ci_lower:.2f}%, {ci_upper:.2f}%]")
+
+# Риск просадки
+risk_30 = mc.get_risk_of_ruin(result, ruin_level=30.0)
+print(f"Риск просадки >= 30%: {risk_30:.1%}")
+
+# Генерация сводки
+summary = mc.generate_summary(result)
+print(summary['recommendation'])
+```
+
+**Тесты:** `tests/test_monte_carlo.py`
+- ✅ 19/19 тестов пройдено
+- Покрытие: инициализация, симуляция, метрики, вероятности, доверительные интервалы, edge cases
 
 ---
 
@@ -204,11 +245,11 @@ tp_percent,sl_percent,metric_total_trades,metric_win_rate,metric_sharpe_ratio,ra
 
 1. ✅ **GridOptimizer** - DONE
 2. ✅ **WalkForwardOptimizer** - DONE
-3. ⏳ **MonteCarloSimulator** - Запланировано
+3. ✅ **MonteCarloSimulator** - DONE
 4. ✅ **Frontend UI** - DONE (OptimizationsPage.tsx с heatmap)
 5. ✅ **Heatmap visualization** - DONE (Plotly интеграция)
 
 ---
 
 **Документация обновлена:** 2025-01-26
-**Статус реализации ТЗ 3.5:** 67% (2/3 модулей)
+**Статус реализации ТЗ 3.5:** 100% (3/3 модулей) ✅

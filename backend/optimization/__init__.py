@@ -15,6 +15,7 @@ from .walk_forward import (
     WFOPeriod,
     ParameterRange as WFOParameterRange,
 )
+from .monte_carlo import MonteCarloSimulator, MonteCarloResult
 
 __all__ = [
     'GridOptimizer',
@@ -23,4 +24,6 @@ __all__ = [
     'WFOMode',
     'WFOPeriod',
     'WFOParameterRange',
+    'MonteCarloSimulator',
+    'MonteCarloResult',
 ]
