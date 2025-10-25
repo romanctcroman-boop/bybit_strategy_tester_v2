@@ -9,6 +9,8 @@ import logging
 from datetime import UTC, datetime
 from typing import Any, TypedDict
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 
@@ -779,7 +781,7 @@ class DataService:
         start_time: datetime,
         end_time: datetime,
         limit: int = 10000,
-    ) -> list[MarketData]:
+    ) -> pd.DataFrame | None:
         """
         Получить исторические свечи
 
@@ -791,14 +793,15 @@ class DataService:
             limit: Максимум результатов
 
         Returns:
-            Список свечей
+            DataFrame с колонками: timestamp, open, high, low, close, volume
+            или None если данных нет
         """
-        return (
+        candles = (
             self.db.query(MarketData)
             .filter(
                 and_(
                     MarketData.symbol == symbol,
-                    MarketData.timeframe == timeframe,
+                    MarketData.interval == timeframe,
                     MarketData.timestamp >= start_time,
                     MarketData.timestamp <= end_time,
                 )
@@ -807,12 +810,30 @@ class DataService:
             .limit(limit)
             .all()
         )
+        
+        if not candles:
+            return None
+        
+        # Convert to DataFrame
+        data = {
+            'timestamp': [c.timestamp for c in candles],
+            'open': [c.open for c in candles],
+            'high': [c.high for c in candles],
+            'low': [c.low for c in candles],
+            'close': [c.close for c in candles],
+            'volume': [c.volume if c.volume is not None else 0.0 for c in candles],
+        }
+        
+        df = pd.DataFrame(data)
+        df.set_index('timestamp', inplace=True)
+        
+        return df
 
     def get_latest_candle(self, symbol: str, timeframe: str) -> MarketData | None:
         """Получить последнюю свечу"""
         return (
             self.db.query(MarketData)
-            .filter(and_(MarketData.symbol == symbol, MarketData.timeframe == timeframe))
+            .filter(and_(MarketData.symbol == symbol, MarketData.interval == timeframe))
             .order_by(desc(MarketData.timestamp))
             .first()
         )
@@ -822,7 +843,7 @@ class DataService:
     ) -> int:
         """Удалить старые свечи"""
         query = self.db.query(MarketData).filter(
-            and_(MarketData.symbol == symbol, MarketData.timeframe == timeframe)
+            and_(MarketData.symbol == symbol, MarketData.interval == timeframe)
         )
 
         if before_date:
