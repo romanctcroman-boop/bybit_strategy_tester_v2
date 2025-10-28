@@ -140,8 +140,8 @@ class DataManager:
                 'timestamp', 'open', 'high', 'low', 'close', 'volume', 'turnover'
             ])
             
-            # Convert types
-            df['timestamp'] = pd.to_datetime(df['timestamp'].astype(int), unit='ms')
+            # Convert types (use int64 to avoid overflow on large timestamps)
+            df['timestamp'] = pd.to_datetime(df['timestamp'].astype('int64'), unit='ms')
             for col in ['open', 'high', 'low', 'close', 'volume', 'turnover']:
                 df[col] = df[col].astype(float)
             

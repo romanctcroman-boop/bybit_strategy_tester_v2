@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@perplexity-ai/mcp-server": "^0.2.2",
+    "vscode-mcp-server": "^0.2.0"
+  }
+}

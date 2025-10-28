@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backend.core.walk_forward_optimizer import WalkForwardOptimizer
+from backend.optimization import WalkForwardOptimizer, WFOConfig, WFOMode, WFOParameterRange
 
 
 @pytest.fixture

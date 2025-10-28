@@ -28,7 +28,7 @@ import shutil
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "backend"))
 
-from optimization.walk_forward_optimizer import WalkForwardOptimizer, WFOMode
+from optimization.walk_forward import WalkForwardOptimizer, WFOMode
 from services.data_manager import DataManager
 from core.backtest_engine import BacktestEngine
 

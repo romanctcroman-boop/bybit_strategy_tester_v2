@@ -41,6 +41,7 @@ import { useOptimizationsStore } from '../store/optimizations';
 import { useNotify } from '../components/NotificationsProvider';
 import type { Optimization, OptimizationResult } from '../types/api';
 import { useLocation } from 'react-router-dom';
+import { TIMEFRAMES } from '../constants/timeframes';
 
 type SortOrder = 'asc' | 'desc';
 type SortKey = 'score' | 'sharpe_ratio' | 'max_drawdown' | 'total_trades' | 'win_rate';
@@ -601,13 +602,11 @@ export default function OptimizationsPage() {
                   label="Timeframe"
                   onChange={(e) => setNewOptForm({ ...newOptForm, timeframe: e.target.value })}
                 >
-                  <MenuItem value="1">1m</MenuItem>
-                  <MenuItem value="5">5m</MenuItem>
-                  <MenuItem value="15">15m</MenuItem>
-                  <MenuItem value="30">30m</MenuItem>
-                  <MenuItem value="60">1h</MenuItem>
-                  <MenuItem value="240">4h</MenuItem>
-                  <MenuItem value="D">1D</MenuItem>
+                  {TIMEFRAMES.map((tf) => (
+                    <MenuItem key={tf.value} value={tf.value}>
+                      {tf.label}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>

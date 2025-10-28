@@ -1,5 +1,5 @@
 """
-Unit тесты для MonteCarloSimulator (backend/optimization/monte_carlo_simulator.py)
+Unit тесты для MonteCarloSimulator (backend/optimization/monte_carlo.py)
 
 Проверяет:
 1. Расчёт prob_profit (ТЗ 3.5.3)
@@ -21,7 +21,7 @@ import sys
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "backend"))
 
-from optimization.monte_carlo_simulator import MonteCarloSimulator
+from optimization.monte_carlo import MonteCarloSimulator
 
 
 # ========================================================================

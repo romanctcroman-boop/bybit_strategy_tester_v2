@@ -14,7 +14,7 @@ from pathlib import Path
 # Добавить backend в sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from backend.core.monte_carlo_simulator import MonteCarloSimulator
+from backend.optimization import MonteCarloSimulator
 
 
 def main():

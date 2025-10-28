@@ -1,0 +1,78 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "MCP: Run All Tests (Quick)",
+      "type": "shell",
+      "command": "py -3.13 -m pytest -v --tb=short -x",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "MCP: Run All Tests (Full Report)",
+      "type": "shell",
+      "command": ".\\scripts\\mcp_run_all_tests.ps1",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "MCP: Analyze Test Failures",
+      "type": "shell",
+      "command": "py -3.13 -m pytest --lf -v --tb=long",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": [],
+      "dependsOn": []
+    },
+    {
+      "label": "MCP: Run Failed Tests Only",
+      "type": "shell",
+      "command": "py -3.13 -m pytest --lf --tb=short",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "MCP: Full Suite with Coverage",
+      "type": "shell",
+      "command": "py -3.13 -m pytest --cov=backend --cov=tests --cov-report=html --cov-report=term",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "MCP: Quick Smoke Tests",
+      "type": "shell",
+      "command": "py -3.13 -m pytest tests/test_mcp_integration.py tests/frontend/test_smoke.py -v",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

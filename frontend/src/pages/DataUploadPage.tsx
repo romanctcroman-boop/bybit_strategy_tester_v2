@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Typography, Button, TextField, Stack } from '@mui/material';
+import { Container, Typography, Button, TextField, Stack, MenuItem } from '@mui/material';
 import { useDataUploadStore } from '../store/dataUpload';
 import { useNotify } from '../components/NotificationsProvider';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { applyFieldErrors, validateSymbol } from '../utils/forms';
 import api, { DataApi } from '../services/api';
+import { TIMEFRAMES } from '../constants/timeframes';
 
 const DataUploadPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -79,12 +80,19 @@ const DataUploadPage: React.FC = () => {
           <TextField
             label="Interval"
             size="small"
+            select
             value={interval}
             onChange={(e) => setInterval(e.target.value)}
             sx={{ width: 200 }}
             error={!!formErrors.interval}
-            helperText={formErrors.interval || 'Bybit: 1,3,5,15,60,240,D,W'}
-          />
+            helperText={formErrors.interval || 'Bybit supported intervals'}
+          >
+            {TIMEFRAMES.map((tf) => (
+              <MenuItem key={tf.value} value={tf.value}>
+                {tf.label}
+              </MenuItem>
+            ))}
+          </TextField>
         </Stack>
         <div>
           <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />

@@ -20,8 +20,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from backend.core.backtest_engine import BacktestEngine
-from backend.core.walk_forward_optimizer import WalkForwardOptimizer
-from backend.core.monte_carlo_simulator import MonteCarloSimulator
+from backend.optimization import WalkForwardOptimizer, MonteCarloSimulator
 
 
 def generate_large_dataset(n_bars: int = 10_000) -> pd.DataFrame:

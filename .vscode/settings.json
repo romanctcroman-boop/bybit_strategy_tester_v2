@@ -55,9 +55,41 @@
     "*test.py"
   ],
   "python.testing.pytestEnabled": false,
-  "python.testing.unittestEnabled": true
-  ,
+  "python.testing.unittestEnabled": true,
+
   // Suppress noisy local validation from the GitHub Actions extension when offline/not signed-in.
   // Workflows with actions/checkout@v4 are valid on GitHub; this only affects VS Code diagnostics.
-  "github-actions.validate.enabled": false
+  "github-actions.validate.enabled": false,
+  
+  // Perplexity AI Assistant
+  // "perplexity-ai-assistant.apiKey": "YOUR_API_KEY_HERE",
+  
+  // MCP Integration Settings
+  "mcp.enabled": true,
+  "mcp.autoStart": true,
+  "mcp.configFile": "${workspaceFolder}/.vscode/mcp.json",
+  
+  // Agent Mode Settings
+  "github.copilot.enable": {
+    "*": true,
+    "yaml": true,
+    "plaintext": true,
+    "markdown": true,
+    "python": true,
+    "typescript": true,
+    "javascript": true
+  },
+  
+  // Workspace Awareness for MCP
+  "files.associations": {
+    "*.md": "markdown",
+    "mcp.json": "jsonc",
+    ".env*": "properties"
+  },
+  
+  // Terminal MCP Environment
+  "terminal.integrated.env.windows": {
+    "PERPLEXITY_API_KEY": "${env:PERPLEXITY_API_KEY}",
+    "GITHUB_TOKEN": "${env:GITHUB_TOKEN}"
+  }
 }

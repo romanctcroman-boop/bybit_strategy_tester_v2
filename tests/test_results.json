@@ -1,0 +1,71 @@
+{
+  "timestamp": "2025-10-26T15:25:57.975939",
+  "tests": [
+    {
+      "test": "test_1_empty_storage",
+      "status": "PASS",
+      "message": "Loaded and saved 1000 candles",
+      "timestamp": "2025-10-26T15:25:00.909432"
+    },
+    {
+      "test": "test_2_update_existing",
+      "status": "PASS",
+      "message": "Updated cache: 1000 -> 2000 candles, historical data loaded",
+      "timestamp": "2025-10-26T15:25:04.784979"
+    },
+    {
+      "test": "test_3_multiple_timeframes",
+      "status": "PASS",
+      "message": "All 4 timeframes isolated",
+      "timestamp": "2025-10-26T15:25:09.606882"
+    },
+    {
+      "test": "test_4_multiple_symbols",
+      "status": "PASS",
+      "message": "All 3 symbols isolated",
+      "timestamp": "2025-10-26T15:25:13.719639"
+    },
+    {
+      "test": "test_5_limit_2000",
+      "status": "PASS",
+      "message": "Correctly limited to 2000 candles",
+      "timestamp": "2025-10-26T15:25:29.492256"
+    },
+    {
+      "test": "test_6_deduplication",
+      "status": "PASS",
+      "message": "Deduplication works: 1000 -> 500",
+      "timestamp": "2025-10-26T15:25:32.977973"
+    },
+    {
+      "test": "test_7_cache_expiry",
+      "status": "PASS",
+      "message": "Old cache correctly ignored",
+      "timestamp": "2025-10-26T15:25:35.648638"
+    },
+    {
+      "test": "test_8_api_limits",
+      "status": "PASS",
+      "message": "API limit respected: 1000 <= 1000",
+      "timestamp": "2025-10-26T15:25:38.448403"
+    },
+    {
+      "test": "test_9_historical_fetch_5000",
+      "status": "PASS",
+      "message": "Loaded 5000 historical candles, time span: 416.6h",
+      "timestamp": "2025-10-26T15:25:45.470826"
+    },
+    {
+      "test": "test_10_historical_different_intervals",
+      "status": "PASS",
+      "message": "Loaded data for 4/4 intervals: {'1': 1500, '15': 1500, '60': 1500, 'D': 1473}",
+      "timestamp": "2025-10-26T15:25:55.961242"
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "passed": 10,
+    "failed": 0,
+    "success_rate": 100.0
+  }
+}

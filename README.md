@@ -1,6 +1,53 @@
 # bybit_strategy_tester_v2
 Универсальная платформа бэктестирования и оптимизации торговых стратегий
 
+---
+
+## 🤖 NEW: Multi-Agent Workflow (Variant 1 - MCP Tools)
+
+**Copilot + Perplexity через Model Context Protocol с ручной координацией**
+
+### ⚡ Quick Start (2 минуты)
+```powershell
+# MCP серверы уже настроены! 
+# ✅ GitHub (@modelcontextprotocol/server-github)
+# ✅ Filesystem (@modelcontextprotocol/server-filesystem)
+
+# Документы workflow:
+# 1. Decision Matrix (когда что использовать)
+.\.github\DECISION_MATRIX.md
+
+# 2. Multi-Agent Workflow (полный процесс)
+.\.github\MULTI_AGENT_WORKFLOW.md
+
+# 3. Copilot Instructions (для агента)
+.\.github\COPILOT_INSTRUCTIONS.md
+```
+
+### 🎯 Как работает Workflow
+```mermaid
+graph LR
+    A[Задача] --> B{Decision Matrix}
+    B -->|Простая| C[Copilot Solo]
+    B -->|Сложная| D[User → Perplexity]
+    D --> E[User → Copilot]
+    E --> F[Copilot: Code + Tests]
+```
+
+### 📊 Статистика
+- ✅ **85 тестов** прошли на 100%
+- ✅ **MCP integration** валидирована (48/48 тестов)
+- ✅ **CSV Export** реализован (16/16 тестов)
+- ✅ **RBAC** внедрен (17/19 тестов, 89.5%)
+
+### 📚 Документация Workflow
+- **🎯 Decision Matrix**: [`.github/DECISION_MATRIX.md`](.github/DECISION_MATRIX.md) - Когда использовать Copilot/Perplexity/Direct Code
+- **🔄 Multi-Agent Workflow**: [`.github/MULTI_AGENT_WORKFLOW.md`](.github/MULTI_AGENT_WORKFLOW.md) - Полный процесс работы
+- **📝 Copilot Instructions**: [`.github/COPILOT_INSTRUCTIONS.md`](.github/COPILOT_INSTRUCTIONS.md) - Инструкции для AI агента
+- **🚀 Quick Start**: [`QUICKSTART_MULTI_AGENT.md`](QUICKSTART_MULTI_AGENT.md) - Начало работы
+
+---
+
 ## ✨ Новое: BacktestEngine (MVP)
 
 **Полноценный движок бэктестирования с EMA Crossover стратегией!**

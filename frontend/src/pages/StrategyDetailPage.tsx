@@ -1,10 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Container, Typography, Paper, Stack, Button, TextField, MenuItem } from '@mui/material';
+import {
+  Container,
+  Typography,
+  Paper,
+  Stack,
+  Button,
+  TextField,
+  MenuItem,
+  Box,
+} from '@mui/material';
 import { StrategiesApi, BacktestsApi } from '../services/api';
 import type { Strategy } from '../types/api';
 import { useNotify } from '../components/NotificationsProvider';
-import { applyFieldErrors, validateIsoUtc, validateSymbol } from '../utils/forms';
+import { applyFieldErrors, validateSymbol } from '../utils/forms';
+import { TIMEFRAMES } from '../constants/timeframes';
+import PeriodSelector, { type PeriodRange } from '../components/PeriodSelector';
+
+// Helper: Convert YYYY-MM-DD to ISO UTC (start of day)
+const dateToIsoUtc = (dateStr: string): string => {
+  return `${dateStr}T00:00:00Z`;
+};
 
 const StrategyDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -16,8 +32,10 @@ const StrategyDetailPage: React.FC = () => {
   // quick backtest form
   const [symbol, setSymbol] = useState('BTCUSDT');
   const [timeframe, setTimeframe] = useState('15');
-  const [startDate, setStartDate] = useState('2025-07-01T00:00:00Z');
-  const [endDate, setEndDate] = useState('2025-10-22T00:00:00Z');
+  const [period, setPeriod] = useState<PeriodRange>({
+    startDate: '2025-07-01',
+    endDate: '2025-10-22',
+  });
   const [initialCap, setInitialCap] = useState<number>(1000);
   const [queueing, setQueueing] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -27,11 +45,9 @@ const StrategyDetailPage: React.FC = () => {
     const symErr = validateSymbol(symbol);
     if (symErr) errs.symbol = symErr;
     if (!timeframe) errs.timeframe = 'Select timeframe';
-    const sErr = validateIsoUtc(startDate);
-    if (sErr) errs.startDate = sErr;
-    const eErr = validateIsoUtc(endDate);
-    if (eErr) errs.endDate = eErr;
-    if (startDate && endDate && Date.parse(startDate) >= Date.parse(endDate))
+    if (!period.startDate) errs.startDate = 'Start date required';
+    if (!period.endDate) errs.endDate = 'End date required';
+    if (period.startDate && period.endDate && period.startDate >= period.endDate)
       errs.endDate = 'End must be after Start';
     if (!initialCap || initialCap <= 0) errs.initialCap = 'Must be > 0';
     setFormErrors(errs);
@@ -111,30 +127,25 @@ const StrategyDetailPage: React.FC = () => {
               error={!!formErrors.timeframe}
               helperText={formErrors.timeframe}
             >
-              {['1', '3', '5', '15', '60', '240', 'D', 'W'].map((v) => (
-                <MenuItem key={v} value={v}>
-                  {v}
+              {TIMEFRAMES.map((tf) => (
+                <MenuItem key={tf.value} value={tf.value}>
+                  {tf.label}
                 </MenuItem>
               ))}
             </TextField>
-            <TextField
-              label="Start (ISO UTC)"
-              size="small"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              sx={{ width: 260 }}
-              error={!!formErrors.startDate}
-              helperText={formErrors.startDate}
-            />
-            <TextField
-              label="End (ISO UTC)"
-              size="small"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              sx={{ width: 260 }}
-              error={!!formErrors.endDate}
-              helperText={formErrors.endDate}
-            />
+            <Box sx={{ width: '100%', mt: 2 }}>
+              <PeriodSelector
+                value={period}
+                onChange={setPeriod}
+                label="Период тестирования"
+                minDate="2020-01-01"
+              />
+              {(formErrors.startDate || formErrors.endDate) && (
+                <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                  {formErrors.startDate || formErrors.endDate}
+                </Typography>
+              )}
+            </Box>
             <TextField
               label="Initial Capital"
               size="small"
@@ -156,8 +167,8 @@ const StrategyDetailPage: React.FC = () => {
                     strategy_id: strategyId,
                     symbol,
                     timeframe,
-                    start_date: startDate,
-                    end_date: endDate,
+                    start_date: dateToIsoUtc(period.startDate),
+                    end_date: dateToIsoUtc(period.endDate),
                     initial_capital: initialCap,
                   } as any);
                   if (bt) {

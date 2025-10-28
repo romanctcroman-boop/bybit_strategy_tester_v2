@@ -1,5 +1,5 @@
 """
-Unit тесты для WalkForwardOptimizer (backend/optimization/walk_forward_optimizer.py)
+Unit тесты для WalkForwardOptimizer (backend/optimization/walk_forward.py)
 
 Проверяет:
 1. Корректность расчёта parameter_stability (ТЗ 3.5.2)
@@ -21,7 +21,7 @@ import sys
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "backend"))
 
-from optimization.walk_forward_optimizer import (
+from optimization.walk_forward import (
     WalkForwardOptimizer,
     WFOMode,
     WFOPeriod

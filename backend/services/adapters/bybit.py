@@ -8,13 +8,41 @@ This module focuses on a small subset used by the strategy tester: fetching klin
 """
 
 import json
-import logging
 import os
 import time
 from datetime import UTC, datetime
 from typing import Any
 
-logger = logging.getLogger(__name__)
+# Import новых модулей
+from backend.core.config import get_config
+from backend.core.logging_config import get_logger
+from backend.core.retry import retry_with_backoff
+from backend.core.exceptions import (
+    BybitAPIError,
+    BybitRateLimitError,
+    BybitSymbolNotFoundError,
+    BybitInvalidIntervalError,
+    BybitConnectionError,
+    BybitTimeoutError,
+    handle_bybit_error
+)
+from backend.core.metrics import (
+    record_cache_hit,
+    record_cache_miss,
+    record_cache_set,
+    record_api_fetch,
+    record_db_store,
+    record_rate_limit_hit,
+    record_retry_attempt,
+    record_historical_fetch,
+    init_adapter_info,
+    track_api_request
+)
+from backend.core.cache import get_cache, make_cache_key
+
+# Получить конфигурацию и логгер
+config = get_config()
+logger = get_logger(__name__)
 
 try:
     # pybit v2+ (the unofficial/official clients vary by name); attempt common import
@@ -30,19 +58,26 @@ import requests
 
 class BybitAdapter:
     def __init__(
-        self, api_key: str | None = None, api_secret: str | None = None, timeout: int = 10
+        self, 
+        api_key: str | None = None, 
+        api_secret: str | None = None, 
+        timeout: int | None = None
     ):
-        self.api_key = api_key
-        self.api_secret = api_secret
-        self.timeout = timeout
-        if _HAS_PYBIT and api_key and api_secret:
+        # Использовать конфигурацию
+        self.api_key = api_key or config.API_KEY
+        self.api_secret = api_secret or config.API_SECRET
+        self.timeout = timeout or config.API_TIMEOUT
+        self.rate_limit_delay = config.RATE_LIMIT_DELAY
+        
+        if _HAS_PYBIT and self.api_key and self.api_secret:
             # pybit HTTP client (uses linear/perpetual endpoints by default)
             try:
-                self._client = PybitHTTP(api_key=api_key, api_secret=api_secret)
+                self._client = PybitHTTP(api_key=self.api_key, api_secret=self.api_secret)
             except Exception:
                 self._client = None
         else:
             self._client = None
+        
         # cache of discovered instruments: symbol -> metadata
         self._instruments_cache: dict[str, dict] = {}
         self._instruments_cache_at: float | None = None
@@ -50,6 +85,42 @@ class BybitAdapter:
         self._instruments_cache_ttl = 60 * 5
         # last HTTP status observed (for observability/backoff tuning)
         self._last_status: int | None = None
+        
+        # Session для HTTP запросов
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'BybitStrategyTester/2.0',
+            'Accept': 'application/json'
+        })
+        
+        # Redis кэш (если включен)
+        self.redis_cache = None
+        if config.REDIS_ENABLED:
+            try:
+                self.redis_cache = get_cache()
+                logger.info("Redis cache initialized")
+            except Exception as e:
+                logger.warning(f"Redis cache initialization failed: {e}")
+        
+        # Инициализировать метрики
+        init_adapter_info(
+            version='2.0',
+            has_api_key=str(bool(self.api_key)),
+            timeout=str(self.timeout),
+            rate_limit_delay=str(self.rate_limit_delay),
+            cache_enabled=str(config.CACHE_ENABLED),
+            redis_enabled=str(config.REDIS_ENABLED)
+        )
+        
+        logger.info(
+            "BybitAdapter initialized",
+            extra={
+                'has_api_key': bool(self.api_key),
+                'timeout': self.timeout,
+                'rate_limit_delay': self.rate_limit_delay,
+                'redis_enabled': config.REDIS_ENABLED
+            }
+        )
 
     def get_klines(self, symbol: str, interval: str = "1", limit: int = 200) -> list[dict]:
         """Fetch kline/candle data. interval is minutes as string in Bybit public API mapping.
@@ -73,6 +144,14 @@ class BybitAdapter:
             return itv
 
         interval_norm = _to_v5_interval(interval)
+        
+        # Проверка Redis кэша (если включен)
+        if self.redis_cache:
+            cache_key = make_cache_key(symbol, interval_norm, limit)
+            cached_data = self.redis_cache.get(cache_key, symbol, interval_norm)
+            if cached_data:
+                logger.debug(f"Cache hit for {symbol} {interval_norm} (limit={limit})")
+                return cached_data
 
         if self._client:
             try:
@@ -117,11 +196,25 @@ class BybitAdapter:
                         f"Successfully fetched {len(data)} klines from Bybit for {chosen_symbol}"
                     )
                     normalized = [self._normalize_kline_row(d) for d in data]
+                    
+                    # Записать метрики
+                    record_api_fetch(chosen_symbol, interval_norm, len(normalized))
+                    
+                    # Сохранить в Redis кэш (если включен)
+                    if self.redis_cache:
+                        cache_key = make_cache_key(chosen_symbol, interval_norm, limit)
+                        self.redis_cache.set(cache_key, normalized, symbol=chosen_symbol, interval=interval_norm)
+                    
                     # attempt to persist normalized candles to audit table (best-effort)
                     try:
                         self._persist_klines_to_db(chosen_symbol, normalized)
-                    except Exception:
-                        logger.exception("Failed to persist klines to DB")
+                        record_db_store(chosen_symbol, interval_norm, len(normalized))
+                    except ModuleNotFoundError as e:
+                        # Тихо игнорируем, если БД недоступна (например, в тестах)
+                        logger.debug(f"DB module not available: {e}")
+                    except Exception as e:
+                        # Логируем другие ошибки
+                        logger.warning(f"Failed to persist klines to DB: {e}")
                     return normalized
             except Exception as ex:
                 try:
@@ -190,6 +283,187 @@ class BybitAdapter:
                 pass
             logger.exception("All Bybit probes failed")
             raise
+
+    def get_klines_historical(
+        self, 
+        symbol: str, 
+        interval: str = "1", 
+        total_candles: int = 2000,
+        end_time: int | None = None
+    ) -> list[dict]:
+        """
+        Загрузить исторические свечи с обходом лимита API в 1000 свечей.
+        Делает множественные запросы, двигаясь назад во времени.
+        
+        Args:
+            symbol: Торговая пара (например, 'BTCUSDT')
+            interval: Интервал свечей ('1', '5', '15', '60', 'D' и т.д.)
+            total_candles: Общее количество свечей для загрузки
+            end_time: Конечная временная метка (мс). Если None - текущее время
+            
+        Returns:
+            Список свечей, отсортированный по времени (от старых к новым)
+        """
+        import time
+        
+        # Вычислить интервал в миллисекундах
+        def get_interval_ms(interval_str: str) -> int:
+            interval_str = str(interval_str)
+            if interval_str == 'D':
+                return 86400000  # 24 часа в мс
+            elif interval_str == 'W':
+                return 604800000  # 7 дней в мс
+            elif interval_str.endswith('m') or interval_str.endswith('M'):
+                minutes = int(interval_str[:-1])
+                return minutes * 60000
+            elif interval_str.endswith('h') or interval_str.endswith('H'):
+                hours = int(interval_str[:-1])
+                return hours * 3600000
+            else:
+                # Предполагаем что это минуты
+                return int(interval_str) * 60000
+        
+        interval_ms = get_interval_ms(interval)
+        current_end = end_time or int(time.time() * 1000)
+        
+        all_candles = []
+        batch_size = 1000  # Максимум за один запрос
+        requests_made = 0
+        max_requests = (total_candles // batch_size) + 2  # +2 для запаса
+        
+        logger.info(
+            f"🔄 Starting historical fetch: {symbol} {interval}, "
+            f"target={total_candles} candles, end={current_end}"
+        )
+        
+        while len(all_candles) < total_candles and requests_made < max_requests:
+            # Рассчитать startTime для текущего батча
+            # Двигаемся назад: end - (batch_size * interval)
+            start_time = current_end - (batch_size * interval_ms)
+            
+            logger.info(
+                f"📊 Batch {requests_made + 1}: fetching {batch_size} candles, "
+                f"from {start_time} to {current_end}"
+            )
+            
+            # Запрос к API с startTime и endTime
+            batch = self._fetch_klines_with_time_range(
+                symbol=symbol,
+                interval=interval,
+                limit=batch_size,
+                start_time=start_time,
+                end_time=current_end
+            )
+            
+            if not batch:
+                logger.warning(f"⚠️ No data returned for batch {requests_made + 1}, stopping")
+                break
+            
+            logger.info(f"✅ Received {len(batch)} candles in batch {requests_made + 1}")
+            
+            # Добавить в начало списка (т.к. идем назад во времени)
+            all_candles = batch + all_candles
+            
+            # Обновить end_time для следующей итерации
+            if batch:
+                # Взять время самой старой свечи из батча
+                oldest_candle_time = min(c.get('open_time', 0) for c in batch)
+                current_end = oldest_candle_time - interval_ms  # Сдвиг назад
+            else:
+                break
+            
+            requests_made += 1
+            
+            # Пауза между запросами для соблюдения rate limits
+            if requests_made < max_requests and len(all_candles) < total_candles:
+                time.sleep(0.2)  # 200ms между запросами
+        
+        # Дедупликация и сортировка
+        seen_times = set()
+        unique_candles = []
+        for candle in sorted(all_candles, key=lambda c: c.get('open_time', 0)):
+            candle_time = candle.get('open_time')
+            if candle_time and candle_time not in seen_times:
+                seen_times.add(candle_time)
+                unique_candles.append(candle)
+        
+        # Обрезать до нужного количества (берем последние)
+        result = unique_candles[-total_candles:] if len(unique_candles) > total_candles else unique_candles
+        
+        logger.info(
+            f"✅ Historical fetch complete: {len(result)} unique candles "
+            f"({requests_made} API requests)"
+        )
+        
+        return result
+    
+    def _fetch_klines_with_time_range(
+        self,
+        symbol: str,
+        interval: str,
+        limit: int,
+        start_time: int,
+        end_time: int
+    ) -> list[dict]:
+        """
+        Внутренний метод для запроса свечей с временным диапазоном.
+        Использует параметры start и end API Bybit.
+        """
+        def _to_v5_interval(itv: str) -> str:
+            itv = str(itv)
+            if itv.endswith("m") or itv.endswith("M"):
+                return itv[:-1]
+            if itv.endswith("h") or itv.endswith("H"):
+                try:
+                    return str(int(itv[:-1]) * 60)
+                except Exception:
+                    return itv[:-1]
+            if itv.endswith("d") or itv.endswith("D"):
+                return "D"
+            return itv
+        
+        interval_norm = _to_v5_interval(interval)
+        v5_kline_url = "https://api.bybit.com/v5/market/kline"
+        
+        candidates = [symbol, symbol.upper()]
+        if not symbol.upper().endswith("USDT"):
+            candidates.append(symbol.upper() + "USDT")
+        
+        for chosen_symbol in candidates:
+            try:
+                params = {
+                    "category": "linear",
+                    "symbol": chosen_symbol,
+                    "interval": interval_norm,
+                    "limit": limit,
+                    "start": start_time,
+                    "end": end_time
+                }
+                
+                r = requests.get(v5_kline_url, params=params, timeout=5)
+                r.raise_for_status()
+                payload = r.json()
+                
+                result = payload.get("result") or payload.get("data") or payload
+                if isinstance(result, dict) and "list" in result:
+                    data = result["list"]
+                elif isinstance(result, list):
+                    data = result
+                else:
+                    data = []
+                
+                if data:
+                    normalized = [self._normalize_kline_row(d) for d in data]
+                    return normalized
+                    
+            except Exception as ex:
+                logger.debug(
+                    f"Fetch with time range failed for {chosen_symbol}: {ex}",
+                    exc_info=False
+                )
+                continue
+        
+        return []
 
     def _normalize_kline_row(self, row: dict) -> dict:
         # Accept both list-style and dict-style rows
@@ -302,16 +576,23 @@ class BybitAdapter:
 
         Behaviour: best-effort; uses UNIQUE(symbol, open_time) to avoid duplicates.
         """
-        # import DB objects lazily to avoid import-time circular dependencies in tests
-        from sqlalchemy import text
-
-        from backend.database import SessionLocal
-        from backend.models.bybit_kline_audit import BybitKlineAudit
-
         # Respect env var BYBIT_PERSIST_KLINES (default true)
         persist_flag = os.environ.get("BYBIT_PERSIST_KLINES", "1").lower()
         if persist_flag not in ("1", "true", "yes", "y"):
             logger.debug("BYBIT_PERSIST_KLINES is false; skipping DB persistence")
+            return
+        
+        # import DB objects lazily to avoid import-time circular dependencies in tests
+        try:
+            from sqlalchemy import text
+            from backend.database import SessionLocal
+            from backend.models.bybit_kline_audit import BybitKlineAudit
+        except ModuleNotFoundError:
+            # БД модули недоступны (например, в тестах без установленного окружения)
+            logger.debug("Database modules not available, skipping persistence")
+            return
+        except ImportError as e:
+            logger.debug(f"Cannot import database modules: {e}")
             return
 
         # Prepare parameter rows

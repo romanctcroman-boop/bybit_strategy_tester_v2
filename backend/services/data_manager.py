@@ -1,5 +1,16 @@
 """
-DataManager - Централизованное управление историческими данными
+DataManager - Unified facade for historical data loading (DEPRECATED - use backend.core.data_manager)
+
+⚠️ DEPRECATION NOTICE:
+This module is DEPRECATED and will be removed in a future version.
+Please use backend.core.data_manager.DataManager instead.
+
+Migration guide:
+    Old: from backend.services.data_manager import DataManager
+    New: from backend.core.data_manager import DataManager
+
+The core implementation provides the same interface with better performance
+and multi-timeframe support.
 
 Соответствие ТЗ 3.1.2:
 - Фасад над BybitAdapter и DataService
@@ -7,25 +18,15 @@ DataManager - Централизованное управление истори
 - Multi-timeframe support
 - Автоматическое обновление данных
 
-Параметры:
-- symbol: str - Торговая пара (BTCUSDT, ETHUSDT, etc.)
-- timeframe: str - Таймфрейм ('1', '5', '15', '60', '240', 'D')
-- start_date: datetime - Начало исторического периода
-- end_date: datetime - Конец периода
-- cache_dir: str - Директория для локального кэша
-
-Методы (ТЗ 3.1.2):
-- load_historical(limit=1000) -> pd.DataFrame
-- update_cache() -> None
-- get_multi_timeframe(timeframes: list) -> dict[str, pd.DataFrame]
-
 Создано: 25 октября 2025 (Фаза 1, Задача 2)
+DEPRECATED: 27 января 2025 (Anomaly #3 fix)
 """
 
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any
+import warnings
 
 import pandas as pd
 from loguru import logger
@@ -34,9 +35,23 @@ from backend.services.adapters.bybit import BybitAdapter
 from backend.services.data_service import DataService
 
 
+# Show deprecation warning when imported
+warnings.warn(
+    "backend.services.data_manager is DEPRECATED. "
+    "Use backend.core.data_manager instead for better performance.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+
 class DataManager:
     """
+    DEPRECATED: Use backend.core.data_manager.DataManager instead!
+    
     ТЗ 3.1.2 - Управляет загрузкой, кэшированием и синхронизацией исторических данных
+    
+    ⚠️ This class is deprecated and will be removed in a future version.
+    For new code, use: from backend.core.data_manager import DataManager
     
     Предоставляет централизованный доступ к рыночным данным с автоматическим
     кэшированием в Parquet формате согласно ТЗ 7.3.
@@ -48,9 +63,14 @@ class DataManager:
     4. Опционально сохраняет в DB audit table
     
     Example:
+        >>> # OLD (deprecated):
         >>> dm = DataManager(symbol='BTCUSDT', timeframe='15')
         >>> df = dm.load_historical(limit=1000)
-        >>> print(f"Loaded {len(df)} bars")
+        
+        >>> # NEW (recommended):
+        >>> from backend.core.data_manager import DataManager
+        >>> dm = DataManager(symbol='BTCUSDT')
+        >>> df = dm.load_historical(timeframe='15', limit=1000)
         
         >>> # Multi-timeframe
         >>> mtf_data = dm.get_multi_timeframe(['5', '15', '60'])

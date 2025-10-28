@@ -48,3 +48,36 @@ def test_marketdata_ingest_csv(tmp_path, monkeypatch):
     data = r3.json()
     assert isinstance(data, list)
     assert len(data) >= 3
+
+
+def test_klines_working_validation():
+    """Test that load_limit parameter validates correctly (min 100, max 1000)."""
+    client = TestClient(app)
+
+    # Test: load_limit too small (< 100) - should fail
+    r1 = client.get(
+        "/api/v1/marketdata/bybit/klines/working",
+        params={"symbol": "BTCUSDT", "interval": "15", "load_limit": 10},
+    )
+    assert r1.status_code == 422, "Should reject load_limit < 100"
+
+    # Test: load_limit at minimum (100) - should succeed
+    r2 = client.get(
+        "/api/v1/marketdata/bybit/klines/working",
+        params={"symbol": "BTCUSDT", "interval": "15", "load_limit": 100},
+    )
+    assert r2.status_code in [200, 404], "Should accept load_limit = 100"
+
+    # Test: load_limit at maximum (1000) - should succeed
+    r3 = client.get(
+        "/api/v1/marketdata/bybit/klines/working",
+        params={"symbol": "BTCUSDT", "interval": "15", "load_limit": 1000},
+    )
+    assert r3.status_code in [200, 404], "Should accept load_limit = 1000"
+
+    # Test: load_limit too large (> 1000) - should fail
+    r4 = client.get(
+        "/api/v1/marketdata/bybit/klines/working",
+        params={"symbol": "BTCUSDT", "interval": "15", "load_limit": 2000},
+    )
+    assert r4.status_code == 422, "Should reject load_limit > 1000"

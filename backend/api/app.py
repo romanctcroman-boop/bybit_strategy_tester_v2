@@ -9,6 +9,8 @@ from backend.api.routers import admin, backtests, marketdata, optimizations, str
 from backend.api.routers import bots as bots_router
 from backend.api.routers import live as live_router
 from backend.api.routers import wizard as wizard_router
+from backend.api.routers import health as health_router  # NEW: Health check router
+from backend.api.routers import rbac as rbac_router  # NEW: RBAC router
 from backend.config import CONFIG
 
 # Optional: start BybitWsManager on app startup when feature flag is enabled
@@ -116,6 +118,8 @@ app.include_router(live_router.router, prefix="/ws", tags=["live-ws"])
 app.include_router(wizard_router.router, prefix="/api/v1/wizard", tags=["wizard"])
 app.include_router(bots_router.router, prefix="/api/v1/bots", tags=["bots"])
 app.include_router(active_deals_router.router, prefix="/api/v1/active-deals", tags=["active-deals"])
+app.include_router(health_router.router, prefix="/api/v1", tags=["health"])  # NEW: Advanced health checks
+app.include_router(rbac_router.router, prefix="/api", tags=["rbac"])  # NEW: RBAC endpoints
 
 # Optional Prometheus metrics (/metrics), minimal text format
 from fastapi import Response

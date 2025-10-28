@@ -36,10 +36,130 @@ type MarketDataState = {
   switchInterval: (interval: string, limit?: number) => Promise<void>;
   setCategory: (category: BybitWsCategory) => Promise<void>;
   loadCandles: (symbol: string, interval: string, limit?: number) => Promise<Candle[]>;
+  loadHistoricalCandles: (
+    symbol: string,
+    interval: string,
+    requiredCount: number
+  ) => Promise<Candle[]>; // New: for backtester
   getMergedCandles: (symbol?: string, interval?: string) => Candle[];
+  clearCandleCache: (symbol?: string, interval?: string) => void;
+  saveCurrentState: () => Promise<void>; // New: for graceful shutdown
 };
 
-const MAX_CLOSED_CACHE = 1200; // keep up to N closed bars per key
+const MAX_CLOSED_CACHE = 2000; // keep up to N closed bars per key
+
+// LocalStorage helpers for persistent candle cache
+const STORAGE_PREFIX = 'bybit_candles_';
+const STORAGE_VERSION = 'v1';
+
+function getStorageKey(symbol: string, interval: string, category: BybitWsCategory): string {
+  return `${STORAGE_PREFIX}${STORAGE_VERSION}_${category}_${symbol.toUpperCase()}_${interval}`;
+}
+
+function saveToStorage(
+  symbol: string,
+  interval: string,
+  category: BybitWsCategory,
+  candles: Candle[]
+): void {
+  try {
+    const key = getStorageKey(symbol, interval, category);
+    const data = {
+      timestamp: Date.now(),
+      candles: candles.slice(-2000), // keep last 2000
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn('Failed to save candles to localStorage:', e);
+  }
+}
+
+function loadFromStorage(
+  symbol: string,
+  interval: string,
+  category: BybitWsCategory
+): Candle[] | null {
+  try {
+    const key = getStorageKey(symbol, interval, category);
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data.candles || !Array.isArray(data.candles)) return null;
+    // Check if data is not too old (max 7 days)
+    const age = Date.now() - (data.timestamp || 0);
+    if (age > 7 * 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return data.candles;
+  } catch (e) {
+    console.warn('Failed to load candles from localStorage:', e);
+    return null;
+  }
+}
+
+function clearStorage(symbol: string, interval: string, category: BybitWsCategory): void {
+  try {
+    const key = getStorageKey(symbol, interval, category);
+    localStorage.removeItem(key);
+  } catch (e) {
+    console.warn('Failed to clear storage:', e);
+  }
+}
+
+// Helper: Calculate time of oldest candle in storage
+function getOldestCandleTime(candles: Candle[]): number | null {
+  if (!candles || candles.length === 0) return null;
+  return Math.min(...candles.map((c) => c.time));
+}
+
+// Helper: Calculate time of newest candle in storage
+function getNewestCandleTime(candles: Candle[]): number | null {
+  if (!candles || candles.length === 0) return null;
+  return Math.max(...candles.map((c) => c.time));
+}
+
+// Helper: Calculate interval in seconds
+function getIntervalSeconds(interval: string): number {
+  const iv = String(interval).toUpperCase();
+  if (iv === 'D') return 86400;
+  if (iv === 'W') return 7 * 86400;
+  const n = parseInt(iv, 10);
+  return (isFinite(n) && n > 0 ? n : 1) * 60;
+}
+
+// Helper: Calculate number of candles needed for date range
+export function calculateCandlesForDateRange(
+  startDate: string, // YYYY-MM-DD
+  endDate: string, // YYYY-MM-DD
+  interval: string
+): number {
+  const start = new Date(startDate).getTime() / 1000;
+  const end = new Date(endDate).getTime() / 1000;
+  const diffSec = end - start;
+  const intervalSec = getIntervalSeconds(interval);
+  const candles = Math.ceil(diffSec / intervalSec);
+
+  // Clamp to API limits (100-1000)
+  return Math.max(100, Math.min(1000, candles));
+}
+
+// Helper: Deduplicate and sort candles
+function deduplicateCandles(candles: Candle[]): Candle[] {
+  const sorted = [...candles].sort((a, b) => a.time - b.time);
+  const dedup: Candle[] = [];
+  let lastTime: number | null = null;
+  for (const c of sorted) {
+    if (lastTime === null || c.time > lastTime) {
+      dedup.push(c);
+      lastTime = c.time;
+    } else if (c.time === lastTime) {
+      // Replace with latest data for same timestamp
+      dedup[dedup.length - 1] = c;
+    }
+  }
+  return dedup;
+}
 
 export const useMarketDataStore = create<MarketDataState>((set, get) => ({
   currentSymbol: 'BTCUSDT',
@@ -52,35 +172,83 @@ export const useMarketDataStore = create<MarketDataState>((set, get) => ({
   ws: {},
   poll: {},
 
-  loadCandles: async (symbol: string, interval: string, limit: number = 1000) => {
+  loadCandles: async (symbol: string, interval: string, _limit?: number) => {
     set({ loading: true, error: null });
+    const key = makeKey(symbol, interval);
+    const category = get().currentCategory;
+    const intervalSec = getIntervalSeconds(interval);
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    // Calculate optimal limit: always use 1000 candles (API max) for all timeframes
+    // This provides different history depths optimized per timeframe
+    const optimalLimit = _limit ?? 1000;
+
     try {
-      // Prefer backend working set API to ensure 1000-load/500-RAM policy server-side
-      const data = await DataApi.bybitWorkingSet(
-        symbol,
-        interval,
-        Math.max(100, Math.min(1000, limit))
-      );
-      const key = makeKey(symbol, interval);
-      // ensure ascending order & numeric
-      const sorted = [...data].sort((a, b) => a.time - b.time);
-      // dedupe any duplicate timestamps from REST (some APIs include the forming bar)
-      const dedup: Candle[] = [];
-      let lastTime: number | null = null;
-      for (const c of sorted) {
-        const t = c.time;
-        if (lastTime === null || t > lastTime) {
-          dedup.push(c);
-          lastTime = t;
-        } else if (t === lastTime) {
-          // replace previous with latest values if equal time appears
-          dedup[dedup.length - 1] = c;
+      // 1. Try to load from localStorage first
+      const cached = loadFromStorage(symbol, interval, category);
+
+      if (cached && cached.length > 0) {
+        console.log(`📦 Found ${cached.length} cached candles for ${key}`);
+
+        // 2. Update last 100 candles (to avoid price gaps) - minimum required by backend
+        const updateCount = Math.min(100, cached.length);
+        const last10Updated = await DataApi.bybitWorkingSet(symbol, interval, updateCount);
+
+        if (last10Updated.length === 0) {
+          console.warn('⚠️ Failed to fetch last 100 candles, using cache as-is');
+          set((s) => ({ candles: { ...s.candles, [key]: cached }, loading: false }));
+          return cached;
         }
+
+        // 3. Determine how many NEW candles we need from last cached to current time
+        const newestCachedTime = getNewestCandleTime(cached) || 0;
+        const newestFetchedTime = getNewestCandleTime(last10Updated) || nowSec;
+        const timeDiff = newestFetchedTime - newestCachedTime;
+        const newCandlesNeeded = Math.floor(timeDiff / intervalSec);
+
+        console.log(`🕐 Newest cached: ${new Date(newestCachedTime * 1000).toISOString()}`);
+        console.log(`🕐 Current time: ${new Date(nowSec * 1000).toISOString()}`);
+        console.log(`📊 New candles needed: ${newCandlesNeeded}`);
+
+        let allCandles = cached;
+
+        // 4. If we need new candles, fetch them
+        if (newCandlesNeeded > 10) {
+          // Fetch maximum available (up to 1000 recent)
+          const fetchCount = Math.min(1000, newCandlesNeeded + 50); // +50 buffer for overlap
+          const newCandles = await DataApi.bybitWorkingSet(symbol, interval, fetchCount);
+
+          // Merge: keep old candles + add new ones
+          allCandles = [...cached, ...newCandles];
+          console.log(`✅ Fetched ${newCandles.length} new candles`);
+        } else {
+          // Just replace last N candles (updateCount)
+          allCandles = [...cached.slice(0, -updateCount), ...last10Updated];
+          console.log(`✅ Updated last ${updateCount} candles`);
+        }
+
+        // 5. Deduplicate, sort, and limit to MAX_CLOSED_CACHE
+        const dedup = deduplicateCandles(allCandles);
+        const final = dedup.slice(-MAX_CLOSED_CACHE);
+
+        set((s) => ({ candles: { ...s.candles, [key]: final }, loading: false }));
+        saveToStorage(symbol, interval, category, final);
+        console.log(`💾 Saved ${final.length} candles to storage`);
+        return final;
       }
+
+      // 6. No cache - load fresh data using optimal limit based on timeframe
+      console.log(`🆕 No cache found, loading fresh data for ${key} (limit: ${optimalLimit})`);
+      const freshData = await DataApi.bybitWorkingSet(symbol, interval, optimalLimit);
+      const dedup = deduplicateCandles(freshData);
+
       set((s) => ({ candles: { ...s.candles, [key]: dedup }, loading: false }));
+      saveToStorage(symbol, interval, category, dedup);
+      console.log(`💾 Saved ${dedup.length} fresh candles to storage`);
       return dedup;
     } catch (e: any) {
       const msg = e?.message || 'Failed to load klines';
+      console.error(`❌ Error loading candles:`, e);
       set({ error: msg, loading: false });
       return [];
     }
@@ -147,24 +315,8 @@ export const useMarketDataStore = create<MarketDataState>((set, get) => ({
     // if cache exists, use it; otherwise fetch
     const cached = get().candles[key];
     if (!cached || cached.length === 0) {
-      // Preload neighbor timeframes for smooth switching
-      const neighbors = (() => {
-        const iv = interval.toUpperCase();
-        if (iv === '1') return ['1', '5'];
-        if (iv === '5') return ['1', '5', '15'];
-        if (iv === '15') return ['5', '15', '60'];
-        if (iv === '60') return ['15', '60', '240'];
-        if (iv === '240') return ['60', '240', 'D'];
-        if (iv === 'D') return ['240', 'D', 'W'];
-        return [iv];
-      })();
-      try {
-        const ivs = Array.from(new Set(neighbors));
-        // Reset bases to ensure new forming candle starts from last closed close
-        await DataApi.resetWorkingSets(symbol, ivs, true, 1000);
-        await DataApi.primeWorkingSets(symbol, ivs, 1000);
-      } catch {}
-      await get().loadCandles(symbol, interval, 1000);
+      // Load candles with automatic timeframe-based limit (30 days)
+      await get().loadCandles(symbol, interval);
     }
     // (re)subscribe WS for this key
     // unsubscribe any previous active ws
@@ -320,21 +472,7 @@ export const useMarketDataStore = create<MarketDataState>((set, get) => ({
     const newKey = makeKey(symbol, interval);
     // if not cached, load
     if (!get().candles[newKey] || get().candles[newKey].length === 0) {
-      try {
-        const iv = interval.toUpperCase();
-        const neighbors = (() => {
-          if (iv === '1') return ['1', '5'];
-          if (iv === '5') return ['1', '5', '15'];
-          if (iv === '15') return ['5', '15', '60'];
-          if (iv === '60') return ['15', '60', '240'];
-          if (iv === '240') return ['60', '240', 'D'];
-          if (iv === 'D') return ['240', 'D', 'W'];
-          return [iv];
-        })();
-        const ivs = Array.from(new Set(neighbors));
-        await DataApi.resetWorkingSets(symbol, ivs, true, 1000);
-        await DataApi.primeWorkingSets(symbol, ivs, 1000);
-      } catch {}
+      // Removed neighbor preloading logic
       await get().loadCandles(symbol, interval, limit);
     }
     // unsubscribe previous
@@ -573,5 +711,85 @@ export const useMarketDataStore = create<MarketDataState>((set, get) => ({
       return [...closed.slice(0, -1), forming];
     }
     return [...closed, forming];
+  },
+
+  loadHistoricalCandles: async (symbol: string, interval: string, requiredCount: number) => {
+    console.log(`📚 Loading historical candles: ${symbol} ${interval}, required: ${requiredCount}`);
+    const _key = makeKey(symbol, interval);
+    const category = get().currentCategory;
+    const cached = loadFromStorage(symbol, interval, category);
+
+    if (!cached || cached.length === 0) {
+      console.warn('⚠️ No cache available for historical load. Load current data first.');
+      return [];
+    }
+
+    const currentCount = cached.length;
+    if (currentCount >= requiredCount) {
+      console.log(`✅ Cache has enough data: ${currentCount} >= ${requiredCount}`);
+      return cached;
+    }
+
+    const neededCount = requiredCount - currentCount;
+    console.log(`📥 Need to load ${neededCount} more historical candles`);
+
+    try {
+      // Update first 10 candles to avoid gaps
+      const oldestTime = getOldestCandleTime(cached);
+      if (!oldestTime) {
+        console.warn('⚠️ Cannot determine oldest candle time');
+        return cached;
+      }
+
+      console.log(`🕐 Oldest cached: ${new Date(oldestTime * 1000).toISOString()}`);
+
+      // Note: Bybit API doesn't support loading older data with endTime parameter
+      // We can only load most recent N candles
+      // For true historical data, we'd need a different API endpoint or backend service
+      console.warn('⚠️ Historical data loading limited: API only provides recent candles');
+      console.warn('💡 Consider implementing backend historical data service');
+
+      // For now, return what we have
+      return cached;
+    } catch (e: any) {
+      console.error(`❌ Error loading historical candles:`, e);
+      return cached;
+    }
+  },
+
+  saveCurrentState: async () => {
+    console.log('💾 Saving current state...');
+    const state = get();
+
+    // Save all active candle caches to localStorage
+    let savedCount = 0;
+    for (const [key, candles] of Object.entries(state.candles)) {
+      if (candles && candles.length > 0) {
+        const [symbol, interval] = key.split(':');
+        saveToStorage(symbol, interval, state.currentCategory, candles);
+        savedCount++;
+      }
+    }
+
+    console.log(`✅ Saved ${savedCount} candle caches to storage`);
+  },
+
+  clearCandleCache: (symbol?: string, interval?: string) => {
+    const s = get();
+    const sym = symbol || s.currentSymbol;
+    const itv = interval || s.currentInterval;
+    const key = makeKey(sym, itv);
+    const category = s.currentCategory;
+
+    // Clear from memory
+    set((state) => ({
+      candles: { ...state.candles, [key]: [] },
+      forming: { ...state.forming, [key]: null },
+    }));
+
+    // Clear from localStorage
+    clearStorage(sym, itv, category);
+
+    console.log(`Cleared cache for ${key}`);
   },
 }));

@@ -56,6 +56,125 @@
 			"dependsOrder": "parallel",
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "MCP: Install Servers",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"install",
+				"-g",
+				"@modelcontextprotocol/server-perplexity-ask",
+				"@modelcontextprotocol/server-capiton-github"
+			],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "new"
+			}
+		},
+		{
+			"label": "MCP: Start Perplexity Server",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-perplexity-ask"
+			],
+			"isBackground": true,
+			"problemMatcher": {
+				"pattern": {
+					"regexp": "^(.*)$",
+					"file": 1,
+					"location": 2,
+					"message": 3
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^.*Starting.*$",
+					"endsPattern": "^.*Ready.*$"
+				}
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "MCP: Start Capiton GitHub Server",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-capiton-github"
+			],
+			"isBackground": true,
+			"problemMatcher": {
+				"pattern": {
+					"regexp": "^(.*)$",
+					"file": 1,
+					"location": 2,
+					"message": 3
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^.*Starting.*$",
+					"endsPattern": "^.*Ready.*$"
+				}
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "MCP: Start All Servers",
+			"dependsOn": [
+				"MCP: Start Perplexity Server",
+				"MCP: Start Capiton GitHub Server"
+			],
+			"dependsOrder": "parallel",
+			"problemMatcher": []
+		},
+		{
+			"label": "Workflow: High Priority Anomalies (4-7)",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Starting automated workflow for high priority anomalies..."
+			],
+			"dependsOn": [
+				"MCP: Start All Servers"
+			],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Test: Run All Critical Tests",
+			"type": "shell",
+			"command": "py",
+			"args": [
+				"-3.13",
+				"-m",
+				"pytest",
+				"test_optimization_consolidation.py",
+				"tests/test_rbac.py",
+				"tests/test_datamanager_compatibility.py",
+				"tests/integration/test_rbac_api.py",
+				"-v",
+				"--tb=short"
+			],
+			"problemMatcher": [],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
 		}
 	]
 }

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 
 from backend.api.schemas import (
     ApiListResponse,
@@ -13,6 +13,7 @@ from backend.api.schemas import (
     OptimizationRunWalkForwardRequest,
     OptimizationUpdate,
 )
+from backend.core.rbac import UserLevel, require_level, get_user_level
 
 
 def _get_data_service():
@@ -105,7 +106,11 @@ def get_optimization(optimization_id: int):
 
 
 @router.post("/", response_model=OptimizationOut)
-def create_optimization(payload: OptimizationCreate):
+@require_level(UserLevel.ADVANCED)  # Grid optimization requires ADVANCED level
+def create_optimization(
+    payload: OptimizationCreate,
+    user_level: UserLevel = Depends(get_user_level)
+):
     DS = _get_data_service()
     if DS is None:
         raise HTTPException(
@@ -213,7 +218,12 @@ def _iso(v) -> str:
         }
     },
 )
-def enqueue_grid_search(optimization_id: int, payload: OptimizationRunGridRequest):
+@require_level(UserLevel.ADVANCED)  # Grid search requires ADVANCED level
+def enqueue_grid_search(
+    optimization_id: int,
+    payload: OptimizationRunGridRequest,
+    user_level: UserLevel = Depends(get_user_level)
+):
     # Lazy imports to avoid impacting environments without Celery
     try:
         from backend.tasks.optimize_tasks import grid_search_task
@@ -289,7 +299,12 @@ def enqueue_grid_search(optimization_id: int, payload: OptimizationRunGridReques
         }
     },
 )
-def enqueue_walk_forward(optimization_id: int, payload: OptimizationRunWalkForwardRequest):
+@require_level(UserLevel.ADVANCED)  # Walk-Forward requires ADVANCED level
+def enqueue_walk_forward(
+    optimization_id: int,
+    payload: OptimizationRunWalkForwardRequest,
+    user_level: UserLevel = Depends(get_user_level)
+):
     try:
         from backend.tasks.optimize_tasks import walk_forward_task
     except Exception as exc:

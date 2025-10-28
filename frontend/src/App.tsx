@@ -3,7 +3,7 @@ import { HashRouter, Routes, Route, Link } from 'react-router-dom';
 
 // Chart Pages
 const TestChartPage = lazy(() => import('./pages/TestChartPage'));
-const TradingViewDemo = lazy(() => import('./pages/TradingViewDemo'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 
 import NotificationsProvider from './components/NotificationsProvider';
 import ApiHealthIndicator from './components/ApiHealthIndicator';
@@ -28,22 +28,20 @@ const App: React.FC = () => {
             <Link to="/test-chart" style={{ textDecoration: 'none', color: 'inherit' }}>
               <strong>Test Chart</strong>
             </Link>
-            <Link to="/tv-demo" style={{ textDecoration: 'none', color: '#666' }}>
-              TradingView Demo
+            <Link to="/settings" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <strong>⚙️ Settings</strong>
             </Link>
           </div>
           <div style={{ marginLeft: 'auto' }}>
             <ApiHealthIndicator />
           </div>
         </nav>
-        <Suspense fallback={<div style={{ padding: 20 }}>Loading...</div>}>
+        <Suspense fallback={<div>Loading...</div>}>
           <Routes>
             {/* Test Chart - Main Page */}
             <Route path="/" element={<TestChartPage />} />
             <Route path="/test-chart" element={<TestChartPage />} />
-
-            {/* TradingView Demo */}
-            <Route path="/tv-demo" element={<TradingViewDemo />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </Suspense>
       </HashRouter>
