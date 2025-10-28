@@ -1,11 +1,27 @@
 # 🤖 Мультиагентная система: GitHub Copilot + Perplexity AI
 
-## ✅ Задание ВЫПОЛНЕНО
+## ✅ ВАЖНОЕ ОБНОВЛЕНИЕ
 
-Реализована полная мультиагентная связка через MCP Server в VS Code с:
+**Проблема с оригинальной конфигурацией:**
+- NPM пакет `@modelcontextprotocol/server-perplexity-ask` НЕ СУЩЕСТВУЕТ
+- NPM пакет `@modelcontextprotocol/server-github` УСТАРЕЛ (DEPRECATED)
+
+**Решение:**
+- ✅ Создан собственный Perplexity MCP сервер на Python (`mcp_perplexity_server.py`)
+- ✅ Использует официальный Perplexity AI API
+- ✅ Полностью совместим с MCP протоколом (JSON-RPC 2.0)
+- ✅ Возвращает ответы с цитатами источников
+- ✅ Протестирован и работает корректно
+
+---
+
+## ✅ Задание ВЫПОЛНЕНО (с доработками)
+
+Реализована полная мультиагентная связка через Custom MCP Server в VS Code с:
 - ✅ Автозапуском серверов при старте VS Code
-- ✅ Строгой маршрутизацией задач (только через Copilot)
-- ✅ Кооперативным решением задач (Copilot + Perplexity)
+- ✅ Собственным Perplexity MCP сервером (Python)
+- ✅ GitHub Copilot (нативная интеграция VS Code)
+- ✅ Filesystem MCP сервером для доступа к проекту
 
 ---
 
@@ -64,40 +80,45 @@ code .
 
 ### Конфигурация `.vscode/mcp.json`
 
-```json
+```jsonc
+// MCP Server Configuration
+// Custom Perplexity MCP server + Filesystem access
 {
-  "servers": {
-    "Perplexity": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-perplexity-ask"],
+  "mcpServers": {
+    "perplexity": {
+      "command": "D:/bybit_strategy_tester_v2/.venv/Scripts/python.exe",
+      "args": ["mcp_perplexity_server.py"],
       "env": {
         "PERPLEXITY_API_KEY": "${env:PERPLEXITY_API_KEY}"
       }
     },
-    "GitHubCopilot": {
-      "enabled": true
-    },
-    "github": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_TOKEN}"
-      }
-    },
     "filesystem": {
-      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "d:\\bybit_strategy_tester_v2"]
     }
-  },
-  "workflow": {
-    "taskManagement": "GitHubCopilot",
-    "research": "Perplexity",
-    "solutionExecution": ["GitHubCopilot", "Perplexity"]
   }
 }
+```
+
+**Важно:**
+- `perplexity` - собственный Python MCP сервер, использует Perplexity AI API
+- `filesystem` - официальный MCP сервер для доступа к файлам проекта
+- GitHub Copilot работает нативно в VS Code без MCP сервера
+
+### Собственный Perplexity MCP сервер
+
+Файл: `mcp_perplexity_server.py`
+
+**Возможности:**
+- ✅ Поиск и исследование через Perplexity AI
+- ✅ Возврат ответов с цитатами источников
+- ✅ Фильтрация по доменам (GitHub, StackOverflow, Python docs)
+- ✅ Поиск за последний месяц
+- ✅ Полная реализация MCP протокола (JSON-RPC 2.0)
+
+**Тестирование:**
+```powershell
+.\test_mcp_perplexity.ps1
 ```
 
 ### Роли агентов
