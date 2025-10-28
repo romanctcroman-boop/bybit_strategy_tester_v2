@@ -1,6 +1,18 @@
 {
-  "mcpServers": {
+  "servers": {
+    "Perplexity": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-perplexity-ask"],
+      "env": {
+        "PERPLEXITY_API_KEY": "${env:PERPLEXITY_API_KEY}"
+      }
+    },
+    "GitHubCopilot": {
+      "enabled": true
+    },
     "github": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
@@ -8,8 +20,14 @@
       }
     },
     "filesystem": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "d:\\bybit_strategy_tester_v2"]
     }
+  },
+  "workflow": {
+    "taskManagement": "GitHubCopilot",
+    "research": "Perplexity",
+    "solutionExecution": ["GitHubCopilot", "Perplexity"]
   }
 }
