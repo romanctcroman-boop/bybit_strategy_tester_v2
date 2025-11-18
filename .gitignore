@@ -284,9 +284,14 @@ BACKEND_*.md
 *PERPLEXITY*.md
 *REPORT*.md
 *SUMMARY*.md
-PHASE*.md
+# PHASE*.md - REMOVED: Need to track monitoring documentation
 QUICK_WIN*.md
 PROJECT_ANALYSIS.md
+
+# Phase 1 monitoring documentation (must track)
+!PHASE1_MONITORING_SETUP_COMPLETE.md
+!PHASE1_STAGING_FIXES_COMPLETION.md
+!monitoring/daily_phase1_summary.md
 MCP_*.md
 E2E_*.md
 FULL_*.md
@@ -327,3 +332,6 @@ query_perplexity.py
 
 # Migration scripts with plaintext keys (run once and delete)
 migrate_api_keys.py
+
+# Grafana credentials (local only)
+monitoring/.grafana_credentials

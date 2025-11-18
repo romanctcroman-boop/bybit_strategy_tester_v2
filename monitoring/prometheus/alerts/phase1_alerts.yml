@@ -1,0 +1,25 @@
+groups:
+  - name: phase1_circuit_breaker
+    interval: 1m
+    rules:
+      - alert: CircuitBreakerFlood
+        expr: increase(circuit_breaker_open_total[10m]) > 8
+        for: 5m
+        labels:
+          severity: warning
+          team: reliability
+          phase: phase1
+        annotations:
+          summary: "Circuit breaker opening frequently"
+          description: "More than 8 opens in the last 10 minutes (service={{ $labels.service }})"
+
+      - alert: RecoveryDrop
+        expr: (rate(agent_auto_recovery_success_total[1h]) / rate(circuit_breaker_open_total[1h])) < 0.70
+        for: 10m
+        labels:
+          severity: critical
+          team: reliability
+          phase: phase1
+        annotations:
+          summary: "Recovery rate below 70%"
+          description: "Agent auto-recovery ratio < 0.70 over the last hour"
