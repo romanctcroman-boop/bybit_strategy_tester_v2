@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762714461,
+  "changed_files": [
+    "tests\\test_perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762714448.686633,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test suite or codebase. No tests ran successfully.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage means:\n- No tests executed successfully\n- Entire codebase is untested in this run\n- No coverage data available for analysis\n\n## Potential Issues with Recent Changes\n1. **Test File Corruption**: `tests\\test_perplexity_client.py` likely contains syntax errors, import failures, or configuration issues\n2. **Dependency Issues**: Missing imports, version conflicts, or broken dependencies\n3. **Environment Problems**: Test environment not properly configured\n4. **Fixtures/Setup Failure**: Test initialization/setup code crashing before any tests run\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check test file for syntax errors: `python -m py_compile tests/test_perplexity_client.py`\n3. Verify imports and dependencies are available in test environment\n4. Run a simple smoke test to validate test environment\n\n**Follow-up:**\n5. Add basic unit tests for core functionality before expanding coverage\n6. Implement CI pipeline with test failure notifications\n7. Set up test isolation to prevent cascading failures\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback on code changes\n- High probability of undetected regressions\n- Deployment risk is extremely high\n- Code quality cannot be measured or assured\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 353,
+      "total_tokens": 480,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

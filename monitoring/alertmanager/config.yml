@@ -1,0 +1,147 @@
+# AlertManager Configuration for Bybit Strategy Tester
+
+global:
+  # Resolved timeout - how long to wait before marking alert as resolved
+  resolve_timeout: 5m
+  
+  # Slack webhook (replace with your webhook URL)
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree - defines how alerts are routed to receivers
+route:
+  # Default receiver for all alerts
+  receiver: 'default'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'cluster', 'service']
+  
+  # Wait time before sending first notification
+  group_wait: 10s
+  
+  # Wait time before sending notification about new alerts in group
+  group_interval: 10s
+  
+  # Wait time before re-sending notification
+  repeat_interval: 12h
+  
+  # Child routes for specific alerts
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      group_interval: 5m
+      repeat_interval: 4h
+      continue: true
+    
+    # Warning alerts - less urgent
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 12h
+    
+    # Info alerts - informational only
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      group_wait: 1m
+      group_interval: 30m
+      repeat_interval: 24h
+
+# Inhibition rules - suppress certain alerts when others fire
+inhibit_rules:
+  # Suppress warning if critical alert is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+  
+  # Suppress info if warning is firing
+  - source_match:
+      severity: 'warning'
+    target_match:
+      severity: 'info'
+    equal: ['alertname', 'instance']
+
+# Receivers - where to send notifications
+receivers:
+  # Default receiver (console log)
+  - name: 'default'
+    # webhook_configs:
+    #   - url: 'http://localhost:5001/webhook'
+  
+  # Critical alerts - multiple channels
+  - name: 'critical-alerts'
+    slack_configs:
+      - channel: '#alerts-critical'
+        username: 'Bybit AlertManager'
+        icon_emoji: ':rotating_light:'
+        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Instance:* {{ .Labels.instance }}
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+    
+    # Email notifications for critical alerts
+    # email_configs:
+    #   - to: 'oncall@example.com'
+    #     from: 'alertmanager@bybit-tester.com'
+    #     smarthost: 'smtp.gmail.com:587'
+    #     auth_username: 'your-email@gmail.com'
+    #     auth_password: 'your-app-password'
+    #     headers:
+    #       Subject: 'CRITICAL Alert: {{ .GroupLabels.alertname }}'
+    
+    # PagerDuty integration (uncomment and configure)
+    # pagerduty_configs:
+    #   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+    #     description: '{{ .GroupLabels.alertname }}'
+  
+  # Warning alerts
+  - name: 'warning-alerts'
+    slack_configs:
+      - channel: '#alerts-warning'
+        username: 'Bybit AlertManager'
+        icon_emoji: ':warning:'
+        title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Instance:* {{ .Labels.instance }}
+          *Summary:* {{ .Annotations.summary }}
+          {{ end }}
+        send_resolved: true
+  
+  # Info alerts
+  - name: 'info-alerts'
+    slack_configs:
+      - channel: '#alerts-info'
+        username: 'Bybit AlertManager'
+        icon_emoji: ':information_source:'
+        title: 'ℹ️ INFO: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Summary:* {{ .Annotations.summary }}
+          {{ end }}
+        send_resolved: true
+
+# Note: To enable Slack notifications:
+# 1. Create a Slack webhook at https://api.slack.com/messaging/webhooks
+# 2. Replace 'YOUR/WEBHOOK/URL' in slack_api_url above
+# 3. Create channels: #alerts-critical, #alerts-warning, #alerts-info
+# 4. Restart AlertManager: docker-compose restart alertmanager

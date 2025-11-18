@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762546889,
+  "changed_files": [
+    "backend\\api\\perplexity_client.py",
+    "backend\\api\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762546873.7295678,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1), indicating fundamental issues with test setup, dependencies, or code syntax. Zero coverage suggests tests didn't run at all.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution means no meaningful coverage data\n- Critical gap: Entire codebase untested in this run\n\n## Potential Issues with Recent Changes\n1. **Client files likely introduced breaking changes**:\n   - `perplexity_client.py` and `deepseek_client.py` modifications may contain syntax errors\n   - Missing imports or dependencies for new API clients\n   - Configuration issues preventing module loading\n\n2. **Test environment problems**:\n   - Missing test dependencies\n   - Environment variables not configured\n   - Path/import resolution failures\n\n## Recommendations for Improvement\n**Immediate Actions (Priority 1)**:\n1. Fix test execution failure first:\n   ```bash\n   python -m pytest --collect-only  # Identify loading errors\n   ```\n2. Check new client files for syntax errors\n3. Verify all required packages installed in test environment\n\n**Follow-up Actions**:\n1. Add basic smoke tests for new client modules\n2. Implement mock tests for external API calls\n3. Set up CI to fail fast on test execution errors\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code could cause:\n- Production outages from syntax/runtime errors\n- API integration failures\n- Data loss or corruption\n- Service unavailability\n\n**Urgency**: Address immediately before any deployment. Current state represents complete test suite failure.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 341,
+      "total_tokens": 479,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 10
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

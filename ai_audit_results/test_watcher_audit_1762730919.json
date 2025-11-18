@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762730919,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762730893.1279745,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code: -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **No test execution**: Coverage data is empty, indicating tests didn't run at all\n- **Critical gap**: Entire codebase is untested in this run\n\n## Potential Issues with Recent Changes\n1. **Breaking changes** in modified files likely caused test infrastructure failure\n2. **Configuration issues** in `tests/backend/conftest.py` may be preventing test execution\n3. **Dependency problems** - changes to `reliability/perplexity_client.py` or database components may have broken imports\n4. **Test framework corruption** - conftest modifications could have disrupted pytest setup\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Run `pytest -v` to identify specific failure points\n   - Check `conftest.py` for configuration errors\n   - Verify all dependencies are available\n\n2. **Isolate the break**:\n   - Test individual files: `pytest tests/unit/test_batch_writer.py -v`\n   - Check for import errors in modified modules\n\n3. **Restore basic functionality**:\n   - Fix any syntax errors in modified Python files\n   - Ensure test database connections work\n   - Verify external service clients initialize properly\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No working test suite means undetected regressions are guaranteed\n- 0% coverage indicates potential runtime errors in production\n- Recent changes to core engine and reliability components are completely unvalidated\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 383,
+      "total_tokens": 589,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762707970,
+  "changed_files": [
+    "reliability\\key_rotation.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762707955.302356,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Absolute test failure:\n- No files were executed during test run\n- Coverage data collection failed entirely\n- All code paths are completely untested\n\n## Potential Issues with Recent Changes\n**key_rotation.py changes likely caused test infrastructure collapse:**\n- Syntax errors preventing import/execution\n- Circular imports or dependency conflicts\n- Missing required dependencies in the module\n- Environment configuration broken by changes\n- Critical exceptions during module import\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test infrastructure first** - Run tests with `-v` flag to see specific failure\n2. **Check key_rotation.py imports** - Validate all imports and dependencies\n3. **Test module isolation** - Try importing key_rotation.py directly in Python shell\n4. **Review recent git changes** - `git diff` to identify breaking syntax/imports\n5. **Add basic smoke test** - Simple import test before complex test scenarios\n\n**FOLLOW-UP:**\n- Implement try/except around test setup\n- Add module-level syntax validation in CI\n- Create minimal working test to verify basic functionality\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- **Critical**: No validation of key rotation logic\n- **High**: Potential security vulnerabilities undetected\n- **High**: Data corruption or loss possible\n- **Medium**: Team unaware of broken test pipeline\n\n**Priority: Fix immediately before any further development or deployment.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 360,
+      "total_tokens": 485,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

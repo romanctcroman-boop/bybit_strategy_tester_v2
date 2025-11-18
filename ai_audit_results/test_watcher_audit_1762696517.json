@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762696517,
+  "changed_files": [
+    "temp_pg_test.py",
+    "backend\\security\\rate_limiter.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762696502.4534295,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment or code structure. No meaningful quality assessment possible until basic test execution is resolved.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All tests failed to execute, making coverage data meaningless. The root cause must be addressed before coverage can be measured.\n\n## Potential Issues with Recent Changes\n1. **Environment corruption** - `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` in changed files suggests virtual environment issues\n2. **Database connectivity** - `temp_pg_test.py` and psycopg2 changes indicate PostgreSQL connection failures\n3. **Import/circular dependency** issues in `backend\\security\\rate_limiter.py`\n4. **Missing dependencies** or broken installation\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Check PostgreSQL service status and connection strings\n2. Recreate virtual environment: `rm -rf .venv && python -m venv .venv`\n3. Reinstall dependencies: `pip install -r requirements.txt`\n4. Run tests with `-v` flag to see specific failure details\n\n**Follow-up:**\n5. Isolate database tests from unit tests\n6. Add connection health checks before test execution\n7. Implement proper test fixtures for database setup/teardown\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No validation of recent changes\n- Potential production-breaking issues undetected\n- Security vulnerabilities in rate limiter unverified\n- Database integration completely untested\n\n**Priority:** Fix test execution immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 157,
+      "completion_tokens": 355,
+      "total_tokens": 512,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 93
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

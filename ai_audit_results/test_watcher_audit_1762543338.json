@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762543338,
+  "changed_files": [
+    "monitoring\\test_alerts.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543323.5404384,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1). The test suite is non-functional and provides zero validation of code quality.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code is being tested\n- **No coverage data generated** - Tests didn't execute sufficiently to collect metrics\n- **Complete testing gap** - All functionality remains unverified\n\n## Potential Issues with Recent Changes\n1. **Syntax/runtime errors** in `monitoring/test_alerts.py` preventing test execution\n2. **Missing dependencies** or imports causing import failures\n3. **Configuration issues** in test setup/teardown\n4. **Environment compatibility** problems (Python version, paths, etc.)\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Fix test execution failure first - run tests individually to identify root cause\n2. Check for syntax errors in `monitoring/test_alerts.py`\n3. Verify all imports and dependencies are available\n4. Ensure test configuration (pytest.ini, conftest.py) is correct\n\n**FOLLOW-UP:**\n5. Implement basic smoke tests before adding complex test cases\n6. Add test discovery verification to CI pipeline\n7. Set up minimum coverage threshold (aim for 70%+ initially)\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression protection\n- Potential production defects undetected\n- Broken development feedback loop\n- All recent changes effectively untested\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 331,
+      "total_tokens": 456,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

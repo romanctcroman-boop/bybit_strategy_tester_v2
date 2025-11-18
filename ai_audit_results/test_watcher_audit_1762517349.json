@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762517349,
+  "changed_files": [
+    "automation\\task1_test_watcher\\test_watcher.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762517332.8364346,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates fundamental issues in the test infrastructure or recent code changes.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No tests executed successfully\n- **No coverage data available** - Execution halted before coverage collection\n- **Critical gap**: Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **Syntax errors** in `test_watcher.py` preventing import/execution\n2. **Missing dependencies** or imports causing import failures\n3. **Configuration issues** in test runner or environment setup\n4. **Breaking changes** in test infrastructure or dependencies\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile automation\\task1_test_watcher\\test_watcher.py` to check for syntax errors\n2. Execute tests with verbose output to identify the specific failure point\n3. Verify all imports and dependencies are available in test environment\n4. Check test configuration files for recent changes\n\n**Short-term:**\n1. Add basic syntax validation to CI pipeline\n2. Implement test execution monitoring with failure alerts\n3. Create smoke tests to validate test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback for recent changes\n- Potential for undetected regressions in production code\n- Broken development workflow\n- Urgent attention required to restore testing capability\n\n**Priority**: Fix test execution immediately before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 334,
+      "total_tokens": 467,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 133
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762713326,
+  "changed_files": [
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713312.1890063,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero value in current state.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code coverage achieved\n- **Critical Gap**: Tests cannot execute at all\n- **Root Cause**: Likely fatal error during test setup/import\n\n## Potential Issues with Recent Changes\n1. **Broken Test Infrastructure** - `tests\\test_deepseek_client.py` changes introduced fatal errors\n2. **Possible Causes**:\n   - Syntax errors in test file\n   - Missing dependencies/imports\n   - Configuration issues\n   - Circular imports\n   - Test framework compatibility issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix Test Execution**:\n   - Run `python -m pytest tests/test_deepseek_client.py -v` to see specific error\n   - Check for syntax errors in the test file\n   - Verify all imports are valid\n\n2. **Debug Steps**:\n   - Add `import pdb; pdb.set_trace()` at test file start\n   - Check Python version compatibility\n   - Verify pytest configuration\n\n3. **Prevention**:\n   - Add pre-commit hooks to validate test syntax\n   - Implement CI pipeline that fails on test execution errors\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- No test feedback on code changes\n- High probability of undetected regressions\n- Deployment would be extremely risky\n- Team cannot trust test results\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 349,
+      "total_tokens": 476,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

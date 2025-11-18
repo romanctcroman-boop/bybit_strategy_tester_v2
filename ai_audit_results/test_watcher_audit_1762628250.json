@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762628250,
+  "changed_files": [
+    "test_provider_readiness.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "mcp-server\\server.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762628234.7087388,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental issues with the test environment or codebase.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\n1. **Environment/Import Issues**: Modified `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` suggests potential dependency conflicts or environment corruption\n2. **Test Infrastructure Failure**: `test_provider_readiness.py` changes may have broken test setup/teardown\n3. **Database Connection Issues**: Changes to `mcp-server\\server.py` and psycopg2 files indicate possible PostgreSQL connection failures\n4. **Temporary Test File**: `temp_pg_test.py` suggests incomplete test development\n\n## Immediate Action Recommendations\n1. **Fix Test Environment First**:\n   - Revert changes to `psycopg2\\__init__.py` in virtual environment\n   - Recreate virtual environment if corrupted\n   - Verify database connectivity before running tests\n\n2. **Debug Test Execution**:\n   - Run tests with `-v` flag to see which test fails first\n   - Check if `temp_pg_test.py` is causing conflicts\n   - Validate test dependencies and imports\n\n3. **Isolate Changes**:\n   - Test `mcp-server\\server.py` changes independently\n   - Verify `test_provider_readiness.py` modifications don't break test discovery\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful testing:\n- No regression detection capability\n- Potential production issues undetectable\n- Database integration likely broken\n- Development blocked until resolved\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 162,
+      "completion_tokens": 389,
+      "total_tokens": 551,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 98
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

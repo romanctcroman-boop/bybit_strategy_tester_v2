@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762587130,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762587112.9554904,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental infrastructure or configuration issues rather than test logic problems.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality or functionality.\n\n## Potential Issues with Recent Changes\nThe single changed file (`tests\\backend\\conftest.py`) suggests:\n- **Pytest configuration corruption** - Likely syntax errors, import failures, or fixture conflicts\n- **Environment setup failure** - Database connections, environment variables, or dependency issues\n- **Hook function errors** - Broken setup/teardown logic preventing test discovery/execution\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug conftest.py** - Check for syntax errors, missing imports, or infinite loops\n2. **Run pytest with `-v` flag** - Get detailed error output to identify root cause\n3. **Verify pytest.ini/pyproject.toml** - Ensure configuration files are valid\n4. **Test isolation** - Temporarily rename conftest.py to confirm it's the culprit\n\n**FOLLOW-UP:**\n- Add pre-commit hooks to validate pytest configuration\n- Implement basic smoke tests for test infrastructure\n- Monitor test execution time for potential hangs\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in code quality. Any deployment would be blind to:\n- Breaking changes in production code\n- Regression defects\n- Integration failures\n\n**Priority: CRITICAL** - Must be resolved before any further development or deployment activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 358,
+      "total_tokens": 485,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

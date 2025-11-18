@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540013,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539999.6874306,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests failed before any meaningful execution\n- **Complete coverage gap** - All code paths remain untested\n\n## Potential Issues with Recent Changes\n1. **Test file `test_e2e_audit_agent.py` likely contains fatal errors**\n2. **Environment setup/teardown failures** preventing test execution\n3. **Dependency issues** - missing imports or broken dependencies\n4. **Configuration problems** in test runner or environment variables\n5. **Syntax errors or runtime exceptions** in test code\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug the failing test file** - Check for syntax errors and runtime exceptions\n2. **Run tests with verbose output** to identify the exact failure point\n3. **Verify test dependencies** and environment setup\n4. **Test isolation** - Run this specific test file separately to isolate the issue\n\n**Short-term:**\n1. **Add basic unit tests** to establish minimum coverage\n2. **Implement test logging** for better failure diagnostics\n3. **Set up continuous integration** with fail-fast feedback\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Zero test reliability** - No confidence in code changes\n- **Production deployment risk** - Untested code could contain critical bugs\n- **Development blocker** - Cannot validate new features or fixes\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 365,
+      "total_tokens": 499,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

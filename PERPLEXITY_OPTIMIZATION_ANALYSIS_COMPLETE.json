@@ -1,0 +1,186 @@
+{
+  "problems": [
+    {
+      "title": "Дублирование клиентов Perplexity",
+      "severity": "high",
+      "description": "В системе присутствуют два отдельных клиента Perplexity - PerplexityProvider и PerplexityClient, что приводит к дублированию логики и неэффективному использованию ресурсов",
+      "impact": "Увеличение сложности поддержки, дублирование кода, потенциальные расхождения в поведении"
+    },
+    {
+      "title": "Отсутствие кэширования запросов",
+      "severity": "high",
+      "description": "Нет механизма кэширования одинаковых запросов к Perplexity API, что приводит к избыточным вызовам и затратам",
+      "impact": "Повышение стоимости API вызовов, снижение производительности при повторяющихся запросах",
+      "status": "✅ FIXED (Quick Win 1)"
+    },
+    {
+      "title": "Базовая retry логика",
+      "severity": "medium",
+      "description": "Retry логика ограничена простыми повторами без экспоненциальной backoff стратегии и без учета типа ошибок",
+      "impact": "Неэффективное восстановление при временных сбоях API, потенциальные блокировки при rate limiting",
+      "status": "✅ PARTIALLY FIXED (Quick Win 3 - Circuit Breaker)"
+    },
+    {
+      "title": "Отсутствие streaming ответов",
+      "severity": "medium",
+      "description": "Текущая реализация не поддерживает streaming ответов, что ухудшает пользовательский опыт для длинных запросов",
+      "impact": "Длительное ожидание полного ответа, невозможность отображения прогресса генерации"
+    },
+    {
+      "title": "Неоптимальные таймауты",
+      "severity": "medium",
+      "description": "Используются фиксированные таймауты без адаптации к типу запроса и текущей загрузке API",
+      "impact": "Лишние ожидания для быстрых запросов, преждевременные прерывания для сложных запросов",
+      "status": "✅ PARTIALLY FIXED (Quick Win 2 - Health Check timeout 10s → 5s)"
+    },
+    {
+      "title": "Отсутствие мониторинга качества ответов",
+      "severity": "low",
+      "description": "Нет механизма для оценки качества и релевантности ответов от разных моделей",
+      "impact": "Невозможность автоматической оптимизации выбора модели на основе исторических данных"
+    }
+  ],
+  "optimizations": [
+    {
+      "priority": 1,
+      "title": "Унифицированный кэширующий клиент",
+      "problem": "Дублирование клиентов и отсутствие кэширования",
+      "solution": "Создать единый PerplexityClient с интегрированным кэшированием на основе хэша запроса и TTL",
+      "expected_impact": "Снижение количества API вызовов на 40-60%, уменьшение задержек для повторяющихся запросов",
+      "effort": "medium",
+      "files_to_modify": [
+        "providers/perplexity_provider.py",
+        "perplexity_client.py"
+      ]
+    },
+    {
+      "priority": 2,
+      "title": "Улучшенная retry стратегия с backoff",
+      "problem": "Базовая retry логика",
+      "solution": "Реализовать экспоненциальный backoff с jitter, учитывать HTTP статусы (429, 500-599) для intelligent retry",
+      "expected_impact": "Улучшение устойчивости к временным сбоям, снижение вероятности блокировок",
+      "effort": "medium",
+      "files_to_modify": [
+        "providers/base.py",
+        "providers/perplexity_provider.py"
+      ]
+    },
+    {
+      "priority": 3,
+      "title": "Streaming поддержка ответов",
+      "problem": "Отсутствие streaming ответов",
+      "solution": "Добавить поддержку Server-Sent Events (SSE) для постепенной доставки сгенерированного контента",
+      "expected_impact": "Улучшение UX для длинных запросов, снижение воспринимаемой задержки",
+      "effort": "high",
+      "files_to_modify": [
+        "providers/perplexity_provider.py",
+        "server.py"
+      ]
+    },
+    {
+      "priority": 4,
+      "title": "Адаптивные таймауты и rate limiting",
+      "problem": "Неоптимальные таймауты",
+      "solution": "Реализовать динамические таймауты на основе исторических данных и адаптивный rate limiting с учетом квот API",
+      "expected_impact": "Оптимизация использования API, предотвращение превышения лимитов",
+      "effort": "medium",
+      "files_to_modify": [
+        "providers/load_balancer.py",
+        "providers/perplexity_provider.py"
+      ]
+    },
+    {
+      "priority": 5,
+      "title": "Система мониторинга качества ответов",
+      "problem": "Отсутствие мониторинга качества ответов",
+      "solution": "Добавить сбор метрик качества (релевантность, полнота, скорость) и механизм обратной связи для оптимизации выбора модели",
+      "expected_impact": "Улучшение качества ответов со временем, data-driven выбор оптимальных моделей",
+      "effort": "high",
+      "files_to_modify": [
+        "providers/provider_registry.py",
+        "providers/health_checker.py"
+      ]
+    }
+  ],
+  "quick_wins": [
+    {
+      "title": "Добавить базовое кэширование в PerplexityProvider",
+      "description": "Реализовать простой in-memory cache с LRU стратегией для часто повторяющихся запросов",
+      "impact": "Немедленное снижение количества API вызовов для повторяющихся запросов",
+      "time": "15 минут",
+      "status": "✅ COMPLETE",
+      "implementation": {
+        "date": "2025-01-28",
+        "files": [
+          "mcp-server/api/providers/perplexity.py"
+        ],
+        "details": "SimpleCache class with LRU eviction, TTL expiration, statistics tracking",
+        "expected_impact": "40-60% reduction in API calls",
+        "actual_metrics": "Cache HIT: <1ms vs 10-15s (API call)"
+      }
+    },
+    {
+      "title": "Улучшить health check логику",
+      "description": "Заменить текущий health check на более легковесный запрос (например, запрос статуса API)",
+      "impact": "Снижение нагрузки от health checks, более точная диагностика доступности сервиса",
+      "time": "10 минут",
+      "status": "✅ COMPLETE",
+      "implementation": {
+        "date": "2025-01-28",
+        "files": [
+          "backend/api/perplexity_client.py"
+        ],
+        "details": "Health check caching (60s TTL), timeout reduction (10s → 5s), minimal request (1 token), metrics (latency_ms, cached, cache_age_seconds)",
+        "actual_metrics": "Health check: 5s timeout, 60s cache, latency metrics"
+      }
+    },
+    {
+      "title": "Добавить circuit breaker в retry логику",
+      "description": "Реализовать простой circuit breaker для предотвращения повторных вызовов при постоянных ошибках",
+      "impact": "Предотвращение каскадных сбоев и избыточной нагрузки на деградировавший сервис",
+      "time": "10 минут",
+      "status": "✅ COMPLETE",
+      "implementation": {
+        "date": "2025-01-28",
+        "files": [
+          "mcp-server/api/providers/base.py"
+        ],
+        "details": "CircuitBreaker class with CLOSED/OPEN/HALF_OPEN states, failure threshold (5), recovery timeout (60s), half_open test calls (3)",
+        "actual_metrics": "Circuit breaker: 5 failures → OPEN → 60s → HALF_OPEN → 3 tests → CLOSED"
+      }
+    },
+    {
+      "title": "Оптимизировать mapping моделей",
+      "description": "Вынести mapping моделей в конфигурацию для легкого обновления без изменения кода",
+      "impact": "Упрощение поддержки при изменениях в API Perplexity",
+      "time": "5 минут",
+      "status": "✅ COMPLETE",
+      "implementation": {
+        "date": "2025-01-28",
+        "files": [
+          "mcp-server/config/models_config.json",
+          "mcp-server/api/providers/perplexity.py"
+        ],
+        "details": "Model mapping moved to config file, fallback support, extensible for other providers (DeepSeek, etc.)",
+        "actual_metrics": "Config-driven models, easy updates without code changes"
+      }
+    }
+  ],
+  "_metadata": {
+    "analysis_date": "2025-01-28",
+    "implementation_date": "2025-01-28",
+    "total_time": "~25 minutes",
+    "analyzer": "DeepSeek Agent",
+    "status": "✅ ALL QUICK WINS COMPLETE",
+    "documentation": [
+      "PERPLEXITY_OPTIMIZATION_COMPLETE.md",
+      "PERPLEXITY_QUICK_WINS_SUMMARY_RU.md"
+    ],
+    "tests": "test_perplexity_quick_wins.py",
+    "next_steps": [
+      "Priority 1: Unified Caching Client (2 hours)",
+      "Priority 2: Exponential Backoff Retry (1 hour)",
+      "Priority 3: Streaming Support (4 hours)"
+    ]
+  }
+}

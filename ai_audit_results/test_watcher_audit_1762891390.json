@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762891390,
+  "changed_files": [
+    "backend\\api\\app.py",
+    "backend\\cache\\decorators.py",
+    "backend\\app.py",
+    "tests\\conftest.py",
+    "backend\\api\\routers\\backtests.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762891364.9275208,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). Zero test coverage indicates either:\n- Test environment setup failure\n- Critical syntax/runtime errors in code\n- Missing test dependencies\n- Test framework configuration issues\n\n## Coverage Analysis\n**0% coverage across all files** - This is a system-level failure, not just poor coverage. The test runner cannot even start collecting coverage data.\n\n## Potential Issues with Recent Changes\n1. **Recent file changes likely introduced breaking changes:**\n   - `backend\\api\\routers\\backtests.py` - New router may have syntax errors\n   - `backend\\cache\\decorators.py` - Decorator changes could cause import failures\n   - Multiple app.py files - Potential circular imports or configuration conflicts\n\n2. **Test configuration problem** in `tests\\conftest.py` may be misconfigured\n\n## Immediate Recommendations\n1. **Fix test execution first:**\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   Check specific error causing exit code -1\n\n2. **Validate recent changes:**\n   - Check syntax in all modified Python files\n   - Verify imports and dependencies in `backend\\api\\routers\\backtests.py`\n   - Test cache decorators independently\n\n3. **Isolate the failure:**\n   - Run tests on individual changed files\n   - Check test configuration in `conftest.py`\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely risky with failing test suite. Critical issues likely exist in:\n- API routing functionality\n- Caching layer\n- Application initialization\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 161,
+      "completion_tokens": 361,
+      "total_tokens": 522,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 97
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

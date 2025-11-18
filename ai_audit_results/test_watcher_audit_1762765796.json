@@ -1,0 +1,62 @@
+{
+  "timestamp": 1762765796,
+  "changed_files": [
+    "backend\\core\\backtest_engine.py",
+    "backend\\security\\rate_limiter.py",
+    "backend\\api\\schemas.py",
+    "backend\\strategies\\bollinger_mean_reversion.py",
+    "backend\\security\\key_manager.py",
+    "backend\\strategies\\base.py",
+    "backend\\security\\key_rotation.py",
+    "backend\\api\\parallel_deepseek_client_v2.py",
+    "mcp-server\\server.py",
+    "mcp-server\\di_container.py",
+    "backend\\api\\perplexity_client.py",
+    "backend\\migrations\\versions\\add_reasoning_kb_001.py",
+    "backend\\migrations\\versions\\perf_indexes_001_add_performance_indexes.py",
+    "backend\\api\\circuit_breaker.py",
+    "backend\\api\\error_handling.py",
+    "backend\\migrations\\versions\\add_reasoning_traces.py",
+    "backend\\strategies\\__init__.py",
+    "backend\\security\\jwt_manager.py",
+    "backend\\security\\secure_logger.py",
+    "backend\\migrations\\versions\\20251108_merge_triple_heads.py",
+    "backend\\api\\lru_ttl_cache.py",
+    "backend\\app.py",
+    "backend\\strategies\\factory.py",
+    "backend\\api\\parallel_deepseek_client.py",
+    "backend\\health_checks.py",
+    "backend\\api\\routers\\backtests.py",
+    "backend\\security\\secure_storage.py",
+    "backend\\api\\secure_key_storage.py",
+    "reliability_auto_system\\encryption_key_manager.py",
+    "backend\\migrations\\versions\\20251107_merge_all_heads.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762765777.997513,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**Critical Failure** - Tests are completely broken:\n- Exit code -1 indicates catastrophic test failure (likely unhandled exceptions)\n- 0% coverage suggests tests aren't even executing properly\n- No individual file coverage data available\n\n## 2. Coverage Analysis & Gaps\n**Complete Test Infrastructure Failure**:\n- Zero coverage across all 30+ modified files\n- Critical security components (rate_limiter, jwt_manager, key_manager) untested\n- Core business logic (backtest_engine, strategies) completely uncovered\n- Database migrations and API clients have no validation\n\n## 3. Potential Issues with Recent Changes\n**High-Risk Areas**:\n- **Security modules**: Multiple security files modified with no validation\n- **Database migrations**: Schema changes without test verification\n- **API clients**: Parallel clients and circuit breakers untested\n- **Strategy engine**: Core trading logic changes unvalidated\n\n## 4. Immediate Recommendations\n\n**Priority 1 - Fix Test Infrastructure**:\n```bash\n# Run with verbose output to identify root cause\npytest -v --tb=short\n# Check for import errors or configuration issues\n```\n\n**Priority 2 - Critical Path Testing**:\n1. Start with security modules (rate_limiter, jwt_manager)\n2. Test database migrations in isolation\n3. Validate core backtest engine functionality\n4. Add circuit breaker and error handling tests\n\n**Priority 3 - Implement Safety Nets**:\n- Add smoke tests for basic API endpoints\n- Create security module unit tests\n- Set up migration rollback verification\n\n## 5. Risk Assessment\n**HIGH RISK** - Do not deploy:\n- Security vulnerabilities likely due to untested changes\n- Data integrity risks from unvalidated migrations\n- Potential system-wide failures in production\n- Regulatory compliance concerns for financial components\n\n**Immediate Action**: Halt all deployments until basic test suite passes and critical security modules achieve >80% coverage.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 471,
+      "completion_tokens": 419,
+      "total_tokens": 890,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 407
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

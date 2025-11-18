@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762546883,
+  "changed_files": [
+    "backend\\api\\perplexity_client.py",
+    "backend\\api\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762546867.762004,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely test harness crash or environment issues). Zero coverage suggests tests never executed.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during testing\n- **Missing**: All modules, functions, and branches\n- **Root Cause**: Test infrastructure failure, not inadequate test design\n\n## Potential Issues with Recent Changes\n1. **Client Integration Breakage**: Changes in `perplexity_client.py` or `deepseek_client.py` may have:\n   - Introduced syntax errors or import cycles\n   - Broken API client initialization\n   - Caused environment/config dependencies to fail\n\n2. **Test Environment**: Missing dependencies, environment variables, or configuration\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which test fails first\n2. Check test logs for stack traces and error messages\n3. Verify all dependencies are installed (`pip list`)\n4. Test client modules in isolation:\n   ```python\n   python -c \"from backend.api.perplexity_client import *; print('Perplexity OK')\"\n   python -c \"from backend.api.deepseek_client import *; print('Deepseek OK')\"\n   ```\n\n**Systematic Fixes:**\n1. Add try/except blocks around client initialization in tests\n2. Implement health checks for external API dependencies\n3. Add validation in client `__init__` methods\n4. Create minimal smoke tests for each client\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky because:\n- No validation that API clients work\n- Potential runtime failures undetected\n- Integration points completely untested\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 385,
+      "total_tokens": 523,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 74
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

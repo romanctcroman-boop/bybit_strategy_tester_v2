@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762561614,
+  "changed_files": [
+    "backend\\config\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762561599.6117036,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, configuration, or codebase that prevent any tests from running.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing gap across the entire codebase.\n\n## Potential Issues with Recent Changes\n- The changed file `backend\\config\\__init__.py` likely contains syntax errors, import issues, or configuration problems\n- Possible circular imports or missing dependencies in the config module\n- Environment setup/configuration may be broken\n\n## Immediate Action Items\n1. **Fix Test Execution First**\n   - Check `backend\\config\\__init__.py` for syntax errors\n   - Verify all imports and dependencies are available\n   - Run tests with verbose output to identify the specific failure point\n\n2. **Validate Configuration**\n   - Ensure test environment is properly configured\n   - Check for missing environment variables or configuration files\n   - Verify database connections and external dependencies\n\n3. **Restore Basic Testing**\n   - Get at least one test passing to establish baseline\n   - Focus on unit tests before integration tests\n\n## Risk Assessment\n**HIGH RISK** - No functional testing is occurring, meaning:\n- Undetected bugs could be deployed to production\n- Code changes aren't being validated\n- Regression risks are extremely high\n- Deployment should be blocked until basic test functionality is restored\n\n**Priority: Fix immediately** - This represents a complete breakdown of the testing pipeline that must be resolved before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 333,
+      "total_tokens": 460,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

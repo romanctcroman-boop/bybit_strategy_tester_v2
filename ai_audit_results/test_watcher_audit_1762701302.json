@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762701302,
+  "changed_files": [
+    "get_agent_recommendations.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762701288.3891566,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files indicates:\n- Test suite failed before any code execution\n- No actual testing occurred\n- Complete absence of meaningful coverage data\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `get_agent_recommendations.py`:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Infinite loops or resource exhaustion\n- Environment configuration broken by changes\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution** - Run tests with verbose output to identify crash cause\n2. **Check syntax** - Validate `get_agent_recommendations.py` for basic Python syntax\n3. **Isolate changes** - Test the modified file in isolation\n4. **Add error handling** - Ensure tests handle exceptions gracefully\n\n**Follow-up:**\n5. Implement basic smoke tests before coverage measurement\n6. Add CI pipeline checks for test execution stability\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may be completely broken\n- No safety net for future changes\n- High probability of undetected regressions\n- Deployment would be extremely risky\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 309,
+      "total_tokens": 436,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

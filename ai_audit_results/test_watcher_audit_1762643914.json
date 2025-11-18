@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762643914,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762643901.480596,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code is being tested\n- **No coverage data available** - Tests aren't even reaching the execution phase\n- **Complete testing gap** - Entire codebase is untested\n\n## Potential Issues with Recent Changes\nThe failure likely stems from changes in `tests\\backend\\conftest.py`:\n- **Fixture/config errors** - pytest configuration or fixture dependencies broken\n- **Import failures** - Missing modules or circular imports\n- **Setup/teardown crashes** - Session/scoped fixtures failing during initialization\n- **Plugin conflicts** - Custom pytest plugins malfunctioning\n\n## Immediate Recommendations\n1. **Debug conftest.py** - Isolate the failing component using `pytest -xvs tests/backend/conftest.py`\n2. **Check fixture dependencies** - Verify all imports and dependencies are available\n3. **Test incrementally** - Run minimal test `pytest tests/backend/ -k \"simple_test\" --tb=short`\n4. **Review recent changes** - Git diff the conftest.py modifications\n5. **Validate pytest configuration** - Check pytest.ini and plugin compatibility\n\n## Risk Assessment\n**HIGH RISK** - \n- No test feedback on code changes\n- Undetected regressions likely\n- Deployment blockers imminent\n- Critical bugs could reach production\n\n**Priority: Fix immediately** - This blocks all further development and deployment activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 343,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

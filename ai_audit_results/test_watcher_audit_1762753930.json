@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762753930,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762753903.0178468,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Exit code -1 indicates test execution crashed before completion. This suggests fundamental issues in test infrastructure or environment setup rather than test failures.\n\n## Coverage Analysis & Gaps\n- **0% coverage** confirms tests didn't execute properly\n- No coverage data available for analysis\n- Likely environment/dependency issues preventing test execution\n\n## Potential Issues with Recent Changes\n1. **Infrastructure Break**: Changes in `backend\\core\\mtf_engine.py` or `reliability\\perplexity_client.py` may have broken core functionality\n2. **Test Configuration**: Modifications to `tests\\backend\\conftest.py` could have disrupted test setup\n3. **Dependency Conflicts**: New integration tests (`test_sandbox_integration.py`) may have unmet dependencies\n4. **Resource Issues**: Stress tests (`test_edge_cases_stress.py`) might be exhausting system resources\n\n## Immediate Action Plan\n1. **Diagnose Exit Code -1**:\n   - Check test runner logs for stack traces\n   - Verify Python environment and dependencies\n   - Ensure database connections in query optimization tests\n\n2. **Isolate the Break**:\n   - Run tests individually starting with basic unit tests\n   - Test `test_batch_writer.py` in isolation first\n   - Check if `conftest.py` changes broke fixture setup\n\n3. **Quick Fixes**:\n   - Roll back recent changes to `conftest.py` if possible\n   - Verify all imports in modified files\n   - Check for missing environment variables\n\n## Risk Assessment\n**HIGH RISK** - Unable to validate any functionality due to complete test failure. Deployment in this state would be extremely risky.\n\n**Priority**: Fix test execution immediately before any further development or analysis.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 375,
+      "total_tokens": 581,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

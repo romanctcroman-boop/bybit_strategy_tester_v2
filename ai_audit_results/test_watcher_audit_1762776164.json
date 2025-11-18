@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762776164,
+  "changed_files": [
+    "diagnostic_dashboard.py",
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "tests\\unit\\test_batch_writer.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762776147.5215647,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely crash)\n- 0% coverage suggests tests never executed properly\n- This represents a complete testing breakdown\n\n## Coverage Analysis & Gaps\n**Total coverage: 0.00%** - All gaps identified:\n- No code executed during test run\n- Missing test execution entirely\n- Coverage reporting mechanism failed\n\n## Potential Issues with Recent Changes\n1. **Database connectivity** - `temp_pg_test.py` and psycopg2 changes suggest PostgreSQL connection issues\n2. **Test framework corruption** - pytest terminal.py modifications may have broken test runner\n3. **Environment problems** - Virtual environment (.venv) changes indicate dependency issues\n4. **Diagnostic dashboard** - New feature may have introduced breaking changes\n\n## Immediate Action Recommendations\n1. **Fix test execution first**:\n   - Check pytest installation: `pip list | grep pytest`\n   - Verify test discovery: `pytest --collect-only`\n   - Run minimal test: `python -c \"import pytest; print(pytest.__version__)\"`\n\n2. **Database connectivity check**:\n   - Test PostgreSQL connection independently\n   - Verify `temp_pg_test.py` works standalone\n   - Check psycopg2 installation\n\n3. **Environment reset**:\n   ```bash\n   # Recreate virtual environment\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Cannot deploy:\n- No test validation of changes\n- Potential breaking changes in production\n- Database connectivity issues could cause outages\n- **Immediate action required** before any deployment\n\n**Priority**: Fix test execution infrastructure before addressing any feature changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 181,
+      "completion_tokens": 382,
+      "total_tokens": 563,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 117
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762705731,
+  "changed_files": [
+    "reliability\\circuit_breaker.py",
+    "tests\\test_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762705704.581025,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception during test setup/execution).\n\n## Coverage Analysis\n**0.00% coverage** - No code is being executed during tests. This represents maximum coverage gap - the entire codebase is untested.\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure broken** - Recent changes to `tests\\test_circuit_breaker.py` likely introduced fatal errors\n2. **Import/circular dependency issues** - Test module may be unable to import circuit_breaker\n3. **Syntax errors** - Recent edits may have broken Python syntax in test files\n4. **Missing dependencies** - Required test dependencies may be missing\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check test file syntax: `python -m py_compile tests/test_circuit_breaker.py`\n3. Verify imports work: `python -c \"from reliability.circuit_breaker import CircuitBreaker\"`\n4. Add basic smoke test to verify test infrastructure works\n\n**FOLLOW-UP:**\n- Implement minimal passing test before adding features\n- Set up CI to prevent merging broken tests\n- Add test logging to capture failure details\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression protection\n- High probability of undetected production bugs\n- Development blocked until tests are functional\n- All recent changes to circuit_breaker are untested\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 344,
+      "total_tokens": 480,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

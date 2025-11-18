@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762616220,
+  "changed_files": [
+    "test_enhanced_cross_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762616204.8820024,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test suite or environment. No tests actually ran successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** - This is not a coverage gap but a complete test execution failure. The coverage report is empty because no tests completed execution.\n\n## Potential Issues with Recent Changes\n1. **test_enhanced_cross_agent.py** likely contains:\n   - Syntax errors or import failures\n   - Fixture/config setup failures\n   - Environment dependency issues\n   - Infinite loops or crashes during test collection/execution\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which specific test fails\n2. Check test logs for Python tracebacks or error messages\n3. Verify all imports and dependencies in the new test file\n4. Test isolation: Run `test_enhanced_cross_agent.py` separately to identify the root cause\n\n**Technical Steps:**\n- Validate test fixtures and setup/teardown methods\n- Check for missing dependencies or environment variables\n- Ensure no infinite loops in test initialization\n- Verify test discovery isn't being blocked\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure means:\n- No validation of recent changes\n- Potential undiscovered regressions\n- Deployment blockers until resolved\n- All existing functionality is currently unverified\n\n**Priority:** Fix immediately - this blocks all other testing and deployment activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 316,
+      "total_tokens": 444,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

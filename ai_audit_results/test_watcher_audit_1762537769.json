@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762537769,
+  "changed_files": [
+    "tests\\test_audit_agent_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537757.5370107,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure.\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage across all files suggests:\n- Tests aren't executing any production code\n- Possible import failures or environment misconfiguration\n- Test fixtures/setup are broken\n\n## Potential Issues with Recent Changes\n1. **Integration test file** (`test_audit_agent_integration.py`) is likely causing the failure\n2. Possible issues:\n   - Missing dependencies or imports\n   - Environment variables not set\n   - Database/API connections failing\n   - Syntax errors in test code\n   - Circular imports\n\n## Immediate Recommendations\n1. **Debug the integration test failure:**\n   ```bash\n   python -m pytest tests/test_audit_agent_integration.py -v\n   ```\n2. Check for missing imports in the integration test file\n3. Verify all required services (databases, APIs) are running\n4. Review recent changes to the integration test for syntax errors\n\n## Risk Assessment\n**HIGH RISK** - No tests are running, meaning:\n- All code changes are effectively untested\n- Regression risks are extremely high\n- Deployment would be dangerous\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 292,
+      "total_tokens": 423,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

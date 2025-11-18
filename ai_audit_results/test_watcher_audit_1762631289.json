@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762631289,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762631275.1291132,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **No coverage data available** - Test framework couldn't collect any metrics\n- **Complete testing gap** - Entire codebase remains untested\n\n## Potential Issues with Recent Changes\n1. **File `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:**\n   - Syntax errors preventing import/execution\n   - Missing dependencies or imports\n   - Runtime errors during module loading\n   - Infinite loops or blocking operations\n   - Environment configuration issues\n\n## Immediate Recommendations\n1. **Debug test execution:**\n   - Run `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py` to check syntax\n   - Execute the file directly to identify runtime errors\n   - Check for missing imports or dependencies\n\n2. **Fix foundational issues:**\n   - Add basic unit tests that can execute\n   - Ensure minimal test setup works before complex scenarios\n   - Verify environment and dependencies\n\n3. **Implement safety nets:**\n   - Add try-catch blocks in test setup\n   - Create smoke tests that validate basic functionality\n   - Set up pre-commit hooks to catch syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may be completely broken\n- No validation of functionality exists\n- High probability of undetected bugs\n- Deployment would be extremely risky\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 370,
+      "total_tokens": 505,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

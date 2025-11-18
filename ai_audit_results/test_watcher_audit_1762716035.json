@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762716035,
+  "changed_files": [
+    "tests\\test_mcp_manager.py",
+    "reliability\\mcp_manager.py",
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762716012.411465,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure before any tests could execute. This suggests fundamental issues in test setup, imports, or environment configuration.\n\n## Coverage Analysis\n**0% coverage** across all files means:\n- No tests executed successfully\n- Recent changes likely broke the test runner itself\n- Missing test dependencies or configuration\n\n## Potential Issues with Recent Changes\n1. **Import/Module Issues**: Changes in `reliability/__init__.py` or imports in `mcp_manager.py` may have broken module resolution\n2. **Test Configuration**: `tests/test_mcp_manager.py` likely has broken imports or setup code\n3. **Dependency Changes**: Missing packages or version conflicts preventing test execution\n4. **Syntax Errors**: Recent edits may contain Python syntax errors\n\n## Immediate Recommendations\n1. **Fix Test Runner**:\n   ```bash\n   python -m pytest tests/ --tb=short -v\n   ```\n   Check for import errors and fix module paths\n\n2. **Validate Imports**:\n   - Ensure `tests/test_mcp_manager.py` can import from `reliability` package\n   - Verify `reliability/__init__.py` exports necessary modules\n\n3. **Check Dependencies**:\n   - Verify all test requirements are installed\n   - Confirm Python path includes project root\n\n## Risk Assessment\n**HIGH RISK** - Deploying without test validation is extremely dangerous. The codebase is completely untested and may contain:\n- Runtime errors\n- Integration failures\n- Regression bugs\n- Broken functionality\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 352,
+      "total_tokens": 494,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

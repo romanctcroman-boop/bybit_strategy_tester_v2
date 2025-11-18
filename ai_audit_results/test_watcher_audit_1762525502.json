@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762525502,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762525483.7213056,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **No coverage data available** - All files show 0% coverage\n- **Critical gap**: Entire codebase is untested due to test execution failure\n\n## Potential Issues with Recent Changes\nThe failure likely stems from changes in `tests\\backend\\conftest.py`:\n- **Fixture configuration errors** - Broken pytest fixtures or setup\n- **Import/dependency issues** - Missing imports or circular dependencies\n- **Environment setup failures** - Database connections, API mocks, or test data setup\n- **Syntax errors** - Invalid Python code in conftest\n\n## Recommendations for Improvement\n1. **Immediate Action**: \n   - Run `pytest tests/backend/ -v` to see specific error details\n   - Check `tests/backend/conftest.py` for syntax errors and fixture definitions\n   - Verify all imports and dependencies in conftest\n\n2. **Debugging Steps**:\n   - Comment out recent changes in conftest to isolate the breaking change\n   - Check pytest logs for specific error messages\n   - Validate fixture scope and dependencies\n\n3. **Prevention**:\n   - Add pre-commit hooks to validate pytest configuration\n   - Implement CI pipeline that fails fast on configuration errors\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- No test protection for production code\n- Undetected regressions likely\n- Deployment carries significant business risk\n- Immediate fix required before any further development\n\n**Priority**: Fix test configuration immediately before proceeding with any other work.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 378,
+      "total_tokens": 505,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

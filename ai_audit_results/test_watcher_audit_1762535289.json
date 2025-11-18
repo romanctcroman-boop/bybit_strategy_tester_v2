@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762535289,
+  "changed_files": [
+    "automation\\safe_async_bridge.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762535261.6722548,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. No meaningful quality assessment possible until basic execution is resolved.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All tests failed before any code execution could be measured. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\n1. **Dependency/Environment Issues**: Missing imports, broken virtual environment, or incompatible package versions\n2. **Syntax/Runtime Errors**: Likely syntax errors in `safe_async_bridge.py` preventing import/execution\n3. **Test Configuration**: Broken test runner configuration or missing test discovery patterns\n4. **Module Import Failures**: `safe_async_bridge.py` may have import cycles or missing dependencies\n\n## Recommendations for Improvement\n**Immediate Actions (Priority 1):**\n- Run `python -m py_compile automation\\safe_async_bridge.py` to check for syntax errors\n- Execute tests with `-v` flag to see specific failure details\n- Verify all imports in `safe_async_bridge.py` are available in test environment\n\n**Short-term (Priority 2):**\n- Add basic smoke test to verify module can be imported\n- Check test runner configuration and dependencies\n- Ensure test discovery includes the correct file patterns\n\n**Long-term (Priority 3):**\n- Implement pre-commit hooks to catch syntax errors\n- Add CI pipeline with dependency installation verification\n\n## Risk Assessment\n**HIGH RISK** - Complete testing failure means:\n- No safety net for recent changes to `safe_async_bridge.py`\n- Potential runtime errors in production\n- Undetected regression risks\n- **Immediate resolution required before any deployment**\n\n**Next Step**: Focus entirely on fixing the Exit Code -1 issue before addressing coverage metrics.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 391,
+      "total_tokens": 518,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

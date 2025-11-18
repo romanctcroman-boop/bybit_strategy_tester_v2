@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539738,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539723.336671,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating either:\n- Test environment/setup issues\n- Fatal errors in test code\n- Missing dependencies or configuration\n- Syntax/runtime errors preventing test execution\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- No tests actually executed\n- Possible import failures or module loading issues\n- Test discovery/collection problems\n- Environment not properly initialized\n\n## Potential Issues with Recent Changes\nThe changed file `tests/integration/test_e2e_audit_agent.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing imports or dependencies\n- Configuration errors in test setup\n- Fixture/teardown issues causing crashes\n- Integration with external systems failing\n\n## Immediate Recommendations\n1. **Debug Test Execution**\n   - Check test runner output/logs for specific error messages\n   - Verify Python environment and dependencies\n   - Run with `-v` flag to see which tests fail during collection\n\n2. **Isolate the Problem**\n   - Run only the changed integration test file\n   - Check for missing environment variables or test data\n   - Validate imports and module structure\n\n3. **Fix Foundational Issues**\n   - Ensure test fixtures and setup methods work correctly\n   - Verify integration points (databases, APIs, etc.) are accessible\n   - Check for infinite loops or resource exhaustion\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback on code changes\n- Potential integration issues undetected\n- Risk of deploying broken functionality\n- Audit agent functionality potentially compromised\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 377,
+      "total_tokens": 511,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

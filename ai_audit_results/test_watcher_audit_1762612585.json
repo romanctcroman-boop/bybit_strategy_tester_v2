@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762612585,
+  "changed_files": [
+    "test_perplexity_streaming.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762612565.7018569,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax errors in test files\n- Import failures\n- Test framework configuration issues\n- Environment setup problems\n\n## Coverage Analysis\n**COMPLETE COVERAGE GAP** - 0% coverage across all files suggests:\n- No tests actually executed\n- Test discovery/loading failed\n- Module imports broken\n- Critical runtime errors before test collection\n\n## Potential Issues with Recent Changes\nThe changed file `test_perplexity_streaming.py` likely contains:\n- Syntax errors (missing imports, incorrect syntax)\n- Broken imports from recent refactoring\n- Test class/fixture definition errors\n- Environment dependency issues\n\n## Immediate Recommendations\n1. **Debug test execution**:\n   ```bash\n   python -m pytest test_perplexity_streaming.py -v\n   ```\n2. **Check syntax**:\n   ```bash\n   python -m py_compile test_perplexity_streaming.py\n   ```\n3. **Verify imports** - Ensure all imported modules exist and are accessible\n4. **Review recent changes** to `test_perplexity_streaming.py` for obvious errors\n\n## Risk Assessment\n**HIGH RISK** - No test validation is occurring, meaning:\n- All code changes are untested\n- Potential regressions undetected\n- Production readiness cannot be verified\n- Critical bugs may be deployed\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 320,
+      "total_tokens": 446,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

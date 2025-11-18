@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762550792,
+  "changed_files": [
+    "backend\\api\\app.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762550778.7425725,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This represents complete test infrastructure failure rather than coverage gaps.\n\n## Potential Issues with Recent Changes\n- **app.py modifications** likely introduced fatal errors preventing test execution\n- Possible causes:\n  - Syntax errors in app.py\n  - Missing imports/dependencies\n  - Environment configuration issues\n  - Infinite loops or blocking operations\n  - Critical exceptions during module import\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check app.py for syntax errors\n   - Verify all imports and dependencies are available\n   - Run with debug flags to identify crash point\n\n2. **Restore Basic Functionality**\n   - Revert app.py changes if recent\n   - Add try-catch blocks around critical sections\n   - Ensure tests can at least start executing\n\n3. **Add Basic Smoke Test**\n   - Create minimal test that verifies application can start\n   - Test imports and basic initialization\n\n## Risk Assessment\n**HIGH RISK** - Unable to validate any functionality. Production deployment would be extremely risky without passing tests. Current state provides zero quality assurance.\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 288,
+      "total_tokens": 413,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

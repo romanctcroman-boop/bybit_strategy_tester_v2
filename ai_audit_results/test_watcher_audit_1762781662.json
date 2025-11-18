@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762781662,
+  "changed_files": [
+    "reliability_auto_system\\encryption_key_manager.py",
+    "background_diagnostic_service.py",
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "reliability_auto_system\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762781643.370458,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates abnormal termination, likely due to:\n- Configuration/setup errors\n- Import failures or dependency issues\n- Test discovery failures\n- Environment misconfiguration\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - All files show 0.00% coverage, indicating:\n- Tests aren't executing at all\n- No code paths are being validated\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\n1. **Dependency Conflict**: Modified `psycopg2/__init__.py` in virtual environment suggests manual package tampering\n2. **Import Structure**: Changes to `reliability_auto_system/__init__.py` may have broken module resolution\n3. **Environment Corruption**: `.venv` modifications indicate potential environment issues\n4. **New Service Integration**: `background_diagnostic_service.py` may have unmet dependencies\n\n## Immediate Action Recommendations\n1. **Fix Test Execution First**:\n   - Run with `-v` flag to see where tests fail\n   - Check Python path and import statements\n   - Verify all dependencies are properly installed\n\n2. **Environment Reset**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n3. **Validate Imports**:\n   - Test basic imports: `python -c \"import reliability_auto_system\"`\n   - Check new service: `python -c \"import background_diagnostic_service\"`\n\n4. **Incremental Testing**:\n   - Run single test: `pytest temp_pg_test.py -v`\n   - Test encryption module separately\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functioning tests exposes:\n- Encryption system failures (critical security risk)\n- Database connectivity issues\n- Background service instability\n- Complete lack of regression detection\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 179,
+      "completion_tokens": 426,
+      "total_tokens": 605,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 115
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

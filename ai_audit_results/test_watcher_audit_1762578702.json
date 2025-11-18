@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762578702,
+  "changed_files": [
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_phase1_security.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762578685.3516426,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional with exit code -1 and 0% coverage. This indicates either:\n- Test environment setup failures\n- Critical syntax/runtime errors in test files\n- Missing dependencies or configuration\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** across all files. No code is being executed during test runs. Major gaps:\n- No backend API testing\n- No ML model testing (LSTM components)\n- No database optimization validation\n- No security protocol verification\n\n## Potential Issues with Recent Changes\n1. **Market Data Tests**: `test_marketdata_*` files likely contain breaking changes\n2. **MTF Engine**: Core trading engine modifications may have introduced fatal errors\n3. **LSTM Integration**: ML pipeline changes affecting prediction endpoints\n4. **Database Optimization**: Query changes potentially breaking test setup\n\n## Recommendations for Improvement\n**Immediate Actions (Next 24 hours):**\n1. Run individual test files to identify which specific test causes the -1 exit code\n2. Check test environment setup and dependencies\n3. Verify database connections and mock configurations\n4. Examine recent changes to `mtf_engine.py` and LSTM components\n\n**Short-term (This week):**\n1. Fix the failing test that causes early termination\n2. Implement basic smoke tests to ensure 70%+ core coverage\n3. Add test logging to capture failure details\n4. Create isolated unit tests before integration tests\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents:\n- Deployment validation\n- Regression detection\n- Code quality assurance\n- Security verification\n\n**Critical areas at risk:**\n- Trading engine reliability\n- Market data integrity  \n- ML prediction accuracy\n- Database performance\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 281,
+      "completion_tokens": 380,
+      "total_tokens": 661,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 25
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

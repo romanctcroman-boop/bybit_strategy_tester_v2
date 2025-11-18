@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762537145,
+  "changed_files": [
+    "automation\\sync_async_wrapper.py",
+    "tests\\test_sync_async_wrapper.py",
+    "tests\\test_safe_async_bridge_final.py",
+    "tests\\test_safe_async_bridge_simple.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537130.128118,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution entirely. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No tests executed successfully\n- Critical gap: Entire codebase is untested\n- Likely configuration or import errors preventing test discovery/execution\n\n## Potential Issues with Recent Changes\n1. **Configuration breakdown** - Test runner setup likely broken\n2. **Import/dependency issues** - Recent changes to `sync_async_wrapper.py` may have broken imports\n3. **Test discovery failure** - Test files not being recognized by test runner\n4. **Environment issues** - Missing dependencies or incorrect Python environment\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m pytest --collect-only` to diagnose test discovery\n2. Check for syntax errors in test files with `python -m py_compile [filename]`\n3. Verify imports in test files reference correct modules\n4. Examine recent changes to `sync_async_wrapper.py` for breaking API changes\n\n**FOLLOW-UP:**\n- Fix test runner configuration (pytest.ini, __init__.py files)\n- Add basic smoke test to verify test execution works\n- Implement CI pipeline to catch these failures earlier\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested. Any deployment carries significant risk of:\n- Runtime failures in production\n- Regression bugs going undetected  \n- Async/sync integration issues (critical for wrapper functionality)\n- Potential deadlocks or performance problems\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 167,
+      "completion_tokens": 362,
+      "total_tokens": 529,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 103
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762890572,
+  "changed_files": [
+    "backend\\core\\retry.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762890558.7886806,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality or functionality.\n\n## Potential Issues with Recent Changes\nThe failure likely stems from changes in `backend\\core\\retry.py`:\n- **Syntax errors** preventing module import\n- **Import/dependency issues** breaking the module\n- **Critical exceptions** during test setup/import\n- **Configuration changes** disrupting test environment\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution first** - Address the Exit Code -1 before analyzing coverage\n2. **Check `retry.py` for syntax errors** - Validate Python syntax and imports\n3. **Verify test runner configuration** - Ensure proper test discovery and execution\n4. **Run isolated test on `retry.py`** - Test the changed file independently\n\n**FOLLOW-UP:**\n5. Implement pre-commit hooks to catch syntax errors\n6. Add basic smoke tests to prevent complete test suite failure\n7. Monitor test execution stability in CI/CD pipeline\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- **Zero test validation** of recent changes\n- **Unknown impact** on dependent modules\n- **Potential runtime failures** in production\n- **Regression risk** across entire system\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 348,
+      "total_tokens": 474,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

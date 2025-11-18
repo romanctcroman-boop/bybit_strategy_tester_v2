@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762608783,
+  "changed_files": [
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_sandbox_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762608761.0087547,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Fatal runtime errors preventing test execution\n- Configuration/import issues in test environment\n- Major breaking changes in recent code modifications\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Potential import/circular dependency issues\n- Environment setup failures\n- Critical syntax/import errors in test files\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **`backend\\core\\mtf_engine.py`** - Core engine changes likely broke imports/dependencies\n2. **Database/test changes** (`test_query_optimization.py`, `test_batch_writer.py`) - May have incompatible interface changes\n3. **Protocol/sandbox tests** - Integration points may have breaking API changes\n\n## Immediate Action Recommendations\n1. **Debug Exit Code -1**\n   - Check test runner logs for specific error messages\n   - Run tests individually to identify failing module: `python -m pytest tests/test_database/test_query_optimization.py -v`\n\n2. **Validate Imports**\n   - Check if `mtf_engine.py` changes broke import chains\n   - Verify all test dependencies are installed\n\n3. **Isolate Breaking Change**\n   - Test each changed file independently\n   - Check for circular imports between `mtf_engine.py` and test modules\n\n4. **Quick Fix Priority**\n   - Fix `mtf_engine.py` imports first (core dependency)\n   - Then protocol/sandbox integration tests\n   - Finally database optimization tests\n\n## Risk Assessment\n**HIGH RISK** - Production deployment blocked:\n- ❌ No test validation of recent changes\n- ❌ Potential runtime errors in production\n- ❌ Database optimization changes untested\n- ❌ Core engine modifications unverified\n\n**NEXT STEPS**: Immediately address the exit code -1 before any coverage improvements. The complete test failure suggests fundamental environment or import issues rather than test logic problems.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 451,
+      "total_tokens": 636,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 121
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

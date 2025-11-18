@@ -1,0 +1,56 @@
+{
+  "timestamp": 1762582315,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\python.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_task_queue_new.py",
+    "backend\\core\\mtf_engine.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    "tests\\test_protocol.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_mtf_engine.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    ".venv\\Lib\\site-packages\\pytest_asyncio\\plugin.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_phase1_security.py",
+    ".venv\\Lib\\site-packages\\pytest\\__main__.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    "analyze_test_hang.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762582291.0173242,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely crash/hang)\n- 0% coverage suggests no tests executed successfully\n- Multiple pytest internals modified (.venv files) - major red flag\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - This is the most severe issue:\n- Zero code coverage means untested code deployment\n- All business logic (LSTM, MTF engine, API routers) completely unvalidated\n- No safety net for recent changes\n\n## Potential Issues with Recent Changes\n1. **Pytest Environment Corruption** - Modified pytest internals in `.venv/` will cause instability\n2. **Test Hanging** - Presence of `analyze_test_hang.py` suggests known hanging issues\n3. **Integration Problems** - Multiple test files modified simultaneously increases conflict risk\n4. **Async/Sync Mix** - `pytest_asyncio` modifications may cause event loop issues\n\n## Immediate Action Recommendations\n1. **Restore Clean Test Environment**\n   ```bash\n   rm -rf .venv/\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Debug Test Hang**\n   - Run tests with `pytest -x --tb=short` to identify first failure\n   - Use `analyze_test_hang.py` to diagnose specific hanging tests\n3. **Isolate Changes**\n   - Revert modifications to pytest internals immediately\n   - Test each changed file individually before integration\n\n## Risk Assessment\n**HIGH RISK** - Current state is deployment-blocking:\n- **Critical**: Production deployment impossible without test validation\n- **High**: Recent changes may have introduced silent failures\n- **Medium**: Test infrastructure instability affects all development\n\n## Priority Fixes\n1. Fix test environment (clean reinstall)\n2. Identify and fix hanging/crashing tests\n3. Restore basic test execution before addressing coverage\n4. Validate core functionality (MTF engine, LSTM, APIs) first\n\n**Immediate goal**: Get tests running (any coverage > 0%) before optimizing coverage metrics.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 460,
+      "completion_tokens": 455,
+      "total_tokens": 915,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 396
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

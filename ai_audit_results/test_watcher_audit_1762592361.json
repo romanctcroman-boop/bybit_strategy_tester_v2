@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762592361,
+  "changed_files": [
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762592345.9924917,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe modified file `automation\\deepseek_robot\\advanced_architecture.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing imports or dependencies\n- Breaking changes to class/method signatures\n- Circular imports or module loading issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix Exit Code -1 First** - Run tests with verbose output to identify the root cause\n2. **Check Syntax** - Validate `advanced_architecture.py` for Python syntax compliance\n3. **Verify Imports** - Ensure all dependencies are available in test environment\n4. **Run Minimal Test** - Create a simple smoke test to verify basic functionality\n\n**Follow-up:**\n5. Add pre-commit hooks for syntax checking\n6. Implement CI pipeline with dependency installation\n7. Create basic unit tests before measuring coverage\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky. The -1 exit code suggests fundamental issues that need immediate resolution before any meaningful testing can occur.\n\n**Priority:** Fix test execution failure before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 336,
+      "total_tokens": 466,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 66
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762544694,
+  "changed_files": [
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\test_protocol.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_phase1_security.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762544674.7332325,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/import)\n- 0% coverage suggests tests aren't even executing\n- This represents a complete breakdown of the testing pipeline\n\n## Coverage Analysis & Gaps\n**Total System Failure** - No coverage data available indicates:\n- Test environment cannot initialize\n- Critical dependencies missing or misconfigured  \n- Possible circular imports or module loading issues\n- Database/API connections failing during test bootstrap\n\n## Potential Issues with Recent Changes\n**High Risk Changes Detected:**\n1. **`backend/ml/lstm_queue_predictor.py`** - New ML component likely has missing dependencies\n2. **`backend/core/mtf_engine.py`** - Core engine modifications may have broken imports\n3. **`tests/backend/conftest.py`** - Test configuration changes probably introduced breaking changes\n4. **Multiple new API test files** - Suggest significant architecture changes without proper test isolation\n\n## Immediate Action Recommendations\n\n**🟥 CRITICAL (Fix within 1 hour):**\n1. Check `tests/backend/conftest.py` for recent changes - this is likely the root cause\n2. Run tests with `-v` flag to see where initialization fails\n3. Verify all new dependencies in `requirements.txt` are installed\n\n**🟨 HIGH PRIORITY (Today):**\n1. Isolate the failure: Run tests file-by-file starting with simplest unit tests\n2. Check database connections and mock configurations\n3. Validate import chains - particularly for new ML and core engine modules\n\n**🟩 MEDIUM PRIORITY (This week):**\n1. Add test suite health checks to CI pipeline\n2. Implement dependency validation in test setup\n3. Create isolated test environments for ML components\n\n## Risk Assessment\n**SEVERE RISK** - Deployment should be blocked immediately:\n- **Code Quality Risk:** High - No validation of recent changes\n- **Regression Risk:** Critical - All functionality unverified\n- **Business Risk:** Severe - Core trading engine and ML predictions untested\n- **Recommended Action:** Halt all deployments until basic test execution is restored\n\n**First debug command:** `pytest tests/ -v --tb=short` to identify the specific failure point.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 489,
+      "total_tokens": 780,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 35
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "phase": "Phase 2: Integration Testing",
+  "generated_at": "2025-10-30T16:46:12.578960",
+  "elapsed_seconds": 87.646149,
+  "test_file": "tests\\integration\\test_phase2_integration.py",
+  "test_file_size_chars": 19283,
+  "test_file_lines": 496,
+  "perplexity_response": {
+    "content_length": 19297,
+    "citations_count": 5,
+    "citations": [
+      "https://blog.mergify.com/pytest-asyncio/",
+      "https://ber2.github.io/posts/asyncio-testing/",
+      "https://pytest-with-eric.com/pytest-advanced/pytest-asyncio/",
+      "https://realpython.com/async-io-python/",
+      "https://discuss.python.org/t/asyncio-best-practices/12576"
+    ]
+  },
+  "phase_1_context": {
+    "completed_optimizations": [
+      {
+        "name": "Backtest Vectorization",
+        "file": "optimizations_output/test_vectorized_backtest_FIXED_v2.py",
+        "status": "✅ 100% pass rate",
+        "performance": "200,000 bars/sec",
+        "validation": "Minimum 2 bars required"
+      },
+      {
+        "name": "SR RSI Async",
+        "file": "optimizations_output/sr_rsi_async_FIXED_v3.py",
+        "status": "✅ 100% pass rate",
+        "features": [
+          "Input validation",
+          "Dynamic window sizing",
+          "NaN-safe operations"
+        ],
+        "edge_cases": [
+          "1 bar",
+          "10 bars",
+          "100 bars",
+          "1000 bars"
+        ]
+      },
+      {
+        "name": "Data Service Async",
+        "file": "optimizations_output/data_service_async_PRODUCTION_clean.py",
+        "status": "✅ Production-ready",
+        "features": [
+          "Concurrency control (Semaphore, max=10)",
+          "Connection pooling (TCPConnector, limit=100)",
+          "Intelligent switching (11.09x speedup)",
+          "Retry logic (exponential backoff)",
+          "Resource cleanup"
+        ],
+        "benchmarks": {
+          "small_local": "11.09x speedup",
+          "large_local": "1.04x speedup"
+        }
+      }
+    ],
+    "integration_requirements": {
+      "end_to_end_flow": "Data Service → Backtest Engine → SR RSI Indicators → Results",
+      "concurrency_testing": "Multiple parallel backtests with shared data service",
+      "error_scenarios": "Network failures, data corruption, edge cases",
+      "performance_thresholds": "≥20% speedup vs sequential baseline"
+    }
+  },
+  "next_steps": [
+    "1. Review generated test suite",
+    "2. Install pytest-asyncio: pip install pytest-asyncio",
+    "3. Run tests: pytest tests/integration/test_phase2_integration.py -v",
+    "4. Analyze results and fix any integration issues",
+    "5. Generate Phase 2 completion report"
+  ]
+}

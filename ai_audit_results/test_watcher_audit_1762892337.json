@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762892337,
+  "changed_files": [
+    "backend\\cache\\cache_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762892324.9061902,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates either:\n- Syntax errors in test code or implementation\n- Critical runtime failures during test setup\n- Missing dependencies or configuration issues\n\n## Coverage Analysis\n**0% coverage** - All tests failed before any code execution could be measured. No coverage data was collected.\n\n## Potential Issues with Recent Changes\nThe cache_manager.py modification likely introduced:\n- **Syntax errors** (missing imports, invalid Python)\n- **Import/circular dependency issues**\n- **Configuration breaking changes** affecting test initialization\n- **Critical exceptions** during module import\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix test execution first** - Check test runner logs for the specific error causing exit code -1\n2. **Verify cache_manager.py syntax** - Run `python -m py_compile backend/cache/cache_manager.py`\n3. **Check imports** - Ensure all dependencies are available in test environment\n4. **Run tests individually** to isolate the failing component\n\n**Follow-up:**\n5. Add basic smoke tests that validate module imports before comprehensive testing\n6. Implement CI checks for syntax validation pre-commit\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail completely. The cache system is likely non-functional, which could:\n- Crash dependent services\n- Cause data consistency issues\n- Impact application performance severely\n\n**Priority:** Fix test execution immediately - this blocks all other quality assessments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 315,
+      "total_tokens": 441,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762608143,
+  "changed_files": [
+    "test_perplexity_quick_wins.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762608126.1397574,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero quality assurance. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code is being tested. The coverage report is empty, indicating tests aren't executing any production code. This is a severe testing gap that makes the entire codebase untested.\n\n## Potential Issues with Recent Changes\n- **test_perplexity_quick_wins.py** likely contains syntax errors, import failures, or runtime exceptions\n- Test configuration/environment setup may be broken\n- Dependencies might be missing or incompatible\n- Test fixtures or setup/teardown methods could be failing\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with verbose output to identify the specific failure point\n2. Check test file for syntax errors: `python -m py_compile test_perplexity_quick_wins.py`\n3. Verify imports and dependencies are correctly installed\n4. Run individual test methods to isolate the failing component\n\n**STRUCTURAL FIXES:**\n1. Implement basic smoke tests that validate test infrastructure\n2. Add error handling and logging to test setup\n3. Ensure test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure means:\n- No regression detection\n- Undetected bugs in production code\n- Broken deployment pipeline\n- Potential for critical failures in production\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 331,
+      "total_tokens": 459,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

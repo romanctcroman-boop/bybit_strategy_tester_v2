@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762625166,
+  "changed_files": [
+    "mcp-server\\server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762625154.7824547,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/execution).\n\n## Coverage Analysis\n**0% coverage** - No tests are executing successfully. This represents maximum coverage gap - all code is untested.\n\n## Potential Issues with Recent Changes\n- Server.py modifications likely introduced fatal errors preventing test execution\n- Possible syntax errors, import failures, or runtime exceptions in test harness\n- Test infrastructure may be broken (fixtures, configuration, dependencies)\n\n## Recommendations\n**Immediate (Priority 1):**\n1. Run tests with `-v` flag to see which specific test is failing\n2. Check test logs for stack traces and error messages\n3. Verify test dependencies and environment setup\n4. Test server.py in isolation to identify syntax/runtime issues\n\n**Short-term:**\n1. Fix the root cause preventing test execution\n2. Add basic smoke tests to prevent complete test suite collapse\n3. Implement test failure alerts with detailed error reporting\n\n## Risk Assessment\n**HIGH RISK** - Code changes cannot be validated. Deployment carries significant risk of production failures. All recent changes to server.py are effectively untested.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 254,
+      "total_tokens": 379,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,103 @@
+=== КРИТИЧЕСКАЯ ПРОБЛЕМА: FastAPI Router 404 Bug ===
+
+ЗАДАЧА: Проанализируй почему FastAPI router возвращает 404, несмотря на успешную регистрацию.
+
+КОНТЕКСТ:
+- Integration тесты: 10/10 PASSED ✅
+- Router регистрация: app.routes 125→130 (+5 routes) ✅
+- HTTP endpoints: 404 Not Found ❌
+- OpenAPI schema: НЕ содержит orchestrator paths ❌
+
+РАБОТАЮЩИЙ КОД (cache_router):
+```python
+# backend/api/routers/cache.py
+router = APIRouter(prefix="/cache", tags=["cache"])
+
+@router.get("/stats")
+async def get_cache_stats():
+    # ... implementation
+
+# backend/api/app.py
+app.include_router(cache_router.router, prefix="/api/v1", tags=["cache"])
+
+# РЕЗУЛЬТАТ: GET /api/v1/cache/stats → 200 OK ✅
+```
+
+НЕ РАБОТАЮЩИЙ КОД (orchestrator):
+```python
+# backend/api/orchestrator.py
+router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
+
+plugin_manager = None  # Global var
+task_queue = None
+
+def set_dependencies(pm, tq):
+    global plugin_manager, task_queue
+    plugin_manager = pm
+    task_queue = tq
+
+@router.get("/system-status")
+async def get_system_status():
+    if not plugin_manager:
+        raise HTTPException(status_code=503, detail="Not initialized")
+    return {...}
+
+# backend/api/app.py
+from backend.api import orchestrator
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    plugin_manager = PluginManager(...)
+    await plugin_manager.initialize()
+    
+    # Inject dependencies
+    orchestrator.set_dependencies(plugin_manager, queue_adapter.queue)
+    
+    yield
+
+app = FastAPI(lifespan=lifespan)
+app.include_router(orchestrator.router, prefix="/api")
+
+# РЕЗУЛЬТАТ: GET /api/orchestrator/system-status → 404 ❌
+```
+
+DEBUG ЛОГИ:
+```
+INFO: 🔍 DEBUG: app.routes BEFORE = 125 routes
+INFO: 🔍 DEBUG: app.routes AFTER = 130 routes
+INFO: 🔍 DEBUG: Found 5 orchestrator routes in app
+INFO:    - /api/orchestrator/plugins
+INFO:    - /api/orchestrator/system-status
+```
+
+КЛЮЧЕВЫЕ РАЗЛИЧИЯ:
+1. Import: cache_router импортируется из package, orchestrator - из модуля
+2. Dependencies: cache_router без dependencies, orchestrator использует global vars + lifespan injection
+3. OpenAPI: cache_router в schema ✅, orchestrator НЕТ ❌
+
+ПОПЫТКИ ИСПРАВЛЕНИЯ (13+ итераций):
+1. ❌ Перезапуск uvicorn (7+ раз)
+2. ❌ Убрал/добавил prefix в router/include_router
+3. ❌ Убрал tags из registration
+4. ❌ Kill ALL Python processes
+5. ❌ Extensive debug logging
+6. ❌ Test endpoints (тоже 404!)
+
+ВОПРОСЫ:
+1. Почему routes в app.routes но возвращают 404?
+2. Почему OpenAPI schema не содержит orchestrator paths?
+3. Может ли set_dependencies() в lifespan блокировать routing?
+4. Влияет ли import pattern (module vs package)?
+5. Проблема в global variables?
+
+ТРЕБУЕТСЯ:
+1. Root Cause Analysis - почему router registered но 404?
+2. Конкретное решение - какой код изменить?
+3. Объяснение - почему cache_router работает, а orchestrator нет?
+
+СРОЧНОСТЬ: P0 CRITICAL - Блокирует production deployment
+
+=== ДЕТАЛЬНЫЕ ОТЧЁТЫ: ===
+- ORCHESTRATOR_404_DEBUG_REPORT.md (полный технический отчёт)
+- URGENT_DEEPSEEK_CONSULTATION_REQUEST.md (запрос консультации)
+- ORCHESTRATOR_INTEGRATION_SUMMARY.md (итоговый статус)

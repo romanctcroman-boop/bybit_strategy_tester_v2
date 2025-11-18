@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762523032,
+  "changed_files": [
+    "mcp-server\\tools\\analysis\\analysis_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762523016.556607,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code is being tested\n- **No coverage data collected** - Test infrastructure failure\n- **Critical gap**: Entire test suite is non-operational\n\n## Potential Issues with Recent Changes\nThe modified `analysis_tools.py` likely contains:\n- Syntax errors preventing test discovery/import\n- Import cycles or dependency issues\n- Code that crashes during module loading\n- Missing dependencies or incorrect imports\n\n## Recommendations for Improvement\n**Immediate Actions (Priority 1):**\n1. Run `python -m py_compile mcp-server/tools/analysis/analysis_tools.py` to check for syntax errors\n2. Execute `python -c \"import mcp-server.tools.analysis.analysis_tools\"` to test module import\n3. Check test runner configuration and dependencies\n\n**Short-term (Priority 2):**\n4. Add basic smoke tests for module import and initialization\n5. Verify test discovery patterns in pytest configuration\n6. Ensure all dependencies are properly installed\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code:\n- Production failures highly likely\n- No regression protection\n- Potential security vulnerabilities undetected\n- **Recommendation**: Block deployments until basic test functionality is restored\n\n**Next Step**: Focus on fixing the test infrastructure crash before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 323,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762762194,
+  "changed_files": [
+    "test_integration_simple.py",
+    "request_next_phase_audit.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762762178.5290222,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution entirely. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**0% coverage across all files** - No code is being tested. The coverage report is empty, suggesting tests aren't even reaching execution phase.\n\n## Potential Issues with Recent Changes\n1. **test_integration_simple.py** likely contains syntax errors, import failures, or configuration issues\n2. **request_next_phase_audit.py** may have breaking changes that prevent test initialization\n3. Possible circular imports or missing dependencies in the test environment\n4. Test runner configuration may be corrupted or misconfigured\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check test file syntax: `python -m py_compile test_integration_simple.py`\n3. Verify imports work in isolation\n4. Examine test configuration and environment setup\n\n**FOLLOW-UP:**\n- Add basic smoke test to verify test framework functionality\n- Implement continuous integration checks to catch similar failures early\n- Review recent commits for breaking changes to test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - No testing feedback means undetected bugs could be deployed to production. The entire test suite is compromised, representing significant quality and deployment risk.\n\n**Priority:** Resolve immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 313,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

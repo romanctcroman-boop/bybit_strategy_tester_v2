@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762700409,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762700392.683329,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. All code paths are untested, making the entire codebase unreliable.\n\n## Potential Issues with Recent Changes\nThe file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Runtime errors during module loading\n- Test configuration issues\n- Circular imports or initialization failures\n\n## Recommendations for Improvement\n**Immediate Actions (Next 2 hours):**\n1. Run `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py` to check for syntax errors\n2. Execute the file directly: `python full_ai_audit_deepseek_perplexity_deepseek.py` to identify runtime issues\n3. Check test configuration and ensure proper test discovery\n\n**Short-term (Next day):**\n1. Fix basic execution issues identified above\n2. Add simple smoke tests to verify basic functionality\n3. Ensure test framework is properly configured (pytest/unittest)\n\n**Medium-term (Week):**\n1. Establish minimum 70% coverage threshold\n2. Implement CI pipeline with test execution\n3. Add integration tests for critical paths\n\n## Risk Assessment\n**HIGH RISK** - The codebase is completely untested and potentially non-functional. Deploying this code would be extremely risky and could lead to:\n- Production failures\n- Data corruption\n- Security vulnerabilities\n- Unpredictable behavior\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 374,
+      "total_tokens": 509,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

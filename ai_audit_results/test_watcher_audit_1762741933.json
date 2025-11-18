@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762741933,
+  "changed_files": [
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762741904.5278466,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests, and 0% coverage confirms no code was exercised.\n\n## Coverage Analysis & Gaps\n- **Total failure**: No coverage data collected\n- **Root cause**: Test execution aborted before any meaningful analysis\n- **Critical gap**: Unable to assess actual code coverage due to test infrastructure failure\n\n## Potential Issues with Recent Changes\n1. **Broken test infrastructure** in `tests/test_protocol.py`\n2. **Syntax errors** or **import failures** preventing test discovery\n3. **Configuration issues** with test runner or dependencies\n4. **Environment setup problems** (missing dependencies, path issues)\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test discovery**: Run `python -m pytest tests/ --tb=short` to identify the crash point\n2. **Check syntax**: Validate `test_protocol.py` for Python syntax errors\n3. **Verify imports**: Ensure all imports in test file resolve correctly\n4. **Test isolation**: Run `test_protocol.py` individually to isolate the failure\n\n**FOLLOW-UP:**\n5. Add basic smoke test to verify test infrastructure works\n6. Implement CI pipeline that fails fast on test configuration issues\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected regressions in production code\n- Unknown code quality state\n- Deployment carries significant business risk\n- Entire test suite is unreliable\n\n**Priority**: Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 342,
+      "total_tokens": 468,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

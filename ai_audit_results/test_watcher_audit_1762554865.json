@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762554865,
+  "changed_files": [
+    "backend\\health_checks.py",
+    "full_ai_audit_deepseek_perplexity_deepseek.py",
+    "backend\\app.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554837.8740711,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies or environment issues\n- Test framework configuration problems\n- Fatal errors during test setup\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% across all files means:\n- No tests executed successfully\n- Recent changes likely broke the test runner itself\n- All modified files have unknown test status\n\n## Potential Issues with Recent Changes\n1. **backend\\app.py** - Likely contains breaking changes that prevent application startup\n2. **backend\\health_checks.py** - May have introduced import/circular dependency issues\n3. **full_ai_audit_deepseek_perplexity_deepseek.py** - Possibly contains syntax errors or missing imports\n\n## Immediate Action Plan\n1. **Debug Test Runner**\n   ```bash\n   python -m pytest --collect-only  # Identify test discovery issues\n   python -c \"import backend.app\"   # Check for import errors\n   ```\n\n2. **Check Recent Changes**\n   - Review git diff for syntax errors\n   - Verify all imports in modified files\n   - Check for missing dependencies in requirements.txt\n\n3. **Validate Core Functionality**\n   - Manually test backend app startup\n   - Verify health check endpoints work\n   - Test AI audit script independently\n\n## Risk Assessment\n**HIGH RISK** - Deploying current state would be dangerous:\n- No confidence in any functionality\n- Potential runtime errors in production\n- Possible data corruption or service outages\n\n## Priority Recommendations\n1. **Fix test execution first** - Address Exit Code -1 immediately\n2. **Add basic smoke tests** - Ensure core functionality works before comprehensive testing\n3. **Implement CI pipeline** - Catch test failures before merge\n4. **Rollback if needed** - Consider reverting recent changes if quick fix isn't possible\n\n**Next Step**: Focus entirely on resolving the test execution failure before addressing coverage or test quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 149,
+      "completion_tokens": 432,
+      "total_tokens": 581,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 85
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

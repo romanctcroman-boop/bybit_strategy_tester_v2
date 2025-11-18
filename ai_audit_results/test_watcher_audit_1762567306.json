@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762567306,
+  "changed_files": [
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "backend\\api\\app.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_phase1_security.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762567286.1204214,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception or environment crash)\n- 0% coverage suggests tests aren't even running to completion\n- Multiple test files modified simultaneously increases risk surface\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- No coverage data generated = tests aren't executing properly\n- Likely root cause in test infrastructure or environment setup\n- All backend API, ML components, and database tests affected\n\n## Potential Issues with Recent Changes\n**HIGH-RISK AREAS**:\n1. **ML Components**: `lstm_queue_predictor.py` + `lstm_predictions.py` - ML code changes often break dependencies\n2. **Core Engine**: `mtf_engine.py` modifications could crash entire system\n3. **Database**: `test_query_optimization.py` changes may indicate performance regressions\n4. **Security**: `test_phase1_security.py` failures could expose vulnerabilities\n\n## Immediate Recommendations\n1. **ISOLATE THE FAILURE**:\n   ```bash\n   # Run tests individually to identify crashing test\n   python -m pytest tests/backend/test_marketdata_ingest.py -v\n   python -m pytest tests/test_phase1_security.py -v\n   ```\n\n2. **CHECK ENVIRONMENT**:\n   - Verify database connections\n   - Confirm ML model dependencies are available\n   - Check for missing environment variables\n\n3. **ROLLBACK STRATEGY**:\n   - Revert ML components first (`lstm_queue_predictor.py`, `lstm_predictions.py`)\n   - Then core engine changes (`mtf_engine.py`)\n   - Test after each rollback\n\n## Risk Assessment\n**SEVERITY: CRITICAL** 🚨\n- **System Stability**: Complete test failure indicates production risk\n- **Security**: Security tests failing could mean vulnerabilities introduced\n- **Data Integrity**: Market data and ML prediction pipelines potentially compromised\n- **Business Impact**: Trading systems and bot functionality at risk\n\n**IMMEDIATE ACTION**: Halt deployments until root cause identified and basic test pass rate restored.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 289,
+      "completion_tokens": 464,
+      "total_tokens": 753,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 225
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

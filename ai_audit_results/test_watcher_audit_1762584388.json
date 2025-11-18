@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762584388,
+  "changed_files": [
+    "test_deepseek_full_capabilities.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762584374.0020194,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). This indicates fundamental issues with the test infrastructure or catastrophic test failures.\n\n## Coverage Analysis\n**ZERO COVERAGE** - No code was executed during testing. This suggests:\n- Test runner configuration errors\n- Import failures preventing test discovery\n- Fatal exceptions before test execution begins\n\n## Potential Issues with Recent Changes\n1. **test_deepseek_full_capabilities.py** likely contains:\n   - Syntax errors or import failures\n   - Infinite loops or resource exhaustion\n   - Environment dependency failures\n   - Fixture/setup code causing crashes\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which specific test fails\n2. Check test file for syntax errors: `python -m py_compile test_deepseek_full_capabilities.py`\n3. Run individual test methods to isolate crashing component\n4. Add try-catch blocks around test setup code\n\n**Structural Improvements:**\n1. Implement test isolation - ensure tests can run independently\n2. Add test logging to capture crash context\n3. Set up continuous integration with fail-fast on syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Current state provides no confidence in code quality. Zero coverage means:\n- Undetected regressions likely\n- Production failures probable\n- All recent changes effectively untested\n\n**Priority:** Fix test execution before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 308,
+      "total_tokens": 436,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

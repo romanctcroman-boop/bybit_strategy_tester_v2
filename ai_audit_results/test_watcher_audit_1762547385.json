@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762547385,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\httpx\\_types.py",
+    ".venv\\Lib\\site-packages\\httpx\\_content.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\wsgi.py",
+    ".venv\\Lib\\site-packages\\httpx\\_api.py",
+    ".venv\\Lib\\site-packages\\httpx\\_urls.py",
+    ".venv\\Lib\\site-packages\\httpx\\_status_codes.py",
+    ".venv\\Lib\\site-packages\\httpx\\_client.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\asgi.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\base.py",
+    ".venv\\Lib\\site-packages\\httpx\\_models.py",
+    ".venv\\Lib\\site-packages\\httpx\\__init__.py",
+    ".venv\\Lib\\site-packages\\httpx\\_exceptions.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\default.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\mock.py",
+    ".venv\\Lib\\site-packages\\httpx\\_config.py",
+    ".venv\\Lib\\site-packages\\httpx\\_auth.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762547370.321751,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute successfully (Exit Code -1). The test suite is fundamentally broken and provides zero meaningful quality assessment. 0% coverage indicates no code was actually tested.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - Complete coverage failure\n- **No files analyzed** - Coverage reporting failed entirely\n- **Root Cause**: Tests likely crashed before any execution could occur\n\n## Potential Issues with Recent Changes\n1. **Dependency Corruption**: All changed files are in `.venv/Lib/site-packages/httpx/` - suggests httpx installation is corrupted or modified\n2. **Environment Issues**: Virtual environment appears compromised\n3. **Test Configuration**: Test runner may be misconfigured or pointing to wrong paths\n4. **Import Errors**: Likely failing during test discovery/import phase\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Recreate virtual environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Run basic test diagnostics**:\n   ```bash\n   python -m pytest --collect-only\n   python -c \"import httpx; print('Import OK')\"\n   ```\n3. **Check test configuration** for incorrect paths or environment variables\n\n**FOLLOW-UP:**\n4. Verify pytest configuration and test discovery patterns\n5. Ensure httpx version compatibility with your codebase\n6. Add basic smoke tests to catch environment issues early\n\n## Risk Assessment\n**HIGH RISK** - Current state provides no confidence in code quality:\n- No regression detection\n- Potential runtime errors in production\n- All changes are effectively untested\n- Environment instability threatens development velocity\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 434,
+      "completion_tokens": 395,
+      "total_tokens": 829,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 370
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

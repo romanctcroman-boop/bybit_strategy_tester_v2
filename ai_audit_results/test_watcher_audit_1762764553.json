@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762764553,
+  "changed_files": [
+    "reliability_auto_system\\self_healing_monitor.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762764534.2127352,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1 indicates system/interruption error). This is not a test failure but a complete execution failure. Test quality cannot be assessed as no tests ran.\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This indicates either:\n- Test framework configuration issues\n- Test discovery failures\n- Environment/dependency problems\n- Fatal errors before test execution\n\n## Potential Issues with Recent Changes\nThe modified `self_healing_monitor.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Configuration changes breaking test setup\n- Infinite loops or blocking operations\n\n## Recommendations for Improvement\n1. **Immediate Actions:**\n   - Run tests with `-v` flag to see why execution fails\n   - Check Python syntax: `python -m py_compile reliability_auto_system/self_healing_monitor.py`\n   - Verify imports and dependencies\n\n2. **Debugging Steps:**\n   - Run a single simple test to isolate the issue\n   - Check test configuration (pytest.ini, conftest.py)\n   - Review recent changes to `self_healing_monitor.py` for obvious errors\n\n3. **Prevention:**\n   - Add pre-commit hooks for syntax checking\n   - Implement basic smoke tests before full test suite\n   - Set up CI to fail fast on configuration issues\n\n## Risk Assessment\n**HIGH RISK** - The system is effectively untested. Any bugs in the self-healing monitor could go undetected, potentially causing:\n- System instability in production\n- Failed auto-recovery scenarios\n- Cascading failures in reliability systems\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 132,
+      "completion_tokens": 375,
+      "total_tokens": 507,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 68
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

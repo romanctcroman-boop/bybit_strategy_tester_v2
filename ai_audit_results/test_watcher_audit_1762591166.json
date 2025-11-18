@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762591166,
+  "changed_files": [
+    "deepseek_self_analysis.py",
+    "apply_deepseek_improvements.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762591147.92726,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data implies tests never ran to completion\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- 0% coverage across all files\n- No test execution means no meaningful coverage data\n- Critical gap: Entire codebase is untested\n\n## Potential Issues with Recent Changes\n1. **File Changes Impact**:\n   - `deepseek_self_analysis.py` and `apply_deepseek_improvements.py` modifications likely introduced breaking changes\n   - Possible syntax errors, import cycles, or runtime exceptions\n   - Test runner unable to initialize or execute\n\n2. **Infrastructure Problems**:\n   - Test configuration/dependencies broken\n   - Environment setup failures\n   - Critical imports missing or corrupted\n\n## Immediate Action Recommendations\n1. **Debug Test Infrastructure**:\n   ```bash\n   python -m pytest --tb=short -v  # Identify failing test immediately\n   python -c \"import deepseek_self_analysis\"  # Check basic import\n   ```\n\n2. **Fix Critical Issues**:\n   - Review recent changes to both modified files for syntax/runtime errors\n   - Verify all imports and dependencies are intact\n   - Check test configuration files (pytest.ini, conftest.py, etc.)\n\n3. **Restore Basic Testing**:\n   - Add simple smoke test to verify basic functionality\n   - Implement minimal test that runs successfully\n   - Gradually rebuild test suite from working baseline\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- ❌ No test validation of recent changes\n- ❌ Unknown if core functionality works\n- ❌ High probability of runtime failures\n- ❌ Zero quality assurance coverage\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 415,
+      "total_tokens": 551,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

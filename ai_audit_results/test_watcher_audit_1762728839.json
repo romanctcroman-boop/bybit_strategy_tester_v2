@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762728839,
+  "changed_files": [
+    "reliability\\distributed_rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762728825.8354902,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with either test infrastructure or code syntax/runtime errors. No meaningful quality assessment possible since tests didn't run.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure suggests:\n- Tests cannot import/load the module\n- Syntax errors preventing module execution\n- Missing dependencies or imports\n- Test harness configuration issues\n\n## Potential Issues with Recent Changes\nThe distributed_rate_limiter.py changes likely introduced:\n- **Syntax errors** (missing imports, invalid Python)\n- **Runtime errors** on module import (circular imports, missing dependencies)\n- **Breaking changes** to class/method signatures\n- **Environment dependencies** not available in test environment\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile reliability\\distributed_rate_limiter.py` to check for syntax errors\n2. Test module import manually: `python -c \"from reliability import distributed_rate_limiter\"`\n3. Check test logs for specific error messages and stack traces\n4. Verify all imports and dependencies are available in test environment\n\n**Follow-up:**\n- Add basic smoke tests that validate module can be imported\n- Implement CI checks that fail on syntax errors before test execution\n- Ensure test environment matches development dependencies\n\n## Risk Assessment\n**HIGH RISK** - Code is currently untestable and potentially broken in production. The -1 exit code suggests severe issues that could affect system stability. No confidence in functionality or reliability of rate limiting component.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 333,
+      "total_tokens": 461,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

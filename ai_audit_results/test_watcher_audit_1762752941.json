@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762752941,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762752926.6637778,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No tests executed successfully\n- Coverage reporting mechanism failed entirely\n- Health_check.py changes completely untested\n\n## Potential Issues with Recent Changes\n1. **Test configuration broken** - Likely issues in pytest configuration, conftest.py, or test dependencies\n2. **Syntax errors** in test files preventing test discovery\n3. **Import failures** - health_check.py may have breaking changes affecting test imports\n4. **Environment/dependency issues** - Missing packages or version conflicts\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `pytest -v` to identify specific test discovery/execution failures\n2. Check for syntax errors in test files: `python -m py_compile test_*.py`\n3. Verify health_check.py imports and dependencies\n4. Review recent changes to test configuration files\n\n**Short-term:**\n1. Fix test runner configuration to get basic test execution working\n2. Add smoke tests for health_check.py core functionality\n3. Implement CI pipeline validation to catch test failures early\n\n## Risk Assessment\n**HIGH RISK** - Code changes are completely unvalidated. Health_check.py modifications could introduce:\n- Runtime failures in production\n- Integration breakdowns\n- Security vulnerabilities\n- Data corruption risks\n\n**Priority:** Fix test execution immediately before any further deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 327,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

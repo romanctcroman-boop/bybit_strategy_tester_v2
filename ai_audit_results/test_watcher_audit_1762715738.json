@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762715738,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psutil\\__init__.py",
+    "reliability\\mcp_manager.py",
+    "health_check.py",
+    "tests\\test_mcp_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762715723.8691285,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental setup/import issues\n- No coverage data collected implies tests never ran\n\n## Coverage Analysis & Gaps\n**NO COVERAGE** - All files show 0% coverage:\n- Critical gap: Entire test suite failed to execute\n- No data available for meaningful coverage analysis\n- Test infrastructure appears broken\n\n## Potential Issues with Recent Changes\n1. **Virtual environment corruption** - `.venv` modifications suggest dependency issues\n2. **Import/circular dependency problems** - Likely in `mcp_manager.py` or `health_check.py`\n3. **Test configuration errors** - Setup/teardown failures preventing execution\n4. **Path/module resolution issues** - Especially with `reliability` package structure\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check Python path and import statements in `test_mcp_manager.py`\n3. Verify virtual environment integrity - consider recreating `.venv`\n4. Test individual components separately before full suite\n\n**Structural Fixes:**\n1. Add basic smoke test to verify test infrastructure works\n2. Implement proper error handling in test setup\n3. Ensure `__init__.py` files exist in package directories\n4. Validate all dependencies are correctly installed\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code changes cannot be validated\n- High probability of undetected regressions\n- Deployment would be extremely risky\n- Test reliability is compromised\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 158,
+      "completion_tokens": 368,
+      "total_tokens": 526,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 94
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

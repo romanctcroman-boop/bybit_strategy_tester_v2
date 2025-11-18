@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762786634,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762786606.649508,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**0% coverage** confirms no tests executed successfully. The entire codebase is untested in this run, making all recent changes unverified.\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure failure** - Likely caused by:\n   - Syntax errors in test files or test configuration\n   - Missing dependencies or import failures\n   - Broken test discovery configuration\n   - Environment setup issues\n\n2. **File `full_ai_audit_deepseek_perplexity_deepseek.py`** may contain:\n   - Fatal import errors\n   - Syntax violations preventing module loading\n   - Missing required dependencies\n\n## Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. Run tests with verbose output to identify the crash point:\n   ```bash\n   python -m pytest -v --tb=short\n   ```\n\n2. Check for basic syntax errors:\n   ```bash\n   python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py\n   ```\n\n3. Verify test discovery:\n   ```bash\n   python -m pytest --collect-only\n   ```\n\n**STRUCTURAL FIXES:**\n- Add a basic smoke test to verify test infrastructure\n- Implement CI pipeline that fails fast on configuration issues\n- Add import validation at module level\n\n## Risk Assessment\n**HIGH RISK** - All changes in the recent file are completely unvalidated. Deployment would be extremely risky as:\n- No functionality is verified\n- Potential runtime crashes undetected\n- Regression protection is nonexistent\n- Could indicate broader environment instability\n\n**Priority: Fix immediately before any further development or deployment.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 384,
+      "total_tokens": 519,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

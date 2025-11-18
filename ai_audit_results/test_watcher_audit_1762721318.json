@@ -1,0 +1,44 @@
+{
+  "timestamp": 1762721318,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pytest_cov\\engine.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    "reliability\\distributed_rate_limiter.py",
+    ".venv\\Lib\\site-packages\\pytest\\__main__.py",
+    ".venv\\Lib\\site-packages\\pytest_cov\\plugin.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    "tests\\test_distributed_rate_limiter.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762721291.8405492,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely crash)\n- 0% coverage suggests tests never executed properly\n- No coverage data collected for any files\n\n## Coverage Analysis & Gaps\n**Total Coverage: 0.00%** - This is not a coverage gap but a complete system failure:\n- No files show any coverage data\n- Coverage collection mechanism appears broken\n- Tests likely crashed before any execution could be measured\n\n## Potential Issues with Recent Changes\n**Primary Suspect: Environment Corruption**\n- Multiple virtual environment files modified (.venv paths)\n- Coverage and pytest plugin files changed\n- This suggests dependency conflicts or corrupted installation\n\n**Specific Concerns:**\n1. Modified pytest_cov files - coverage plugin likely broken\n2. Changes to pluggy components - pytest plugin system compromised\n3. Virtual environment files altered - environment instability\n\n## Recommendations for Improvement\n\n**Immediate Actions:**\n1. **Recreate Virtual Environment**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\n   pip install -r requirements.txt\n   ```\n\n2. **Verify Installation**\n   ```bash\n   pip list | grep -E \"(pytest|cov)\"\n   pytest --version\n   ```\n\n3. **Run Basic Test**\n   ```bash\n   pytest tests/ -v --tb=short\n   ```\n\n**Follow-up Steps:**\n4. Add isolated test run without coverage first\n5. Gradually reintroduce coverage with `--cov` flags\n6. Check for version conflicts in requirements\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Unreliable test environment\n- Potential false sense of security if tests appear to run\n- Development workflow compromised\n- Cannot trust any test results until resolved\n\n**Priority: CRITICAL** - Address environment issues before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 322,
+      "completion_tokens": 421,
+      "total_tokens": 743,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 258
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,127 @@
+# API Alert Rules
+# Monitors external API (DeepSeek, Perplexity) health and performance
+
+groups:
+  - name: api_alerts
+    interval: 30s
+    rules:
+      # CRITICAL: API is down
+      - alert: DeepSeekAPIDown
+        expr: |
+          sum(rate(deepseek_api_calls_total{status="success"}[5m])) == 0
+          and
+          sum(rate(deepseek_api_calls_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: api-client
+          service: automation-platform
+          api: deepseek
+        annotations:
+          summary: "DeepSeek API is not responding"
+          description: "All DeepSeek API calls are failing for the last 5 minutes."
+          runbook: "Check API status, credentials, and network connectivity."
+      
+      - alert: PerplexityAPIDown
+        expr: |
+          sum(rate(perplexity_api_calls_total{status="success"}[5m])) == 0
+          and
+          sum(rate(perplexity_api_calls_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: api-client
+          service: automation-platform
+          api: perplexity
+        annotations:
+          summary: "Perplexity API is not responding"
+          description: "All Perplexity API calls are failing for the last 5 minutes."
+          runbook: "Check API status, credentials, and network connectivity."
+      
+      # CRITICAL: High rate limit hits
+      - alert: APIRateLimitExceeded
+        expr: rate(api_rate_limits_total[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          component: api-client
+          service: automation-platform
+        annotations:
+          summary: "API rate limits are being exceeded"
+          description: "Hitting rate limits {{ $value | humanize }} times per second."
+          runbook: "Implement backoff strategy or reduce API call frequency."
+      
+      # WARNING: High API error rate
+      - alert: APIHighErrorRate
+        expr: |
+          sum(rate(api_errors_total[5m])) 
+          / 
+          sum(rate(deepseek_api_calls_total[5m]) + rate(perplexity_api_calls_total[5m])) 
+          * 100 > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: api-client
+          service: automation-platform
+        annotations:
+          summary: "API error rate is above 10%"
+          description: "{{ $value | humanize }}% of API calls are failing."
+          runbook: "Investigate error types and implement retry logic if needed."
+      
+      # WARNING: Slow API responses
+      - alert: APISlowResponses
+        expr: |
+          histogram_quantile(0.95, 
+            rate(api_request_duration_seconds_bucket[5m])
+          ) > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: api-client
+          service: automation-platform
+        annotations:
+          summary: "API responses are slow (p95 > 10s)"
+          description: "95th percentile response time is {{ $value | humanize }}s."
+          runbook: "Check API status and network latency. Consider implementing timeout."
+      
+      # WARNING: DeepSeek specific slow responses
+      - alert: DeepSeekSlowResponses
+        expr: deepseek_api_response_time_seconds > 15
+        for: 5m
+        labels:
+          severity: warning
+          component: api-client
+          service: automation-platform
+          api: deepseek
+        annotations:
+          summary: "DeepSeek API is responding slowly"
+          description: "Last response time was {{ $value | humanize }}s (threshold: 15s)."
+          runbook: "Check DeepSeek API status and consider implementing caching."
+      
+      # WARNING: Approaching rate limit
+      - alert: APIRateLimitApproaching
+        expr: rate(api_rate_limits_total[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: api-client
+          service: automation-platform
+        annotations:
+          summary: "Approaching API rate limits"
+          description: "Rate limit hits: {{ $value | humanize }} per second."
+          runbook: "Monitor API usage and implement throttling if necessary."
+      
+      # INFO: API recovered
+      - alert: APIRecovered
+        expr: |
+          sum(rate(deepseek_api_calls_total{status="success"}[2m])) > 0
+          and
+          sum(rate(deepseek_api_calls_total{status="error"}[10m])) > 0
+        labels:
+          severity: info
+          component: api-client
+          service: automation-platform
+        annotations:
+          summary: "API has recovered from errors"
+          description: "API calls are succeeding again after previous failures."
+          runbook: "No action needed. Monitor for stability."

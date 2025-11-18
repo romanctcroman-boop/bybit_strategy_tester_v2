@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762519159,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\httpcore\\_async\\connection.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762519144.314077,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment setup failure\n- Fatal errors in test infrastructure\n- Critical bugs preventing test execution\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- No tests actually executed\n- Possible import/initialization failures\n- Environment/dependency issues\n\n## Potential Issues with Recent Changes\nThe modified file `.venv\\Lib\\site-packages\\httpcore\\_async\\connection.py` indicates:\n- **Virtual environment corruption** - Modifying installed packages in `.venv` is problematic\n- **Dependency version conflicts** - Manual changes to dependencies suggest compatibility issues\n- **Environment isolation breach** - Tests should not rely on modified site-packages\n\n## Recommendations\n**IMMEDIATE ACTIONS:**\n1. **Reset virtual environment**: `rm -rf .venv && python -m venv .venv`\n2. **Reinstall dependencies**: `pip install -r requirements.txt`\n3. **Verify test runner configuration**\n4. **Check for syntax/runtime errors in test files**\n\n**FOLLOW-UP:**\n- Implement dependency pinning in `requirements.txt`\n- Add pre-test environment validation\n- Set up CI with clean environment for each run\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- No test results to evaluate code changes\n- Environment instability threatens development velocity\n- Potential for undetected regressions in production\n\n**Priority**: Fix test environment immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 347,
+      "total_tokens": 483,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

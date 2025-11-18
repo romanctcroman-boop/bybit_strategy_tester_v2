@@ -1,0 +1,53 @@
+# Prometheus Configuration for Bybit Strategy Tester
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'bybit-strategy-tester'
+    environment: 'development'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Bybit Strategy Tester Metrics
+  - job_name: 'bybit-strategy-tester'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['host.docker.internal:9090']
+        labels:
+          service: 'automation-platform'
+          component: 'metrics-exporter'
+    
+    # For Windows/Mac Docker Desktop, use host.docker.internal
+    # For Linux, use your host IP or setup network accordingly
+
+  # Alternative for Linux hosts
+  # - job_name: 'bybit-strategy-tester-linux'
+  #   scrape_interval: 10s
+  #   static_configs:
+  #     - targets: ['172.17.0.1:9090']  # Docker bridge IP
+  #       labels:
+  #         service: 'automation-platform'
+
+  # System metrics (if using node_exporter)
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']

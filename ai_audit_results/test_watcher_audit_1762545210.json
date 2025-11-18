@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762545210,
+  "changed_files": [
+    "backend\\migrations\\versions\\20251107_merge_all_heads.py",
+    "backend\\migrations\\versions\\add_reasoning_traces.py",
+    "backend\\migrations\\versions\\add_reasoning_kb_001.py",
+    "backend\\migrations\\versions\\perf_indexes_001_add_performance_indexes.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762545196.0796945,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely environment/config issues)\n- 0% coverage suggests tests aren't even executing\n- No test results or coverage data available\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No coverage data collected\n- All files show 0% coverage\n- Test infrastructure appears broken\n\n## Potential Issues with Recent Changes\n**MIGRATION FILES SUSPECT:**\n- 4 database migration files modified/added\n- `20251107_merge_all_heads.py` suggests complex schema changes\n- Migration conflicts or dependency issues likely causing test failures\n- Database state may be incompatible with current code\n\n## Immediate Recommendations\n1. **FIX TEST INFRASTRUCTURE:**\n   - Check database connection/migration state\n   - Verify test configuration files\n   - Ensure migration dependencies are resolved\n\n2. **VALIDATE MIGRATIONS:**\n   ```bash\n   python manage.py migrate --plan\n   python manage.py check\n   ```\n\n3. **ISOLATE THE FAILURE:**\n   - Run tests with `-v` for verbose output\n   - Test migrations independently\n   - Check for circular migration dependencies\n\n4. **RESTORE BASIC TESTING:**\n   - Fix migration issues first\n   - Get at least one test passing\n   - Then address coverage gaps\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No functional test suite\n- Database schema changes untested\n- High probability of production failures\n- **Recommendation: Block all deployments until basic tests pass**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 191,
+      "completion_tokens": 352,
+      "total_tokens": 543,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 127
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

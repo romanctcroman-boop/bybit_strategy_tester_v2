@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762569413,
+  "changed_files": [
+    "backend\\api\\app.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762569389.8670616,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful testing occurred. This represents a complete breakdown in the testing process.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This is not a coverage gap but a complete testing failure.\n\n## Potential Issues with Recent Changes\n1. **app.py modifications likely broke test execution**\n   - Syntax errors preventing import/execution\n   - Missing dependencies or imports\n   - Runtime errors during test setup\n   - Environment configuration issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with verbose output to identify the specific failure point\n2. Check `app.py` for syntax errors: `python -m py_compile backend/api/app.py`\n3. Verify test runner configuration and dependencies\n4. Run a minimal test case to isolate the issue\n\n**Process Improvements:**\n1. Implement pre-commit hooks to catch syntax errors\n2. Add CI pipeline step for basic syntax validation\n3. Ensure tests run in isolated environment with proper dependencies\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code could lead to:\n- Production outages\n- Security vulnerabilities\n- Data corruption\n- Complete service failure\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 280,
+      "total_tokens": 405,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

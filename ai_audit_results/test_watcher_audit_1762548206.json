@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762548206,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\starlette\\requests.py",
+    ".venv\\Lib\\site-packages\\fastapi\\__init__.py",
+    ".venv\\Lib\\site-packages\\fastapi\\testclient.py",
+    ".venv\\Lib\\site-packages\\starlette\\responses.py",
+    "backend\\security\\__init__.py",
+    ".venv\\Lib\\site-packages\\starlette\\__init__.py",
+    "backend\\security\\jwt_manager.py",
+    ".venv\\Lib\\site-packages\\starlette\\testclient.py",
+    ".venv\\Lib\\site-packages\\fastapi\\responses.py",
+    ".venv\\Lib\\site-packages\\fastapi\\requests.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762548193.1150513,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests never executed properly\n- Modified virtual environment packages are highly concerning\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA AVAILABLE** - Tests failed before coverage could be measured:\n- Zero files show coverage metrics\n- Unable to assess existing test effectiveness\n- Critical gap: unknown if any code paths are tested\n\n## Potential Issues with Recent Changes\n**HIGH RISK MODIFICATIONS DETECTED**:\n- Direct changes to `.venv` packages (Starlette/FastAPI) - should NEVER be modified\n- Virtual environment corruption likely\n- JWT manager changes without test validation\n- Possible dependency version conflicts\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS**:\n1. **Restore clean virtual environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Fix test infrastructure**:\n   - Check test runner configuration\n   - Verify pytest/coverage installation\n   - Add error handling for test setup\n\n3. **Isolate changes**:\n   - Only modify application code, not dependencies\n   - Test JWT manager changes in isolation first\n\n## Risk Assessment\n**HIGH RISK** - Current state is untestable:\n- Production deployment would be extremely risky\n- No validation of security changes (JWT manager)\n- Dependency integrity compromised\n- **Recommend blocking deployments until resolved**\n\n**Priority**: Fix test environment immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 281,
+      "completion_tokens": 348,
+      "total_tokens": 629,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 217
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762620601,
+  "changed_files": [
+    "backend\\ml\\market_regime_detector.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "backend\\ml\\retrain_scheduler.py",
+    "mcp-server\\mcp_cache.py",
+    "tests\\unit\\test_ast_validator.py",
+    "backend\\ml\\optuna_optimizer.py",
+    "backend\\security\\ast_validator.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_walk_forward.py",
+    "backend\\ml\\__init__.py",
+    "tests\\unit\\test_structured_logger.py",
+    "backend\\ml\\optimizer.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    "tests\\unit\\test_retrain_scheduler.py",
+    "backend\\ml\\drift_detector.py",
+    "tests\\unit\\test_lru_ttl_cache.py",
+    "tests\\unit\\test_drift_detector.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762620577.3558784,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (likely crash/segmentation fault)\n- 0% coverage suggests tests aren't executing properly\n- No coverage data available for analysis\n\n## 2. Coverage Analysis\n**COMPLETE COVERAGE FAILURE**:\n- No files show any coverage data\n- All ML components (market regime detector, drift detector, optimizers) untested\n- Security and validation modules completely uncovered\n\n## 3. Potential Issues with Recent Changes\n**HIGH RISK CHANGES**:\n- Modified `.venv\\Lib\\site-packages\\_pytest\\terminal.py` - Never modify virtual environment files directly\n- Multiple ML pipeline components changed simultaneously\n- Security validator modifications without test validation\n- Possible circular imports or environment corruption\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS**:\n1. **Restore test environment**: Delete and recreate virtual environment\n2. **Fix test execution**: Check for infinite loops, memory issues, or import errors\n3. **Isolate changes**: Test modified files individually before integration\n4. **Remove venv modifications**: Never commit changes to package files\n\n**TESTING PRIORITIES**:\n1. Security validator (ast_validator.py) - critical security component\n2. ML optimizers (walk_forward_optimizer, optuna_optimizer) - core business logic\n3. Drift detection - model reliability dependency\n\n## 5. Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- Security vulnerabilities possible in AST validator\n- ML model degradation likely due to untested optimizers\n- Complete test suite failure indicates systemic issues\n- No validation of critical financial ML components\n\n**IMMEDIATE NEXT STEPS**:\n1. Fix test environment (recreate venv, verify pytest installation)\n2. Run tests on individual components to identify root cause\n3. Restore original pytest package files\n4. Implement basic smoke tests before addressing coverage gaps",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 320,
+      "completion_tokens": 437,
+      "total_tokens": 757,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 256
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

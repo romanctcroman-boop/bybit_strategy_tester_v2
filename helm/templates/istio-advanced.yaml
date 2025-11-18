@@ -1,0 +1,220 @@
+{{- if and .Values.global.istio.enabled .Values.global.istio.tracing.enabled -}}
+---
+# Jaeger Tracing Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-jaeger-config
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+data:
+  jaeger-config.yaml: |
+    service_name: bybit-strategy-tester
+    sampler:
+      type: probabilistic
+      param: {{ .Values.global.istio.tracing.sampling | default 10 }}
+    reporter:
+      log_spans: true
+      local_agent_host_port: 'jaeger-agent:6831'
+      max_queue_size: 100
+      flush_interval: 1s
+---
+# Telemetry for Distributed Tracing
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-tracing
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+spec:
+  # Enable tracing for all workloads in namespace
+  tracing:
+  - providers:
+    - name: jaeger
+    randomSamplingPercentage: {{ .Values.global.istio.tracing.sampling | default 10 }}.0
+    customTags:
+      environment:
+        literal:
+          value: {{ .Values.global.environment }}
+      cluster:
+        literal:
+          value: {{ .Values.global.namespace }}
+      app_version:
+        literal:
+          value: {{ .Chart.AppVersion }}
+---
+# Traffic Mirroring for Shadow Testing
+{{- if .Values.istio.trafficMirroring.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-backend-mirror
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+spec:
+  hosts:
+  {{- range .Values.istio.virtualServices.backend.hosts }}
+  - {{ . | quote }}
+  {{- end }}
+  gateways:
+  - {{ include "bybit-strategy-tester.fullname" . }}-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api/v1
+    route:
+    - destination:
+        host: {{ include "bybit-strategy-tester.fullname" . }}-backend
+        port:
+          number: 8000
+      weight: 100
+    # Mirror traffic to canary for shadow testing
+    mirror:
+      host: {{ include "bybit-strategy-tester.fullname" . }}-backend-canary
+      port:
+        number: 8000
+    mirrorPercentage:
+      value: {{ .Values.istio.trafficMirroring.percentage | default 10 }}
+{{- end }}
+---
+# Fault Injection for Chaos Engineering
+{{- if .Values.istio.faultInjection.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-chaos
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+  annotations:
+    description: "Chaos engineering: fault injection for resilience testing"
+spec:
+  hosts:
+  - {{ include "bybit-strategy-tester.fullname" . }}-backend
+  http:
+  - match:
+    # Only inject faults for specific test endpoints
+    - headers:
+        x-chaos-test:
+          exact: "true"
+    fault:
+      # HTTP Delay (latency injection)
+      {{- if .Values.istio.faultInjection.delay.enabled }}
+      delay:
+        percentage:
+          value: {{ .Values.istio.faultInjection.delay.percentage | default 10 }}
+        fixedDelay: {{ .Values.istio.faultInjection.delay.fixedDelay | default "5s" }}
+      {{- end }}
+      # HTTP Abort (error injection)
+      {{- if .Values.istio.faultInjection.abort.enabled }}
+      abort:
+        percentage:
+          value: {{ .Values.istio.faultInjection.abort.percentage | default 10 }}
+        httpStatus: {{ .Values.istio.faultInjection.abort.httpStatus | default 503 }}
+      {{- end }}
+    route:
+    - destination:
+        host: {{ include "bybit-strategy-tester.fullname" . }}-backend
+        port:
+          number: 8000
+  # Normal traffic (no faults)
+  - route:
+    - destination:
+        host: {{ include "bybit-strategy-tester.fullname" . }}-backend
+        port:
+          number: 8000
+{{- end }}
+---
+# Request Timeout Configuration
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-timeouts
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+spec:
+  hosts:
+  - {{ include "bybit-strategy-tester.fullname" . }}-backend
+  http:
+  # Long-running operations (backtests)
+  - match:
+    - uri:
+        prefix: /api/v1/backtest
+    route:
+    - destination:
+        host: {{ include "bybit-strategy-tester.fullname" . }}-backend
+        port:
+          number: 8000
+    timeout: {{ .Values.istio.timeouts.backtest | default "300s" }}
+  # Standard API operations
+  - match:
+    - uri:
+        prefix: /api/v1
+    route:
+    - destination:
+        host: {{ include "bybit-strategy-tester.fullname" . }}-backend
+        port:
+          number: 8000
+    timeout: {{ .Values.istio.timeouts.standard | default "30s" }}
+    retries:
+      attempts: {{ .Values.istio.retries.attempts | default 3 }}
+      perTryTimeout: {{ .Values.istio.retries.perTryTimeout | default "10s" }}
+      retryOn: "5xx,reset,connect-failure,refused-stream"
+---
+# Rate Limiting
+{{- if .Values.istio.rateLimit.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: EnvoyFilter
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-rate-limit
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+spec:
+  workloadSelector:
+    labels:
+      app: backend
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.filters.network.http_connection_manager"
+            subFilter:
+              name: "envoy.filters.http.router"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.local_ratelimit
+        typed_config:
+          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+          type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+          value:
+            stat_prefix: http_local_rate_limiter
+            token_bucket:
+              max_tokens: {{ .Values.istio.rateLimit.maxTokens | default 100 }}
+              tokens_per_fill: {{ .Values.istio.rateLimit.tokensPerFill | default 100 }}
+              fill_interval: {{ .Values.istio.rateLimit.fillInterval | default "1s" }}
+            filter_enabled:
+              runtime_key: local_rate_limit_enabled
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            filter_enforced:
+              runtime_key: local_rate_limit_enforced
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            response_headers_to_add:
+            - append: false
+              header:
+                key: x-local-rate-limit
+                value: 'true'
+{{- end }}
+{{- end }}

@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762542358,
+  "changed_files": [
+    "tests\\monitoring\\__init__.py",
+    "automation\\metrics\\__init__.py",
+    "tests\\monitoring\\test_metrics_export.py",
+    "automation\\metrics\\prometheus_exporter.py",
+    "automation\\metrics\\collectors\\audit_agent_collector.py",
+    "demo_prometheus_metrics.py",
+    "automation\\metrics\\custom_metrics.py",
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    "automation\\metrics\\collectors\\__init__.py",
+    "automation\\metrics\\collectors\\system_collector.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762542332.8216512,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage confirms no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- Zero coverage across all files indicates fundamental test execution failure\n- No metrics collection, export, or monitoring functionality validated\n- All collector types (audit_agent, test_watcher, system) untested\n\n## Potential Issues with Recent Changes\n1. **Prometheus Integration**: `prometheus_exporter.py` changes likely broke test initialization\n2. **Collector Registry**: Changes in collector `__init__.py` files may have disrupted import chains\n3. **Dependencies**: Missing Prometheus client library or version incompatibility\n4. **Configuration**: Broken metrics export configuration in `test_metrics_export.py`\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure First:**\n   ```bash\n   python -m pytest tests/monitoring/test_metrics_export.py -v --tb=short\n   ```\n2. **Check Dependencies:**\n   - Verify `prometheus-client` installation and version\n   - Validate all collector imports in `automation/metrics/collectors/__init__.py`\n\n3. **Isolate the Failure:**\n   - Run simplest test case in `test_metrics_export.py`\n   - Test individual collector initialization separately\n\n## Risk Assessment\n**HIGH RISK** - Monitoring system completely unvalidated:\n- Production metrics collection may be broken\n- No visibility into system performance or audit trails\n- Potential silent failures in production monitoring\n\n**Priority:** Fix test infrastructure immediately before any feature development continues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 242,
+      "completion_tokens": 368,
+      "total_tokens": 610,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 178
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

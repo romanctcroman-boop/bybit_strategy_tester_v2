@@ -1,0 +1,51 @@
+{
+  "timestamp": 1762675106,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    "backend\\core\\mtf_engine.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    "tests\\test_protocol.py",
+    "tests\\test_sandbox_integration.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    "tests\\test_mtf_engine.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    "mcp-server\\orchestrator\\api\\models.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762675086.819196,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- No tests executed successfully\n- Likely environment corruption or fatal code errors\n\n## 2. Coverage Analysis\n**ZERO COVERAGE** - All metrics show 0.00%\n- No code was executed during test run\n- This indicates tests never reached execution phase\n- Coverage data is meaningless in this state\n\n## 3. Potential Issues\n**Primary Suspects:**\n- **Environment corruption** - Modified `.venv` packages suggest virtual environment issues\n- **Fatal import/circular dependencies** - Changes to core modules (`mtf_engine.py`, FastAPI apps)\n- **Plugin system conflicts** - Multiple pytest/pluggy files modified\n- **Memory/segfault issues** - Exit code -1 suggests low-level failures\n\n## 4. Immediate Actions Required\n\n**🔄 Environment Reset:**\n```bash\n# Recreate clean environment\nrm -rf .venv\npython -m venv .venv\nsource .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\npip install -r requirements.txt\n```\n\n**🔍 Debug Steps:**\n1. Run simplest test first: `pytest tests/ -v --tb=short`\n2. Check for import errors: `python -c \"from backend.core.mtf_engine import *\"`\n3. Verify dependencies: `pip list` vs requirements\n4. Run with minimal plugins: `pytest -p no:warning -p no:logging`\n\n## 5. Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- ❌ No test validation of recent changes\n- ❌ Potential breaking changes in core engine\n- ❌ Database and integration tests compromised\n- ❌ FastAPI application integrity unknown\n\n**Priority:** Fix test execution before any further development or deployment.\n\n**Next:** Focus on getting ANY test to run successfully, then rebuild coverage from there.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 418,
+      "completion_tokens": 445,
+      "total_tokens": 863,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 354
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

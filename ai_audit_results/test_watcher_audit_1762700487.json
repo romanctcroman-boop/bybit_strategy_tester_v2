@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762700487,
+  "changed_files": [
+    "backend\\api\\schemas.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762700471.7764544,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is not a coverage gap but a complete test execution failure.\n\n## Potential Issues with Recent Changes\nThe schema changes in `backend\\api\\schemas.py` likely introduced:\n- **Syntax errors** preventing module import\n- **Circular imports** breaking dependency chain\n- **Missing dependencies** or incompatible type definitions\n- **Runtime exceptions** during module loading\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check Python syntax: `python -m py_compile backend/api/schemas.py`\n   - Verify imports work: `python -c \"from backend.api import schemas\"`\n   - Examine test runner configuration and dependencies\n\n2. **Debug schema changes**:\n   - Review recent commits to `schemas.py` for obvious syntax issues\n   - Check for missing imports, undefined variables, or type errors\n   - Validate Pydantic model definitions if using data validation\n\n3. **Add basic smoke test**:\n   ```python\n   # tests/test_schemas_smoke.py\n   def test_schemas_import():\n       from backend.api import schemas\n       assert schemas is not None\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail with same exit code. The codebase is currently untestable and potentially broken. All development should pause until basic test execution is restored.\n\n**Priority**: Fix test execution immediately before any further development or analysis.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 366,
+      "total_tokens": 492,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

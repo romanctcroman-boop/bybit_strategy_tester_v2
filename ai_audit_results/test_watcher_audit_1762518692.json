@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762518692,
+  "changed_files": [
+    "send_compact_to_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762518676.4107077,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All code paths untested. Complete testing vacuum. Recent changes in `send_compact_to_deepseek.py` have no validation.\n\n## Potential Issues with Recent Changes\n- **Syntax errors** in `send_compact_to_deepseek.py` likely causing import failures\n- **Missing dependencies** or environment misconfiguration\n- **Runtime exceptions** during module import/initialization\n- **Broken imports** or circular dependencies\n\n## Immediate Action Plan\n1. **Fix test execution first** - Run with `python -m pytest -v` to see specific error\n2. **Check syntax** - Run `python -m py_compile send_compact_to_deepseek.py`\n3. **Validate imports** - Test import manually: `python -c \"import send_compact_to_deepseek\"`\n4. **Add basic smoke test** - Create minimal test that imports and instantiates main class/function\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially broken. Deployment would be reckless.\n\n## Priority Recommendations\n1. **Fix test infrastructure** before any feature work\n2. **Add basic unit test** covering main functionality\n3. **Implement CI pipeline** to prevent regression\n4. **Aim for 70%+ coverage** once tests are running\n\n**Next step**: Identify the specific test failure cause - likely in test setup or recent file changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 342,
+      "total_tokens": 469,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

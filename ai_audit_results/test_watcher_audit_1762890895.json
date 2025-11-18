@@ -1,0 +1,41 @@
+{
+  "timestamp": 1762890895,
+  "changed_files": [
+    "backend\\services\\pagerduty_service.py",
+    "backend\\services\\reasoning_storage.py",
+    "backend\\core\\logging_config.py",
+    "backend\\services\\slack_service.py",
+    "backend\\services\\k8s_automl_manager.py",
+    "backend\\services\\data_service.py",
+    "backend\\services\\tournament_storage.py",
+    "backend\\tasks\\backfill_tasks.py",
+    "backend\\services\\ml_hpa_monitor.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762890879.8470123,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code: -1), indicating fundamental issues with test setup, dependencies, or code syntax. Zero coverage suggests tests didn't run at all.\n\n## Coverage Analysis & Gaps\n- **0% coverage across all files** - No meaningful data collected\n- **Critical gap**: Unable to assess impact of 9 modified service files\n- **Missing**: No visibility into API endpoints, business logic, or integration points\n\n## Potential Issues with Recent Changes\n1. **Dependency conflicts** - Likely missing/incompatible packages in test environment\n2. **Configuration errors** - Logging or service initialization failures\n3. **Syntax/import errors** - Recent changes may have broken imports or syntax\n4. **Environment setup** - Test environment not properly configured\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Fix test execution failure first:\n   ```bash\n   python -m pytest --tb=short -v  # Identify failing test\n   ```\n2. Check dependency installation: `pip list | grep -E \"(pytest|coverage)\"`\n3. Validate imports in changed files, especially service modules\n\n**Short-term:**\n4. Add basic smoke tests for each service\n5. Implement health checks for external integrations (PagerDuty, Slack, k8s)\n6. Add logging to debug initialization failures\n\n**Long-term:**\n7. Set up CI pipeline with dependency caching\n8. Add pre-commit hooks for syntax validation\n9. Implement service-level unit tests (target 70%+ coverage)\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- No validation of core services (k8s, ML, data, tournament logic)\n- Potential runtime failures in production\n- Integration points with external systems untested\n- Backfill tasks could corrupt data if faulty\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 216,
+      "completion_tokens": 412,
+      "total_tokens": 628,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 152
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

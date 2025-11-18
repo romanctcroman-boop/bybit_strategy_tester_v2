@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762627876,
+  "changed_files": [
+    "mcp-server\\providers\\failover_manager.py",
+    "mcp-server\\providers\\health_checker.py",
+    "mcp-server\\providers\\provider_registry.py",
+    "mcp-server\\providers\\__init__.py",
+    "mcp-server\\server.py",
+    "mcp-server\\providers\\load_balancer.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762627862.874906,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code executed during testing\n- **All files show 0% coverage** - Complete testing blackout\n- **Critical gap**: Entire provider system (failover, health checks, load balancing) untested\n\n## Potential Issues with Recent Changes\n1. **Import/circular dependency** in provider modules (`__init__.py` changes)\n2. **Runtime exception** in module initialization preventing test execution\n3. **Missing dependencies** or broken imports in server.py\n4. **Configuration errors** in provider registry initialization\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which test fails first\n2. Check import statements in `mcp-server/providers/__init__.py`\n3. Validate all new provider classes inherit correctly and have required methods\n4. Test provider modules in isolation before integration\n\n**Structural Fixes:**\n1. Add basic smoke tests for each provider class\n2. Implement error handling in module initialization\n3. Create minimal test for server startup\n4. Add import validation in `__init__.py`\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail completely. Critical systems (failover, load balancing, health checks) are completely untested and potentially broken. Recommend blocking all deployments until basic test execution is restored.\n\n**Priority**: Fix test execution immediately before addressing any feature work.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 191,
+      "completion_tokens": 346,
+      "total_tokens": 537,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 127
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

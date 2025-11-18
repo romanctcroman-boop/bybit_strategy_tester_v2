@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540291,
+  "changed_files": [
+    "test_0.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540276.5135117,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is not a coverage gap but a complete testing infrastructure failure.\n\n## Potential Issues with Recent Changes\n- `test_0.py` likely contains syntax errors, import failures, or runtime exceptions\n- Test file may be importing modules that don't exist or have circular dependencies\n- Possible configuration issues in test runner setup\n- Test file might be attempting to run as a script instead of being discovered by test framework\n\n## Immediate Action Items\n1. **Run test file directly**: `python test_0.py` to identify syntax/runtime errors\n2. **Check imports**: Verify all imported modules exist and are accessible\n3. **Validate test structure**: Ensure proper test class/method naming conventions\n4. **Test framework configuration**: Verify pytest/unittest setup and discovery rules\n5. **Isolate the failure**: Create minimal test case to identify root cause\n\n## Risk Assessment\n**HIGH RISK** - No testing protection exists. Any code changes are deploying blind. This represents significant business risk for production stability and regression detection.\n\n## Priority Recommendations\n1. **Fix test execution immediately** - This blocks all meaningful quality assessment\n2. **Add basic smoke test** - Ensure test framework can at least start and run one passing test\n3. **Validate test discovery** - Confirm test runner can find and execute test files\n4. **Implement CI/CD gate** - Prevent deployment until tests execute successfully\n\n**Next step**: Run `python -m py_compile test_0.py` to check for syntax errors, then attempt direct execution to identify the runtime failure.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 123,
+      "completion_tokens": 377,
+      "total_tokens": 500,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 59
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmptvl_okeo",
+    "debounce_seconds": 0.5
+  }
+}

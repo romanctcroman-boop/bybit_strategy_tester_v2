@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762592683,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "automation\\deepseek_robot\\demo_advanced_architecture.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762592663.9349377,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental environment or setup issues\n- No coverage data means tests didn't even start running\n\n## Coverage Analysis & Gaps\n**NO COVERAGE** - All gaps:\n- 0% coverage across all files\n- No test execution means no meaningful coverage data\n- Critical business logic completely untested\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: `.venv` file changes suggest virtual environment issues\n2. **Database Connection Failures**: `psycopg2` modifications indicate PostgreSQL connectivity problems\n3. **Architecture Changes**: `demo_advanced_architecture.py` modifications may have broken test setup\n4. **Missing Dependencies**: Temporary file `temp_pg_test.py` suggests incomplete test infrastructure\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix Test Environment**:\n   - Recreate virtual environment: `rm -rf .venv && python -m venv .venv`\n   - Reinstall dependencies with: `pip install -r requirements.txt`\n\n2. **Verify Database Connectivity**:\n   - Check PostgreSQL service status\n   - Validate connection strings in test configuration\n   - Test psycopg2 import separately\n\n3. **Isolate Test Failure**:\n   - Run simplest test first: `python -m pytest -v temp_pg_test.py`\n   - Check for import errors and missing dependencies\n\n**STRUCTURAL IMPROVEMENTS:**\n- Add try-catch blocks around test setup\n- Implement health checks before test execution\n- Create isolated test database\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- **Critical**: No working test suite means undetected regressions\n- **High**: Database integration completely untested\n- **Medium**: Architecture changes without validation\n- **Immediate Action Required**: Fix test environment before any further development\n\n**Priority**: Fix test execution before addressing coverage - you can't measure what doesn't run.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 161,
+      "completion_tokens": 442,
+      "total_tokens": 603,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 97
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

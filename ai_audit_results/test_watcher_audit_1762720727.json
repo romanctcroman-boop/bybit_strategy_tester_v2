@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762720727,
+  "changed_files": [
+    "tests\\integration\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762720713.1976125,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental issues with test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% overall coverage confirms no tests executed. All code paths are untested, representing maximum coverage gap.\n\n## Potential Issues with Recent Changes\n- **Integration test initialization failure** - The changed `tests/integration/__init__.py` file likely contains syntax errors, import issues, or configuration problems\n- **Environment/dependency issues** - Missing test dependencies or incompatible versions\n- **Test runner configuration** - Potentially misconfigured pytest or test discovery\n\n## Recommendations for Improvement\n1. **Immediate: Fix test initialization**\n   - Check `tests/integration/__init__.py` for syntax errors\n   - Verify all imports and dependencies are available\n   - Run with `pytest -v` to see specific failure details\n\n2. **Short-term: Restore basic functionality**\n   - Run minimal smoke test to verify environment\n   - Check Python version compatibility\n   - Validate test configuration files\n\n3. **Medium-term: Prevent regression**\n   - Add pre-commit hooks to validate test syntax\n   - Implement CI pipeline that fails fast on test configuration issues\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected breaking changes in production code\n- No safety net for deployments\n- Potential for critical bugs in production\n- Complete loss of test-driven development benefits\n\n**Priority: Fix immediately** - This blocks all meaningful quality assurance and deployment confidence.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 344,
+      "total_tokens": 472,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762551168,
+  "changed_files": [
+    "backend\\api\\parallel_deepseek_client.py",
+    "test_parallel_deepseek.py",
+    "add_deepseek_keys.py",
+    "automation\\task2_key_manager\\key_manager.py",
+    "automation\\task1_test_watcher\\test_watcher_parallel.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762551154.1590812,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution. This represents a complete testing breakdown.\n\n## Coverage Analysis\n**0% coverage across all files** - No code is being tested. This is a severe regression indicating either:\n- Test infrastructure failure\n- Configuration issues\n- Critical bugs in test setup\n- Missing dependencies\n\n## Potential Issues with Recent Changes\n1. **Parallel client changes** (`parallel_deepseek_client.py`) likely broke test initialization\n2. **Key management integration** (`key_manager.py`) may have dependency/authentication issues\n3. **Test watcher modifications** (`test_watcher_parallel.py`) could have introduced configuration conflicts\n4. **New test file** (`test_parallel_deepseek.py`) may contain syntax errors or missing imports\n\n## Immediate Action Recommendations\n1. **Debug test initialization**: Check for unhandled exceptions in test setup/teardown\n2. **Verify dependencies**: Ensure all required packages for parallel execution are installed\n3. **Isolate the failure**: Run tests individually to identify which component fails first\n4. **Check configuration**: Validate environment variables, API keys, and parallel execution settings\n5. **Review recent commits**: Focus on changes to test infrastructure and parallel execution logic\n\n## Risk Assessment\n**HIGH RISK** - Deploying without test validation exposes multiple critical risks:\n- Production API integration failures\n- Parallel execution race conditions\n- Authentication/authorization breaches\n- Data corruption in concurrent operations\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 176,
+      "completion_tokens": 336,
+      "total_tokens": 512,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 112
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

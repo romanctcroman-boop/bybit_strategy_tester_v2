@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762538809,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    "backend\\api\\routers\\automl.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\pytest_asyncio\\plugin.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    "tests\\unit\\test_batch_writer.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    "tests\\integration\\test_e2e_test_watcher.py",
+    ".venv\\Lib\\site-packages\\pytest\\__main__.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\_pytest\\python.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538792.3281014,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely crash/segfault)\n- 0% coverage suggests no tests executed successfully\n- Test infrastructure appears compromised\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- No code coverage data collected\n- All test files failed to execute\n- Impossible to assess actual code coverage\n\n## Potential Issues with Recent Changes\n**ENVIRONMENT CORRUPTION DETECTED**:\n- Multiple pytest/pluggy virtual environment files modified (.venv)\n- This indicates environment instability or dependency conflicts\n- Changes to `tests/unit/test_batch_writer.py` and `tests/integration/test_e2e_test_watcher.py` may contain breaking changes\n- Possible version incompatibility between pytest, pluggy, and pytest-asyncio\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS**:\n1. **Rebuild Virtual Environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Run Basic Test Isolation**:\n   ```bash\n   python -m pytest tests/unit/test_batch_writer.py -v\n   python -m pytest tests/integration/test_e2e_test_watcher.py -v\n   ```\n\n3. **Check Dependency Versions**:\n   - Verify pytest, pluggy, pytest-asyncio compatibility\n   - Review recent dependency updates\n\n4. **Add Environment Sanity Check**:\n   ```python\n   # Add to test suite\n   def test_environment():\n       import pytest, pluggy\n       assert pytest.__version__ == \"expected_version\"\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Production readiness compromised:\n- ❌ No reliable test feedback\n- ❌ Undetected regressions likely\n- ❌ Deployment would be extremely risky\n- ⚠️ Test infrastructure requires immediate attention before any code changes\n\n**Priority**: Fix test environment immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 408,
+      "completion_tokens": 442,
+      "total_tokens": 850,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 344
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

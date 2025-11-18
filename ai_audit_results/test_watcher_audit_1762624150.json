@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762624150,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_protocol.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_mtf_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762624132.9777842,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran properly\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - This is a red flag:\n- 0% coverage across all files indicates tests didn't execute\n- Unable to assess actual code coverage gaps\n- Test infrastructure itself may be failing\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **MTF Engine Changes** (`backend\\core\\mtf_engine.py`) - Core component modifications may have broken imports or initialization\n2. **Integration Test Issues** (`tests\\test_sandbox_integration.py`) - Environment/dependency problems\n3. **Database Query Changes** (`tests\\test_database\\test_query_optimization.py`) - Connection/configuration failures\n\n## Immediate Action Recommendations\n1. **Debug Test Infrastructure First**:\n   - Run tests with `-v` flag to see which test fails first\n   - Check for import errors in test modules\n   - Verify database connections and environment variables\n\n2. **Isolate the Failure**:\n   - Run changed test files individually\n   - Test `mtf_engine.py` imports in isolation\n   - Check for circular imports or missing dependencies\n\n3. **Fix Order**:\n   - Start with unit tests before integration tests\n   - Verify `mtf_engine` module loads independently\n   - Ensure test database is accessible\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents:\n- Any quality assurance\n- Regression detection  \n- Code change validation\n- Deployment safety checks\n\n**Priority**: Fix test execution immediately before any further development or deployment.\n\n**Next Steps**: Focus on making at least one test pass to restore basic feedback loop, then expand coverage systematically.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 403,
+      "total_tokens": 588,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 121
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762635199,
+  "changed_files": [
+    "update_deepseek_tools.py",
+    "backend\\api\\deepseek_pool.py",
+    "deepseek_security_audit_request.py",
+    "deepseek_real_analysis.py",
+    "deepseek_comprehensive_analysis.py",
+    "deepseek_self_diagnostic.py",
+    "deepseek_final_assessment.py",
+    "deepseek_perplexity_full_tz_audit.py",
+    "mcp-server\\server.py",
+    "backend\\api\\deepseek_pool_refactored.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762635183.7156684,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception or environment issue)\n- 0% coverage means no tests executed successfully\n- Entire test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- Zero coverage across all files indicates fundamental test execution failure\n- No meaningful coverage data available for analysis\n- Test runner cannot even initialize properly\n\n## Potential Issues with Recent Changes\n1. **Import/Module Issues**: Likely circular imports or missing dependencies in the deepseek_* files\n2. **Architecture Conflicts**: `deepseek_pool.py` and `deepseek_pool_refactored.py` suggest incomplete refactoring\n3. **Integration Failures**: Multiple new analysis/audit modules may have incompatible interfaces\n4. **Environment Configuration**: MCP server integration may have broken test environment\n\n## Immediate Action Recommendations\n**PRIORITY 1 - RESTORE TEST EXECUTION**:\n```bash\n# 1. Check basic Python syntax\npython -m py_compile update_deepseek_tools.py\n\n# 2. Run tests with verbose output to identify root cause\npython -m pytest -v --tb=long\n\n# 3. Isolate problematic modules\npython -c \"import backend.api.deepseek_pool\"\n```\n\n**PRIORITY 2 - STABILIZE ARCHITECTURE**:\n- Remove or consolidate duplicate files (`deepseek_pool.py` vs `deepseek_pool_refactored.py`)\n- Create minimal test to verify basic imports work\n- Add try/catch blocks around module imports in test setup\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Deployment Risk**: Cannot validate any functionality\n- **Regression Risk**: No protection against breaking changes\n- **Quality Risk**: Zero visibility into code quality or behavior\n\n**Immediate mitigation required before any further development or deployment.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 220,
+      "completion_tokens": 420,
+      "total_tokens": 640,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 156
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

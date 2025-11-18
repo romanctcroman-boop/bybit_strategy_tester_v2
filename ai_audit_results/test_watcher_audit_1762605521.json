@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762605521,
+  "changed_files": [
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762605504.1620655,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% coverage** - All code changes are completely untested. This represents maximum testing risk.\n\n## Potential Issues with Recent Changes\nThe file `automation\\deepseek_robot\\advanced_architecture.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing imports or dependencies\n- Breaking changes to existing interfaces\n- Runtime errors that crash test discovery\n\n## Recommendations for Improvement\n**Immediate Actions (Priority 1):**\n1. Fix test execution - resolve Exit Code -1 first\n2. Check Python syntax: `python -m py_compile advanced_architecture.py`\n3. Verify imports and dependencies are available\n4. Run minimal smoke test to confirm basic functionality\n\n**Testing Strategy:**\n1. Add basic unit tests covering core functionality\n2. Aim for 70%+ coverage on changed files\n3. Implement integration tests for critical workflows\n4. Add pre-commit hooks to prevent syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Changes cannot be safely deployed because:\n- No verification of functionality exists\n- Potential breaking changes undetected\n- Regression risk is maximum\n- Production failures highly likely\n\n**Next Step:** Fix test execution failure before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 315,
+      "total_tokens": 445,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762563405,
+  "changed_files": [
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_phase1_security.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762563386.1821642,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests aren't executing properly\n- Likely environment or dependency issues preventing test execution\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - This is a major red flag:\n- Empty coverage report indicates tests aren't running to completion\n- Cannot assess actual code coverage without successful test execution\n- All backend modules and ML components appear untested in current state\n\n## 3. Potential Issues with Recent Changes\n**HIGH RISK AREAS:**\n- **LSTM components** (`lstm_predictions.py`, `lstm_queue_predictor.py`) - ML code often has dependency issues\n- **MTF Engine** (`mtf_engine.py`) - Core trading engine likely has complex dependencies\n- **Database optimization** - Recent query changes may have broken test environment\n- **Security tests** (`test_phase1_security.py`) - May be failing due to environment config\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. **Fix test environment first** - Check Python version, dependencies, and environment variables\n2. **Run tests individually** to identify which module causes the crash\n3. **Check for circular imports** in new ML and MTF engine components\n4. **Verify database connections** and mock configurations\n\n**SHORT-TERM:**\n5. Add basic smoke tests for core components\n6. Implement dependency validation in test setup\n7. Create isolated test environments for ML components\n\n## 5. Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- **Critical**: No working tests means unknown production stability\n- **High**: ML predictions and trading engine untested\n- **Medium**: Security and protocol changes unverified\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 281,
+      "completion_tokens": 427,
+      "total_tokens": 708,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 153
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

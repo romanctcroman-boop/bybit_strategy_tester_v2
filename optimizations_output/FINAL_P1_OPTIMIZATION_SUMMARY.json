@@ -1,0 +1,82 @@
+{
+  "timestamp": "2025-10-30T16:00:13.313906",
+  "execution_time": 72.16845393180847,
+  "tasks": {
+    "backtest_vectorization": {
+      "status": "tested",
+      "results": {
+        "timestamp": "2025-10-30T15:47:06.984031",
+        "tests_run": 4,
+        "tests_passed": 4,
+        "tests_failed": 0,
+        "results": {
+          "5min_1000bars": {
+            "bars": 1000,
+            "trades": 2,
+            "winning": 0,
+            "losing": 2,
+            "win_rate": 0.0,
+            "total_pnl": -2123.9350858773396,
+            "roi": -0.2123935085877427,
+            "final_equity": 997876.0649141226,
+            "execution_time": 0.0038328170776367188,
+            "bars_per_second": 260904.7026623538
+          },
+          "15min_1000bars": {
+            "bars": 1000,
+            "trades": 1,
+            "winning": 1,
+            "losing": 0,
+            "win_rate": 100.0,
+            "total_pnl": 1990.4920459926216,
+            "roi": 0.19904920459926362,
+            "final_equity": 1001990.4920459926,
+            "execution_time": 0.0021152496337890625,
+            "bars_per_second": 472757.4391343553
+          },
+          "30min_600bars": {
+            "bars": 600,
+            "trades": 1,
+            "winning": 0,
+            "losing": 1,
+            "win_rate": 0.0,
+            "total_pnl": -1239.3557133821887,
+            "roi": -0.12393557133821304,
+            "final_equity": 998760.6442866179,
+            "execution_time": 0.0021653175354003906,
+            "bars_per_second": 277095.61770535127
+          },
+          "5min_25920bars": {
+            "bars": 1000,
+            "trades": 2,
+            "winning": 0,
+            "losing": 2,
+            "win_rate": 0.0,
+            "total_pnl": -2124.2545838433143,
+            "roi": -0.21242545838434015,
+            "final_equity": 997875.7454161566,
+            "execution_time": 0.0020084381103515625,
+            "bars_per_second": 497899.33523266856
+          }
+        },
+        "aggregate": {
+          "total_bars": 3600,
+          "total_time": 0.010121822357177734,
+          "avg_speed": 355667.178593301
+        }
+      }
+    },
+    "sr_rsi_async": {
+      "status": "success",
+      "code_path": "optimizations_output\\sr_rsi_async_FINAL.py",
+      "code_size": 11334,
+      "citations": 7
+    },
+    "data_service_async": {
+      "status": "success",
+      "code_path": "optimizations_output\\data_service_async_FINAL.py",
+      "code_size": 20747,
+      "citations": 8
+    }
+  }
+}

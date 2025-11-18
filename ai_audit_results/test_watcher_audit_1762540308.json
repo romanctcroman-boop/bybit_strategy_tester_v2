@@ -1,0 +1,32 @@
+{
+  "timestamp": 1762540308,
+  "changed_files": [
+    "test_1.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": 2,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540294.86527,
+    "success": false
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional. Exit code 2 indicates test execution failed before any tests could run, suggesting fundamental infrastructure or configuration issues.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage data collected. This indicates:\n- Tests failed during setup/import phase\n- Coverage tool not properly configured or executed\n- Test runner unable to discover/execute any tests\n\n## Potential Issues with Recent Changes\n**test_1.py modifications likely broke test infrastructure:**\n- Syntax errors preventing test discovery\n- Missing imports or dependencies\n- Broken test configuration/setup\n- Test runner configuration conflicts\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test discovery**: Run `python -m pytest --collect-only` to diagnose test collection issues\n2. **Check syntax**: Validate test_1.py for Python syntax errors\n3. **Verify imports**: Ensure all required modules and dependencies are available\n4. **Test isolation**: Run individual test files to identify specific failures\n\n**Follow-up:**\n5. Add basic smoke test to verify test infrastructure\n6. Implement CI pipeline with test execution validation\n7. Set up pre-commit hooks to catch syntax errors early\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback loop\n- Potential undetected regressions in production code\n- Development velocity impacted by broken test infrastructure\n- High probability of shipping critical bugs\n\n**Priority**: Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 123,
+      "completion_tokens": 321,
+      "total_tokens": 444,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 59
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmptvl_okeo",
+    "debounce_seconds": 0.5
+  }
+}

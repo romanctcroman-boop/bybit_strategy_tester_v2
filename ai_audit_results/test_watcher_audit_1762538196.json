@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762538196,
+  "changed_files": [
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "backend\\security\\key_rotation.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538178.1848783,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental execution failure\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - Critical gaps:\n- Zero test execution means no code paths were validated\n- All business logic in changed files remains untested\n- No baseline for measuring test effectiveness\n\n## Potential Issues with Recent Changes\n**HIGH RISK AREAS:**\n1. **Psycopg2 interaction** - Modified package file suggests database connection issues\n2. **Key rotation logic** - Security-critical code with no validation\n3. **temp_pg_test.py** - Likely PostgreSQL test setup that's failing catastrophically\n4. **Environment/dependency conflict** - Virtual env package modification indicates environment issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution** - Run with `-v` flag to identify where tests crash\n2. **Isolate database dependencies** - Test without PostgreSQL first to isolate the crash source\n3. **Check environment integrity** - Verify .venv isn't corrupted; consider fresh install\n4. **Add basic unit tests** - Create simple tests that don't require database connections\n\n**STRUCTURAL FIXES:**\n- Implement try/catch around database operations in tests\n- Add health checks before test execution\n- Create mocked database tests for key_rotation.py\n\n## Risk Assessment\n**HIGH RISK** - Multiple critical issues:\n- **Security risk**: Key rotation logic completely untested\n- **Stability risk**: Tests crash entire test runner\n- **Quality risk**: No validation of recent changes\n- **Operational risk**: Database dependency causing system-level failures\n\n**Priority**: Fix test execution immediately before any deployment. The -1 exit code suggests system-level instability that could affect production.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 415,
+      "total_tokens": 571,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

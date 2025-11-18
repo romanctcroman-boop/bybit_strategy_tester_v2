@@ -1,0 +1,55 @@
+{
+  "timestamp": 1762704570,
+  "changed_files": [
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    "mcp-server\\orchestrator\\api\\models.py",
+    "health_check.py",
+    "tests\\test_sandbox_integration.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    "tests\\test_database\\test_query_optimization.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    "temp_pg_test.py",
+    "backend\\core\\mtf_engine.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    "mcp-server\\server.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762704553.3198383,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 🔴 Critical Issues Identified\n\n**1. Test Execution Failure**\n- Exit code -1 indicates catastrophic test failure\n- Likely causes: Environment setup issues, import errors, or critical code failures\n- **Action**: Check test logs for Python exceptions or environment configuration errors\n\n**2. Zero Coverage**\n- 0% coverage suggests tests aren't executing at all\n- **Action**: Verify test discovery and runner configuration\n\n## 🚨 Immediate Actions Required\n\n**1. Diagnose Test Runner Failure**\n```bash\n# Run with verbose output to see what's failing\npytest -v tests/\n# Check for import errors\npython -c \"from tests import test_mtf_engine\"\n```\n\n**2. Environment Issues**\n- Virtual environment path (.venv) in changed files suggests environment corruption\n- **Action**: Recreate virtual environment and reinstall dependencies\n\n**3. Test Configuration**\n- Multiple pytest internal files modified indicates possible configuration conflicts\n- **Action**: Check pytest.ini/pyproject.toml for incorrect settings\n\n## 📊 Coverage Gaps\n- **Current**: 0% (tests not running)\n- **Target**: Need baseline execution first\n- **Priority**: Fix test execution before measuring coverage\n\n## 🔧 Recommendations\n\n**Immediate (Next 2 hours):**\n1. Recreate virtual environment\n2. Run simplest test individually: `pytest tests/test_protocol.py -v`\n3. Check for circular imports or missing dependencies\n\n**Short-term (Today):**\n1. Fix test discovery issues\n2. Verify database connections (psycopg2 in changed files)\n3. Ensure FastAPI application starts correctly\n\n**Medium-term:**\n1. Implement basic smoke tests\n2. Add coverage reporting once tests execute\n3. Create health check validation\n\n## ⚠️ Risk Assessment\n- **High Risk**: No test feedback on recent changes\n- **Critical**: Production readiness unknown\n- **Urgency**: Address immediately - blocking all development\n\n**Start with:** Check the specific error causing exit code -1 and recreate the test environment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 460,
+      "completion_tokens": 440,
+      "total_tokens": 900,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 396
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

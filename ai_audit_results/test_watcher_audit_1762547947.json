@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762547947,
+  "changed_files": [
+    "tests\\monitoring\\test_health_endpoints.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762547926.3511078,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) indicating severe infrastructure or configuration issues. No meaningful test execution occurred.\n\n## Coverage Analysis\n**0% COVERAGE** - Complete coverage failure suggests:\n- Test runner crashed before collecting coverage data\n- Possible import errors or environment misconfiguration\n- Test files may not be discoverable by the test framework\n\n## Potential Issues with Recent Changes\n1. **Broken Test Infrastructure** - Exit code -1 typically indicates segmentation fault or fatal error\n2. **Dependency Conflicts** - Recent changes to `test_health_endpoints.py` may have introduced incompatible imports\n3. **Environment Configuration** - Missing test dependencies or corrupted virtual environment\n4. **Test Discovery Failure** - Potentially malformed test file preventing test collection\n\n## Immediate Recommendations\n1. **Debug Test Execution**:\n   ```bash\n   python -m pytest tests/monitoring/test_health_endpoints.py -v\n   ```\n2. **Check for Syntax Errors**:\n   ```bash\n   python -m py_compile tests/monitoring/test_health_endpoints.py\n   ```\n3. **Verify Dependencies** - Ensure all test requirements are installed\n4. **Run with Minimal Configuration** - Use `--tb=short` to identify root cause\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No validation of health endpoints functionality\n- Potential production issues undetected\n- All monitoring tests are currently unreliable\n- Deployment blocking until resolved\n\n**Priority**: Fix immediately - this represents a complete testing infrastructure breakdown.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 333,
+      "total_tokens": 463,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

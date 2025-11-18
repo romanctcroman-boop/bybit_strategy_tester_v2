@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762765866,
+  "changed_files": [
+    "auto_diagnostic_system.py",
+    "reliability_auto_system\\encryption_key_manager.py",
+    "load_keys_and_analyze.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762765849.6372032,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). This indicates fundamental issues preventing test execution, making quality assessment impossible until basic functionality is restored.\n\n## Coverage Analysis & Gaps\n**0% coverage** across all files suggests:\n- Tests may not be running at all due to configuration or import errors\n- Test discovery is failing\n- Critical runtime errors preventing test execution\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **Encryption/Key Management**: `encryption_key_manager.py` changes may have broken imports or initialization\n2. **Auto-diagnostic System**: `auto_diagnostic_system.py` modifications could be causing import cycles or runtime errors\n3. **Dependency Issues**: Changes in `load_keys_and_analyze.py` may have altered module dependencies\n\n## Immediate Action Plan\n1. **Debug Test Execution**:\n   - Run tests with `-v` flag to see where they fail\n   - Check for syntax errors in changed files\n   - Verify imports and module structure\n\n2. **Fix Critical Path**:\n   - Start with minimal test case to verify basic functionality\n   - Check encryption key initialization in test environment\n   - Ensure all dependencies are properly installed\n\n3. **Restore Baseline**:\n   - Get at least one test passing before addressing coverage\n   - Focus on `encryption_key_manager.py` as it's likely core dependency\n\n## Risk Assessment\n**HIGH RISK** - No tests are executing, meaning:\n- Production code changes are completely untested\n- Encryption/system reliability features may be broken\n- Deployment would be extremely risky\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 148,
+      "completion_tokens": 360,
+      "total_tokens": 508,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 84
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

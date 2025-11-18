@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762560152,
+  "changed_files": [
+    "automation\\deepseek_code_agent\\code_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762560138.3108735,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates either:\n- Syntax errors in test files or code\n- Test environment setup failures\n- Critical runtime exceptions during test discovery/execution\n\n## Coverage Analysis\n**0% coverage** - All tests failed before any code execution. No coverage data was collected, making this a complete testing blackout.\n\n## Potential Issues with Recent Changes\nThe failure likely relates to changes in `automation\\deepseek_code_agent\\code_agent.py`:\n- Import errors or circular dependencies\n- Syntax errors (missing colons, brackets, etc.)\n- Breaking changes to class/method signatures\n- Environment-dependent code failing in test context\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix test execution** - Run tests with verbose output (`pytest -v`) to identify the root failure\n2. **Check syntax** - Validate `code_agent.py` for basic Python syntax compliance\n3. **Verify imports** - Ensure all dependencies are available in test environment\n\n**Follow-up:**\n4. Add basic smoke tests that validate import and initialization\n5. Implement CI checks to prevent merge of code that breaks test execution\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky. The -1 exit code suggests fundamental issues that could affect production stability.\n\n**Priority:** Fix test execution immediately before any other development continues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 312,
+      "total_tokens": 443,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

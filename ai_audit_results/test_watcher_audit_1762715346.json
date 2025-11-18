@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762715346,
+  "changed_files": [
+    "reliability\\mcp_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762715320.78917,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). This indicates either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% overall coverage suggests:\n- Tests didn't run at all due to execution failure\n- No meaningful test results to analyze\n- Complete testing gap across the codebase\n\n## Potential Issues with Recent Changes\nThe modified `reliability\\mcp_manager.py` likely contains:\n- Syntax errors preventing import/execution\n- Breaking changes to class/method signatures\n- Missing imports or dependencies\n- Circular import issues\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check Python syntax in all modified files\n   - Verify test dependencies are installed\n   - Run tests with `-v` flag to see specific failure points\n   - Ensure test discovery can import modules successfully\n\n2. **Validate MCP Manager Changes**\n   - Manually test `mcp_manager.py` imports\n   - Check for missing imports or undefined references\n   - Verify method signatures match usage\n\n3. **Restore Baseline**\n   - Get tests running before assessing coverage\n   - Start with minimal test case to verify execution\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code with known test failures. The zero coverage and execution failure indicate the codebase may be in an unstable state. Without passing tests, reliability cannot be verified.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 345,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

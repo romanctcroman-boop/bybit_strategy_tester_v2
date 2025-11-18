@@ -1,0 +1,780 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "bybit-strategy-tester",
+    "title": "Bybit Strategy Tester - Production Monitoring",
+    "tags": ["bybit", "trading", "monitoring", "production"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h"]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "type": "stat",
+        "title": "Worker Health Status",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "sum(worker_up{cluster_name=\"bybit_strategy_tester\"})",
+            "legendFormat": "Active Workers",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "green",
+                  "value": 3
+                }
+              ]
+            },
+            "mappings": [],
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          },
+          "orientation": "auto",
+          "textMode": "value_and_name",
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "type": "timeseries",
+        "title": "Tasks Processed Rate (per worker)",
+        "gridPos": {
+          "x": 6,
+          "y": 0,
+          "w": 9,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "rate(worker_tasks_processed_total{cluster_name=\"bybit_strategy_tester\"}[1m])",
+            "legendFormat": "{{worker_name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "unit": "ops",
+            "min": 0
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["lastNotNull", "max"]
+          }
+        }
+      },
+      {
+        "id": 3,
+        "type": "stat",
+        "title": "Dead Workers Detected",
+        "gridPos": {
+          "x": 15,
+          "y": 0,
+          "w": 4,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "increase(dead_workers_detected_total{cluster_name=\"bybit_strategy_tester\"}[1h])",
+            "legendFormat": "Last Hour",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 5
+                }
+              ]
+            },
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 4,
+        "type": "stat",
+        "title": "Tasks Reassigned",
+        "gridPos": {
+          "x": 19,
+          "y": 0,
+          "w": 5,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "increase(tasks_reassigned_total{cluster_name=\"bybit_strategy_tester\"}[1h])",
+            "legendFormat": "Last Hour",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 10
+                },
+                {
+                  "color": "red",
+                  "value": 50
+                }
+              ]
+            },
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 5,
+        "type": "timeseries",
+        "title": "Worker Uptime",
+        "gridPos": {
+          "x": 0,
+          "y": 4,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "worker_uptime_seconds{cluster_name=\"bybit_strategy_tester\"}",
+            "legendFormat": "{{worker_name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "fillOpacity": 0
+            },
+            "unit": "s",
+            "min": 0
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": ["lastNotNull"]
+          }
+        }
+      },
+      {
+        "id": 6,
+        "type": "bargauge",
+        "title": "Task Failure Rate (per worker)",
+        "gridPos": {
+          "x": 12,
+          "y": 4,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "rate(worker_tasks_failed_total{cluster_name=\"bybit_strategy_tester\"}[5m]) * 100",
+            "legendFormat": "{{worker_name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 5
+                },
+                {
+                  "color": "red",
+                  "value": 10
+                }
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        }
+      },
+      {
+        "id": 7,
+        "type": "stat",
+        "title": "Redis Cluster Nodes Up",
+        "gridPos": {
+          "x": 0,
+          "y": 10,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "sum(redis_cluster_node_up{cluster_name=\"bybit_strategy_tester\"})",
+            "legendFormat": "Healthy Nodes",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 4
+                },
+                {
+                  "color": "green",
+                  "value": 6
+                }
+              ]
+            },
+            "mappings": [],
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 8,
+        "type": "timeseries",
+        "title": "Redis Cluster Memory Usage (per node)",
+        "gridPos": {
+          "x": 6,
+          "y": 10,
+          "w": 9,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "redis_cluster_memory_bytes{cluster_name=\"bybit_strategy_tester\"} / 1024 / 1024",
+            "legendFormat": "{{node_id}} ({{role}})",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 1,
+              "fillOpacity": 15,
+              "showPoints": "never"
+            },
+            "unit": "decmbytes",
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 500
+                },
+                {
+                  "color": "red",
+                  "value": 900
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["lastNotNull", "max"]
+          }
+        }
+      },
+      {
+        "id": 9,
+        "type": "timeseries",
+        "title": "Redis Operations per Second",
+        "gridPos": {
+          "x": 15,
+          "y": 10,
+          "w": 9,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "redis_cluster_ops_per_sec{cluster_name=\"bybit_strategy_tester\"}",
+            "legendFormat": "{{node_id}} ({{role}})",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "ops",
+            "min": 0
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max"]
+          }
+        }
+      },
+      {
+        "id": 10,
+        "type": "gauge",
+        "title": "Redis Connected Clients",
+        "gridPos": {
+          "x": 0,
+          "y": 14,
+          "w": 6,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "sum(redis_cluster_connected_clients{cluster_name=\"bybit_strategy_tester\"})",
+            "legendFormat": "Total Clients",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 100
+                },
+                {
+                  "color": "red",
+                  "value": 500
+                }
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 1000
+          }
+        },
+        "options": {
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 11,
+        "type": "timeseries",
+        "title": "Replication Lag (Master → Replica)",
+        "gridPos": {
+          "x": 6,
+          "y": 16,
+          "w": 18,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "redis_cluster_replication_lag_seconds{cluster_name=\"bybit_strategy_tester\"}",
+            "legendFormat": "{{replica_id}} ← {{master_id}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "fillOpacity": 0,
+              "showPoints": "auto"
+            },
+            "unit": "s",
+            "min": 0,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 2
+                },
+                {
+                  "color": "red",
+                  "value": 5
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "displayMode": "table",
+            "placement": "bottom",
+            "calcs": ["lastNotNull", "max", "mean"]
+          }
+        },
+        "alert": {
+          "name": "High Replication Lag Alert",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [5],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Replication lag exceeds 5 seconds",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 12,
+        "type": "table",
+        "title": "Worker Status Overview",
+        "gridPos": {
+          "x": 0,
+          "y": 22,
+          "w": 24,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "worker_up{cluster_name=\"bybit_strategy_tester\"}",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "",
+            "refId": "A"
+          },
+          {
+            "expr": "worker_tasks_processed_total{cluster_name=\"bybit_strategy_tester\"}",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "",
+            "refId": "B"
+          },
+          {
+            "expr": "worker_tasks_failed_total{cluster_name=\"bybit_strategy_tester\"}",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "",
+            "refId": "C"
+          },
+          {
+            "expr": "worker_uptime_seconds{cluster_name=\"bybit_strategy_tester\"}",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "",
+            "refId": "D"
+          },
+          {
+            "expr": "worker_current_status{cluster_name=\"bybit_strategy_tester\"}",
+            "format": "table",
+            "instant": true,
+            "legendFormat": "",
+            "refId": "E"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "merge",
+            "options": {}
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "cluster_name": true,
+                "__name__": true
+              },
+              "renameByName": {
+                "worker_id": "Worker ID",
+                "worker_name": "Worker Name",
+                "Value #A": "Status (Up/Down)",
+                "Value #B": "Tasks Processed",
+                "Value #C": "Tasks Failed",
+                "Value #D": "Uptime (s)",
+                "Value #E": "Current Status"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            },
+            "mappings": [
+              {
+                "type": "value",
+                "options": {
+                  "0": {
+                    "text": "DOWN",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "UP",
+                    "color": "green"
+                  }
+                }
+              }
+            ]
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Status (Up/Down)"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Current Status"
+              },
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "0": {
+                          "text": "Idle",
+                          "color": "blue"
+                        },
+                        "1": {
+                          "text": "Processing",
+                          "color": "orange"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Worker Name"
+            }
+          ]
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "enable": true,
+          "expr": "changes(dead_workers_detected_total{cluster_name=\"bybit_strategy_tester\"}[1m]) > 0",
+          "iconColor": "red",
+          "name": "Dead Worker Detected",
+          "step": "1m",
+          "tagKeys": "worker_id",
+          "textFormat": "Dead worker detected: {{worker_id}}",
+          "titleFormat": "Worker Failure"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "selected": false,
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "definition": "label_values(worker_up{cluster_name=\"bybit_strategy_tester\"}, worker_name)",
+          "hide": 0,
+          "includeAll": true,
+          "label": "Worker",
+          "multi": true,
+          "name": "worker",
+          "options": [],
+          "query": {
+            "query": "label_values(worker_up{cluster_name=\"bybit_strategy_tester\"}, worker_name)",
+            "refId": "StandardVariableQuery"
+          },
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 1,
+          "type": "query"
+        }
+      ]
+    }
+  },
+  "overwrite": true
+}

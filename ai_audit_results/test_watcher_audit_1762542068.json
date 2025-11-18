@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762542068,
+  "changed_files": [
+    "tests\\monitoring\\__init__.py",
+    "tests\\monitoring\\test_metrics_export.py",
+    "automation\\metrics\\prometheus_exporter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762542053.155388,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in test infrastructure or code changes.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No tests executed successfully\n- **No file-specific coverage data** - Execution halted before coverage collection\n- **Critical gap**: Unable to assess actual code coverage due to test failure\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure failure** - Exit code -1 suggests segmentation fault, memory error, or fatal Python interpreter issue\n2. **Prometheus exporter changes** likely introduced fatal errors:\n   - Infinite loops or recursion\n   - Memory leaks causing crashes\n   - Import/circular dependency issues\n   - Resource exhaustion (file handles, sockets)\n3. **Test initialization problems** in `__init__.py` or test module imports\n\n## Immediate Recommendations\n1. **Debug the crash**:\n   ```bash\n   python -m pytest tests/monitoring/test_metrics_export.py -v --tb=short\n   ```\n2. **Check for memory issues**:\n   - Run with `--maxfail=1 --tb=long` for detailed error tracing\n   - Use `pytest -x --pdb` to enter debugger on failure\n3. **Validate Prometheus exporter**:\n   - Test exporter initialization in isolation\n   - Check for resource leaks in metric collection\n   - Verify thread safety in concurrent operations\n\n## Risk Assessment\n**HIGH RISK** - Production metrics export is likely broken:\n- Monitoring systems may be receiving corrupted/no data\n- Potential memory exhaustion in production\n- Silent failure of metrics collection\n- No visibility into system performance\n\n**Priority**: Fix immediately before deploying any changes to production environments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 152,
+      "completion_tokens": 375,
+      "total_tokens": 527,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 88
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

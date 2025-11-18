@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762695718,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    "mcp-server\\orchestrator\\api\\models.py",
+    "automation\\task1_test_watcher\\test_watcher.py",
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    "backend\\app.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762695701.7940052,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage means no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No files were tested (0% across all modules)\n- Critical gaps: API models, application entry points, test watchers\n- No validation of recent changes to FastAPI integration\n\n## Potential Issues with Recent Changes\n1. **FastAPI dependency conflict** - Modified `.venv\\Lib\\site-packages\\` suggests manual package edits\n2. **Model serialization issues** - Changes to `models.py` may break API contracts\n3. **Import/circular dependency problems** - Likely preventing test execution entirely\n4. **Environment configuration** - Virtual environment corruption\n\n## Immediate Recommendations\n1. **Fix test infrastructure first:**\n   - Check for unhandled imports in `app.py` and `models.py`\n   - Verify FastAPI version compatibility\n   - Remove manual package edits from `.venv\\`\n\n2. **Restore basic test execution:**\n   - Run simplest test case first to isolate failure\n   - Check Python path and module resolution\n   - Validate virtual environment integrity\n\n3. **Add diagnostic logging:**\n   - Capture test runner exceptions\n   - Verify module imports work outside test context\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be blind:\n- No validation of API changes\n- Potential runtime failures in production\n- Broken monitoring (test watcher changes untested)\n- **Recommend blocking deployments until basic tests pass**\n\n**Priority:** Fix test execution before addressing coverage gaps. Current state indicates fundamental environment or dependency issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 189,
+      "completion_tokens": 372,
+      "total_tokens": 561,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 125
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

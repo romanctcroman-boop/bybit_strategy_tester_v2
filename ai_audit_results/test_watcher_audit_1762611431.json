@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762611431,
+  "changed_files": [
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762611412.0800936,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution occurred\n- Complete testing infrastructure failure\n- Recent changes to `perplexity.py` completely untested\n\n## Potential Issues with Recent Changes\n1. **Syntax errors** in `perplexity.py` preventing import/execution\n2. **Missing dependencies** for Perplexity API integration\n3. **Environment configuration** issues (API keys, endpoints)\n4. **Import/circular dependency** problems\n5. **Critical runtime exceptions** during test setup\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile mcp-server\\api\\providers\\perplexity.py` to check syntax\n2. Execute tests with `-v` flag to see failure details\n3. Check test runner configuration and dependencies\n\n**Short-term:**\n1. Add basic smoke test for `perplexity.py` imports\n2. Validate environment variables and API configuration\n3. Implement error handling in test setup\n\n**Long-term:**\n1. Establish minimum 70% coverage requirement\n2. Add pre-commit hooks for syntax validation\n3. Implement CI pipeline with dependency checks\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail. Recent changes to API provider are completely unvalidated, risking:\n- Service outages\n- Data integrity issues\n- Security vulnerabilities from untested code\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 132,
+      "completion_tokens": 354,
+      "total_tokens": 486,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 4
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

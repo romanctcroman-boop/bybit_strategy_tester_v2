@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762627280,
+  "changed_files": [
+    "deepseek_review_mcp_server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762627266.200165,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code is being tested. The coverage report is empty, confirming zero test execution.\n\n## Potential Issues with Recent Changes\n1. **Test runner crash** - Likely caused by:\n   - Syntax errors in test files or test configuration\n   - Missing dependencies or imports in `deepseek_review_mcp_server.py`\n   - Circular imports or initialization failures\n   - Test discovery configuration issues\n\n2. **File changes** - Recent modifications to `deepseek_review_mcp_server.py` may have introduced breaking changes that prevent test loading.\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with verbose output to identify the crash point: `pytest -v`\n2. Check for syntax errors: `python -m py_compile deepseek_review_mcp_server.py`\n3. Verify test discovery: Ensure test files follow naming conventions (`test_*.py` or `*_test.py`)\n4. Review recent changes to `deepseek_review_mcp_server.py` for import/dependency issues\n\n**SHORT TERM:**\n- Add basic smoke test to verify module can be imported\n- Fix test configuration and dependencies\n- Implement minimal test suite to achieve >70% coverage\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially unstable. Deployment would be extremely risky. The inability to run tests suggests fundamental issues that could affect runtime behavior.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 343,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

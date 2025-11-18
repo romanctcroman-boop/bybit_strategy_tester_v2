@@ -1,0 +1,51 @@
+# ==============================================================================
+# Bybit Strategy Tester V2 - Sandbox Python Dependencies
+# ==============================================================================
+# Purpose: Minimal whitelist of packages allowed in sandbox environment
+# Security: Only trusted packages for strategy development
+# Updated: 2025-11-01
+# ==============================================================================
+
+# ==============================================================================
+# DATA ANALYSIS & MANIPULATION
+# ==============================================================================
+pandas==2.1.4
+numpy==1.26.2
+
+# ==============================================================================
+# TECHNICAL ANALYSIS
+# ==============================================================================
+ta==0.11.0              # Technical Analysis Library
+pandas-ta==0.3.14b      # Additional TA indicators
+
+# ==============================================================================
+# BACKTESTING & TRADING
+# ==============================================================================
+vectorbt==0.26.2        # Vectorized backtesting framework
+vectorbtpro==0.26.2     # VectorBT Pro (if licensed)
+
+# ==============================================================================
+# SCIENTIFIC COMPUTING
+# ==============================================================================
+scipy==1.11.4           # Scientific computing utilities
+
+# ==============================================================================
+# PERFORMANCE & OPTIMIZATION
+# ==============================================================================
+numba==0.58.1           # JIT compiler for numerical functions
+
+# ==============================================================================
+# UTILITIES
+# ==============================================================================
+python-dateutil==2.8.2  # Date parsing utilities
+pytz==2023.3.post1      # Timezone support
+
+# ==============================================================================
+# SECURITY NOTES:
+# ==============================================================================
+# NOT INCLUDED (blocked for security):
+# - requests, urllib3: No network access
+# - os, subprocess, sys: Controlled via AST validation
+# - pickle: No arbitrary code execution
+# - eval, exec: Blocked via code validator
+# ==============================================================================

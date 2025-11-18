@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762554551,
+  "changed_files": [
+    "backend\\api\\app.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554531.7115068,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful testing occurred. This indicates either:\n- Syntax errors in test files or application code\n- Missing dependencies or environment configuration issues\n- Test framework configuration problems\n\n## Coverage Analysis\n**0% coverage** - All tests failed before any code execution could be measured. No coverage data was collected.\n\n## Potential Issues with Recent Changes\nThe failure likely relates to changes in `backend\\api\\app.py`:\n- Syntax errors introduced in the modified file\n- Breaking changes to imports or dependencies\n- Configuration changes that broke test initialization\n\n## Recommendations\n**Immediate Actions:**\n1. Run tests with verbose output to identify the specific failure point\n2. Check `backend\\api\\app.py` for syntax errors using `python -m py_compile`\n3. Verify all imports and dependencies are correctly installed\n4. Run a minimal test to isolate the issue\n\n**Follow-up:**\n- Fix the root cause preventing test execution\n- Add pre-commit hooks to catch syntax errors\n- Implement basic smoke tests to validate test environment\n\n## Risk Assessment\n**HIGH RISK** - No tests are running, meaning:\n- Undetected bugs may exist in production code\n- Recent changes to `app.py` are completely untested\n- Deployment could introduce critical failures\n- Entire codebase is effectively untested\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 306,
+      "total_tokens": 431,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

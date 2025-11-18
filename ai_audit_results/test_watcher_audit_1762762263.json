@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762762263,
+  "changed_files": [
+    "request_next_phase_audit.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762762247.54247,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/execution).\n\n## Coverage Analysis\n**0% COVERAGE** - No code is being executed during tests. This represents complete test infrastructure failure rather than just low coverage.\n\n## Potential Issues with Recent Changes\n1. **request_next_phase_audit.py** likely contains syntax errors or import failures\n2. Test runner configuration may be broken\n3. Dependencies missing or incompatible\n4. Test discovery/import mechanism failed\n\n## Immediate Recommendations\n1. **Run tests with verbose output** to see the actual error: `pytest -v` or `python -m pytest --tb=long`\n2. **Check syntax** of the changed file: `python -m py_compile request_next_phase_audit.py`\n3. **Verify imports**: Run `python -c \"import request_next_phase_audit\"`\n4. **Examine test configuration** (pytest.ini, conftest.py, setup.cfg) for issues\n5. **Check dependency installation** and virtual environment\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Do not deploy until:\n- Basic test execution is restored\n- Minimum 70% coverage achieved\n- All critical paths are validated\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 304,
+      "total_tokens": 431,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

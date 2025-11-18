@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762756052,
+  "changed_files": [
+    "tests\\test_perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762756013.09615,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal errors during test discovery/setup\n\n## Coverage Analysis\n**0% coverage** - All code changes are completely untested. This represents maximum testing risk.\n\n## Potential Issues with Recent Changes\n1. **tests/test_perplexity_client.py** likely contains:\n   - Syntax errors (missing imports, invalid Python)\n   - Broken test fixtures/setup\n   - Dependency conflicts or missing requirements\n   - Configuration errors in test runner\n\n## Immediate Action Items\n1. **Fix Test Execution First**:\n   ```bash\n   python -m pytest tests/test_perplexity_client.py -v\n   ```\n   Check for specific error messages and fix the root cause.\n\n2. **Validate Test Structure**:\n   - Ensure proper imports and test class inheritance\n   - Verify pytest fixtures are correctly defined\n   - Check for missing dependencies in requirements.txt\n\n3. **Add Basic Smoke Test**:\n   ```python\n   def test_import():\n       from perplexity_client import PerplexityClient\n       assert PerplexityClient is not None\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Any code changes in perplexity_client are completely unverified. Deployment would be extremely risky.\n\n## Priority Recommendations\n1. **Immediate**: Fix test execution - this blocks all quality assessment\n2. **Short-term**: Add basic unit tests covering core functionality\n3. **Medium-term**: Establish minimum 80% coverage threshold\n4. **Continuous**: Run tests before commit via pre-commit hooks\n\n**Next Step**: Run tests with verbose output to identify the specific failure cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 376,
+      "total_tokens": 503,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762730041,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\__init__.py",
+    ".venv\\Lib\\site-packages\\_pytest\\mark\\structures.py",
+    ".venv\\Lib\\site-packages\\_pytest\\mark\\__init__.py",
+    ".venv\\Lib\\site-packages\\pytest\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762730016.0390112,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test setup/execution, not just test failures. Zero coverage confirms no tests actually ran.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution occurred\n- Unable to assess actual code coverage gaps due to complete test failure\n\n## Potential Issues with Recent Changes\n1. **Pytest environment corruption** - Modified pytest core files in `.venv` suggest:\n   - Manual edits to test framework files (should never be modified directly)\n   - Possible version conflicts or broken installation\n   - Custom modifications that broke pytest functionality\n\n2. **Environment isolation failure** - Virtual environment contains altered system packages\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Recreate virtual environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\n   pip install -r requirements.txt\n   ```\n\n2. **Verify pytest installation**:\n   ```bash\n   pip install pytest pytest-cov\n   pytest --version\n   ```\n\n3. **Run basic test check**:\n   ```bash\n   pytest -v --tb=short\n   ```\n\n**FOLLOW-UP:**\n4. Establish CI checks to prevent manual modification of venv packages\n5. Implement pre-commit hooks to validate test environment\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing capability\n- Potential environment instability affecting development\n- Undetectable regressions in codebase\n- Deployment risks without test validation\n\n**Priority:** Fix immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 195,
+      "completion_tokens": 376,
+      "total_tokens": 571,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 131
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

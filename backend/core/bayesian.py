@@ -1,0 +1,77 @@
+"""Minimal Bayesian optimizer stub.
+
+Implements a lightweight async optimize routine returning deterministic results
+and a simple parameter importance mapping to keep Celery tasks operable in dev/CI.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+
+class BayesianOptimizer:
+    def __init__(
+        self,
+        data: Any,
+        initial_capital: float = 10_000.0,
+        commission: float = 0.0006,
+        n_trials: int = 50,
+        n_jobs: int = 1,
+        random_state: int | None = None,
+    ) -> None:
+        self.data = data
+        self.initial_capital = initial_capital
+        self.commission = commission
+        self.n_trials = n_trials
+        self.n_jobs = n_jobs
+        self.random_state = random_state
+
+    async def optimize_async(
+        self,
+        strategy_config: dict[str, Any],
+        param_space: dict[str, dict[str, Any]],
+        metric: str = "sharpe_ratio",
+        direction: str = "maximize",
+        show_progress: bool = False,
+    ) -> dict[str, Any]:
+        # Simulate async work
+        await asyncio.sleep(0)
+
+        # Choose midpoint values deterministically for numeric ranges; first choice for categorical
+        best_params: dict[str, Any] = {}
+        for name, spec in param_space.items():
+            typ = spec.get("type")
+            if typ in ("int", "float"):
+                low = spec.get("low")
+                high = spec.get("high")
+                if low is None or high is None:
+                    val = spec.get("default", 0)
+                else:
+                    mid = (low + high) / 2
+                    val = int(mid) if typ == "int" else float(mid)
+            elif typ == "categorical":
+                choices = spec.get("choices") or spec.get("values") or []
+                val = choices[0] if choices else None
+            else:
+                val = spec.get("default")
+            best_params[name] = val
+
+        # Dummy metric outcome
+        best_value = 1.0 if metric == "sharpe_ratio" else 0.1
+
+        return {
+            "best_params": best_params,
+            "best_value": best_value,
+            "direction": direction,
+            "metric": metric,
+            "statistics": {
+                "completed_trials": max(1, int(self.n_trials)),
+                "n_jobs": self.n_jobs,
+            },
+            "trials": [],
+        }
+
+    def get_importance(self) -> dict[str, float]:
+        # Uniform importance in the stub
+        return {"param_importance": 1.0}

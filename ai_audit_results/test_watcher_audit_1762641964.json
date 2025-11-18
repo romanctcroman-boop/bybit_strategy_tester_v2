@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762641964,
+  "changed_files": [
+    "test_mcp_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762641949.207731,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or test code structure.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data** for any files - Tests didn't run to completion\n- **Complete testing gap** - Unable to assess actual code coverage\n\n## Potential Issues with Recent Changes\n1. **Test file `test_mcp_tools.py` likely contains syntax errors** or import failures\n2. **Dependency issues** - Missing imports or incompatible versions\n3. **Configuration problems** - Test runner setup or environment variables\n4. **Critical exceptions** during test discovery/import phase\n\n## Immediate Action Recommendations\n1. **Fix test execution first**:\n   - Run `python -m pytest test_mcp_tools.py -v` to see specific errors\n   - Check for syntax errors in the test file\n   - Verify all imports are available and correct\n\n2. **Debug the test failure**:\n   - Examine the exact error message from test execution\n   - Ensure test dependencies are installed\n   - Check for circular imports or module loading issues\n\n3. **Restore basic functionality**:\n   - Create a minimal passing test to verify test infrastructure\n   - Gradually reintroduce test cases once execution works\n\n## Risk Assessment\n**HIGH RISK** - Without any test execution, there's:\n- **No validation** of recent changes in `test_mcp_tools.py`\n- **Unknown code quality** of the MCP tools module\n- **High probability** of undetected regressions\n- **Zero confidence** in current code state\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 378,
+      "total_tokens": 503,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

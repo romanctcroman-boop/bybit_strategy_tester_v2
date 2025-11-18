@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762625215,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\server.py",
+    "test_deepseek_mcp_tools.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\main.py",
+    "mcp-server\\server.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762625200.7721205,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage means no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - All files show 0% coverage:\n- Cannot assess actual code coverage\n- No tests are running to completion\n- Critical gap: Entire test suite is failing\n\n## Potential Issues with Recent Changes\n1. **Environment corruption** - `.venv` modifications suggest dependency issues\n2. **Import/circular dependency problems** - FastMCP and dotenv package changes\n3. **Server initialization failures** - `mcp-server/server.py` and FastMCP server files modified\n4. **Test file itself may be broken** - `test_deepseek_mcp_tools.py` changes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see specific failure points\n2. Check Python environment: `python --version` and reinstall dependencies\n3. Test import statements in isolation\n4. Add try-catch blocks around test initialization to capture errors\n\n**STRUCTURAL FIXES:**\n1. Create minimal test case to verify test infrastructure works\n2. Implement test logging to capture setup failures\n3. Add dependency version checks in test setup\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback\n- Potential deployment of broken code\n- Environment instability affecting development\n- Urgent attention required before any further development\n\n**Priority:** Fix test infrastructure immediately before addressing any other issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 234,
+      "completion_tokens": 352,
+      "total_tokens": 586,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 170
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

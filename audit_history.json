@@ -1,0 +1,602 @@
+[
+  {
+    "timestamp": "2025-11-11T23:32:23.173820",
+    "trigger_reason": "Marker file: WEEK4_PHASE4_HEALTH_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:23.520866",
+    "trigger_reason": "Marker file: WEEK4_PHASE5_DEPLOY_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:23.838864",
+    "trigger_reason": "Marker file: WEEK_1_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:24.172754",
+    "trigger_reason": "Marker file: WEEK_1_DAY_1_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:24.497574",
+    "trigger_reason": "Marker file: WEEK_1_DAY_2_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:24.900210",
+    "trigger_reason": "Marker file: WEEK_1_DAY_3_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:25.276885",
+    "trigger_reason": "Marker file: WEEK_1_DAY_4_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:25.602808",
+    "trigger_reason": "Marker file: WEEK_1_DAY_5_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:25.940551",
+    "trigger_reason": "Marker file: WEEK_1_DAY_6_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:26.263301",
+    "trigger_reason": "Marker file: WEEK_1_TASKS_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:26.595561",
+    "trigger_reason": "Marker file: WEEK_2_DAY_2_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:26.929925",
+    "trigger_reason": "Marker file: WEEK_2_TASK_1_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:27.251999",
+    "trigger_reason": "Marker file: WEEK_2_TASK_2_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:27.574331",
+    "trigger_reason": "Marker file: WEEK_2_TASK_3_SECURITY_AUDIT_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:27.923609",
+    "trigger_reason": "Marker file: WEEK_3_DAY_1-3_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:28.250680",
+    "trigger_reason": "Marker file: WEEK_3_DAY_1_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:28.566061",
+    "trigger_reason": "Marker file: WEEK_3_DAY_4_DEEPSEEK_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:28.908476",
+    "trigger_reason": "Marker file: WEEK_3_DAY_5_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:29.228730",
+    "trigger_reason": "Marker file: WEEK_3_INTEGRATION_TESTING_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:29.550881",
+    "trigger_reason": "Marker file: WORKER_HEARTBEAT_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:29.995676",
+    "trigger_reason": "Marker file: INTEGRATION_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:30.341808",
+    "trigger_reason": "Marker file: OPTIMIZATION_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:30.651294",
+    "trigger_reason": "Marker file: PROJECT_STATUS_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:30.965213",
+    "trigger_reason": "Marker file: QUICK_WIN_1_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:31.335038",
+    "trigger_reason": "Marker file: QUICK_WIN_2_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:31.675786",
+    "trigger_reason": "Marker file: QUICK_WIN_3_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:32.015171",
+    "trigger_reason": "Marker file: TASK_12_CHARTS_API_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:32.364526",
+    "trigger_reason": "Marker file: TASK_8_MTF_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:32.682878",
+    "trigger_reason": "Marker file: TASK_9_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:33.003177",
+    "trigger_reason": "Marker file: TASK_9_STEP_2_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:33.348567",
+    "trigger_reason": "Marker file: INTEGRATION_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:33.668286",
+    "trigger_reason": "Marker file: MODULAR_REFACTORING_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:34.001480",
+    "trigger_reason": "Marker file: P2_OBSERVABILITY_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:34.326307",
+    "trigger_reason": "Marker file: P3_CONFIGURATION_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:34.661431",
+    "trigger_reason": "Marker file: IMPLEMENTATION_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:34.983906",
+    "trigger_reason": "Marker file: INTEGRATION_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:35.288809",
+    "trigger_reason": "Marker file: REAL_API_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:35.608407",
+    "trigger_reason": "Marker file: AGENT_TO_AGENT_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:35.925997",
+    "trigger_reason": "Marker file: AUTHENTICATION_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:36.259580",
+    "trigger_reason": "Marker file: CODE_AGENT_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:36.609014",
+    "trigger_reason": "Marker file: CRITICAL_ANOMALIES_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:36.954206",
+    "trigger_reason": "Marker file: E2E_TESTS_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:37.286248",
+    "trigger_reason": "Marker file: EXTENDED_TESTING_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:37.627379",
+    "trigger_reason": "Marker file: HORIZONTAL_SCALING_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:37.953462",
+    "trigger_reason": "Marker file: MUST_FIX_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:38.275568",
+    "trigger_reason": "Marker file: P0_TASKS_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:38.600005",
+    "trigger_reason": "Marker file: PHASE1_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:38.916630",
+    "trigger_reason": "Marker file: PHASE_1_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:39.282716",
+    "trigger_reason": "Marker file: PHASE_2_1_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:39.597451",
+    "trigger_reason": "Marker file: PHASE_2_2_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:39.920811",
+    "trigger_reason": "Marker file: PHASE_2_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:40.227570",
+    "trigger_reason": "Marker file: PRIORITY_1_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:40.549099",
+    "trigger_reason": "Marker file: PRIORITY_2_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:40.915561",
+    "trigger_reason": "Marker file: PRIORITY_3_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:41.314889",
+    "trigger_reason": "Marker file: PRIORITY_4_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:41.658929",
+    "trigger_reason": "Marker file: QUICK_WIN_2_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:42.006327",
+    "trigger_reason": "Marker file: QUICK_WIN_3_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:42.359348",
+    "trigger_reason": "Marker file: SANDBOX_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:42.672693",
+    "trigger_reason": "Marker file: SECURE_LOGGING_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:42.988811",
+    "trigger_reason": "Marker file: SESSION_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:43.295281",
+    "trigger_reason": "Marker file: TASK1_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:43.624093",
+    "trigger_reason": "Marker file: TASK2_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:43.939164",
+    "trigger_reason": "Marker file: TASK3_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:44.243508",
+    "trigger_reason": "Marker file: PHASE_1-3_AUDIT_FINAL_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:44.548831",
+    "trigger_reason": "Marker file: PHASE_1-3_AUDIT_VALIDATION_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:45.000996",
+    "trigger_reason": "Marker file: PHASE_1-3_COMPLETE_SUMMARY.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:45.307577",
+    "trigger_reason": "Marker file: PHASE_1-3_PARALLEL_AUDIT_FINAL.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:45.610513",
+    "trigger_reason": "Marker file: PHASE_1_2_FINAL_ANALYSIS.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:45.951858",
+    "trigger_reason": "Marker file: PHASE_1_COMPLETE_FINAL_SUMMARY.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:46.419750",
+    "trigger_reason": "Marker file: PHASE_1_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:46.725398",
+    "trigger_reason": "Marker file: PHASE_1_DEEPSEEK_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:47.040844",
+    "trigger_reason": "Marker file: PHASE_1_IMPLEMENTATION_PLAN.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:47.344975",
+    "trigger_reason": "Marker file: PHASE_1_INTEGRATION_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:47.649231",
+    "trigger_reason": "Marker file: PHASE_1_QUICK_START_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:48.031796",
+    "trigger_reason": "Marker file: PHASE_1_QUICK_WINS_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:48.359347",
+    "trigger_reason": "Marker file: PHASE_1_SECURITY_INTEGRATION_GUIDE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:48.666351",
+    "trigger_reason": "Marker file: PHASE_2_1_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:48.982428",
+    "trigger_reason": "Marker file: PHASE_2_2_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:49.288447",
+    "trigger_reason": "Marker file: PHASE_2_2_LIFECYCLE_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:49.602138",
+    "trigger_reason": "Marker file: PHASE_2_3_2_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:49.923334",
+    "trigger_reason": "Marker file: PHASE_2_3_3_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:50.259340",
+    "trigger_reason": "Marker file: PHASE_2_3_4_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:50.595408",
+    "trigger_reason": "Marker file: PHASE_2_3_5_DEEPSEEK_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:50.950408",
+    "trigger_reason": "Marker file: PHASE_2_3_5_EXTENDED_TEST_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:51.274365",
+    "trigger_reason": "Marker file: PHASE_2_3_5_FINAL_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:51.582659",
+    "trigger_reason": "Marker file: PHASE_2_3_5_PERPLEXITY_ANALYSIS.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:51.896717",
+    "trigger_reason": "Marker file: PHASE_2_3_ALL_TESTS_RESULTS.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:52.222821",
+    "trigger_reason": "Marker file: PHASE_2_COMPLETE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:52.589409",
+    "trigger_reason": "Marker file: PHASE_2_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:52.904165",
+    "trigger_reason": "Marker file: PHASE_2_PROGRESS.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:53.220245",
+    "trigger_reason": "Marker file: PHASE_2_TEST_FIXES.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:53.538288",
+    "trigger_reason": "Marker file: PHASE_3_DEPLOYMENT_PLAN.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:53.924658",
+    "trigger_reason": "Marker file: PHASE_3_PLAN.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:54.248181",
+    "trigger_reason": "Marker file: PHASE_2_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:54.576447",
+    "trigger_reason": "Marker file: PHASE_2_STREAMING_GUIDE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:54.919155",
+    "trigger_reason": "Marker file: PHASE_3_CACHING_GUIDE.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:55.236797",
+    "trigger_reason": "Marker file: PHASE_3_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:55.557566",
+    "trigger_reason": "Marker file: TASK1_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:55.878573",
+    "trigger_reason": "Marker file: TASK2_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  },
+  {
+    "timestamp": "2025-11-11T23:32:56.186375",
+    "trigger_reason": "Marker file: TASK3_COMPLETION_REPORT.md",
+    "status": "FAILED",
+    "details": "Ошибка при запуске аудита: 'utf-8' codec can't decode byte 0xc7 in position 865: invalid continuation byte"
+  }
+]

@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762546867,
+  "changed_files": [
+    "tests\\monitoring\\__init__.py",
+    "automation\\metrics\\collectors\\audit_agent_collector.py",
+    "automation\\metrics\\__init__.py",
+    "temp_pg_test.py",
+    "automation\\metrics\\collectors\\system_collector.py",
+    "automation\\metrics\\prometheus_exporter.py",
+    "automation\\metrics\\custom_metrics.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\_subprocess.py",
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    "backend\\api\\deepseek_client.py",
+    "demo_prometheus_metrics.py",
+    "automation\\metrics\\collectors\\__init__.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "mcp-server\\tools\\analysis\\analysis_tools.py",
+    "backend\\api\\perplexity_client.py",
+    "tests\\monitoring\\test_metrics_export.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762546850.6686144,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental runtime issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- Zero coverage across all files indicates test execution never reached actual test logic\n- No meaningful coverage data to analyze gaps\n\n## Potential Issues with Recent Changes\n**HIGH-RISK CHANGES IDENTIFIED**:\n1. **Database/PostgreSQL changes** (`temp_pg_test.py`, psycopg2 modifications) - likely causing connection failures\n2. **Metrics collector changes** - multiple collector files modified may have dependency conflicts\n3. **Environment contamination** - `.venv` modifications suggest virtual environment corruption\n4. **New API clients** (`deepseek_client.py`, `perplexity_client.py`) - potential external service dependencies failing\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS**:\n1. **Fix test environment**:\n   - Recreate virtual environment from clean state\n   - Verify all dependencies are properly installed\n   - Check PostgreSQL connectivity and test database setup\n\n2. **Debug test execution**:\n   - Run tests with `-v` flag to see which test fails first\n   - Add `--tb=short` to get clearer error traces\n   - Check for missing environment variables or configuration\n\n3. **Isolate failures**:\n   - Run tests individually to identify broken components\n   - Test database connectivity separately\n   - Verify external API client configurations\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- Complete test suite failure indicates fundamental system instability\n- Database and external service integrations likely broken\n- No confidence in any functionality working correctly\n- **Recommend blocking all deployments until basic tests pass**\n\n**Priority**: Fix test environment and database connectivity first, then address individual component failures.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 341,
+      "completion_tokens": 418,
+      "total_tokens": 759,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 277
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

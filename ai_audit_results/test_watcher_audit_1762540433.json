@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540433,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540417.3882573,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **No coverage data available** - Coverage reporting failed entirely\n- **Critical gap**: Unable to assess actual code coverage due to test execution failure\n\n## Potential Issues with Recent Changes\n1. **File `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:**\n   - Syntax errors preventing import/execution\n   - Fatal runtime errors during module loading\n   - Missing dependencies or imports\n   - Infinite loops or blocking operations during import\n\n2. **Test infrastructure may have:**\n   - Incorrect test discovery configuration\n   - Environment compatibility issues\n   - Missing test dependencies\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test execution failure:**\n   ```bash\n   python -m pytest --tb=short -x  # Isolate first failure\n   python -c \"import full_ai_audit_deepseek_perplexity_deepseek\"  # Check import\n   ```\n2. **Check for syntax errors:**\n   ```bash\n   python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py\n   ```\n3. **Review recent changes to the modified file for obvious defects**\n\n**Follow-up:**\n4. Add basic smoke tests that validate module import\n5. Implement CI pipeline with fail-fast on syntax errors\n6. Add static analysis (pylint, flake8) to catch issues pre-commit\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may be completely broken\n- No validation of recent changes functionality\n- Potential for undetected runtime errors in production\n- Complete loss of test automation value\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 435,
+      "total_tokens": 570,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

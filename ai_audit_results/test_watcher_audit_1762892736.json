@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762892736,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\loguru\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\main.py",
+    "backend\\agents\\unified_agent_interface.py",
+    ".venv\\Lib\\site-packages\\loguru\\__init__.pyi",
+    "backend\\agents\\agent_to_agent_communicator.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762892721.967822,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates fundamental issues with the test environment or test setup rather than test failures.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a severe issue indicating:\n- Test runner configuration problems\n- Missing test discovery\n- Environment setup failures\n- Possible import errors or dependency issues\n\n## Potential Issues with Recent Changes\n1. **Modified dependencies** - Changes to loguru and dotenv in virtual environment suggest dependency conflicts or version mismatches\n2. **Agent interface changes** - `unified_agent_interface.py` and `agent_to_agent_communicator.py` modifications may have broken imports or initialization\n3. **Environment corruption** - `.venv` modifications indicate potential virtual environment issues\n\n## Immediate Action Items\n1. **Fix Test Execution**:\n   - Check pytest/runner configuration\n   - Verify Python path and import statements\n   - Run with `-v` flag to see what tests are discovered\n\n2. **Environment Reset**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n3. **Validate Dependencies**:\n   - Check for version conflicts between loguru and dotenv\n   - Verify all agent dependencies are properly installed\n\n4. **Test Discovery**:\n   - Run `python -m pytest --collect-only` to see if tests are found\n   - Check test file naming conventions (`test_*.py`)\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- No confidence in code functionality\n- Potential breaking changes undetected\n- Deployment would be extremely risky\n\n**Priority**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 217,
+      "completion_tokens": 385,
+      "total_tokens": 602,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 153
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

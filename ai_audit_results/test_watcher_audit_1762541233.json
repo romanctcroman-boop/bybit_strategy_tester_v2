@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762541233,
+  "changed_files": [
+    "test_crash.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541215.3080173,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) indicating severe instability. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code is being tested. The crash prevents any meaningful coverage measurement, making it impossible to assess actual gaps.\n\n## Potential Issues with Recent Changes\n- **test_crash.py** is likely causing the entire test suite to fail\n- Possible causes: infinite loop, segmentation fault, import errors, or environment configuration issues\n- Test infrastructure may be improperly configured\n\n## Recommendations for Improvement\n1. **Immediate**: Isolate and debug test_crash.py - run it separately to identify the crash cause\n2. **Fix root cause**: Address the specific failure (memory issues, dependency problems, etc.)\n3. **Add test isolation**: Ensure tests can run independently without crashing the entire suite\n4. **Implement basic smoke tests**: Add simple validation tests before comprehensive testing\n\n## Risk Assessment\n**HIGH RISK** - No functional testing is occurring, meaning:\n- All code changes are untested\n- Regression detection is impossible\n- Production deployments carry significant failure risk\n- Immediate attention required to restore testing capability\n\n**Priority**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 123,
+      "completion_tokens": 268,
+      "total_tokens": 391,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 59
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmp4nv3veph",
+    "debounce_seconds": 0.5
+  }
+}

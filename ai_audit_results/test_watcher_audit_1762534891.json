@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762534891,
+  "changed_files": [
+    "health_check.py",
+    "backend\\security\\key_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762534876.8855958,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). This indicates either:\n- Syntax errors in test files or application code\n- Missing dependencies or environment setup issues\n- Test framework configuration problems\n\n## Coverage Analysis\n**0.00% coverage is a major red flag** - Tests aren't running at all, making coverage data meaningless until execution is fixed.\n\n## Potential Issues with Recent Changes\nThe changed files suggest potential problems:\n- **health_check.py**: Possible syntax errors or import issues\n- **backend\\security\\key_manager.py**: Security-related code may have breaking changes or dependency issues\n\n## Immediate Action Plan\n\n1. **Fix Test Execution First**\n   - Check test runner logs for specific error messages\n   - Verify Python environment and dependencies\n   - Run `python -m py_compile` on changed files to check for syntax errors\n\n2. **Validate Recent Changes**\n   - Test health_check.py in isolation\n   - Verify key_manager.py doesn't have circular imports or missing dependencies\n\n3. **Quick Diagnostics**\n   ```bash\n   python -m pytest --collect-only  # Identify test collection issues\n   python health_check.py           # Direct execution test\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deploying without passing tests is dangerous, especially with security-related changes. The 0% coverage indicates no validation of recent modifications.\n\n## Priority Recommendations\n1. **Immediate**: Fix test execution - this blocks all other quality metrics\n2. **Short-term**: Add basic smoke tests for health_check and key_manager\n3. **Medium-term**: Implement minimum 80% coverage requirement for critical paths\n\n**Next step**: Share specific test execution error logs for targeted troubleshooting.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 360,
+      "total_tokens": 491,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

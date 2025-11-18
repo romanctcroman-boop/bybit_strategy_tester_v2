@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762538219,
+  "changed_files": [
+    "backend\\security\\secure_storage.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538205.8555036,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% across all files indicates:\n- Test runner failed before any tests could execute\n- No code paths were exercised\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\nThe secure_storage.py modification likely introduced:\n- **Fatal import errors** (missing dependencies/circular imports)\n- **Syntax errors** preventing module loading\n- **Environment configuration breaks** (path issues, missing credentials)\n- **Critical runtime exceptions** during module initialization\n\n## Immediate Recommendations\n1. **Debug test runner failure**:\n   ```bash\n   python -m pytest backend/security/ -v --tb=short\n   ```\n2. **Check module import**:\n   ```python\n   python -c \"from backend.security import secure_storage\"\n   ```\n3. **Validate syntax**:\n   ```bash\n   python -m py_compile backend/security/secure_storage.py\n   ```\n4. **Add basic smoke test** to prevent regression:\n   ```python\n   def test_module_import():\n       import backend.security.secure_storage\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No validation of security-critical storage functionality\n- Potential undetected vulnerabilities in encryption/authentication\n- Complete loss of testing safety net\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 332,
+      "total_tokens": 459,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

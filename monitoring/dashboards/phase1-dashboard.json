@@ -1,0 +1,143 @@
+{
+  "dashboard": {
+    "title": "Phase 1 Security & Scaling Dashboard",
+    "tags": ["phase1", "security", "scaling"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Security Score Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "8.5",
+            "legendFormat": "Security Score"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Active Workers",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "celery_workers_active",
+            "legendFormat": "Active Workers"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 3,
+        "title": "Queue Depth",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "celery_queue_depth",
+            "legendFormat": "Queue Depth"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      },
+      {
+        "id": 4,
+        "title": "JWT Tokens",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(jwt_tokens_issued_total[5m])",
+            "legendFormat": "Issued"
+          },
+          {
+            "expr": "rate(jwt_tokens_rejected_total[5m])",
+            "legendFormat": "Rejected"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+      },
+      {
+        "id": 5,
+        "title": "Rate Limit Violations",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(rate_limit_exceeded_total[5m])",
+            "legendFormat": "Rate Limit Violations"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12}
+      },
+      {
+        "id": 6,
+        "title": "Sandbox Executions",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(sandbox_executions_total[5m])",
+            "legendFormat": "Executions"
+          },
+          {
+            "expr": "rate(sandbox_timeouts_total[5m])",
+            "legendFormat": "Timeouts"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+      },
+      {
+        "id": 7,
+        "title": "Task Processing Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(celery_tasks_processed_total[5m])",
+            "legendFormat": "Processed"
+          },
+          {
+            "expr": "rate(celery_tasks_failed_total[5m])",
+            "legendFormat": "Failed"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+      },
+      {
+        "id": 8,
+        "title": "Sensitive Data Filtered",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sensitive_data_filtered_total",
+            "legendFormat": "Filtered Items"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 9,
+        "title": "Worker Scaling Events",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(worker_scaling_events_total[5m])",
+            "legendFormat": "Scaling Events"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28}
+      },
+      {
+        "id": 10,
+        "title": "Audit Log Entries",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(audit_log_entries_total[5m])",
+            "legendFormat": "Audit Entries"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28}
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

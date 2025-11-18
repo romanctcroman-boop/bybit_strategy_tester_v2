@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762537263,
+  "changed_files": [
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\test_protocol.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_phase1_security.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537247.8191667,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**Critical Failure** - Exit code -1 indicates a fatal error during test execution, likely a configuration issue, import error, or environment problem preventing any tests from running.\n\n## 2. Coverage Analysis\n**Complete Failure** - 0.00% coverage means no tests executed successfully. This is a critical issue requiring immediate attention.\n\n## 3. Potential Issues\n- **Configuration/Environment**: Likely missing dependencies, broken imports, or environment setup issues\n- **Recent Changes**: Focus on modified test files and backend modules (LSTM predictor, MTF engine)\n- **Test Infrastructure**: `conftest.py` changes may have broken test discovery/setup\n\n## 4. Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Check test runner configuration\n   - Verify all dependencies are installed\n   - Run individual test files to isolate the failure\n   - Review recent changes to `conftest.py`\n\n2. **Priority Testing Order**:\n   - Start with core components: `test_mtf_engine.py`, `test_database\\test_query_optimization.py`\n   - Then API layers: bot and marketdata tests\n   - Finally ML components: LSTM predictor tests\n\n3. **Quick Wins**:\n   - Run `python -m pytest tests/ -v` to get detailed error output\n   - Check for circular imports in modified backend modules\n   - Verify database connections in test setup\n\n## 5. Risk Assessment\n**HIGH RISK** - No test validation means:\n- Recent changes to ML components and core engine are completely untested\n- Potential production-breaking changes in API routes and database optimizations\n- Zero confidence in system stability\n\n**Action**: Stop further deployments until basic test execution is restored and critical path coverage reaches at least 70%.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 388,
+      "total_tokens": 679,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 227
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

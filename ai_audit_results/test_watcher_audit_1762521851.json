@@ -1,0 +1,60 @@
+{
+  "timestamp": 1762521851,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    "tests\\test_phase1_security.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    "full_ai_audit_deepseek_perplexity_deepseek.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\api\\routers\\automl.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    "backend\\core\\mtf_engine.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\test_protocol.py",
+    "automation\\task1_test_watcher\\test_watcher.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762521832.3111918,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage suggests tests never executed properly\n- Multiple pytest/coverage internal files modified - environment corruption suspected\n\n## Coverage Analysis\n**NO COVERAGE DATA** - This is a system-level failure, not a coverage gap:\n- Coverage collection failed entirely\n- Cannot assess actual code coverage\n- Test infrastructure appears broken\n\n## Potential Issues\n1. **Environment Corruption**: Virtual environment files (.venv) modified - likely incompatible package versions\n2. **Test Framework Conflict**: pytest/pluggy/coverage internal files changed - suggests dependency issues\n3. **Critical Test Failure**: Early test crash preventing any execution\n4. **Path/Import Issues**: Modified files span multiple directories - potential import/configuration problems\n\n## Immediate Actions Required\n1. **Environment Reset**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Test Isolation**:\n   - Run single test: `pytest tests/test_phase1_security.py -v`\n   - Check for import errors\n3. **Dependency Audit**:\n   - Verify pytest, coverage, pluggy versions\n   - Check for version conflicts\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential deployment of untested code\n- Environment instability affecting development\n- Security tests (test_phase1_security) may be compromised\n\n## Priority Recommendations\n1. **Fix environment immediately** - this is blocking all testing\n2. **Run tests individually** to identify the failing component\n3. **Verify test dependencies** before addressing coverage\n4. **Add test isolation** to prevent single failures from breaking entire suite\n\nThe root cause appears environmental rather than test logic. Address infrastructure first, then assess actual test quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 539,
+      "completion_tokens": 413,
+      "total_tokens": 952,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 475
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

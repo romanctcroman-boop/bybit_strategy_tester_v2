@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762744927,
+  "changed_files": [
+    "tests\\test_perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762744902.8596282,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal errors during test discovery/setup\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure rather than a coverage gap.\n\n## Potential Issues with Recent Changes\nThe changed file `tests/test_perplexity_client.py` likely contains:\n- Syntax errors preventing test discovery\n- Missing imports or dependencies\n- Broken test fixtures/setup\n- Configuration errors in test runner\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest tests/test_perplexity_client.py -v` to see specific error details\n2. Check for syntax errors in the test file\n3. Verify all imports are correct and dependencies installed\n4. Ensure test framework (pytest/unittest) is properly configured\n\n**Follow-up:**\n5. Fix the root cause preventing test execution\n6. Add basic smoke tests to validate test environment\n7. Implement CI checks to catch test failures before merge\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untested and potentially unstable. Without functioning tests:\n- Regression bugs cannot be detected\n- New features may break existing functionality\n- Deployment carries significant risk\n- Code quality cannot be measured or maintained\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 322,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

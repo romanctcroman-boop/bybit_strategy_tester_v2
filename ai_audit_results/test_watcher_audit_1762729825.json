@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762729825,
+  "changed_files": [
+    "reliability\\retry_policy.py",
+    "tests\\test_perplexity_client.py",
+    "test_critical_fixes.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762729810.5952704,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates either:\n- Syntax errors in test files or code\n- Missing dependencies or configuration\n- Test framework setup issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**ZERO COVERAGE** - All tests failed before any execution could occur. No meaningful coverage data was collected.\n\n## Potential Issues with Recent Changes\n1. **test_critical_fixes.py** - New test file likely contains fatal errors\n2. **reliability\\retry_policy.py** - Changes may have broken imports or dependencies\n3. **tests\\test_perplexity_client.py** - May have configuration or import issues\n\n## Immediate Recommendations\n1. **Fix Exit Code -1 First**\n   - Run tests individually to isolate failing file: `python -m pytest tests/test_perplexity_client.py -v`\n   - Check for syntax errors: `python -m py_compile test_critical_fixes.py`\n   - Verify imports in changed files\n\n2. **Debug Priority Order**\n   - Start with `test_critical_fixes.py` (new file highest risk)\n   - Then `tests/test_perplexity_client.py` \n   - Finally verify `reliability/retry_policy.py` changes\n\n3. **Quick Diagnostics**\n   ```bash\n   python -c \"from reliability.retry_policy import *\"  # Check imports\n   python -m pytest --collect-only  # Test discovery only\n   ```\n\n## Risk Assessment\n**HIGH RISK** - No tests are passing. The codebase is completely untested and potentially broken. Deploying this state would be extremely risky.\n\n**CRITICAL ACTION**: Fix test execution before any coverage or quality analysis can proceed. The -1 exit code must be resolved as the absolute priority.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 144,
+      "completion_tokens": 390,
+      "total_tokens": 534,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 80
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

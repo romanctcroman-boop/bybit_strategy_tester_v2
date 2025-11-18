@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762716456,
+  "changed_files": [
+    "tests\\test_mcp_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762716430.5651128,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files\n- Import failures or dependency issues\n- Test framework configuration problems\n- Critical exceptions during test setup\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe changed file `tests\\test_mcp_manager.py` likely contains:\n- Syntax errors (missing imports, invalid Python)\n- Broken test fixtures or setup methods\n- Import cycles or module resolution issues\n- Environment/dependency mismatches\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix test execution first** - Run tests with verbose output to identify the specific failure\n2. **Check test file syntax** - Validate `test_mcp_manager.py` for basic Python syntax\n3. **Verify imports** - Ensure all required modules and dependencies are available\n4. **Run individual test file** - Isolate the problem by running only the changed test file\n\n**Follow-up:**\n- Once tests execute, establish baseline coverage\n- Add missing test cases for MCP manager functionality\n- Implement continuous integration to catch similar issues earlier\n\n## Risk Assessment\n**HIGH RISK** - No test validation is occurring. Any bugs in MCP manager functionality are undetected. Deployment in this state could lead to:\n- Runtime failures in production\n- Regression issues going unnoticed\n- Potential data loss or system instability\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 341,
+      "total_tokens": 467,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

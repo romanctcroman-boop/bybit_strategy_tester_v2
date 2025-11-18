@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762602269,
+  "changed_files": [
+    "automation\\deepseek_robot\\dual_analytics_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762602251.1876974,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible since tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents a complete testing failure, not just gaps in coverage.\n\n## Potential Issues with Recent Changes\nThe modified file `dual_analytics_engine.py` likely contains:\n- **Syntax errors** preventing module import\n- **Fatal runtime errors** during import/initialization\n- **Missing dependencies** causing import failures\n- **Circular imports** or module loading issues\n\n## Recommendations for Improvement\n1. **Immediate Action:**\n   - Run `python -m py_compile automation\\deepseek_robot\\dual_analytics_engine.py` to check for syntax errors\n   - Verify all imports and dependencies are available\n   - Test module import manually: `python -c \"from automation.deepseek_robot import dual_analytics_engine\"`\n\n2. **Debugging Steps:**\n   - Check test runner configuration and environment\n   - Run tests with `-v` flag to see where failure occurs\n   - Add basic smoke test to verify module can be imported\n\n3. **Process Improvements:**\n   - Implement pre-commit hooks to catch syntax errors\n   - Add basic import tests to CI pipeline\n   - Ensure test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable, meaning:\n- No validation of recent changes\n- High probability of runtime errors in production\n- Impossible to assess regression impact\n- All subsequent deployments carry unknown risk\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 379,
+      "total_tokens": 512,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 5
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

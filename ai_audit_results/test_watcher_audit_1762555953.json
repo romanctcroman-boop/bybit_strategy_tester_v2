@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762555953,
+  "changed_files": [
+    "backend\\ml\\lstm_queue_predictor.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\main.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\importer.py",
+    ".venv\\Lib\\site-packages\\click\\core.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\server.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\config.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762555926.0656426,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No meaningful quality assessment possible until basic test execution is resolved\n\n## Coverage Analysis\n**0% coverage = Complete testing breakdown**\n- No tests ran successfully\n- Coverage reporting failed entirely\n- All code changes are completely untested\n\n## Potential Issues with Recent Changes\n\n**High Risk Dependencies:**\n- Uvicorn internals modified (.venv files) - **NEVER modify package files directly**\n- Backend ML changes (`lstm_queue_predictor.py`) + API routes modified simultaneously\n- Likely version conflicts or broken imports\n\n**Immediate Suspects:**\n1. Modified virtual environment packages (uvicorn, click) - this will break in production\n2. LSTM predictor changes may have broken API route dependencies\n3. Import/circular dependency issues\n\n## Recommendations\n\n**IMMEDIATE ACTIONS:**\n1. **Revert all `.venv` modifications** - use dependency management instead\n2. Check for syntax errors in `lstm_queue_predictor.py` and API routes\n3. Run isolated import tests on modified modules\n4. Verify Python environment integrity\n\n**Short-term:**\n- Create minimal smoke test to verify basic imports work\n- Add exception handling to prevent silent failures\n- Use dependency injection instead of modifying packages\n\n**Long-term:**\n- Implement pre-commit hooks to prevent venv modifications\n- Add basic integration tests for ML-API connectivity\n- Set up proper dependency versioning\n\n## Risk Assessment\n**CRITICAL RISK** - Production deployment would fail catastrophically\n- **Code Stability**: Unknown - no tests passed\n- **Integration Risk**: High - ML and API layers modified together\n- **Dependency Risk**: Critical - package modifications are unrecoverable\n- **Business Impact**: Complete service outage likely\n\n**Priority**: Fix test execution immediately before any further development",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 230,
+      "completion_tokens": 424,
+      "total_tokens": 654,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 166
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

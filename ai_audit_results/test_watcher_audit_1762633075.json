@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762633075,
+  "changed_files": [
+    "mcp-server\\service_factories.py",
+    "mcp-server\\server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762633063.535823,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** across all files - This is a complete testing breakdown. Recent changes in `service_factories.py` and `server.py` have likely introduced fatal errors preventing test execution.\n\n## Potential Issues with Recent Changes\n1. **Fatal import/circular dependencies** between service_factories and server modules\n2. **Syntax errors** in modified files preventing module loading\n3. **Missing dependencies** or environment configuration issues\n4. **Critical exceptions** during test setup/import phase\n\n## Immediate Recommendations\n1. **Fix Import Chain**: Check for circular imports between service_factories.py and server.py\n2. **Validate Syntax**: Run `python -m py_compile mcp-server/*.py` to identify syntax errors\n3. **Isolate Failure**: Test each changed file independently with minimal imports\n4. **Add Basic Smoke Test**: Create a simple test that imports modules without executing logic\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- Zero test validation of recent changes\n- Potential runtime crashes in production\n- No safety net for regression detection\n\n**Priority**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 290,
+      "total_tokens": 426,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762580454,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py",
+    "refactor_pass2_deepseek.py",
+    "backend\\api\\deepseek_pool.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762580436.549893,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage means no tests executed successfully\n- No coverage data available suggests fundamental execution issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- Zero test execution across all files\n- No meaningful coverage data to analyze\n- Critical gap: Entire test infrastructure appears broken\n\n## Potential Issues with Recent Changes\nThe three modified files suggest:\n1. **DeepSeek integration changes** (`deepseek_pool.py`, `full_ai_audit_deepseek_perplexity_deepseek.py`) likely introduced breaking changes\n2. **Refactoring issues** (`refactor_pass2_deepseek.py`) may have broken imports or dependencies\n3. **Possible causes**: Missing dependencies, API credential issues, syntax errors, or circular imports\n\n## Immediate Action Recommendations\n1. **Debug Test Execution**:\n   - Run tests with `-v` flag to see which test fails first\n   - Check for uncaught exceptions in test setup/teardown\n   - Verify all dependencies are installed\n\n2. **Fix Core Issues**:\n   - Test DeepSeek API connectivity separately\n   - Validate imports in refactored files\n   - Check for missing environment variables/credentials\n\n3. **Restore Baseline**:\n   - Revert recent changes if possible\n   - Run minimal smoke test before full test suite\n   - Ensure basic test infrastructure works before addressing coverage\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would be extremely risky\n- No validation of recent AI integration changes\n- Potential for silent failures in production\n- Urgent attention required before any further development\n\n**Priority**: Fix test execution before addressing coverage gaps. The 0% coverage is a symptom, not the root cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 405,
+      "total_tokens": 561,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

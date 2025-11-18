@@ -1,0 +1,41 @@
+{
+  "timestamp": 1762624493,
+  "changed_files": [
+    "deepseek_self_analysis.py",
+    "fix_security_issues.py",
+    "deepseek_autofix.py",
+    "deepseek_meta_analysis_v2.py",
+    "deepseek_automation_tasks_query.py",
+    "automation\\task2_key_manager\\key_manager.py",
+    "deepseek_automation_split_tasks.py",
+    "deepseek_automation_full_response.py",
+    "demo_prometheus_metrics.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762624478.130639,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1), indicating fundamental issues with test setup, dependencies, or code structure. Zero coverage suggests tests may not be running at all.\n\n## Coverage Analysis & Gaps\n- **100% coverage gap** - No files show any test coverage\n- Likely causes: Test runner configuration errors, import failures, or syntax errors preventing test execution\n- All modified files appear completely untested\n\n## Potential Issues with Recent Changes\n1. **Multiple automation/self-analysis files modified** - High risk of circular dependencies or import conflicts\n2. **New modules** (`key_manager.py`, multiple `deepseek_automation_*` files) may have broken existing test infrastructure\n3. **Exit Code -1** typically indicates segmentation fault, memory issues, or fatal Python interpreter errors\n\n## Immediate Action Recommendations\n1. **Fix test execution first**:\n   - Check for syntax errors: `python -m py_compile [each_changed_file]`\n   - Verify imports work in isolation\n   - Run tests with `-v` flag to see where they fail\n\n2. **Add basic smoke tests**:\n   - Create minimal tests for core modules\n   - Focus on `key_manager.py` and `deepseek_self_analysis.py` first\n\n3. **Investigate infrastructure**:\n   - Check test runner configuration\n   - Verify Python environment/dependencies\n   - Look for circular imports in new automation files\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- Zero test coverage means undetected bugs are certain\n- Test suite failure indicates potential runtime crashes\n- Multiple interconnected automation files increase failure cascade risk\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 207,
+      "completion_tokens": 376,
+      "total_tokens": 583,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 143
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

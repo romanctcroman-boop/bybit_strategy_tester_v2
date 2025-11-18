@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762746423,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762746405.8837097,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code: -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **No test execution**: Coverage data is empty, indicating tests didn't run at all\n- **Critical gap**: Entire codebase is untested in this run\n\n## Potential Issues with Recent Changes\n1. **Breaking changes** in modified files likely caused test infrastructure failure\n2. **Configuration issues** in `tests/backend/conftest.py` may be preventing test execution\n3. **Dependency conflicts** - changes to `reliability/perplexity_client.py` and core engine files may have broken imports\n4. **Test infrastructure failure** - Exit code -1 suggests catastrophic failure before tests could execute\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests individually to isolate the breaking change:\n   ```bash\n   pytest tests/test_mtf_engine.py -v\n   pytest tests/backend/conftest.py -v\n   ```\n2. Check for syntax errors in modified Python files\n3. Verify all imports in changed files are valid\n4. Examine `conftest.py` for configuration errors\n\n**Short-term:**\n1. Add basic smoke tests to prevent complete test suite collapse\n2. Implement test isolation to prevent cascade failures\n3. Set up pre-commit hooks to catch syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- Zero test coverage means undetected bugs are guaranteed\n- Core engine changes (`mtf_engine.py`) are completely unvalidated\n- Database and integration changes are untested\n- No reliability metrics available for perplexity client\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 395,
+      "total_tokens": 601,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

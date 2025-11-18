@@ -1,0 +1,230 @@
+---
+# Source: bybit-strategy-tester/templates/worker-deployment.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: bybit-strategy-tester-worker
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: worker
+    component: executor
+    tier: backend
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: worker
+---
+# Source: bybit-strategy-tester/templates/worker-deployment.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: bybit-strategy-tester-worker
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: worker
+    component: executor
+    tier: backend
+  annotations:
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8001"
+    prometheus.io/scrape: "true"
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for worker metrics
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app: worker
+---
+# Source: bybit-strategy-tester/templates/worker-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bybit-strategy-tester-worker
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: worker
+    component: executor
+    tier: backend
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "true"
+      labels:
+        app.kubernetes.io/name: bybit-strategy-tester
+        app.kubernetes.io/instance: bybit-strategy-tester
+        app: worker
+        version: 1.0.0
+    spec:
+      serviceAccountName: bybit-strategy-tester
+      securityContext:
+        capabilities:
+          drop:
+          - ALL
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: worker
+        image: "bybit-strategy-tester/worker:1.0.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: metrics
+          containerPort: 8001
+          protocol: TCP
+        env:
+        - name: REDIS_URL
+          value: "redis://redis-cluster:6379"
+        - name: WORKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: HEARTBEAT_INTERVAL
+          value: "30"
+        - name: MAX_TASKS_PER_WORKER
+          value: "10"
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: metrics
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /ready
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - worker
+            topologyKey: kubernetes.io/hostname
+---
+# Source: bybit-strategy-tester/templates/worker-deployment.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bybit-strategy-tester-worker
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: worker
+    component: executor
+    tier: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bybit-strategy-tester-worker
+  minReplicas: 5
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - external:
+      metric:
+        name: redis_stream_length
+        selector:
+          matchLabels:
+            stream_name: backtest_tasks
+      target:
+        averageValue: "10"
+        type: AverageValue
+    type: External
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 30
+        periodSeconds: 90
+      - type: Pods
+        value: 2
+        periodSeconds: 90
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 5
+        periodSeconds: 15
+      selectPolicy: Max

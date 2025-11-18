@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762680600,
+  "changed_files": [
+    "run_full_project_audit.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762680584.8393288,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **No files executed**: Coverage report is completely empty\n- **Root cause**: Tests never reached execution phase due to fatal error\n\n## Potential Issues with Recent Changes\nThe failure likely stems from `run_full_project_audit.py` changes:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** or broken imports\n- **Environment configuration** issues\n- **Infinite loops** or fatal exceptions during test setup\n- **Module initialization** failures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test runner**: Check why tests exit with code -1 before execution\n2. **Validate `run_full_project_audit.py` syntax**: Run `python -m py_compile run_full_project_audit.py`\n3. **Test isolation**: Run tests individually to identify failing component\n4. **Check test dependencies**: Verify all required packages are installed\n\n**Systematic Fixes:**\n5. **Add pre-commit hooks** to catch syntax errors\n6. **Implement basic smoke tests** to validate test infrastructure\n7. **Add logging** to test setup process\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Zero test validation** of code changes\n- **Production readiness unknown**\n- **Regression risk**: 100%\n- **Immediate deployment blocker** until resolved\n\n**Priority**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 357,
+      "total_tokens": 483,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

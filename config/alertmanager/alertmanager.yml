@@ -1,0 +1,317 @@
+# Alertmanager Configuration
+# Week 1, Day 6: Enhanced Alerting System
+# Routes alerts to PagerDuty, Slack, and Email
+
+global:
+  # Global defaults
+  resolve_timeout: 5m
+  
+  # Slack configuration
+  slack_api_url: '{{ env "SLACK_WEBHOOK_URL" }}'
+  
+  # PagerDuty configuration
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Routing tree
+route:
+  # Default receiver
+  receiver: 'slack-alerts'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'component']
+  
+  # Wait time before sending initial notification
+  group_wait: 30s
+  
+  # Wait time before sending notification about new alerts in group
+  group_interval: 5m
+  
+  # Wait time before re-sending notification
+  repeat_interval: 4h
+  
+  # Child routes (specific routing rules)
+  routes:
+    # CRITICAL alerts → PagerDuty + Slack
+    - match:
+        severity: critical
+      receiver: 'pagerduty-critical'
+      continue: true
+      group_wait: 10s
+      group_interval: 2m
+      repeat_interval: 1h
+    
+    - match:
+        severity: critical
+      receiver: 'slack-critical'
+      group_wait: 10s
+      group_interval: 2m
+      repeat_interval: 1h
+    
+    # WARNING alerts → Slack only
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      group_wait: 1m
+      group_interval: 10m
+      repeat_interval: 4h
+    
+    # INFO alerts → Slack ops channel
+    - match:
+        severity: info
+      receiver: 'slack-ops'
+      group_wait: 5m
+      group_interval: 30m
+      repeat_interval: 12h
+    
+    # Database alerts → Database team
+    - match:
+        component: database
+      receiver: 'slack-database'
+      continue: true
+      group_wait: 30s
+      group_interval: 5m
+    
+    # Security alerts → Security team + PagerDuty
+    - match:
+        component: security
+      receiver: 'pagerduty-security'
+      continue: true
+      group_wait: 30s
+      group_interval: 2m
+    
+    - match:
+        component: security
+      receiver: 'slack-security'
+      group_wait: 30s
+      group_interval: 2m
+    
+    # Backup alerts → Ops team
+    - match:
+        component: backup
+      receiver: 'slack-ops'
+      group_wait: 1m
+      group_interval: 10m
+
+# Inhibition rules (suppress alerts based on other alerts)
+inhibit_rules:
+  # Suppress warnings if critical alert is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+  
+  # Suppress API errors if API is down
+  - source_match:
+      alertname: 'APIUnresponsive'
+    target_match:
+      component: 'backend'
+    equal: ['instance']
+  
+  # Suppress connection pool alerts if database is down
+  - source_match:
+      alertname: 'DatabaseDown'
+    target_match:
+      component: 'database'
+    equal: ['instance']
+
+# Receivers (notification destinations)
+receivers:
+  # PagerDuty - Critical alerts
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - service_key: '{{ env "PAGERDUTY_INTEGRATION_KEY" }}'
+        severity: 'critical'
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          summary: '{{ .CommonAnnotations.summary }}'
+          description: '{{ .CommonAnnotations.description }}'
+          impact: '{{ .CommonAnnotations.impact }}'
+          action: '{{ .CommonAnnotations.action }}'
+          severity: '{{ .GroupLabels.severity }}'
+          component: '{{ .GroupLabels.component }}'
+          num_alerts: '{{ .Alerts | len }}'
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+        client: 'Prometheus Alertmanager'
+        client_url: 'http://localhost:9093'
+        links:
+          - href: '{{ .CommonAnnotations.runbook }}'
+            text: 'Runbook'
+          - href: '{{ .CommonAnnotations.dashboard }}'
+            text: 'Dashboard'
+  
+  # PagerDuty - Security alerts
+  - name: 'pagerduty-security'
+    pagerduty_configs:
+      - service_key: '{{ env "PAGERDUTY_SECURITY_KEY" }}'
+        severity: 'error'
+        description: '🔒 SECURITY: {{ .GroupLabels.alertname }}'
+        details:
+          summary: '{{ .CommonAnnotations.summary }}'
+          description: '{{ .CommonAnnotations.description }}'
+          impact: '{{ .CommonAnnotations.impact }}'
+          action: '{{ .CommonAnnotations.action }}'
+        client: 'Security Monitoring'
+        client_url: 'http://localhost:9093'
+  
+  # Slack - Critical alerts (#alerts channel with @channel mention)
+  - name: 'slack-critical'
+    slack_configs:
+      - channel: '{{ env "SLACK_ALERTS_CHANNEL" | default "#alerts" }}'
+        username: 'Alertmanager'
+        icon_emoji: ':fire:'
+        title: '🚨 CRITICAL ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          <!channel> *CRITICAL ISSUE DETECTED*
+          
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          
+          *Impact:* {{ .CommonAnnotations.impact }}
+          
+          *Immediate Actions Required:*
+          {{ .CommonAnnotations.action }}
+          
+          *Component:* {{ .GroupLabels.component }}
+          *Severity:* {{ .GroupLabels.severity }}
+          *Alerts Firing:* {{ .Alerts.Firing | len }}
+          
+          <{{ .CommonAnnotations.runbook }}|📖 Runbook> | <{{ .CommonAnnotations.dashboard }}|📊 Dashboard>
+        color: 'danger'
+        send_resolved: true
+  
+  # Slack - Warning alerts (#alerts channel)
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '{{ env "SLACK_ALERTS_CHANNEL" | default "#alerts" }}'
+        username: 'Alertmanager'
+        icon_emoji: ':warning:'
+        title: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          
+          *Impact:* {{ .CommonAnnotations.impact }}
+          
+          *Recommended Actions:*
+          {{ .CommonAnnotations.action }}
+          
+          *Component:* {{ .GroupLabels.component }}
+          *Alerts Firing:* {{ .Alerts.Firing | len }}
+          
+          <{{ .CommonAnnotations.runbook }}|📖 Runbook> | <{{ .CommonAnnotations.dashboard }}|📊 Dashboard>
+        color: 'warning'
+        send_resolved: true
+  
+  # Slack - General alerts (default)
+  - name: 'slack-alerts'
+    slack_configs:
+      - channel: '{{ env "SLACK_ALERTS_CHANNEL" | default "#alerts" }}'
+        username: 'Alertmanager'
+        icon_emoji: ':bell:'
+        title: '🔔 {{ .GroupLabels.severity | toUpper }}: {{ .GroupLabels.alertname }}'
+        text: |
+          *{{ .CommonAnnotations.summary }}*
+          
+          {{ .CommonAnnotations.description }}
+          
+          *Component:* {{ .GroupLabels.component }}
+          *Alerts:* {{ .Alerts | len }}
+          
+          <{{ .CommonAnnotations.runbook }}|📖 Runbook>
+        color: '#439FE0'
+        send_resolved: true
+  
+  # Slack - Info alerts (#ops channel)
+  - name: 'slack-ops'
+    slack_configs:
+      - channel: '{{ env "SLACK_OPS_CHANNEL" | default "#ops" }}'
+        username: 'Alertmanager'
+        icon_emoji: ':information_source:'
+        title: 'ℹ️ INFO: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ .CommonAnnotations.summary }}
+          
+          {{ .CommonAnnotations.description }}
+          
+          *Component:* {{ .GroupLabels.component }}
+        color: 'good'
+        send_resolved: true
+  
+  # Slack - Database team (#database channel)
+  - name: 'slack-database'
+    slack_configs:
+      - channel: '{{ env "SLACK_DATABASE_CHANNEL" | default "#database" }}'
+        username: 'DB Alertmanager'
+        icon_emoji: ':database:'
+        title: '🗄️ DATABASE: {{ .GroupLabels.alertname }}'
+        text: |
+          *{{ .CommonAnnotations.summary }}*
+          
+          {{ .CommonAnnotations.description }}
+          
+          *Impact:* {{ .CommonAnnotations.impact }}
+          *Action:* {{ .CommonAnnotations.action }}
+          
+          *Severity:* {{ .GroupLabels.severity }}
+          
+          <{{ .CommonAnnotations.runbook }}|📖 Runbook> | <{{ .CommonAnnotations.dashboard }}|📊 Dashboard>
+        color: '{{ if eq .GroupLabels.severity "critical" }}danger{{ else }}warning{{ end }}'
+        send_resolved: true
+  
+  # Slack - Security team (#security channel)
+  - name: 'slack-security'
+    slack_configs:
+      - channel: '{{ env "SLACK_SECURITY_CHANNEL" | default "#security" }}'
+        username: 'Security Alertmanager'
+        icon_emoji: ':lock:'
+        title: '🔒 SECURITY: {{ .GroupLabels.alertname }}'
+        text: |
+          <!here> *Security Alert Detected*
+          
+          *{{ .CommonAnnotations.summary }}*
+          
+          {{ .CommonAnnotations.description }}
+          
+          *Impact:* {{ .CommonAnnotations.impact }}
+          *Action:* {{ .CommonAnnotations.action }}
+          
+          <{{ .CommonAnnotations.runbook }}|📖 Runbook>
+        color: 'danger'
+        send_resolved: true
+
+# Time intervals for muting/maintenance windows
+time_intervals:
+  # Business hours (9 AM - 5 PM UTC, Monday-Friday)
+  - name: business_hours
+    time_intervals:
+      - times:
+          - start_time: '09:00'
+            end_time: '17:00'
+        weekdays: ['monday:friday']
+  
+  # Off hours (outside business hours)
+  - name: off_hours
+    time_intervals:
+      - times:
+          - start_time: '00:00'
+            end_time: '09:00'
+        weekdays: ['monday:friday']
+      - times:
+          - start_time: '17:00'
+            end_time: '23:59'
+        weekdays: ['monday:friday']
+      - weekdays: ['saturday', 'sunday']
+  
+  # Maintenance window (example: Sundays 2-4 AM UTC)
+  - name: maintenance_window
+    time_intervals:
+      - times:
+          - start_time: '02:00'
+            end_time: '04:00'
+        weekdays: ['sunday']

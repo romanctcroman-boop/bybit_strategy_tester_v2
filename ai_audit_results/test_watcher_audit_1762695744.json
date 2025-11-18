@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762695744,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\pytest\\__main__.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762695727.373932,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests did not execute successfully (Exit Code: -1). This indicates either a fatal error in test setup/configuration or severe issues in the codebase preventing test execution. The 0% coverage confirms no tests actually ran.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution means no coverage data collected\n- Critical gap: Unable to assess actual code coverage due to test failure\n\n## Potential Issues with Recent Changes\n- **Virtual environment corruption**: Modified files are all pytest/pluggy internals (.venv\\Lib\\site-packages\\*)\n- **Dependency conflicts**: Changes to core testing framework files suggest version mismatches or installation issues\n- **Environment isolation breach**: Test framework files should not be modified during normal development\n\n## Recommendations for Improvement\n1. **IMMEDIATE ACTION**: Recreate virtual environment\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\n   pip install -r requirements.txt\n   ```\n\n2. **Verify pytest installation**: \n   ```bash\n   pip install --upgrade pytest\n   pytest --version\n   ```\n\n3. **Run basic test**: Execute a simple test to verify framework functionality\n\n4. **Add isolation**: Ensure tests don't modify package files in venv\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- No test results available for code changes\n- Potential environment instability affecting development\n- Impossible to detect regressions or validate functionality\n- Deployment would be extremely risky without passing tests\n\n**Priority**: Fix test environment immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 296,
+      "completion_tokens": 371,
+      "total_tokens": 667,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 232
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

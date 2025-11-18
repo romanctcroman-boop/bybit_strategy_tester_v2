@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762626664,
+  "changed_files": [
+    "tests\\test_deepseek_agent.py",
+    "test_deepseek_and_perplexity.py",
+    "deepseek_generate_7_tools.py",
+    "test_deepseek_api.py",
+    "tests\\integration\\test_deepseek_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762626649.5110161,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n**TOTAL COVERAGE BREAKDOWN: 0%**\n- No files were executed successfully\n- All test modules failed to collect/run\n- Zero production code exercised\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure Failure** - Likely broken test runner configuration or missing dependencies\n2. **Import/Module Issues** - Recent file changes may have broken imports or module structure\n3. **Environment Configuration** - Missing API keys, environment variables, or dependencies\n4. **Test Discovery Broken** - pytest/nose unable to locate or load test modules\n\n## Immediate Recommendations\n1. **Fix Test Runner First**\n   ```bash\n   python -m pytest tests/ --tb=short -v\n   ```\n   - Start with simplest test to isolate the crash\n   - Check for missing `__init__.py` files in test directories\n\n2. **Validate Test Structure**\n   - Ensure all test files follow naming convention (`test_*.py`)\n   - Verify imports work outside test context\n   - Check for circular imports\n\n3. **Environment Setup**\n   - Verify all required environment variables are set\n   - Confirm API dependencies are accessible\n   - Check Python path and module structure\n\n## Risk Assessment\n**HIGH RISK** - Deploying without test validation is extremely dangerous:\n- No regression protection\n- Potential runtime crashes in production\n- Integration points completely untested\n- All recent changes effectively unverified\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 172,
+      "completion_tokens": 360,
+      "total_tokens": 532,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 108
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

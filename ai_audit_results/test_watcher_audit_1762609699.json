@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762609699,
+  "changed_files": [
+    "tests\\backend\\conftest.py",
+    "temp_pg_test.py",
+    "analyze_perplexity_agent_architecture.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762609677.4466398,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage confirms no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN** - No code was tested:\n- Zero coverage across all files\n- Test execution halted before any meaningful testing\n- Coverage reporting mechanism failed entirely\n\n## Potential Issues with Recent Changes\n**HIGH-RISK MODIFICATIONS DETECTED**:\n\n1. **Database Configuration** (`tests\\backend\\conftest.py` + `temp_pg_test.py`)\n   - Likely PostgreSQL test setup failures\n   - Connection/dependency issues preventing test startup\n\n2. **Third-Party Package Conflict** (`.venv\\Lib\\site-packages\\psycopg2\\__init__.py`)\n   - Modified psycopg2 installation suggests environment corruption\n   - Could indicate version incompatibility or broken dependencies\n\n3. **Architecture Analysis Script** (`analyze_perplexity_agent_architecture.py`)\n   - Possibly introduced circular imports or initialization failures\n\n## Immediate Recommendations\n\n**PRIORITY 1 - RESTORE TEST INFRASTRUCTURE**:\n```bash\n# Recreate clean virtual environment\nrm -rf .venv\npython -m venv .venv\npip install -r requirements.txt\n```\n\n**PRIORITY 2 - ISOLATE FAILURE**:\n- Run tests with `-v` flag to see which test fails first\n- Check database connectivity in test setup\n- Verify psycopg2 installation integrity\n\n**PRIORITY 3 - VALIDATE CHANGES**:\n- Review `conftest.py` for fixture errors\n- Test database connection independently\n- Check for missing environment variables\n\n## Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- ❌ No confidence in code changes\n- ❌ Database integration likely broken  \n- ❌ Environment instability\n- ❌ Zero test feedback loop\n\n**IMMEDIATE ACTION REQUIRED**: Fix test infrastructure before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 167,
+      "completion_tokens": 455,
+      "total_tokens": 622,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 103
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

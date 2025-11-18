@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762721102,
+  "changed_files": [
+    "reliability\\distributed_rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762721088.2006083,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0% COVERAGE** - No code coverage was collected, which is expected given the test failure. The empty coverage report confirms tests never reached the execution phase.\n\n## Potential Issues with Recent Changes\nThe distributed_rate_limiter.py modification likely introduced:\n- **Syntax errors** preventing module import\n- **Runtime exceptions** during module initialization\n- **Missing dependencies** or imports\n- **Circular imports** causing import failures\n- **Critical logic errors** in class/function definitions\n\n## Recommendations for Improvement\n1. **Immediate Action:**\n   - Check Python syntax: `python -m py_compile reliability\\distributed_rate_limiter.py`\n   - Test module import: `python -c \"import reliability.distributed_rate_limiter\"`\n   - Review recent changes for obvious syntax/import issues\n\n2. **Debugging Steps:**\n   - Run tests with `-v` flag to see where failure occurs\n   - Check test logs for stack traces\n   - Verify all imports and dependencies are available\n   - Test the module in isolation before integration\n\n3. **Process Improvements:**\n   - Add pre-commit hooks for basic syntax checking\n   - Implement CI pipeline that fails fast on syntax errors\n   - Require basic smoke tests for rate limiter functionality\n\n## Risk Assessment\n**HIGH RISK** - A non-functional rate limiter in distributed systems could lead to:\n- **Service outages** due to uncontrolled request flooding\n- **Cascading failures** across dependent services\n- **Resource exhaustion** (memory, CPU, network)\n- **Data inconsistency** in distributed transactions\n\n**Priority:** Fix immediately before deployment. The rate limiter is likely completely broken.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 406,
+      "total_tokens": 534,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

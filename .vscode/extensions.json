@@ -1,0 +1,31 @@
+{
+  // Рекомендуемые расширения для проекта Bybit Strategy Tester
+  "recommendations": [
+    // MCP (Model Context Protocol) support
+    "modelcontextprotocol.mcp-client",
+    
+    // Perplexity AI Assistant
+    "perplexity-ai.perplexity-ai-assistant",
+    
+    // Python
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    
+    // TypeScript/React
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    
+    // Database
+    "ckolkman.vscode-postgres",
+    
+    // Docker
+    "ms-azuretools.vscode-docker",
+    
+    // GitHub
+    "GitHub.copilot",
+    "GitHub.copilot-chat"
+  ],
+  
+  // Нежелательные расширения (могут конфликтовать)
+  "unwantedRecommendations": []
+}

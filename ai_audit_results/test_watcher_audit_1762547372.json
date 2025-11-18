@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762547372,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\__init__.py",
+    ".venv\\Lib\\site-packages\\httpx\\_client.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\asgi.py",
+    ".venv\\Lib\\site-packages\\httpx\\_models.py",
+    ".venv\\Lib\\site-packages\\httpx\\_exceptions.py",
+    ".venv\\Lib\\site-packages\\httpx\\_types.py",
+    ".venv\\Lib\\site-packages\\httpx\\_urls.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\default.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\mock.py",
+    ".venv\\Lib\\site-packages\\httpx\\_api.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\base.py",
+    ".venv\\Lib\\site-packages\\httpx\\_config.py",
+    ".venv\\Lib\\site-packages\\httpx\\__init__.py",
+    ".venv\\Lib\\site-packages\\httpx\\_content.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\wsgi.py",
+    ".venv\\Lib\\site-packages\\httpx\\_auth.py",
+    ".venv\\Lib\\site-packages\\httpx\\_status_codes.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762547357.3266706,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite failed completely (Exit Code -1) with 0% coverage, indicating fundamental execution problems rather than test quality issues.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach the coverage measurement phase\n- **Complete testing gap** - All application logic remains untested\n\n## Potential Issues with Recent Changes\n1. **Dependency Corruption**: All changed files are in `.venv\\Lib\\site-packages\\httpx\\` - suggests virtual environment or httpx installation is corrupted\n2. **Import/Module Conflicts**: Modified core httpx transport and client files may cause import failures\n3. **Environment Isolation Failure**: Tests are likely importing from corrupted venv instead of project code\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Recreate Virtual Environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Verify Test Discovery**:\n   ```bash\n   python -m pytest --collect-only\n   ```\n3. **Run Basic Test**:\n   ```bash\n   python -c \"import httpx; print('Import OK')\"\n   ```\n\n**FOLLOW-UP:**\n4. Check for accidental modifications to site-packages\n5. Ensure tests import from project code, not venv\n6. Add pre-test environment validation\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in code quality:\n- No regression detection\n- All bugs undetected\n- Deployment would be blind\n- Environment instability threatens development workflow\n\n**Priority**: Fix environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 434,
+      "completion_tokens": 385,
+      "total_tokens": 819,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 370
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

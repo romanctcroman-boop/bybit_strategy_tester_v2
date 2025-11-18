@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762552832,
+  "changed_files": [
+    "backend\\api\\secure_key_storage.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552817.748165,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here's my analysis:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- Zero test execution suggests fundamental runtime issues\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - All metrics show 0.00%\n- No tests executed successfully\n- Cannot assess actual code coverage\n- Missing baseline for comparison\n\n## 3. Potential Issues with Recent Changes\n**File: `backend\\api\\secure_key_storage.py`**\n- Likely contains code causing fatal runtime errors\n- Possible issues:\n  - Syntax errors preventing import/execution\n  - Infinite loops or recursion depth exceeded\n  - Memory allocation failures\n  - Import circular dependencies\n  - Corrupted environment/package dependencies\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. **Debug the fatal error:**\n   ```bash\n   python -m py_compile backend/api/secure_key_storage.py\n   ```\n2. **Run with verbose output:**\n   ```bash\n   python -m pytest -v --tb=long\n   ```\n3. **Check for basic syntax:**\n   ```bash\n   python -c \"from backend.api import secure_key_storage\"\n   ```\n\n**FOLLOW-UP:**\n- Isolate the failing component with minimal test cases\n- Verify Python environment and dependencies\n- Check for system resource limitations\n\n## 5. Risk Assessment\n**HIGH RISK** - Deployment would be catastrophic\n- Complete test suite failure indicates unstable codebase\n- Security implications for key storage component\n- No validation of recent cryptographic changes\n- Potential data corruption or security vulnerabilities\n\n**Priority: Fix fatal errors before any other development continues.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 382,
+      "total_tokens": 510,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

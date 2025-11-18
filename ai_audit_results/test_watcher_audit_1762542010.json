@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762542010,
+  "changed_files": [
+    "mcp-server\\tools\\analysis\\analysis_tools.py",
+    "automation\\metrics\\collectors\\audit_agent_collector.py",
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    "automation\\metrics\\collectors\\__init__.py",
+    "automation\\metrics\\collectors\\system_collector.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541989.8654895,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues in the test environment or codebase. Zero coverage suggests tests didn't run or encountered fatal errors before collecting any metrics.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during testing\n- **No file-specific coverage data** - Tests failed before reaching any meaningful execution\n- **Critical gap**: Unable to assess actual code coverage due to test infrastructure failure\n\n## Potential Issues with Recent Changes\n1. **Metrics collector changes** likely introduced breaking changes:\n   - 4 modified files in `automation/metrics/collectors/`\n   - Possible circular imports or initialization failures\n   - Configuration or dependency issues in collector modules\n\n2. **Analysis tools modification** may have incompatible changes:\n   - `analysis_tools.py` changes could affect test discovery/execution\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to identify where failure occurs\n2. Check for import errors in collector modules\n3. Verify `__init__.py` files don't create circular dependencies\n4. Test metrics collectors in isolation\n\n**Short-term:**\n1. Add basic smoke tests for each collector\n2. Implement error handling in collector initialization\n3. Add integration tests for metrics collection pipeline\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents reliable quality assessment:\n- No visibility into actual code quality\n- Potential production issues undetected\n- Metrics collection system may be broken\n- **Priority**: Fix test infrastructure immediately before any further development\n\n**First step**: Identify the specific failure point by running tests with detailed logging.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 192,
+      "completion_tokens": 357,
+      "total_tokens": 549,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 128
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

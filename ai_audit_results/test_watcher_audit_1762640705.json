@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762640705,
+  "changed_files": [
+    "backend\\api\\deepseek_pool.py",
+    "backend\\api\\lru_ttl_cache.py",
+    "backend\\api\\secure_key_storage.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762640689.7859695,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **100% coverage gap** - No code was executed during testing\n- **Critical infrastructure files** (caching, key storage, API components) completely untested\n- No baseline metrics available for comparison\n\n## Potential Issues with Recent Changes\n1. **Environment/Configuration Failure**: Recent changes likely broke test infrastructure\n2. **Import/Dependency Issues**: New files may have circular imports or missing dependencies\n3. **Initialization Failures**: Cache or storage components may crash during module load\n4. **Resource Conflicts**: New components may conflict with existing infrastructure\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure**:\n   - Check test runner configuration and environment variables\n   - Verify all dependencies are installed and compatible\n   - Run tests with `-v` flag to see where they fail\n\n2. **Isolate New Components**:\n   - Test each changed file independently\n   - Add basic import tests to verify module loading\n   - Check for missing imports in new files\n\n3. **Add Basic Validation**:\n   ```python\n   # Quick smoke tests for each new module\n   def test_module_imports():\n       from backend.api import deepseek_pool, lru_ttl_cache, secure_key_storage\n       assert deepseek_pool is not None\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- Zero test validation of critical infrastructure\n- Potential runtime crashes in production\n- Security risks in key storage and API components\n- Cache instability could cause system-wide failures\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 151,
+      "completion_tokens": 384,
+      "total_tokens": 535,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 87
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "key": "ctrl+shift+g",
+    "command": "workbench.action.tasks.runTask",
+    "args": "AI: Generate Code (DeepSeek)",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+shift+r",
+    "command": "workbench.action.tasks.runTask",
+    "args": "AI: Refactor Code (DeepSeek)",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+shift+a",
+    "command": "workbench.action.tasks.runTask",
+    "args": "AI: Analyze Logic (Sonar Pro)",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+shift+e",
+    "command": "workbench.action.tasks.runTask",
+    "args": "AI: Explain Code (Sonar Pro)",
+    "when": "editorHasSelection"
+  },
+  {
+    "key": "ctrl+shift+d",
+    "command": "workbench.action.tasks.runTask",
+    "args": "AI: Generate Documentation (DeepSeek)",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+shift+w ctrl+shift+c",
+    "command": "workbench.action.tasks.runTask",
+    "args": "AI: Code Review Workflow",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+shift+w ctrl+shift+s",
+    "command": "workbench.action.tasks.runTask",
+    "args": "AI: Strategy Development Workflow",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+shift+w ctrl+shift+r",
+    "command": "workbench.action.tasks.runTask",
+    "args": "AI: Refactor with Audit Workflow",
+    "when": "editorTextFocus"
+  }
+]

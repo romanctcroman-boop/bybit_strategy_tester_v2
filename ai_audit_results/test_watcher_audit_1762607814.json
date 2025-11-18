@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762607814,
+  "changed_files": [
+    "mcp-server\\api\\providers\\base.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762607795.6673226,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0.00% coverage** - All coverage data is invalid due to test failure. No reliable coverage metrics can be derived from this execution.\n\n## Potential Issues with Recent Changes\nThe failure likely stems from changes in `mcp-server\\api\\providers\\base.py`:\n- **Syntax errors** - Python cannot parse the modified file\n- **Import/circular dependency** issues preventing module loading\n- **Critical runtime exceptions** during test setup/import phase\n- **Missing dependencies** or broken imports in the provider base class\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution first** - Run `python -m py_compile mcp-server/api/providers/base.py` to check for syntax errors\n2. **Isolate the failure** - Test the provider base class in isolation before running full test suite\n3. **Check imports** - Verify all imports in base.py resolve correctly\n4. **Review recent changes** - Git diff the base.py file for obvious breaking changes\n\n**Follow-up:**\n5. Add basic smoke tests that validate module imports before comprehensive testing\n6. Implement pre-commit hooks for syntax validation\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail completely. The provider base class is likely a core dependency, meaning entire API functionality may be broken.\n\n**Priority:** Fix immediately - this blocks all further testing and deployment activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 345,
+      "total_tokens": 475,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

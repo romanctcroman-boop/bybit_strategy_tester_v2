@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762715235,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762715219.8866658,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **No coverage data available** for any files, including the modified audit script\n- **Complete testing blackout** - Unable to assess any functional coverage\n\n## Potential Issues with Recent Changes\n1. **Fatal runtime error** in `full_ai_audit_deepseek_perplexity_deepseek.py` likely causing immediate crash\n2. **Syntax errors** or **import failures** preventing module loading\n3. **Missing dependencies** or **environment configuration** issues\n4. **Infinite loops** or **blocking operations** halting execution\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Run tests with verbose output** to identify the crash point\n2. **Check Python syntax** of the modified file: `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py`\n3. **Test import isolation**: `python -c \"import full_ai_audit_deepseek_perplexity_deepseek\"`\n4. **Add basic smoke test** that validates module can load without execution\n\n**STRUCTURAL IMPROVEMENTS:**\n1. Implement **try-catch wrappers** around test execution\n2. Add **pre-commit hooks** for syntax validation\n3. Create **minimal viable test** that runs even with partial failures\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Zero test reliability** - No confidence in any functionality\n- **Production deployment risk** - Untested changes pose high failure probability\n- **Regression detection impossible** - Cannot identify what breaks\n- **Urgent attention required** before any further development or deployment\n\n**Priority:** Fix test execution immediately before addressing any other issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 430,
+      "total_tokens": 565,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

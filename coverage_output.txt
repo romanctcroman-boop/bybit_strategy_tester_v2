@@ -1,0 +1,97 @@
+﻿py : 2025-11-14 12:06:23.574 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:150 - \u2705 DeepSeek key 1/8 
+loaded
+строка:1 знак:1
++ py -m pytest tests/backend/ -x --cov=backend --cov-report=html --cov- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (2025-11-14 12:0... key 1/8 loaded:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+2025-11-14 12:06:23.575 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:150 - \u2705 DeepSeek key 2/8 loade
+d
+2025-11-14 12:06:23.575 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:150 - \u2705 DeepSeek key 3/8 loade
+d
+2025-11-14 12:06:23.575 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:150 - \u2705 DeepSeek key 4/8 loade
+d
+2025-11-14 12:06:23.575 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:150 - \u2705 DeepSeek key 5/8 loade
+d
+2025-11-14 12:06:23.575 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:150 - \u2705 DeepSeek key 6/8 loade
+d
+2025-11-14 12:06:23.575 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:150 - \u2705 DeepSeek key 7/8 loade
+d
+2025-11-14 12:06:23.575 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:150 - \u2705 DeepSeek key 8/8 loade
+d
+2025-11-14 12:06:23.575 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:165 - \u2705 Perplexity key 1/8 loa
+ded
+2025-11-14 12:06:23.576 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:165 - \u2705 Perplexity key 2/8 loa
+ded
+2025-11-14 12:06:23.576 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:165 - \u2705 Perplexity key 3/8 loa
+ded
+2025-11-14 12:06:23.576 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:165 - \u2705 Perplexity key 4/8 loa
+ded
+2025-11-14 12:06:23.576 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:165 - \u2705 Perplexity key 5/8 loa
+ded
+2025-11-14 12:06:23.576 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:165 - \u2705 Perplexity key 6/8 loa
+ded
+2025-11-14 12:06:23.576 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:165 - \u2705 Perplexity key 7/8 loa
+ded
+2025-11-14 12:06:23.576 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:165 - \u2705 Perplexity key 8/8 loa
+ded
+2025-11-14 12:06:23.576 | INFO     | backend.agents.unified_agent_interface:_load_keys:169 - \U0001f511 Loaded 8 DeepSeek 
++ 8 Perplexity keys
+2025-11-14 12:06:23.576 | INFO     | backend.agents.unified_agent_interface:__init__:233 - \U0001f680 Unified Agent Interf
+ace initialized
+2025-11-14 12:06:23.576 | INFO     | backend.agents.agent_to_agent_communicator:__init__:118 - \u2705 AgentToAgentCommunic
+ator initialized
+2025-11-14 12:06:24.448 | INFO     | orchestrator.monitoring.metrics:__init__:101 - \U0001f4ca Prometheus metrics initiali
+zed
+Warning: Failed to load encrypted secrets: 'charmap' codec can't encode character '\u2713' in position 0: character maps to <undefined>
+....................................................F
+================================== FAILURES ===================================
+______________ TestBackfillEndpoints.test_backfill_sync_success _______________
+
+self = <test_admin.TestBackfillEndpoints object at 0x0000022AC517B9D0>
+client = <starlette.testclient.TestClient object at 0x0000022AC585AF90>
+valid_auth_headers = {'Authorization': 'Basic YWRtaTphZG1pbg=='}
+mock_db_session = <MagicMock id='2382759193840'>
+
+    def test_backfill_sync_success(self, client, valid_auth_headers, mock_db_session):
+        """Test successful sync backfill"""
+        mock_service = MagicMock()
+        # svc.backfill() returns tuple: (upserts, pages, eta, est_left)
+        mock_service.backfill.return_value = (100, 5, None, 0)
+    
+        mock_run = MagicMock()
+        mock_run.id = 1
+        mock_db_session.add = MagicMock()
+        mock_db_session.commit = MagicMock()
+        mock_db_session.refresh = MagicMock(side_effect=lambda obj: setattr(obj, 'id', 1))
+        mock_db_session.query = MagicMock()
+        mock_db_session.query.return_value.get.return_value = mock_run
+    
+        with patch('backend.database.Base.metadata.create_all'):
+            with patch('backend.api.routers.admin.BackfillService', return_value=mock_service):
+                with patch('backend.database.SessionLocal', return_value=mock_db_session):
+                    with patch('backend.models.backfill_run.BackfillRun', return_value=mock_run):
+                        with patch('backend.api.app.metrics_inc_run_status'):
+                            with patch('backend.api.app.metrics_inc_pages'):
+                                with patch('backend.api.app.metrics_inc_upserts'):
+                                    with patch('backend.api.app.metrics_observe_duration'):
+                                        response = client.post(
+                                            "/admin/backfill",
+                                            json={
+                                                "symbol": "BTCUSDT",
+                                                "interval": "1",
+                                                "lookback_minutes": 60,
+                                                "mode": "sync"
+                                            },
+                                            headers=valid_auth_headers
+                                        )
+    
+>       assert response.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = <Response [500 Internal Server Error]>.status_code
+
+tests\backend\api\routers\test_admin.py:253: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/backend/api/routers/test_admin.py::TestBackfillEndpoints::test_backfill_sync_success
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762598840,
+  "changed_files": [
+    "automation\\deepseek_robot\\dual_analytics_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762598823.1068664,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal errors during test setup\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files indicates:\n- No tests executed successfully\n- Complete lack of test validation for `dual_analytics_engine.py`\n- No baseline established for code quality metrics\n\n## Potential Issues with Recent Changes\nThe modified `dual_analytics_engine.py` likely contains:\n- Breaking syntax errors preventing import/execution\n- Missing dependencies or imports\n- Circular import issues\n- Runtime errors in module-level code\n\n## Immediate Action Recommendations\n1. **Fix Test Execution First**\n   - Check Python syntax in `dual_analytics_engine.py`\n   - Verify all imports are valid and available\n   - Run with `python -m py_compile` to identify syntax errors\n\n2. **Debug Test Framework**\n   - Run minimal test case to isolate failure\n   - Check test configuration and dependencies\n   - Ensure test discovery is working\n\n3. **Add Basic Validation**\n   - Create simple smoke test for import functionality\n   - Add module-level error handling\n   - Verify basic class/function instantiation\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely dangerous:\n- No functional verification of analytics engine\n- Potential runtime failures in production\n- Data corruption or processing errors likely\n- Complete lack of quality assurance\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 355,
+      "total_tokens": 488,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 5
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

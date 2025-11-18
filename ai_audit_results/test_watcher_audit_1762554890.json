@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762554890,
+  "changed_files": [
+    "test_circuit_breaker_load.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554874.476738,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero validation of code behavior. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code coverage achieved\n- **Critical Gap**: Tests cannot execute, so all code paths are untested\n- **File-Specific**: Only `test_circuit_breaker_load.py` was modified, suggesting this file contains the breaking change\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `test_circuit_breaker_load.py`\n2. **Missing Dependencies** or environment configuration issues\n3. **Infinite Loop** or resource exhaustion in test code\n4. **Test Framework Configuration** broken by recent changes\n5. **Critical Exception** preventing test discovery/execution\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug Exit Code -1**: Check test runner logs for specific error details\n2. **Isolate Breaking Change**: Revert `test_circuit_breaker_load.py` changes and verify baseline functionality\n3. **Run Tests Individually**: Execute `test_circuit_breaker_load.py` in isolation to identify the specific failure\n\n**Technical Steps:**\n- Add try-catch blocks with detailed error logging in the failing test\n- Verify all imports and dependencies in the test file\n- Check for infinite loops or resource-intensive operations\n- Validate test framework configuration and setup/teardown methods\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **No regression protection** for any code changes\n- **Production stability at risk** - undetected bugs could deploy\n- **Development blocked** - cannot validate any changes\n- **Urgent attention required** - testing infrastructure must be restored immediately\n\n**Priority**: Fix test execution before any further development or deployment activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 409,
+      "total_tokens": 536,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

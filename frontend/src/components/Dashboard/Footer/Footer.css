@@ -1,0 +1,68 @@
+/* Dashboard Footer Styles */
+
+.dashboard-footer {
+  color: #e0c0ff;
+  font-size: 12px;
+}
+
+.footer-left,
+.footer-center,
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-label {
+  color: #b090d0;
+  font-weight: 500;
+}
+
+.footer-value {
+  color: #e0c0ff;
+  font-weight: 600;
+}
+
+.footer-separator {
+  color: #8060a0;
+  margin: 0 4px;
+}
+
+.footer-center {
+  flex: 1;
+  justify-content: center;
+}
+
+.status-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: rgba(138, 43, 226, 0.2);
+  border-radius: 12px;
+}
+
+.status-icon {
+  color: #9370db;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.status-message span:last-child {
+  color: #d0b0f0;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .dashboard-footer {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .footer-center {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+  }
+}

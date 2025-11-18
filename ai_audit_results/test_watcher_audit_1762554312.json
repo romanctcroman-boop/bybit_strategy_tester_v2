@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762554312,
+  "changed_files": [
+    "backend\\api\\parallel_deepseek_client_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554297.9520078,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage data collected. This represents a complete testing blackout. The parallel_deepseek_client_v2.py changes cannot be validated through automated tests.\n\n## Potential Issues with Recent Changes\n1. **Import/Circular Dependency Issues** - Likely broken imports or dependency resolution in the new client module\n2. **Syntax/Runtime Errors** - Fatal errors preventing module loading or test discovery\n3. **Configuration Problems** - Missing environment variables, API keys, or configuration files\n4. **Test Infrastructure Breakage** - The changes may have broken test setup/teardown procedures\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see specific failure points\n2. Check import statements in parallel_deepseek_client_v2.py\n3. Verify all dependencies are installed and compatible\n4. Test the module in isolation: `python -m backend.api.parallel_deepseek_client_v2`\n\n**STRUCTURAL FIXES:**\n1. Add basic smoke tests that validate module import and initialization\n2. Implement CI pipeline that fails fast on import/syntax errors\n3. Add pre-commit hooks for basic syntax validation\n\n## Risk Assessment\n**HIGH RISK** - Changes are completely untested and potentially non-functional. Deployment could cause:\n- Service outages\n- API failures\n- Cascading failures in dependent systems\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 365,
+      "total_tokens": 496,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

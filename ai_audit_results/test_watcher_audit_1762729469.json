@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762729469,
+  "changed_files": [
+    "test_critical_fixes.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762729457.944274,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. No tests actually ran to completion.\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This isn't a coverage gap but a complete test execution failure.\n\n## Potential Issues with Recent Changes\n1. **test_critical_fixes.py** likely contains syntax errors, import failures, or runtime exceptions\n2. Missing dependencies or environment setup issues\n3. Possible infinite loops or resource exhaustion in test code\n4. Configuration errors in test runner or pytest setup\n\n## Immediate Recommendations\n1. **Run tests with verbose output** to see the actual error: `pytest -v test_critical_fixes.py`\n2. **Check for syntax errors**: `python -m py_compile test_critical_fixes.py`\n3. **Verify imports and dependencies** are properly installed\n4. **Add try-catch blocks** around test setup to capture and log exceptions\n5. **Review recent changes** to test_critical_fixes.py for obvious bugs\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No validation of critical fixes\n- Potential undiscovered regressions in production\n- Broken CI/CD pipeline\n- All code changes are effectively untested\n\n**Priority**: Fix test execution immediately before any further deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 294,
+      "total_tokens": 419,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

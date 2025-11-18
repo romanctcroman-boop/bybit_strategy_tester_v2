@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762707309,
+  "changed_files": [
+    "reliability\\circuit_breaker.py",
+    "tests\\test_integration_retry_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762707290.9267797,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating either:\n- Syntax errors in test or production code\n- Import failures or module loading issues\n- Test framework configuration problems\n- Fatal exceptions during test discovery/execution\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage confirms no tests executed successfully. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\n1. **Circuit Breaker Implementation**: Likely syntax errors, import cycles, or breaking changes in `reliability/circuit_breaker.py`\n2. **Integration Test Dependencies**: `test_integration_retry_circuit_breaker.py` may have missing imports or incompatible test structure\n3. **Configuration Break**: Recent changes broke test runner setup or dependency injection\n\n## Immediate Actions Required\n1. **Fix Exit Code -1 First**:\n   - Run `python -m py_compile reliability/circuit_breaker.py` to check syntax\n   - Execute tests individually to isolate failing component\n   - Check test imports and pytest configuration\n\n2. **Validate Test Structure**:\n   - Ensure test files follow pytest naming conventions (`test_*.py`)\n   - Verify all imports resolve correctly\n   - Check for missing `__init__.py` files in packages\n\n3. **Add Basic Smoke Test**:\n   ```python\n   # tests/test_smoke.py\n   def test_import():\n       from reliability.circuit_breaker import CircuitBreaker\n       assert CircuitBreaker is not None\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deploying without test validation exposes:\n- Runtime failures in production\n- Circuit breaker logic defects causing cascading failures\n- Integration issues with retry mechanisms\n\n## Priority Recommendations\n1. **Immediate**: Fix test execution failure - this blocks all quality validation\n2. **Short-term**: Add basic unit tests for circuit breaker states (open/closed/half-open)\n3. **Medium-term**: Implement integration tests verifying retry+circuit breaker interaction\n4. **Continuous**: Add pre-commit hooks to prevent zero-coverage commits\n\n**Next Step**: Run `pytest -xvs tests/` with detailed output to identify the specific failure point.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 477,
+      "total_tokens": 619,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

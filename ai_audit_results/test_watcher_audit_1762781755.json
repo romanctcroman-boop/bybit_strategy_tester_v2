@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762781755,
+  "changed_files": [
+    "background_diagnostic_service.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762781738.8515813,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Test framework configuration issues\n- Critical runtime exceptions during test setup\n- Missing dependencies or environment problems\n\n## Coverage Analysis\n**0% COVERAGE** - This is a major red flag:\n- No code was executed during test run\n- All test assertions failed or tests couldn't execute\n- Complete lack of visibility into code quality\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `background_diagnostic_service.py`:\n- Likely introduced breaking changes or syntax errors\n- Possible circular imports or dependency issues\n- May have broken existing test fixtures or mocks\n\n## Immediate Actions Required\n1. **Fix Test Execution First**\n   - Check test runner configuration\n   - Verify all dependencies are installed\n   - Run tests with `-v` flag to see specific failure points\n\n2. **Validate Recent Changes**\n   - Review `background_diagnostic_service.py` for syntax errors\n   - Check import statements and dependencies\n   - Test the module in isolation\n\n3. **Quick Diagnostics**\n   ```bash\n   python -m py_compile background_diagnostic_service.py\n   python -c \"import background_diagnostic_service\"\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely dangerous:\n- Zero test coverage means unknown regression impact\n- Critical functionality may be broken\n- No confidence in code correctness\n\n## Recommendations\n1. **Immediate**: Fix test execution before any further development\n2. **Short-term**: Add basic smoke tests for the changed service\n3. **Long-term**: Implement CI pipeline that blocks on test failures\n\n**Priority**: Fix test execution immediately - this blocks all quality assessment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 384,
+      "total_tokens": 509,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

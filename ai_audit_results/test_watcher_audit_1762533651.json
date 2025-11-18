@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762533651,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\test_phase1_security.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\backend\\conftest.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762533632.6431923,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution, likely due to configuration issues, import failures, or environment problems.\n\n## Coverage Analysis\n**0% coverage** across all files suggests:\n- Test runner cannot execute any tests\n- Possible circular imports or dependency issues\n- Environment configuration failures\n- Critical syntax errors in test files or dependencies\n\n## Potential Issues with Recent Changes\n1. **Dependency conflicts** - Recent changes to `backend/core/mtf_engine.py` or `backend/ml/lstm_queue_predictor.py` may have broken imports\n2. **Configuration breakage** - Changes to `tests/backend/conftest.py` likely disrupted test setup\n3. **Circular imports** - Multiple backend and test file modifications may have created import loops\n4. **Missing dependencies** - New ML components may require uninstalled packages\n\n## Immediate Action Items\n1. **Fix test execution first**:\n   ```bash\n   python -m pytest tests/ --collect-only  # Identify collection errors\n   python -c \"import backend.core.mtf_engine\"  # Check core imports\n   ```\n\n2. **Check conftest.py** - Review recent changes to test configuration for syntax errors or broken fixtures\n\n3. **Validate dependencies** - Ensure all ML and database dependencies are properly installed\n\n4. **Isolate the failure**:\n   - Run tests in smaller groups: `pytest tests/backend/test_marketdata_upload.py -v`\n   - Check for specific import errors in recently modified files\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be blind:\n- No safety net for recent ML and core engine changes\n- Database optimization changes completely untested\n- API endpoints modified without validation\n- Critical financial systems potentially unstable\n\n**Priority**: Fix test execution immediately before any further development or deployment. The entire test suite is currently useless for quality assurance.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 409,
+      "total_tokens": 700,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 227
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

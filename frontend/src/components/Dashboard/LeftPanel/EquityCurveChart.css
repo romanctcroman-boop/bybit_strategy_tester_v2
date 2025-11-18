@@ -1,0 +1,39 @@
+/* Equity Curve Chart Styles */
+
+.equity-curve-chart {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 20px;
+  min-height: 450px;
+}
+
+.chart-title {
+  margin: 0 0 12px 0;
+  color: #a0b0ff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.chart-container {
+  width: 100%;
+  position: relative;
+}
+
+.chart-no-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: #7080c0;
+  font-size: 14px;
+}
+
+.chart-no-data p {
+  margin: 0;
+}
+
+/* TradingView chart overrides */
+.equity-curve-chart canvas {
+  border-radius: 4px;
+}

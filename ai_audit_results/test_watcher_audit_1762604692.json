@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762604692,
+  "changed_files": [
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762604672.4407423,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents the worst-case scenario for test coverage, indicating:\n- Tests may be completely broken or misconfigured\n- Test environment setup failures\n- Possible import/circular dependency issues\n- Test runner configuration problems\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `advanced_architecture.py`, suggesting:\n- **Syntax errors** preventing module import\n- **Missing dependencies** or imports\n- **Circular imports** causing import-time failures\n- **Architectural changes** breaking test infrastructure\n- **Environment configuration** mismatches\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution** - Check for syntax errors in `advanced_architecture.py`\n2. **Verify imports** - Ensure all dependencies are available in test environment\n3. **Run minimal test** - Execute a single simple test to validate basic functionality\n\n**Follow-up:**\n4. **Add smoke tests** - Create basic validation tests that run before full test suite\n5. **Improve test isolation** - Ensure tests can run independently of architectural changes\n6. **Monitor exit codes** - Set up alerts for non-zero test exits\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Production risk**: Untested code changes\n- **Regression risk**: No safety net for future changes\n- **Development blockage**: Cannot validate any functionality\n- **Urgency**: Requires immediate attention before further development\n\n**Priority**: Fix test execution as blocking issue before any additional feature work.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 380,
+      "total_tokens": 510,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762760529,
+  "changed_files": [
+    "reliability\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762760511.9618518,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception in test framework or environment).\n\n## Coverage Analysis\n**0% COVERAGE** - No tests executed successfully. This represents complete testing failure, not just gaps.\n\n## Potential Issues with Recent Changes\n1. **Circuit breaker implementation** likely introduced breaking changes\n2. Possible syntax errors or import issues in `circuit_breaker.py`\n3. Test infrastructure may be broken (dependencies, configuration)\n4. Critical exceptions preventing test execution\n\n## Immediate Actions Required\n1. **Fix test execution first** - Check for:\n   - Syntax errors in test files or implementation\n   - Missing dependencies or imports\n   - Test configuration/runner issues\n2. **Validate circuit_breaker.py** manually for basic functionality\n3. Run tests in debug mode to identify the root cause of exit code -1\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functional tests is extremely dangerous:\n- Circuit breaker pattern failures could cause cascading system failures\n- No validation of fault tolerance mechanisms\n- Potential production outages from undetected bugs\n\n## Priority Recommendations\n1. **Immediate**: Fix test execution - this is blocking all quality assurance\n2. **Short-term**: Add basic smoke tests for circuit breaker functionality\n3. **Medium-term**: Target 80%+ coverage for reliability components\n4. **Critical**: Do not deploy until tests are functional and passing\n\n**Next step**: Run `python -m pytest -v` to see specific error details and address the root cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 336,
+      "total_tokens": 461,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

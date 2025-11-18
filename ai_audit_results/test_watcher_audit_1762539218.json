@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539218,
+  "changed_files": [
+    "tests\\integration\\test_e2e_test_watcher_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539204.7198055,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach any application code\n- **Complete coverage gap** - Entire codebase remains untested\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure failure** - Likely environment/config issues preventing test execution\n2. **Integration test dependency failures** - External services/databases may be unavailable\n3. **Syntax/runtime errors** in `test_e2e_test_watcher_v2.py` causing immediate crashes\n4. **Missing test dependencies** or incorrect import paths\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check test environment setup and dependencies\n3. Validate `test_e2e_test_watcher_v2.py` for syntax errors\n4. Ensure all required services are running for integration tests\n\n**FOLLOW-UP:**\n5. Add basic unit tests alongside integration tests\n6. Implement test environment health checks\n7. Set up continuous integration with proper error reporting\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected regressions likely in production\n- Code changes cannot be safely deployed\n- Critical bugs may go unnoticed\n- Integration points are completely unverified\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 342,
+      "total_tokens": 477,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

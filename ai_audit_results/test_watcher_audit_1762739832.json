@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762739832,
+  "changed_files": [
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762739803.471061,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional. Exit code -1 indicates a fatal error before tests even executed, suggesting fundamental infrastructure or configuration issues.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout with zero visibility into code quality or functionality.\n\n## Potential Issues with Recent Changes\n1. **Test File Corruption**: `tests\\test_deepseek_client.py` may contain syntax errors, import failures, or configuration issues\n2. **Environment Setup**: Missing dependencies, incorrect Python paths, or broken virtual environment\n3. **Test Runner Configuration**: Pytest/unittest configuration errors preventing test discovery\n4. **Recent Changes Impact**: The modified test file likely introduced breaking changes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m pytest tests/test_deepseek_client.py -v` to identify specific failure points\n2. Check for syntax errors: `python -m py_compile tests/test_deepseek_client.py`\n3. Verify imports and dependencies in the test file\n4. Review recent commits to the test file for breaking changes\n\n**STRUCTURAL FIXES:**\n1. Implement CI pipeline validation to catch test failures before merge\n2. Add basic smoke tests that validate test environment setup\n3. Create test infrastructure health checks\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable quality gate\n- Potential for undetected production bugs\n- Development team working without safety net\n- Possible regression issues going unnoticed\n\n**Priority**: Resolve immediately - blocking all further development until tests are functional.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 351,
+      "total_tokens": 478,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

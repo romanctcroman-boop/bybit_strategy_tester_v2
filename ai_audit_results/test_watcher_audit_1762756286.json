@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762756286,
+  "changed_files": [
+    "test_integration_phase3_extended.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762756256.3146224,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax/runtime errors preventing test execution\n- Test framework configuration issues\n- Missing dependencies or environment setup problems\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- No tests actually executed\n- Potential path/import issues with the test file\n- Test discovery failure\n\n## Potential Issues with Recent Changes\nThe modified `test_integration_phase3_extended.py` likely contains:\n- Syntax errors (missing imports, parentheses, etc.)\n- Runtime exceptions during test collection\n- Configuration errors in test setup/teardown\n- Incompatible dependencies with the test environment\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution:**\n   ```bash\n   python -m pytest test_integration_phase3_extended.py -v\n   ```\n2. **Check for syntax errors:**\n   ```bash\n   python -m py_compile test_integration_phase3_extended.py\n   ```\n3. **Verify imports and dependencies**\n4. **Run with detailed error output to identify root cause**\n\n**FOLLOW-UP:**\n- Add test discovery verification\n- Implement pre-commit hooks for syntax validation\n- Ensure test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential for undetected regressions\n- Broken CI/CD pipeline\n- All integration tests for phase 3 are compromised\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 359,
+      "total_tokens": 488,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

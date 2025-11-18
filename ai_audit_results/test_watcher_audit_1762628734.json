@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762628734,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\aiohttp\\client_reqrep.py",
+    ".venv\\Lib\\site-packages\\aiohttp\\streams.py",
+    "backend\\agents\\deepseek.py",
+    ".venv\\Lib\\site-packages\\aiohttp\\helpers.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762628721.3904884,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely environment/configuration issues). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was tested. This represents maximum testing risk.\n\n## Potential Issues\n1. **Environment corruption** - Modified files in `.venv/` suggest virtual environment issues\n2. **Dependency conflicts** - Changes to `aiohttp` packages indicate version mismatches or broken install\n3. **Import/initialization failures** - Tests likely fail before execution begins\n4. **Configuration problems** - Test runner cannot locate or execute tests properly\n\n## Immediate Actions Required\n1. **Recreate virtual environment**:\n   ```bash\n   rm -rf .venv/\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Verify test discovery**:\n   ```bash\n   python -m pytest --collect-only\n   ```\n3. **Check `deepseek.py` imports** - Ensure no circular imports or missing dependencies\n4. **Validate aiohttp version compatibility** with your codebase\n\n## Risk Assessment\n**HIGH RISK** - Cannot validate any functionality. Recent changes to `deepseek.py` and aiohttp dependencies are completely untested. Potential for:\n- Runtime crashes in production\n- Integration failures\n- Data corruption risks\n- API compatibility issues\n\n## Priority\nFix test environment immediately before making any further code changes. Current state provides zero quality assurance.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 184,
+      "completion_tokens": 323,
+      "total_tokens": 507,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 120
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

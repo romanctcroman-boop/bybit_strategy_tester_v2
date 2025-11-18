@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540141,
+  "changed_files": [
+    "tests\\stress\\test_parallel_execution.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540128.2674406,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). This indicates severe infrastructure or environmental issues rather than test logic failures. The test suite is currently non-functional.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed successfully. This isn't a coverage gap but a complete execution failure. All existing coverage metrics are invalid until execution is restored.\n\n## Potential Issues with Recent Changes\n- **File-specific failure**: The changed file `tests\\stress\\test_parallel_execution.py` suggests parallel execution issues\n- **Possible causes**: Resource exhaustion, deadlocks, infinite loops, memory leaks, or environment configuration problems\n- **Infrastructure risk**: Exit code -1 typically indicates process termination (SIGKILL, out-of-memory, or system intervention)\n\n## Recommendations for Improvement\n**Immediate Actions (Priority 1):**\n1. **Isolate the failure**: Run stress tests separately from main test suite\n2. **Add resource monitoring**: Implement memory/CPU logging in stress tests\n3. **Implement timeouts**: Add hard timeouts to prevent infinite execution\n4. **Check system resources**: Verify adequate memory and process limits\n\n**Short-term (Priority 2):**\n- Add graceful degradation for parallel test failures\n- Implement test retry mechanisms with exponential backoff\n- Create isolated test environments for stress testing\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- No reliable test results\n- Zero coverage data\n- Potential system instability from stress tests\n- Blocks CI/CD pipeline functionality\n\n**Critical next step**: Fix the parallel execution crash before any other test analysis can be performed.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 350,
+      "total_tokens": 479,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

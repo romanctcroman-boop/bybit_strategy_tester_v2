@@ -1,0 +1,22 @@
+Название: bybit_strategy_tester_v2
+
+API ключ: o40eJxo5zcRRIl7mnL
+API секрет: LYXrFuN8sZjQyOBmkL8Th2sXQpN7LzTza293
+
+
+DeepSeek API_1: sk-1630fbba63c64f88952c16ad33337242
+DeepSeek API_2: sk-0a584271e8104aea89c9f5d7502093dd
+DeepSeek API_3: sk-d2b206a09da4413685613d637b9b8463
+DeepSeek API_4: sk-1428e58c87d74e90a063f6f5f5d8fbb3
+DeepSeek API_5: sk-8d66d1927a2044f7a368cc020173069b
+DeepSeek API_6: sk-0382ccd139814a5fb5ec7b65dd96afc0
+DeepSeek API_7: sk-abd04bc463a249cebbca748024d19bde
+DeepSeek API_8: sk-1fa47abaeb854e058aa9ee42fdedc811
+
+
+
+
+Perplexity API_1: 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
+Perplexity API_2: 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
+Perplexity API_3: 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
+Perplexity API_4: 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

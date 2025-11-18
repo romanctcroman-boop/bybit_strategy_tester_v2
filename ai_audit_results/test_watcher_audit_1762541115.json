@@ -1,0 +1,55 @@
+{
+  "timestamp": 1762541115,
+  "changed_files": [
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\recovery\\test_network_failure.py",
+    "tests\\recovery\\__init__.py",
+    "tests\\test_phase1_security.py",
+    "automation\\sync_async_wrapper.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "automation\\task2_key_manager\\encrypt_secrets.py",
+    "tests\\test_protocol.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "automation\\task2_key_manager\\test_key_manager.py",
+    "backend\\core\\mtf_engine.py",
+    "automation\\task1_test_watcher\\test_watcher.py",
+    "tests\\test_sandbox_integration.py",
+    "automation\\task2_key_manager\\key_manager.py",
+    "tests\\recovery\\test_component_crash.py",
+    "tests\\backend\\conftest.py",
+    "tests\\recovery\\test_disk_full.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_marketdata_upload.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541098.80891,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- Likely environment/config issue or fatal code error\n\n## 2. Coverage Analysis\n**COMPLETE FAILURE** - No coverage data collected:\n- All test files show 0% coverage\n- Either tests crashed immediately or coverage collection failed\n- No meaningful coverage metrics available\n\n## 3. Potential Issues\n**High Priority Problems:**\n- **Fatal runtime error** in test environment or application code\n- **Configuration issues** with test runner or coverage setup\n- **Recent changes** to `mtf_engine.py`, `lstm_queue_predictor.py`, or security tests may contain breaking changes\n- **Dependency conflicts** or environment corruption\n\n## 4. Recommendations\n\n**Immediate Actions (Next 2 hours):**\n1. **Check test logs** for segmentation faults or import errors\n2. **Run tests individually** to isolate crashing component:\n   ```bash\n   python -m pytest tests/backend/test_marketdata_upload.py -v\n   ```\n3. **Verify Python environment** and dependencies\n4. **Test without coverage** to rule out coverage tool issues\n\n**Short-term (Next day):**\n1. **Add test isolation** - ensure tests can run independently\n2. **Implement basic smoke tests** that run before full test suite\n3. **Fix environment setup** in CI/CD pipeline\n\n## 5. Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- **Critical**: No confidence in code changes\n- **Security**: Security tests (test_phase1_security.py) not running\n- **Financial**: Market data and trading components untested\n- **Recovery**: Failure recovery tests completely skipped\n\n**Priority**: Fix test execution environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 405,
+      "completion_tokens": 428,
+      "total_tokens": 833,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 341
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

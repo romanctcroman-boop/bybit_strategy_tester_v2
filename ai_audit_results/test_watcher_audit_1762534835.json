@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762534835,
+  "changed_files": [
+    "health_check.py",
+    "automation\\task3_audit_agent\\config.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762534808.841413,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe changed files suggest:\n1. **health_check.py** - Possible breaking changes in core functionality\n2. **config.py** - Configuration changes that may have broken test environment setup\n3. **Environment/dependency issues** preventing test execution\n\n## Immediate Action Recommendations\n1. **Fix Test Execution First**:\n   - Check test runner output for specific error messages\n   - Verify Python environment and dependencies\n   - Run tests with `-v` flag to identify failure point\n\n2. **Validate Recent Changes**:\n   - Test `health_check.py` independently\n   - Verify `config.py` changes don't break imports/initialization\n   - Check for circular imports or missing modules\n\n3. **Quick Recovery Steps**:\n   - Revert recent changes if possible\n   - Run minimal smoke test: `python -m pytest --collect-only`\n   - Verify basic imports: `python -c \"import health_check\"`\n\n## Risk Assessment\n**HIGH RISK** - Deploying without passing tests is extremely dangerous:\n- Unknown if core functionality works\n- Potential runtime errors in production\n- No validation of recent changes\n- Complete lack of quality assurance\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 355,
+      "total_tokens": 491,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 8
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

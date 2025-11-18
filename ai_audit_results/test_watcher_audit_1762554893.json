@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762554893,
+  "changed_files": [
+    "test_circuit_breaker_load.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554877.9346075,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero quality assurance. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code coverage achieved\n- **Critical Gap**: Tests aren't even running to completion\n- **Complete testing blackout** - No visibility into code quality or regression risks\n\n## Potential Issues with Recent Changes\nThe file `test_circuit_breaker_load.py` is likely causing:\n- **Syntax errors** preventing test execution\n- **Import/dependency issues** with circuit breaker implementation\n- **Configuration errors** in test setup/teardown\n- **Infinite loops or resource exhaustion** in load testing logic\n- **Missing test dependencies** or environment setup\n\n## Recommendations for Improvement\n\n**IMMEDIATE ACTIONS (Next 2 hours):**\n1. **Debug test failure**: Run `pytest test_circuit_breaker_load.py -v` to see specific error\n2. **Check syntax**: Validate Python syntax in the test file\n3. **Verify imports**: Ensure all imported modules exist and are accessible\n4. **Isolate the issue**: Temporarily comment out test content to identify failing component\n\n**SHORT-TERM (Next day):**\n5. **Add test validation**: Implement pre-commit hooks to catch syntax errors\n6. **Improve test isolation**: Ensure tests can run independently\n7. **Monitor resource usage**: Add timeouts for load tests\n\n## Risk Assessment\n**SEVERITY: CRITICAL** - No functional testing means:\n- **Undetected production bugs** highly likely\n- **Zero regression protection**\n- **Deployment blocking** - cannot safely release changes\n- **Team velocity impact** - development halted until resolved\n\n**Priority: P0** - Must be resolved before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 406,
+      "total_tokens": 533,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

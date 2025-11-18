@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762531255,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\dotenv\\main.py",
+    ".venv\\Lib\\site-packages\\dotenv\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762531227.8725002,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely environment/configuration issues). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Zero code coverage indicates:\n- Test runner failed before executing any tests\n- No test files discovered or executed\n- Possible path/config issues preventing test discovery\n\n## Potential Issues with Recent Changes\n**Dotenv package modifications** are highly suspicious:\n- Modifying `.venv` site-packages is a red flag\n- Likely corrupted virtual environment\n- Dotenv changes may have broken environment setup\n- Possible manual edits instead of proper dependency management\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Rebuild virtual environment** - Delete `.venv` and recreate with `python -m venv .venv`\n2. **Reinstall dependencies** - Use `pip install -r requirements.txt`\n3. **Verify dotenv usage** - Check if dotenv is being modified instead of using environment variables properly\n4. **Test basic setup** - Run minimal test to verify environment: `python -m pytest --version`\n\n**FOLLOW-UP:**\n5. Add pre-commit hook to prevent venv modifications\n6. Implement CI check for venv integrity\n7. Create basic smoke test to catch environment issues early\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Development environment instability\n- Potential for production deployment failures\n- No reliable testing feedback loop\n- Critical path issues in development workflow\n\n**Priority:** Resolve environment issues before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 153,
+      "completion_tokens": 344,
+      "total_tokens": 497,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 89
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

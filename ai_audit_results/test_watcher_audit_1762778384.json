@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762778384,
+  "changed_files": [
+    "background_diagnostic_service.py",
+    "diagnostic_dashboard.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762778367.935764,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% coverage** - All tests failed before any code execution could be measured. This represents maximum risk - we have no visibility into code functionality.\n\n## Potential Issues with Recent Changes\nThe changed files (`background_diagnostic_service.py`, `diagnostic_dashboard.py`) likely contain:\n- Import errors or circular dependencies\n- Syntax errors (Python 2/3 compatibility, missing parentheses, etc.)\n- Missing required modules/packages\n- Runtime errors during module import\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Run tests with `-v` flag to see specific failure points\n   - Check Python version compatibility\n   - Verify all imports and dependencies are installed\n\n2. **Validate Recent Changes**\n   - Manually import and test the two changed files\n   - Check for syntax errors: `python -m py_compile background_diagnostic_service.py`\n   - Verify no missing imports or dependencies\n\n3. **Restore Basic Testing**\n   - Add simple smoke tests that verify module imports\n   - Ensure test framework configuration is correct\n   - Fix any environment setup issues\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- No functional verification of diagnostic services\n- Potential system failures in monitoring/health checks\n- Could impact system stability and error detection capabilities\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 354,
+      "total_tokens": 485,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

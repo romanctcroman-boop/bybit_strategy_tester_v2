@@ -1,0 +1,76 @@
+{
+  "timestamp": 1762539976,
+  "changed_files": [
+    "tests\\integration\\test_provider_integration.py",
+    ".venv\\Lib\\site-packages\\_pytest\\assertion\\rewrite.py",
+    "tests\\integration\\test_copilot_perplexity_mcp.py",
+    "tests\\integration\\test_postgres_upsert.py",
+    "tests\\integration\\test_mcp_tools_comprehensive.py",
+    "tests\\integration\\test_alembic_migration.py",
+    "tests\\integration\\test_no_sqlite_defaults.py",
+    "tests\\integration\\test_mcp_cyclic_dialogue.py",
+    "tests\\integration\\test_mcp_multi_interaction.py",
+    ".venv\\Lib\\site-packages\\testcontainers\\postgres\\__init__.py",
+    "tests\\integration\\test_backups.py",
+    "tests\\integration\\test_wfo_expansion.py",
+    "tests\\integration\\test_real_copilot_perplexity.py",
+    "tests\\integration\\test_extended_backtest_suite.py",
+    "tests\\integration\\test_migration_timestamptz.py",
+    "tests\\integration\\test_sandbox_simple.py",
+    "optimizations_output\\data_service_async_PRODUCTION_clean.py",
+    "tests\\integration\\test_sandbox.py",
+    "tests\\integration\\test_simplified_real.py",
+    "tests\\integration\\test_walkforward_validation.py",
+    "optimizations_output\\sr_rsi_async_FIXED_v3.py",
+    "tests\\integration\\test_wfo_end_to_end.py",
+    ".venv\\Lib\\site-packages\\prometheus_client\\registry.py",
+    "tests\\integration\\test_mcp_real_functional.py",
+    "backend\\services\\strategy_arena.py",
+    "tests\\integration\\test_backtest_full_cycle.py",
+    "mcp-server\\api\\provider_manager_v2.py",
+    "tests\\integration\\test_phase2_integration_adapted.py",
+    "tests\\integration\\test_cluster_monitoring.py",
+    "tests\\integration\\integration_test_imports.py",
+    "tests\\integration\\test_phase2_integration.py",
+    ".venv\\Lib\\site-packages\\testcontainers\\core\\waiting_utils.py",
+    "tests\\integration\\test_lstm_drift_integration.py",
+    "tests\\integration\\test_redis_streams_live.py",
+    "backend\\services\\task_worker.py",
+    "tests\\integration\\test_worker_heartbeat.py",
+    "tests\\integration\\test_mtf_backtest_engine.py",
+    ".venv\\Lib\\site-packages\\prometheus_client\\metrics.py",
+    "tests\\integration\\test_ws_live.py",
+    ".venv\\Lib\\site-packages\\testcontainers\\redis\\__init__.py",
+    "backend\\migrations\\helpers\\timestamptz_helpers.py",
+    "tests\\integration\\test_strategy_arena.py",
+    "tests\\integration\\test_real_mcp_copilot_perplexity.py",
+    ".venv\\Lib\\site-packages\\_pytest\\pathlib.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539958.8965678,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- Multiple integration tests modified simultaneously\n\n## 2. Coverage Analysis\n**COMPLETE COVERAGE FAILURE:**\n- No code coverage collected (0.00%)\n- All test execution appears to have been interrupted\n- Impossible to assess actual coverage gaps due to test failure\n\n## 3. Potential Issues with Recent Changes\n**HIGH-RISK CHANGES IDENTIFIED:**\n- **Pytest internals modified** (`_pytest/assertion/rewrite.py`, `_pytest/pathlib.py`) - extremely dangerous\n- **Third-party packages modified** (prometheus_client, testcontainers) - should never be modified directly\n- **Multiple integration tests changed simultaneously** - violates change isolation principle\n- **Production code mixed with test changes** (`backend/services/`, `mcp-server/api/`)\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. **Revert pytest and third-party package modifications** immediately\n2. **Isolate changes** - test one integration change at a time\n3. **Check for circular imports** or infinite recursion in test setup\n4. **Run with `pytest -xvs`** to see which test causes the crash\n5. **Add `--tb=short`** to get clearer error tracebacks\n\n**STRUCTURAL IMPROVEMENTS:**\n- Implement pre-commit hooks to prevent modification of venv files\n- Use dependency injection instead of modifying third-party code\n- Separate integration test runs from unit tests\n- Add test isolation with proper teardown\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **System instability** from modified core dependencies\n- **Untestable changes** due to complete test failure\n- **Regression risk** from multiple simultaneous changes\n- **Environment contamination** from vend modifications\n\n**Priority:** Fix test infrastructure first, then address individual test failures incrementally.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 794,
+      "completion_tokens": 466,
+      "total_tokens": 1260,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 730
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

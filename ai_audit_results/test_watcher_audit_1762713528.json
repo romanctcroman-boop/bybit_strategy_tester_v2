@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762713528,
+  "changed_files": [
+    "add_mocks_to_all_tests.py",
+    "tests\\test_deepseek_client.py",
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713513.9649086,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely segmentation fault, memory error, or fatal Python interpreter crash).\n\n## Coverage Analysis\n**0.00% coverage** - No code is being executed during test runs. This represents complete test infrastructure failure.\n\n## Potential Issues with Recent Changes\n1. **Mock Implementation**: `add_mocks_to_all_tests.py` suggests aggressive mocking that may be breaking test execution\n2. **Client Integration**: Changes to `deepseek_client.py` and its tests may have introduced fatal errors\n3. **Circular Dependencies**: Mocks might be interfering with test discovery/imports\n4. **Resource Conflicts**: Possible file handle or network socket issues in client code\n\n## Immediate Recommendations\n1. **Remove Recent Mocks**: Temporarily revert `add_mocks_to_all_tests.py` changes to isolate the issue\n2. **Run Minimal Test**: Execute a single simple test to verify basic test framework functionality\n3. **Check Import Chains**: Validate no circular imports between test files and production code\n4. **Inspect Client Code**: Review `deepseek_client.py` for unhandled exceptions or resource leaks\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in code quality. Shipping any code in this state would be extremely dangerous.\n\n## Priority Actions\n1. Fix test execution before any further development\n2. Restore basic test functionality before addressing coverage\n3. Validate client code independently of test framework\n4. Implement mocks gradually with validation at each step\n\n**Next Step**: Run `python -m pytest tests/ -v --tb=short` to get detailed failure information and begin troubleshooting.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 145,
+      "completion_tokens": 358,
+      "total_tokens": 503,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 81
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

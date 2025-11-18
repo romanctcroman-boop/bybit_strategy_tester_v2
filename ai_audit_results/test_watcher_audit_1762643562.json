@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762643562,
+  "changed_files": [
+    "tests\\test_stale_idempotency.py",
+    "tests\\frontend\\test_smoke.py",
+    "scripts\\probe_ports.py",
+    "scripts\\check_db_connect.py",
+    ".venv\\Lib\\site-packages\\sqlalchemy\\sql\\sqltypes.py",
+    ".venv\\Lib\\site-packages\\sqlalchemy\\types.py",
+    ".venv\\Lib\\site-packages\\sqlalchemy\\schema.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762643547.16525,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- No tests executed successfully\n- Test infrastructure appears compromised\n\n## 2. Coverage Analysis\n**ZERO COVERAGE** - All tests failed before collecting coverage data\n- No meaningful coverage data available\n- Coverage reporting system may also be broken\n\n## 3. Potential Issues\n**Primary Suspects:**\n- **Environment corruption**: Modified `.venv` SQLAlchemy files suggest dependency issues\n- **Database connectivity**: `check_db_connect.py` changes + SQLAlchemy modifications\n- **Test pollution**: Changes to idempotency tests may have broken test isolation\n- **Port/probe issues**: `probe_ports.py` modifications\n\n## 4. Immediate Actions Required\n\n**HIGH PRIORITY:**\n1. **Restore clean environment**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Debug test failure**\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n3. **Check database connectivity** before running tests\n\n**MEDIUM PRIORITY:**\n4. Revert local modifications to SQLAlchemy in `.venv`\n5. Validate port probing scripts work independently\n6. Add test environment sanity checks\n\n## 5. Risk Assessment\n**HIGH RISK** - Deployment blocking\n- No working test suite\n- Potential environment corruption\n- Database connectivity uncertain\n- **Cannot safely deploy until resolved**\n\n**Start with environment restoration, then isolate the specific test failure causing the -1 exit code.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 216,
+      "completion_tokens": 376,
+      "total_tokens": 592,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 152
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

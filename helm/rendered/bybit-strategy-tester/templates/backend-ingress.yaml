@@ -1,0 +1,38 @@
+---
+# Source: bybit-strategy-tester/templates/backend-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - "api.bybit-strategy-tester.example.com"
+      secretName: backend-tls
+  rules:
+    - host: "api.bybit-strategy-tester.example.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bybit-strategy-tester-backend
+                port:
+                  number: 8000

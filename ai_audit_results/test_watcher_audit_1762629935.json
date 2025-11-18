@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762629935,
+  "changed_files": [
+    "tests\\test_deepseek_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762629923.2578783,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test suite or environment setup. No meaningful quality assessment possible until basic execution is resolved.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All tests failed to execute, making coverage data meaningless. The entire codebase is effectively untested.\n\n## Potential Issues with Recent Changes\n1. **Broken test infrastructure** - Exit code -1 suggests system-level failure (segmentation fault, memory issues, or environment problems)\n2. **Dependency conflicts** - Recent changes to `test_deepseek_tools.py` may have introduced incompatible dependencies\n3. **Import/circular dependency issues** - Test module may fail to import required components\n4. **Environment configuration** - Missing environment variables, corrupted virtual environment, or Python interpreter issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check Python environment integrity: `python --version` and `pip list`\n3. Run a simple smoke test to verify basic Python functionality\n4. Examine recent changes to `test_deepseek_tools.py` for obvious syntax errors\n\n**FOLLOW-UP:**\n5. Isolate the failing test and run it individually\n6. Check for system resource issues (memory, disk space)\n7. Verify all test dependencies are properly installed\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure means:\n- No regression protection for any code changes\n- Potential deployment of broken code to production\n- Unknown stability of the entire application\n- Critical need to resolve before any further development\n\n**Priority: Fix test execution immediately before addressing any other issues.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 368,
+      "total_tokens": 496,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

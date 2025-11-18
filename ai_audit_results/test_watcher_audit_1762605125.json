@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762605125,
+  "changed_files": [
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762605109.332153,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All code is untested. This represents maximum testing debt with no safety net for changes.\n\n## Potential Issues with Recent Changes\nThe `advanced_architecture.py` modification likely introduced:\n- **Syntax errors** preventing test execution\n- **Import/circular dependency** issues\n- **Environment configuration** problems\n- **Critical runtime exceptions** during test setup\n\n## Recommendations for Improvement\n**Immediate Actions (Next 2 hours):**\n1. Run tests with `-v` flag to see specific failure point\n2. Check Python syntax: `python -m py_compile automation/deepseek_robot/advanced_architecture.py`\n3. Verify imports and dependencies in the changed file\n\n**Short-term (This week):**\n1. Fix the blocking issue preventing test execution\n2. Add basic smoke tests for core functionality\n3. Implement minimum 70% coverage requirement\n4. Add CI pipeline to prevent 0% coverage commits\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely dangerous:\n- No validation of recent changes\n- Potential runtime failures in production\n- Regression detection impossible\n- Complete loss of quality assurance\n\n**Priority:** Fix test execution blocking issue before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 305,
+      "total_tokens": 435,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

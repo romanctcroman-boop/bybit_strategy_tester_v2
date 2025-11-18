@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762635093,
+  "changed_files": [
+    "update_deepseek_tools.py",
+    "mcp-server\\server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762635077.7160332,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No meaningful quality assessment possible until basic test execution is resolved\n\n## Coverage Analysis\n**COVERAGE: 0%** - Complete coverage failure:\n- No tests executed against any files\n- Modified files (`update_deepseek_tools.py`, `mcp-server\\server.py`) completely untested\n- Impossible to assess actual code coverage without test execution\n\n## Potential Issues with Recent Changes\n1. **Environment/Configuration Break** - Likely introduced in modified files:\n   - Import errors or dependency conflicts\n   - Syntax errors preventing test discovery\n   - Environment variable/config changes breaking test setup\n\n2. **Test Runner Failure** - Possible causes:\n   - `pytest` configuration corrupted\n   - Path/module resolution issues\n   - Critical exception in test setup/teardown\n\n## Immediate Recommendations\n1. **Debug Test Execution** (Highest Priority):\n   ```bash\n   python -m pytest --tb=short -v  # Identify failing test\n   python -c \"import update_deepseek_tools\"  # Check imports\n   ```\n\n2. **Check Recent Changes**:\n   - Review `update_deepseek_tools.py` for syntax/import issues\n   - Verify `mcp-server\\server.py` dependencies and paths\n   - Check for circular imports or missing requirements\n\n3. **Infrastructure Fixes**:\n   - Verify test configuration files intact\n   - Check Python path and environment variables\n   - Ensure test dependencies installed\n\n## Risk Assessment\n**HIGH RISK** - Production deployment extremely dangerous:\n- 100% of recent changes completely untested\n- Unknown if basic functionality works\n- High probability of runtime errors in production\n- **Recommendation**: Block deployments until tests execute successfully\n\n**Next Step**: Fix test execution first, then assess actual test coverage and quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 420,
+      "total_tokens": 554,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 70
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539494,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539479.1430385,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1), indicating severe infrastructure or environment issues rather than test failures. The test suite is non-functional.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files suggests:\n- Tests aren't executing at all\n- Environment setup/teardown failures\n- Possible import/circular dependency issues\n- Configuration problems in test runner\n\n## Potential Issues with Recent Changes\nFocusing on `tests/integration/test_e2e_audit_agent.py`:\n- **Integration test dependencies** missing (databases, services, APIs)\n- **Environment variables** not properly configured\n- **Test fixtures/setup** crashing before any test execution\n- **Import errors** in the new integration test file\n- **Resource constraints** (memory, ports, file permissions)\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see where execution stops\n2. Check test logs for stack traces and error messages\n3. Verify all integration test dependencies are running\n4. Test the new audit agent file in isolation: `pytest tests/integration/test_e2e_audit_agent.py -v`\n\n**Systematic Fixes:**\n1. Add proper error handling in test setup/teardown\n2. Implement health checks for integration dependencies\n3. Add validation for required environment variables\n4. Create a minimal smoke test to verify test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback loop\n- High probability of undetected regressions\n- Integration testing completely broken\n- Deployment risks significantly increased\n\n**Priority:** Fix test infrastructure immediately before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 377,
+      "total_tokens": 511,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

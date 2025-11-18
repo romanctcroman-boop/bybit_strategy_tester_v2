@@ -1,0 +1,100 @@
+# TestWatcher Alert Rules
+# Monitors TestWatcher component health and performance
+
+groups:
+  - name: test_watcher_alerts
+    interval: 30s
+    rules:
+      # CRITICAL: TestWatcher is down
+      - alert: TestWatcherDown
+        expr: test_watcher_is_running == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: test-watcher
+          service: automation-platform
+        annotations:
+          summary: "TestWatcher is not running"
+          description: "TestWatcher has been stopped for more than 2 minutes. Automated testing is disabled."
+          runbook: "Check TestWatcher process status and restart if needed."
+      
+      # CRITICAL: High error rate
+      - alert: TestWatcherHighErrorRate
+        expr: rate(test_watcher_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: test-watcher
+          service: automation-platform
+        annotations:
+          summary: "High error rate in TestWatcher"
+          description: "TestWatcher is experiencing {{ $value | humanize }} errors per second (threshold: 0.1/s)."
+          runbook: "Check error logs and investigate root cause. May require component restart."
+      
+      # WARNING: Files stuck in queue
+      - alert: TestWatcherQueueBacklog
+        expr: test_watcher_changed_files_current > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: test-watcher
+          service: automation-platform
+        annotations:
+          summary: "TestWatcher has {{ $value }} files in queue"
+          description: "File processing queue has been backed up for more than 10 minutes."
+          runbook: "Check for slow test execution or processing bottlenecks."
+      
+      # WARNING: Slow test execution
+      - alert: TestWatcherSlowTests
+        expr: histogram_quantile(0.95, rate(test_watcher_test_execution_duration_seconds_bucket[5m])) > 120
+        for: 10m
+        labels:
+          severity: warning
+          component: test-watcher
+          service: automation-platform
+        annotations:
+          summary: "Test execution is slow (p95 > 2 minutes)"
+          description: "95th percentile test execution time is {{ $value | humanize }}s."
+          runbook: "Investigate slow tests and optimize test suite."
+      
+      # WARNING: High memory usage
+      - alert: TestWatcherHighMemory
+        expr: test_watcher_memory_usage_bytes > 500000000  # 500 MB
+        for: 10m
+        labels:
+          severity: warning
+          component: test-watcher
+          service: automation-platform
+        annotations:
+          summary: "TestWatcher memory usage is high"
+          description: "TestWatcher is using {{ $value | humanize }}B of memory (threshold: 500MB)."
+          runbook: "Check for memory leaks and consider restarting component."
+      
+      # WARNING: Low test pass rate
+      - alert: TestWatcherLowPassRate
+        expr: |
+          sum(rate(test_watcher_tests_run_total{status="pass"}[10m])) 
+          / 
+          sum(rate(test_watcher_tests_run_total[10m])) 
+          * 100 < 80
+        for: 15m
+        labels:
+          severity: warning
+          component: test-watcher
+          service: automation-platform
+        annotations:
+          summary: "Test pass rate is below 80%"
+          description: "Only {{ $value | humanize }}% of tests are passing."
+          runbook: "Review failing tests and address underlying issues."
+      
+      # INFO: TestWatcher restarted
+      - alert: TestWatcherRestarted
+        expr: changes(test_watcher_is_running[5m]) > 0
+        labels:
+          severity: info
+          component: test-watcher
+          service: automation-platform
+        annotations:
+          summary: "TestWatcher has been restarted"
+          description: "TestWatcher status changed in the last 5 minutes."
+          runbook: "Verify restart was intentional and check startup logs."

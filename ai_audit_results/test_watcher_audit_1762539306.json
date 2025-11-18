@@ -1,0 +1,44 @@
+{
+  "timestamp": 1762539306,
+  "changed_files": [
+    "backend\\ml\\retrain_scheduler.py",
+    "mcp-server\\mcp_cache.py",
+    "tests\\unit\\test_lru_ttl_cache.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "tests\\unit\\test_ast_validator.py",
+    "tests\\unit\\test_retrain_scheduler.py",
+    "tests\\unit\\test_drift_detector.py",
+    "tests\\unit\\test_structured_logger.py",
+    "tests\\integration\\test_e2e_audit_agent.py",
+    "tests\\integration\\test_e2e_test_watcher_v2.py",
+    "tests\\test_walk_forward.py",
+    "tests\\test_task_queue.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539291.3322363,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Exit code -1 indicates test execution crashed before completion. This suggests either:\n- Fatal import/initialization errors\n- Test environment setup failures\n- Critical bugs preventing test execution\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% across all files indicates:\n- Tests never executed successfully\n- Potential module import failures\n- Environment configuration issues\n- Missing dependencies or broken imports\n\n## Potential Issues with Recent Changes\n1. **Import/Dependency Issues** - Likely broken imports in changed files\n2. **Circular Dependencies** - Between `backend/ml/retrain_scheduler.py` and test files\n3. **Environment Configuration** - Missing environment variables or config files\n4. **Initialization Failures** - Critical errors in module initialization\n\n## Immediate Recommendations\n1. **Debug Test Execution**\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   Check specific error messages\n\n2. **Check Import Chains**\n   - Verify all changed modules import correctly\n   - Test each changed file individually: `python -c \"import backend.ml.retrain_scheduler\"`\n\n3. **Environment Validation**\n   - Confirm all dependencies installed\n   - Check required environment variables\n   - Validate configuration files\n\n4. **Isolate Failure**\n   - Run tests for single file: `pytest tests/unit/test_retrain_scheduler.py`\n   - Identify which specific test/module causes crash\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code likely broken\n- No validation of recent changes\n- Potential deployment failures\n- Undetected regression issues\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 268,
+      "completion_tokens": 369,
+      "total_tokens": 637,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 204
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

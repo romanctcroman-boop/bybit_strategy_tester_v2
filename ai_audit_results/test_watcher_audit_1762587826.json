@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762587826,
+  "changed_files": [
+    "automation\\deepseek_robot\\ai_integrations.py",
+    "automation\\deepseek_robot\\demo.py",
+    "automation\\deepseek_robot\\robot.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762587809.341518,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test framework failure\n- 0% coverage suggests tests aren't even executing\n- No file-specific coverage data available\n\n## Coverage Analysis & Gaps\n**Total Coverage: 0%** - This indicates:\n- Test runner is crashing before any tests execute\n- Possible import errors or configuration issues\n- No actual test execution occurred\n\n## Potential Issues with Recent Changes\nThe modified files suggest integration issues:\n1. **`ai_integrations.py`** - Likely contains breaking changes to AI service integrations\n2. **`robot.py`** - Core robot functionality may have incompatible API changes\n3. **`demo.py`** - Demo scripts may have dependency or import issues\n\n## Immediate Action Recommendations\n1. **Fix Test Infrastructure First**:\n   - Check test runner configuration and dependencies\n   - Verify all imports in test files work correctly\n   - Run tests with `-v` flag to see where they fail\n\n2. **Investigate Integration Changes**:\n   - Review `ai_integrations.py` for breaking API changes\n   - Check if new dependencies are missing from test environment\n   - Validate robot core functionality in isolation\n\n3. **Quick Validation Steps**:\n   ```bash\n   python -m pytest automation/deepseek_robot/ --collect-only\n   python -c \"from automation.deepseek_robot import robot; print('Import OK')\"\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback loop\n- Potential breaking changes in production code\n- Undetected regressions likely present\n- Deployment would be extremely risky\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 153,
+      "completion_tokens": 368,
+      "total_tokens": 521,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 89
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,32 @@
+groups:
+  - name: mcp-latency-and-errors
+    rules:
+      - alert: MCPHighLatencyP95
+        expr: |
+          histogram_quantile(0.95, sum(rate(mcp_tool_duration_seconds_bucket[5m])) by (le)) > 60
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MCP P95 latency exceeds 60s"
+          description: "P95 of mcp_tool_duration_seconds > 60s for 5 minutes. Investigate agent latency or fallback logic."
+
+      - alert: MCPHighLatencyP99
+        expr: |
+          histogram_quantile(0.99, sum(rate(mcp_tool_duration_seconds_bucket[5m])) by (le)) > 120
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MCP P99 latency exceeds 120s"
+          description: "P99 of mcp_tool_duration_seconds > 120s for 5 minutes. Agent responses too slow."
+
+      - alert: MCPToolFailureRate
+        expr: |
+          sum(rate(mcp_tool_errors_total[5m])) / clamp_min(sum(rate(mcp_tool_calls_total[5m])), 1) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MCP tool error rate > 10%"
+          description: "Error rate for MCP tools exceeded 10% in the last 10 minutes. Check logs and agent availability."

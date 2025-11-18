@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762756940,
+  "changed_files": [
+    "health_check.py",
+    "test_integration_simple.py",
+    "reliability\\distributed_rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762756910.7960744,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- 0% coverage across all files\n- No test execution occurred\n- Impossible to assess actual code coverage\n\n## Potential Issues with Recent Changes\n1. **Integration Test Failure** - `test_integration_simple.py` likely contains breaking changes\n2. **Distributed System Complexity** - `reliability\\distributed_rate_limiter.py` may have introduced race conditions or dependency issues\n3. **Health Check Impact** - `health_check.py` modifications might be causing early test termination\n\n## Immediate Action Recommendations\n1. **DEBUG TEST INFRASTRUCTURE:**\n   - Check for uncaught exceptions in test setup/teardown\n   - Verify test dependencies and environment configuration\n   - Examine test runner configuration\n\n2. **ISOLATE FAILING COMPONENT:**\n   ```bash\n   python -m pytest test_integration_simple.py -v  # Isolate integration tests\n   python -m pytest health_check.py -v             # Test health check independently\n   ```\n\n3. **VALIDATE DISTRIBUTED COMPONENTS:**\n   - Test rate limiter in isolation\n   - Check for missing services/dependencies\n   - Verify network connectivity for distributed components\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No validation of recent changes to critical reliability components\n- Health check failures could cause cascading system outages\n- Distributed rate limiter changes untested → potential performance degradation\n\n**Priority:** Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 387,
+      "total_tokens": 529,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

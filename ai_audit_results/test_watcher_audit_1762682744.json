@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762682744,
+  "changed_files": [
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762682725.7607267,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/import)\n- 0% coverage suggests tests aren't even executing\n- Multiple test files modified simultaneously increases risk\n\n## Coverage Analysis & Gaps\n**Total coverage: 0.00%** - All gaps exist:\n- No code is being executed during test runs\n- Likely due to import errors or configuration issues\n- Database, protocol, and MTF engine tests all failing\n\n## Potential Issues with Recent Changes\n1. **Import/Configuration Breakage** - Changes in `backend/core/mtf_engine.py` likely broke test imports\n2. **Circular Dependencies** - Modified core module may have created import loops\n3. **Missing Dependencies** - New imports in core module without test environment equivalents\n4. **Test Infrastructure** - Changes to multiple test files may have introduced conflicting modifications\n\n## Immediate Action Recommendations\n1. **Isolate the Break**:\n   ```bash\n   python -m pytest tests/ --tb=short -v  # Identify first failing test\n   ```\n2. **Check Core Module First**:\n   - Review `backend/core/mtf_engine.py` for new imports/API changes\n   - Verify all dependencies are available in test environment\n3. **Fix Test Imports**:\n   - Ensure test files can import from modified core modules\n   - Check `__init__.py` files and PYTHONPATH\n4. **Rollback Strategy**:\n   - Consider reverting `mtf_engine.py` changes first to restore test functionality\n   - Test each modified file incrementally\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be blind:\n- No safety net for database, protocol, or engine changes\n- Multiple critical components modified without validation\n- Potential for production outages if deployed in current state\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 416,
+      "total_tokens": 601,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 121
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

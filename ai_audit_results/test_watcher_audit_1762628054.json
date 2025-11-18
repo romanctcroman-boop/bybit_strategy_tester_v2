@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762628054,
+  "changed_files": [
+    "add_provider_ready_decorator.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_protocol.py",
+    "mcp-server\\server.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_mtf_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762628039.2579439,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax/runtime errors preventing test execution\n- Test framework configuration issues\n- Critical failures in test setup/teardown\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- No tests actually executed\n- Possible import/configuration errors\n- Missing dependencies or environment setup\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **`add_provider_ready_decorator.py`** - New decorator may have syntax issues or circular imports\n2. **`mcp-server\\server.py`** & **`backend\\core\\mtf_engine.py`** - Core service changes breaking imports\n3. **Test files themselves** - Recent test modifications may contain errors\n\n## Immediate Recommendations\n1. **Fix Exit Code -1 First**\n   - Check test runner logs for specific error messages\n   - Verify all imports work: `python -m pytest tests/ --collect-only`\n   - Test individual files to isolate the breaking change\n\n2. **Validate Recent Changes**\n   - Test the new decorator in isolation\n   - Check MCP server and MTF engine for API changes\n   - Verify test configuration files weren't modified\n\n3. **Quick Diagnostics**\n   ```bash\n   # Test basic imports\n   python -c \"from add_provider_ready_decorator import *\"\n   # Run simplest test first\n   pytest tests/unit/test_batch_writer.py -v\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No validation of recent changes\n- Potential undiscovered regressions\n- Deployment would be extremely risky\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 204,
+      "completion_tokens": 398,
+      "total_tokens": 602,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 140
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762541113,
+  "changed_files": [
+    "test_crash.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541101.9034016,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1), indicating severe instability. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n**0% coverage** - Complete test infrastructure failure. No code was executed, making coverage metrics meaningless until basic test stability is restored.\n\n## Potential Issues with Recent Changes\n- **test_crash.py** is the culprit - likely contains syntax errors, import failures, or infinite loops\n- Possible causes: missing dependencies, environment configuration issues, or fatal runtime errors\n- Test framework may be improperly configured or corrupted\n\n## Recommendations for Improvement\n1. **Immediate**: Run `test_crash.py` in isolation with debug output to identify crash cause\n2. **Fix root cause**: Address syntax errors, import issues, or environmental dependencies\n3. **Add validation**: Implement pre-commit hooks to catch syntax errors before test execution\n4. **Restore baseline**: Ensure at least one passing test exists before expanding coverage\n\n## Risk Assessment\n**HIGH RISK** - No functional testing means undetected bugs could reach production. Development is effectively flying blind until test stability is restored.\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 123,
+      "completion_tokens": 258,
+      "total_tokens": 381,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 59
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmpdd8bhuz8",
+    "debounce_seconds": 0.5
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762721224,
+  "changed_files": [
+    "tests\\test_distributed_rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762721211.2549038,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) indicating severe infrastructure or dependency issues, not just test failures. No meaningful test execution occurred.\n\n## Coverage Analysis\n**0% COVERAGE** - Complete coverage failure suggests:\n- Test environment not properly initialized\n- Critical dependencies missing\n- Test discovery/import failures\n- Possible circular imports or module loading issues\n\n## Potential Issues with Recent Changes\nThe modified `test_distributed_rate_limiter.py` likely contains:\n- Syntax errors preventing import\n- Missing imports for distributed components (Redis, Celery, etc.)\n- Environment configuration issues\n- Test fixture/setup code that crashes during collection\n\n## Immediate Recommendations\n\n**1. Fix Test Execution First:**\n```bash\n# Run with verbose output to see crash details\npython -m pytest tests/test_distributed_rate_limiter.py -v\n\n# Check for import/syntax issues\npython -c \"from tests.test_distributed_rate_limiter import *\"\n```\n\n**2. Infrastructure Check:**\n- Verify Redis/Message broker connectivity\n- Confirm all dependencies installed\n- Check environment variables for distributed components\n\n**3. Test Isolation:**\n- Temporarily comment out test content, keep only imports\n- Add basic smoke test to verify environment\n- Implement proper error handling in test setup\n\n## Risk Assessment\n**HIGH RISK** - Distributed rate limiting is likely critical infrastructure. Current state means:\n- No validation of concurrent request handling\n- Potential production failures undetected\n- Race conditions and scaling issues unverified\n\n**Priority:** Fix test execution immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 335,
+      "total_tokens": 464,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762536731,
+  "changed_files": [
+    "tests\\test_safe_async_bridge_simple.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762536704.9595258,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. The test suite is non-functional and provides zero validation of code behavior.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code is being tested\n- **No coverage data available** - Tests aren't even reaching the execution phase\n- **Complete testing gap** - All functionality remains unverified\n\n## Potential Issues with Recent Changes\nThe file `tests/test_safe_async_bridge_simple.py` likely contains:\n- **Syntax errors** preventing test discovery/execution\n- **Import failures** or missing dependencies\n- **Configuration issues** in test setup/teardown\n- **Runtime exceptions** during test collection\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution** - Run tests with `-v` flag to see specific failure details\n2. **Check test imports** - Verify all modules and dependencies are available\n3. **Validate test structure** - Ensure proper test class/method naming conventions\n4. **Test isolation** - Run the failing test file individually: `python -m pytest tests/test_safe_async_bridge_simple.py -v`\n\n**FOLLOW-UP:**\n5. Add basic smoke test to verify test infrastructure works\n6. Implement CI pipeline that fails fast on test execution issues\n\n## Risk Assessment\n**HIGH RISK** - No functional testing means:\n- Undetected regressions in production code\n- Broken functionality going unnoticed\n- Invalid assumptions about system behavior\n- Potential deployment of completely broken code\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 358,
+      "total_tokens": 489,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

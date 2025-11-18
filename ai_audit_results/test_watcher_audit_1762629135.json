@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762629135,
+  "changed_files": [
+    "analyze_gap_to_100.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762629123.78247,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution entirely.\n\n## Coverage Analysis\n**0% coverage** confirms no tests ran successfully. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\n1. **analyze_gap_to_100.py** likely contains:\n   - Syntax errors preventing import/execution\n   - Fatal runtime errors during module loading\n   - Missing dependencies or imports\n   - Circular imports breaking the test environment\n\n## Immediate Recommendations\n1. **Debug test execution first:**\n   ```bash\n   python -m pytest -v  # Identify specific failure point\n   python -c \"import analyze_gap_to_100\"  # Check module loads\n   ```\n\n2. **Check for:**\n   - Syntax errors in analyze_gap_to_100.py\n   - Missing __init__.py files\n   - Broken imports or dependencies\n   - Infinite loops or fatal exceptions in module scope\n\n3. **Restore basic testing:**\n   - Fix fatal errors before addressing coverage\n   - Add simple smoke tests to verify module functionality\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected regressions in production code\n- Potential deployment of broken code\n- Complete loss of quality assurance\n- High probability of production incidents\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 299,
+      "total_tokens": 425,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

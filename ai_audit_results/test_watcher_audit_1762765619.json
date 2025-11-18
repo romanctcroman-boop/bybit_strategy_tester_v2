@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762765619,
+  "changed_files": [
+    "auto_diagnostic_system.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762765606.8828018,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or system error). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This represents complete test suite failure, not just poor coverage.\n\n## Potential Issues with Recent Changes\n1. **auto_diagnostic_system.py changes likely broke test infrastructure**\n2. Possible causes:\n   - Syntax errors preventing test discovery/import\n   - Module initialization crashes\n   - Missing dependencies in test environment\n   - Test runner configuration broken\n\n## Immediate Recommendations\n1. **Fix test execution first** - Run tests with verbose output to identify crash cause\n2. Check for:\n   - Import errors in auto_diagnostic_system.py\n   - Missing `__init__.py` files\n   - Syntax errors or runtime exceptions on module load\n3. Add basic smoke test to verify module can be imported\n4. Once tests run, establish baseline coverage >80%\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested. Any changes are deploying blind. Production failures are highly probable.\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 259,
+      "total_tokens": 385,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

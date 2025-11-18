@@ -1,0 +1,350 @@
+{{- if .Values.workerHpaML.enabled }}
+---
+# ML-Powered Horizontal Pod Autoscaler
+# Uses LSTM predictions + actual queue metrics for proactive scaling
+# Scales workers BEFORE queue backlog occurs
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-worker-hpa-ml
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker-hpa-ml
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "bybit-strategy-tester.fullname" . }}-worker
+  
+  minReplicas: {{ .Values.workerHpaML.minReplicas }}
+  maxReplicas: {{ .Values.workerHpaML.maxReplicas }}
+  
+  # Scaling behavior (v2 HPA feature)
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.workerHpaML.scaleUpStabilizationWindow }}
+      policies:
+        # Fast scale-up when LSTM predicts spike
+        - type: Percent
+          value: {{ .Values.workerHpaML.scaleUpPercentage }}
+          periodSeconds: {{ .Values.workerHpaML.scaleUpPeriod }}
+        # Absolute scale-up limit
+        - type: Pods
+          value: {{ .Values.workerHpaML.scaleUpPods }}
+          periodSeconds: {{ .Values.workerHpaML.scaleUpPeriod }}
+      selectPolicy: Max  # Use highest value from policies
+    
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.workerHpaML.scaleDownStabilizationWindow }}
+      policies:
+        # Conservative scale-down
+        - type: Percent
+          value: {{ .Values.workerHpaML.scaleDownPercentage }}
+          periodSeconds: {{ .Values.workerHpaML.scaleDownPeriod }}
+        - type: Pods
+          value: {{ .Values.workerHpaML.scaleDownPods }}
+          periodSeconds: {{ .Values.workerHpaML.scaleDownPeriod }}
+      selectPolicy: Min  # Use lowest value from policies
+  
+  metrics:
+    # =====================================================
+    # PRIMARY METRIC: LSTM Predicted Queue Length
+    # =====================================================
+    - type: External
+      external:
+        metric:
+          name: predicted_queue_length
+          selector:
+            matchLabels:
+              namespace: {{ .Release.Namespace }}
+        target:
+          type: AverageValue
+          averageValue: {{ .Values.workerHpaML.predictedQueueTarget | quote }}
+    
+    {{- if .Values.workerHpaML.useHybridMetric }}
+    # =====================================================
+    # HYBRID METRIC: Weighted Predicted + Actual Queue
+    # (70% prediction + 30% actual for smoother scaling)
+    # =====================================================
+    - type: External
+      external:
+        metric:
+          name: hybrid_queue_metric
+          selector:
+            matchLabels:
+              namespace: {{ .Release.Namespace }}
+        target:
+          type: AverageValue
+          averageValue: {{ .Values.workerHpaML.hybridQueueTarget | quote }}
+    {{- end }}
+    
+    {{- if .Values.workerHpaML.useActualQueue }}
+    # =====================================================
+    # FALLBACK METRIC: Actual Queue Length
+    # (Used if LSTM predictions unavailable)
+    # =====================================================
+    - type: External
+      external:
+        metric:
+          name: celery_queue_length
+          selector:
+            matchLabels:
+              namespace: {{ .Release.Namespace }}
+        target:
+          type: AverageValue
+          averageValue: {{ .Values.workerHpaML.actualQueueTarget | quote }}
+    {{- end }}
+    
+    {{- if .Values.workerHpaML.useQueueGrowthRate }}
+    # =====================================================
+    # SUPPLEMENTARY METRIC: Queue Growth Rate
+    # (Scale up if queue is rapidly growing)
+    # =====================================================
+    - type: External
+      external:
+        metric:
+          name: queue_growth_rate
+          selector:
+            matchLabels:
+              namespace: {{ .Release.Namespace }}
+        target:
+          type: AverageValue
+          averageValue: {{ .Values.workerHpaML.queueGrowthRateTarget | quote }}
+    {{- end }}
+    
+    {{- if .Values.workerHpaML.useCPU }}
+    # =====================================================
+    # RESOURCE METRIC: CPU Utilization
+    # (Safety metric to prevent CPU starvation)
+    # =====================================================
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.workerHpaML.cpuTarget }}
+    {{- end }}
+    
+    {{- if .Values.workerHpaML.useMemory }}
+    # =====================================================
+    # RESOURCE METRIC: Memory Utilization
+    # (Safety metric to prevent OOM)
+    # =====================================================
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.workerHpaML.memoryTarget }}
+    {{- end }}
+
+---
+# ServiceMonitor for Prometheus to scrape LSTM metrics
+{{- if .Values.prometheusOperator.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-lstm-metrics
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lstm-metrics
+spec:
+  selector:
+    matchLabels:
+      {{- include "bybit-strategy-tester.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.workerHpaML.scrapeInterval }}
+      scrapeTimeout: {{ .Values.workerHpaML.scrapeTimeout }}
+      relabelings:
+        # Add namespace label
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        # Add pod label
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        # Keep only LSTM metrics
+        - sourceLabels: [__name__]
+          regex: 'lstm_.*'
+          action: keep
+{{- end }}
+
+---
+# PrometheusRule for LSTM-based alerting
+{{- if .Values.prometheusOperator.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-lstm-alerts
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lstm-alerts
+spec:
+  groups:
+    - name: lstm_predictions
+      interval: 30s
+      rules:
+        # =====================================================
+        # Alert: High Predicted Queue
+        # =====================================================
+        - alert: HighPredictedQueue
+          expr: |
+            avg(lstm_predicted_queue_length{namespace="{{ .Release.Namespace }}",horizon_minutes="5"}) > {{ .Values.workerHpaML.predictedQueueTarget }}
+          for: 2m
+          labels:
+            severity: warning
+            component: lstm
+          annotations:
+            summary: "LSTM predicts high queue in 5 minutes"
+            description: "Predicted queue length: {{`{{ $value }}`}} (target: {{ .Values.workerHpaML.predictedQueueTarget }})"
+        
+        # =====================================================
+        # Alert: Very High Predicted Queue (Critical)
+        # =====================================================
+        - alert: CriticalPredictedQueue
+          expr: |
+            avg(lstm_predicted_queue_length{namespace="{{ .Release.Namespace }}",horizon_minutes="5"}) > {{ mul .Values.workerHpaML.predictedQueueTarget 2 }}
+          for: 1m
+          labels:
+            severity: critical
+            component: lstm
+          annotations:
+            summary: "LSTM predicts CRITICAL queue spike"
+            description: "Predicted queue length: {{`{{ $value }}`}} (critical threshold: {{ mul .Values.workerHpaML.predictedQueueTarget 2 }})"
+        
+        # =====================================================
+        # Alert: Low Prediction Confidence
+        # =====================================================
+        - alert: LowPredictionConfidence
+          expr: |
+            avg(lstm_prediction_confidence{namespace="{{ .Release.Namespace }}"}) < 0.5
+          for: 5m
+          labels:
+            severity: info
+            component: lstm
+          annotations:
+            summary: "LSTM predictions have low confidence"
+            description: "Confidence score: {{`{{ $value }}`}} (consider retraining model)"
+        
+        # =====================================================
+        # Alert: LSTM Model Not Trained
+        # =====================================================
+        - alert: LSTMModelNotTrained
+          expr: |
+            lstm_model_version{namespace="{{ .Release.Namespace }}"} == 0
+          for: 10m
+          labels:
+            severity: warning
+            component: lstm
+          annotations:
+            summary: "LSTM model not trained"
+            description: "Train model using POST /api/v1/ml/lstm/train"
+        
+        # =====================================================
+        # Alert: High Prediction Latency
+        # =====================================================
+        - alert: HighPredictionLatency
+          expr: |
+            histogram_quantile(0.99, rate(lstm_prediction_latency_seconds_bucket{namespace="{{ .Release.Namespace }}"}[5m])) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: lstm
+          annotations:
+            summary: "LSTM predictions are slow"
+            description: "99th percentile latency: {{`{{ $value }}`}}s (consider GPU acceleration)"
+        
+        # =====================================================
+        # Alert: Queue Growing Faster Than Predicted
+        # =====================================================
+        - alert: QueueGrowthDeviation
+          expr: |
+            (
+              rate(celery_queue_length{namespace="{{ .Release.Namespace }}"}[5m]) > 
+              rate(lstm_predicted_queue_length{namespace="{{ .Release.Namespace }}",horizon_minutes="5"}[5m]) * 1.5
+            )
+          for: 3m
+          labels:
+            severity: warning
+            component: lstm
+          annotations:
+            summary: "Actual queue growing faster than predicted"
+            description: "Model may need retraining with recent data"
+        
+        # =====================================================
+        # Recording Rule: Prediction Accuracy
+        # =====================================================
+        - record: lstm:prediction_accuracy:5m
+          expr: |
+            1 - abs(
+              avg(celery_queue_length{namespace="{{ .Release.Namespace }}"}) -
+              avg(lstm_predicted_queue_length{namespace="{{ .Release.Namespace }}",horizon_minutes="5"})
+            ) / avg(celery_queue_length{namespace="{{ .Release.Namespace }}"})
+        
+        # =====================================================
+        # Recording Rule: HPA Effectiveness
+        # =====================================================
+        - record: hpa:scale_efficiency:5m
+          expr: |
+            rate(kube_hpa_status_current_replicas{hpa="{{ include "bybit-strategy-tester.fullname" . }}-worker-hpa-ml",namespace="{{ .Release.Namespace }}"}[5m])
+{{- end }}
+
+---
+# ConfigMap for HPA tuning parameters
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-hpa-ml-config
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: hpa-ml-config
+data:
+  hpa-parameters.yaml: |
+    # ML-Powered HPA Configuration
+    
+    # Target metrics
+    predicted_queue_target: {{ .Values.workerHpaML.predictedQueueTarget }}
+    hybrid_queue_target: {{ .Values.workerHpaML.hybridQueueTarget }}
+    actual_queue_target: {{ .Values.workerHpaML.actualQueueTarget }}
+    queue_growth_rate_target: {{ .Values.workerHpaML.queueGrowthRateTarget }}
+    
+    # Scaling limits
+    min_replicas: {{ .Values.workerHpaML.minReplicas }}
+    max_replicas: {{ .Values.workerHpaML.maxReplicas }}
+    
+    # Scaling behavior
+    scale_up:
+      stabilization_window: {{ .Values.workerHpaML.scaleUpStabilizationWindow }}s
+      percentage: {{ .Values.workerHpaML.scaleUpPercentage }}%
+      pods: {{ .Values.workerHpaML.scaleUpPods }}
+      period: {{ .Values.workerHpaML.scaleUpPeriod }}s
+    
+    scale_down:
+      stabilization_window: {{ .Values.workerHpaML.scaleDownStabilizationWindow }}s
+      percentage: {{ .Values.workerHpaML.scaleDownPercentage }}%
+      pods: {{ .Values.workerHpaML.scaleDownPods }}
+      period: {{ .Values.workerHpaML.scaleDownPeriod }}s
+    
+    # Metric weights (for hybrid mode)
+    weights:
+      predicted_queue: 0.7
+      actual_queue: 0.3
+    
+    # LSTM model parameters
+    lstm:
+      sequence_length: 60  # minutes
+      prediction_horizon: 15  # minutes
+      confidence_threshold: 0.5
+      retrain_interval: 86400  # 24 hours
+    
+    # Alert thresholds
+    alerts:
+      high_queue: {{ .Values.workerHpaML.predictedQueueTarget }}
+      critical_queue: {{ mul .Values.workerHpaML.predictedQueueTarget 2 }}
+      low_confidence: 0.5
+      high_latency: 0.1  # seconds
+
+{{- end }}

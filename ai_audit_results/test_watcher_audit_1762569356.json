@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762569356,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762569339.3589568,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run successfully. This indicates either fatal test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage confirms no tests executed successfully. All code paths are untested, representing maximum coverage gap risk.\n\n## Potential Issues with Recent Changes\nThe single changed file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures\n- **Runtime exceptions** during test setup\n- **Infinite loops** or **memory issues** crashing test runner\n- **Configuration errors** in test environment\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test failure** - Check test logs for specific error causing Exit Code -1\n2. **Validate file syntax** - Run `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py`\n3. **Test isolation** - Run minimal test to verify basic functionality\n4. **Add basic unit tests** - Start with simple function tests before complex integration\n\n**FOLLOW-UP:**\n- Implement test environment validation\n- Add pre-commit hooks for syntax checking\n- Establish minimum 70% coverage threshold\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely dangerous:\n- **Critical functionality completely untested**\n- **Unknown runtime behavior**\n- **High probability of production failures**\n- **Potential data corruption or security vulnerabilities**\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 374,
+      "total_tokens": 509,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

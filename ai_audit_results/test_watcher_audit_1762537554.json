@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762537554,
+  "changed_files": [
+    "automation\\task3_audit_agent\\audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537541.7552884,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or system error). No tests executed successfully.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents maximum coverage gap - the entire codebase is untested.\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `audit_agent.py` - Likely breaking changes preventing test execution\n2. **Missing Dependencies** - Required imports may be unavailable\n3. **Runtime Exceptions** - Code crashes before tests can execute\n4. **Test Configuration Issues** - Test runner setup may be broken\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Fix syntax/runtime errors in `audit_agent.py`\n2. Verify all imports and dependencies are available\n3. Run basic syntax check: `python -m py_compile automation\\task3_audit_agent\\audit_agent.py`\n\n**Testing Recovery:**\n1. Start with minimal smoke test to verify basic functionality\n2. Add unit tests for core functions before expanding coverage\n3. Implement error handling to prevent complete test suite failure\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky. Critical bugs could go undetected.\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 303,
+      "total_tokens": 437,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762705113,
+  "changed_files": [
+    "fix_mcp_print_statements.py",
+    "mcp-server\\server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762705086.8534005,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test execution failure\n- Zero test execution suggests broken test infrastructure or environment\n- No coverage data collected due to test execution failure\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA AVAILABLE** - Tests failed before coverage could be measured:\n- 0.00% coverage across all files\n- Unable to assess actual code coverage gaps\n- Coverage instrumentation likely never activated\n\n## Potential Issues with Recent Changes\nThe modified files suggest MCP (Model Context Protocol) server changes:\n- `fix_mcp_print_statements.py` - Likely debugging/logging modifications\n- `mcp-server\\server.py` - Core server logic changes\n- **Primary suspect**: Recent changes broke test runner initialization or import paths\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Check test runner configuration and dependencies\n   - Verify Python path and import statements work\n   - Run with `-v` flag to see where tests fail\n\n2. **Debug Specific Issues**:\n   - Test import of modified files individually\n   - Check for syntax errors in recent changes\n   - Validate MCP server starts without test framework\n\n3. **Restore Basic Testing**:\n   - Create minimal smoke test for server startup\n   - Add basic unit test for print statement fixes\n   - Verify test discovery works with current file structure\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- No validation of MCP server functionality\n- Potential breaking changes undetected\n- Print statement fixes may introduce regressions\n- **Recommendation**: Block deployments until basic tests pass\n\n**Priority**: Fix test infrastructure immediately before addressing any feature changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 367,
+      "total_tokens": 501,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 70
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

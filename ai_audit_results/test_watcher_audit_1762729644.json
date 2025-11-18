@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762729644,
+  "changed_files": [
+    "test_critical_fixes.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762729630.113814,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either fatal runtime errors or test environment issues.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing failure rather than a coverage gap.\n\n## Potential Issues\n1. **Test File Syntax/Runtime Errors** - `test_critical_fixes.py` likely contains fatal Python errors\n2. **Missing Dependencies** - Required imports or test fixtures may be unavailable\n3. **Environment Configuration** - Test runner or environment may be misconfigured\n4. **Infinite Loops/Crashes** - Tests may be hanging or crashing the runner\n\n## Immediate Actions Required\n1. **Run tests locally** to see the actual error message\n2. **Check test file syntax** with `python -m py_compile test_critical_fixes.py`\n3. **Verify imports and dependencies** are available in test environment\n4. **Run with verbose output** to capture specific failure details\n\n## Risk Assessment\n**HIGH RISK** - No validation of recent changes. Production code is completely untested and may contain critical defects.\n\n## Priority Recommendations\n1. **Fix test execution first** - Address the Exit Code -1 before analyzing coverage\n2. **Add basic smoke tests** to verify test infrastructure works\n3. **Implement CI/CD failure alerts** for immediate notification of test crashes\n4. **Review recent changes** to `test_critical_fixes.py` for obvious syntax/import issues\n\n**Next Step**: The absolute priority is getting tests to run at all. Coverage analysis is irrelevant until Exit Code becomes 0.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 353,
+      "total_tokens": 478,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

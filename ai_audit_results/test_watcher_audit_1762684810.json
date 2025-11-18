@@ -1,0 +1,61 @@
+{
+  "timestamp": 1762684810,
+  "changed_files": [
+    "tests\\backend\\test_data_manager.py",
+    "tests\\backend\\test_walk_forward_optimizer.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_bybit_symbol_validation.py",
+    "tests\\backend\\test_backfill_service.py",
+    "temp_pg_test.py",
+    "tests\\backend\\test_mtf_api.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    "tests\\backend\\test_db_rollback_demo.py",
+    "tests\\backend\\test_mtf_alignment_example.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    "tests\\backend\\test_bybit_persistence.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    "tests\\backend\\test_mtf_manager.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_bybit_adapter.py",
+    "tests\\backend\\test_mcp_advanced_tools.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_utils_formatting.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\backend\\test_archival_service.py",
+    "tests\\test_edge_cases_stress.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    "tests\\backend\\test_monte_carlo_simulator.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_bybit_adapter_edgecases.py",
+    "tests\\backend\\test_bybit_ws_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762684791.0874062,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests never executed properly\n- Multiple test files modified, indicating widespread issues\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - This is a major red flag:\n- Coverage report is empty (`{}`)\n- Either tests crashed before collection or coverage setup is broken\n- Impossible to assess actual code coverage without valid data\n\n## 3. Potential Issues\n**Immediate suspects:**\n- **Environment corruption** - Modified `.venv` files suggest virtual environment issues\n- **Database connectivity** - Files like `test_db_rollback_demo.py` and PostgreSQL-related tests indicate DB problems\n- **Plugin conflicts** - Changes to `pluggy` and `pytest` internal files suggest dependency issues\n- **Configuration breakage** - Multiple backend test modifications point to core system changes\n\n## 4. Recommendations\n\n**IMMEDIATE ACTIONS:**\n1. **Fix test environment** - Recreate virtual environment and verify pytest installation\n2. **Check database connectivity** - Ensure test databases are accessible\n3. **Run tests individually** - Start with basic tests to isolate the crash point\n4. **Verify pytest configuration** - Check `pytest.ini`/`conftest.py` for recent changes\n\n**SHORT-TERM:**\n5. **Add test logging** - Implement detailed logging to capture crash details\n6. **Create smoke tests** - Add basic health checks before full test suite\n7. **Fix coverage setup** - Ensure coverage is properly configured and reporting\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential undetected production issues\n- Development blocked until tests are functional\n- High probability of regression issues\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 514,
+      "completion_tokens": 425,
+      "total_tokens": 939,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 450
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

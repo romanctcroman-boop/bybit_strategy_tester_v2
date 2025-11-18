@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762598669,
+  "changed_files": [
+    "ask_deepseek_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762598653.9377034,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely test harness crash or environment issues). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - Zero code coverage detected. This means:\n- No tests ran to completion\n- Potentially fatal errors in test setup/configuration\n- Missing test dependencies or environment\n\n## Potential Issues with Recent Changes\n1. **ask_deepseek_optimization.py** likely contains syntax errors or import issues preventing test execution\n2. Possible circular imports or missing dependencies\n3. Test runner configuration may be broken\n4. Environment variables or paths may be misconfigured\n\n## Immediate Action Recommendations\n1. **Fix Test Execution First**:\n   - Run tests with `-v` flag to see specific failure details\n   - Check for syntax errors: `python -m py_compile ask_deepseek_optimization.py`\n   - Verify test discovery with `python -m pytest --collect-only`\n\n2. **Infrastructure Checks**:\n   - Confirm pytest/coverage installation\n   - Check for missing `__init__.py` files\n   - Validate virtual environment activation\n\n3. **Debug Steps**:\n   - Run minimal test: `python -c \"import ask_deepseek_optimization\"`\n   - Check import dependencies\n   - Review recent changes to test configuration\n\n## Risk Assessment\n**HIGH RISK** - Code changes cannot be validated. Shipping current state risks:\n- Runtime errors in production\n- Regression bugs undetected\n- Broken functionality\n\n**Priority**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 343,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762559728,
+  "changed_files": [
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "ask_deepseek_chat_directly.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_phase1_security.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762559708.7605593,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BLACKOUT** - 0.00% coverage means:\n- No tests executed to completion\n- Potential environment/config issues preventing test execution\n- Possible circular imports or dependency failures\n- Critical business logic completely untested\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **ML/API Integration Risks**: `lstm_predictions.py` + `lstm_queue_predictor.py` changes may have broken imports or dependencies\n2. **MTF Engine Changes**: `mtf_engine.py` modifications could cause system-wide failures\n3. **Database/Query Changes**: `test_query_optimization.py` suggests schema/performance changes\n4. **Security Test Failures**: `test_phase1_security.py` indicates security-related breaking changes\n\n## Immediate Action Recommendations\n1. **Debug Test Infrastructure**:\n   - Check Python environment and dependencies\n   - Verify database connections and test fixtures\n   - Run tests with `-v` flag to see where they crash\n\n2. **Isolate the Break**:\n   ```bash\n   python -m pytest tests/ --collect-only  # Check if tests can be discovered\n   python -m pytest tests/test_phase1_security.py -v  # Test smallest scope first\n   ```\n\n3. **Fix Critical Path**:\n   - Start with security tests (often have strict requirements)\n   - Then database tests (common dependency failure point)\n   - Finally ML/API tests (most complex dependencies)\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be blind:\n- Zero confidence in system stability\n- Security vulnerabilities potentially undetected\n- ML predictions and financial data processing completely untested\n- Database integrity unverified\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 293,
+      "completion_tokens": 439,
+      "total_tokens": 732,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 229
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

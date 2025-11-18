@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762592815,
+  "changed_files": [
+    "automation\\deepseek_robot\\demo_advanced_architecture.py",
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762592797.6716692,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data means tests didn't run at all\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- 0% coverage across all files\n- No tests executed for the changed architecture files\n- Impossible to assess actual code quality or regression risks\n\n## Potential Issues with Recent Changes\n1. **Architecture files likely broke test infrastructure:**\n   - `demo_advanced_architecture.py` may have initialization/import errors\n   - `advanced_architecture.py` could have syntax errors or missing dependencies\n2. **Test runner configuration failure**\n3. **Environment/dependency conflicts** from architectural changes\n\n## Immediate Recommendations\n1. **Fix Test Infrastructure First:**\n   - Check for syntax errors in both changed files\n   - Verify imports and dependencies in new architecture\n   - Run tests with `-v` flag to see specific failure points\n\n2. **Isolate the Break:**\n   ```bash\n   python -m py_compile automation/deepseek_robot/*.py  # Check syntax\n   python -c \"from automation.deepseek_robot import advanced_architecture\"  # Test imports\n   ```\n\n3. **Add Basic Smoke Test:**\n   - Create minimal test that imports and instantiates core components\n   - Verify test runner configuration files\n\n## Risk Assessment\n**HIGH RISK** - Current state is unacceptable:\n- **Deployment Risk:** Extreme - shipping completely untested code\n- **Regression Risk:** Maximum - no safety net for architectural changes\n- **Quality Risk:** Critical - unable to validate any functionality\n\n**Priority:** Fix test execution immediately before any further development. The architecture changes have likely introduced fundamental compatibility issues with your test environment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 145,
+      "completion_tokens": 395,
+      "total_tokens": 540,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 81
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

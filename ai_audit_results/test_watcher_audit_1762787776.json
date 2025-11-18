@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762787776,
+  "changed_files": [
+    "backend\\scaling\\health_checks.py",
+    "mcp-server\\providers\\health_checker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762787761.326441,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during testing\n- **No file-specific coverage data** - Testing infrastructure failed before collection\n- **Critical gap**: Entire codebase untested due to execution failure\n\n## Potential Issues with Recent Changes\nThe health check related files (`health_checks.py`, `health_checker.py`) likely introduced:\n- **Fatal import errors** or circular dependencies\n- **Environment configuration issues** (missing dependencies, broken imports)\n- **Syntax errors** or runtime exceptions that crash test runner\n- **Incompatible changes** breaking test infrastructure\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution** - Run tests with `-v` flag to see specific failure points\n2. **Check imports** in changed files for circular dependencies\n3. **Validate environment** - Ensure all dependencies are installed\n4. **Add try-catch blocks** around health check initialization\n\n**Medium-term:**\n5. Implement basic smoke tests before full test suite\n6. Add integration test for health check endpoints\n7. Set up test environment validation script\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Production instability** - If tests can't run, deployments are risky\n- **Regression risk** - No safety net for future changes\n- **Critical path failure** - Health checks are essential for system monitoring\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 141,
+      "completion_tokens": 353,
+      "total_tokens": 494,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 77
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

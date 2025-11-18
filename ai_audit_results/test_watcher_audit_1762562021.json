@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762562021,
+  "changed_files": [
+    "temp_pg_test.py",
+    "refactor_pass2_deepseek.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762562005.0689883,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental runtime issues\n\n## Coverage Analysis & Gaps\n**Total Failure** - No meaningful coverage data exists:\n- Zero coverage across all files\n- Test infrastructure itself may be broken\n- Unable to assess actual code coverage gaps\n\n## Potential Issues with Recent Changes\n**High Risk Areas:**\n1. **Psycopg2 modification** - Changes to database driver (`__init__.py`) likely caused fatal errors\n2. **Database connection issues** - PostgreSQL driver modifications often cause segfaults\n3. **Environment corruption** - Virtual env package modifications suggest dependency conflicts\n4. **Refactored code** - `refactor_pass2_deepseek.py` may introduce breaking changes\n\n## Immediate Recommendations\n1. **ROLLBACK** psycopg2 changes immediately - restore original package\n2. **Isolate database tests** - run without modified psycopg2 first\n3. **Check Python environment** - recreate virtual environment if corrupted\n4. **Add basic smoke test** - verify tests can run before complex refactoring\n5. **Test incrementally** - validate each change before proceeding\n\n## Risk Assessment\n**HIGH RISK** - Current state is completely broken:\n- **Production Risk**: Critical - cannot validate any functionality\n- **Regression Risk**: Extreme - no test feedback on changes\n- **Debugging Complexity**: High - exit code -1 suggests low-level system issues\n\n**Priority #1**: Fix test execution before any further development. Current state provides zero quality assurance.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 366,
+      "total_tokens": 522,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

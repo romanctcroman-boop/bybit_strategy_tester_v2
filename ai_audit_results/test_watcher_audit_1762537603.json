@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762537603,
+  "changed_files": [
+    "automation\\task3_audit_agent\\audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537582.4843333,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files indicates:\n- Test suite failed before any code execution\n- No tests reached the actual code under test\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\nThe audit_agent.py modification likely introduced:\n- **Syntax errors** preventing module import\n- **Fatal runtime exceptions** during test setup\n- **Missing dependencies** or broken imports\n- **Environment configuration** issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test harness** - Investigate why tests crash before execution\n2. **Check syntax** - Validate audit_agent.py for basic Python syntax\n3. **Verify imports** - Ensure all dependencies are available\n4. **Run minimal test** - Create simple smoke test to verify basic functionality\n\n**Short-term:**\n- Add try/catch blocks around test initialization\n- Implement basic logging to capture failure points\n- Create isolated unit test for audit_agent.py\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No validation of recent changes\n- Complete testing breakdown\n- High probability of production defects\n- Urgent attention required before further development\n\n**Priority:** Fix test infrastructure immediately before addressing any feature changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 308,
+      "total_tokens": 442,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

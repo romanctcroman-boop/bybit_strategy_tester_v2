@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762606077,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762606057.3996222,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental infrastructure or configuration issues rather than test logic problems.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality or functionality.\n\n## Potential Issues with Recent Changes\nThe single changed file `tests\\backend\\conftest.py` is highly suspicious:\n- **Configuration corruption** - pytest configuration/plugins likely broken\n- **Fixture failures** - Critical test dependencies may be failing to initialize\n- **Import errors** - Module dependencies or paths may be misconfigured\n- **Syntax errors** - Recent changes may contain invalid Python syntax\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug conftest.py** - Revert recent changes or examine for syntax/import errors\n2. **Run pytest with `-v` flag** to see specific failure details\n3. **Check pytest configuration** - Verify pytest.ini/pyproject.toml settings\n4. **Test isolation** - Run tests outside the backend directory to isolate the issue\n\n**FOLLOW-UP:**\n- Add pre-commit hooks to validate pytest configuration\n- Implement basic smoke tests for test infrastructure\n- Monitor test execution time for early failure detection\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in code quality. Shipping any code in this state carries significant risk of:\n- Undetected regressions\n- Production failures\n- Security vulnerabilities\n\n**Priority:** Fix test infrastructure immediately before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 352,
+      "total_tokens": 479,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

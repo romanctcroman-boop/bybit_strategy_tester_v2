@@ -1,0 +1,50 @@
+{
+  "timestamp": 1762620447,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    "tests\\test_sandbox_integration.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    "tests\\test_protocol.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_mtf_engine.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762620428.8140168,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- No tests executed successfully\n- This suggests fundamental environment or code issues\n\n## 2. Coverage Analysis\n**ZERO COVERAGE** - All metrics show 0.00%\n- No code was executed during test run\n- This is a symptom, not the root cause - focus on why tests won't run\n\n## 3. Potential Issues\n**Primary suspects:**\n- **Environment corruption**: Modified files in `.venv\\Lib\\site-packages` suggest virtual environment issues\n- **Plugin conflicts**: Changes to `pluggy` and `pytest` core files indicate potential hook/plugin problems\n- **Recent code changes**: `backend\\core\\mtf_engine.py` modifications may have introduced fatal errors\n- **Circular imports** or **initialization failures** preventing test startup\n\n## 4. Immediate Actions Required\n\n**HIGH PRIORITY:**\n1. **Recreate virtual environment** - Delete `.venv` and reinstall dependencies\n2. **Run minimal test** - Execute a single, simple test to isolate the issue\n3. **Check `mtf_engine.py`** - Recent changes here are likely causing fatal errors\n4. **Verify pytest installation** - Reinstall pytest and plugins\n\n**DEBUGGING STEPS:**\n```bash\n# Start with basics\npython -c \"print('Python works')\"\npytest tests/ -v --tb=short  # Get minimal traceback\npytest tests/test_protocol.py -v  # Test single file\n```\n\n## 5. Risk Assessment\n**HIGH RISK** - Production deployment would fail\n- **Critical**: No working test suite\n- **High**: Potential runtime crashes in production\n- **Medium**: Unknown code quality without test feedback\n\n**NEXT STEPS:**\n1. Fix environment first (recreate venv)\n2. Identify the fatal error causing exit code -1\n3. Restore basic test functionality before addressing coverage\n4. Add CI checks to prevent virtual environment corruption\n\n**Priority**: Fix test execution before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 403,
+      "completion_tokens": 480,
+      "total_tokens": 883,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 339
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762541237,
+  "changed_files": [
+    "tests\\recovery\\test_disk_full.py",
+    "tests\\recovery\\test_component_crash.py",
+    "tests\\recovery\\test_network_failure.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541210.6334858,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely segmentation fault, environment crash, or fatal Python error). Test infrastructure itself is broken.\n\n## Coverage Analysis & Gaps\n**0% coverage** means:\n- No tests executed successfully\n- All recovery scenarios untested\n- Complete testing blackout for critical failure recovery paths\n\n## Potential Issues with Recent Changes\nThe 3 modified recovery test files likely contain:\n- Fatal import errors or syntax errors\n- Environment-destroying operations (disk filling, process killing)\n- Missing test dependencies or setup\n- Infinite loops or resource exhaustion\n- Corrupted test fixtures/teardown\n\n## Recommendations for Improvement\n**Immediate (Next 30 minutes):**\n1. Run tests individually to identify which file causes the crash\n2. Check test logs for stack traces or error messages\n3. Verify test environment isolation and resource limits\n\n**Short-term (Today):**\n1. Add proper error handling in recovery tests\n2. Implement resource cleanup in test teardown\n3. Add test timeouts and resource monitoring\n4. Create isolated test environments for destructive operations\n\n**Long-term:**\n1. Implement staged test execution (safe tests first)\n2. Add pre-flight checks for destructive tests\n3. Monitor test resource consumption\n\n## Risk Assessment\n**HIGH RISK** - Recovery mechanisms are completely untested. Any of these scenarios in production could cause:\n- Data loss or corruption\n- System downtime\n- Cascading failures\n- Inability to recover from expected failure conditions\n\n**Priority:** Fix immediately - this represents a complete testing breakdown that masks potential production failures.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 155,
+      "completion_tokens": 346,
+      "total_tokens": 501,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 91
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

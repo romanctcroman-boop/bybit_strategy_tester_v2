@@ -1,0 +1,22 @@
+{
+  "timestamp": 1762714064,
+  "changed_files": [
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762714061.2888968,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "error": "peer closed connection without sending complete message body (incomplete chunked read)",
+    "success": false
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

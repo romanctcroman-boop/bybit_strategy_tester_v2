@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762550857,
+  "changed_files": [
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "backend\\api\\parallel_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762550841.15037,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental runtime issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- Zero coverage across all files indicates tests didn't run\n- No meaningful coverage data to analyze\n- Critical gap: entire test infrastructure is broken\n\n## Potential Issues with Recent Changes\n1. **Psycopg2 Integration**: Changes to `temp_pg_test.py` and psycopg2 files suggest PostgreSQL connection issues\n2. **Parallel Client Conflicts**: `parallel_deepseek_client.py` modifications may introduce threading/process conflicts\n3. **Environment Corruption**: `.venv` modifications indicate potential dependency or environment issues\n4. **Database Connection Failures**: Likely PostgreSQL connection crashes causing segmentation faults\n\n## Immediate Action Recommendations\n1. **ISOLATE THE CRASH**: Run tests with `python -m pytest -xvs --tb=short` to identify crashing test\n2. **CHECK DATABASE CONNECTIONS**: Verify PostgreSQL service is running and credentials are correct\n3. **VALIDATE DEPENDENCIES**: Recreate virtual environment: `rm -rf .venv && python -m venv .venv && pip install -r requirements.txt`\n4. **TEST IN ISOLATION**: Run individual test files to identify which component causes the crash\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would fail catastrophically:\n- Complete test suite failure indicates unstable codebase\n- Database integration issues could cause production outages\n- Parallel processing changes may introduce race conditions\n- Immediate fix required before any further development\n\n**Priority**: Fix test infrastructure before addressing any feature development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 158,
+      "completion_tokens": 389,
+      "total_tokens": 547,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 94
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

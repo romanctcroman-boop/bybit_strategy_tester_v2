@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762641879,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\mcp\\shared\\session.py",
+    "test_mcp_tools.py",
+    ".venv\\Lib\\site-packages\\anyio\\_backends\\_asyncio.py",
+    ".venv\\Lib\\site-packages\\anyio\\streams\\memory.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\low_level.py",
+    ".venv\\Lib\\site-packages\\anyio\\abc\\_streams.py",
+    ".venv\\Lib\\site-packages\\anyio\\_core\\_eventloop.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762641863.833916,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage means no tests executed successfully\n- Test infrastructure appears broken rather than individual test failures\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files show any coverage data\n- Either test runner crashed before collecting coverage or all tests failed immediately\n- Unable to assess actual code coverage gaps due to total system failure\n\n## Potential Issues with Recent Changes\n**ENVIRONMENT/SETUP PROBLEMS:**\n- Modified files in `.venv/` suggest virtual environment corruption\n- Changes to `anyio` and `mcp` packages indicate dependency conflicts or version mismatches\n- Likely incompatible package versions or broken installation\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Rebuild virtual environment:**\n   ```bash\n   rm -rf .venv/\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Run tests in isolation:**\n   ```bash\n   python -m pytest test_mcp_tools.py -v --tb=short\n   ```\n\n3. **Check dependency compatibility:**\n   - Verify `anyio`, `mcp`, and `fastmcp` version compatibility\n   - Review recent dependency updates\n\n4. **Add basic smoke test:**\n   - Create simple test that imports modules without execution\n   - Verify environment setup before running full test suite\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback\n- Potential runtime crashes in production\n- Dependency hell scenario\n- Impossible to validate any code changes\n\n**Priority:** Fix test environment immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 247,
+      "completion_tokens": 381,
+      "total_tokens": 628,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 183
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

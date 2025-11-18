@@ -1,0 +1,99 @@
+/* Dashboard Layout - на основе макета */
+
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+/* Header - зеленый фон */
+.dashboard-header {
+  background: linear-gradient(135deg, #2d5016 0%, #3d6b1f 100%);
+  padding: 12px 24px;
+  min-height: 60px;
+  border-bottom: 2px solid #4a7c2c;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Main Content Area */
+.dashboard-main {
+  display: grid;
+  grid-template-columns: 70fr 30fr;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left Panel - синий фон */
+.left-panel {
+  background: linear-gradient(180deg, #0a0a3f 0%, #000033 100%);
+  padding: 20px;
+  overflow-y: auto;
+  border-right: 2px solid #1a1a5a;
+}
+
+/* Right Panel - бирюзовый фон */
+.right-panel {
+  background: linear-gradient(180deg, #0d4d4d 0%, #085858 100%);
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* Footer - фиолетовый фон */
+.dashboard-footer {
+  background: linear-gradient(135deg, #4a0e4e 0%, #6a1b6d 100%);
+  padding: 10px 24px;
+  min-height: 40px;
+  border-top: 2px solid #7a2b7d;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Scrollbar styling */
+.left-panel::-webkit-scrollbar,
+.right-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.left-panel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 51, 0.5);
+}
+
+.right-panel::-webkit-scrollbar-track {
+  background: rgba(8, 88, 88, 0.5);
+}
+
+.left-panel::-webkit-scrollbar-thumb,
+.right-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.left-panel::-webkit-scrollbar-thumb:hover,
+.right-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+  .dashboard-main {
+    grid-template-columns: 65fr 35fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .dashboard-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: 60fr 40fr;
+  }
+
+  .left-panel {
+    border-right: none;
+    border-bottom: 2px solid #1a1a5a;
+  }
+}

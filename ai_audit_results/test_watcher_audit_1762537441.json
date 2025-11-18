@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762537441,
+  "changed_files": [
+    "automation\\task1_test_watcher\\test_watcher.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537426.082876,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution, likely due to:\n- Syntax errors in test files\n- Missing dependencies or imports\n- Configuration issues\n- Runtime exceptions during test discovery\n\n## Coverage Analysis\n**0.00% coverage** - No code is being executed, indicating:\n- Tests are failing before any actual test logic runs\n- Test discovery/loading is broken\n- No meaningful testing is occurring\n\n## Potential Issues with Recent Changes\nThe modified `test_watcher.py` file likely contains:\n- Syntax errors (missing parentheses, incorrect indentation)\n- Broken imports or module references\n- Configuration errors in test setup/teardown\n- Infinite loops or blocking operations preventing test completion\n\n## Recommendations for Improvement\n1. **Immediate Actions:**\n   - Run `python -m py_compile automation\\task1_test_watcher\\test_watcher.py` to check for syntax errors\n   - Execute tests with `-v` flag to see detailed failure messages\n   - Check test configuration and environment setup\n\n2. **Debugging Steps:**\n   - Add `print(\"Test starting\")` at file beginning to verify execution\n   - Comment out recent changes incrementally to identify breaking modifications\n   - Verify all imports and dependencies are available\n\n3. **Prevention:**\n   - Add pre-commit hooks to validate syntax\n   - Implement basic smoke tests for test files\n   - Use IDE linting to catch syntax issues before commit\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression protection\n- Potential for undetected production bugs\n- Broken CI/CD pipeline\n- Development blocking until resolved\n\n**Priority:** Fix immediately - this blocks all meaningful testing and deployment safety.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 377,
+      "total_tokens": 510,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 5
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

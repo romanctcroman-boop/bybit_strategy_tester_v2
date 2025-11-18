@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762550894,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\primitives\\__init__.py",
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\__init__.py",
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\primitives\\kdf\\__init__.py",
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\primitives\\kdf\\pbkdf2.py",
+    "automation\\task2_key_manager\\key_manager.py",
+    ".venv\\Lib\\site-packages\\cryptography\\__init__.py",
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\primitives\\hashes.py",
+    ".venv\\Lib\\site-packages\\cryptography\\fernet.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762550880.2084303,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests never executed properly\n- No coverage data available for analysis\n\n## Coverage Analysis & Gaps\n**NO MEASURABLE COVERAGE** - Critical gaps:\n- Zero coverage across all files\n- Unable to assess actual code coverage\n- Test infrastructure appears broken\n\n## Potential Issues with Recent Changes\n1. **Virtual environment corruption** - Modified `.venv` packages suggest dependency issues\n2. **Cryptography library conflicts** - Multiple cryptography module changes may indicate version mismatches\n3. **Import/initialization errors** - Exit code -1 suggests fatal import errors or environment issues\n4. **Path configuration problems** - Virtual environment paths may be incorrectly configured\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution environment:**\n   - Recreate virtual environment: `python -m venv .venv`\n   - Reinstall dependencies with pinned versions\n   - Verify cryptography library compatibility\n\n2. **Debug test runner:**\n   - Run tests with `-v` flag to see specific failures\n   - Check for unhandled exceptions in test setup\n   - Validate import statements in test files\n\n3. **Isolate the failure:**\n   - Run simplest test case first\n   - Check environment variables and path configurations\n   - Verify pytest/coverage configuration\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback mechanism\n- Potential deployment of untested code\n- Environment instability affecting development\n- Cryptographic functionality may be compromised\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 305,
+      "completion_tokens": 367,
+      "total_tokens": 672,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 241
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

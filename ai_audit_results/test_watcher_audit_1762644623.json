@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762644623,
+  "changed_files": [
+    "backend\\core\\backtest_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762644610.6062167,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with either test infrastructure or code changes.\n\n## Coverage Analysis & Gaps\n- **0% coverage** - No tests executed successfully\n- No coverage data available for analysis\n- Complete testing gap across entire codebase\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `backtest_engine.py` likely causing test runner crash\n2. **Breaking changes** that prevent test discovery/execution\n3. **Missing dependencies** or environment configuration issues\n4. **Circular imports** or module loading failures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Fix test execution first - check for syntax errors in `backtest_engine.py`\n2. Run isolated test on the changed file: `python -m pytest backend/core/test_backtest_engine.py -v`\n3. Verify imports and dependencies in the modified file\n4. Check test configuration and environment setup\n\n**Follow-up:**\n5. Add basic smoke tests for core functionality\n6. Implement minimum 80% coverage target for new changes\n7. Set up pre-commit hooks to prevent syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would likely cause production failures:\n- Untested core engine changes\n- Unknown impact on dependent modules\n- Potential runtime crashes in production environment\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 310,
+      "total_tokens": 438,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

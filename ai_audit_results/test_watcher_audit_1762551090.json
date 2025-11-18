@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762551090,
+  "changed_files": [
+    "backend\\health_checks.py",
+    "backend\\app.py",
+    "test_parallel_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762551076.1765962,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1), indicating fundamental issues with the test environment, configuration, or code syntax.\n\n## Coverage Analysis\n**0% coverage** across all files suggests:\n- Tests are not executing at all\n- Possible import errors or runtime failures before test collection\n- Missing test configuration or dependencies\n\n## Potential Issues with Recent Changes\n1. **Health checks or app.py changes** may have introduced breaking changes\n2. **test_parallel_deepseek.py** likely contains syntax errors or incompatible imports\n3. Possible circular imports between changed files\n4. Missing dependencies for new test file\n\n## Immediate Actions Required\n1. **Fix test execution first** - Run with verbose output to identify failure point\n2. **Check imports** - Verify all modules in changed files can be imported\n3. **Validate test configuration** - Ensure pytest/coverage is properly configured\n4. **Run tests individually** to isolate the failing component\n\n## Risk Assessment\n**HIGH RISK** - No test validation of recent changes means:\n- Production code changes are completely untested\n- High probability of runtime errors in deployment\n- Potential for breaking existing functionality\n\n## Priority Recommendations\n1. **Immediate**: Fix test execution - start with `python -m pytest -v` to diagnose\n2. **Add basic smoke tests** for health_checks.py and app.py once tests run\n3. **Verify test_parallel_deepseek.py** imports and setup logic\n4. **Re-establish baseline** - get to minimal passing state before adding features\n\n**Next step**: Run with detailed logging to identify the specific failure causing exit code -1.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 140,
+      "completion_tokens": 350,
+      "total_tokens": 490,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 76
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

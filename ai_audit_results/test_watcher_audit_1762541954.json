@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762541954,
+  "changed_files": [
+    "temp_pg_test.py",
+    "automation\\metrics\\custom_metrics.py",
+    "automation\\metrics\\__init__.py",
+    "automation\\metrics\\prometheus_exporter.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541938.9285905,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test setup/execution, not just test failures. 0% coverage confirms no tests actually ran.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **No test execution**: Coverage data is empty {}\n- **Critical gap**: Test infrastructure is broken, making coverage measurement impossible\n\n## Potential Issues with Recent Changes\n1. **Database dependency failure**: `temp_pg_test.py` and psycopg2 changes suggest PostgreSQL connection issues\n2. **Import/circular dependency**: Changes in `automation\\metrics\\` package structure may break imports\n3. **Environment configuration**: `.venv` changes indicate potential virtual environment or dependency conflicts\n4. **Test setup failure**: Exit code -1 typically indicates unhandled exceptions in test configuration\n\n## Recommendations for Improvement\n**Immediate Actions (1-2 hours):**\n1. Run tests with `-v` flag to see exact failure point\n2. Check PostgreSQL service status and connection strings\n3. Verify `automation.metrics` imports work outside test context\n4. Examine test setup/teardown methods for unhandled exceptions\n\n**Short-term (Next day):**\n1. Add try-catch blocks around test setup code\n2. Create isolated unit tests for metrics modules\n3. Implement health checks for external dependencies\n4. Add test logging to capture initialization failures\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential production issues undetected\n- Metrics/exporters may be broken\n- Database integration untested\n\n**Priority**: Fix test infrastructure immediately before any further development. Without working tests, all subsequent changes carry significant regression risk.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 177,
+      "completion_tokens": 380,
+      "total_tokens": 557,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 113
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

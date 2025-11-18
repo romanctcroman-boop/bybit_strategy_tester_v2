@@ -1,0 +1,80 @@
+{
+  "timestamp": 1762543971,
+  "changed_files": [
+    "tests\\frontend\\test_smoke.py",
+    "backend\\security\\sandbox_executor.py",
+    "backend\\visualization\\advanced_charts.py",
+    "backend\\indicators\\__init__.py",
+    "backend\\scripts\\test_dr_system.py",
+    "backend\\utils\\password.py",
+    "backend\\scripts\\init_db.py",
+    "backend\\services\\adapters\\bybit.py",
+    "backend\\health_checks.py",
+    "tests\\monitoring\\test_health_endpoints.py",
+    "backend\\visualization\\demo_charts.py",
+    "backend\\security\\ast_validator.py",
+    "backend\\app.py",
+    "backend\\security\\logging_middleware.py",
+    "backend\\security\\rate_limiter.py",
+    "backend\\migrations\\versions\\2f4e6a7b8c9d_autogen_convert_timestamps_to_timestamptz.py",
+    "backend\\strategies\\sr_mean_reversion.py",
+    "backend\\scripts\\restore_database.py",
+    "backend\\security\\key_manager.py",
+    "backend\\scaling\\celery_integration.py",
+    "backend\\security\\crypto.py",
+    "tests\\integration\\test_postgres_upsert.py",
+    "backend\\scaling\\__init__.py",
+    "backend\\security\\auth_middleware.py",
+    "backend\\indicators\\rsi.py",
+    "backend\\strategies\\support_resistance.py",
+    "backend\\scripts\\dr_automation.py",
+    "backend\\utils\\__init__.py",
+    "tests\\test_backtest_task.py",
+    "backend\\services\\adapters\\binance.py",
+    "mcp-server\\file_finder_mcp.py",
+    "backend\\tasks\\optimize_tasks.py",
+    "backend\\utils\\formatting.py",
+    "backend\\scripts\\backup_database.py",
+    "backend\\services\\archival_service.py",
+    "backend\\security\\rbac_manager.py",
+    "backend\\tasks\\backtest_tasks.py",
+    "backend\\workers\\automl_worker.py",
+    "scripts\\probe_ports.py",
+    "backend\\services\\adapters\\bybit_async.py",
+    "backend\\strategies\\bollinger_mean_reversion.py",
+    "backend\\visualization\\__init__.py",
+    "scripts\\check_db_connect.py",
+    "backend\\services\\anomaly_detection_service.py",
+    "backend\\services\\ab_testing_service.py",
+    "backend\\security\\master_key_manager.py",
+    "backend\\orchestrator\\queue.py",
+    "backend\\strategies\\sr_rsi_strategy.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543953.483566,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception or system error)\n- 0% coverage suggests tests aren't even executing properly\n- No coverage data available for analysis\n\n## Coverage Analysis & Gaps\n**ALL COVERAGE IS MISSING** - This indicates:\n- Test environment setup failure\n- Possible import/dependency issues\n- Configuration problems in test runner\n- Critical infrastructure failures\n\n## Potential Issues with Recent Changes\nHigh-risk areas based on changed files:\n\n**Security Changes (Highest Risk):**\n- `sandbox_executor.py`, `ast_validator.py`, `crypto.py`, `key_manager.py` - Security components failing could block all execution\n- `auth_middleware.py`, `rate_limiter.py` - Authentication failures would prevent API access\n\n**Database/Infrastructure:**\n- Migration files and `init_db.py`/`restore_database.py` - DB connection/schema issues\n- `celery_integration.py` - Task queue system failures\n\n**External Service Adapters:**\n- `bybit.py`, `binance.py` - Exchange API integration failures\n\n## Immediate Action Recommendations\n\n1. **Diagnose Test Runner Failure:**\n   - Check test environment setup and dependencies\n   - Verify database connectivity\n   - Examine test runner configuration\n\n2. **Security First Approach:**\n   - Test security components in isolation\n   - Verify crypto/key management functionality\n   - Check authentication middleware\n\n3. **Infrastructure Validation:**\n   - Test database migrations independently\n   - Verify Celery worker connectivity\n   - Check external API adapters\n\n4. **Implement Progressive Testing:**\n   - Start with unit tests for core components\n   - Add integration tests gradually\n   - Focus on security and data persistence first\n\n## Risk Assessment\n**HIGH RISK** - Multiple critical systems affected:\n- **Security**: Authentication, encryption, sandboxing potentially compromised\n- **Data Integrity**: Database operations and migrations failing\n- **Business Critical**: Trading adapters and strategy execution at risk\n- **Monitoring**: Health checks and monitoring systems non-functional\n\n**Priority**: Fix test infrastructure immediately before any deployment. The complete test failure suggests fundamental environment or configuration issues that could affect production stability.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 662,
+      "completion_tokens": 478,
+      "total_tokens": 1140,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 598
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

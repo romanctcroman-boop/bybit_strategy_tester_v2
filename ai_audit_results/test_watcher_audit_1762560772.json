@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762560772,
+  "changed_files": [
+    "backend\\api\\task_queue.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762560757.1767435,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run. This indicates severe infrastructure or configuration issues.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is not a coverage gap but a complete test execution failure.\n\n## Potential Issues with Recent Changes\n1. **Syntax errors** in `task_queue.py` preventing import/execution\n2. **Missing dependencies** or broken imports in the changed file\n3. **Configuration issues** in test runner or environment setup\n4. **Circular imports** introduced by recent changes\n\n## Immediate Recommendations\n1. **Fix test execution first:**\n   - Run `python -m py_compile backend/api/task_queue.py` to check syntax\n   - Verify imports and dependencies in the changed file\n   - Check test configuration files for errors\n\n2. **Debug steps:**\n   - Run tests with `-v` flag to see where they fail\n   - Check for uncaught exceptions during test setup\n   - Verify all required test dependencies are installed\n\n3. **After fixing execution:**\n   - Add unit tests specifically for `task_queue.py` functionality\n   - Aim for 80%+ coverage on the modified file\n   - Implement integration tests for queue operations\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code could cause:\n- Production failures in task queue operations\n- Service downtime if queue processing breaks\n- Data loss or corruption in queue operations\n\n**Block deployment until tests execute successfully and achieve meaningful coverage.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 339,
+      "total_tokens": 465,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

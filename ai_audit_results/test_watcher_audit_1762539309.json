@@ -1,0 +1,44 @@
+{
+  "timestamp": 1762539309,
+  "changed_files": [
+    "tests\\unit\\test_structured_logger.py",
+    "tests\\test_walk_forward.py",
+    "tests\\unit\\test_lru_ttl_cache.py",
+    "tests\\unit\\test_retrain_scheduler.py",
+    "backend\\ml\\retrain_scheduler.py",
+    "tests\\unit\\test_drift_detector.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "tests\\integration\\test_e2e_audit_agent.py",
+    "tests\\unit\\test_ast_validator.py",
+    "tests\\integration\\test_e2e_test_watcher_v2.py",
+    "mcp-server\\mcp_cache.py",
+    "tests\\test_task_queue.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539295.3345478,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment/setup issues\n- Critical code errors preventing test execution\n- Missing dependencies or configuration\n\n## Coverage Analysis\n**COMPLETE COVERAGE GAP** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Possible import/initialization failures\n- Environment misconfiguration\n\n## Potential Issues with Recent Changes\n1. **Backend changes** (`retrain_scheduler.py`, `walk_forward_optimizer.py`) likely introduced breaking changes\n2. **MCP server cache** modifications may have dependency issues\n3. **Test file changes** across unit/integration tests suggest widespread impact\n\n## Immediate Recommendations\n1. **Debug Exit Code -1**: Check test runner logs for specific error messages\n2. **Verify Dependencies**: Ensure all required packages are installed and compatible\n3. **Run Tests Individually**: Isolate failing test files to identify root cause\n4. **Check Imports**: Validate imports in changed backend files haven't broken dependencies\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents:\n- Any quality assurance\n- Regression detection\n- Code validation\n- Deployment readiness\n\n**Priority**: Fix test execution immediately before any further development or deployment.\n\n**Next Steps**: \n1. Run `pytest -v` to see specific failure points\n2. Check for Python version compatibility issues\n3. Validate recent dependency updates\n4. Review changes to core backend modules for breaking API changes",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 268,
+      "completion_tokens": 334,
+      "total_tokens": 602,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 204
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

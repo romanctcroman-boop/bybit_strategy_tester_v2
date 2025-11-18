@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762716927,
+  "changed_files": [
+    "tests\\integration\\__init__.py",
+    "tests\\integration\\test_real_api_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762716908.7240324,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution entirely. This represents a complete breakdown in the testing pipeline.\n\n## Coverage Analysis & Gaps\n**0% coverage** across all files means:\n- No tests executed successfully\n- All code paths untested\n- No validation of integration logic\n- Complete absence of quality metrics\n\n## Potential Issues with Recent Changes\n1. **Integration test file changes** likely introduced fatal errors\n2. Possible issues:\n   - Broken imports in `test_real_api_integration.py`\n   - Missing dependencies or environment setup\n   - Syntax errors in test files\n   - Configuration issues in `__init__.py`\n   - Authentication/connection failures with real API\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check test file syntax: `python -m py_compile tests/integration/test_real_api_integration.py`\n3. Verify imports and dependencies in integration tests\n4. Ensure API endpoints/credentials are properly configured\n\n**Short-term:**\n- Add unit tests alongside integration tests\n- Implement test environment isolation\n- Add pre-commit test validation\n\n**Long-term:**\n- Establish minimum 70% coverage requirement\n- Implement staged testing (unit → integration → E2E)\n- Add automated test health monitoring\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functional tests exposes:\n- Critical business logic failures in production\n- Integration point failures with external APIs\n- Regression risks for all recent changes\n- Complete lack of quality assurance\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 360,
+      "total_tokens": 502,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,21 @@
+# Grafana Datasource Provisioning Configuration
+# This file follows Grafana's official datasource provisioning format
+# See: https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources
+# 
+# NOTE: VS Code YAML validator may show false errors for 'apiVersion' and 'datasources'
+# These properties are VALID and required by Grafana. The validator uses wrong schema.
+# yaml-language-server: disable
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: 15s
+      httpMethod: POST
+    version: 1

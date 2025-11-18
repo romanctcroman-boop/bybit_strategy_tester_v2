@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540636,
+  "changed_files": [
+    "tests\\stress\\test_parallel_execution.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540623.7621257,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). This indicates a fundamental problem in the test environment or test code itself, not just test failures.\n\n## Coverage Analysis\n**0% coverage** - No code was executed successfully. This is a direct result of the test crash, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe stress test `test_parallel_execution.py` likely contains:\n- Infinite loops or resource exhaustion\n- Memory leaks causing system crashes\n- Race conditions leading to deadlocks\n- Missing error handling for edge cases\n- Environment configuration issues\n\n## Immediate Recommendations\n\n1. **Debug the Crash First**\n   ```bash\n   python -m pytest tests/stress/test_parallel_execution.py -v --tb=short\n   ```\n   Run with minimal parallelism to identify the crash point.\n\n2. **Add Safe Guards**\n   - Implement timeout decorators\n   - Add resource monitoring (memory, CPU)\n   - Include graceful degradation for stress conditions\n\n3. **Isolate and Fix**\n   - Test the stress module in isolation\n   - Add incremental complexity with smaller test cases\n   - Verify environment can handle the load\n\n## Risk Assessment\n**HIGH RISK** - This crash indicates unstable test infrastructure that could mask real product issues. No reliable quality signals are being generated until resolved.\n\n**Priority:** Fix this immediately before any further testing or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 296,
+      "total_tokens": 425,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

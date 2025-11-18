@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762540230,
+  "changed_files": [
+    "tests\\stress\\test_api_rate_limits.py",
+    "tests\\stress\\test_parallel_execution.py",
+    "tests\\stress\\test_memory_leaks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540207.1186643,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely segmentation fault, environment crash, or fatal Python error). Stress tests may be causing system instability.\n\n## Coverage Analysis\n**0% coverage is a major red flag** - No code is being executed during test runs. This suggests:\n- Test environment not properly initialized\n- Tests crashing before execution begins\n- Import failures or dependency issues\n- Possible infinite loops or resource exhaustion in setup\n\n## Potential Issues with Recent Changes\nThe stress test files modified likely contain:\n- **Resource exhaustion** - Memory leaks or file descriptor limits being breached\n- **Race conditions** in parallel execution causing deadlocks\n- **API rate limit tests** potentially overwhelming systems\n- **Infinite loops** or unrecoverable errors in test setup\n\n## Immediate Recommendations\n1. **Isolate failing tests** - Run each stress test individually to identify the culprit\n2. **Add resource monitoring** - Implement memory/CPU limits and timeouts for stress tests\n3. **Fix test environment** - Ensure proper test isolation and cleanup between runs\n4. **Add progressive testing** - Start with single-threaded tests before parallel execution\n5. **Implement graceful degradation** - Tests should handle failures without crashing entire test suite\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential production instability if similar issues exist in code\n- Undetected regressions due to complete test failure\n- Possible infrastructure damage from unconstrained stress tests\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 153,
+      "completion_tokens": 336,
+      "total_tokens": 489,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 89
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

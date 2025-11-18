@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762760222,
+  "changed_files": [
+    "reliability\\distributed_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762760205.065683,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure, not just poor coverage.\n\n## Potential Issues with Recent Changes\nThe distributed_cache.py modification likely contains:\n- **Syntax errors** preventing module import\n- **Fatal runtime errors** during module initialization\n- **Missing dependencies** or broken imports\n- **Infinite loops** or blocking operations during import\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile reliability\\distributed_cache.py` to check for syntax errors\n2. Execute `python -c \"import reliability.distributed_cache\"` to identify import-time failures\n3. Check for missing imports or circular dependencies\n4. Verify all required dependencies are installed\n\n**Testing Process:**\n1. Add basic unit tests that don't require distributed infrastructure\n2. Implement mock-based tests for external dependencies\n3. Add integration tests only after unit tests pass\n4. Set up CI to fail fast on syntax/import issues\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable and potentially unstable. Without functioning tests:\n- No regression detection\n- No validation of distributed_cache functionality\n- High probability of production failures\n- Impossible to assess actual code quality\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 334,
+      "total_tokens": 459,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

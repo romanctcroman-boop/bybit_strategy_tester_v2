@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762546863,
+  "changed_files": [
+    "demo_prometheus_metrics.py",
+    "mcp-server\\tools\\analysis\\analysis_tools.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    "backend\\api\\deepseek_client.py",
+    "automation\\metrics\\__init__.py",
+    "automation\\metrics\\collectors\\system_collector.py",
+    "automation\\metrics\\collectors\\audit_agent_collector.py",
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    "automation\\metrics\\custom_metrics.py",
+    "backend\\api\\perplexity_client.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\_subprocess.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "automation\\metrics\\collectors\\__init__.py",
+    "temp_pg_test.py",
+    "tests\\monitoring\\test_metrics_export.py",
+    "tests\\monitoring\\__init__.py",
+    "automation\\metrics\\prometheus_exporter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762546846.3868256,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test framework failure\n- 0% coverage suggests tests didn't execute at all\n- Likely environment or dependency issues preventing test execution\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- No files were covered (0% across all changed files)\n- Critical monitoring components completely untested:\n  - Prometheus metrics exporters\n  - System/audit/test collectors  \n  - API clients (DeepSeek, Perplexity)\n- Database integration (psycopg2) not validated\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: Virtual env files modified (.venv) - likely dependency conflicts\n2. **Test Framework Damage**: pytest terminal.py changes may have broken test runner\n3. **Import/Circular Dependency Issues**: Multiple __init__.py files modified\n4. **Database Connectivity**: temp_pg_test.py suggests DB config problems\n\n## Immediate Action Recommendations\n1. **Restore Test Environment**:\n   ```bash\n   rm -rf .venv && python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Validate Test Runner**:\n   ```bash\n   pytest --version\n   pytest tests/ -v --tb=short\n   ```\n3. **Check Critical Dependencies**:\n   - Verify psycopg2 database connectivity\n   - Test Prometheus client initialization\n   - Validate API client configurations\n\n4. **Prioritize Core Tests**:\n   - Fix test_metrics_export.py first (monitoring foundation)\n   - Then system_collector tests\n   - Finally API client tests\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be dangerous:\n- ❌ No monitoring validation\n- ❌ Database operations untested  \n- ❌ External API integrations unverified\n- ❌ Critical system metrics unvalidated\n\n**Immediate Priority**: Fix test environment before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 341,
+      "completion_tokens": 428,
+      "total_tokens": 769,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 277
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

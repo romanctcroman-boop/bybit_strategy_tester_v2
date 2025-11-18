@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762557137,
+  "changed_files": [
+    "test_code_agent_quick.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762557122.9610374,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files\n- Import failures\n- Test framework configuration issues\n- Fatal errors during test discovery/setup\n\n## Coverage Analysis\n**0.00% COVERAGE** - No code coverage was collected because:\n- Tests never executed\n- No production code was touched\n- Coverage reporting failed entirely\n\n## Potential Issues with Recent Changes\nThe single changed file `test_code_agent_quick.py` likely contains:\n- Broken imports or syntax errors\n- Missing dependencies\n- Incorrect test configuration\n- Fatal exceptions in test setup/teardown\n\n## Recommendations\n**Immediate Actions:**\n1. **Debug test execution**: Run `python -m pytest test_code_agent_quick.py -v` to see specific error details\n2. **Check syntax**: Validate Python syntax in the test file\n3. **Verify imports**: Ensure all imported modules exist and are accessible\n4. **Examine test fixtures**: Review setUp/tearDown methods for errors\n\n**Follow-up:**\n5. Add basic smoke test to verify test framework works\n6. Implement CI pipeline that fails fast on test execution errors\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Unknown if recent changes broke functionality\n- Potential production defects undetected\n- Development blocked until tests are functional\n- All code changes are effectively untested\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 325,
+      "total_tokens": 451,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762544696,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_phase1_security.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\backend\\conftest.py",
+    "tests\\backend\\test_marketdata_ingest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762544680.4286797,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero tests executed successfully\n- No coverage data collected\n\n## Coverage Analysis\n**COVERAGE: 0%** - All gaps:\n- No tests executed means no code coverage\n- Cannot assess which parts of changed files are tested\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\n1. **Breaking changes in core components:**\n   - `mtf_engine.py` modifications likely introduced fatal errors\n   - LSTM predictor changes (`lstm_queue_predictor.py`, `lstm_predictions.py`) may have dependency issues\n\n2. **Test infrastructure failure:**\n   - `conftest.py` changes may have broken test setup/teardown\n   - Mock implementations (`*_mock.py` files) potentially incompatible\n\n3. **Integration conflicts:**\n   - Sandbox and security test failures suggest environment/config issues\n   - Database optimization changes might have broken query patterns\n\n## Immediate Actions Required\n1. **Debug test execution:**\n   ```bash\n   python -m pytest -v --tb=short tests/backend/test_marketdata_ingest.py\n   ```\n   Start with simplest test to identify root cause\n\n2. **Check recent changes:**\n   - Review `backend/core/mtf_engine.py` for syntax/runtime errors\n   - Verify imports and dependencies in modified files\n   - Test database connectivity and migrations\n\n3. **Fix test infrastructure:**\n   - Validate `conftest.py` fixtures\n   - Check environment variables and configs\n   - Ensure all dependencies are installed\n\n## Risk Assessment\n**HIGH RISK** - Production deployment blocked:\n- ❌ No validation of business logic changes\n- ❌ Security tests failing (potential vulnerabilities)\n- ❌ Core trading engine modifications untested\n- ❌ ML prediction pipeline unverified\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 421,
+      "total_tokens": 712,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 35
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

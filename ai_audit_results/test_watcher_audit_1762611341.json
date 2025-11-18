@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762611341,
+  "changed_files": [
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762611320.3040915,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely test harness crash or environment issues). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - All code changes are completely untested. No coverage data available suggests tests didn't even start executing.\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `perplexity.py` likely preventing test discovery\n2. **Missing dependencies** or broken imports\n3. **Environment configuration** issues (paths, API keys, etc.)\n4. **Test runner configuration** problems\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Run `python -m pytest --collect-only` to diagnose test discovery\n   - Check for syntax errors in `perplexity.py`\n   - Verify all imports resolve correctly\n\n2. **Basic Test Scaffolding**:\n   - Add minimal smoke test for `perplexity.py`\n   - Ensure tests can import the module\n   - Test basic initialization\n\n3. **Infrastructure Check**:\n   - Verify pytest configuration\n   - Check dependency installation\n   - Validate environment variables\n\n## Risk Assessment\n**HIGH RISK** - Code changes are completely unvalidated. Deployment would be extremely risky without any test verification. Critical functionality could be broken.\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 132,
+      "completion_tokens": 293,
+      "total_tokens": 425,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 4
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

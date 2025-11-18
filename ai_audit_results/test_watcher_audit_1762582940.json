@@ -1,0 +1,76 @@
+{
+  "timestamp": 1762582940,
+  "changed_files": [
+    "tests\\test_shared_circuit_breaker.py",
+    "backend\\api\\app.py",
+    "backend\\sandbox\\docker_sandbox.py",
+    "backend\\migrations\\versions\\add_reasoning_traces.py",
+    "tests\\test_task_queue_new.py",
+    "backend\\core\\redis_streams_queue.py",
+    "backend\\security\\__init__.py",
+    "backend\\config\\__init__.py",
+    "tests\\test_task_queue.py",
+    "backend\\scaling\\load_balancer.py",
+    "tests\\integration\\test_sandbox_executor.py",
+    "backend_api_deepseek_pool_temp.py",
+    "backend\\tasks\\backfill_tasks.py",
+    "backend\\api\\routers\\reasoning.py",
+    "backend\\security\\jwt_manager.py",
+    "backend\\models\\__init__.py",
+    "backend\\config\\timeout_config.py",
+    "backend\\api\\routers\\live.py",
+    "backend\\api\\routers\\health.py",
+    "backend\\migrations\\versions\\perf_indexes_001_add_performance_indexes.py",
+    "backend\\services\\reasoning_storage.py",
+    "backend\\api\\deepseek_pool.py",
+    "tests\\test_deepseek_pool_deadlock.py",
+    "backend\\security\\secure_logger.py",
+    "backend\\scaling\\dynamic_worker_scaling.py",
+    "backend\\api\\task_queue.py",
+    "backend\\migrations\\versions\\add_reasoning_kb_001.py",
+    "backend\\database\\models\\reasoning_trace.py",
+    "tests\\test_integration_full.py",
+    "backend\\database\\__init__.py",
+    "backend\\security\\audit_logger.py",
+    "backend\\scaling\\health_checks.py",
+    "backend\\services\\tournament_storage.py",
+    "backend\\scaling\\redis_consumer_groups.py",
+    "backend\\services\\data_service.py",
+    "scripts\\test_tournament_fixed.py",
+    "backend\\settings.py",
+    "backend\\core\\logging_config.py",
+    "backend\\services\\slack_service.py",
+    "backend\\services\\pagerduty_service.py",
+    "backend\\api\\routers\\admin.py",
+    "backend\\api\\shared_circuit_breaker.py",
+    "backend\\services\\sandbox_executor.py",
+    "backend\\database\\models\\tournament.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762582917.3181581,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely failing (Exit Code -1) with 0% coverage, indicating either:\n- Test environment/setup failure\n- Critical code errors preventing test execution\n- Missing test dependencies or configuration\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** across all files suggests:\n- Tests aren't executing at all\n- Possible import/initialization errors\n- Database/migration issues preventing test startup\n- Environment variables or config missing\n\n## Potential Issues with Recent Changes\nHigh-risk areas based on changed files:\n1. **Database Migrations** (`add_reasoning_traces.py`, `perf_indexes_001_add_performance_indexes.py`) - Likely schema conflicts\n2. **Security Changes** (`jwt_manager.py`, `secure_logger.py`, `audit_logger.py`) - Authentication/authorization breaking\n3. **Core Infrastructure** (`redis_streams_queue.py`, `load_balancer.py`, `dynamic_worker_scaling.py`) - System initialization failures\n4. **New Features** (`reasoning.py`, `deepseek_pool.py`) - Integration points failing\n\n## Immediate Recommendations\n1. **Debug Test Environment**:\n   - Check database connectivity and migration state\n   - Verify Redis/queue services are running\n   - Validate environment variables and configs\n\n2. **Isolate Failure**:\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   Run minimal test to identify root cause\n\n3. **Check Recent Changes**:\n   - Review migration files for conflicts\n   - Test security middleware changes in isolation\n   - Verify new API routers aren't causing import cycles\n\n4. **Fix Order**:\n   - Fix database migrations first\n   - Then security/auth issues  \n   - Then core infrastructure\n   - Finally feature tests\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail:\n- Critical path failures in core services\n- Security layer potentially broken\n- Database schema inconsistencies\n- Queue/worker systems non-functional\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 616,
+      "completion_tokens": 450,
+      "total_tokens": 1066,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 552
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762698517,
+  "changed_files": [
+    "run_full_project_audit.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762698501.167775,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **No coverage data available** - Test execution halted before collection could begin\n- **Critical gap**: Unable to assess actual code coverage due to test failure\n\n## Potential Issues with Recent Changes\n- **run_full_project_audit.py modifications likely caused test failure**\n- Possible issues:\n  - Syntax errors or import failures\n  - Infinite loops or resource exhaustion\n  - Environment configuration conflicts\n  - Critical exceptions during test setup\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test execution failure** - Check logs for specific error causing exit code -1\n2. **Rollback run_full_project_audit.py changes** to restore test functionality\n3. **Run tests incrementally** to isolate the failing component\n4. **Add pre-commit hooks** to catch syntax/import issues before commit\n\n**Medium-term:**\n1. **Implement smoke tests** that run basic functionality checks\n2. **Add test failure alerts** with detailed error reporting\n3. **Create isolated test environments** to prevent configuration conflicts\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Deployment risk**: Cannot verify code functionality\n- **Regression risk**: No confidence in recent changes\n- **Quality risk**: Entire test suite is non-functional\n- **Urgency**: Requires immediate attention before further development\n\n**Priority**: Fix test execution failure before addressing coverage or adding new features.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 359,
+      "total_tokens": 485,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762766401,
+  "changed_files": [
+    "auto_diagnostic_system.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762766386.6174045,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files confirms no tests executed. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `auto_diagnostic_system.py`, suggesting:\n- Syntax errors or import failures in the modified file\n- Breaking changes to critical dependencies or interfaces\n- Runtime errors that prevent module loading\n- Circular imports or initialization failures\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution** - Run tests with verbose output to identify the root cause\n2. **Check syntax** - Validate `auto_diagnostic_system.py` for basic Python syntax compliance\n3. **Isolate the failure** - Test the changed file in isolation to confirm it's the source\n4. **Review imports** - Verify all dependencies are available and compatible\n\n**PROCESS IMPROVEMENTS:**\n- Add pre-commit hooks to catch syntax errors\n- Implement smoke tests that run before full test suite\n- Set up incremental coverage tracking\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untested and potentially unstable. Any deployment would be extremely risky. The complete testing failure suggests fundamental issues that could affect core functionality.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 326,
+      "total_tokens": 452,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

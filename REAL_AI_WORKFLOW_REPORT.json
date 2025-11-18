@@ -1,0 +1,4247 @@
+{
+  "test_date": "2025-10-29T13:32:37.941002",
+  "test_period": {
+    "start": "2025-07-31T00:00:00",
+    "end": "2025-10-29T00:00:00"
+  },
+  "dialogue_turns": 8,
+  "results": {
+    "phase1_project_analysis": "The key considerations for selecting a **trading pair** and **testing period** for a 15-minute crypto backtesting system are: **volatility**, **liquidity**, and **data availability**. Each factor directly impacts the reliability and relevance of your backtest results.\n\n**Volatility**\n- Choose trading pairs with sufficient price movement; high volatility is essential for strategies like EMA Crossover and RSI Mean Reversion, which rely on price swings to generate signals[1].\n- Avoid pairs with extremely low volatility, as they may not produce enough trading opportunities or meaningful results in a 15-minute timeframe[1].\n\n**Liquidity**\n- Select pairs with high trading volume and tight bid-ask spreads to minimize slippage and ensure realistic execution modeling[4].\n- Low-liquidity pairs can distort backtest results due to simulated trades that would not be executable in live markets, especially on shorter timeframes like 15 minutes[4].\n- Major pairs (e.g., BTC/USDT, ETH/USDT) typically offer better liquidity and more reliable data for backtesting[1].\n\n**Data Availability**\n- Ensure comprehensive historical data is available for your chosen pair and period, including minute-level OHLCV (Open, High, Low, Close, Volume) data[1].\n- Gaps or inconsistencies in historical data can invalidate backtest results, especially for intraday strategies[1].\n- Confirm that your Bybit API integration provides sufficient depth and quality for the selected pair and timeframe[1].\n\n**Testing Period**\n- Select a period that includes diverse market conditions (bull, bear, sideways) to evaluate strategy robustness and avoid overfitting to a single regime[4].\n- The period should be long enough to generate a statistically significant number of trades (ideally 50-100+)[6].\n- Avoid periods with known data outages or exchange anomalies.\n\n**Additional Considerations**\n- Model realistic trading costs (fees, slippage, spread) for the selected pair, as these can significantly impact performance, especially in lower-liquidity environments[4].\n- Document all parameters (entry/exit rules, position sizing, etc.) before running the backtest to ensure repeatability and transparency[2].\n- Consider walk-forward or out-of-sample validation to avoid overfitting and assess generalizability[4].\n\nIn summary, prioritize **high-liquidity, volatile pairs with complete historical data** over a period that reflects varied market conditions, and always account for trading frictions to ensure your 15-minute backtest results are robust and actionable[1][4][6].",
+    "phase2_pair_selection": "The best cryptocurrency pair for backtesting on Bybit from July 31 to October 29, 2025, meeting your criteria is **MNTUSDT (Mantle/USDT)**.\n\n**Reasoning:**\n\n- **High liquidity:** MNT experienced a record-breaking 450% surge in trading volume on Bybit during Q3 2025, making it one of the most actively traded assets on the platform in this period[3]. Bybit’s recent delisting activity specifically targeted low-liquidity pairs, but MNT was not affected, indicating it meets and exceeds Bybit’s liquidity requirements[1].\n- **Good volatility for 15-minute trading:** MNT’s price more than doubled since early August 2025, and its trading activity “soared well beyond the platform’s overall trajectory,” reflecting strong intraday volatility suitable for short-term strategies like EMA crossovers[3].\n- **Stable data availability:** MNT’s trading activity and user engagement were consistently high from July through October 2025, ensuring reliable and continuous data for backtesting over your specified 3-month period[3].\n- **Suitability for EMA Crossover strategy:** High liquidity and volatility, combined with robust trading infrastructure on Bybit, make MNTUSDT well-suited for technical strategies such as EMA crossovers, which rely on price momentum and frequent trading opportunities[3][4].\n\n**Expected volatility level:**  \n**High.** MNT’s price action in Q3 2025 was characterized by rapid growth, frequent swings, and strong trading volume, providing ample volatility for 15-minute timeframe strategies[3].\n\n**Summary Table:**\n\n| Symbol   | Liquidity | Volatility | Data Stability | EMA Crossover Suitability |\n|----------|-----------|------------|---------------|--------------------------|\n| MNTUSDT  | High      | High       | High          | Excellent                |\n\n**Alternative major pairs** like BTCUSDT and ETHUSDT also offer deep liquidity and stable data on Bybit[4], but MNTUSDT stands out for its exceptional volatility and recent trading activity, which are particularly advantageous for short-term backtesting and EMA-based strategies in your specified period.",
+    "selected_symbol": "BTCUSDT",
+    "test_period_start": "2025-07-31T00:00:00",
+    "test_period_end": "2025-10-29T00:00:00",
+    "phase3_api_limits": "1. **Bybit API rate limits for kline/historical data requests:**  \nThe standard Bybit REST API rate limit is **5 requests per second** as of December 2024[3]. However, if you use the official Node.js SDK (`bybit-api`), the rate limit is significantly higher—**400 requests per second**—which exceeds even the highest VIP tier[2]. This elevated limit is automatic when using the SDK.\n\n2. **Maximum number of candles per request:**  \nYou can request up to **10,000 records (candles) per API call**[1]. If you need more data, you must adjust the date range and make multiple requests.\n\n3. **How far back can we fetch historical data:**  \n- For **Spot trading**:\n  - **Classic/Standard accounts:** up to **180 days** (6 months) via API[1].\n  - **Unified Trading Accounts (UTA):** up to **2 years** via API[1].\n- For **Derivatives:** up to **3 months** per request, but up to **2 years** total via file export[1].\n- For **full historical backtesting**, use a UTA for maximum range, or supplement with file exports if needed.\n\n4. **Best practices to avoid rate limiting:**  \n- **Throttle requests**: Ensure your system does not exceed the API’s rate limit (5 req/sec for REST, or 400 req/sec with the SDK)[2][3].\n- **Implement exponential backoff**: If you hit a rate limit, wait and retry after a delay.\n- **Monitor API responses**: Parse and respect any rate limit headers returned by the API[2].\n- **Batch requests**: Request the maximum allowed candles per call (10,000) to minimize the number of requests.\n- **Use the official SDK**: It automatically manages higher rate limits and handles silent disconnections[2].\n\n5. **Should we use data caching strategies?**  \nYes, **data caching is strongly recommended** for backtesting systems:\n- **Reduce redundant API calls**: Store fetched candles locally (in memory or database) to avoid repeated requests for the same data.\n- **Improve performance**: Cached data speeds up backtests and reduces latency.\n- **Handle API downtime**: Cached historical data ensures continuity if the API is unavailable.\n- **Implement cache invalidation**: For live trading, periodically refresh cache to ensure data accuracy.\n\n**Summary Table**\n\n| Parameter                | Value / Recommendation                  |\n|--------------------------|-----------------------------------------|\n| Rate Limit (REST API)    | 5 requests/sec (standard)               |\n| Rate Limit (SDK)         | 400 requests/sec (with Node.js SDK)     |\n| Max Candles per Request  | 10,000                                  |\n| Historical Range (Spot)  | 180 days (standard), 2 years (UTA)      |\n| Historical Range (Deriv) | 3 months/request, 2 years (file export) |\n| Caching                  | Strongly recommended                    |\n| Best Practices           | Throttle, batch, monitor, use SDK       |\n\nFor robust backtesting, use a **Unified Trading Account**, maximize each request, throttle according to your rate tier, and cache all retrieved data for efficiency and reliability[1][2][3].",
+    "data_loading_strategy": {
+      "page_size": 1000,
+      "rate_limit": 10,
+      "use_cache": true,
+      "backfill_recommended": true
+    },
+    "phase4_strategy_generation": "Here is an **optimized test strategy for 15-minute EMA crossover trading on BTCUSDT (Bybit) for the last 3 months**, with specific numeric parameters and explanations for each:\n\n```json\n{\n  \"strategy\": \"EMA Crossover with Filters\",\n  \"asset\": \"BTCUSDT\",\n  \"exchange\": \"Bybit\",\n  \"timeframe\": \"15m\",\n  \"period\": \"Last 3 months\",\n  \"parameters\": {\n    \"fast_ema_period\": 21,\n    \"slow_ema_period\": 100,\n    \"rsi\": {\n      \"period\": 14,\n      \"overbought\": 70,\n      \"oversold\": 30\n    },\n    \"volume_filter\": {\n      \"enabled\": true,\n      \"min_relative_volume\": 1.2\n    },\n    \"take_profit_percent\": 2.0,\n    \"stop_loss_percent\": 1.0,\n    \"risk_per_trade_percent\": 1.0\n  },\n  \"explanations\": {\n    \"fast_ema_period\": \"21 is a common fast EMA for 15m crypto trading, balancing reactivity and noise reduction.\",\n    \"slow_ema_period\": \"100 is widely used as a slow EMA, providing strong trend confirmation and reducing whipsaws.\",\n    \"rsi\": {\n      \"period\": \"14 is the industry standard for RSI and works well on 15m charts.\",\n      \"overbought\": \"70 is a classic overbought threshold, filtering out long entries in exhausted conditions.\",\n      \"oversold\": \"30 is a classic oversold threshold, filtering out short entries in exhausted conditions.\"\n    },\n    \"volume_filter\": {\n      \"enabled\": \"Volume spikes often precede strong moves. Setting a minimum of 1.2x the 20-period average volume helps filter for high-conviction signals.\",\n      \"min_relative_volume\": \"Trade only if current volume is at least 1.2 times the 20-period average.\"\n    },\n    \"take_profit_percent\": \"2.0% is a realistic TP for 15m BTCUSDT, balancing win rate and reward.\",\n    \"stop_loss_percent\": \"1.0% SL keeps risk tight and allows for multiple trades without large drawdowns.\",\n    \"risk_per_trade_percent\": \"1.0% of account balance per trade is standard for systematic strategies, controlling risk and drawdown.\"\n  }\n}\n```\n\n**Key points:**\n- **21/100 EMA** is a robust crossover pair for 15m crypto, widely used in both discretionary and automated systems.\n- **RSI 14, 70/30** is a classic filter to avoid overextended entries.\n- **Volume filter** (current volume ≥ 1.2 × 20-period average) helps avoid false signals in low-liquidity periods.\n- **TP 2% / SL 1%** is a common risk/reward setup for 15m BTCUSDT, based on typical volatility and backtest results from similar strategies[6][8].\n- **Risk per trade 1%** is industry standard for systematic trading and aligns with best practices for capital preservation[1][3].\n\nThese parameters are optimized for **BTCUSDT 15m** trading and reflect both industry standards and recent performance trends for short-term crypto strategies.",
+    "strategy_config": {
+      "type": "ema_crossover",
+      "fast_ema": 20,
+      "slow_ema": 50,
+      "rsi_period": 14,
+      "rsi_oversold": 30,
+      "rsi_overbought": 70,
+      "take_profit_pct": 3.0,
+      "stop_loss_pct": 1.5,
+      "risk_per_trade_pct": 2.0,
+      "max_positions": 1
+    },
+    "phase5_ema_research": "For 15-minute cryptocurrency trading, the most widely recommended **EMA periods** are fast EMAs in the 8–12 range and slow EMAs in the 20–26 range, with some traders extending the slow EMA up to 50 for additional noise reduction[1][3][5][6].\n\n**Fast EMA Range and Recommendations**\n- Common fast EMA periods: **8, 9, 12**.\n- These settings react quickly to price changes, capturing short bursts of momentum ideal for volatile crypto markets and scalping[1][3][5].\n- The 9-EMA is especially popular for intraday and scalping strategies due to its sensitivity[1][5].\n\n**Slow EMA Range and Recommendations**\n- Common slow EMA periods: **20, 21, 26, 50**.\n- These settings filter out more noise, providing a smoother trend signal and helping avoid whipsaws in choppy markets[1][3][6].\n- The 21-EMA is often used for swing rhythm and short-term trend confirmation[1][5].\n\n**Common Successful Combinations**\n- **9/21 EMA**: Frequently used for scalping and short-term momentum trades in crypto, especially on altcoins during high volatility[1][5].\n- **12/26 EMA**: Classic combination from MACD, adapted for short-term trend following and crossover signals[3][7].\n- **20/50 EMA**: Used for more conservative entries, reducing false signals in highly volatile or consolidating markets[1][3].\n\n**Why These Periods Work for Crypto Volatility**\n- Short EMAs (8–12) respond rapidly to price spikes, which are common in crypto, allowing traders to enter and exit quickly[1][2][5].\n- Longer EMAs (20–50) help filter out erratic moves and false breakouts, which are frequent due to crypto’s high volatility and low liquidity on short timeframes[1][3][6].\n- The combination balances sensitivity (for timely entries) and stability (to avoid whipsaws), which is critical for 15-minute charts where price action is fast and noisy[1][2][5].\n\n**Three Specific Parameter Combinations to Test**\n- **9 EMA (fast) / 21 EMA (slow)**: Highly popular for capturing short-term momentum and quick reversals in volatile crypto pairs[1][5].\n- **12 EMA (fast) / 26 EMA (slow)**: Adapted from MACD, suitable for trend-following and crossover strategies on 15-minute charts[3][7].\n- **20 EMA (fast) / 50 EMA (slow)**: More conservative, effective for filtering noise and confirming stronger trend shifts[1][3].\n\nTesting these combinations will help determine which best fits your target asset’s volatility and trading style. Always validate with historical backtesting to account for market-specific behavior and avoid curve fitting[2][6].",
+    "phase5_rsi_research": "For **15-minute crypto trading**, optimal RSI parameters often differ from the classic defaults to better capture short-term momentum and filter EMA crossover signals. The most effective settings for this timeframe are:\n\n- **RSI period:** 14 is standard, but many traders find shorter or longer periods (such as 7–10 for more sensitivity, or 21+ for smoother signals) can be useful. However, recent expert backtests and community scripts for 15-minute scalping frequently retain **RSI 14** as a robust baseline[3].\n- **Overbought level:** Lowering the threshold to **70 or 75** can help catch reversals earlier. Some intraday traders use **75** for overbought to filter only the strongest moves[6].\n- **Oversold level:** Raising the threshold to **30 or 35** is common, but some use **35** to catch moves earlier and avoid false signals[6].\n- **RSI divergence:** Yes, using **RSI divergence** is recommended. Divergence between price and RSI on the 15-minute chart can signal early reversals, especially when combined with EMA crossovers[1][2].\n\n### Specific Values for Filtering EMA Crossover Signals\n\n| Parameter         | Recommended Value (15m Crypto) | Rationale/Source                   |\n|-------------------|-------------------------------|------------------------------------|\n| **RSI period**    | 14                            | Most robust for 15m scalping[3]    |\n| **Overbought**    | 75                            | Catches stronger reversals[6]      |\n| **Oversold**      | 35                            | Catches earlier moves[6]           |\n| **Divergence**    | Yes (bullish/bearish)         | Early reversal confirmation[1][2]  |\n\n- For **EMA crossover filtering**, only take long signals when RSI is below 35 and showing bullish divergence, or short signals when RSI is above 75 and showing bearish divergence.\n- Some advanced traders experiment with longer RSI periods (e.g., 21, 55–65) for smoother signals, but these may lag on 15-minute charts and are more common on 5-minute or 1-minute timeframes[2].\n\n### Additional Notes\n\n- **RSI settings are not universal**: You should backtest these parameters on your specific crypto asset, as volatility and trend strength can vary.\n- **Combining RSI with EMA crossovers**: This dual-filter approach reduces false signals and improves entry precision, especially in choppy markets[1][7].\n- **Divergence is powerful**: RSI divergence on the 15-minute chart is more reliable when confirmed by price action or trendline breaks on both RSI and price[2].\n\nIn summary, for 15-minute crypto trading, use **RSI period 14**, **overbought at 75**, **oversold at 35**, and always confirm entries with **RSI divergence** when filtering EMA crossover signals[1][2][3][6].",
+    "parameter_matrix": [
+      {
+        "fast_ema": 9,
+        "slow_ema": 21,
+        "rsi_period": 14,
+        "rsi_oversold": 30,
+        "rsi_overbought": 70
+      },
+      {
+        "fast_ema": 12,
+        "slow_ema": 26,
+        "rsi_period": 14,
+        "rsi_oversold": 35,
+        "rsi_overbought": 65
+      },
+      {
+        "fast_ema": 20,
+        "slow_ema": 50,
+        "rsi_period": 9,
+        "rsi_oversold": 25,
+        "rsi_overbought": 75
+      }
+    ],
+    "backtest_results": {
+      "final_capital": 10019.390019104889,
+      "total_return": 0.0019390019104887912,
+      "total_trades": 5,
+      "winning_trades": 4,
+      "losing_trades": 1,
+      "win_rate": 0.8,
+      "sharpe_ratio": 0.0312542503455913,
+      "sortino_ratio": 0.020500981772247902,
+      "max_drawdown": 0.020352475308099745,
+      "profit_factor": 7.204153127797759,
+      "metrics": {
+        "net_profit": 19.94064357232998,
+        "net_profit_pct": 0.19390019104887912,
+        "gross_profit": 23.15472342522493,
+        "gross_loss": -3.214079852894952,
+        "total_commission": 0.5619008668801926,
+        "max_drawdown_abs": 203.52475308099747,
+        "max_drawdown_pct": 2.0352475308099747,
+        "max_runup_abs": 22.714348815621634,
+        "max_runup_pct": 0.22714348815621632,
+        "buy_hold_return": 572.0008048704028,
+        "buy_hold_return_pct": 5.720008048704028,
+        "avg_pnl": 3.988128714465996,
+        "avg_win": 5.788680856306232,
+        "avg_loss": -3.214079852894952,
+        "max_win": 5.793606925019481,
+        "max_loss": -3.214079852894952,
+        "avg_bars": 87.2,
+        "avg_bars_win": 99.0,
+        "avg_bars_loss": 40.0
+      },
+      "trades": [
+        {
+          "entry_time": "2025-10-19T01:30:00",
+          "exit_time": "2025-10-20T04:00:00",
+          "entry_price": 106909.32794999999,
+          "exit_price": 110061.54948460576,
+          "quantity": 0.0018707441514695259,
+          "side": "long",
+          "pnl": 5.7837566500000195,
+          "pnl_pct": 2.9485000000000205,
+          "commission": 0.11324335000000002,
+          "run_up": 6.70057911443454,
+          "run_up_pct": 3.3502895572172786,
+          "drawdown": 1.58831407189664,
+          "drawdown_pct": 0.7941570359483174,
+          "bars_held": 106,
+          "exit_reason": "take_profit",
+          "cumulative_pnl": 5.7837566500000195
+        },
+        {
+          "entry_time": "2025-10-21T14:30:00",
+          "exit_time": "2025-10-21T15:30:00",
+          "entry_price": 109954.24965,
+          "exit_price": 113196.25070093026,
+          "quantity": 0.0018199703583080204,
+          "side": "long",
+          "pnl": 5.7870382127755295,
+          "pnl_pct": 2.9485000000000205,
+          "commission": 0.11330760152101312,
+          "run_up": 6.20873851583952,
+          "run_up_pct": 3.1026089131244383,
+          "drawdown": 0.5038581567079569,
+          "drawdown_pct": 0.25178622097941084,
+          "bars_held": 4,
+          "exit_reason": "take_profit",
+          "cumulative_pnl": 5.7870382127755295
+        },
+        {
+          "entry_time": "2025-10-23T02:30:00",
+          "exit_time": "2025-10-25T07:15:00",
+          "entry_price": 108309.7278,
+          "exit_price": 111503.24012418301,
+          "quantity": 0.0018486521821821907,
+          "side": "long",
+          "pnl": 5.790321637429898,
+          "pnl_pct": 2.9485000000000205,
+          "commission": 0.11337188949677567,
+          "run_up": 7.121881139326232,
+          "run_up_pct": 3.556903223978014,
+          "drawdown": 0.26126594587300656,
+          "drawdown_pct": 0.13048486305954343,
+          "bars_held": 211,
+          "exit_reason": "take_profit",
+          "cumulative_pnl": 5.790321637429898
+        },
+        {
+          "entry_time": "2025-10-26T06:30:00",
+          "exit_time": "2025-10-27T01:15:00",
+          "entry_price": 111621.18269999999,
+          "exit_price": 114912.3332719095,
+          "quantity": 0.0017948261587862257,
+          "side": "long",
+          "pnl": 5.793606925019481,
+          "pnl_pct": 2.9485000000000205,
+          "commission": 0.11343621394797118,
+          "run_up": 7.110773326371834,
+          "run_up_pct": 3.5493418042774616,
+          "drawdown": 0.18304121770363582,
+          "drawdown_pct": 0.09136500575709361,
+          "bars_held": 75,
+          "exit_reason": "take_profit",
+          "cumulative_pnl": 5.793606925019481
+        },
+        {
+          "entry_time": "2025-10-28T10:15:00",
+          "exit_time": "2025-10-28T20:15:00",
+          "entry_price": 114551.74725,
+          "exit_price": 112777.05430572938,
+          "quantity": 0.0017499016103074974,
+          "side": "long",
+          "pnl": -3.214079852894952,
+          "pnl_pct": -1.549249999999991,
+          "commission": 0.10854181191443256,
+          "run_up": 2.6401688667808645,
+          "run_up_pct": 1.3170927429917434,
+          "drawdown": 3.8892390117595057,
+          "drawdown_pct": 1.9402124396666554,
+          "bars_held": 40,
+          "exit_reason": "stop_loss",
+          "cumulative_pnl": -3.214079852894952
+        }
+      ],
+      "equity_curve": [
+        {
+          "timestamp": "2025-10-19T00:45:00",
+          "equity": 10000.0
+        },
+        {
+          "timestamp": "2025-10-19T01:00:00",
+          "equity": 10000.0
+        },
+        {
+          "timestamp": "2025-10-19T01:15:00",
+          "equity": 10000.0
+        },
+        {
+          "timestamp": "2025-10-19T01:30:00",
+          "equity": 9799.790049975012
+        },
+        {
+          "timestamp": "2025-10-19T01:45:00",
+          "equity": 9799.938774135053
+        },
+        {
+          "timestamp": "2025-10-19T02:00:00",
+          "equity": 9799.863570220165
+        },
+        {
+          "timestamp": "2025-10-19T02:15:00",
+          "equity": 9799.767788119609
+        },
+        {
+          "timestamp": "2025-10-19T02:30:00",
+          "equity": 9799.696886916268
+        },
+        {
+          "timestamp": "2025-10-19T02:45:00",
+          "equity": 9799.69221005589
+        },
+        {
+          "timestamp": "2025-10-19T03:00:00",
+          "equity": 9799.666580861014
+        },
+        {
+          "timestamp": "2025-10-19T03:15:00",
+          "equity": 9800.239776869024
+        },
+        {
+          "timestamp": "2025-10-19T03:30:00",
+          "equity": 9800.441068939723
+        },
+        {
+          "timestamp": "2025-10-19T03:45:00",
+          "equity": 9800.479980418075
+        },
+        {
+          "timestamp": "2025-10-19T04:00:00",
+          "equity": 9800.059437132824
+        },
+        {
+          "timestamp": "2025-10-19T04:15:00",
+          "equity": 9800.087498295095
+        },
+        {
+          "timestamp": "2025-10-19T04:30:00",
+          "equity": 9800.193943637314
+        },
+        {
+          "timestamp": "2025-10-19T04:45:00",
+          "equity": 9800.059811281653
+        },
+        {
+          "timestamp": "2025-10-19T05:00:00",
+          "equity": 9800.059062983993
+        },
+        {
+          "timestamp": "2025-10-19T05:15:00",
+          "equity": 9799.928485042221
+        },
+        {
+          "timestamp": "2025-10-19T05:30:00",
+          "equity": 9799.92736259573
+        },
+        {
+          "timestamp": "2025-10-19T05:45:00",
+          "equity": 9799.756376580286
+        },
+        {
+          "timestamp": "2025-10-19T06:00:00",
+          "equity": 9799.615135396849
+        },
+        {
+          "timestamp": "2025-10-19T06:15:00",
+          "equity": 9799.59624088092
+        },
+        {
+          "timestamp": "2025-10-19T06:30:00",
+          "equity": 9799.40392838215
+        },
+        {
+          "timestamp": "2025-10-19T06:45:00",
+          "equity": 9799.542550523773
+        },
+        {
+          "timestamp": "2025-10-19T07:00:00",
+          "equity": 9799.735611320204
+        },
+        {
+          "timestamp": "2025-10-19T07:15:00",
+          "equity": 9799.655917619351
+        },
+        {
+          "timestamp": "2025-10-19T07:30:00",
+          "equity": 9799.492788729343
+        },
+        {
+          "timestamp": "2025-10-19T07:45:00",
+          "equity": 9799.568740941893
+        },
+        {
+          "timestamp": "2025-10-19T08:00:00",
+          "equity": 9799.662465223882
+        },
+        {
+          "timestamp": "2025-10-19T08:15:00",
+          "equity": 9799.405424977469
+        },
+        {
+          "timestamp": "2025-10-19T08:30:00",
+          "equity": 9799.023044872909
+        },
+        {
+          "timestamp": "2025-10-19T08:45:00",
+          "equity": 9798.923708358467
+        },
+        {
+          "timestamp": "2025-10-19T09:00:00",
+          "equity": 9798.6857497024
+        },
+        {
+          "timestamp": "2025-10-19T09:15:00",
+          "equity": 9798.408131270322
+        },
+        {
+          "timestamp": "2025-10-19T09:30:00",
+          "equity": 9799.89724361489
+        },
+        {
+          "timestamp": "2025-10-19T09:45:00",
+          "equity": 9800.72804109256
+        },
+        {
+          "timestamp": "2025-10-19T10:00:00",
+          "equity": 9800.767887942986
+        },
+        {
+          "timestamp": "2025-10-19T10:15:00",
+          "equity": 9801.45576056748
+        },
+        {
+          "timestamp": "2025-10-19T10:30:00",
+          "equity": 9801.320505765329
+        },
+        {
+          "timestamp": "2025-10-19T10:45:00",
+          "equity": 9801.630862220058
+        },
+        {
+          "timestamp": "2025-10-19T11:00:00",
+          "equity": 9802.064500714368
+        },
+        {
+          "timestamp": "2025-10-19T11:15:00",
+          "equity": 9801.527222994067
+        },
+        {
+          "timestamp": "2025-10-19T11:30:00",
+          "equity": 9801.503838692173
+        },
+        {
+          "timestamp": "2025-10-19T11:45:00",
+          "equity": 9801.461372799935
+        },
+        {
+          "timestamp": "2025-10-19T12:00:00",
+          "equity": 9801.06140770035
+        },
+        {
+          "timestamp": "2025-10-19T12:15:00",
+          "equity": 9800.928959014427
+        },
+        {
+          "timestamp": "2025-10-19T12:30:00",
+          "equity": 9800.950285497753
+        },
+        {
+          "timestamp": "2025-10-19T12:45:00",
+          "equity": 9801.234638608777
+        },
+        {
+          "timestamp": "2025-10-19T13:00:00",
+          "equity": 9800.823449044283
+        },
+        {
+          "timestamp": "2025-10-19T13:15:00",
+          "equity": 9800.923159707558
+        },
+        {
+          "timestamp": "2025-10-19T13:30:00",
+          "equity": 9801.546304584412
+        },
+        {
+          "timestamp": "2025-10-19T13:45:00",
+          "equity": 9802.022970194206
+        },
+        {
+          "timestamp": "2025-10-19T14:00:00",
+          "equity": 9801.822987644415
+        },
+        {
+          "timestamp": "2025-10-19T14:15:00",
+          "equity": 9802.605332848558
+        },
+        {
+          "timestamp": "2025-10-19T14:30:00",
+          "equity": 9802.335758616331
+        },
+        {
+          "timestamp": "2025-10-19T14:45:00",
+          "equity": 9802.62497566215
+        },
+        {
+          "timestamp": "2025-10-19T15:00:00",
+          "equity": 9802.775383491928
+        },
+        {
+          "timestamp": "2025-10-19T15:15:00",
+          "equity": 9802.753495785355
+        },
+        {
+          "timestamp": "2025-10-19T15:30:00",
+          "equity": 9802.517782022269
+        },
+        {
+          "timestamp": "2025-10-19T15:45:00",
+          "equity": 9802.768648812982
+        },
+        {
+          "timestamp": "2025-10-19T16:00:00",
+          "equity": 9802.498887506339
+        },
+        {
+          "timestamp": "2025-10-19T16:15:00",
+          "equity": 9802.502816069058
+        },
+        {
+          "timestamp": "2025-10-19T16:30:00",
+          "equity": 9803.54313689169
+        },
+        {
+          "timestamp": "2025-10-19T16:45:00",
+          "equity": 9803.033172035999
+        },
+        {
+          "timestamp": "2025-10-19T17:00:00",
+          "equity": 9803.966299218753
+        },
+        {
+          "timestamp": "2025-10-19T17:15:00",
+          "equity": 9803.803544477574
+        },
+        {
+          "timestamp": "2025-10-19T17:30:00",
+          "equity": 9804.011758301633
+        },
+        {
+          "timestamp": "2025-10-19T17:45:00",
+          "equity": 9803.915040829002
+        },
+        {
+          "timestamp": "2025-10-19T18:00:00",
+          "equity": 9804.09051663041
+        },
+        {
+          "timestamp": "2025-10-19T18:15:00",
+          "equity": 9804.107727476603
+        },
+        {
+          "timestamp": "2025-10-19T18:30:00",
+          "equity": 9804.318186193645
+        },
+        {
+          "timestamp": "2025-10-19T18:45:00",
+          "equity": 9804.418645154577
+        },
+        {
+          "timestamp": "2025-10-19T19:00:00",
+          "equity": 9803.85424164408
+        },
+        {
+          "timestamp": "2025-10-19T19:15:00",
+          "equity": 9803.976214162756
+        },
+        {
+          "timestamp": "2025-10-19T19:30:00",
+          "equity": 9803.552303538032
+        },
+        {
+          "timestamp": "2025-10-19T19:45:00",
+          "equity": 9803.524803599006
+        },
+        {
+          "timestamp": "2025-10-19T20:00:00",
+          "equity": 9803.463630265253
+        },
+        {
+          "timestamp": "2025-10-19T20:15:00",
+          "equity": 9803.60094288597
+        },
+        {
+          "timestamp": "2025-10-19T20:30:00",
+          "equity": 9803.526674343157
+        },
+        {
+          "timestamp": "2025-10-19T20:45:00",
+          "equity": 9803.392541987498
+        },
+        {
+          "timestamp": "2025-10-19T21:00:00",
+          "equity": 9803.284225901127
+        },
+        {
+          "timestamp": "2025-10-19T21:15:00",
+          "equity": 9802.983971464815
+        },
+        {
+          "timestamp": "2025-10-19T21:30:00",
+          "equity": 9803.2443790507
+        },
+        {
+          "timestamp": "2025-10-19T21:45:00",
+          "equity": 9803.233528734621
+        },
+        {
+          "timestamp": "2025-10-19T22:00:00",
+          "equity": 9803.827115853883
+        },
+        {
+          "timestamp": "2025-10-19T22:15:00",
+          "equity": 9804.055533714778
+        },
+        {
+          "timestamp": "2025-10-19T22:30:00",
+          "equity": 9804.231383665016
+        },
+        {
+          "timestamp": "2025-10-19T22:45:00",
+          "equity": 9803.98799985091
+        },
+        {
+          "timestamp": "2025-10-19T23:00:00",
+          "equity": 9803.41592628939
+        },
+        {
+          "timestamp": "2025-10-19T23:15:00",
+          "equity": 9803.310042170417
+        },
+        {
+          "timestamp": "2025-10-19T23:30:00",
+          "equity": 9802.85694793693
+        },
+        {
+          "timestamp": "2025-10-19T23:45:00",
+          "equity": 9803.04776384038
+        },
+        {
+          "timestamp": "2025-10-20T00:00:00",
+          "equity": 9801.962545158114
+        },
+        {
+          "timestamp": "2025-10-20T00:15:00",
+          "equity": 9801.208074041826
+        },
+        {
+          "timestamp": "2025-10-20T00:30:00",
+          "equity": 9801.554722933093
+        },
+        {
+          "timestamp": "2025-10-20T00:45:00",
+          "equity": 9801.93878670739
+        },
+        {
+          "timestamp": "2025-10-20T01:00:00",
+          "equity": 9802.036252477681
+        },
+        {
+          "timestamp": "2025-10-20T01:15:00",
+          "equity": 9802.069551723578
+        },
+        {
+          "timestamp": "2025-10-20T01:30:00",
+          "equity": 9801.980317227553
+        },
+        {
+          "timestamp": "2025-10-20T01:45:00",
+          "equity": 9801.940470377127
+        },
+        {
+          "timestamp": "2025-10-20T02:00:00",
+          "equity": 9801.844688276571
+        },
+        {
+          "timestamp": "2025-10-20T02:15:00",
+          "equity": 9802.678291870467
+        },
+        {
+          "timestamp": "2025-10-20T02:30:00",
+          "equity": 9803.226981130092
+        },
+        {
+          "timestamp": "2025-10-20T02:45:00",
+          "equity": 9803.270943617652
+        },
+        {
+          "timestamp": "2025-10-20T03:00:00",
+          "equity": 9803.155144554676
+        },
+        {
+          "timestamp": "2025-10-20T03:15:00",
+          "equity": 9803.29601158928
+        },
+        {
+          "timestamp": "2025-10-20T03:30:00",
+          "equity": 9803.92551699625
+        },
+        {
+          "timestamp": "2025-10-20T03:45:00",
+          "equity": 9805.855750811737
+        },
+        {
+          "timestamp": "2025-10-20T04:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T04:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T04:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T04:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T05:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T05:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T05:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T05:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T06:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T06:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T06:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T06:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T07:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T07:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T07:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T07:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T08:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T08:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T08:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T08:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T09:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T09:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T09:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T09:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T10:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T10:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T10:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T10:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T11:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T11:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T11:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T11:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T12:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T12:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T12:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T12:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T13:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T13:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T13:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T13:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T14:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T14:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T14:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T14:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T15:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T15:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T15:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T15:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T16:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T16:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T16:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T16:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T17:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T17:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T17:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T17:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T18:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T18:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T18:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T18:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T19:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T19:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T19:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T19:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T20:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T20:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T20:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T20:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T21:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T21:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T21:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T21:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T22:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T22:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T22:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T22:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T23:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T23:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T23:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-20T23:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T00:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T00:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T00:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T00:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T01:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T01:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T01:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T01:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T02:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T02:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T02:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T02:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T03:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T03:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T03:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T03:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T04:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T04:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T04:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T04:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T05:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T05:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T05:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T05:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T06:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T06:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T06:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T06:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T07:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T07:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T07:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T07:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T08:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T08:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T08:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T08:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T09:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T09:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T09:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T09:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T10:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T10:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T10:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T10:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T11:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T11:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T11:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T11:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T12:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T12:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T12:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T12:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T13:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T13:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T13:30:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T13:45:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T14:00:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T14:15:00",
+          "equity": 10005.67375665
+        },
+        {
+          "timestamp": "2025-10-21T14:30:00",
+          "equity": 9805.350212371477
+        },
+        {
+          "timestamp": "2025-10-21T14:45:00",
+          "equity": 9809.464255366433
+        },
+        {
+          "timestamp": "2025-10-21T15:00:00",
+          "equity": 9809.836439304707
+        },
+        {
+          "timestamp": "2025-10-21T15:15:00",
+          "equity": 9810.886016210343
+        },
+        {
+          "timestamp": "2025-10-21T15:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T15:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T16:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T16:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T16:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T16:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T17:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T17:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T17:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T17:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T18:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T18:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T18:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T18:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T19:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T19:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T19:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T19:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T20:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T20:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T20:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T20:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T21:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T21:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T21:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T21:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T22:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T22:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T22:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T22:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T23:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T23:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T23:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-21T23:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T00:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T00:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T00:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T00:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T01:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T01:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T01:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T01:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T02:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T02:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T02:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T02:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T03:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T03:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T03:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T03:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T04:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T04:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T04:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T04:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T05:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T05:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T05:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T05:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T06:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T06:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T06:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T06:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T07:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T07:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T07:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T07:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T08:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T08:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T08:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T08:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T09:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T09:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T09:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T09:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T10:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T10:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T10:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T10:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T11:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T11:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T11:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T11:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T12:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T12:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T12:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T12:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T13:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T13:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T13:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T13:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T14:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T14:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T14:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T14:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T15:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T15:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T15:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T15:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T16:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T16:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T16:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T16:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T17:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T17:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T17:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T17:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T18:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T18:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T18:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T18:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T19:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T19:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T19:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T19:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T20:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T20:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T20:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T20:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T21:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T21:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T21:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T21:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T22:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T22:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T22:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T22:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T23:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T23:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T23:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-22T23:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T00:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T00:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T00:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T00:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T01:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T01:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T01:30:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T01:45:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T02:00:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T02:15:00",
+          "equity": 10011.350732451452
+        },
+        {
+          "timestamp": "2025-10-23T02:30:00",
+          "equity": 9810.913529468779
+        },
+        {
+          "timestamp": "2025-10-23T02:45:00",
+          "equity": 9811.1542239829
+        },
+        {
+          "timestamp": "2025-10-23T03:00:00",
+          "equity": 9811.27253772256
+        },
+        {
+          "timestamp": "2025-10-23T03:15:00",
+          "equity": 9811.66149414169
+        },
+        {
+          "timestamp": "2025-10-23T03:30:00",
+          "equity": 9811.152929926371
+        },
+        {
+          "timestamp": "2025-10-23T03:45:00",
+          "equity": 9811.071958960792
+        },
+        {
+          "timestamp": "2025-10-23T04:00:00",
+          "equity": 9811.065488678154
+        },
+        {
+          "timestamp": "2025-10-23T04:15:00",
+          "equity": 9811.40933798404
+        },
+        {
+          "timestamp": "2025-10-23T04:30:00",
+          "equity": 9812.01218346065
+        },
+        {
+          "timestamp": "2025-10-23T04:45:00",
+          "equity": 9811.550390145541
+        },
+        {
+          "timestamp": "2025-10-23T05:00:00",
+          "equity": 9811.895348642736
+        },
+        {
+          "timestamp": "2025-10-23T05:15:00",
+          "equity": 9811.776295442203
+        },
+        {
+          "timestamp": "2025-10-23T05:30:00",
+          "equity": 9811.595866989222
+        },
+        {
+          "timestamp": "2025-10-23T05:45:00",
+          "equity": 9812.11385933067
+        },
+        {
+          "timestamp": "2025-10-23T06:00:00",
+          "equity": 9812.342352740388
+        },
+        {
+          "timestamp": "2025-10-23T06:15:00",
+          "equity": 9813.843088581883
+        },
+        {
+          "timestamp": "2025-10-23T06:30:00",
+          "equity": 9814.104857730881
+        },
+        {
+          "timestamp": "2025-10-23T06:45:00",
+          "equity": 9814.508233637032
+        },
+        {
+          "timestamp": "2025-10-23T07:00:00",
+          "equity": 9813.700372633419
+        },
+        {
+          "timestamp": "2025-10-23T07:15:00",
+          "equity": 9813.22508415738
+        },
+        {
+          "timestamp": "2025-10-23T07:30:00",
+          "equity": 9813.015262134702
+        },
+        {
+          "timestamp": "2025-10-23T07:45:00",
+          "equity": 9812.720032381209
+        },
+        {
+          "timestamp": "2025-10-23T08:00:00",
+          "equity": 9813.524565810892
+        },
+        {
+          "timestamp": "2025-10-23T08:15:00",
+          "equity": 9813.680222324632
+        },
+        {
+          "timestamp": "2025-10-23T08:30:00",
+          "equity": 9813.280728588063
+        },
+        {
+          "timestamp": "2025-10-23T08:45:00",
+          "equity": 9813.142449404837
+        },
+        {
+          "timestamp": "2025-10-23T09:00:00",
+          "equity": 9812.480447058397
+        },
+        {
+          "timestamp": "2025-10-23T09:15:00",
+          "equity": 9813.000288052026
+        },
+        {
+          "timestamp": "2025-10-23T09:30:00",
+          "equity": 9812.890847842842
+        },
+        {
+          "timestamp": "2025-10-23T09:45:00",
+          "equity": 9813.015077269483
+        },
+        {
+          "timestamp": "2025-10-23T10:00:00",
+          "equity": 9813.290896175065
+        },
+        {
+          "timestamp": "2025-10-23T10:15:00",
+          "equity": 9813.157053757075
+        },
+        {
+          "timestamp": "2025-10-23T10:30:00",
+          "equity": 9813.045025434836
+        },
+        {
+          "timestamp": "2025-10-23T10:45:00",
+          "equity": 9813.006573469445
+        },
+        {
+          "timestamp": "2025-10-23T11:00:00",
+          "equity": 9812.946307408307
+        },
+        {
+          "timestamp": "2025-10-23T11:15:00",
+          "equity": 9813.20955547905
+        },
+        {
+          "timestamp": "2025-10-23T11:30:00",
+          "equity": 9812.60356729373
+        },
+        {
+          "timestamp": "2025-10-23T11:45:00",
+          "equity": 9812.675294998398
+        },
+        {
+          "timestamp": "2025-10-23T12:00:00",
+          "equity": 9812.082617108792
+        },
+        {
+          "timestamp": "2025-10-23T12:15:00",
+          "equity": 9812.43755832777
+        },
+        {
+          "timestamp": "2025-10-23T12:30:00",
+          "equity": 9812.338655436024
+        },
+        {
+          "timestamp": "2025-10-23T12:45:00",
+          "equity": 9812.529621206442
+        },
+        {
+          "timestamp": "2025-10-23T13:00:00",
+          "equity": 9812.385426336232
+        },
+        {
+          "timestamp": "2025-10-23T13:15:00",
+          "equity": 9812.481001654052
+        },
+        {
+          "timestamp": "2025-10-23T13:30:00",
+          "equity": 9812.911922477719
+        },
+        {
+          "timestamp": "2025-10-23T13:45:00",
+          "equity": 9813.117862330813
+        },
+        {
+          "timestamp": "2025-10-23T14:00:00",
+          "equity": 9812.013477517177
+        },
+        {
+          "timestamp": "2025-10-23T14:15:00",
+          "equity": 9812.767173011853
+        },
+        {
+          "timestamp": "2025-10-23T14:30:00",
+          "equity": 9813.226747944344
+        },
+        {
+          "timestamp": "2025-10-23T14:45:00",
+          "equity": 9813.308828101233
+        },
+        {
+          "timestamp": "2025-10-23T15:00:00",
+          "equity": 9813.81739231655
+        },
+        {
+          "timestamp": "2025-10-23T15:15:00",
+          "equity": 9813.6504590245
+        },
+        {
+          "timestamp": "2025-10-23T15:30:00",
+          "equity": 9813.524380945675
+        },
+        {
+          "timestamp": "2025-10-23T15:45:00",
+          "equity": 9813.890968673402
+        },
+        {
+          "timestamp": "2025-10-23T16:00:00",
+          "equity": 9814.091547435168
+        },
+        {
+          "timestamp": "2025-10-23T16:15:00",
+          "equity": 9813.733833237917
+        },
+        {
+          "timestamp": "2025-10-23T16:30:00",
+          "equity": 9813.742706768391
+        },
+        {
+          "timestamp": "2025-10-23T16:45:00",
+          "equity": 9814.53855153282
+        },
+        {
+          "timestamp": "2025-10-23T17:00:00",
+          "equity": 9813.94716769974
+        },
+        {
+          "timestamp": "2025-10-23T17:15:00",
+          "equity": 9814.462756793351
+        },
+        {
+          "timestamp": "2025-10-23T17:30:00",
+          "equity": 9815.421467815031
+        },
+        {
+          "timestamp": "2025-10-23T17:45:00",
+          "equity": 9816.37204476711
+        },
+        {
+          "timestamp": "2025-10-23T18:00:00",
+          "equity": 9815.510203119775
+        },
+        {
+          "timestamp": "2025-10-23T18:15:00",
+          "equity": 9815.043233578555
+        },
+        {
+          "timestamp": "2025-10-23T18:30:00",
+          "equity": 9815.043973039428
+        },
+        {
+          "timestamp": "2025-10-23T18:45:00",
+          "equity": 9815.109785057115
+        },
+        {
+          "timestamp": "2025-10-23T19:00:00",
+          "equity": 9814.726189729312
+        },
+        {
+          "timestamp": "2025-10-23T19:15:00",
+          "equity": 9815.039536274191
+        },
+        {
+          "timestamp": "2025-10-23T19:30:00",
+          "equity": 9814.667587455137
+        },
+        {
+          "timestamp": "2025-10-23T19:45:00",
+          "equity": 9814.395280988701
+        },
+        {
+          "timestamp": "2025-10-23T20:00:00",
+          "equity": 9813.853071303667
+        },
+        {
+          "timestamp": "2025-10-23T20:15:00",
+          "equity": 9813.963990434599
+        },
+        {
+          "timestamp": "2025-10-23T20:30:00",
+          "equity": 9813.842533986228
+        },
+        {
+          "timestamp": "2025-10-23T20:45:00",
+          "equity": 9813.116198543848
+        },
+        {
+          "timestamp": "2025-10-23T21:00:00",
+          "equity": 9813.491290071614
+        },
+        {
+          "timestamp": "2025-10-23T21:15:00",
+          "equity": 9813.376858501537
+        },
+        {
+          "timestamp": "2025-10-23T21:30:00",
+          "equity": 9813.040034073943
+        },
+        {
+          "timestamp": "2025-10-23T21:45:00",
+          "equity": 9813.196245183337
+        },
+        {
+          "timestamp": "2025-10-23T22:00:00",
+          "equity": 9813.798536064292
+        },
+        {
+          "timestamp": "2025-10-23T22:15:00",
+          "equity": 9814.012609986989
+        },
+        {
+          "timestamp": "2025-10-23T22:30:00",
+          "equity": 9814.04570086105
+        },
+        {
+          "timestamp": "2025-10-23T22:45:00",
+          "equity": 9813.897993551695
+        },
+        {
+          "timestamp": "2025-10-23T23:00:00",
+          "equity": 9814.06233873069
+        },
+        {
+          "timestamp": "2025-10-23T23:15:00",
+          "equity": 9814.142385370178
+        },
+        {
+          "timestamp": "2025-10-23T23:30:00",
+          "equity": 9814.159208105037
+        },
+        {
+          "timestamp": "2025-10-23T23:45:00",
+          "equity": 9814.16604811811
+        },
+        {
+          "timestamp": "2025-10-24T00:00:00",
+          "equity": 9814.444640001966
+        },
+        {
+          "timestamp": "2025-10-24T00:15:00",
+          "equity": 9814.330578162324
+        },
+        {
+          "timestamp": "2025-10-24T00:30:00",
+          "equity": 9814.743382194605
+        },
+        {
+          "timestamp": "2025-10-24T00:45:00",
+          "equity": 9814.963556669503
+        },
+        {
+          "timestamp": "2025-10-24T01:00:00",
+          "equity": 9814.97427885216
+        },
+        {
+          "timestamp": "2025-10-24T01:15:00",
+          "equity": 9814.500839028304
+        },
+        {
+          "timestamp": "2025-10-24T01:30:00",
+          "equity": 9814.812706651437
+        },
+        {
+          "timestamp": "2025-10-24T01:45:00",
+          "equity": 9815.136220783319
+        },
+        {
+          "timestamp": "2025-10-24T02:00:00",
+          "equity": 9814.898484112691
+        },
+        {
+          "timestamp": "2025-10-24T02:15:00",
+          "equity": 9814.83636939937
+        },
+        {
+          "timestamp": "2025-10-24T02:30:00",
+          "equity": 9815.318497888484
+        },
+        {
+          "timestamp": "2025-10-24T02:45:00",
+          "equity": 9815.114036957133
+        },
+        {
+          "timestamp": "2025-10-24T03:00:00",
+          "equity": 9814.970766413015
+        },
+        {
+          "timestamp": "2025-10-24T03:15:00",
+          "equity": 9814.911424677966
+        },
+        {
+          "timestamp": "2025-10-24T03:30:00",
+          "equity": 9814.848200773336
+        },
+        {
+          "timestamp": "2025-10-24T03:45:00",
+          "equity": 9814.898853843128
+        },
+        {
+          "timestamp": "2025-10-24T04:00:00",
+          "equity": 9815.209612274952
+        },
+        {
+          "timestamp": "2025-10-24T04:15:00",
+          "equity": 9815.84998539086
+        },
+        {
+          "timestamp": "2025-10-24T04:30:00",
+          "equity": 9816.147433526974
+        },
+        {
+          "timestamp": "2025-10-24T04:45:00",
+          "equity": 9816.214354735968
+        },
+        {
+          "timestamp": "2025-10-24T05:00:00",
+          "equity": 9816.165735183577
+        },
+        {
+          "timestamp": "2025-10-24T05:15:00",
+          "equity": 9815.909327125908
+        },
+        {
+          "timestamp": "2025-10-24T05:30:00",
+          "equity": 9816.240605596955
+        },
+        {
+          "timestamp": "2025-10-24T05:45:00",
+          "equity": 9816.381103162801
+        },
+        {
+          "timestamp": "2025-10-24T06:00:00",
+          "equity": 9816.334332262591
+        },
+        {
+          "timestamp": "2025-10-24T06:15:00",
+          "equity": 9816.517718559064
+        },
+        {
+          "timestamp": "2025-10-24T06:30:00",
+          "equity": 9816.725876794779
+        },
+        {
+          "timestamp": "2025-10-24T06:45:00",
+          "equity": 9816.799453151629
+        },
+        {
+          "timestamp": "2025-10-24T07:00:00",
+          "equity": 9816.178121153198
+        },
+        {
+          "timestamp": "2025-10-24T07:15:00",
+          "equity": 9816.32416467559
+        },
+        {
+          "timestamp": "2025-10-24T07:30:00",
+          "equity": 9815.813382077653
+        },
+        {
+          "timestamp": "2025-10-24T07:45:00",
+          "equity": 9816.050564152627
+        },
+        {
+          "timestamp": "2025-10-24T08:00:00",
+          "equity": 9816.08864638758
+        },
+        {
+          "timestamp": "2025-10-24T08:15:00",
+          "equity": 9815.58026703748
+        },
+        {
+          "timestamp": "2025-10-24T08:30:00",
+          "equity": 9816.105838852875
+        },
+        {
+          "timestamp": "2025-10-24T08:45:00",
+          "equity": 9816.090495039762
+        },
+        {
+          "timestamp": "2025-10-24T09:00:00",
+          "equity": 9816.57114460713
+        },
+        {
+          "timestamp": "2025-10-24T09:15:00",
+          "equity": 9816.73604438178
+        },
+        {
+          "timestamp": "2025-10-24T09:30:00",
+          "equity": 9816.665795598858
+        },
+        {
+          "timestamp": "2025-10-24T09:45:00",
+          "equity": 9816.551179163562
+        },
+        {
+          "timestamp": "2025-10-24T10:00:00",
+          "equity": 9816.442108684812
+        },
+        {
+          "timestamp": "2025-10-24T10:15:00",
+          "equity": 9816.090125309325
+        },
+        {
+          "timestamp": "2025-10-24T10:30:00",
+          "equity": 9816.249848857866
+        },
+        {
+          "timestamp": "2025-10-24T10:45:00",
+          "equity": 9816.156676787885
+        },
+        {
+          "timestamp": "2025-10-24T11:00:00",
+          "equity": 9816.36760800187
+        },
+        {
+          "timestamp": "2025-10-24T11:15:00",
+          "equity": 9816.17165087056
+        },
+        {
+          "timestamp": "2025-10-24T11:30:00",
+          "equity": 9815.92171309553
+        },
+        {
+          "timestamp": "2025-10-24T11:45:00",
+          "equity": 9816.052043074373
+        },
+        {
+          "timestamp": "2025-10-24T12:00:00",
+          "equity": 9816.255025083976
+        },
+        {
+          "timestamp": "2025-10-24T12:15:00",
+          "equity": 9815.925040669457
+        },
+        {
+          "timestamp": "2025-10-24T12:30:00",
+          "equity": 9816.939026391385
+        },
+        {
+          "timestamp": "2025-10-24T12:45:00",
+          "equity": 9816.482779032822
+        },
+        {
+          "timestamp": "2025-10-24T13:00:00",
+          "equity": 9816.281460810182
+        },
+        {
+          "timestamp": "2025-10-24T13:15:00",
+          "equity": 9816.333407936501
+        },
+        {
+          "timestamp": "2025-10-24T13:30:00",
+          "equity": 9815.288364857914
+        },
+        {
+          "timestamp": "2025-10-24T13:45:00",
+          "equity": 9815.764392794825
+        },
+        {
+          "timestamp": "2025-10-24T14:00:00",
+          "equity": 9815.107936404933
+        },
+        {
+          "timestamp": "2025-10-24T14:15:00",
+          "equity": 9814.046255456706
+        },
+        {
+          "timestamp": "2025-10-24T14:30:00",
+          "equity": 9814.172703265966
+        },
+        {
+          "timestamp": "2025-10-24T14:45:00",
+          "equity": 9814.433548088873
+        },
+        {
+          "timestamp": "2025-10-24T15:00:00",
+          "equity": 9814.828420194986
+        },
+        {
+          "timestamp": "2025-10-24T15:15:00",
+          "equity": 9815.095920165748
+        },
+        {
+          "timestamp": "2025-10-24T15:30:00",
+          "equity": 9814.28232834037
+        },
+        {
+          "timestamp": "2025-10-24T15:45:00",
+          "equity": 9814.12870534403
+        },
+        {
+          "timestamp": "2025-10-24T16:00:00",
+          "equity": 9814.088959322113
+        },
+        {
+          "timestamp": "2025-10-24T16:15:00",
+          "equity": 9814.692913990033
+        },
+        {
+          "timestamp": "2025-10-24T16:30:00",
+          "equity": 9814.03553327405
+        },
+        {
+          "timestamp": "2025-10-24T16:45:00",
+          "equity": 9814.54280343284
+        },
+        {
+          "timestamp": "2025-10-24T17:00:00",
+          "equity": 9814.474588167317
+        },
+        {
+          "timestamp": "2025-10-24T17:15:00",
+          "equity": 9814.966884243431
+        },
+        {
+          "timestamp": "2025-10-24T17:30:00",
+          "equity": 9814.674982063865
+        },
+        {
+          "timestamp": "2025-10-24T17:45:00",
+          "equity": 9814.42356536709
+        },
+        {
+          "timestamp": "2025-10-24T18:00:00",
+          "equity": 9814.923625782369
+        },
+        {
+          "timestamp": "2025-10-24T18:15:00",
+          "equity": 9814.97316966085
+        },
+        {
+          "timestamp": "2025-10-24T18:30:00",
+          "equity": 9815.123095352827
+        },
+        {
+          "timestamp": "2025-10-24T18:45:00",
+          "equity": 9815.156186226888
+        },
+        {
+          "timestamp": "2025-10-24T19:00:00",
+          "equity": 9815.339017927705
+        },
+        {
+          "timestamp": "2025-10-24T19:15:00",
+          "equity": 9815.782139855773
+        },
+        {
+          "timestamp": "2025-10-24T19:30:00",
+          "equity": 9815.41832510632
+        },
+        {
+          "timestamp": "2025-10-24T19:45:00",
+          "equity": 9815.183546279184
+        },
+        {
+          "timestamp": "2025-10-24T20:00:00",
+          "equity": 9815.248433970779
+        },
+        {
+          "timestamp": "2025-10-24T20:15:00",
+          "equity": 9815.395956414917
+        },
+        {
+          "timestamp": "2025-10-24T20:30:00",
+          "equity": 9815.511127445867
+        },
+        {
+          "timestamp": "2025-10-24T20:45:00",
+          "equity": 9815.691371033628
+        },
+        {
+          "timestamp": "2025-10-24T21:00:00",
+          "equity": 9815.2212587837
+        },
+        {
+          "timestamp": "2025-10-24T21:15:00",
+          "equity": 9815.682682368373
+        },
+        {
+          "timestamp": "2025-10-24T21:30:00",
+          "equity": 9815.929847165131
+        },
+        {
+          "timestamp": "2025-10-24T21:45:00",
+          "equity": 9816.04095116128
+        },
+        {
+          "timestamp": "2025-10-24T22:00:00",
+          "equity": 9815.805617738488
+        },
+        {
+          "timestamp": "2025-10-24T22:15:00",
+          "equity": 9816.018027874221
+        },
+        {
+          "timestamp": "2025-10-24T22:30:00",
+          "equity": 9815.967744534866
+        },
+        {
+          "timestamp": "2025-10-24T22:45:00",
+          "equity": 9815.931326086877
+        },
+        {
+          "timestamp": "2025-10-24T23:00:00",
+          "equity": 9815.698950507576
+        },
+        {
+          "timestamp": "2025-10-24T23:15:00",
+          "equity": 9815.953509913063
+        },
+        {
+          "timestamp": "2025-10-24T23:30:00",
+          "equity": 9815.826877238584
+        },
+        {
+          "timestamp": "2025-10-24T23:45:00",
+          "equity": 9815.92171309553
+        },
+        {
+          "timestamp": "2025-10-25T00:00:00",
+          "equity": 9815.650146089967
+        },
+        {
+          "timestamp": "2025-10-25T00:15:00",
+          "equity": 9815.619458463741
+        },
+        {
+          "timestamp": "2025-10-25T00:30:00",
+          "equity": 9815.539226959036
+        },
+        {
+          "timestamp": "2025-10-25T00:45:00",
+          "equity": 9815.488573889244
+        },
+        {
+          "timestamp": "2025-10-25T01:00:00",
+          "equity": 9815.700429429322
+        },
+        {
+          "timestamp": "2025-10-25T01:15:00",
+          "equity": 9816.102696144164
+        },
+        {
+          "timestamp": "2025-10-25T01:30:00",
+          "equity": 9815.813936673308
+        },
+        {
+          "timestamp": "2025-10-25T01:45:00",
+          "equity": 9816.038178183006
+        },
+        {
+          "timestamp": "2025-10-25T02:00:00",
+          "equity": 9815.8686567779
+        },
+        {
+          "timestamp": "2025-10-25T02:15:00",
+          "equity": 9815.911915238963
+        },
+        {
+          "timestamp": "2025-10-25T02:30:00",
+          "equity": 9815.891395199742
+        },
+        {
+          "timestamp": "2025-10-25T02:45:00",
+          "equity": 9815.952400721753
+        },
+        {
+          "timestamp": "2025-10-25T03:00:00",
+          "equity": 9816.008969478527
+        },
+        {
+          "timestamp": "2025-10-25T03:15:00",
+          "equity": 9816.061840930939
+        },
+        {
+          "timestamp": "2025-10-25T03:30:00",
+          "equity": 9816.070714461413
+        },
+        {
+          "timestamp": "2025-10-25T03:45:00",
+          "equity": 9815.937981234732
+        },
+        {
+          "timestamp": "2025-10-25T04:00:00",
+          "equity": 9816.269629436216
+        },
+        {
+          "timestamp": "2025-10-25T04:15:00",
+          "equity": 9816.438781110885
+        },
+        {
+          "timestamp": "2025-10-25T04:30:00",
+          "equity": 9816.413824306426
+        },
+        {
+          "timestamp": "2025-10-25T04:45:00",
+          "equity": 9816.328231710391
+        },
+        {
+          "timestamp": "2025-10-25T05:00:00",
+          "equity": 9816.167398970541
+        },
+        {
+          "timestamp": "2025-10-25T05:15:00",
+          "equity": 9816.233765583882
+        },
+        {
+          "timestamp": "2025-10-25T05:30:00",
+          "equity": 9816.432495693465
+        },
+        {
+          "timestamp": "2025-10-25T05:45:00",
+          "equity": 9816.624570655194
+        },
+        {
+          "timestamp": "2025-10-25T06:00:00",
+          "equity": 9816.670047498876
+        },
+        {
+          "timestamp": "2025-10-25T06:15:00",
+          "equity": 9816.499416902461
+        },
+        {
+          "timestamp": "2025-10-25T06:30:00",
+          "equity": 9816.586488420242
+        },
+        {
+          "timestamp": "2025-10-25T06:45:00",
+          "equity": 9816.574841911493
+        },
+        {
+          "timestamp": "2025-10-25T07:00:00",
+          "equity": 9816.756379555783
+        },
+        {
+          "timestamp": "2025-10-25T07:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T07:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T07:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T08:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T08:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T08:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T08:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T09:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T09:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T09:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T09:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T10:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T10:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T10:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T10:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T11:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T11:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T11:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T11:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T12:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T12:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T12:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T12:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T13:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T13:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T13:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T13:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T14:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T14:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T14:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T14:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T15:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T15:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T15:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T15:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T16:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T16:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T16:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T16:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T17:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T17:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T17:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T17:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T18:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T18:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T18:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T18:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T19:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T19:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T19:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T19:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T20:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T20:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T20:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T20:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T21:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T21:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T21:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T21:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T22:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T22:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T22:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T22:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T23:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T23:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T23:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-25T23:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T00:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T00:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T00:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T00:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T01:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T01:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T01:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T01:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T02:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T02:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T02:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T02:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T03:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T03:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T03:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T03:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T04:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T04:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T04:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T04:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T05:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T05:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T05:30:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T05:45:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T06:00:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T06:15:00",
+          "equity": 10017.030929230825
+        },
+        {
+          "timestamp": "2025-10-26T06:30:00",
+          "equity": 9816.480003056819
+        },
+        {
+          "timestamp": "2025-10-26T06:45:00",
+          "equity": 9816.496156492249
+        },
+        {
+          "timestamp": "2025-10-26T07:00:00",
+          "equity": 9816.611384331642
+        },
+        {
+          "timestamp": "2025-10-26T07:15:00",
+          "equity": 9816.54659110731
+        },
+        {
+          "timestamp": "2025-10-26T07:30:00",
+          "equity": 9816.58230814787
+        },
+        {
+          "timestamp": "2025-10-26T07:45:00",
+          "equity": 9816.688741339085
+        },
+        {
+          "timestamp": "2025-10-26T08:00:00",
+          "equity": 9816.826045540232
+        },
+        {
+          "timestamp": "2025-10-26T08:15:00",
+          "equity": 9816.844711732285
+        },
+        {
+          "timestamp": "2025-10-26T08:30:00",
+          "equity": 9816.90106927367
+        },
+        {
+          "timestamp": "2025-10-26T08:45:00",
+          "equity": 9816.784226090733
+        },
+        {
+          "timestamp": "2025-10-26T09:00:00",
+          "equity": 9816.67545962551
+        },
+        {
+          "timestamp": "2025-10-26T09:15:00",
+          "equity": 9818.40567204258
+        },
+        {
+          "timestamp": "2025-10-26T09:30:00",
+          "equity": 9817.765637034357
+        },
+        {
+          "timestamp": "2025-10-26T09:45:00",
+          "equity": 9818.140217253696
+        },
+        {
+          "timestamp": "2025-10-26T10:00:00",
+          "equity": 9817.879429012824
+        },
+        {
+          "timestamp": "2025-10-26T10:15:00",
+          "equity": 9817.75809876449
+        },
+        {
+          "timestamp": "2025-10-26T10:30:00",
+          "equity": 9817.916940879542
+        },
+        {
+          "timestamp": "2025-10-26T10:45:00",
+          "equity": 9818.052091289299
+        },
+        {
+          "timestamp": "2025-10-26T11:00:00",
+          "equity": 9818.072911272742
+        },
+        {
+          "timestamp": "2025-10-26T11:15:00",
+          "equity": 9818.427927886949
+        },
+        {
+          "timestamp": "2025-10-26T11:30:00",
+          "equity": 9819.593129029234
+        },
+        {
+          "timestamp": "2025-10-26T11:45:00",
+          "equity": 9819.513438747783
+        },
+        {
+          "timestamp": "2025-10-26T12:00:00",
+          "equity": 9820.311059492748
+        },
+        {
+          "timestamp": "2025-10-26T12:15:00",
+          "equity": 9820.142166351206
+        },
+        {
+          "timestamp": "2025-10-26T12:30:00",
+          "equity": 9819.879762766792
+        },
+        {
+          "timestamp": "2025-10-26T12:45:00",
+          "equity": 9820.02352834211
+        },
+        {
+          "timestamp": "2025-10-26T13:00:00",
+          "equity": 9819.693998259358
+        },
+        {
+          "timestamp": "2025-10-26T13:15:00",
+          "equity": 9820.149704621073
+        },
+        {
+          "timestamp": "2025-10-26T13:30:00",
+          "equity": 9820.510644161604
+        },
+        {
+          "timestamp": "2025-10-26T13:45:00",
+          "equity": 9820.289701061458
+        },
+        {
+          "timestamp": "2025-10-26T14:00:00",
+          "equity": 9820.418749062275
+        },
+        {
+          "timestamp": "2025-10-26T14:15:00",
+          "equity": 9820.244650924873
+        },
+        {
+          "timestamp": "2025-10-26T14:30:00",
+          "equity": 9820.544745858622
+        },
+        {
+          "timestamp": "2025-10-26T14:45:00",
+          "equity": 9820.027835924891
+        },
+        {
+          "timestamp": "2025-10-26T15:00:00",
+          "equity": 9819.952453226222
+        },
+        {
+          "timestamp": "2025-10-26T15:15:00",
+          "equity": 9819.91637722043
+        },
+        {
+          "timestamp": "2025-10-26T15:30:00",
+          "equity": 9819.877429492784
+        },
+        {
+          "timestamp": "2025-10-26T15:45:00",
+          "equity": 9820.229394902522
+        },
+        {
+          "timestamp": "2025-10-26T16:00:00",
+          "equity": 9819.798277659183
+        },
+        {
+          "timestamp": "2025-10-26T16:15:00",
+          "equity": 9819.700818598762
+        },
+        {
+          "timestamp": "2025-10-26T16:30:00",
+          "equity": 9820.122602746076
+        },
+        {
+          "timestamp": "2025-10-26T16:45:00",
+          "equity": 9819.921941181523
+        },
+        {
+          "timestamp": "2025-10-26T17:00:00",
+          "equity": 9820.203369923222
+        },
+        {
+          "timestamp": "2025-10-26T17:15:00",
+          "equity": 9820.117936198063
+        },
+        {
+          "timestamp": "2025-10-26T17:30:00",
+          "equity": 9819.968606661652
+        },
+        {
+          "timestamp": "2025-10-26T17:45:00",
+          "equity": 9819.772791127729
+        },
+        {
+          "timestamp": "2025-10-26T18:00:00",
+          "equity": 9820.00701594145
+        },
+        {
+          "timestamp": "2025-10-26T18:15:00",
+          "equity": 9819.875096218779
+        },
+        {
+          "timestamp": "2025-10-26T18:30:00",
+          "equity": 9820.21772853249
+        },
+        {
+          "timestamp": "2025-10-26T18:45:00",
+          "equity": 9820.050630217109
+        },
+        {
+          "timestamp": "2025-10-26T19:00:00",
+          "equity": 9819.997144397576
+        },
+        {
+          "timestamp": "2025-10-26T19:15:00",
+          "equity": 9820.21772853249
+        },
+        {
+          "timestamp": "2025-10-26T19:30:00",
+          "equity": 9820.087424153364
+        },
+        {
+          "timestamp": "2025-10-26T19:45:00",
+          "equity": 9820.059604347902
+        },
+        {
+          "timestamp": "2025-10-26T20:00:00",
+          "equity": 9819.938274099568
+        },
+        {
+          "timestamp": "2025-10-26T20:15:00",
+          "equity": 9819.60982091251
+        },
+        {
+          "timestamp": "2025-10-26T20:30:00",
+          "equity": 9819.837943317292
+        },
+        {
+          "timestamp": "2025-10-26T20:45:00",
+          "equity": 9819.526361496126
+        },
+        {
+          "timestamp": "2025-10-26T21:00:00",
+          "equity": 9819.683049819789
+        },
+        {
+          "timestamp": "2025-10-26T21:15:00",
+          "equity": 9819.069937203947
+        },
+        {
+          "timestamp": "2025-10-26T21:30:00",
+          "equity": 9819.789841976237
+        },
+        {
+          "timestamp": "2025-10-26T21:45:00",
+          "equity": 9819.864506744441
+        },
+        {
+          "timestamp": "2025-10-26T22:00:00",
+          "equity": 9821.878122211985
+        },
+        {
+          "timestamp": "2025-10-26T22:15:00",
+          "equity": 9821.474106843641
+        },
+        {
+          "timestamp": "2025-10-26T22:30:00",
+          "equity": 9821.74763835024
+        },
+        {
+          "timestamp": "2025-10-26T22:45:00",
+          "equity": 9822.005195904027
+        },
+        {
+          "timestamp": "2025-10-26T23:00:00",
+          "equity": 9821.620744140815
+        },
+        {
+          "timestamp": "2025-10-26T23:15:00",
+          "equity": 9821.462799438841
+        },
+        {
+          "timestamp": "2025-10-26T23:30:00",
+          "equity": 9821.907377878373
+        },
+        {
+          "timestamp": "2025-10-26T23:45:00",
+          "equity": 9821.744048697923
+        },
+        {
+          "timestamp": "2025-10-27T00:00:00",
+          "equity": 9822.335443917244
+        },
+        {
+          "timestamp": "2025-10-27T00:15:00",
+          "equity": 9822.35734079638
+        },
+        {
+          "timestamp": "2025-10-27T00:30:00",
+          "equity": 9822.389827149855
+        },
+        {
+          "timestamp": "2025-10-27T00:45:00",
+          "equity": 9822.141064244246
+        },
+        {
+          "timestamp": "2025-10-27T01:00:00",
+          "equity": 9822.581694066228
+        },
+        {
+          "timestamp": "2025-10-27T01:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T01:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T01:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T02:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T02:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T02:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T02:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T03:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T03:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T03:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T03:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T04:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T04:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T04:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T04:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T05:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T05:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T05:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T05:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T06:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T06:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T06:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T06:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T07:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T07:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T07:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T07:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T08:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T08:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T08:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T08:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T09:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T09:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T09:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T09:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T10:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T10:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T10:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T10:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T11:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T11:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T11:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T11:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T12:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T12:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T12:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T12:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T13:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T13:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T13:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T13:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T14:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T14:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T14:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T14:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T15:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T15:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T15:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T15:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T16:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T16:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T16:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T16:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T17:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T17:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T17:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T17:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T18:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T18:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T18:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T18:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T19:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T19:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T19:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T19:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T20:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T20:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T20:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T20:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T21:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T21:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T21:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T21:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T22:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T22:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T22:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T22:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T23:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T23:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T23:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-27T23:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T00:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T00:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T00:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T00:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T01:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T01:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T01:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T01:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T02:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T02:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T02:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T02:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T03:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T03:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T03:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T03:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T04:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T04:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T04:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T04:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T05:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T05:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T05:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T05:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T06:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T06:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T06:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T06:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T07:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T07:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T07:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T07:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T08:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T08:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T08:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T08:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T09:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T09:15:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T09:30:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T09:45:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T10:00:00",
+          "equity": 10022.714348815622
+        },
+        {
+          "timestamp": "2025-10-28T10:15:00",
+          "equity": 9822.04963492651
+        },
+        {
+          "timestamp": "2025-10-28T10:30:00",
+          "equity": 9822.054534651019
+        },
+        {
+          "timestamp": "2025-10-28T10:45:00",
+          "equity": 9822.145004564272
+        },
+        {
+          "timestamp": "2025-10-28T11:00:00",
+          "equity": 9822.017611727042
+        },
+        {
+          "timestamp": "2025-10-28T11:15:00",
+          "equity": 9822.07675840147
+        },
+        {
+          "timestamp": "2025-10-28T11:30:00",
+          "equity": 9821.99188817337
+        },
+        {
+          "timestamp": "2025-10-28T11:45:00",
+          "equity": 9821.703679378154
+        },
+        {
+          "timestamp": "2025-10-28T12:00:00",
+          "equity": 9821.678305804804
+        },
+        {
+          "timestamp": "2025-10-28T12:15:00",
+          "equity": 9821.461667985448
+        },
+        {
+          "timestamp": "2025-10-28T12:30:00",
+          "equity": 9821.761251141132
+        },
+        {
+          "timestamp": "2025-10-28T12:45:00",
+          "equity": 9821.900368319151
+        },
+        {
+          "timestamp": "2025-10-28T13:00:00",
+          "equity": 9822.439513005287
+        },
+        {
+          "timestamp": "2025-10-28T13:15:00",
+          "equity": 9822.970433153854
+        },
+        {
+          "timestamp": "2025-10-28T13:30:00",
+          "equity": 9823.089776443678
+        },
+        {
+          "timestamp": "2025-10-28T13:45:00",
+          "equity": 9823.776962806045
+        },
+        {
+          "timestamp": "2025-10-28T14:00:00",
+          "equity": 9824.238936831167
+        },
+        {
+          "timestamp": "2025-10-28T14:15:00",
+          "equity": 9824.501772053034
+        },
+        {
+          "timestamp": "2025-10-28T14:30:00",
+          "equity": 9822.45351221817
+        },
+        {
+          "timestamp": "2025-10-28T14:45:00",
+          "equity": 9822.983032445449
+        },
+        {
+          "timestamp": "2025-10-28T15:00:00",
+          "equity": 9823.418232975931
+        },
+        {
+          "timestamp": "2025-10-28T15:15:00",
+          "equity": 9822.924935711986
+        },
+        {
+          "timestamp": "2025-10-28T15:30:00",
+          "equity": 9822.043160290552
+        },
+        {
+          "timestamp": "2025-10-28T15:45:00",
+          "equity": 9822.220775303998
+        },
+        {
+          "timestamp": "2025-10-28T16:00:00",
+          "equity": 9822.612228294225
+        },
+        {
+          "timestamp": "2025-10-28T16:15:00",
+          "equity": 9822.989332091245
+        },
+        {
+          "timestamp": "2025-10-28T16:30:00",
+          "equity": 9823.015755605562
+        },
+        {
+          "timestamp": "2025-10-28T16:45:00",
+          "equity": 9823.444131519766
+        },
+        {
+          "timestamp": "2025-10-28T17:00:00",
+          "equity": 9823.707491712115
+        },
+        {
+          "timestamp": "2025-10-28T17:15:00",
+          "equity": 9823.676693443775
+        },
+        {
+          "timestamp": "2025-10-28T17:30:00",
+          "equity": 9823.784312392809
+        },
+        {
+          "timestamp": "2025-10-28T17:45:00",
+          "equity": 9823.4026588516
+        },
+        {
+          "timestamp": "2025-10-28T18:00:00",
+          "equity": 9823.425932543018
+        },
+        {
+          "timestamp": "2025-10-28T18:15:00",
+          "equity": 9822.695348620715
+        },
+        {
+          "timestamp": "2025-10-28T18:30:00",
+          "equity": 9822.416589294193
+        },
+        {
+          "timestamp": "2025-10-28T18:45:00",
+          "equity": 9822.906561745078
+        },
+        {
+          "timestamp": "2025-10-28T19:00:00",
+          "equity": 9822.575305370246
+        },
+        {
+          "timestamp": "2025-10-28T19:15:00",
+          "equity": 9820.55381903002
+        },
+        {
+          "timestamp": "2025-10-28T19:30:00",
+          "equity": 9821.096113539053
+        },
+        {
+          "timestamp": "2025-10-28T19:45:00",
+          "equity": 9820.519345968296
+        },
+        {
+          "timestamp": "2025-10-28T20:00:00",
+          "equity": 9819.189595734624
+        },
+        {
+          "timestamp": "2025-10-28T20:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T20:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T20:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T21:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T21:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T21:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T21:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T22:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T22:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T22:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T22:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T23:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T23:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T23:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-28T23:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T00:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T00:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T00:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T00:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T01:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T01:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T01:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T01:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T02:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T02:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T02:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T02:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T03:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T03:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T03:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T03:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T04:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T04:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T04:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T04:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T05:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T05:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T05:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T05:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T06:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T06:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T06:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T06:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T07:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T07:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T07:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T07:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T08:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T08:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T08:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T08:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T09:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T09:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T09:30:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T09:45:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T10:00:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T10:15:00",
+          "equity": 10019.390019104889
+        },
+        {
+          "timestamp": "2025-10-29T10:30:00",
+          "equity": 10019.390019104889
+        }
+      ]
+    },
+    "phase7_ai_analysis": "The **EMA Crossover strategy on BTCUSDT 15m** over 3 months produced a very modest total return (0.19%), low trade frequency, and extremely low risk-adjusted performance (Sharpe ratio 0.03), indicating the strategy is not currently acceptable for live crypto trading.\n\n**1. Is this performance acceptable for a crypto trading strategy?**\n- No, this performance is not acceptable for live trading. The **total return** is negligible (0.19% over 3 months), and the **Sharpe ratio** (0.03) is far below industry standards for risk-adjusted returns, which typically require values above 1.0 for consideration in professional trading[2][5]. The **Sortino ratio** (0.02) also signals poor downside risk management[5].\n\n**2. Main weaknesses based on these metrics:**\n- **Low Return:** 0.19% total return is insufficient to justify the risk and effort, especially in a volatile market like crypto.\n- **Low Risk-Adjusted Performance:** Sharpe (0.03) and Sortino (0.02) ratios are extremely low, indicating the strategy does not compensate for risk taken[2][5].\n- **Low Trade Frequency:** Only 5 trades in 3 months suggests the strategy is not capturing enough market opportunities.\n- **Max Drawdown:** 2.04% is moderate, but given the low return, the risk/reward profile is unattractive.\n- **Potential Overfitting or Underfitting:** High win rate (80%) with few trades may indicate the strategy is either too restrictive or not robust.\n\n**3. Which parameter should we optimize first?**\n- **Entry/Exit Sensitivity (EMA lengths):** The low trade count and low return suggest the EMA parameters may be too conservative, missing profitable moves. Optimizing the EMA periods to increase signal frequency and capture more volatility should be the first step[2].\n- **Risk/Reward Ratio:** Adjust stop-loss and take-profit levels to improve the average profit per trade, as win rate alone does not guarantee profitability[2].\n\n**4. Should we add additional filters or indicators?**\n- Yes. The strategy is underperforming and may benefit from:\n  - **Volatility filters** (e.g., ATR) to avoid sideways markets.\n  - **Trend confirmation** (e.g., RSI, MACD) to reduce false signals.\n  - **Volume filters** to confirm breakout strength[3][4].\n\n**5. Is the Sharpe ratio good enough for live trading?**\n- No. A **Sharpe ratio of 0.03** is considered extremely poor; professional strategies typically require Sharpe ratios above 1.0, with anything below 0.2 indicating unacceptable risk-adjusted returns[5][2].\n\n---\n\n**Three Specific Recommendations for Improvement:**\n\n- **Optimize EMA Parameters and Trade Frequency:** Test shorter EMA periods or alternative crossover combinations to increase the number of trades and capture more market volatility. This can help improve both total return and risk-adjusted metrics[2].\n- **Incorporate Additional Filters:** Add volatility (ATR), trend (RSI/MACD), and volume filters to reduce false signals and improve trade quality. This can help boost the profit factor and risk-adjusted returns[3][4].\n- **Review Risk Management Rules:** Adjust stop-loss and take-profit levels to improve the risk/reward ratio. Consider dynamic position sizing based on volatility to better manage drawdowns and maximize returns per unit of risk[2].\n\nThese steps should be validated through further backtesting and walk-forward analysis to ensure robustness and avoid overfitting.",
+    "phase8_risk_optimization": "1. **Is 2% risk per trade too aggressive for crypto?**\n\n2% risk per trade is at the upper end of the recommended range for most traders, especially in highly volatile markets like crypto[2][3][6]. Most risk management guidelines suggest **1%–2% per trade**; beginners and those seeking longevity should lean toward 1%[2][3][6]. Risking more than 2% increases the chance of significant drawdowns and account loss, especially during losing streaks[3][6].\n\n2. **Should we use Kelly Criterion for position sizing?**\n\nThe **Kelly Criterion** can theoretically optimize position sizing for maximum growth, but it is often too aggressive for practical trading, especially in volatile markets like crypto. Most professional traders use **fractional Kelly** (e.g., half or quarter Kelly) or stick to fixed risk percentages (1%–2%) to avoid large drawdowns[2][3]. Kelly requires accurate win rate and payoff ratio estimates, which are difficult to maintain in crypto due to market unpredictability.\n\n3. **What's the optimal Take Profit / Stop Loss ratio for 15m crypto?**\n\nA **risk-reward ratio (RRR) of at least 2:1** is generally recommended for short-term crypto trading, such as the 15-minute timeframe[1][5]. Your current setup (TP 3%, SL 1.5%) gives an RRR of 2:1, which is considered the minimum for long-term profitability. Many traders aim for **2.5:1 or 3:1** to better offset losses from losing trades, but higher ratios may reduce win rates[1][5]. For 15m crypto, **2:1 to 3:1** is optimal, balancing realistic price movement and trade frequency[1].\n\n4. **Should we implement trailing stop?**\n\nImplementing a **trailing stop** is recommended in crypto trading to lock in profits as price moves favorably while still allowing for upside potential[1]. Trailing stops help capture larger moves and reduce the risk of giving back gains, especially in volatile markets. They can be set at a percentage (e.g., 1.5%–2%) or based on volatility measures. Use trailing stops in conjunction with your fixed stop-loss and take-profit for dynamic risk management.\n\n5. **How many concurrent positions are safe?**\n\nWith a **2% risk per trade** and an initial capital of $10,000, limiting to **1–2 concurrent positions** is prudent[2][6]. This ensures total risk exposure does not exceed 2%–4% of your account at any time. More positions increase risk of correlated losses, especially in crypto where assets often move together. For most traders, **1 position at 2% risk** or **2 positions at 1% risk each** is optimal for safety and capital preservation[2][6].\n\n---\n\n**Numeric Recommendations for Risk Management Optimization:**\n\n- **Risk per trade:** 1%–1.5% (reduce from 2% for greater longevity)[2][3][6]\n- **Max concurrent positions:** 1–2 (never exceed 4% total risk)\n- **Stop-loss:** 1.0%–1.5% (current is reasonable; adjust based on volatility)\n- **Take-profit:** 2.5%–4.5% (aim for RRR of 2:1 to 3:1)[1][5]\n- **Trailing stop:** 1.5%–2% below current price or use ATR-based trailing stop\n- **Position sizing formula:** \\(\\text{Position Size} = \\frac{\\text{Account Balance} \\times \\text{Risk \\%}}{\\text{Stop-Loss \\%}}\\)[2][3]\n\n**Summary Table:**\n\n| Parameter            | Conservative Value | Aggressive Value | Notes                              |\n|----------------------|-------------------|------------------|------------------------------------|\n| Risk per trade       | 1%                | 2%               | Beginners use 1%; max 2%[2][3][6]  |\n| Max positions        | 1                 | 2                | Never >4% total risk[2][6]         |\n| Stop-loss            | 1.0%              | 1.5%             | Adjust for volatility              |\n| Take-profit          | 2.5%              | 4.5%             | RRR 2:1–3:1[1][5]                  |\n| Trailing stop        | 1.5%              | 2%               | Use volatility-based if possible   |\n\nReducing risk per trade and using trailing stops will optimize your strategy for longevity and adaptability in volatile crypto markets[1][2][3][6].",
+    "optimized_risk_config": {
+      "risk_per_trade_pct": 1.5,
+      "take_profit_pct": 4.0,
+      "stop_loss_pct": 1.5,
+      "trailing_stop_pct": 0.5,
+      "max_positions": 2,
+      "use_kelly": false
+    }
+  },
+  "dialogue_history": [
+    {
+      "timestamp": "2025-10-29T13:30:31.123693",
+      "agent": "Copilot",
+      "message": "\n        Analyze the current state of a cryptocurrency backtesting project:\n        \n        PROJECT CONTEXT:\n        - Backend: Python FastAPI with PostgreSQL/SQLite\n        - Bybit API integration for historical data\n        - BacktestEngine with EMA Crossover strategy\n        - Support for 15-minute timeframe (central TF)\n        - Available strategies: EMA Crossover, RSI Mean Reversion\n        \n        QUESTION:\n        What are the key considerations for selecting a trading pair and \n        testing period for a 15-minute crypto backtesting system? \n        Consider volatility, liquidity, and data availability.\n        ",
+      "response": "The key considerations for selecting a **trading pair** and **testing period** for a 15-minute crypto backtesting system are: **volatility**, **liquidity**, and **data availability**. Each factor directly impacts the reliability and relevance of your backtest results.\n\n**Volatility**\n- Choose trading pairs with sufficient price movement; high volatility is essential for strategies like EMA Crossover and RSI Mean Reversion, which rely on price swings to generate signals[1].\n- Avoid pairs with ext..."
+    },
+    {
+      "timestamp": "2025-10-29T13:30:43.954188",
+      "agent": "Copilot",
+      "message": "\n        CONTEXT: Cryptocurrency backtesting system, 15-minute timeframe\n        PERIOD: 2025-07-31 to 2025-10-29 (3 months)\n        \n        QUESTION:\n        Recommend the best cryptocurrency pair for backtesting with these criteria:\n        1. High liquidity on Bybit exchange\n        2. Good volatility for 15-minute trading\n        3. Stable data availability for last 3 months\n        4. Suitable for EMA Crossover strategy\n        \n        Provide: Symbol (e.g., BTCUSDT), reasoning, expected volatility level.\n        ",
+      "response": "The best cryptocurrency pair for backtesting on Bybit from July 31 to October 29, 2025, meeting your criteria is **MNTUSDT (Mantle/USDT)**.\n\n**Reasoning:**\n\n- **High liquidity:** MNT experienced a record-breaking 450% surge in trading volume on Bybit during Q3 2025, making it one of the most actively traded assets on the platform in this period[3]. Bybit’s recent delisting activity specifically targeted low-liquidity pairs, but MNT was not affected, indicating it meets and exceeds Bybit’s liquid..."
+    },
+    {
+      "timestamp": "2025-10-29T13:30:56.106873",
+      "agent": "Copilot",
+      "message": "\n        CONTEXT: Bybit API for historical kline data (candles)\n        \n        QUESTIONS:\n        1. What are Bybit API rate limits for kline/historical data requests?\n        2. What is the maximum number of candles per request?\n        3. How far back can we fetch historical data?\n        4. What are the best practices to avoid rate limiting?\n        5. Should we use data caching strategies?\n        \n        Provide specific numbers and strategies for a backtesting system.\n        ",
+      "response": "1. **Bybit API rate limits for kline/historical data requests:**  \nThe standard Bybit REST API rate limit is **5 requests per second** as of December 2024[3]. However, if you use the official Node.js SDK (`bybit-api`), the rate limit is significantly higher—**400 requests per second**—which exceeds even the highest VIP tier[2]. This elevated limit is automatic when using the SDK.\n\n2. **Maximum number of candles per request:**  \nYou can request up to **10,000 records (candles) per API call**[1]. ..."
+    },
+    {
+      "timestamp": "2025-10-29T13:31:14.682814",
+      "agent": "Copilot",
+      "message": "\n        TASK: Generate a test strategy for cryptocurrency backtesting\n        \n        REQUIREMENTS:\n        - Timeframe: 15 minutes\n        - Strategy Type: EMA Crossover with filters\n        - Asset: BTCUSDT on Bybit\n        - Period: Last 3 months\n        \n        PARAMETERS NEEDED:\n        1. Fast EMA period (typical range: 9-50)\n        2. Slow EMA period (typical range: 50-200)\n        3. RSI filter period and levels (oversold/overbought)\n        4. Volume filter (optional)\n        5. Take Profit %\n        6. Stop Loss %\n        7. Risk per trade %\n        \n        Provide SPECIFIC NUMERIC VALUES optimized for 15m crypto trading.\n        Format as JSON with explanations.\n        ",
+      "response": "Here is an **optimized test strategy for 15-minute EMA crossover trading on BTCUSDT (Bybit) for the last 3 months**, with specific numeric parameters and explanations for each:\n\n```json\n{\n  \"strategy\": \"EMA Crossover with Filters\",\n  \"asset\": \"BTCUSDT\",\n  \"exchange\": \"Bybit\",\n  \"timeframe\": \"15m\",\n  \"period\": \"Last 3 months\",\n  \"parameters\": {\n    \"fast_ema_period\": 21,\n    \"slow_ema_period\": 100,\n    \"rsi\": {\n      \"period\": 14,\n      \"overbought\": 70,\n      \"oversold\": 30\n    },\n    \"volume_fi..."
+    },
+    {
+      "timestamp": "2025-10-29T13:31:26.726213",
+      "agent": "Copilot",
+      "message": "\n        CONTEXT: EMA Crossover strategy for 15-minute crypto trading\n        \n        QUESTION:\n        What are the optimal EMA periods for 15-minute cryptocurrency trading?\n        Consider:\n        - Fast EMA range and recommendations\n        - Slow EMA range and recommendations\n        - Common successful combinations (e.g., 9/21, 20/50, 12/26)\n        - Why these periods work for crypto volatility\n        \n        Provide 3 specific parameter combinations to test.\n        ",
+      "response": "For 15-minute cryptocurrency trading, the most widely recommended **EMA periods** are fast EMAs in the 8–12 range and slow EMAs in the 20–26 range, with some traders extending the slow EMA up to 50 for additional noise reduction[1][3][5][6].\n\n**Fast EMA Range and Recommendations**\n- Common fast EMA periods: **8, 9, 12**.\n- These settings react quickly to price changes, capturing short bursts of momentum ideal for volatile crypto markets and scalping[1][3][5].\n- The 9-EMA is especially popular fo..."
+    },
+    {
+      "timestamp": "2025-10-29T13:31:36.878270",
+      "agent": "Copilot",
+      "message": "\n        CONTEXT: RSI filter for entry signals in crypto trading\n        \n        QUESTION:\n        What are optimal RSI parameters for 15-minute crypto trading?\n        - RSI period (typically 14, but is it optimal for 15m?)\n        - Oversold level (below 30?)\n        - Overbought level (above 70?)\n        - Should we use RSI divergence?\n        \n        Provide specific values for filtering EMA crossover signals.\n        ",
+      "response": "For **15-minute crypto trading**, optimal RSI parameters often differ from the classic defaults to better capture short-term momentum and filter EMA crossover signals. The most effective settings for this timeframe are:\n\n- **RSI period:** 14 is standard, but many traders find shorter or longer periods (such as 7–10 for more sensitivity, or 21+ for smoother signals) can be useful. However, recent expert backtests and community scripts for 15-minute scalping frequently retain **RSI 14** as a robus..."
+    },
+    {
+      "timestamp": "2025-10-29T13:32:17.140050",
+      "agent": "Copilot",
+      "message": "\n        BACKTEST RESULTS ANALYSIS\n        \n        Strategy: EMA Crossover on BTCUSDT 15m\n        Period: 3 months\n        \n        RESULTS:\n        - Total Return: 0.19%\n        - Max Drawdown: 2.04%\n        - Total Trades: 5\n        - Win Rate: 80.0%\n        - Profit Factor: 7.20\n        - Sharpe Ratio: 0.03\n        - Sortino Ratio: 0.02\n        - Final Capital: $10,019.39\n        \n        QUESTIONS:\n        1. Is this performance acceptable for a crypto trading strategy?\n        2. What are the main weaknesses based on these metrics?\n        3. Which parameter should we optimize first?\n        4. Should we add additional filters or indicators?\n        5. Is the Sharpe ratio good enough for live trading?\n        \n        Provide detailed analysis and 3 specific recommendations for improvement.\n        ",
+      "response": "The **EMA Crossover strategy on BTCUSDT 15m** over 3 months produced a very modest total return (0.19%), low trade frequency, and extremely low risk-adjusted performance (Sharpe ratio 0.03), indicating the strategy is not currently acceptable for live crypto trading.\n\n**1. Is this performance acceptable for a crypto trading strategy?**\n- No, this performance is not acceptable for live trading. The **total return** is negligible (0.19% over 3 months), and the **Sharpe ratio** (0.03) is far below ..."
+    },
+    {
+      "timestamp": "2025-10-29T13:32:37.939609",
+      "agent": "Copilot",
+      "message": "\n        CONTEXT: Crypto trading strategy with current parameters\n        - Initial Capital: $10,000\n        - Current Risk per Trade: 2%\n        - Max Positions: 1\n        - Current Stop Loss: 1.5%\n        - Current Take Profit: 3.0%\n        \n        QUESTIONS:\n        1. Is 2% risk per trade too aggressive for crypto?\n        2. Should we use Kelly Criterion for position sizing?\n        3. What's the optimal Take Profit / Stop Loss ratio for 15m crypto?\n        4. Should we implement trailing stop?\n        5. How many concurrent positions are safe?\n        \n        Provide specific numeric recommendations for risk management optimization.\n        ",
+      "response": "1. **Is 2% risk per trade too aggressive for crypto?**\n\n2% risk per trade is at the upper end of the recommended range for most traders, especially in highly volatile markets like crypto[2][3][6]. Most risk management guidelines suggest **1%–2% per trade**; beginners and those seeking longevity should lean toward 1%[2][3][6]. Risking more than 2% increases the chance of significant drawdowns and account loss, especially during losing streaks[3][6].\n\n2. **Should we use Kelly Criterion for positio..."
+    }
+  ]
+}

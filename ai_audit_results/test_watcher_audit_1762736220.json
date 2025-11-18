@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762736220,
+  "changed_files": [
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762736202.2902436,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero validation of code behavior. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code is being tested\n- **No coverage data generated** - Tests didn't execute sufficiently to collect metrics\n- **Complete testing gap** - All functionality is unverified\n\n## Potential Issues with Recent Changes\n1. **Test file `test_deepseek_client.py` likely contains fatal errors** preventing test execution\n2. **Possible issues:**\n   - Syntax errors in test code\n   - Missing imports/dependencies\n   - Configuration issues in test setup\n   - Fixture/teardown failures causing test runner crash\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution first** - Run tests individually to identify the crashing test\n2. **Check for syntax errors** in `test_deepseek_client.py`\n3. **Verify test dependencies** are properly installed\n4. **Add basic smoke test** to ensure test framework loads correctly\n\n**Short-term:**\n5. **Implement test isolation** - Ensure failing tests don't block entire suite\n6. **Add test logging** to capture failure details\n7. **Set up CI pipeline** with fail-fast detection\n\n## Risk Assessment\n**HIGH RISK** - Deploying code in this state is extremely dangerous:\n- **No quality gates** - All defects will reach production\n- **Regression risk** - 100% of functionality is unprotected\n- **Development blocked** - Cannot validate any code changes\n\n**Priority: Fix test execution immediately before any further development.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 361,
+      "total_tokens": 488,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

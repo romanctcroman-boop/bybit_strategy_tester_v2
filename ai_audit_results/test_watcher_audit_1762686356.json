@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762686356,
+  "changed_files": [
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_sandbox_integration.py",
+    "backend\\api\\schemas.py",
+    "tests\\unit\\test_batch_writer.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762686337.894134,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/import)\n- 0% coverage suggests tests aren't even executing\n- This represents a complete testing breakdown\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** across all files indicates:\n- Test environment/config issues preventing execution\n- Possible circular imports or dependency failures\n- Critical infrastructure problems in test harness\n\n## Potential Issues with Recent Changes\n1. **MTF Engine modifications** (`mtf_engine.py`) likely broke test imports\n2. **Schema changes** (`schemas.py`) may have incompatible dependencies\n3. **Database query optimization tests** appear to be failing to load\n4. **Integration tests** (`sandbox_integration.py`) may have environment dependencies missing\n\n## Immediate Action Recommendations\n1. **Fix Test Infrastructure First**:\n   - Run `python -m pytest tests/ --tb=short` to identify the root failure\n   - Check for missing dependencies in `requirements-test.txt`\n   - Verify test configuration and environment variables\n\n2. **Isolate the Failure**:\n   - Test files individually to find which one causes the crash\n   - Start with simplest unit test (`test_batch_writer.py`)\n\n3. **Priority Fixes**:\n   - Fix import issues in test modules\n   - Ensure all dependencies are installed\n   - Verify database connections for integration tests\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No functional tests means undetected regressions are certain\n- Core engine changes untested\n- Database and integration logic completely unverified\n- **Do not deploy until basic test execution is restored**\n\n**First priority**: Get tests running with at least 70% coverage before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 194,
+      "completion_tokens": 385,
+      "total_tokens": 579,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 130
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

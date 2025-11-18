@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762537776,
+  "changed_files": [
+    "tests\\test_audit_agent_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537760.3611193,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure.\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage confirms no tests executed successfully. This represents a complete testing blackout.\n\n## Potential Issues\n1. **Test Harness Failure**: Exit code -1 suggests environment/dependency issues\n2. **Integration Break**: Recent changes to `test_audit_agent_integration.py` likely broke the test runner\n3. **Missing Dependencies**: Possible missing imports, configuration, or external services\n4. **Syntax/Import Errors**: File may contain fatal Python errors preventing execution\n\n## Immediate Actions Required\n1. **Debug Test Runner**: Check test output logs for specific error messages\n2. **Validate Test File**: Review `test_audit_agent_integration.py` for syntax errors and imports\n3. **Check Dependencies**: Verify all required packages and services are available\n4. **Run Isolated Test**: Execute the problematic test file alone to identify specific failures\n\n## Risk Assessment\n**HIGH RISK** - Zero test coverage means:\n- No validation of recent changes\n- Potential undetected regressions\n- Production deployment would be extremely risky\n- Integration points are completely untested\n\n## Priority Recommendations\n1. **Fix test execution immediately** - this blocks all quality assurance\n2. **Add basic smoke tests** to prevent complete test suite collapse\n3. **Implement test isolation** to prevent single test failures from breaking entire suite\n4. **Review recent commits** to the problematic test file for breaking changes\n\n**Next Step**: Examine the actual test failure output - the exit code and coverage data alone are insufficient to diagnose the root cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 374,
+      "total_tokens": 505,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

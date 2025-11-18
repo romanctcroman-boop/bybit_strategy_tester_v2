@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762519349,
+  "changed_files": [
+    "mcp-server\\tools\\analysis\\analysis_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762519331.540027,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data collected due to test execution failure\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA AVAILABLE** - Tests never reached execution phase:\n- 0% total coverage indicates tests didn't run at all\n- Unable to assess coverage gaps due to complete test failure\n- Modified file `analysis_tools.py` has unknown test coverage\n\n## Potential Issues with Recent Changes\n**HIGH PROBABILITY OF BREAKING CHANGE** in `analysis_tools.py`:\n- Likely introduced syntax errors, import issues, or runtime exceptions\n- Possible circular imports or dependency conflicts\n- May have broken test infrastructure or mocking setup\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure First**:\n   - Check test runner configuration and dependencies\n   - Run with `-v` flag to see which test fails first\n   - Verify Python environment and package versions\n\n2. **Isolate the Breaking Change**:\n   - Revert `analysis_tools.py` changes and verify tests pass\n   - Add minimal changes incrementally to identify breaking code\n   - Check for missing imports or syntax errors in the modified file\n\n3. **Add Basic Sanity Tests**:\n   - Create simple import tests for `analysis_tools.py`\n   - Add unit tests that run before complex integration tests\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- Unknown impact of changes in `analysis_tools.py`\n- No validation of functionality or regression testing\n- Potential for runtime failures in dependent systems\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 374,
+      "total_tokens": 505,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

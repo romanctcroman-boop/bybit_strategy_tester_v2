@@ -1,0 +1,44 @@
+{
+  "timestamp": 1762641929,
+  "changed_files": [
+    "backend\\security\\__init__.py",
+    "backend\\security\\sandbox_executor.py",
+    "backend\\security\\crypto.py",
+    "backend\\security\\logging_middleware.py",
+    "backend\\security\\auth_middleware.py",
+    "backend\\security\\jwt_manager.py",
+    "backend\\security\\secure_logger.py",
+    "backend\\security\\rbac_manager.py",
+    "test_mcp_tools.py",
+    "backend\\security\\master_key_manager.py",
+    "backend\\security\\rate_limiter.py",
+    "backend\\api\\deepseek_pool_refactored.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762641911.4999235,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken\n- Exit code -1 indicates catastrophic test failure (likely unhandled exceptions)\n- 0% coverage suggests tests aren't even executing properly\n- No individual file coverage data available\n\n## 2. Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE**\n- 0% coverage across all security modules\n- No tests are executing successfully\n- Critical security components untested: JWT, RBAC, crypto, auth middleware\n\n## 3. Potential Issues with Recent Changes\n**HIGH RISK AREAS:**\n- Multiple security files modified simultaneously\n- Likely breaking changes in authentication/authorization flow\n- Possible circular imports or initialization failures in security module\n- `master_key_manager.py` changes could affect all encryption\n- `deepseek_pool_refactored.py` suggests major architectural changes\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. **Fix test infrastructure first**\n   - Check for import errors in test setup\n   - Verify security module `__init__.py` isn't broken\n   - Run tests with `-v` flag to see where they fail\n\n2. **Isolate the breaking change**\n   - Revert security changes incrementally\n   - Test authentication flow manually\n   - Verify JWT and RBAC functionality\n\n3. **Priority testing order:**\n   - Auth middleware → JWT manager → RBAC → Crypto\n   - Mock dependencies to isolate components\n\n## 5. Risk Assessment\n**SEVERITY: CRITICAL** 🔴\n- **Security Risk**: High - Untested security changes\n- **Stability Risk**: High - Core authentication likely broken\n- **Business Risk**: Critical - Production deployment unsafe\n\n**IMMEDIATE NEXT STEPS:**\n1. Don't deploy these changes\n2. Fix test execution before addressing coverage\n3. Validate security functionality manually\n4. Consider feature flags for gradual rollout\n\nThe 0% coverage indicates fundamental test execution problems - address these before worrying about coverage metrics.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 241,
+      "completion_tokens": 448,
+      "total_tokens": 689,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 177
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

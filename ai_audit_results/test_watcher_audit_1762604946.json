@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762604946,
+  "changed_files": [
+    "test_load_balancing.py",
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762604921.6576676,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- Zero test cases executed successfully\n- No coverage data collected\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- 0% coverage across all files\n- No tests executed, so no meaningful coverage data exists\n- Critical gap: Entire codebase is untested in this run\n\n## Potential Issues with Recent Changes\n1. **test_load_balancing.py** likely contains code causing fatal errors:\n   - Infinite loops or recursion\n   - Memory exhaustion\n   - Import conflicts/circular dependencies\n   - Syntax errors in test fixtures\n\n2. **advanced_architecture.py** changes may have introduced:\n   - Breaking API changes not reflected in tests\n   - Resource leaks or threading issues\n   - Incompatible dependencies\n\n## Immediate Recommendations\n1. **Debug Test Execution:**\n   - Run tests with `python -m pytest -xvs` to see exact failure point\n   - Check for infinite loops with timeout decorators\n   - Validate imports and dependencies\n\n2. **Isolate the Failure:**\n   - Run `test_load_balancing.py` in isolation\n   - Comment out recent changes incrementally\n   - Check system resource limits\n\n3. **Add Basic Sanity Tests:**\n   - Create simple smoke tests that validate basic functionality\n   - Ensure tests can run without fatal errors before adding complexity\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may be completely broken\n- No safety net for recent changes\n- Potential for cascading failures in dependent systems\n- Urgent attention required before any deployment\n\n**Priority:** Fix test execution immediately before addressing coverage or adding new features.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 383,
+      "total_tokens": 521,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 74
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

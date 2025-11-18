@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762625370,
+  "changed_files": [
+    "test_deepseek_mcp_tools.py",
+    "mcp-server\\server.py",
+    "test_deepseek_tools_via_list.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762625354.82474,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No files were even processed for coverage\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- 0% coverage across all files means no tests executed successfully\n- Critical gap: Entire test suite is failing to run\n- All production code (server.py) and test files are untested\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure Failure** - Likely caused by:\n   - Broken imports in test files\n   - Missing dependencies or environment setup\n   - Syntax errors in test files\n   - Configuration issues with test runner\n\n2. **Recent File Changes**:\n   - `test_deepseek_mcp_tools.py` - Primary suspect for breaking changes\n   - `mcp-server\\server.py` - Possible API changes breaking tests\n   - `test_deepseek_tools_via_list.py` - May contain broken test logic\n\n## Immediate Recommendations\n1. **Diagnose Root Cause**:\n   ```bash\n   python -m pytest -v --tb=short test_deepseek_mcp_tools.py\n   ```\n2. **Check for Syntax Errors**:\n   ```bash\n   python -m py_compile test_deepseek_mcp_tools.py\n   ```\n3. **Validate Imports**:\n   - Verify all modules in `mcp-server\\server.py` are available\n   - Check test file imports reference correct paths\n\n4. **Restore Basic Functionality**:\n   - Comment out recent changes in test files\n   - Run minimal smoke test to verify test infrastructure\n   - Gradually reintroduce changes\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- No validation of recent code changes\n- Potential undetected regressions in server functionality\n- Complete test suite failure indicates systemic issues\n- Urgent fix required before any further development\n\n**Priority**: Fix test infrastructure immediately before addressing any feature work.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 148,
+      "completion_tokens": 442,
+      "total_tokens": 590,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 84
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

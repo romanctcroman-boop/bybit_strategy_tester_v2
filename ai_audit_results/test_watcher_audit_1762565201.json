@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762565201,
+  "changed_files": [
+    "tests\\test_integration_full.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762565186.1116595,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero validation of code behavior. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% coverage** indicates:\n- No tests executed successfully\n- Potentially missing test configuration or dependencies\n- Possible environment setup failures\n- Test discovery/import issues\n\n## Potential Issues with Recent Changes\nThe integration test file (`test_integration_full.py`) likely contains:\n- Syntax errors or import failures\n- Missing dependencies or environment variables\n- Configuration issues in test setup/teardown\n- Infinite loops or resource exhaustion\n- Permission/access problems\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest tests/test_integration_full.py -v` to see specific error details\n2. Check for Python syntax errors in the test file\n3. Verify all imports and dependencies are available\n4. Examine test setup/teardown methods for failures\n\n**Systematic Fixes:**\n1. Implement test isolation - run unit tests separately from integration tests\n2. Add CI pipeline validation that fails fast on test configuration issues\n3. Create smoke tests to validate test environment before full suite execution\n\n## Risk Assessment\n**HIGH RISK** - Deploying code in this state is extremely dangerous:\n- No regression protection\n- Undetected breaking changes likely\n- Production failures highly probable\n- Complete loss of test-driven development benefits\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 330,
+      "total_tokens": 457,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

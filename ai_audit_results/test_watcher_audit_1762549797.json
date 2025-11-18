@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762549797,
+  "changed_files": [
+    "backend\\migrations\\versions\\20251020_merge_heads.py",
+    "backend\\migrations\\versions\\20251020_add_bybit_kline_audit.py",
+    "backend\\migrations\\versions\\20251022_backfill_open_time_dt.py",
+    "backend\\migrations\\versions\\0001_convert_timestamps_to_timestamptz.py",
+    "backend\\migrations\\versions\\2f4e6a7b8c9d_autogen_convert_timestamps_to_timestamptz.py",
+    "mcp-server\\agent_communication.py",
+    "backend\\migrations\\versions\\add_tournament_tables.py",
+    "backend\\migrations\\versions\\add_saga_tables.py",
+    "mcp-server\\multi_agent_router.py",
+    "backend\\migrations\\versions\\1a2b3c4d5e6f_convert_timestamps_to_timestamptz.py",
+    "backend\\migrations\\versions\\20251029_add_interval_to_kline_audit.py",
+    "backend\\migrations\\versions\\20251021_add_backfill_runs.py",
+    "backend\\migrations\\versions\\20251022_consolidate_heads.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762549773.842845,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates test runner crashed before execution\n- 0% coverage confirms no tests actually ran\n- Likely environment/config issues or fatal import errors\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No coverage data collected (empty results)\n- All application logic completely untested\n- Migration files (13) appear to be primary changes - zero test coverage\n\n## Potential Issues with Recent Changes\n**HIGH RISK AREAS:**\n1. **Database Migration Risks** - 13 migration files modified/added with no validation\n2. **Schema Changes** - Timestamp conversions and table additions could break data integrity\n3. **MCP Server Changes** - Agent communication and routing logic untested\n4. **Backfill Operations** - Data pipeline changes without test coverage\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix Test Infrastructure**\n   - Investigate why tests don't run (check imports, dependencies, config)\n   - Start with simplest test to verify basic functionality\n\n2. **Migration Testing Priority**\n   ```python\n   # Add migration validation tests\n   def test_migration_rollback():\n       # Test both upgrade and downgrade paths\n       pass\n   ```\n\n3. **Critical Path Coverage**\n   - Add tests for database connectivity first\n   - Test basic API endpoints\n   - Validate migration integrity\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- **Data Corruption Risk**: High (schema changes without validation)\n- **Service Failure Risk**: High (untested agent communication)\n- **Regression Risk**: Critical (0% coverage)\n- **Recommendation**: **BLOCK DEPLOYMENT** until basic test functionality is restored\n\n**NEXT STEPS:**\n1. Fix test runner configuration\n2. Add basic smoke tests for critical paths\n3. Validate migration safety before deployment\n4. Aim for >70% coverage on changed files before release",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 381,
+      "completion_tokens": 426,
+      "total_tokens": 807,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 317
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

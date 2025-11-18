@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762611263,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\tenacity\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762611248.587345,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests did not execute successfully (Exit Code -1). This indicates either:\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n- Environment/dependency problems\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is a direct result of test execution failure, not a measurement of actual coverage.\n\n## Potential Issues with Recent Changes\nThe modified file `.venv\\Lib\\site-packages\\tenacity\\__init__.py` suggests:\n- **Dependency corruption** - Virtual environment packages should not be modified directly\n- **Environment contamination** - Changes in site-packages indicate manual edits to dependencies\n- **Version conflicts** - Possible tenacity library issues affecting test runner\n\n## Immediate Recommendations\n1. **Rebuild virtual environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify test runner configuration**:\n   - Check pytest/unittest configuration files\n   - Ensure test discovery paths are correct\n\n3. **Isolate dependency changes**:\n   - Never modify site-packages directly\n   - Use requirements.txt for version pinning\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- No test validation of code changes\n- Unreliable development environment\n- Potential for undetected regressions\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 318,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

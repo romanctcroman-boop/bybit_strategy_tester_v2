@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539916,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539902.0727248,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach any production code\n- **Complete coverage gap** - All code paths remain untested\n\n## Potential Issues with Recent Changes\n1. **Test file `test_e2e_audit_agent.py` likely contains fatal errors**\n2. **Environment setup failures** (missing dependencies, configuration issues)\n3. **Import/circular dependency problems** preventing test execution\n4. **Test framework configuration errors** (pytest/unittest setup)\n5. **Recent changes broke the entire test execution pipeline**\n\n## Recommendations for Improvement\n1. **Immediate:**\n   - Fix the failing test file first - examine `test_e2e_audit_agent.py` for syntax/runtime errors\n   - Check test environment setup and dependencies\n   - Run tests with verbose output to identify the exact failure point\n\n2. **Short-term:**\n   - Add basic smoke tests to verify test infrastructure\n   - Implement test isolation to prevent single test from breaking entire suite\n   - Set up test execution monitoring with detailed error logging\n\n3. **Long-term:**\n   - Establish test quality gates in CI/CD pipeline\n   - Implement test failure categorization and prioritization\n   - Add coverage thresholds to prevent deployment with 0% coverage\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **No reliable testing** - production deployments are effectively untested\n- **Critical path failure** - entire test suite is non-functional\n- **Regression risk** - impossible to detect breaking changes\n- **Deployment risk** - shipping potentially broken code to production\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 410,
+      "total_tokens": 544,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

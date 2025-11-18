@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762554626,
+  "changed_files": [
+    "temp_pg_test.py",
+    "test_circuit_breaker_load.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554611.7436614,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**Critical Failure** - Tests didn't execute properly (Exit Code -1). This indicates either:\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n- Environment/dependency problems\n\n## 2. Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a severe issue suggesting:\n- Tests aren't reaching the codebase\n- Import/module path problems\n- Test runner configuration errors\n\n## 3. Potential Issues with Changes\n- **temp_pg_test.py** - Likely PostgreSQL-related test with connection/setup failures\n- **test_circuit_breaker_load.py** - Circuit breaker pattern implementation may have dependency issues\n- **psycopg2 changes** - Database driver modifications causing import/connection failures\n\n## 4. Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check test runner configuration\n   - Verify all dependencies are installed\n   - Run with `-v` flag to see where tests fail\n\n2. **Database Connection Issues**\n   - Ensure PostgreSQL is running\n   - Verify connection strings in temp_pg_test.py\n   - Check psycopg2 installation and version compatibility\n\n3. **Isolate Problems**\n   - Run tests individually to identify failing components\n   - Test database connectivity separately\n   - Check for missing environment variables\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential production issues undetected\n- Database integration problems\n- Circuit breaker reliability concerns\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 353,
+      "total_tokens": 509,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

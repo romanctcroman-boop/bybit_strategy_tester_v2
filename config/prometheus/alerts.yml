@@ -1,0 +1,435 @@
+# Prometheus Alerting Rules
+# Week 1, Day 6: Enhanced Alerting System
+# Production-ready alert rules for Bybit Strategy Tester
+
+groups:
+  # =============================================================================
+  # APPLICATION HEALTH ALERTS
+  # =============================================================================
+  - name: application_health
+    interval: 30s
+    rules:
+      # API Unresponsive - CRITICAL
+      - alert: APIUnresponsive
+        expr: up{job="backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: backend
+          team: platform
+          runbook: https://docs.example.com/runbooks/api-unresponsive
+        annotations:
+          summary: "Backend API is unresponsive"
+          description: "Backend API ({{ $labels.instance }}) has been down for more than 2 minutes. Immediate action required."
+          impact: "Users cannot access the application. All trading operations halted."
+          action: "1. Check backend container status\n2. Review application logs\n3. Restart backend if needed\n4. Escalate if restart fails"
+          dashboard: "http://localhost:3000/d/backend-health"
+      
+      # High Error Rate - CRITICAL
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) 
+            / 
+            sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: backend
+          team: platform
+          runbook: https://docs.example.com/runbooks/high-error-rate
+        annotations:
+          summary: "High HTTP 5xx error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%). Application stability compromised."
+          impact: "5% or more requests are failing. User experience severely degraded."
+          action: "1. Check application logs for errors\n2. Review recent deployments\n3. Check database connectivity\n4. Consider rollback if deployment-related"
+          dashboard: "http://localhost:3000/d/error-rates"
+      
+      # Slow Response Time - WARNING
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+          component: backend
+          team: platform
+          runbook: https://docs.example.com/runbooks/slow-response
+        annotations:
+          summary: "API response time above threshold"
+          description: "95th percentile response time is {{ $value | humanizeDuration }} for {{ $labels.endpoint }}"
+          impact: "User experience degraded. Application feels slow."
+          action: "1. Check database query performance\n2. Review application profiling\n3. Check for N+1 queries\n4. Consider scaling if load-related"
+          dashboard: "http://localhost:3000/d/performance"
+
+  # =============================================================================
+  # DATABASE ALERTS
+  # =============================================================================
+  - name: database_health
+    interval: 30s
+    rules:
+      # Database Down - CRITICAL
+      - alert: DatabaseDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+          team: platform
+          runbook: https://docs.example.com/runbooks/database-down
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL ({{ $labels.instance }}) is not responding. Data layer unavailable."
+          impact: "Complete application failure. No data operations possible."
+          action: "1. Check PostgreSQL container status\n2. Review PostgreSQL logs\n3. Check disk space\n4. Restart PostgreSQL if needed\n5. Initiate DR procedure if restart fails"
+          dashboard: "http://localhost:3000/d/database-health"
+      
+      # Connection Pool Exhausted - WARNING
+      - alert: ConnectionPoolExhausted
+        expr: |
+          (
+            pgbouncer_active_clients{database="bybit_strategy_tester"} 
+            / 
+            pgbouncer_max_client_conn
+          ) > 0.90
+        for: 2m
+        labels:
+          severity: warning
+          component: database
+          team: platform
+          runbook: https://docs.example.com/runbooks/connection-pool
+        annotations:
+          summary: "Database connection pool near capacity"
+          description: "Connection pool usage is {{ $value | humanizePercentage }} (threshold: 90%). Risk of connection exhaustion."
+          impact: "New requests may fail to acquire database connections. Application slowdown imminent."
+          action: "1. Check for connection leaks\n2. Review long-running queries\n3. Increase pool size if needed\n4. Kill idle connections if necessary"
+          dashboard: "http://localhost:3000/d/database-connections"
+      
+      # Database High Connections - WARNING
+      - alert: DatabaseHighConnections
+        expr: |
+          sum(pg_stat_activity_count) by (instance) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+          team: platform
+          runbook: https://docs.example.com/runbooks/high-connections
+        annotations:
+          summary: "High number of database connections"
+          description: "Database has {{ $value }} active connections (threshold: 80)"
+          impact: "Database performance may degrade. Connection limit approaching."
+          action: "1. Identify connection sources\n2. Check for connection leaks\n3. Review application connection handling\n4. Consider connection pooling tuning"
+          dashboard: "http://localhost:3000/d/database-connections"
+      
+      # Slow Queries - WARNING
+      - alert: SlowQueries
+        expr: |
+          rate(pg_stat_statements_mean_exec_time_seconds[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+          team: platform
+          runbook: https://docs.example.com/runbooks/slow-queries
+        annotations:
+          summary: "Database queries executing slowly"
+          description: "Average query execution time is {{ $value | humanizeDuration }} (threshold: 500ms)"
+          impact: "Application response times degraded. User experience affected."
+          action: "1. Identify slow queries with EXPLAIN ANALYZE\n2. Check for missing indexes\n3. Review query plans\n4. Consider query optimization"
+          dashboard: "http://localhost:3000/d/database-performance"
+
+  # =============================================================================
+  # RESOURCE UTILIZATION ALERTS
+  # =============================================================================
+  - name: resource_utilization
+    interval: 30s
+    rules:
+      # High CPU Usage - WARNING
+      - alert: HighCPUUsage
+        expr: |
+          (
+            100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+          ) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+          team: platform
+          runbook: https://docs.example.com/runbooks/high-cpu
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value | humanize }}% on {{ $labels.instance }} (threshold: 80%)"
+          impact: "System performance degraded. Application may become unresponsive."
+          action: "1. Identify CPU-intensive processes\n2. Check for runaway processes\n3. Review application profiling\n4. Consider scaling up if sustained"
+          dashboard: "http://localhost:3000/d/system-resources"
+      
+      # High Memory Usage - WARNING
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) 
+            / 
+            node_memory_MemTotal_bytes
+          ) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+          team: platform
+          runbook: https://docs.example.com/runbooks/high-memory
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }} (threshold: 85%)"
+          impact: "Risk of OOM killer. Application may crash."
+          action: "1. Identify memory-intensive processes\n2. Check for memory leaks\n3. Review application memory usage\n4. Consider scaling up if needed"
+          dashboard: "http://localhost:3000/d/system-resources"
+      
+      # Disk Space Critical - CRITICAL
+      - alert: DiskSpaceCritical
+        expr: |
+          (
+            (node_filesystem_avail_bytes{mountpoint="/"} 
+            / 
+            node_filesystem_size_bytes{mountpoint="/"})
+          ) < 0.15
+        for: 5m
+        labels:
+          severity: critical
+          component: infrastructure
+          team: platform
+          runbook: https://docs.example.com/runbooks/disk-space
+        annotations:
+          summary: "Disk space critically low"
+          description: "Only {{ $value | humanizePercentage }} disk space available on {{ $labels.instance }} (threshold: 15%)"
+          impact: "System may become unstable. Application writes may fail. Database corruption risk."
+          action: "1. Clean up old logs\n2. Apply backup retention policy\n3. Remove unused Docker images\n4. Expand disk if needed\n5. Review disk usage growth"
+          dashboard: "http://localhost:3000/d/system-resources"
+      
+      # Disk Space Warning - WARNING
+      - alert: DiskSpaceWarning
+        expr: |
+          (
+            (node_filesystem_avail_bytes{mountpoint="/"} 
+            / 
+            node_filesystem_size_bytes{mountpoint="/"})
+          ) < 0.30
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+          team: platform
+          runbook: https://docs.example.com/runbooks/disk-space
+        annotations:
+          summary: "Disk space running low"
+          description: "Only {{ $value | humanizePercentage }} disk space available on {{ $labels.instance }} (threshold: 30%)"
+          impact: "Disk space may become critical soon."
+          action: "1. Review disk usage trends\n2. Plan cleanup or expansion\n3. Check log rotation\n4. Monitor growth rate"
+          dashboard: "http://localhost:3000/d/system-resources"
+
+  # =============================================================================
+  # BACKUP & DISASTER RECOVERY ALERTS
+  # =============================================================================
+  - name: backup_dr
+    interval: 1m
+    rules:
+      # Backup Failed - CRITICAL
+      - alert: BackupFailed
+        expr: |
+          time() - backup_last_success_timestamp_seconds > 86400
+        for: 1h
+        labels:
+          severity: critical
+          component: backup
+          team: platform
+          runbook: https://docs.example.com/runbooks/backup-failed
+        annotations:
+          summary: "Database backup failed or missing"
+          description: "No successful backup in last 24 hours. Last backup: {{ $value | humanizeDuration }} ago"
+          impact: "RPO violation. Data loss risk in case of disaster."
+          action: "1. Check backup service logs\n2. Verify S3 connectivity\n3. Check disk space\n4. Run manual backup\n5. Escalate if manual backup fails"
+          dashboard: "http://localhost:3000/d/backup-status"
+      
+      # Backup Size Anomaly - WARNING
+      - alert: BackupSizeAnomaly
+        expr: |
+          abs(
+            backup_size_bytes - avg_over_time(backup_size_bytes[7d])
+          ) / avg_over_time(backup_size_bytes[7d]) > 0.50
+        for: 30m
+        labels:
+          severity: warning
+          component: backup
+          team: platform
+          runbook: https://docs.example.com/runbooks/backup-size
+        annotations:
+          summary: "Backup size significantly different from average"
+          description: "Backup size deviation: {{ $value | humanizePercentage }} from 7-day average"
+          impact: "May indicate data corruption, missing data, or unexpected growth."
+          action: "1. Compare backup contents\n2. Verify database integrity\n3. Check for missing tables\n4. Review recent data changes"
+          dashboard: "http://localhost:3000/d/backup-status"
+      
+      # Backup Upload Failed - WARNING
+      - alert: BackupUploadFailed
+        expr: |
+          backup_s3_upload_failures_total > 0
+        for: 5m
+        labels:
+          severity: warning
+          component: backup
+          team: platform
+          runbook: https://docs.example.com/runbooks/backup-upload
+        annotations:
+          summary: "Backup upload to S3 failed"
+          description: "{{ $value }} backup upload failures detected"
+          impact: "Backups not stored offsite. DR capability compromised."
+          action: "1. Check AWS credentials\n2. Verify S3 bucket access\n3. Check network connectivity\n4. Review S3 service status\n5. Retry upload manually"
+          dashboard: "http://localhost:3000/d/backup-status"
+
+  # =============================================================================
+  # CELERY WORKER ALERTS
+  # =============================================================================
+  - name: celery_workers
+    interval: 30s
+    rules:
+      # Celery Workers Down - CRITICAL
+      - alert: CeleryWorkersDown
+        expr: |
+          celery_workers_total == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: celery
+          team: platform
+          runbook: https://docs.example.com/runbooks/celery-down
+        annotations:
+          summary: "No Celery workers available"
+          description: "All Celery workers are down. Background task processing halted."
+          impact: "Backtests cannot be executed. Scheduled tasks not running."
+          action: "1. Check Celery container status\n2. Review Celery logs\n3. Check Redis/broker connectivity\n4. Restart Celery workers"
+          dashboard: "http://localhost:3000/d/celery-health"
+      
+      # High Task Queue Length - WARNING
+      - alert: HighTaskQueueLength
+        expr: |
+          celery_queue_length{queue="default"} > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: celery
+          team: platform
+          runbook: https://docs.example.com/runbooks/task-queue
+        annotations:
+          summary: "Celery task queue backing up"
+          description: "{{ $value }} tasks queued (threshold: 100). Workers may be overloaded."
+          impact: "Task processing delayed. User requests may time out."
+          action: "1. Check worker performance\n2. Review task execution time\n3. Consider scaling workers\n4. Check for stuck tasks"
+          dashboard: "http://localhost:3000/d/celery-health"
+      
+      # Task Failure Rate High - WARNING
+      - alert: TaskFailureRateHigh
+        expr: |
+          (
+            rate(celery_task_failed_total[5m]) 
+            / 
+            rate(celery_task_total[5m])
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: celery
+          team: platform
+          runbook: https://docs.example.com/runbooks/task-failures
+        annotations:
+          summary: "High Celery task failure rate"
+          description: "Task failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+          impact: "Background tasks failing. Backtests may not complete."
+          action: "1. Review failed task logs\n2. Check for common error patterns\n3. Verify database connectivity\n4. Check resource availability"
+          dashboard: "http://localhost:3000/d/celery-health"
+
+  # =============================================================================
+  # SECURITY ALERTS
+  # =============================================================================
+  - name: security
+    interval: 1m
+    rules:
+      # High Failed Login Attempts - WARNING
+      - alert: HighFailedLoginAttempts
+        expr: |
+          rate(auth_failed_login_attempts_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+          team: security
+          runbook: https://docs.example.com/runbooks/failed-logins
+        annotations:
+          summary: "High rate of failed login attempts"
+          description: "{{ $value | humanize }} failed login attempts per second (threshold: 10/s)"
+          impact: "Potential brute force attack. Account compromise risk."
+          action: "1. Review login attempt sources\n2. Check for automated attacks\n3. Consider rate limiting\n4. Block suspicious IPs\n5. Alert security team"
+          dashboard: "http://localhost:3000/d/security"
+      
+      # SSL Certificate Expiring - WARNING
+      - alert: SSLCertificateExpiring
+        expr: |
+          (ssl_certificate_expiry_seconds - time()) < 604800
+        for: 1h
+        labels:
+          severity: warning
+          component: security
+          team: platform
+          runbook: https://docs.example.com/runbooks/ssl-expiry
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate expires in {{ $value | humanizeDuration }} (threshold: 7 days)"
+          impact: "Service will become inaccessible when certificate expires."
+          action: "1. Renew SSL certificate\n2. Update certificate in load balancer\n3. Verify certificate chain\n4. Test HTTPS connectivity"
+          dashboard: "http://localhost:3000/d/security"
+
+  # =============================================================================
+  # BUSINESS METRICS ALERTS
+  # =============================================================================
+  - name: business_metrics
+    interval: 1m
+    rules:
+      # Low Active Users - INFO
+      - alert: LowActiveUsers
+        expr: |
+          active_users_total < 10
+        for: 1h
+        labels:
+          severity: info
+          component: business
+          team: product
+          runbook: https://docs.example.com/runbooks/low-users
+        annotations:
+          summary: "Unusually low number of active users"
+          description: "Only {{ $value }} active users (normal: >10)"
+          impact: "May indicate service issue or off-peak hours."
+          action: "1. Verify application is accessible\n2. Check for incidents\n3. Review marketing campaigns\n4. Check user feedback"
+          dashboard: "http://localhost:3000/d/business-metrics"
+      
+      # High Backtest Failure Rate - WARNING
+      - alert: HighBacktestFailureRate
+        expr: |
+          (
+            rate(backtests_failed_total[1h]) 
+            / 
+            rate(backtests_total[1h])
+          ) > 0.20
+        for: 30m
+        labels:
+          severity: warning
+          component: business
+          team: platform
+          runbook: https://docs.example.com/runbooks/backtest-failures
+        annotations:
+          summary: "High backtest failure rate"
+          description: "Backtest failure rate is {{ $value | humanizePercentage }} (threshold: 20%)"
+          impact: "User experience degraded. Trust in platform reduced."
+          action: "1. Review backtest error logs\n2. Check data quality\n3. Verify strategy validation\n4. Review recent code changes"
+          dashboard: "http://localhost:3000/d/business-metrics"

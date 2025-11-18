@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762555284,
+  "changed_files": [
+    "tests\\monitoring\\test_health_endpoints.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762555270.1688921,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates fundamental issues in the test environment or test code structure.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach the coverage collection phase\n- **Complete testing gap** - All production code remains untested\n\n## Potential Issues with Recent Changes\n1. **Test file corruption** - `test_health_endpoints.py` may contain syntax errors or import failures\n2. **Environment misconfiguration** - Missing dependencies or incorrect test runner setup\n3. **Fixtures/Setup failures** - Critical setup code failing before tests execute\n4. **Path/Import issues** - Module resolution problems in the test file\n\n## Recommendations for Improvement\n**Immediate Actions:**\n- Run `python -m pytest tests/monitoring/test_health_endpoints.py -v` to see detailed failure reasons\n- Check for syntax errors: `python -m py_compile tests/monitoring/test_health_endpoints.py`\n- Verify imports work in isolation\n\n**Short-term:**\n- Add basic smoke test to verify test infrastructure\n- Implement proper error handling in test fixtures\n- Set up continuous integration with detailed logging\n\n**Long-term:**\n- Establish test quality gates in CI/CD pipeline\n- Add test health monitoring\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback loop\n- Potential for undetected production failures\n- Development velocity impacted by broken test infrastructure\n- Health monitoring endpoints (critical infrastructure) are untested\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 366,
+      "total_tokens": 496,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

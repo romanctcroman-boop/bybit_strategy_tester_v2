@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762777863,
+  "changed_files": [
+    "background_diagnostic_service.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762777849.9862804,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No code paths were executed during test run\n- Complete testing infrastructure failure\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `background_diagnostic_service.py`. Likely causes:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Infinite loops or blocking operations\n- Environment configuration issues\n- Critical exceptions during module load\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see specific failure point\n2. Check Python syntax: `python -m py_compile background_diagnostic_service.py`\n3. Verify imports and dependencies are available\n4. Add try/catch blocks around service initialization\n\n**Medium-term:**\n1. Implement basic smoke tests before full test suite\n2. Add test environment health checks\n3. Set up test isolation to prevent cascading failures\n\n## Risk Assessment\n**HIGH RISK** - Deployment with broken tests means:\n- No validation of recent changes\n- Potential runtime failures in production\n- Undetected regressions\n- Complete loss of test automation value\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 298,
+      "total_tokens": 423,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

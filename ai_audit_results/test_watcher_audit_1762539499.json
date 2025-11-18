@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539499,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539483.040735,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1), indicating severe infrastructure or environment issues rather than test failures. The test suite is non-functional.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files suggests:\n- Tests cannot execute at all\n- Environment/dependency failures\n- Possible import errors or configuration issues\n- No code paths are being exercised\n\n## Potential Issues with Recent Changes\nThe modified `test_e2e_audit_agent.py` likely contains:\n- **Fatal syntax errors** preventing test discovery\n- **Missing dependencies** or imports\n- **Environment configuration** issues\n- **Resource conflicts** (ports, files, databases)\n- **Infinite loops** or memory issues causing crashes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug the crash**: Run tests with `-v` flag to see where execution stops\n2. **Check syntax**: Validate `test_e2e_audit_agent.py` for Python syntax errors\n3. **Verify dependencies**: Ensure all required packages are installed and compatible\n4. **Test isolation**: Run the problematic test file alone to isolate the issue\n\n**FOLLOW-UP:**\n5. Add basic smoke tests to verify test environment health\n6. Implement test logging to capture crash context\n7. Set up pre-commit hooks to catch syntax errors early\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **No reliable testing** - changes cannot be validated\n- **Production deployment risk** - untested code could reach production\n- **Development blockage** - team cannot verify functionality\n- **Regression risk** - existing functionality may be broken\n\n**Priority**: Fix test execution immediately before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 381,
+      "total_tokens": 515,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

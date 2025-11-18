@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762721182,
+  "changed_files": [
+    "tests\\test_distributed_rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762721168.4540768,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) indicating severe infrastructure or dependency issues, not just test failures. No meaningful testing occurred.\n\n## Coverage Analysis & Gaps\n**0% coverage** - Complete testing gap. The distributed rate limiter appears completely untested despite being a critical infrastructure component.\n\n## Potential Issues with Recent Changes\n1. **Test file corruption** - `test_distributed_rate_limiter.py` may contain syntax errors or import failures\n2. **Missing dependencies** - Redis/network dependencies likely unavailable in test environment\n3. **Environment configuration** - Test setup/teardown may be crashing the test runner\n4. **Resource constraints** - Memory/port allocation failures for distributed components\n\n## Recommendations for Improvement\n**Immediate (Next 2 hours):**\n- Check test file syntax: `python -m py_compile tests/test_distributed_rate_limiter.py`\n- Verify test dependencies are installed and accessible\n- Run with `-v` flag to see where execution fails\n\n**Short-term (This week):**\n- Add basic unit tests mocking external dependencies\n- Implement integration test with test Redis instance\n- Add error handling for distributed connection failures\n- Set up CI environment with required services\n\n**Long-term:**\n- Target 80%+ coverage for distributed components\n- Add chaos testing for network partitions\n- Implement performance/load testing\n\n## Risk Assessment\n**HIGH RISK** - Distributed rate limiter is likely deployed untested. Potential production impacts:\n- Service outages if rate limiting fails\n- Cascading failures across distributed systems\n- Resource exhaustion from unregulated traffic\n\n**Priority: Critical** - Fix test infrastructure immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 356,
+      "total_tokens": 485,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "timestamp": 1762606918,
+  "changed_files": [
+    "mcp-server\\test_multi_agent.py",
+    "mcp-server\\test_deepseek_api.py",
+    "scripts\\perplexity_final_analysis.py",
+    "mcp-server\\test_deepseek_verify_fixes.py",
+    "mcp-server\\test_perplexity.py",
+    "mcp-server\\test_providers.py",
+    "mcp-server\\test_deepseek_perfect_10.py",
+    "mcp-server\\test_deepseek_final_score.py",
+    "mcp-server\\api\\providers\\base.py",
+    "scripts\\perplexity_strategy.py",
+    "mcp-server\\test_observability.py",
+    "mcp-server\\test_main_integration.py",
+    "mcp-server\\test_config.py",
+    "mcp-server\\test_functional.py",
+    "mcp-server\\test_modular_architecture.py",
+    "mcp-server\\test_guide.py",
+    "scripts\\perplexity_final_correct.py",
+    "mcp-server\\test_deepseek_quick_win5.py",
+    "mcp-server\\test_quick.py",
+    "mcp-server\\api\\providers\\perplexity.py",
+    "mcp-server\\test_ai_interaction_full.py",
+    "mcp-server\\install_p1_p2_p3_deps.py",
+    "mcp-server\\test_deepseek_code_review.py",
+    "mcp-server\\test_enhanced_router.py",
+    "mcp-server\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762606914.6518166,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "error": "API error: 404",
+    "response": "",
+    "success": false
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

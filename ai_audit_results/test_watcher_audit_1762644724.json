@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762644724,
+  "changed_files": [
+    "backend\\core\\backtest_engine.py",
+    "backend\\strategies\\factory.py",
+    "backend\\strategies\\base.py",
+    "backend\\strategies\\__init__.py",
+    "test_strategy_integration.py",
+    "backend\\strategies\\bollinger_mean_reversion.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762644707.1082451,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax errors in test or production code\n- Import failures due to circular dependencies or missing modules\n- Test framework configuration issues\n- Environment setup problems\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- No code paths are being exercised\n- Critical infrastructure issues preventing test execution\n\n## Potential Issues with Recent Changes\n1. **Strategy Factory/Base Changes** - Modifications to `factory.py` and `base.py` likely broke imports or inheritance chains\n2. **New Strategy Implementation** - `bollinger_mean_reversion.py` may have syntax errors or missing dependencies\n3. **Integration Test Issues** - `test_strategy_integration.py` itself may be failing to import/execute\n4. **Circular Imports** - Changes to `__init__.py` could have created import loops\n\n## Immediate Action Recommendations\n1. **Fix Exit Code -1 First**\n   ```bash\n   python -m py_compile backend/strategies/bollinger_mean_reversion.py\n   python -c \"from backend.strategies.factory import StrategyFactory\"\n   ```\n2. **Check Import Chain**\n   - Verify all imports in changed files resolve correctly\n   - Test each changed file individually for syntax errors\n3. **Run Tests with Verbose Output**\n   ```bash\n   python -m pytest test_strategy_integration.py -v\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No validation of strategy factory changes\n- Bollinger bands strategy completely untested\n- Core backtest engine modifications unverified\n- **Recommend blocking all deployments until basic tests pass**\n\n**Priority:** Fix test execution before addressing coverage. The 0% coverage is a symptom, not the root cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 180,
+      "completion_tokens": 417,
+      "total_tokens": 597,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 116
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

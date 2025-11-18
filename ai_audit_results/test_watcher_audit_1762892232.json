@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762892232,
+  "changed_files": [
+    "mcp-server\\tools\\__init__.py",
+    "backend\\agents\\deepseek_cli.py",
+    "mcp-server\\tools\\market_reasoning_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762892219.077222,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test execution failure\n- Zero coverage suggests tests didn't run or crashed immediately\n- No file-specific coverage data available\n\n## Coverage Analysis & Gaps\n**100% GAP** - No code coverage achieved:\n- All modified files show 0% coverage\n- No test execution occurred for any component\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\n1. **mcp-server/tools/market_reasoning_tools.py** - Likely contains breaking changes\n2. **backend/agents/deepseek_cli.py** - Possible dependency or import issues\n3. **mcp-server/tools/__init__.py** - Package structure changes may have broken imports\n\n## Immediate Action Recommendations\n1. **Fix Test Infrastructure First**:\n   - Check test runner configuration\n   - Verify Python environment and dependencies\n   - Run tests with `-v` flag to see failure details\n\n2. **Isolate Breaking Changes**:\n   - Test each changed file independently\n   - Check for circular imports in new tools modules\n   - Validate MCP server compatibility\n\n3. **Emergency Steps**:\n   - Revert recent changes if blocking development\n   - Add basic smoke tests for core functionality\n   - Run `python -m pytest --collect-only` to diagnose test discovery\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- No validation of market reasoning tools functionality\n- Deepseek CLI agent changes completely untested\n- High probability of runtime errors in production\n- Recommend immediate fix before any further development",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 155,
+      "completion_tokens": 344,
+      "total_tokens": 499,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 91
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

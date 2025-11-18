@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762627439,
+  "changed_files": [
+    "apply_deepseek_critical_fixes.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762627425.240676,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test execution failure\n- Zero test execution suggests broken test infrastructure or environment\n- No meaningful quality assessment possible without functioning tests\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- 0% coverage indicates no tests executed successfully\n- No file-level coverage data available\n- Entire codebase is effectively untested\n\n## Potential Issues with Recent Changes\n**HIGH PROBABILITY** that `apply_deepseek_critical_fixes.py` changes broke the test infrastructure:\n- File modification immediately preceded test suite collapse\n- Possible syntax errors, import issues, or environment dependencies\n- May have altered test configuration or runner behavior\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution** - Check for syntax errors in test files\n2. **Verify dependencies** - Ensure all test requirements are installed\n3. **Run tests individually** - Isolate the failing component\n4. **Check `apply_deepseek_critical_fixes.py`** - Review for breaking changes to test infrastructure\n\n**FOLLOW-UP:**\n- Implement basic smoke tests to prevent complete test suite collapse\n- Add pre-commit hooks to validate test execution\n- Set up CI pipeline with test environment isolation\n\n## Risk Assessment\n**SEVERE RISK** - Current state represents production deployment risk:\n- No confidence in code functionality\n- Potential undetected regressions\n- High probability of silent failures in production\n- **Recommend blocking deployments until tests are restored**\n\n**Priority: CRITICAL** - Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 353,
+      "total_tokens": 481,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

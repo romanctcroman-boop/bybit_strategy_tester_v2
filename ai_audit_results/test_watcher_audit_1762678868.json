@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762678868,
+  "changed_files": [
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "run_deepseek_docker_analysis.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762678848.966686,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BLACKOUT** - 0.00% across all files indicates:\n- Test runner failed before collecting any coverage data\n- Possible environment misconfiguration or dependency failures\n- Critical path testing completely absent\n\n## Potential Issues with Recent Changes\n1. **Docker Integration Risk** - `run_deepseek_docker_analysis.py` likely introduced environment conflicts\n2. **Core Engine Modifications** - `mtf_engine.py` changes may have broken import chains or dependencies\n3. **Database Test Changes** - New query optimization tests might have setup/teardown issues\n4. **Integration Test Failures** - Sandbox integration tests probably have environment dependency problems\n\n## Immediate Action Recommendations\n**Priority 1 - Fix Test Infrastructure:**\n```bash\n# Isolate the crash source\npython -m pytest tests/ --tb=short -v\n# Check Docker dependency\ndocker ps  # Verify Docker daemon running\n# Test core imports\npython -c \"from backend.core.mtf_engine import *\"\n```\n\n**Priority 2 - Incremental Recovery:**\n1. Comment out new Docker analysis script temporarily\n2. Run tests in isolation: `pytest tests/unit/ -v`\n3. Check database test setup requirements\n4. Verify all new dependencies are properly installed\n\n**Priority 3 - Prevention:**\n- Add pre-commit hooks to validate basic imports\n- Implement staged testing (unit → integration → Docker)\n- Add environment sanity checks in test setup\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents:\n- Any quality validation of code changes\n- Detection of regression issues\n- Confidence in deployment readiness\n- Team velocity due to blocked CI/CD pipeline\n\n**Critical Path:** Restore basic test execution within 2-4 hours to unblock development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 196,
+      "completion_tokens": 439,
+      "total_tokens": 635,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 132
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

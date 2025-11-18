@@ -1,0 +1,52 @@
+{
+  "timestamp": 1762886994,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    "backend\\core\\mtf_engine.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    "mcp-server\\orchestrator\\api\\models.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\loguru\\_handler.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    "verify_system.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    ".venv\\Lib\\site-packages\\loguru\\_simple_sinks.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762886977.539313,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage means no tests executed successfully\n- Test framework itself appears compromised\n\n## Coverage Analysis & Gaps\n**Total Coverage: 0%** - All gaps identified:\n- No code executed during test run\n- Coverage system failed to collect any data\n- Test infrastructure itself may be broken\n\n## Potential Issues with Recent Changes\n1. **Virtual Environment Corruption** - Multiple `.venv` package files modified\n2. **Test Framework Interference** - Pytest, coverage, and pluggy files altered\n3. **Critical File Changes**:\n   - `verify_system.py` - Likely system verification script\n   - `backend\\core\\mtf_engine.py` - Core backend component\n   - `full_ai_audit_deepseek_perplexity_deepseek.py` - AI audit script possibly interfering\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Restore Clean Environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify Test Infrastructure**:\n   - Run `pytest --version` to confirm installation\n   - Execute minimal test: `pytest -v --tb=short`\n\n3. **Isolate Recent Changes**:\n   - Revert `verify_system.py` and test\n   - Check `mtf_engine.py` for breaking changes\n\n4. **Systematic Recovery**:\n   - Test without coverage first\n   - Add coverage back incrementally\n\n## Risk Assessment\n**HIGH RISK** - Development blocked:\n- **Immediate**: All testing invalid, deployment impossible\n- **Short-term**: Undetected regressions likely\n- **Long-term**: Test reliability credibility damaged\n\n**Priority**: Fix test infrastructure before any feature development continues. The modified virtual environment packages suggest environment corruption as the root cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 448,
+      "completion_tokens": 432,
+      "total_tokens": 880,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 384
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762518286,
+  "changed_files": [
+    "backend\\config.py",
+    "backend\\database\\__init__.py",
+    "backend\\tasks\\optimize_tasks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762518271.2835255,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **0% coverage across all files** - No code paths tested\n- **Critical gap**: Entire test suite is failing to run\n- No data available for specific file coverage due to test execution failure\n\n## Potential Issues with Recent Changes\n1. **Config changes** (`backend\\config.py`): Likely breaking environment setup or imports\n2. **Database initialization** (`backend\\database\\__init__.py`): Possible connection/import issues\n3. **Task optimization** (`backend\\tasks\\optimize_tasks.py`): May contain syntax errors or breaking changes\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check for syntax errors in recent changes\n   - Verify imports and dependencies\n   - Run tests with `-v` flag to see specific failure points\n\n2. **Priority fixes**:\n   - Review `config.py` for environment variable changes\n   - Validate database connection logic\n   - Test optimize_tasks.py in isolation\n\n3. **Add basic smoke test** to prevent complete test suite collapse\n\n## Risk Assessment\n**HIGH RISK** - Deploying current state would be extremely dangerous:\n- No validation of core functionality\n- Database and task changes completely untested\n- High probability of production failures\n\n**Immediate action required** - Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 144,
+      "completion_tokens": 327,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 80
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762543481,
+  "changed_files": [
+    "backend\\api\\app.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543466.8804066,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - Zero code coverage indicates:\n- Test runner failed before collecting/executing any tests\n- Possible configuration errors or missing dependencies\n- No tests may exist for the changed file\n\n## Potential Issues with Recent Changes\n**app.py modifications likely caused:**\n- Syntax errors preventing import/execution\n- Missing imports or dependencies\n- Runtime exceptions during module loading\n- Environment configuration conflicts\n\n## Immediate Recommendations\n1. **Debug Test Runner Failure:**\n   - Check Python syntax in `app.py`: `python -m py_compile backend/api/app.py`\n   - Verify imports and dependencies are available\n   - Run with `python -m pytest -v` to see specific error\n\n2. **Fix Basic Test Execution:**\n   - Ensure `__init__.py` files exist in package directories\n   - Verify pytest configuration in `pytest.ini`/`setup.cfg`\n   - Check for circular imports in `app.py`\n\n3. **Add Basic Smoke Test:**\n   ```python\n   # tests/test_smoke.py\n   def test_app_import():\n       from backend.api.app import app  # Should not crash\n       assert app is not None\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be blind:\n- No validation of `app.py` functionality\n- Potential runtime crashes in production\n- Zero confidence in recent changes\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 348,
+      "total_tokens": 473,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

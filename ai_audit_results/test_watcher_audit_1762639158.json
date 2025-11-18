@@ -1,0 +1,48 @@
+{
+  "timestamp": 1762639158,
+  "changed_files": [
+    "backend\\agents\\deepseek.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\server.py",
+    "test_perplexity_bitcoin.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\__init__.py",
+    "backend\\agents\\__init__.py",
+    "tests\\test_protocol.py",
+    ".venv\\Lib\\site-packages\\dotenv\\main.py",
+    "mcp-server\\server.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\__init__.py",
+    "backend\\api\\parallel_deepseek_client.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_mtf_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762639140.5890088,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage suggests tests aren't even executing\n- No coverage data generated implies fundamental infrastructure issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- Zero coverage across all files indicates tests aren't running at all\n- No meaningful coverage data to analyze\n- Critical gap: Basic test execution capability\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: Modified `.venv` packages suggest dependency conflicts\n2. **Import/Circular Dependencies**: Changes across `backend/agents/`, `mcp-server/`, and FastMCP packages\n3. **Configuration Issues**: Modified `dotenv` files may have broken environment setup\n4. **Integration Breakage**: Multiple server/agent files changed simultaneously\n\n## Immediate Action Recommendations\n\n**HIGH PRIORITY**:\n1. **Fix Test Infrastructure First**:\n   ```bash\n   # Recreate clean environment\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Debug Test Execution**:\n   ```bash\n   # Run simplest test first\n   python -m pytest tests/ -v --tb=short\n   ```\n\n3. **Check Environment Variables**:\n   - Verify `.env` files aren't corrupted\n   - Ensure required API keys/env vars are set\n\n4. **Isolate the Failure**:\n   - Run tests individually to identify which change broke execution\n   - Start with `test_protocol.py` or `test_sandbox_integration.py`\n\n**MEDIUM PRIORITY**:\n- Add basic smoke tests for core modules\n- Implement test environment validation\n- Create isolated test for FastMCP server changes\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No functioning test suite means undetected regressions\n- Multiple core components modified without validation\n- Critical path components (MTF engine, agents, servers) all potentially broken\n\n**Immediate Action Required**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 331,
+      "completion_tokens": 466,
+      "total_tokens": 797,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 267
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

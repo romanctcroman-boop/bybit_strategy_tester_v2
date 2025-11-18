@@ -1,0 +1,61 @@
+{
+  "timestamp": 1762543798,
+  "changed_files": [
+    "backend\\core\\logging_config.py",
+    "backend\\services\\pagerduty_service.py",
+    "backend\\security\\__init__.py",
+    "backend\\models\\__init__.py",
+    "backend\\api\\routers\\live.py",
+    "backend\\app.py",
+    "backend\\api\\routers\\health.py",
+    "backend\\scaling\\redis_consumer_groups.py",
+    "backend\\services\\data_service.py",
+    "backend\\tasks\\backfill_tasks.py",
+    "backend\\sandbox\\docker_sandbox.py",
+    "backend\\services\\slack_service.py",
+    "backend\\security\\audit_logger.py",
+    "backend\\core\\redis_streams_queue.py",
+    "backend\\services\\sandbox_executor.py",
+    "backend\\settings.py",
+    "backend\\scaling\\dynamic_worker_scaling.py",
+    "backend\\scaling\\load_balancer.py",
+    "backend\\database\\models\\reasoning_trace.py",
+    "backend\\services\\reasoning_storage.py",
+    "backend\\api\\routers\\reasoning.py",
+    "backend\\api\\routers\\admin.py",
+    "backend\\database\\__init__.py",
+    "backend\\security\\secure_logger.py",
+    "backend\\security\\jwt_manager.py",
+    "tests\\integration\\test_sandbox_executor.py",
+    "backend\\scaling\\health_checks.py",
+    "backend\\database\\models\\tournament.py",
+    "backend\\services\\tournament_storage.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543779.89213,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- Zero test execution suggests fundamental infrastructure or configuration issues\n- No coverage data generated implies tests didn't even start running\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete test failure means:\n- No code was executed during test run\n- All new backend changes remain completely untested\n- Critical security modules (JWT, audit logging) have no validation\n- Core services (sandbox, scaling, database) lack any test verification\n\n## Potential Issues with Recent Changes\n**HIGH RISK CHANGES IDENTIFIED:**\n1. **Security modules** (`jwt_manager.py`, `secure_logger.py`, `audit_logger.py`) - Authentication/auditing may be broken\n2. **Core infrastructure** (`redis_streams_queue.py`, `dynamic_worker_scaling.py`) - System stability at risk\n3. **Sandbox execution** (`docker_sandbox.py`, `sandbox_executor.py`) - Critical isolation layer potentially compromised\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test infrastructure** - Investigate why tests don't run at all\n2. **Run tests individually** to identify which specific change broke the test harness\n3. **Check recent changes to** `backend/app.py` and `backend/settings.py` - likely configuration issues\n4. **Verify dependencies** - New security or database modules may have broken imports\n\n**SHORT-TERM:**\n1. Add basic smoke tests for critical paths before complex integration tests\n2. Implement health checks for test infrastructure\n3. Add logging to test setup to diagnose initialization failures\n\n## Risk Assessment\n**SEVERITY: CRITICAL** 🚨\n- **Security Risk**: HIGH - Authentication/auditing changes untested\n- **Stability Risk**: HIGH - Core scaling and queue systems unvalidated  \n- **Data Integrity Risk**: MEDIUM - Database models and storage layers untested\n- **Deployment Risk**: EXTREME - Zero confidence in any backend functionality\n\n**Priority**: Fix test execution immediately before any deployment. Current state suggests entire backend may be non-functional.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 429,
+      "completion_tokens": 479,
+      "total_tokens": 908,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 365
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762545251,
+  "changed_files": [
+    "backend\\migrations\\versions\\20251107_merge_all_heads.py",
+    "backend\\migrations\\versions\\add_reasoning_kb_001.py",
+    "backend\\migrations\\versions\\perf_indexes_001_add_performance_indexes.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762545235.6192007,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely segmentation fault, memory error, or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **No file-specific coverage data** - Testing infrastructure failed before collecting metrics\n- **Complete testing blackout** - Unable to assess any functional coverage\n\n## Potential Issues with Recent Changes\n1. **Database migration conflicts** - Multiple migration files (`merge_all_heads.py`, `add_reasoning_kb_001.py`, `perf_indexes_001_add_performance_indexes.py`) suggest potential:\n   - Schema conflicts or dependency issues\n   - Migration ordering problems\n   - Database connection failures during test setup\n\n2. **Environment/Infrastructure**:\n   - Database connection crashes\n   - Memory exhaustion during migration application\n   - Python interpreter crashes\n\n## Immediate Recommendations\n1. **Debug Exit Code -1**:\n   ```bash\n   python -m pytest --tb=long -v  # Get detailed traceback\n   python -m pytest --maxfail=1 --pdb  # Debug first failure\n   ```\n\n2. **Isolate Migration Issues**:\n   - Test migrations individually: `alembic upgrade head --sql`\n   - Check database connectivity in test environment\n   - Verify migration dependencies\n\n3. **Infrastructure Check**:\n   - Validate test database setup/teardown\n   - Check for memory leaks in migration scripts\n   - Verify Python environment stability\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- Zero test verification of recent database changes\n- Potential data corruption from faulty migrations\n- Complete unknown of system stability\n- **Recommendation**: Block all deployments until exit code is 0 and basic coverage is restored\n\n**Priority**: Fix test execution before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 174,
+      "completion_tokens": 412,
+      "total_tokens": 586,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 110
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

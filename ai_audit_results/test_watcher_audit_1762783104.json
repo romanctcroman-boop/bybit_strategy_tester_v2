@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762783104,
+  "changed_files": [
+    "reliability\\deepseek_client.py",
+    "reliability\\perplexity_client.py",
+    "full_ai_audit_deepseek_perplexity_deepseek.py",
+    "tests\\test_integration_retry_circuit_breaker.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\test_perplexity_client.py",
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762783072.7735693,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage means no tests executed successfully\n- All test files appear affected\n\n## Coverage Analysis & Gaps\n**TOTAL COVERAGE BREAKDOWN:**\n- **0%** across all modules\n- No code execution measured\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\n1. **Integration Breakage** - New retry/circuit breaker logic likely causing systemic failures\n2. **Client Initialization** - DeepSeek/Perplexity clients may have authentication or connection issues\n3. **Environment Dependencies** - Missing API keys, network access, or configuration\n4. **Import/Circular Dependencies** - Recent file changes may have broken module imports\n\n## Immediate Action Recommendations\n**🟥 CRITICAL (Fix within 24 hours):**\n1. Run tests individually to identify the first failure point\n2. Check client initialization and authentication in `deepseek_client.py` and `perplexity_client.py`\n3. Verify all environment variables and API configurations\n4. Add try-catch blocks around test setup to prevent complete suite collapse\n\n**🟨 HIGH PRIORITY:**\n1. Implement basic smoke tests before full integration tests\n2. Add connection timeout handling in client modules\n3. Create isolated unit tests for each client before integration tests\n\n**🟩 MEDIUM PRIORITY:**\n1. Add test logging to capture failure context\n2. Implement circuit breaker test isolation\n3. Create mock-based tests for offline validation\n\n## Risk Assessment\n**SEVERITY: CRITICAL** 🔴\n- **Production Risk:** High - No reliable test coverage\n- **Regression Risk:** Extreme - Changes cannot be validated\n- **Integration Risk:** Critical - Client services may be unstable\n- **Business Impact:** Severe - AI audit functionality completely untested\n\n**IMMEDIATE NEXT STEPS:**\n1. Start with `test_deepseek_client.py` - likely the root failure\n2. Check API credentials and network connectivity\n3. Add debug logging to identify where tests are crashing\n4. Fix basic unit tests before addressing integration scenarios",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 200,
+      "completion_tokens": 471,
+      "total_tokens": 671,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 136
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762765961,
+  "changed_files": [
+    "auto_diagnostic_system.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762765944.954635,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or system error). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files indicates:\n- Tests never reached execution phase\n- Possible import failures or runtime errors before test collection\n- No code paths were exercised\n\n## Potential Issues with Recent Changes\nThe single changed file `auto_diagnostic_system.py` likely contains:\n- Syntax errors preventing module import\n- Circular imports or dependency issues\n- Missing required dependencies\n- Runtime exceptions during module initialization\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see error details\n2. Check Python syntax: `python -m py_compile auto_diagnostic_system.py`\n3. Verify imports work: `python -c \"import auto_diagnostic_system\"`\n4. Add basic smoke test to validate module loading\n\n**Short-term:**\n- Implement error handling in test setup\n- Add module-level try/except blocks for debugging\n- Create minimal test that imports module before complex tests\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- No validation of recent changes\n- Unknown if core functionality works\n- Potential for runtime failures in production\n- **Recommend blocking deployment** until basic tests pass and >80% coverage achieved\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 322,
+      "total_tokens": 448,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

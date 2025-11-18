@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762597137,
+  "changed_files": [
+    "automation\\deepseek_robot\\production_autonomous_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762597122.0517092,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% coverage** - All code changes are completely untested. This represents maximum testing risk.\n\n## Potential Issues with Recent Changes\nThe file `automation\\deepseek_robot\\production_autonomous_agent.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing imports or dependencies\n- Runtime errors that crash during module loading\n- Circular imports or initialization issues\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check Python syntax in both test files and production code\n   - Verify all imports are available in test environment\n   - Run with `python -m pytest -v` to see specific error details\n\n2. **Debug the Failure**\n   ```bash\n   python -c \"import automation.deepseek_robot.production_autonomous_agent\"\n   ```\n   This will reveal import-time errors\n\n3. **Add Basic Smoke Test**\n   - Create minimal test that imports the module\n   - Ensure basic functionality before comprehensive testing\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested autonomous agent code could lead to:\n- Runtime failures in production\n- Unpredictable autonomous behavior\n- System crashes or resource leaks\n- Safety concerns for robotic systems\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 331,
+      "total_tokens": 464,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 5
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

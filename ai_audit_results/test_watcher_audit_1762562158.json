@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762562158,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762562140.0212088,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**0% coverage** confirms no tests executed successfully. The entire codebase is untested in this run, making all recent changes unverified.\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure failure** - Likely caused by:\n   - Syntax errors in test files or test configuration\n   - Missing dependencies or import failures\n   - Broken test discovery configuration\n   - Environment setup issues\n\n2. **File `full_ai_audit_deepseek_perplexity_deepseek.py`** may contain:\n   - Fatal import errors\n   - Syntax violations preventing module loading\n   - Missing required dependencies\n\n## Immediate Recommendations\n\n**URGENT ACTIONS (Next 1-2 hours):**\n1. Run tests with verbose output to see the actual error: `pytest -v --tb=short`\n2. Check for syntax errors: `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py`\n3. Verify imports work: `python -c \"import full_ai_audit_deepseek_perplexity_deepseek\"`\n\n**SHORT-TERM (Today):**\n4. Fix the root cause preventing test execution\n5. Add basic smoke tests to verify the module loads\n6. Ensure test dependencies are properly installed\n\n**MEDIUM-TERM (This week):**\n7. Implement minimum 70% test coverage target\n8. Add CI pipeline that fails on test crashes\n9. Create test environment validation script\n\n## Risk Assessment\n**HIGH RISK** - Deploying any code in this state is extremely dangerous:\n- **Critical**: No validation of functionality\n- **High**: Potential runtime errors in production\n- **Medium**: Regression risk for all features\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 424,
+      "total_tokens": 559,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

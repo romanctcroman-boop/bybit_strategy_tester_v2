@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762760352,
+  "changed_files": [
+    "reliability\\distributed_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762760334.5610166,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure before any meaningful test execution occurred.\n\n## Coverage Analysis\n**0% coverage** confirms no tests actually ran. This represents maximum coverage gap - we have no visibility into code quality or functionality.\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure failure** - Likely caused by changes in `distributed_cache.py`\n2. **Syntax errors** or **import failures** preventing test discovery/execution\n3. **Missing dependencies** or **environment configuration** issues\n4. **Breaking changes** that prevent the test runner from starting\n\n## Immediate Recommendations\n\n### 1. Fix Test Execution (Highest Priority)\n```bash\n# Run with verbose output to identify failure point\npython -m pytest -v --tb=short\n# Check for syntax errors\npython -c \"from reliability.distributed_cache import *\"\n```\n\n### 2. Emergency Actions\n- Revert `distributed_cache.py` changes if recently modified\n- Verify all imports and dependencies are available\n- Check for circular imports or initialization errors\n\n### 3. Restore Basic Testing\n- Add minimal smoke test for `distributed_cache.py`\n- Ensure tests can at least import and instantiate core classes\n- Target 70%+ coverage once execution is restored\n\n## Risk Assessment\n**SEVERE RISK** - Deploying without any test validation is extremely dangerous:\n- High probability of runtime failures in production\n- No regression detection for distributed caching logic\n- Potential data corruption or system instability\n\n**Immediate action required** - Do not proceed with deployment until basic test execution is restored and meaningful coverage is achieved.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 353,
+      "total_tokens": 478,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762637408,
+  "changed_files": [
+    "mcp-server\\providers\\failover_manager.py",
+    "mcp-server\\providers\\health_checker.py",
+    "mcp-server\\providers\\provider_registry.py",
+    "mcp-server\\di_container.py",
+    "mcp-server\\providers\\__init__.py",
+    "mcp-server\\server.py",
+    "mcp-server\\providers\\load_balancer.py",
+    "mcp-server\\service_factories.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762637393.9156585,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment issue). Zero coverage suggests tests aren't even executing.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code is being tested\n- **No file-specific coverage data** - Tests aren't reaching any modules\n- **Critical Gap**: Entire MCP server infrastructure untested\n\n## Potential Issues with Recent Changes\n1. **Dependency Injection Break**: `di_container.py` changes likely broke service initialization\n2. **Provider Registry Issues**: Changes to `provider_registry.py` may have broken core registration system\n3. **Import/Circular Dependencies**: Recent file additions/modifications created import loops\n4. **Environment Configuration**: Missing dependencies or configuration files\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Check Python environment and dependencies\n   - Run with `-v` flag to see where tests fail\n   - Verify `pytest.ini`/configuration exists\n\n2. **Priority Test Targets**:\n   - Start with `di_container.py` (dependency injection core)\n   - Then `provider_registry.py` (service registration)\n   - Add basic health checks for `health_checker.py`\n\n3. **Quick Wins**:\n   - Add simple smoke tests for each provider module\n   - Implement basic integration test for server startup\n   - Add coverage for core factory methods in `service_factories.py`\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- Zero test coverage means undetected failures are guaranteed\n- Critical infrastructure changes (load balancing, failover) completely untested\n- High probability of runtime failures in production environment\n\n**Immediate Action**: Fix test execution environment before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 211,
+      "completion_tokens": 384,
+      "total_tokens": 595,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 147
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

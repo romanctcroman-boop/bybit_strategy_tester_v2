@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762721736,
+  "changed_files": [
+    "tests\\test_distributed_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762721722.3992343,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates either:\n- Syntax errors in test files\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal errors during test discovery/setup\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a direct result of the test execution failure, not an actual coverage measurement.\n\n## Potential Issues with Recent Changes\nThe changed file `tests/test_distributed_cache.py` likely contains:\n- Syntax errors (missing imports, incorrect syntax)\n- Broken test fixtures or setup methods\n- Import cycles or module resolution issues\n- Incompatible dependencies with the test environment\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest tests/test_distributed_cache.py -v` to see specific error details\n2. Check for syntax errors: `python -m py_compile tests/test_distributed_cache.py`\n3. Verify imports and dependencies are correctly installed\n4. Examine test setup/teardown methods for errors\n\n**Follow-up:**\n- Fix the root cause preventing test execution\n- Add basic smoke tests to validate test environment\n- Implement CI checks to catch test failures before merge\n\n## Risk Assessment\n**HIGH RISK** - No tests are running, meaning:\n- Undetected regressions in distributed cache functionality\n- Potential production failures\n- Complete loss of test feedback loop\n- All distributed cache changes are effectively untested\n\n**Priority:** Fix test execution immediately before any further development on distributed cache features.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 329,
+      "total_tokens": 455,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762756953,
+  "changed_files": [
+    "test_integration_simple.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762756937.3176382,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). No tests ran successfully, indicating fundamental issues with the test environment or test code itself.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\n1. **test_integration_simple.py** likely contains syntax errors, import failures, or environment dependencies that prevent test execution\n2. Possible missing test dependencies or configuration\n3. Test file may be attempting to import modules that don't exist or have circular dependencies\n4. Environment setup/teardown failures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile test_integration_simple.py` to check for syntax errors\n2. Execute tests with `python -m pytest test_integration_simple.py -v` to see detailed failure output\n3. Verify all imports and dependencies are available in test environment\n4. Check for infinite loops or memory issues in test setup\n\n**Follow-up:**\n- Add basic smoke tests that validate test environment\n- Implement test discovery verification in CI pipeline\n- Ensure test isolation and proper cleanup\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure means:\n- No validation of recent changes\n- Potential production-breaking code could be deployed\n- All existing functionality is unverified\n- Urgent attention required before any deployment\n\n**Priority:** Fix test execution immediately before proceeding with any other development or deployment activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 329,
+      "total_tokens": 455,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

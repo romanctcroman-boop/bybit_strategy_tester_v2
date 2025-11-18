@@ -1,0 +1,47 @@
+{
+  "timestamp": 1762552302,
+  "changed_files": [
+    "backend\\api\\circuit_breaker.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_phase1_security.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\test_protocol.py",
+    "tests\\backend\\conftest.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "backend\\core\\mtf_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552274.3874576,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- Zero test execution suggests fundamental infrastructure or dependency issues\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - All tests failed before collection:\n- 0.00% coverage means no tests ran successfully\n- Coverage reporting failed entirely, indicating severe test environment issues\n\n## 3. Potential Issues with Recent Changes\n**High-risk areas based on changed files:**\n- **Circuit Breaker Pattern** (`circuit_breaker.py`) - Could be causing infinite loops or resource exhaustion\n- **LSTM Predictor** (`lstm_queue_predictor.py`, `lstm_predictions.py`) - ML components may have memory leaks or dependency issues\n- **MTF Engine** (`mtf_engine.py`) - Core trading engine changes likely introduced fatal errors\n- **Security Tests** (`test_phase1_security.py`) - Security middleware may be blocking test execution\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. **Debug Exit Code -1**: Check for:\n   - Segmentation faults in C extensions\n   - Memory exhaustion in LSTM components\n   - Infinite recursion in circuit breaker\n   - Database connection deadlocks\n\n2. **Isolate Components**:\n   ```bash\n   # Test core components individually\n   pytest tests/test_mtf_engine.py -v\n   pytest tests/backend/test_bots_api_mock.py -v\n   ```\n\n3. **Check Dependencies**:\n   - Verify ML library versions (TensorFlow/PyTorch)\n   - Confirm database connectivity\n   - Validate security middleware configuration\n\n## 5. Risk Assessment\n**HIGH RISK** - Production deployment blocked:\n- **Critical**: Core trading engine potentially unstable\n- **High**: ML prediction service completely untested\n- **Medium**: API reliability unknown due to circuit breaker issues\n- **Security**: Security phase 1 implementation unverified\n\n**NEXT STEPS**: Focus on fixing the fatal error before addressing coverage. The test infrastructure itself needs repair before meaningful quality assessment can occur.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 301,
+      "completion_tokens": 471,
+      "total_tokens": 772,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 237
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

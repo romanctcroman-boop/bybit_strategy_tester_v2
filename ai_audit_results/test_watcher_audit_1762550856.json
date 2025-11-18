@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762550856,
+  "changed_files": [
+    "temp_pg_test.py",
+    "backend\\api\\parallel_deepseek_client.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762550837.6273794,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data available for analysis\n\n## Coverage Analysis & Gaps\n**NO MEANINGFUL DATA** - Coverage is 0% across all files, indicating:\n- Tests crashed before any code execution\n- No actual test execution occurred\n- Impossible to assess real coverage gaps\n\n## Potential Issues with Recent Changes\n**HIGH RISK CHANGES IDENTIFIED**:\n\n1. **PostgreSQL Integration** (`temp_pg_test.py`, `psycopg2`):\n   - Likely database connection/config issues\n   - Possible missing dependencies or environment variables\n   - Potential version conflicts with psycopg2\n\n2. **API Client Integration** (`parallel_deepseek_client.py`):\n   - External API dependencies may be failing\n   - Authentication/connection timeouts\n   - Missing mock implementations for tests\n\n3. **Environment Issues**:\n   - Virtual environment corruption (.venv reference)\n   - Missing test dependencies\n   - Environment configuration mismatches\n\n## Immediate Recommendations\n\n**CRITICAL (Fix within 24 hours)**:\n1. **Isolate the Crash**:\n   ```bash\n   python -m pytest --tb=short -x  # Find first failing test\n   python -c \"import psycopg2\"     # Test PostgreSQL import\n   ```\n\n2. **Check Dependencies**:\n   - Verify psycopg2 installation: `pip show psycopg2-binary`\n   - Confirm all test requirements in requirements-test.txt\n\n3. **Environment Reset**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt -r requirements-test.txt\n   ```\n\n**HIGH PRIORITY**:\n4. Add connection failure handling in database tests\n5. Implement proper mocking for external API calls\n6. Add health checks before test execution\n\n## Risk Assessment\n**SEVERE RISK** - Current state indicates:\n- **Development Blocked**: No reliable test feedback\n- **Production Risk**: Undetected regressions likely\n- **Integration Failure**: Database/API integrations broken\n\n**Immediate Action Required**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 158,
+      "completion_tokens": 505,
+      "total_tokens": 663,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 94
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

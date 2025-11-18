@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762733522,
+  "changed_files": [
+    "tests\\test_perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762733503.980556,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code is being tested\n- **No coverage data available** - Tests aren't even reaching execution phase\n- **Complete testing gap** - Entire codebase is untested\n\n## Potential Issues with Recent Changes\n1. **Test file `test_perplexity_client.py` is likely broken** - Syntax errors, import failures, or configuration issues\n2. **Dependency problems** - Missing imports or broken dependencies\n3. **Environment setup failure** - Test runner cannot initialize\n4. **Fixtures/configuration broken** - Setup/teardown failures preventing test execution\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check for syntax errors in `test_perplexity_client.py`\n   - Verify imports and dependencies\n   - Run with `-v` flag to see specific failure details\n   - Check test configuration and fixtures\n\n2. **Restore basic functionality**:\n   - Get at least one test passing\n   - Achieve minimal coverage (>70%)\n   - Fix any broken assertions or mock setups\n\n3. **Implement safety nets**:\n   - Add pre-commit hooks to catch syntax errors\n   - Set up CI to fail fast on test execution issues\n   - Add smoke tests to verify test suite functionality\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression protection\n- High probability of undetected bugs in production\n- Development team working without safety nets\n- Potential for critical failures in production code\n\n**Priority: IMMEDIATE** - Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 380,
+      "total_tokens": 507,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

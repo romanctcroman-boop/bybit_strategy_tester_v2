@@ -1,0 +1,65 @@
+{
+  "timestamp": 1762606757,
+  "changed_files": [
+    "analyze_project_with_mcp.py",
+    "automation\\task3_audit_agent\\config.py",
+    "analyze_sr_wfo.py",
+    "automation\\deepseek_robot\\analyze_perplexity_architecture.py",
+    "ask_deepseek_optimization.py",
+    "automation\\task2_key_manager\\encrypt_secrets.py",
+    "analyze_mcp_improvements.py",
+    "analyze_final_v2_with_deepseek.py",
+    "analyze_project_deepseek.py",
+    "add_logging_wrapper.py",
+    "auto_add_logging_to_tools.py",
+    "add_deepseek_keys.py",
+    "automation\\task3_audit_agent\\audit_agent.py",
+    "ai_ai_full_collaboration.py",
+    "apply_critical_fixes.py",
+    "adapt_phase2_tests.py",
+    "analyze_p1_performance.py",
+    "analyze_ide_problems.py",
+    "add_minimal_logging.py",
+    "analyze_ide_direct.py",
+    "add_logging_to_tools.py",
+    "analyze_tests_with_deepseek.py",
+    "automation\\task2_key_manager\\test_key_manager.py",
+    "add_logging_to_all_tools.py",
+    "analyze_data_cache.py",
+    "analyze_parallel_with_deepseek.py",
+    "analyze_test_hang.py",
+    "analyze_with_perplexity.py",
+    "auto_add_logging_all.py",
+    "analyze_with_deepseek.py",
+    "automation\\task2_key_manager\\key_manager.py",
+    "analyze_ide_with_edits.py",
+    "apply_deepseek_improvements.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762606733.1826544,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exceptions or environment issues)\n- 0% coverage means no tests executed successfully\n- This represents a complete testing breakdown\n\n## Coverage Analysis & Gaps\n**TOTAL COVERAGE FAILURE:**\n- No files show any coverage data\n- Entire codebase is untested from measurement perspective\n- This suggests either:\n  - Test runner configuration errors\n  - Import/syntax errors preventing test execution\n  - Environment/dependency issues\n\n## Potential Issues with Recent Changes\nBased on the file patterns, several high-risk changes:\n\n1. **Massive logging injection** - Multiple `add_logging_*` files suggest widespread instrumentation that may have broken imports\n2. **Security modifications** - `encrypt_secrets.py` and key management changes could introduce dependency/import issues\n3. **Architecture changes** - DeepSeek integration files may have broken existing interfaces\n4. **Automation framework** - Multiple `automation/` directory changes could have configuration conflicts\n\n## Recommendations for Improvement\n\n**IMMEDIATE ACTIONS (Next 2 hours):**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check for syntax errors in recently modified files, especially:\n   - `encrypt_secrets.py` (crypto dependencies)\n   - `audit_agent.py` (complex automation)\n   - Any `add_logging_*` files (import modifications)\n3. Verify all dependencies are installed and compatible\n\n**SHORT-TERM (Next day):**\n1. Create a minimal test that imports core modules to isolate the breaking change\n2. Roll back logging changes incrementally to identify the breaking commit\n3. Add basic smoke tests that run before full test suite\n\n**MEDIUM-TERM:**\n1. Implement test isolation - ensure tests can run independently\n2. Add continuous integration with dependency validation\n3. Create a staging environment for architectural changes\n\n## Risk Assessment\n**SEVERITY: CRITICAL** 🚨\n\n- **Deployment Risk:** Cannot validate any functionality - HIGH\n- **Regression Risk:** Unknown impact of changes - VERY HIGH  \n- **Security Risk:** Encryption/secret management changes untested - HIGH\n- **Maintenance Risk:** No visibility into code health - VERY HIGH\n\n**Priority #1:** Fix test execution immediately - the entire development feedback loop is broken. Without working tests, you're flying blind on all subsequent changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 441,
+      "completion_tokens": 532,
+      "total_tokens": 973,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 377
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

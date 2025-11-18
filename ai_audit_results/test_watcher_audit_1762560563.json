@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762560563,
+  "changed_files": [
+    "backend\\api\\shared_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762560545.8940132,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. Zero coverage suggests tests didn't even start running properly.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** for any files, including the modified `shared_circuit_breaker.py`\n- **Critical gap**: Unable to assess actual code coverage due to test execution failure\n\n## Potential Issues with Recent Changes\n1. **Circuit Breaker Implementation**: The modified file suggests changes to fault tolerance logic that may have introduced:\n   - Import/dependency issues\n   - Syntax errors preventing module loading\n   - Configuration changes breaking test setup\n   - Circular imports or initialization failures\n\n2. **Test Environment**: Possible dependency conflicts, missing test dependencies, or environment configuration issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Fix test execution failure first:\n   ```bash\n   python -m pytest --tb=short -v  # Get detailed failure info\n   ```\n2. Check for syntax errors in `shared_circuit_breaker.py`\n3. Verify all imports and dependencies are available in test environment\n\n**Follow-up:**\n4. Add basic smoke tests to verify module can be imported\n5. Implement circuit breaker unit tests covering:\n   - Open/closed/half-open states\n   - Failure thresholds and timeouts\n   - Exception handling\n6. Set coverage target: 80%+ for circuit breaker logic\n\n## Risk Assessment\n**HIGH RISK** - Deploying without valid test results poses significant risk:\n- Circuit breaker failures could cause cascading system failures\n- No validation of fault tolerance mechanisms\n- Potential production outages if circuit breaker logic is defective\n- **Recommendation**: Block deployment until tests pass with meaningful coverage",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 395,
+      "total_tokens": 525,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 66
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

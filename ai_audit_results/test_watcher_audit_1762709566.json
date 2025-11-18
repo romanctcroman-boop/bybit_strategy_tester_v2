@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762709566,
+  "changed_files": [
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762709550.4743361,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- Zero test execution suggests fundamental runtime issues\n- No coverage data collected due to premature termination\n\n## Coverage Analysis & Gaps\n**NO COVERAGE** - All metrics at 0%:\n- No code paths executed\n- No import statements processed\n- Complete test infrastructure failure\n\n## Potential Issues with Recent Changes\n1. **File `tests/test_deepseek_client.py` likely contains:**\n   - Infinite loops or recursion\n   - Fatal import errors (circular imports, missing dependencies)\n   - Memory corruption or segmentation faults\n   - Syntax errors preventing test discovery\n\n2. **Environment issues:**\n   - Missing test dependencies\n   - Python version incompatibility\n   - Resource exhaustion\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Isolate the failing test:**\n   ```bash\n   python -m pytest tests/test_deepseek_client.py -v --tb=short\n   ```\n\n2. **Check for basic syntax:**\n   ```bash\n   python -m py_compile tests/test_deepseek_client.py\n   ```\n\n3. **Run with minimal setup:**\n   ```bash\n   python -c \"from tests.test_deepseek_client import *; print('Imports successful')\"\n   ```\n\n4. **Add debug output** to identify where execution fails\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential for undetected regressions\n- Development blocked until resolved\n- Possible production issues if deployed\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 368,
+      "total_tokens": 495,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

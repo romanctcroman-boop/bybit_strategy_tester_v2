@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762636114,
+  "changed_files": [
+    "backend\\security\\key_manager.py",
+    "add_deepseek_keys_interactive.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762636102.136575,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This represents complete testing infrastructure failure rather than coverage gaps.\n\n## Potential Issues with Recent Changes\n1. **Key management changes** (`key_manager.py`) likely introduced breaking changes\n2. **Interactive script addition** (`add_deepseek_keys_interactive.py`) may have:\n   - Missing dependencies\n   - Environment configuration issues\n   - Blocking I/O operations halting test execution\n3. Possible authentication/security changes broke test environment\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check test runner configuration\n   - Verify all dependencies are installed\n   - Run with `-v` flag to see where tests fail\n   - Check for unhandled exceptions in new code\n\n2. **Isolate the failure**:\n   ```bash\n   python -m pytest backend/security/ --tb=short -v\n   ```\n\n3. **Review new interactive script**:\n   - Remove or mock any user input requirements\n   - Ensure it doesn't block test execution\n   - Add proper error handling\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functional tests is extremely dangerous. The security-related changes combined with broken testing pose significant operational risk.\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 319,
+      "total_tokens": 455,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

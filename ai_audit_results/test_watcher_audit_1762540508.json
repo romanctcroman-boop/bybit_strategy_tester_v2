@@ -1,0 +1,52 @@
+{
+  "timestamp": 1762540508,
+  "changed_files": [
+    "test_3.py",
+    "test_14.py",
+    "test_18.py",
+    "test_7.py",
+    "test_16.py",
+    "test_9.py",
+    "test_6.py",
+    "test_12.py",
+    "test_10.py",
+    "test_5.py",
+    "test_1.py",
+    "test_17.py",
+    "test_4.py",
+    "test_2.py",
+    "test_13.py",
+    "test_19.py",
+    "test_8.py",
+    "test_11.py",
+    "test_15.py",
+    "test_0.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540492.424324,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception in test runner)\n- 0% coverage suggests tests aren't executing at all\n- All test files modified simultaneously indicates systemic issue\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No coverage data collected (empty coverage report)\n- All 20 test files potentially corrupted or incompatible\n- Zero code paths being exercised\n\n## Potential Issues with Recent Changes\n**SYSTEMIC CONFIGURATION FAILURE:**\n1. **Test runner configuration** - pytest/runner setup broken\n2. **Dependency conflicts** - missing packages or version mismatches\n3. **Environment issues** - Python path, import errors, or missing test dependencies\n4. **Mass file corruption** - all test files modified with breaking changes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Run single test file**: `pytest test_0.py -v` to isolate the failure\n2. **Check test runner**: Verify pytest/unittest installation and configuration\n3. **Review recent commits**: Identify what changed across all test files simultaneously\n4. **Check imports**: Ensure all test dependencies are available\n5. **Validate test discovery**: Confirm test file naming conventions and location\n\n**FOLLOW-UP:**\n- Restore from backup if mass file modification was unintended\n- Implement test execution monitoring\n- Add pre-commit hooks to prevent test configuration breaks\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be blind:\n- No test validation of code changes\n- Critical bugs could reach production undetected\n- Complete loss of CI/CD quality gates\n- Urgent fix required before any further development\n\n**Priority: CRITICAL** - Address immediately before continuing development work.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 237,
+      "completion_tokens": 391,
+      "total_tokens": 628,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 173
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmpqzzbr2_b",
+    "debounce_seconds": 2
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "timestamp": 1762726070,
+  "changed_files": [
+    "test_ai_collaboration.py",
+    "simplified_reliable_mcp.py",
+    "test_backup_quick.py",
+    "tests\\__init__.py",
+    "test_ai_reasoning.py",
+    "test_deepseek_api.py",
+    "test_agents_critical_fix.py",
+    "tests\\test_charts_api.py",
+    "tests\\test_request_deduplication.py",
+    "test_authentication_simple.py",
+    "tests\\test_walk_forward.py",
+    "tests\\test_deepseek_agent.py",
+    "test_full_90days_mtf_ai_workflow.py",
+    "test_advanced_scenarios.py",
+    "tests\\test_stale_idempotency.py",
+    "test_enhanced_api.py",
+    "test_horizontal_scaling_simple.py",
+    "full_ai_audit_deepseek_perplexity_deepseek.py",
+    "tests\\test_secure_logging.py",
+    "test_comprehensive_p1.py",
+    "test_copilot_perplexity_ml_comprehensive.py",
+    "tests\\test_storage_logic.py",
+    "test_circuit_breaker.py",
+    "test_deepseek_max_permissions.py",
+    "tests\\test_distributed_cache.py",
+    "test_ai_full_cycle.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762726042.7586331,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage suggests tests aren't even executing\n- Multiple test files modified simultaneously increases risk\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files show any coverage data\n- Entire codebase is untested in this execution\n- Likely pre-execution failure prevents any test runs\n\n## Potential Issues with Recent Changes\n1. **Massive simultaneous changes** - 25+ files modified at once\n2. **Critical infrastructure files** modified: `simplified_reliable_mcp.py`, authentication, circuit breaker\n3. **High-risk areas affected**: distributed cache, storage logic, API endpoints\n4. **Possible root causes**:\n   - Broken imports/dependencies\n   - Environment configuration issues\n   - Critical syntax errors in shared modules\n   - Circular imports from mass changes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Roll back changes** and reintroduce incrementally\n2. **Fix pre-test setup** - check environment, dependencies, imports\n3. **Run tests individually** to identify breaking changes\n4. **Add CI pipeline** to prevent mass broken commits\n\n**STRUCTURAL FIXES:**\n1. Implement test isolation - each test should run independently\n2. Add health check tests for critical infrastructure\n3. Create staging environment for large changes\n4. Enforce smaller, focused commits\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be catastrophic:\n- **Critical**: Entire test suite non-functional\n- **High**: Multiple core systems modified simultaneously  \n- **Medium**: No regression detection capability\n- **Immediate action required** before any further development\n\n**Priority**: Fix test execution environment first, then reintroduce changes in small batches with verification at each step.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 376,
+      "completion_tokens": 405,
+      "total_tokens": 781,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 312
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

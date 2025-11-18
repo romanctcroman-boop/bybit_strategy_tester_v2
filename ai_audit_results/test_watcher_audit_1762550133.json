@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762550133,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762550120.3037958,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality or functionality.\n\n## Potential Issues with Recent Changes\n- **health_check.py likely contains fatal errors** preventing import/execution\n- Possible syntax errors, import failures, or runtime exceptions during module loading\n- Test runner configuration may be broken\n- Dependencies might be missing or incompatible\n\n## Recommendations for Improvement\n1. **Immediate Priority**: Fix the test execution failure\n   - Check health_check.py for syntax errors\n   - Verify imports and dependencies\n   - Run with `python -m py_compile health_check.py` to check syntax\n\n2. **Restore Basic Testing**:\n   - Add simple smoke test to verify module loads\n   - Implement minimal unit test for core functionality\n   - Ensure test runner configuration is valid\n\n3. **Prevention**:\n   - Add pre-commit hooks to catch syntax errors\n   - Implement CI pipeline that fails fast on compilation errors\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code with known execution failures. Current state provides zero quality assurance. All functionality in health_check.py is unverified and potentially broken.\n\n**Next Steps**: Fix the immediate execution failure before addressing coverage gaps. Without passing tests, coverage metrics are meaningless.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 327,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

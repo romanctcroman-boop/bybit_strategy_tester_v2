@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762639951,
+  "changed_files": [
+    "test_ide_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762639937.6692772,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates fundamental issues in test infrastructure or codebase integrity.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **No coverage data** generated for any files\n- Complete testing blackout - unable to assess actual code coverage\n\n## Potential Issues with Recent Changes\n1. **test_ide_integration.py modifications** likely introduced:\n   - Syntax errors or import failures\n   - Infinite loops or resource exhaustion\n   - Environment configuration conflicts\n   - Test framework compatibility issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution**: Run with `-v` flag to identify failure point\n2. **Check test dependencies**: Verify all imports and mocking setups\n3. **Validate test environment**: Ensure proper Python version and package compatibility\n4. **Isolate the failing test**: Run `test_ide_integration.py` in isolation\n\n**STRUCTURAL IMPROVEMENTS:**\n1. Add pre-commit test validation\n2. Implement test failure alerts\n3. Create smoke tests to catch basic execution failures\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable quality feedback mechanism\n- Potential for undetected regressions\n- Broken CI/CD pipeline\n- Development blocking until resolved\n\n**Priority**: Resolve immediately - this represents a complete testing system failure.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 318,
+      "total_tokens": 444,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

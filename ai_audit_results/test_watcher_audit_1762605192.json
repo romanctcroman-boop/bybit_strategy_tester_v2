@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762605192,
+  "changed_files": [
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\unit\\test_batch_writer.py",
+    "automation\\deepseek_robot\\advanced_architecture.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_sandbox_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762605174.7821734,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental infrastructure or configuration issues rather than test logic problems.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No tests executed successfully\n- **No coverage data available** - Execution halted before coverage collection\n- **Critical gap**: Complete test infrastructure failure\n\n## Potential Issues with Recent Changes\n1. **Database/Query Optimization tests** (`test_query_optimization.py`) - Likely causing test environment setup failures\n2. **MTF Engine modifications** - Changes in both implementation (`mtf_engine.py`) and tests suggest breaking API changes\n3. **Sandbox Integration** - New integration tests may have environment dependencies failing\n4. **Architecture changes** (`advanced_architecture.py`) - Possibly introduced incompatible changes\n\n## Immediate Recommendations\n1. **Debug Exit Code -1**: Investigate test runner configuration and environment setup\n2. **Isolate failing components**: Run tests individually to identify the specific failure point\n3. **Check dependencies**: Verify database connections, sandbox environments, and external services\n4. **Review recent MTF Engine changes**: Likely culprit for breaking existing functionality\n5. **Validate test environment**: Ensure all required services are running and accessible\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential production-breaking changes\n- Complete loss of quality assurance\n- Urgent attention required before any deployment\n\n**Priority**: Fix test infrastructure immediately, then address specific test failures.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 198,
+      "completion_tokens": 333,
+      "total_tokens": 531,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 134
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

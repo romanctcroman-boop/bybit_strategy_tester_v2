@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762683111,
+  "changed_files": [
+    "tests\\test_edge_cases_stress.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762683095.8134758,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (exit code -1). This indicates severe issues in either test infrastructure or catastrophic test failures that prevent any meaningful execution.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed successfully. This suggests:\n- Test runner crashed before collecting any coverage data\n- Import/initialization failures in test files\n- Environment/dependency issues preventing test execution\n\n## Potential Issues with Recent Changes\nThe changed file `tests\\test_edge_cases_stress.py` is likely the culprit:\n- **Syntax errors** preventing import/execution\n- **Infinite loops** or resource exhaustion in stress tests\n- **Missing dependencies** or imports\n- **Environment configuration** issues\n- **Memory overflows** or system resource limits being hit\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Isolate the failing test**: Run `test_edge_cases_stress.py` in isolation to identify the crash\n2. **Check for syntax errors**: Validate Python syntax in the changed file\n3. **Add resource limits**: Implement timeouts and memory limits for stress tests\n4. **Review test infrastructure**: Ensure test runner configuration is correct\n\n**Long-term:**\n- Implement test execution with `--fail-fast` to prevent cascading failures\n- Add pre-commit hooks to validate test syntax\n- Set up resource monitoring for stress tests\n\n## Risk Assessment\n**HIGH RISK** - Complete test suite failure means:\n- No validation of existing functionality\n- Potential undetected regressions in production\n- Broken CI/CD pipeline blocking deployments\n- Loss of confidence in test reliability\n\n**Priority**: Fix immediately - this blocks all meaningful testing and deployment activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 359,
+      "total_tokens": 487,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762556109,
+  "changed_files": [
+    "backend\\migrations\\versions\\add_saga_tables.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762556094.690774,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as zero tests ran successfully. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete test coverage failure. No code was executed during testing, rendering coverage metrics meaningless until test execution is fixed.\n\n## Potential Issues with Recent Changes\nThe migration file `add_saga_tables.py` is highly suspect:\n- Likely contains syntax errors, import issues, or database compatibility problems\n- May have broken application initialization preventing test startup\n- Could have circular dependencies or missing dependencies\n- Possible database schema conflicts with existing migrations\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution failure first**\n   - Check test runner logs for specific error messages\n   - Run tests with `-v` flag for verbose output\n   - Verify database connectivity and migration state\n\n2. **Isolate the migration issue**\n   - Rollback recent migration and verify tests pass\n   - Test migration independently: `python -m alembic upgrade head`\n   - Check for syntax errors in migration file\n\n3. **Restore basic test functionality**\n   - Fix migration or application bootstrap issues\n   - Ensure minimal test suite can execute\n   - Re-establish database test fixtures\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail similarly. Current state indicates:\n- Broken application startup process\n- Untested database schema changes\n- Potential data integrity issues\n- Complete loss of test safety net\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 132,
+      "completion_tokens": 352,
+      "total_tokens": 484,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 68
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

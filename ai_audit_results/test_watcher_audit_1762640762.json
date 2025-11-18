@@ -1,0 +1,43 @@
+{
+  "timestamp": 1762640762,
+  "changed_files": [
+    "backend\\api\\routers\\anomaly_detection.py",
+    "backend\\api\\routers\\ab_testing.py",
+    "backend\\api\\routers\\analytics_ws.py",
+    "backend\\health_checks.py",
+    "backend\\models\\saga_checkpoint.py",
+    "backend\\models\\saga_audit_log.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "backend\\models\\task.py",
+    "backend\\api\\routers\\automl.py",
+    "backend\\ml\\drift_detector.py",
+    "backend\\database\\batch_writer.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762640747.1510715,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage means no tests executed successfully\n- This represents a complete testing breakdown\n\n## Coverage Analysis & Gaps\n**TOTAL COVERAGE BREACH**:\n- Zero coverage across all 11 modified files\n- No test execution means all new code is completely untested\n- Critical gap: Entire ML pipeline (LSTM, AutoML, drift detection) has no validation\n\n## Potential Issues with Recent Changes\n1. **Dependency/Environment Failure**: Missing packages, version conflicts, or broken imports\n2. **Database/Connection Issues**: New database models (saga_checkpoint, task) may have migration problems\n3. **API Router Conflicts**: Multiple new routers may have route collisions or initialization errors\n4. **ML Pipeline Dependencies**: LSTM, AutoML, drift detection likely require specific ML libraries not installed\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS**:\n1. Run tests with `-v` flag to see which test fails first\n2. Check test environment setup and dependency installation\n3. Verify database connectivity and migrations for new models\n4. Test routers individually to identify conflicting routes\n\n**STRUCTURAL FIXES**:\n1. Add basic smoke tests for each new router before integration\n2. Implement health check validation for new services\n3. Create isolated test environments for ML components\n4. Add integration test sequencing to catch dependency issues early\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- **Critical**: ML predictions and analytics completely unvalidated\n- **High**: Database operations (batch_writer, saga patterns) untested\n- **Medium**: API endpoints could have runtime errors or security issues\n- **Business Impact**: Potential data corruption, failed predictions, service outages\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 249,
+      "completion_tokens": 413,
+      "total_tokens": 662,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 185
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

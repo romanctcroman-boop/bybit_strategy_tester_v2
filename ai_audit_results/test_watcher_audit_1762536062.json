@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762536062,
+  "changed_files": [
+    "backend\\api\\app.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762536047.9409907,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either:\n- Syntax errors in test files or application code\n- Missing dependencies or configuration issues\n- Test framework setup problems\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is a direct result of test execution failure, not a coverage gap issue.\n\n## Potential Issues with Recent Changes\nThe change to `backend\\api\\app.py` likely introduced:\n- **Syntax errors** preventing Python from parsing the file\n- **Import/circular dependency issues** breaking module loading\n- **Missing required dependencies** for the application to start\n- **Configuration errors** in test setup or application bootstrap\n\n## Recommendations for Improvement\n1. **Immediate Action**: Fix test execution failure first\n   - Check Python syntax: `python -m py_compile backend/api/app.py`\n   - Verify imports and dependencies are available\n   - Run tests with verbose output to see exact failure point\n\n2. **Debugging Steps**:\n   - Run application directly to isolate runtime vs test issues\n   - Check test configuration and environment setup\n   - Ensure all required packages are installed in test environment\n\n3. **Prevention**:\n   - Add pre-commit hooks with syntax checking\n   - Implement CI pipeline that runs basic syntax validation before tests\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail completely. The application may not even start. All functionality is untested and potentially broken.\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 345,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

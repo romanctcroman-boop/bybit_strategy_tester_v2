@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762561265,
+  "changed_files": [
+    "backend\\config\\timeout_config.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762561251.7017689,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates either:\n- Severe configuration/environment issues\n- Syntax errors in test code or implementation\n- Missing dependencies or setup requirements\n\n## Coverage Analysis\n**0% coverage** - All tests failed before any code execution. No actual coverage data was collected.\n\n## Potential Issues with Recent Changes\nThe changed file `timeout_config.py` likely contains:\n- Syntax errors preventing import/execution\n- Configuration that breaks test environment\n- Missing imports or dependencies\n- Infinite loops or blocking operations\n\n## Recommendations\n**Immediate Actions:**\n1. Check `timeout_config.py` for syntax errors\n2. Verify test environment setup and dependencies\n3. Run tests with `-v` flag to see specific failure points\n4. Test the config module in isolation first\n\n**Short-term:**\n- Add basic syntax validation to CI pipeline\n- Create minimal smoke tests for configuration files\n- Ensure tests can run without external dependencies\n\n## Risk Assessment\n**HIGH RISK** - No validation of recent changes. The broken config could affect:\n- Production deployments\n- Other development work\n- System stability\n\n**Priority:** Fix immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 264,
+      "total_tokens": 391,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

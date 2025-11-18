@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762537641,
+  "changed_files": [
+    "automation\\task3_audit_agent\\audit_agent.py",
+    "tests\\test_audit_agent_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537627.2962468,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or system error). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files indicates:\n- Tests cannot execute at all\n- No code paths are being exercised\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\nBased on changed files, likely issues:\n1. **Integration test file** (`test_audit_agent_integration.py`) contains fatal errors\n2. **Module imports broken** - Audit agent module cannot be imported\n3. **Syntax errors** in test file or dependencies\n4. **Missing dependencies** or environment setup issues\n5. **Circular imports** between module and test files\n\n## Immediate Action Recommendations\n1. **Fix test execution first**:\n   ```bash\n   python -m pytest tests/test_audit_agent_integration.py -v\n   ```\n   Check for import/syntax errors\n\n2. **Validate module import**:\n   ```python\n   python -c \"from automation.task3_audit_agent.audit_agent import *\"\n   ```\n\n3. **Check file structure** - Ensure `__init__.py` files exist in packages\n\n4. **Run minimal smoke test** - Create simple test that imports and instantiates basic class\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No validation of audit agent functionality\n- Potential production-breaking bugs undetected\n- Complete loss of test automation for critical component\n- High probability of regression issues\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 148,
+      "completion_tokens": 361,
+      "total_tokens": 509,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 84
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

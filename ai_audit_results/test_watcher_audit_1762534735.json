@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762534735,
+  "changed_files": [
+    "backend\\ml\\retrain_scheduler.py",
+    "mcp-server\\mcp_cache.py",
+    "tests\\unit\\test_lru_ttl_cache.py",
+    "tests\\unit\\test_batch_writer.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "tests\\unit\\test_ast_validator.py",
+    "tests\\unit\\test_retrain_scheduler.py",
+    "health_check.py",
+    "tests\\unit\\test_drift_detector.py",
+    "tests\\unit\\test_structured_logger.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    "tests\\test_walk_forward.py",
+    "tests\\test_task_queue.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762534716.4999921,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test framework failure\n- 0% coverage suggests tests aren't even executing\n- No coverage data generated implies fundamental infrastructure issues\n\n## Coverage Analysis & Gaps\n**Total System Failure** - No meaningful coverage data exists:\n- Zero coverage across all files indicates tests aren't running\n- Likely environment/configuration issues preventing test execution\n- No baseline to identify actual code coverage gaps\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: `.venv\\Lib\\site-packages\\_pytest\\terminal.py` modification suggests broken test environment\n2. **Import/Dependency Issues**: Multiple backend modules changed without corresponding test updates\n3. **Configuration Break**: Test runner configuration likely broken\n4. **Path/Module Resolution**: File structure changes may have broken imports\n\n## Immediate Action Recommendations\n1. **Fix Test Environment**:\n   - Restore clean virtual environment\n   - Reinstall test dependencies (`pytest`, `coverage`)\n   - Verify pytest installation integrity\n\n2. **Diagnose Root Cause**:\n   - Run `pytest --version` to verify installation\n   - Execute minimal test: `pytest tests/ -v --tb=short`\n   - Check for import errors in test modules\n\n3. **Priority Test Recovery**:\n   - Focus on core modules first: `test_task_queue.py`, `test_walk_forward.py`\n   - Verify backend imports work in isolation\n   - Add basic smoke tests for critical paths\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- No validation of ML retraining scheduler changes\n- Walk-forward optimizer modifications untested\n- Cache and batch writer logic unverified\n- Drift detection changes pose data quality risks\n\n**IMMEDIATE NEXT STEPS**:\n1. Restore test environment from known good state\n2. Run isolated tests on critical modules\n3. Fix import/configuration issues before any deployment\n4. Re-establish baseline coverage before further development",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 267,
+      "completion_tokens": 428,
+      "total_tokens": 695,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 203
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

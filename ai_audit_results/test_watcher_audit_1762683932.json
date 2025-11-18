@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762683932,
+  "changed_files": [
+    "frontend\\node_modules\\flatted\\python\\flatted.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762683915.8507562,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely segmentation fault, memory error, or fatal Python interpreter crash)\n- Zero test execution suggests fundamental environment or code issues\n\n## Coverage Analysis\n**NO COVERAGE DATA** - All metrics at 0%:\n- Tests didn't run at all, making coverage irrelevant\n- This indicates pre-execution failure before any test could run\n\n## Potential Issues with Recent Changes\nThe flatted.py change likely introduced:\n1. **Fatal syntax errors** causing interpreter crashes\n2. **Circular imports** or module loading conflicts\n3. **Memory corruption** in C extensions (if any)\n4. **Infinite recursion** during module import\n5. **Critical exception** during test setup\n\n## Immediate Recommendations\n1. **Isolate the failure**:\n   ```bash\n   python -c \"import frontend.node_modules.flatted.python.flatted\"  # Test import\n   python -m pytest --collect-only  # Check test discovery\n   ```\n\n2. **Rollback flatted.py changes** and verify tests pass\n\n3. **Add basic syntax validation** to CI:\n   ```bash\n   python -m py_compile frontend/node_modules/flatted/python/flatted.py\n   ```\n\n4. **Check for environment issues**:\n   - Python version compatibility\n   - Missing dependencies\n   - File permissions\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would fail catastrophically:\n- No working test suite means undetected regressions\n- Exit code -1 suggests system-level instability\n- Immediate fix required before any further development\n\n**Priority**: Fix test execution before addressing coverage or test quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 361,
+      "total_tokens": 494,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 69
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

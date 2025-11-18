@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762612646,
+  "changed_files": [
+    "mcp-server\\api\\__init__.py",
+    "test_perplexity_streaming.py",
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762612630.5480828,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/import). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No tests executed for modified API components\n- Complete lack of validation for perplexity streaming functionality\n- Critical gap: New provider implementation untested\n\n## Potential Issues with Recent Changes\n1. **Import/circular dependency issues** in new `mcp-server\\api\\` structure\n2. **Syntax errors** in `perplexity.py` preventing module loading\n3. **Missing dependencies** for perplexity provider\n4. **Test configuration broken** - unable to discover/run any tests\n\n## Recommendations for Improvement\n**Immediate (Blocking):**\n1. Fix test runner configuration - check pytest/unitest setup\n2. Resolve import errors in `mcp-server\\api\\__init__.py`\n3. Validate `perplexity.py` for syntax and dependency issues\n\n**Short-term:**\n1. Add basic smoke tests for perplexity provider\n2. Implement minimal streaming API tests\n3. Achieve >70% coverage for new components\n\n**Process:**\n- Run tests locally before committing\n- Add pre-commit hooks for test execution\n- Set up CI to fail on <80% coverage\n\n## Risk Assessment\n**HIGH RISK** - Shipping completely untested code:\n- Production failures likely in streaming API\n- Provider integration may break existing functionality\n- No safety net for regression\n- Potential data loss/corruption in streaming scenarios\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 153,
+      "completion_tokens": 357,
+      "total_tokens": 510,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 89
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762722133,
+  "changed_files": [
+    "tests\\test_request_deduplication.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762722120.7964466,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely broken. Exit code -1 indicates a fatal error during test execution, preventing any tests from running.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues\n1. **Test Harness Failure**: The test runner itself is crashing before any tests execute\n2. **Import/Dependency Issues**: Likely missing imports or broken dependencies in the test file\n3. **Syntax Errors**: Possible Python syntax errors in `test_request_deduplication.py`\n4. **Configuration Problems**: Test configuration or setup code may be causing crashes\n\n## Immediate Actions Required\n1. **Fix Test Execution First**:\n   - Run `python -m pytest tests/test_request_deduplication.py -v` to see specific error details\n   - Check for syntax errors: `python -m py_compile tests/test_request_deduplication.py`\n   - Verify all imports and dependencies are available\n\n2. **Debug the Test File**:\n   - Comment out all test methods and gradually uncomment to identify the failing code\n   - Check fixture setups and teardowns\n   - Verify test dependencies are installed\n\n3. **Validate Test Environment**:\n   - Ensure pytest and required testing libraries are properly installed\n   - Check Python version compatibility\n\n## Risk Assessment\n**HIGH RISK** - With 0% test coverage and broken test execution:\n- No regression protection for request deduplication logic\n- High probability of undetected production bugs\n- Deployment would be extremely risky\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 351,
+      "total_tokens": 478,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

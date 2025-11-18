@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762700802,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\anyio\\_backends\\_asyncio.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\server.py",
+    ".venv\\Lib\\site-packages\\anyio\\streams\\memory.py",
+    ".venv\\Lib\\site-packages\\mcp\\shared\\session.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\low_level.py",
+    ".venv\\Lib\\site-packages\\anyio\\_core\\_eventloop.py",
+    ".venv\\Lib\\site-packages\\anyio\\abc\\_streams.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762700787.5069175,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental environment or configuration issues\n- No coverage data collected means tests didn't even start running\n\n## Coverage Analysis\n**0% coverage** - No meaningful data available:\n- No files were tested due to execution failure\n- Cannot assess actual code coverage gaps\n- This indicates tests are broken, not just insufficient\n\n## Potential Issues with Recent Changes\n**Environment/Path Problems:**\n- Modified files are all in `.venv\\Lib\\site-packages` - virtual environment corruption\n- Likely incompatible package versions or installation issues\n- AnyIO and FastMCP dependencies may have breaking changes\n\n## Immediate Recommendations\n\n**1. Environment Reset:**\n```bash\n# Recreate virtual environment\nrm -rf .venv\npython -m venv .venv\nsource .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\npip install -r requirements.txt\n```\n\n**2. Test Infrastructure Fix:**\n- Check test runner configuration\n- Verify pytest/unitest setup isn't crashing\n- Ensure test discovery is working\n\n**3. Dependency Management:**\n- Pin AnyIO and FastMCP versions in requirements\n- Test with known compatible versions first\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be dangerous:\n- No validation of recent code changes\n- Unknown if core functionality works\n- Potential runtime failures in production\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 259,
+      "completion_tokens": 336,
+      "total_tokens": 595,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 195
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

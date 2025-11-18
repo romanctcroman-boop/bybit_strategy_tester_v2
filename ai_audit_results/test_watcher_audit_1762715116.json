@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762715116,
+  "changed_files": [
+    "reliability\\mcp_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762715091.3657606,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite failed completely (Exit Code -1) with 0% coverage, indicating either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Test execution halted before coverage collection\n- **Critical gap**: Unable to assess actual code coverage due to test failure\n\n## Potential Issues with Recent Changes\n1. **Syntax/runtime errors** in `reliability\\mcp_manager.py` preventing import/execution\n2. **Missing dependencies** or broken imports in the modified file\n3. **Infinite loops** or fatal exceptions during module initialization\n4. **Configuration issues** with test runner or environment\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check Python syntax: `python -m py_compile reliability\\mcp_manager.py`\n   - Test module import: `python -c \"import reliability.mcp_manager\"`\n   - Verify dependencies and imports\n\n2. **Debug the failure**:\n   - Run tests with verbose output to see exact failure point\n   - Check for unhandled exceptions in module-level code\n   - Validate recent changes don't break existing interfaces\n\n3. **Restore basic functionality**:\n   - Ensure tests can at least import and initialize the module\n   - Add basic smoke tests before comprehensive coverage\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure suggests:\n- Production code may be completely broken\n- No safety net for future changes\n- Potential deployment blockers\n- Urgent fix required before any further development\n\n**Priority**: Fix test execution immediately before addressing coverage metrics.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 366,
+      "total_tokens": 491,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

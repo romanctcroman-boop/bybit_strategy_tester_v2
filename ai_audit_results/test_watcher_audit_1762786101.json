@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762786101,
+  "changed_files": [
+    "tests\\test_sync_async_wrapper.py",
+    "tests\\test_task_queue.py",
+    "automation\\sync_async_wrapper.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762786074.1172693,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - No code was executed during test run. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\n1. **Sync/Async wrapper changes** likely introduced breaking changes that crash the test environment\n2. **Task queue modifications** may have dependency conflicts or initialization errors\n3. **Possible circular imports** or module loading failures\n4. **Environment configuration** issues (missing dependencies, version conflicts)\n\n## Immediate Recommendations\n1. **DEBUG TEST INFRASTRUCTURE FIRST**\n   - Run tests with `-v` flag to see where they fail\n   - Check for import errors in changed files\n   - Verify all dependencies are installed\n\n2. **ISOLATE THE FAILURE**\n   ```bash\n   python -m pytest tests/test_sync_async_wrapper.py -v --tb=short\n   python -m pytest tests/test_task_queue.py -v --tb=short\n   ```\n\n3. **VALIDATE IMPORTS**\n   - Check `sync_async_wrapper.py` for correct imports\n   - Verify no circular dependencies between changed modules\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functional tests is extremely dangerous. The codebase is currently untested and may contain critical bugs.\n\n**Priority:** Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 147,
+      "completion_tokens": 328,
+      "total_tokens": 475,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 83
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

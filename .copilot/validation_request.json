@@ -1,0 +1,11 @@
+{
+  "type": "validation_request",
+  "problem": "Division by zero vulnerability",
+  "original": "def calc(a, b):\n    return a / b",
+  "fixed": "def calc(a, b):\n    if b == 0:\n        return 0\n    return a / b",
+  "questions": [
+    "Is the fix correct?",
+    "Are there any issues with the fixed code?",
+    "Can this be improved further?"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762595203,
+  "changed_files": [
+    "automation\\deepseek_robot\\production_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762595186.0821612,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage confirms no tests executed successfully\n- This represents a complete testing infrastructure breakdown\n\n## Coverage Analysis & Gaps\n**TOTAL COVERAGE FAILURE:**\n- Zero coverage across all files\n- No test execution occurred\n- All code paths are currently untested\n\n## Potential Issues with Recent Changes\nThe file `automation\\deepseek_robot\\production_test.py` likely contains:\n- **Fatal syntax errors** preventing import/execution\n- **Infinite loops** or **blocking operations** hanging test execution\n- **Memory corruption** or **segfault-causing code**\n- **Missing dependencies** causing import failures\n- **Environment configuration issues**\n\n## Immediate Recommendations\n1. **DEBUG THE TEST EXECUTION:**\n   - Run tests with `python -m pytest -v` to see specific error messages\n   - Check for Python version compatibility issues\n   - Verify all imports and dependencies are available\n\n2. **ISOLATE THE FAILURE:**\n   - Temporarily remove/comment out `production_test.py`\n   - Run tests on other files to verify framework works\n   - Gradually reintroduce `production_test.py` code in sections\n\n3. **ADD BASIC SANITY TESTS:**\n   - Create simple passing tests first\n   - Ensure test framework is operational\n   - Build up test coverage incrementally\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may contain undetected critical bugs\n- No regression protection\n- Potential deployment of broken code\n- Complete loss of testing safety net\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 382,
+      "total_tokens": 511,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

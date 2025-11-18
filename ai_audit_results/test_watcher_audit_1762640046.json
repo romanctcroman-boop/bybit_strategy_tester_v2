@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762640046,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762640032.7135544,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates fundamental issues in the test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during testing\n- **No coverage data collected** - Test execution halted before any meaningful coverage could be measured\n- **Complete testing gap** - Entire codebase remains untested\n\n## Potential Issues with Recent Changes\nThe failure likely stems from changes in `tests\\backend\\conftest.py`:\n- **Fixture failures** - Broken pytest fixtures or configuration\n- **Import errors** - Missing dependencies or incorrect imports\n- **Environment setup** - Failed test environment initialization\n- **Syntax errors** - Invalid Python code in conftest\n\n## Recommendations for Improvement\n1. **Immediate Actions:**\n   - Revert `conftest.py` changes and verify tests pass\n   - Run `pytest -xvs tests/backend/conftest.py` to isolate the failure\n   - Check pytest output for specific error messages\n\n2. **Debugging Steps:**\n   - Add `print()` statements in `conftest.py` to trace execution\n   - Verify all imports and dependencies are available\n   - Check for infinite loops or resource exhaustion\n\n3. **Prevention:**\n   - Add pre-commit hooks to validate pytest configuration\n   - Implement CI pipeline that fails fast on configuration errors\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- **No test validation** of any functionality\n- **Undetected regressions** likely in production\n- **Broken deployment pipeline** - cannot trust test results\n- **Urgent fix required** before any further development\n\n**Priority: Fix immediately** - The test infrastructure must be restored before proceeding with any code changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 390,
+      "total_tokens": 517,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

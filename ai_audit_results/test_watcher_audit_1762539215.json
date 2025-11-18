@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539215,
+  "changed_files": [
+    "tests\\integration\\test_e2e_test_watcher_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539201.1104372,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach any application code\n- **Complete testing gap** - All functionality remains untested\n\n## Potential Issues with Recent Changes\n1. **Test file corruption**: `test_e2e_test_watcher_v2.py` may contain syntax errors or import failures\n2. **Environment misconfiguration**: Missing dependencies, incorrect Python version, or environment variables\n3. **Infrastructure failure**: Test runner crashed before executing any tests\n4. **Path/resource issues**: File permissions, missing fixtures, or database connections\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile tests/integration/test_e2e_test_watcher_v2.py` to check for syntax errors\n2. Execute tests with `-v` flag to see exact failure point\n3. Verify all dependencies are installed: `pip list`\n4. Check test environment setup and configuration files\n\n**Systematic Fixes:**\n1. Add pre-commit hooks to validate test syntax\n2. Implement CI pipeline with dependency verification step\n3. Create basic smoke test to validate test environment\n4. Add logging to capture test initialization failures\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression protection for recent changes\n- Potential deployment of broken code\n- Undetected integration issues\n- Complete test suite unreliability\n\n**Priority**: Fix test infrastructure immediately before making any further code changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 369,
+      "total_tokens": 504,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

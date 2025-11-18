@@ -1,0 +1,43 @@
+{
+  "timestamp": 1762608709,
+  "changed_files": [
+    "tests\\integration\\test_copilot_perplexity_mcp.py",
+    "test_deepseek_and_perplexity.py",
+    "scripts\\ask_deepseek_perplexity_fix.py",
+    "query_perplexity.py",
+    "scripts\\ask_perplexity.py",
+    "tests\\integration\\test_real_mcp_copilot_perplexity.py",
+    "scripts\\test_perplexity_minimal.py",
+    "deepseek_perplexity_full_tz_audit.py",
+    "test_copilot_perplexity_ml_comprehensive.py",
+    "tests\\integration\\test_real_copilot_perplexity.py",
+    "ml_optimizer_perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762608684.3686526,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage means no code executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No files executed = 0% coverage across all modules\n- Critical gap: Entire test suite failing to run\n- No meaningful coverage data available due to execution failure\n\n## Potential Issues with Recent Changes\n1. **Integration Test Breakage** - Multiple integration test files modified (`test_copilot_perplexity_mcp.py`, `test_real_mcp_copilot_perplexity.py`)\n2. **Script Dependencies** - Changes to query/ask scripts likely broke test dependencies\n3. **Import/Module Issues** - Exit code -1 suggests import failures or environment configuration problems\n4. **MCP/Copilot Integration** - Recent MCP-related changes may have broken authentication or API connectivity\n\n## Immediate Action Recommendations\n\n**PRIORITY 1 - RESTORE TEST EXECUTION:**\n```bash\n# 1. Run minimal test to isolate failure\npython scripts/test_perplexity_minimal.py\n\n# 2. Check import dependencies\npython -c \"import query_perplexity; import scripts.ask_perplexity\"\n\n# 3. Verify environment variables\necho $PERPLEXITY_API_KEY $DEEPSEEK_API_KEY\n```\n\n**PRIORITY 2 - FIX INTEGRATION TESTS:**\n- Start with `test_perplexity_minimal.py` - most likely to succeed\n- Check API credentials and network connectivity\n- Validate MCP server configuration\n\n**PRIORITY 3 - IMPROVE TEST ISOLATION:**\n- Add unit tests before integration tests\n- Implement mocking for external dependencies\n- Create health check tests for API connectivity\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would likely fail\n- No validation of core functionality\n- Integration points completely untested\n- Potential for silent failures in production\n\n**CRITICAL PATH:** Fix test execution before any further development. Current test suite provides zero confidence in code quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 258,
+      "completion_tokens": 469,
+      "total_tokens": 727,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 194
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

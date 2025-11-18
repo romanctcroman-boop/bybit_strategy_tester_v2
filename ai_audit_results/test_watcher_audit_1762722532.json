@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762722532,
+  "changed_files": [
+    "reliability\\circuit_breaker.py",
+    "tests\\test_perplexity_client.py",
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762722517.6484756,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. No meaningful quality assessment possible until basic execution is fixed.\n\n## Coverage Analysis & Gaps\n**0% coverage across all files** - Tests aren't executing at all. This represents a complete testing gap where:\n- No code paths are being validated\n- All reliability components (circuit breaker) are untested\n- Recent changes to perplexity client tests are unverified\n\n## Potential Issues with Recent Changes\n1. **Test Configuration**: Likely broken test runner configuration or missing dependencies\n2. **Import/Dependency Issues**: Changes in `reliability/__init__.py` may have broken imports\n3. **Test Structure**: `test_perplexity_client.py` may contain syntax errors or missing fixtures\n4. **Environment**: Possible Python version conflicts or missing packages\n\n## Recommendations for Improvement\n**Immediate (Next 2 hours):**\n- Run tests with `-v` flag to see specific failure points\n- Check test dependencies and virtual environment\n- Verify imports in `test_perplexity_client.py` match actual module structure\n\n**Short-term (Today):**\n- Fix the root cause of test execution failure\n- Add basic smoke tests to verify test infrastructure\n- Ensure `reliability.circuit_breaker` has at least minimal unit tests\n\n**Medium-term (This week):**\n- Implement 70%+ coverage target for reliability module\n- Add integration tests for circuit breaker patterns\n- Set up CI/CD with coverage reporting\n\n## Risk Assessment\n**HIGH RISK** - Deploying any code in current state is dangerous:\n- Circuit breaker logic changes could introduce system-wide failures\n- No validation of perplexity client reliability patterns\n- Potential for silent failures in production\n- **Recommendation**: Block deployments until tests execute successfully and achieve >50% coverage",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 143,
+      "completion_tokens": 402,
+      "total_tokens": 545,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 79
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

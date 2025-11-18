@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762640283,
+  "changed_files": [
+    "backend\\security\\key_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762640272.411491,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests.\n\n## 2. Coverage Analysis\n**0% coverage** across all files suggests:\n- No tests executed successfully\n- Possible import errors or runtime crashes\n- Test infrastructure may be broken\n\n## 3. Potential Issues with Recent Changes\nThe `key_manager.py` modification likely introduced:\n- **Import/syntax errors** preventing test execution\n- **Missing dependencies** or broken imports\n- **Runtime exceptions** during module loading\n- **Circular imports** or initialization failures\n\n## 4. Immediate Recommendations\n**Priority Actions:**\n1. **Fix test execution** - Check for syntax errors in `key_manager.py`\n2. **Verify imports** - Ensure all dependencies are available\n3. **Run isolated test** - Test `key_manager.py` independently to identify crash source\n4. **Check test configuration** - Validate pytest/unitest setup files\n\n## 5. Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- Zero test validation of security-critical key management code\n- Unknown if recent changes broke existing functionality\n- Security vulnerabilities could be introduced undetected\n\n**Next Step:** Immediately fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 288,
+      "total_tokens": 414,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

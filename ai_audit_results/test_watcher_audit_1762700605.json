@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762700605,
+  "changed_files": [
+    "backend\\security\\secure_logger.py",
+    "backend\\security\\jwt_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762700590.9174786,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution occurred for modified security modules\n- Critical security components (JWT manager, secure logger) completely untested\n\n## Potential Issues with Recent Changes\n1. **Breaking changes** in security modules likely caused test infrastructure collapse\n2. Possible import errors, dependency conflicts, or syntax errors in modified files\n3. Security implementations may have introduced fatal runtime errors\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check for syntax errors in `jwt_manager.py` and `secure_logger.py`\n   - Verify imports and dependencies\n   - Run tests with `-v` flag to see failure details\n\n2. **Priority testing**:\n   - Add basic smoke tests for security modules\n   - Focus on JWT token generation/validation\n   - Test secure logging functionality\n\n3. **Infrastructure**:\n   - Add try/catch blocks in test setup\n   - Implement test environment validation\n\n## Risk Assessment\n**HIGH RISK** - Security changes deployed with zero test validation. Potential for:\n- Authentication bypass vulnerabilities\n- Logging security flaws (sensitive data exposure)\n- Production system crashes\n- Compliance violations\n\n**Action**: Block deployments until basic test suite passes and achieves >80% coverage on security modules.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 137,
+      "completion_tokens": 317,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 9
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

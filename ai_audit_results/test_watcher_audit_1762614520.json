@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762614520,
+  "changed_files": [
+    "test_cross_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762614505.7824466,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test code\n- Import failures or dependency issues\n- Test framework configuration problems\n- Environment setup failures\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure rather than a coverage gap.\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `test_cross_agent.py`, suggesting:\n- Broken test imports or syntax errors in the modified test file\n- Missing dependencies required by the new test code\n- Test framework incompatibility with recent changes\n- Circular imports or module loading issues\n\n## Immediate Recommendations\n1. **Debug Test Execution**\n   - Check `test_cross_agent.py` for syntax errors\n   - Verify all imports are valid and dependencies installed\n   - Run tests with `-v` flag to see specific failure points\n\n2. **Validate Test Environment**\n   - Confirm pytest/unittest configuration\n   - Check Python version compatibility\n   - Verify required packages are available\n\n3. **Isolate the Failure**\n   - Run only `test_cross_agent.py` to identify the specific issue\n   - Check if other test files still pass independently\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure means:\n- No validation of existing functionality\n- Potential undetected regressions\n- Zero confidence in code changes\n- Deployment would be extremely risky\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 329,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

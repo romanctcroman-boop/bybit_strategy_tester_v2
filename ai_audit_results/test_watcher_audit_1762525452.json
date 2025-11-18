@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762525452,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762525431.6533253,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run successfully. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents the worst-case coverage scenario where:\n- No functions/methods were called\n- No branches were tested\n- No edge cases were evaluated\n- Complete absence of test validation\n\n## Potential Issues with Recent Changes\nThe single changed file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures\n- **Runtime errors** during module initialization\n- **Infinite loops** or **blocking operations** during import\n- **Environment configuration** issues\n\n## Immediate Action Recommendations\n\n1. **DEBUG TEST EXECUTION**\n   ```bash\n   python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py\n   ```\n   Check for syntax errors first\n\n2. **ISOLATE THE FAILURE**\n   - Test import in isolation: `python -c \"import full_ai_audit_deepseek_perplexity_deepseek\"`\n   - Check for missing imports/dependencies\n   - Verify file permissions and paths\n\n3. **ADD BASIC SANITY TESTS**\n   - Create minimal test that imports the module\n   - Add test for basic function calls\n   - Ensure tests can run without external dependencies\n\n4. **IMPLEMENT PROGRESSIVE TESTING**\n   - Start with unit tests for individual functions\n   - Add integration tests gradually\n   - Set up continuous testing with fail-fast approach\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Production instability** - Code may not run at all\n- **Zero validation** - No confidence in functionality\n- **Regression risk** - Changes cannot be safely made\n- **Deployment blocker** - Should not be deployed until basic tests pass\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 458,
+      "total_tokens": 593,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

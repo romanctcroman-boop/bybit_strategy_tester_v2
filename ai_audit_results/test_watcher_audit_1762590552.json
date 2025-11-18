@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762590552,
+  "changed_files": [
+    "deepseek_self_analysis.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762590535.515903,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely test harness crash or environment issues). No tests executed successfully.\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This represents complete testing failure, not just poor coverage.\n\n## Potential Issues\n1. **Test runner crash** - Possible causes:\n   - Syntax errors in test files\n   - Missing dependencies/imports\n   - Environment configuration issues\n   - Circular imports in `deepseek_self_analysis.py`\n\n2. **File changes impact** - Recent modifications to `deepseek_self_analysis.py` may have:\n   - Introduced fatal syntax errors\n   - Broken module imports\n   - Created circular dependencies\n\n## Immediate Actions Required\n1. **Check test execution logs** - Identify why tests crash immediately\n2. **Validate `deepseek_self_analysis.py` syntax** - Run `python -m py_compile deepseek_self_analysis.py`\n3. **Test import chain** - Try importing the module directly\n4. **Review recent changes** - Check git diff for obvious syntax/import issues\n\n## Risk Assessment\n**HIGH RISK** - No testing feedback means code quality is completely unknown. Deployment would be extremely risky.\n\n## Priority Recommendations\n1. **Fix test execution first** - Don't worry about coverage until tests actually run\n2. **Add basic smoke test** - Ensure test framework loads successfully\n3. **Verify environment** - Check Python version, dependencies, and paths\n4. **Implement CI/CD guardrails** - Prevent merging when tests don't execute\n\n**Next step**: Run tests with verbose output (`-v` flag) to identify where the crash occurs.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 366,
+      "total_tokens": 492,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762715460,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "reliability\\mcp_manager.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762715447.3033037,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates either:\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n- Environment setup problems\n\n## Coverage Analysis\n**0% coverage** - No tests ran successfully. This is a severe regression from any previous coverage levels.\n\n## Potential Issues with Recent Changes\n1. **`.venv` modification** - Changes in virtual environment packages (psycopg2) suggest dependency conflicts\n2. **`mcp_manager.py`** - Likely contains breaking changes that prevent test execution\n3. **`temp_pg_test.py`** - Possibly contains malformed test code or import errors\n\n## Immediate Actions Required\n1. **Fix test execution first**:\n   - Check test runner configuration\n   - Verify all imports work correctly\n   - Run with `-v` flag to see where tests fail\n\n2. **Isolate the breaking change**:\n   - Revert `mcp_manager.py` changes and test\n   - Check if `temp_pg_test.py` runs independently\n   - Verify psycopg2 compatibility\n\n3. **Add basic smoke test**:\n   ```python\n   def test_imports():\n       import reliability.mcp_manager\n       # Basic functionality check\n   ```\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means undetected production bugs are likely. The codebase is currently untested and potentially unstable.\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 154,
+      "completion_tokens": 323,
+      "total_tokens": 477,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 90
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

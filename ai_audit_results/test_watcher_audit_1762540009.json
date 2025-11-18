@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540009,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539996.1541276,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1), indicating severe infrastructure or configuration issues rather than test failures. The test suite is non-functional.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality or functionality.\n\n## Potential Issues with Recent Changes\nThe modified E2E audit agent test (`test_e2e_audit_agent.py`) likely contains:\n- Fatal syntax errors or import failures\n- Environment/dependency conflicts\n- Infinite loops or resource exhaustion\n- Configuration mismatches\n- Broken test infrastructure\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug the crash**: Run tests with `--tb=long` to see full traceback\n2. **Isolate the failure**: Run only the changed test file to confirm it's the culprit\n3. **Check dependencies**: Verify all required packages are installed and compatible\n4. **Validate test environment**: Ensure databases, services, and configurations are correct\n\n**Systematic Fixes:**\n5. Add pre-commit test validation to catch syntax errors early\n6. Implement test isolation to prevent one broken test from halting entire suite\n7. Set up continuous integration with staged testing\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in system stability. Without working tests:\n- Undetected regressions are guaranteed\n- Deployment risks are extremely high\n- Code changes are essentially untested\n- Audit functionality (the modified component) cannot be verified\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 348,
+      "total_tokens": 482,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

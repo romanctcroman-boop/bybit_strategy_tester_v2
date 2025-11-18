@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762711862,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "tests\\test_deepseek_client.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762711845.762563,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage confirms no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files were measured for coverage\n- All test execution paths failed before coverage could be collected\n- This represents a complete testing blackout\n\n## Potential Issues with Recent Changes\n1. **Environment corruption** - `.venv` modifications suggest virtual environment issues\n2. **Database dependency failure** - `psycopg2` changes indicate PostgreSQL connection problems\n3. **Test file conflicts** - Both `test_deepseek_client.py` and `temp_pg_test.py` modified, potential import/execution conflicts\n4. **Fatal runtime error** - Exit code -1 suggests memory issues, segmentation faults, or incompatible dependencies\n\n## Immediate Action Recommendations\n1. **ISOLATE THE FAILURE:**\n   - Run tests with `-v` flag to see which specific test causes crash\n   - Execute `temp_pg_test.py` separately from main test suite\n   - Check if `psycopg2` installation is corrupted\n\n2. **ENVIRONMENT RESET:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n3. **TEST IN ISOLATION:**\n   - Run each test file individually to identify the crashing component\n   - Add `try/except` blocks around test setup to catch fatal errors\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be completely blind:\n- No code coverage means undetected regressions are guaranteed\n- Fatal errors in test environment likely indicate production risks\n- Database connectivity issues could affect application functionality\n- **Do not deploy until root cause is identified and tests pass**\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 429,
+      "total_tokens": 585,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

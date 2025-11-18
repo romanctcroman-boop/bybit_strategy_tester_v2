@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762644111,
+  "changed_files": [
+    "test_backtest_engine_real.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762644099.6592906,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't run long enough to collect metrics\n- **Complete testing gap** - All production code remains untested\n\n## Potential Issues with Recent Changes\n1. **test_backtest_engine_real.py** likely contains:\n   - Syntax errors or import failures\n   - Missing dependencies for backtesting engine\n   - Environment configuration issues\n   - Infinite loops or crashes during setup\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check Python version compatibility and dependency installation\n3. Verify test file imports and module structure\n4. Add try-catch blocks around test setup to capture initialization errors\n\n**Short-term:**\n1. Create a minimal passing test to verify basic functionality\n2. Add logging to identify where execution fails\n3. Implement test isolation to prevent cascading failures\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code changes cannot be validated\n- Regression risk is extremely high\n- Deployment would be unsafe\n- Backtesting engine functionality is unverified\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 308,
+      "total_tokens": 434,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

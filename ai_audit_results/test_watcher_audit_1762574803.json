@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762574803,
+  "changed_files": [
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_phase1_security.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762574785.8693428,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**Critical Failure** - Exit code -1 indicates catastrophic test failure, likely preventing any tests from executing. This suggests:\n- Broken test environment/setup\n- Critical dependency failures\n- Configuration issues preventing test execution\n\n## 2. Coverage Analysis\n**Complete Coverage Failure** - 0% coverage confirms no tests ran successfully. This represents maximum risk as we have no visibility into code quality.\n\n## 3. Potential Issues with Recent Changes\nThe changed files suggest problems in:\n- **LSTM prediction system** (`lstm_predictions.py`, `lstm_queue_predictor.py`)\n- **MTF engine** (`mtf_engine.py`) - likely core trading component\n- **Market data ingestion/upload** - critical data pipeline components\n- **Database query optimization** - potential performance impacts\n\n## 4. Immediate Recommendations\n\n**Priority 1 - Fix Test Execution:**\n- Check test environment setup and dependencies\n- Verify database connections and mock services\n- Examine test configuration files\n- Run tests individually to identify root cause\n\n**Priority 2 - Critical Path Testing:**\n- Focus on `mtf_engine.py` and market data files first (core business logic)\n- Test LSTM components in isolation\n- Verify database query changes don't break existing functionality\n\n**Priority 3 - Coverage Recovery:**\n- Once tests execute, prioritize coverage for changed files\n- Implement integration tests for market data pipeline\n- Add security tests for Phase 1 components\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state represents maximum operational risk:\n- No validation of core trading engine changes\n- Market data pipeline untested\n- ML prediction system potentially broken\n- Security implications unknown\n\n**Immediate Action Required:** Fix test execution before any deployment. Current changes cannot be safely released to production.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 281,
+      "completion_tokens": 391,
+      "total_tokens": 672,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 25
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

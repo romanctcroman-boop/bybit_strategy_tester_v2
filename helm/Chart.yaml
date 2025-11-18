@@ -1,0 +1,46 @@
+apiVersion: v2
+name: bybit-strategy-tester
+description: Enterprise-grade cryptocurrency strategy backtesting platform with ML-powered optimization
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.24.0-0"
+
+keywords:
+  - trading
+  - backtesting
+  - cryptocurrency
+  - bybit
+  - ml
+  - optimization
+
+maintainers:
+  - name: Bybit Strategy Tester Team
+    email: team@example.com
+
+sources:
+  - https://github.com/RomanCTC/bybit_strategy_tester_v2
+
+# Dependencies temporarily disabled for testing
+# Uncomment for production deployment
+# dependencies:
+#   - name: redis
+#     version: "17.11.3"
+#     repository: https://charts.bitnami.com/bitnami
+#     condition: redis.enabled
+#   - name: postgresql
+#     version: "12.5.8"
+#     repository: https://charts.bitnami.com/bitnami
+#     condition: postgresql.enabled
+#   - name: prometheus
+#     version: "23.1.0"
+#     repository: https://prometheus-community.github.io/helm-charts
+#     condition: prometheus.enabled
+#   - name: grafana
+#     version: "6.57.4"
+#     repository: https://grafana.github.io/helm-charts
+#     condition: grafana.enabled
+
+annotations:
+  category: Trading
+  licenses: MIT

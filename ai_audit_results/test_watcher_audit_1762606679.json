@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762606679,
+  "changed_files": [
+    "automation\\deepseek_robot\\analyze_perplexity_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762606655.5160413,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero tests executed successfully\n- No coverage data collected\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**\n- 0% coverage across all files\n- No test execution occurred\n- Coverage instrumentation likely failed to initialize\n\n## Potential Issues with Recent Changes\nThe modified file `analyze_perplexity_architecture.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Runtime exceptions during module loading\n- Environment compatibility issues\n\n## Immediate Recommendations\n\n**1. DIAGNOSE ROOT CAUSE**\n```bash\n# Check for syntax errors\npython -m py_compile automation/deepseek_robot/analyze_perplexity_architecture.py\n\n# Test module import directly\npython -c \"from automation.deepseek_robot import analyze_perplexity_architecture\"\n```\n\n**2. FIX TEST INFRASTRUCTURE**\n- Verify test runner configuration\n- Check pytest/unitest setup files\n- Ensure all dependencies are installed\n- Validate Python path and module structure\n\n**3. IMPLEMENT SAFEGUARDS**\n- Add basic syntax checking in CI pipeline\n- Create smoke tests for critical modules\n- Add import validation in test setup\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be dangerous:\n- No validation of recent architectural changes\n- Potential runtime failures undetected\n- Core functionality completely untested\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 343,
+      "total_tokens": 477,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 70
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

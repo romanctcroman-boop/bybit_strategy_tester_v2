@@ -1,0 +1,47 @@
+{
+  "timestamp": 1762551568,
+  "changed_files": [
+    "deepseek_comprehensive_analysis.py",
+    "mcp-server\\deepseek_direct_call.py",
+    "deepseek_self_diagnostic.py",
+    "deepseek_security_audit_request.py",
+    "deepseek_verify_fixes.py",
+    "backend\\agents\\deepseek.py",
+    "deepseek_weaknesses_analysis.py",
+    "mcp-server\\auto_install_deepseek_results.py",
+    "tests\\monitoring\\test_health_endpoints.py",
+    "deepseek_real_analysis.py",
+    "deepseek_perplexity_full_tz_audit.py",
+    "deepseek_verify_complete.py",
+    "ask_deepseek_api_keys_security.py",
+    "mcp-server\\deepseek_code_agent.py",
+    "deepseek_final_assessment.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762551546.7147107,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Exit code -1 indicates catastrophic test failure (likely segmentation fault, memory error, or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **100% coverage gap** - No files were tested\n- Likely environment/dependency issues preventing test execution\n- Missing unit tests for all 15 changed files\n\n## Potential Issues with Recent Changes\n1. **Deepseek integration files** (8 files) may have circular imports or initialization conflicts\n2. **MCP server components** could be causing environment corruption\n3. **Security audit scripts** might be interfering with test environment\n4. Possible infinite loops or resource exhaustion in analysis modules\n\n## Immediate Recommendations\n1. **Debug Exit Code -1:**\n   - Run tests with `--tb=short` to identify crashing module\n   - Check for memory leaks in deepseek analysis modules\n   - Verify no system calls are blocking test execution\n\n2. **Isolate Components:**\n   - Test MCP server files separately from analysis modules\n   - Temporarily remove security audit scripts from test suite\n   - Check for environment variable conflicts\n\n3. **Add Basic Sanity Tests:**\n   - Create minimal unit tests for each deepseek_*.py file\n   - Test imports independently before integration\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be completely untested:\n- Security vulnerabilities likely in unaudited code\n- Integration failures probable in production\n- No validation of deepseek API interactions\n- Potential data corruption or system instability\n\n**Priority:** Fix test environment immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 277,
+      "completion_tokens": 339,
+      "total_tokens": 616,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 213
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

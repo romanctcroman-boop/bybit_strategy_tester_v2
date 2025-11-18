@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762643004,
+  "changed_files": [
+    "tests\\test_protocol.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_sandbox_integration.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\unit\\test_batch_writer.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762642990.1256862,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran properly\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - All gaps identified:\n- No modules tested whatsoever\n- Missing: Core engine, database, protocol, sandbox integration\n- Complete absence of unit, integration, and system test validation\n\n## Potential Issues with Recent Changes\n1. **MTF Engine modifications** likely introduced breaking changes\n2. **Test infrastructure corruption** - runner configuration or dependencies\n3. **Import/dependency failures** preventing test discovery\n4. **Environment setup issues** - missing test data, services, or configurations\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests individually to identify failing module: `pytest tests/test_protocol.py -v`\n2. Check test runner configuration and dependencies\n3. Verify database/sandbox connectivity in test environment\n4. Add `--tb=short` to pytest for clearer error traces\n\n**STRUCTURAL FIXES:**\n1. Implement test isolation - ensure tests can run independently\n2. Add health checks for external dependencies\n3. Create smoke test to validate test infrastructure\n4. Set up continuous integration with failure alerts\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- **Critical**: Core trading engine changes untested\n- **High**: Database optimization modifications unvalidated  \n- **Medium**: Protocol and integration changes may have side effects\n- **Blind spot**: Zero confidence in system stability\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 369,
+      "total_tokens": 554,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 121
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762590407,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762590389.5627346,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- Zero test execution suggests fundamental infrastructure or import issues\n- No files were even processed for coverage analysis\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN** - 0% coverage across all files means:\n- No tests executed successfully\n- Recent changes likely broke test runner or critical dependencies\n- All production code changes are completely untested\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **`mtf_engine.py` modifications** - Core engine changes probably broke imports or initialization\n2. **Integration test changes** (`test_sandbox_integration.py`) - May have introduced circular imports or environment dependencies\n3. **Protocol/engine test updates** - Could have altered test discovery patterns\n4. **Database query optimization tests** - Might require unavailable test databases or services\n\n## Immediate Recommendations\n**Priority 1 - Restore Test Execution:**\n```bash\n# Isolate the failure\npython -m pytest tests/ --tb=short -v\n# Check specific test files individually\npython -m pytest tests/test_mtf_engine.py -v\n```\n\n**Debugging Steps:**\n1. Check for import errors in `backend/core/mtf_engine.py`\n2. Verify test dependencies and environment setup\n3. Examine recent changes to test configuration/conftest.py\n4. Run with `--collect-only` to see if tests are discovered\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- All new code is completely untested\n- Potential for runtime errors in production\n- Integration points may be broken\n- **Do not deploy** until basic test execution is restored\n\n**Immediate Action:** Focus exclusively on fixing test infrastructure before addressing any feature work or code quality issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 404,
+      "total_tokens": 589,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 121
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

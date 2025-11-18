@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762597882,
+  "changed_files": [
+    "automation\\deepseek_robot\\dual_analytics_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762597868.494837,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** across all files means:\n- Zero test execution occurred\n- Recent changes in `dual_analytics_engine.py` completely broke test infrastructure\n- No validation of any functionality\n\n## Potential Issues with Recent Changes\nThe changes in `dual_analytics_engine.py` likely caused:\n- Import errors or circular dependencies\n- Syntax errors preventing module loading\n- Environment configuration conflicts\n- Critical exceptions during test discovery/setup\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure First**\n   - Run tests with `-v` flag to see where they fail\n   - Check for syntax errors in `dual_analytics_engine.py`\n   - Verify imports and dependencies\n\n2. **Isolate the Breaking Change**\n   - Revert `dual_analytics_engine.py` changes temporarily\n   - Run tests to confirm baseline functionality\n   - Incrementally reapply changes\n\n3. **Add Basic Smoke Tests**\n   - Create minimal import tests for critical modules\n   - Add test environment validation checks\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing pipeline\n- Potential production-breaking changes\n- Complete loss of quality assurance\n- High probability of undetected regressions\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 315,
+      "total_tokens": 448,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 69
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

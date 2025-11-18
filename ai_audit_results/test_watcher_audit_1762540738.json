@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540738,
+  "changed_files": [
+    "tests\\stress\\test_parallel_execution.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540723.2211194,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). This indicates a severe infrastructure or environment issue rather than typical test failures. The test suite is currently non-functional.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All test execution has failed. No code is being exercised, making coverage data meaningless until the execution issue is resolved.\n\n## Potential Issues with Recent Changes\n- **File `tests\\stress\\test_parallel_execution.py`** is the only modified file, suggesting this stress test introduced the failure\n- Likely causes:\n  - Infinite loops or resource exhaustion in parallel execution\n  - Memory leaks causing system crashes\n  - Race conditions leading to deadlocks\n  - Environment configuration issues with parallel execution\n  - Missing dependencies for stress testing\n\n## Recommendations for Improvement\n1. **Immediate Action**: Isolate and run the stress test separately to confirm it's the root cause\n2. **Debug Strategy**:\n   - Add timeout mechanisms to stress tests\n   - Implement resource monitoring (memory, CPU) during execution\n   - Run with reduced parallelism to identify threshold issues\n3. **Infrastructure**:\n   - Check test environment resource limits\n   - Verify all stress test dependencies are properly installed\n4. **Add Safeguards**:\n   - Implement graceful degradation for stress test failures\n   - Add pre-flight checks for required system resources\n\n## Risk Assessment\n**HIGH RISK** - The entire test pipeline is broken. This blocks:\n- All future code changes from proper validation\n- Release readiness assessment\n- Bug detection capabilities\n- Must be treated as a **P0 issue** requiring immediate resolution\n\n**Priority**: Fix test execution before addressing coverage gaps. The 0% coverage is a symptom, not the root problem.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 372,
+      "total_tokens": 501,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

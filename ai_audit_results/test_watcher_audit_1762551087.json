@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762551087,
+  "changed_files": [
+    "test_parallel_deepseek.py",
+    "backend\\app.py",
+    "backend\\health_checks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762551073.0815668,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage across all files** - This represents a complete testing breakdown. No code paths were executed, suggesting:\n- Test infrastructure failure\n- Environment/dependency issues\n- Fatal errors in test setup/teardown\n- Possible circular imports or initialization failures\n\n## Potential Issues with Recent Changes\n1. **test_parallel_deepseek.py** - Likely contains fatal errors preventing test execution\n2. **backend/app.py** - Recent changes may have broken application initialization\n3. **backend/health_checks.py** - Could contain import dependencies causing cascade failures\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure**\n   - Run tests with `-v` flag to see specific failure points\n   - Check for import errors in test files\n   - Verify all dependencies are installed\n\n2. **Isolate the Failure**\n   ```bash\n   python -m pytest test_parallel_deepseek.py -v --tb=short\n   python -c \"import backend.app\"  # Test imports manually\n   ```\n\n3. **Fix Critical Path**\n   - Address any syntax errors or missing imports\n   - Ensure test fixtures and setup methods aren't throwing exceptions\n   - Verify database/API connections if applicable\n\n## Risk Assessment\n**HIGH RISK** - Deployment with 0% test coverage is extremely dangerous. Recent changes have completely broken the testing pipeline, indicating potential:\n- Runtime crashes in production\n- Broken application initialization\n- Missing dependencies\n- Critical integration failures\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 140,
+      "completion_tokens": 366,
+      "total_tokens": 506,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 76
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

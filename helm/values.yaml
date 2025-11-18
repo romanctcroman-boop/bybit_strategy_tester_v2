@@ -1,0 +1,894 @@
+# ==========================================
+# Bybit Strategy Tester - Helm Values
+# ==========================================
+# Production-ready configuration for Kubernetes deployment
+# Supports: Auto-scaling, HA, Monitoring, Service Mesh
+
+# ==========================================
+# Global Configuration
+# ==========================================
+global:
+  # Image registry for all components
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: "standard"
+  
+  # Namespace where resources will be deployed
+  namespace: "bybit-strategy-tester"
+  
+  # Environment (dev, staging, production)
+  environment: "production"
+  
+  # Service mesh integration
+  istio:
+    enabled: true
+    mtls:
+      mode: STRICT
+    tracing:
+      enabled: true
+      sampling: 10  # 10% of requests
+
+# ==========================================
+# Backend API Service
+# ==========================================
+backend:
+  enabled: true
+  
+  image:
+    repository: bybit-strategy-tester/backend
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  
+  # Replica configuration
+  replicaCount: 3
+  
+  # Auto-scaling configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    
+    # Custom metrics (requires Prometheus Adapter)
+    customMetrics:
+      - type: Pods
+        pods:
+          metric:
+            name: http_requests_per_second
+          target:
+            type: AverageValue
+            averageValue: "100"
+  
+  # Resource limits
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    annotations: {}
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rate-limit: "100"
+    hosts:
+      - host: api.bybit-strategy-tester.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: backend-tls
+        hosts:
+          - api.bybit-strategy-tester.example.com
+  
+  # Environment variables
+  env:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: postgresql-secret
+          key: connection-string
+    - name: REDIS_URL
+      value: "redis://redis-cluster:6379"
+    - name: LOG_LEVEL
+      value: "INFO"
+    - name: WORKERS_COUNT
+      value: "4"
+    - name: PROMETHEUS_ENABLED
+      value: "true"
+  
+  # Pod affinity (spread across nodes)
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                    - backend
+            topologyKey: kubernetes.io/hostname
+  
+  # Pod Disruption Budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+# ==========================================
+# Worker Service (Strategy Execution)
+# ==========================================
+worker:
+  enabled: true
+  
+  image:
+    repository: bybit-strategy-tester/worker
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  
+  # Replica configuration
+  replicaCount: 5
+  
+  # Auto-scaling based on queue length
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 75
+    
+    # Custom metric: Redis queue length
+    customMetrics:
+      - type: External
+        external:
+          metric:
+            name: redis_stream_length
+            selector:
+              matchLabels:
+                stream_name: "backtest_tasks"
+          target:
+            type: AverageValue
+            averageValue: "10"  # Scale when queue > 10 tasks per worker
+  
+  # Resource limits (workers are CPU-intensive)
+  resources:
+    requests:
+      cpu: "1000m"
+      memory: "1Gi"
+    limits:
+      cpu: "4000m"
+      memory: "4Gi"
+  
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: metrics
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: metrics
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 2
+  
+  # Service for metrics endpoint
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8001"
+      prometheus.io/path: "/metrics"
+  
+  # Environment variables
+  env:
+    - name: REDIS_URL
+      value: "redis://redis-cluster:6379"
+    - name: WORKER_ID
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    - name: LOG_LEVEL
+      value: "INFO"
+    - name: HEARTBEAT_INTERVAL
+      value: "30"
+    - name: MAX_TASKS_PER_WORKER
+      value: "10"
+  
+  # Pod affinity (spread across nodes for HA)
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - worker
+          topologyKey: kubernetes.io/hostname
+  
+  # Pod Disruption Budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 3
+
+# ==========================================
+# Redis Cluster (StatefulSet)
+# ==========================================
+redis:
+  enabled: true
+  
+  # Use StatefulSet for stable network identities
+  architecture: replication
+  
+  # Master configuration
+  master:
+    count: 3
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: "fast-ssd"
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "4Gi"
+  
+  # Replica configuration
+  replica:
+    replicaCount: 3
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: "fast-ssd"
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "4Gi"
+  
+  # Redis configuration
+  commonConfiguration: |-
+    # Network
+    bind 0.0.0.0
+    protected-mode no
+    port 6379
+    
+    # Persistence
+    save 900 1
+    save 300 10
+    save 60 10000
+    
+    # Memory
+    maxmemory 3gb
+    maxmemory-policy allkeys-lru
+    
+    # Performance
+    tcp-backlog 511
+    timeout 0
+    tcp-keepalive 300
+  
+  # Sentinel for automatic failover
+  sentinel:
+    enabled: true
+    quorum: 2
+    downAfterMilliseconds: 5000
+    failoverTimeout: 10000
+    parallelSyncs: 1
+
+# ==========================================
+# PostgreSQL Database
+# ==========================================
+postgresql:
+  enabled: true
+  
+  auth:
+    username: strategy_user
+    password: ""  # Set via secret
+    database: strategy_db
+  
+  primary:
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: "standard"
+    
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "4Gi"
+    
+    # PostgreSQL configuration
+    extendedConfiguration: |-
+      max_connections = 200
+      shared_buffers = 1GB
+      effective_cache_size = 3GB
+      maintenance_work_mem = 256MB
+      checkpoint_completion_target = 0.9
+      wal_buffers = 16MB
+      default_statistics_target = 100
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
+      work_mem = 5242kB
+      min_wal_size = 1GB
+      max_wal_size = 4GB
+  
+  # Read replicas
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 50Gi
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "4Gi"
+  
+  # Backup configuration
+  backup:
+    enabled: true
+    cronjob:
+      schedule: "0 2 * * *"  # Daily at 2 AM
+      storage: 100Gi
+
+# ==========================================
+# Prometheus Monitoring
+# ==========================================
+prometheus:
+  enabled: true
+  
+  server:
+    retention: "30d"
+    retentionSize: "50GB"
+    
+    persistentVolume:
+      enabled: true
+      size: 100Gi
+      storageClass: "standard"
+    
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "2Gi"
+      limits:
+        cpu: "2000m"
+        memory: "8Gi"
+    
+    # Scrape configs (Phase 2 + Phase 3)
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'bybit_strategy_tester'
+        environment: 'production'
+    
+    # Alert rules
+    serverFiles:
+      alerts:
+        groups: []  # Loaded from ConfigMap
+  
+  # Alertmanager
+  alertmanager:
+    enabled: true
+    persistentVolume:
+      enabled: true
+      size: 10Gi
+    
+    config:
+      global:
+        resolve_timeout: 5m
+      
+      route:
+        group_by: ['alertname', 'cluster', 'service']
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 12h
+        receiver: 'slack'
+      
+      receivers:
+        - name: 'slack'
+          slack_configs:
+            - api_url: ""  # Set via secret
+              channel: '#alerts'
+              title: "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}"
+              text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+
+# ==========================================
+# Grafana Dashboards
+# ==========================================
+grafana:
+  enabled: true
+  
+  adminUser: admin
+  adminPassword: ""  # Set via secret
+  
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: "standard"
+  
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  
+  # Datasources
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://prometheus-server:9090
+          access: proxy
+          isDefault: true
+  
+  # Dashboards (Phase 3)
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+  
+  dashboards:
+    default:
+      bybit-strategy-tester:
+        file: dashboards/grafana_dashboard.json
+
+# ==========================================
+# Service Mesh (Istio)
+# ==========================================
+istio:
+  enabled: true
+  
+  # Istio Gateway
+  gateway:
+    enabled: true
+    type: LoadBalancer
+    ports:
+      - port: 80
+        targetPort: 8080
+        name: http
+      - port: 443
+        targetPort: 8443
+        name: https
+  
+  # Traffic Mirroring (Shadow Testing)
+  trafficMirroring:
+    enabled: true
+    percentage: 10  # Mirror 10% of traffic to canary
+  
+  # Fault Injection (Chaos Engineering)
+  faultInjection:
+    enabled: true
+    # HTTP Delay
+    delay:
+      enabled: true
+      percentage: 10  # 10% of requests
+      fixedDelay: "5s"  # 5 second delay
+    # HTTP Abort (errors)
+    abort:
+      enabled: true
+      percentage: 5  # 5% of requests
+      httpStatus: 503  # Service Unavailable
+  
+  # Request Timeouts
+  timeouts:
+    standard: "30s"  # Standard API calls
+    backtest: "300s"  # Long-running backtests (5 min)
+  
+  # Retry Configuration
+  retries:
+    attempts: 3
+    perTryTimeout: "10s"
+  
+  # Rate Limiting
+  rateLimit:
+    enabled: true
+    maxTokens: 100  # Max requests in bucket
+    tokensPerFill: 100  # Refill rate
+    fillInterval: "1s"  # Refill every 1 second
+  
+  # Virtual Services
+  virtualServices:
+    backend:
+      enabled: true
+      hosts:
+        - api.bybit-strategy-tester.example.com
+      gateways:
+        - bybit-gateway
+      http:
+        - match:
+            - uri:
+                prefix: /api/v1
+          route:
+            - destination:
+                host: backend
+                port:
+                  number: 8000
+              weight: 90
+            - destination:
+                host: backend-canary
+                port:
+                  number: 8000
+              weight: 10  # 10% canary traffic
+          retries:
+            attempts: 3
+            perTryTimeout: 2s
+          timeout: 10s
+  
+  # Destination Rules (Circuit Breaking)
+  destinationRules:
+    backend:
+      enabled: true
+      trafficPolicy:
+        connectionPool:
+          tcp:
+            maxConnections: 100
+          http:
+            http1MaxPendingRequests: 50
+            http2MaxRequests: 100
+            maxRequestsPerConnection: 2
+        outlierDetection:
+          consecutiveErrors: 5
+          interval: 30s
+          baseEjectionTime: 30s
+          maxEjectionPercent: 50
+          minHealthPercent: 50
+
+# ==========================================
+# Network Policies
+# ==========================================
+networkPolicy:
+  enabled: true
+  
+  # Allow backend to access PostgreSQL and Redis
+  backend:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 8000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+  
+  # Allow worker to access Redis only
+  worker:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+
+# ==========================================
+# Security
+# ==========================================
+security:
+  # Pod Security Policy
+  podSecurityPolicy:
+    enabled: true
+  
+  # Service Account
+  serviceAccount:
+    create: true
+    name: bybit-strategy-tester
+  
+  # RBAC
+  rbac:
+    create: true
+  
+  # Security Context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    capabilities:
+      drop:
+        - ALL
+
+# ==========================================
+# ML Features (Phase 4.4)
+# ==========================================
+ml:
+  # AutoML Optimization Service
+  automl:
+    enabled: false  # Enable when ready
+    image:
+      repository: bybit-strategy-tester/automl
+      tag: "1.0.0"
+    
+    replicaCount: 2
+    
+    resources:
+      requests:
+        cpu: "2000m"
+        memory: "4Gi"
+        nvidia.com/gpu: 1
+      limits:
+        cpu: "8000m"
+        memory: "16Gi"
+        nvidia.com/gpu: 1
+    
+    env:
+      - name: OPTUNA_STORAGE
+        value: "postgresql://strategy_user@postgresql:5432/strategy_db"
+      - name: N_TRIALS
+        value: "100"
+      - name: N_JOBS
+        value: "4"
+  
+  # Predictive Scaling Service
+  predictiveScaling:
+    enabled: false  # Enable when ready
+    image:
+      repository: bybit-strategy-tester/ml-scaler
+      tag: "1.0.0"
+    
+    replicaCount: 1
+    
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "4Gi"
+    
+    env:
+      - name: MODEL_PATH
+        value: "/models/lstm_scaler.h5"
+      - name: PREDICTION_HORIZON
+        value: "300"  # 5 minutes ahead
+  
+  # Anomaly Detection Service
+  anomalyDetection:
+    enabled: false  # Enable when ready
+    image:
+      repository: bybit-strategy-tester/anomaly-detector
+      tag: "1.0.0"
+    
+    replicaCount: 1
+    
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "2000m"
+        memory: "4Gi"
+    
+    env:
+      - name: MODEL_TYPE
+        value: "isolation_forest"
+      - name: CONTAMINATION
+        value: "0.05"
+      - name: ALERT_THRESHOLD
+        value: "0.8"
+
+# ==========================================
+# AutoML (Optuna) Configuration
+# ==========================================
+automl:
+  enabled: true
+  
+  # Job execution parameters
+  parallelism: 5  # Number of parallel workers
+  completions: 100  # Total trials to execute
+  backoffLimit: 10  # Max retries for failed trials
+  activeDeadlineSeconds: 7200  # 2 hours max job duration
+  ttlSecondsAfterFinished: 86400  # Keep completed jobs for 1 day
+  
+  # Default optimization parameters
+  defaultSampler: "tpe"  # tpe, random, cmaes
+  defaultPruner: "median"  # median, hyperband, none
+  defaultJobs: 5  # Parallel workers per study
+  defaultTimeout: null  # No timeout by default
+  
+  # Storage configuration (Optuna database)
+  storage:
+    url: ""  # Auto-generated from PostgreSQL if empty
+    engineKwargs:
+      pool_size: 10
+      max_overflow: 20
+  
+  # Resource limits for worker pods
+  resources:
+    requests:
+      cpu: "1000m"  # 1 CPU core per worker
+      memory: "2Gi"  # 2GB RAM per worker
+    limits:
+      cpu: "2000m"  # Max 2 CPU cores
+      memory: "4Gi"  # Max 4GB RAM
+  
+  # Persistent storage (optional)
+  persistence:
+    enabled: false  # Enable for shared study artifacts
+    storageClass: "standard"
+    size: "10Gi"
+    accessMode: ReadWriteMany
+  
+  # Node affinity (schedule on specific nodes)
+  nodeSelector: {}
+  # Example:
+  #   workload-type: compute-intensive
+  
+  # Tolerations (allow scheduling on tainted nodes)
+  tolerations: []
+  # Example:
+  #   - key: "dedicated"
+  #     operator: "Equal"
+  #     value: "ml"
+  #     effect: "NoSchedule"
+  
+  # Pod affinity (co-locate with other pods)
+  affinity: {}
+  # Example:
+  #   podAffinity:
+  #     preferredDuringSchedulingIgnoredDuringExecution:
+  #       - weight: 100
+  #         podAffinityTerm:
+  #           labelSelector:
+  #             matchExpressions:
+  #               - key: app.kubernetes.io/component
+  #                 operator: In
+  #                 values:
+  #                   - backend
+  #           topologyKey: kubernetes.io/hostname
+  
+  # Logging
+  logLevel: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+# ==========================================
+# Prometheus Adapter (Custom Metrics API)
+# ==========================================
+prometheusAdapter:
+  enabled: true
+  
+  replicas: 2  # HA setup
+  
+  image:
+    repository: registry.k8s.io/prometheus-adapter/prometheus-adapter
+    tag: "v0.11.2"
+    pullPolicy: IfNotPresent
+  
+  # Prometheus connection
+  prometheusUrl: "http://prometheus-server.monitoring.svc.cluster.local"
+  metricsRelistInterval: "30s"
+  logLevel: 4  # 0-10 (higher = more verbose)
+  
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ==========================================
+# ML-Powered HPA Configuration
+# ==========================================
+workerHpaML:
+  enabled: true
+  
+  # Scaling limits
+  minReplicas: 5
+  maxReplicas: 50
+  
+  # Target metrics
+  predictedQueueTarget: "10"     # LSTM predicted queue length
+  hybridQueueTarget: "12"        # Weighted predicted + actual
+  actualQueueTarget: "15"        # Fallback: actual queue length
+  queueGrowthRateTarget: "0.5"   # Queue growth rate (tasks/second)
+  cpuTarget: 80                  # CPU utilization percentage
+  memoryTarget: 85               # Memory utilization percentage
+  
+  # Metric selection (enable/disable specific metrics)
+  useHybridMetric: true          # Use weighted predicted + actual
+  useActualQueue: true           # Use actual queue as fallback
+  useQueueGrowthRate: true       # Use queue growth rate
+  useCPU: true                   # Use CPU utilization
+  useMemory: false               # Use memory utilization
+  
+  # Scale-up behavior (proactive)
+  scaleUpStabilizationWindow: 30          # seconds
+  scaleUpPercentage: 100                  # 100% increase (double replicas)
+  scaleUpPods: 10                         # Or add 10 pods (whichever is higher)
+  scaleUpPeriod: 15                       # every 15 seconds
+  
+  # Scale-down behavior (conservative)
+  scaleDownStabilizationWindow: 300       # 5 minutes (avoid flapping)
+  scaleDownPercentage: 50                 # 50% decrease (half replicas)
+  scaleDownPods: 2                        # Or remove 2 pods (whichever is lower)
+  scaleDownPeriod: 60                     # every 60 seconds
+  
+  # Prometheus scraping
+  scrapeInterval: "15s"
+  scrapeTimeout: "10s"
+
+# ==========================================
+# Prometheus Operator Integration
+# ==========================================
+prometheusOperator:
+  enabled: true  # Enable ServiceMonitor and PrometheusRule CRDs

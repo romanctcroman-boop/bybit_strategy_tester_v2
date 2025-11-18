@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762639580,
+  "changed_files": [
+    "mcp-server\\server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762639569.1085477,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or system error). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents complete test infrastructure failure rather than coverage gaps.\n\n## Potential Issues with Recent Changes\n1. **Server.py modifications** likely introduced:\n   - Syntax errors preventing import/execution\n   - Missing dependencies or imports\n   - Runtime exceptions during test setup\n   - Environment configuration issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check server.py for syntax errors: `python -m py_compile mcp-server/server.py`\n3. Verify imports and dependencies in server.py\n4. Run minimal test to isolate failure: `python -m pytest mcp-server/ --tb=short`\n\n**FOLLOW-UP:**\n- Add basic smoke test to prevent complete test suite collapse\n- Implement test environment validation\n- Add error handling in test setup/teardown\n\n## Risk Assessment\n**HIGH RISK** - Codebase is completely untested. Any deployment carries significant risk of runtime failures. Recent changes to server.py are unverified and likely contain critical bugs.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 298,
+      "total_tokens": 423,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

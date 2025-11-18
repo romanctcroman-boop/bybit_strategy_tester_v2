@@ -1,0 +1,155 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "AI: Generate Code (DeepSeek)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/mcp-server/vscode_integration.py",
+        "--task",
+        "code-generation",
+        "--prompt",
+        "${input:codePrompt}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "AI: Refactor Code (DeepSeek)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/mcp-server/vscode_integration.py",
+        "--task",
+        "refactoring",
+        "--file",
+        "${file}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "AI: Analyze Logic (Sonar Pro)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/mcp-server/vscode_integration.py",
+        "--task",
+        "logic-analysis",
+        "--file",
+        "${file}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "AI: Code Review Workflow",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/mcp-server/vscode_integration.py",
+        "--workflow",
+        "code-review",
+        "--file",
+        "${file}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "AI: Strategy Development Workflow",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/mcp-server/vscode_integration.py",
+        "--workflow",
+        "strategy-dev",
+        "--prompt",
+        "${input:strategyDescription}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "AI: Refactor with Audit Workflow",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/mcp-server/vscode_integration.py",
+        "--workflow",
+        "refactor-audit",
+        "--file",
+        "${file}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "AI: Explain Code (Sonar Pro)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/mcp-server/vscode_integration.py",
+        "--task",
+        "explain",
+        "--prompt",
+        "Explain this code: ${selectedText}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "AI: Generate Documentation (DeepSeek)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/mcp-server/vscode_integration.py",
+        "--task",
+        "documentation",
+        "--file",
+        "${file}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "codePrompt",
+      "type": "promptString",
+      "description": "Describe what code to generate",
+      "default": "Create a FastAPI endpoint for user authentication"
+    },
+    {
+      "id": "strategyDescription",
+      "type": "promptString",
+      "description": "Describe the trading strategy",
+      "default": "RSI mean reversion strategy with dynamic thresholds"
+    }
+  ]
+}

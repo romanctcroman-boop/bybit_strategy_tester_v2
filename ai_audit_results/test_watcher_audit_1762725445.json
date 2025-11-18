@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762725445,
+  "changed_files": [
+    "test_reliable_mcp.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762725420.1335366,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data collected\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**\n- 0% coverage across all files\n- No tests executed successfully\n- Coverage reporting system failed entirely\n\n## Potential Issues with Recent Changes\nThe modified `test_reliable_mcp.py` likely contains:\n- Syntax errors preventing test discovery/execution\n- Import failures or missing dependencies\n- Configuration errors in test setup\n- Infinite loops or fatal exceptions during test collection\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test discovery**: Run `python -m pytest test_reliable_mcp.py --collect-only` to identify collection issues\n2. **Check syntax**: Validate Python syntax in the test file\n3. **Verify imports**: Ensure all imported modules exist and are accessible\n4. **Test isolation**: Run a minimal test case to isolate the failure point\n\n**STRUCTURAL FIXES:**\n- Add try-catch blocks around test setup\n- Implement basic smoke tests before full test suite\n- Set up continuous integration with fail-fast on syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing mechanism\n- Potential for undetected production bugs\n- Complete loss of quality assurance\n- Urgent attention required before any deployment\n\n**Priority**: Fix test infrastructure immediately before proceeding with development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 330,
+      "total_tokens": 455,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

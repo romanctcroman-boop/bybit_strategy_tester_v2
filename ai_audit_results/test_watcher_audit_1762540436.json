@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540436,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540421.0128386,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates fundamental issues preventing test execution rather than test quality problems.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed\n- **No coverage data available** - Tests didn't run long enough to collect metrics\n- **Complete coverage gap** - All code paths untested due to execution failure\n\n## Potential Issues with Recent Changes\nThe file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures\n- **Runtime errors** during module initialization\n- **Infinite loops** or **blocking operations** preventing test completion\n- **Environment configuration issues**\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug the test failure** - Check logs for specific error messages\n2. **Run the file directly** to identify syntax/runtime errors:\n   ```bash\n   python full_ai_audit_deepseek_perplexity_deepseek.py\n   ```\n3. **Verify imports and dependencies** - Ensure all required packages are installed\n4. **Add basic exception handling** to capture and log initialization errors\n\n**Testing Strategy:**\n1. **Start with unit tests** for individual functions before integration tests\n2. **Add test isolation** - Mock external dependencies\n3. **Implement health checks** - Basic validation that code can load\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Zero test reliability** - Cannot trust any test results\n- **Production readiness unknown** - No validation of functionality\n- **Regression risk** - Changes cannot be safely validated\n- **Deployment blocker** - Should not deploy until basic tests pass\n\n**Priority:** Fix test execution before addressing coverage or test quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 406,
+      "total_tokens": 541,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762548207,
+  "changed_files": [
+    "backend\\security\\__init__.py",
+    ".venv\\Lib\\site-packages\\starlette\\testclient.py",
+    "backend\\security\\jwt_manager.py",
+    ".venv\\Lib\\site-packages\\fastapi\\responses.py",
+    ".venv\\Lib\\site-packages\\fastapi\\__init__.py",
+    ".venv\\Lib\\site-packages\\fastapi\\testclient.py",
+    ".venv\\Lib\\site-packages\\starlette\\__init__.py",
+    ".venv\\Lib\\site-packages\\starlette\\requests.py",
+    ".venv\\Lib\\site-packages\\fastapi\\requests.py",
+    ".venv\\Lib\\site-packages\\starlette\\responses.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762548189.957134,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests never executed properly\n- Modified virtual environment files suggest environment corruption\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - Critical issues:\n- Zero coverage across all files indicates test framework failure\n- No test execution occurred despite file modifications\n- Unable to assess actual code coverage gaps\n\n## Potential Issues with Recent Changes\n**ENVIRONMENT CORRUPTION** - High risk:\n- Virtual environment files (.venv) modified - should never happen in CI/CD\n- Core FastAPI/Starlette library files altered - indicates dependency issues\n- JWT manager changes combined with framework modifications suggest compatibility breaks\n- Likely version conflicts or improper dependency management\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Rebuild clean virtual environment** - Delete .venv and recreate from requirements\n2. **Verify dependency versions** - Check for FastAPI/Starlette compatibility\n3. **Isolate test failures** - Run tests with `-v` flag to identify crashing tests\n4. **Restore original library files** - Reinstall FastAPI/Starlette packages\n\n**PROCEDURAL FIXES:**\n5. **Add pre-commit hooks** to prevent accidental virtual environment modifications\n6. **Implement dependency pinning** in requirements.txt\n7. **Add environment sanity checks** in test scripts\n\n## Risk Assessment\n**HIGH RISK** - Multiple critical issues:\n- **Environment instability** - Modified core dependencies\n- **Test reliability** - Complete test suite failure\n- **Security concerns** - JWT manager changes with broken tests\n- **Deployment risk** - Cannot validate security changes\n\n**Priority:** Fix environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 281,
+      "completion_tokens": 389,
+      "total_tokens": 670,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 217
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

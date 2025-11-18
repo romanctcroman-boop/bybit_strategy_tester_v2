@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762645017,
+  "changed_files": [
+    "test_strategy_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762645003.2178025,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files\n- Import failures or dependency issues\n- Test framework configuration problems\n- Environment setup failures\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This isn't a coverage gap but a complete test execution failure.\n\n## Potential Issues with Recent Changes\nThe changed file `test_strategy_integration.py` likely contains:\n- **Syntax errors** (missing imports, incorrect Python syntax)\n- **Broken imports** (modules not available in test environment)\n- **Configuration issues** (pytest/unittest setup problems)\n- **Environment dependencies** missing (database, APIs, external services)\n\n## Immediate Recommendations\n\n1. **Debug Test Execution**\n   ```bash\n   python -m pytest test_strategy_integration.py -v\n   ```\n   Check specific error messages and stack traces\n\n2. **Validate Test File Syntax**\n   ```bash\n   python -m py_compile test_strategy_integration.py\n   ```\n\n3. **Check Dependencies**\n   - Verify all imports are available in test environment\n   - Confirm test framework (pytest/unittest) is properly installed\n\n4. **Isolate the Issue**\n   - Run a minimal test case to verify basic functionality\n   - Check if other test files still execute properly\n\n## Risk Assessment\n**HIGH RISK** - No test validation is occurring. Any bugs in production code are undetected. Deployment should be blocked until tests execute successfully.\n\n**Priority:** Fix test execution immediately before addressing any other quality issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 347,
+      "total_tokens": 473,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

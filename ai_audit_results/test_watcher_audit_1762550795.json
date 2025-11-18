@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762550795,
+  "changed_files": [
+    "backend\\api\\app.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762550782.1218524,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates fundamental issues with test infrastructure or environment.\n\n## Coverage Analysis\n**0% COVERAGE** - Complete coverage failure. No code was executed during testing, suggesting:\n- Test runner configuration issues\n- Missing dependencies or environment setup\n- Test discovery failures\n- Fatal errors before coverage measurement\n\n## Potential Issues with Recent Changes\nThe modification to `backend\\api\\app.py` likely introduced:\n- Syntax errors preventing import/execution\n- Missing imports or dependency changes\n- Configuration breaking changes\n- Runtime errors during module loading\n\n## Recommendations for Improvement\n1. **Immediate Actions:**\n   - Check test runner logs for specific error details\n   - Verify `app.py` syntax and imports\n   - Ensure all dependencies are installed\n   - Test import of `app.py` in isolation\n\n2. **Infrastructure Fixes:**\n   - Add pre-commit hooks to catch syntax errors\n   - Implement basic smoke tests before full test suite\n   - Set up test environment validation\n\n3. **Process Improvements:**\n   - Require all changes to pass basic import tests\n   - Add CI pipeline status checks\n   - Monitor test execution stability\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely risky due to:\n- Unknown functionality status\n- Potential runtime failures in production\n- Complete lack of test validation\n- Possible breaking changes to core API\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 339,
+      "total_tokens": 464,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762738620,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762738602.278361,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **Critical gap**: Tests aren't even starting execution\n- **Missing**: No coverage data available due to test execution failure\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure failure** - Likely issues in `tests/backend/conftest.py` or test dependencies\n2. **Import/circular dependency problems** - Changes in `backend/core/mtf_engine.py` may have broken imports\n3. **Environment configuration** - Missing dependencies or environment variables\n4. **Test discovery issues** - Modified test files may have syntax errors or broken fixtures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests individually to identify which specific test/file is causing the failure\n2. Check `tests/backend/conftest.py` for recent changes that may break test setup\n3. Verify all imports in modified files still resolve correctly\n4. Run with `-v` flag to see which test fails first\n\n**Short-term:**\n1. Add basic smoke tests to verify test infrastructure works\n2. Implement CI pipeline that fails fast on configuration issues\n3. Add test logging to capture initialization failures\n\n## Risk Assessment\n**HIGH RISK** - The entire test suite is non-functional, meaning:\n- No regression protection for recent changes\n- Potential production-breaking issues undetected\n- All modified files (including core engine) are untested\n- Urgent fix required before further development\n\n**Priority**: Fix test execution immediately before any additional code changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 363,
+      "total_tokens": 569,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

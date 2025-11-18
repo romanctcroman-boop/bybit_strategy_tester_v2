@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762603103,
+  "changed_files": [
+    "test_optimizations.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762603086.6496367,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero quality assurance. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code is being tested. All test coverage gaps exist:\n- No unit tests executed\n- No integration tests executed  \n- No functional validation occurring\n- Complete absence of quality metrics\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `test_optimizations.py`, suggesting:\n- Syntax errors in test file\n- Missing dependencies or imports\n- Test configuration broken\n- Fixture/setup failures causing cascade failure\n- Possible circular imports or initialization issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test_optimizations.py** - Check for syntax errors, missing imports\n2. **Run tests individually** to isolate the failing component\n3. **Verify test dependencies** and environment setup\n4. **Check test configuration** (pytest.ini, conftest.py, etc.)\n\n**STRUCTURAL IMPROVEMENTS:**\n1. Implement test isolation to prevent single-file failures from breaking entire suite\n2. Add pre-commit test validation\n3. Set up CI pipeline with fail-fast detection\n\n## Risk Assessment\n**HIGH RISK** - Codebase is completely untested in current state:\n- Undetected regressions likely\n- Production deployment extremely risky\n- No quality gates functional\n- Development velocity impaired without test feedback\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 124,
+      "completion_tokens": 339,
+      "total_tokens": 463,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 60
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

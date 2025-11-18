@@ -1,0 +1,8 @@
+# YAML validation configuration
+# Disable schema validation for Grafana provisioning files
+
+# These files use Grafana's custom format and should not be validated
+# against standard Prometheus schemas
+ignoreFiles:
+  - monitoring/grafana/provisioning/datasources/*.yml
+  - monitoring/grafana/provisioning/dashboards/*.yml

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762635948,
+  "changed_files": [
+    "add_logging_to_all_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762635936.9778678,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% coverage** - All tests failed before any code execution could be measured. This represents a complete testing breakdown.\n\n## Potential Issues with Recent Changes\nThe `add_logging_to_all_tools.py` modification likely introduced:\n- **Import/circular dependency issues** preventing module loading\n- **Syntax errors** (missing imports, incorrect function definitions)\n- **Breaking changes** to existing function signatures or class structures\n- **Missing dependencies** for new logging functionality\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix test execution first** - Run tests with `-v` flag to see specific failure points\n2. **Check syntax** - Run `python -m py_compile add_logging_to_all_tools.py`\n3. **Verify imports** - Test module import directly: `python -c \"import add_logging_to_all_tools\"`\n4. **Review logging implementation** - Ensure no infinite loops or resource exhaustion\n\n**Follow-up:**\n5. Add basic smoke tests before complex logging features\n6. Implement CI pipeline that catches syntax errors pre-merge\n7. Use type hints and linters to prevent runtime import issues\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail completely. The codebase is currently untestable and potentially broken. All existing functionality is at risk until basic test execution is restored.\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 356,
+      "total_tokens": 483,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

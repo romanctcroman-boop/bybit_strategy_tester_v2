@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762708643,
+  "changed_files": [
+    "reliability\\service_monitor.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762708628.8042336,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or severe code defects that prevent even basic test execution.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - No code was executed during testing. This suggests:\n- Tests cannot run due to fatal errors\n- Test runner configuration issues\n- Missing dependencies or environment setup\n- Syntax errors or import failures in the codebase\n\n## Potential Issues with Recent Changes\nThe modified `reliability\\service_monitor.py` likely contains:\n- **Syntax errors** preventing module import\n- **Missing imports** or dependency issues\n- **Runtime errors** during module initialization\n- **Configuration issues** affecting test setup\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution** - Check test runner configuration and dependencies\n2. **Validate syntax** - Run `python -m py_compile reliability\\service_monitor.py`\n3. **Test isolation** - Run tests for the specific changed file separately\n4. **Check imports** - Verify all required modules are available in test environment\n\n**Follow-up:**\n5. Add basic smoke tests to catch initialization failures\n6. Implement CI checks for syntax validation pre-merge\n7. Ensure test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would likely cause production failures since:\n- Zero test coverage means unknown runtime behavior\n- Critical failures suggest the service monitor may not start\n- Reliability component failures could impact system monitoring\n- No validation of the core functionality exists\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 352,
+      "total_tokens": 477,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

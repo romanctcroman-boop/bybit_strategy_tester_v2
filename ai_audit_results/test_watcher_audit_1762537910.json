@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762537910,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    ".venv\\Lib\\site-packages\\coverage\\types.py",
+    ".venv\\Lib\\site-packages\\coverage\\misc.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    ".venv\\Lib\\site-packages\\coverage\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537897.4930825,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates abnormal termination, not just test failures. The test suite failed to execute properly.\n\n## Coverage Analysis\n**0.00% coverage is a major red flag** - This suggests:\n- Tests didn't run at all due to fatal errors\n- Coverage tool wasn't properly initialized or executed\n- Test environment is severely misconfigured\n\n## Potential Issues with Recent Changes\n**Environment corruption detected** - Modified files are all within `.venv\\Lib\\site-packages\\coverage\\`:\n- Coverage package files were altered in virtual environment\n- This indicates either manual edits to installed packages or corruption\n- Likely causing the coverage module to malfunction\n\n## Immediate Recommendations\n1. **Recreate virtual environment** - Delete `.venv` and run `python -m venv .venv`\n2. **Reinstall dependencies** - `pip install -r requirements.txt`\n3. **Verify test runner configuration** - Check pytest/coverage configuration files\n4. **Run basic test first** - Execute a simple test without coverage to verify test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential environment instability\n- Impossible to assess actual code quality\n- Deployment would be extremely risky\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 205,
+      "completion_tokens": 292,
+      "total_tokens": 497,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 141
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

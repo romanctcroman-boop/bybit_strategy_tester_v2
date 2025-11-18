@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762716615,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pytest_cov\\engine.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    ".venv\\Lib\\site-packages\\pytest\\__main__.py",
+    ".venv\\Lib\\site-packages\\pytest_cov\\plugin.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762716599.018362,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test setup/execution, not test failures. The test infrastructure itself is broken.\n\n## Coverage Analysis\n**0.00% coverage** confirms no tests actually executed. This represents maximum risk - no code validation is occurring.\n\n## Potential Issues with Recent Changes\n1. **Virtual Environment Corruption** - Modified files are all in `.venv\\Lib\\site-packages`, suggesting:\n   - Virtual environment is corrupted or improperly configured\n   - Package installation/upgrade conflicts\n   - Possible permission issues modifying system packages\n\n2. **Test Framework Conflicts** - Changes to pytest, coverage, and pluggy core files indicate:\n   - Incompatible package versions\n   - Plugin conflicts (pytest-cov vs coverage)\n   - Broken test discovery/execution hooks\n\n## Immediate Recommendations\n\n**HIGH PRIORITY:**\n1. **Recreate Virtual Environment**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\n   pip install -r requirements.txt\n   ```\n\n2. **Verify Basic Test Execution**\n   ```bash\n   python -m pytest --version\n   python -m pytest -v --tb=short\n   ```\n\n3. **Check Package Compatibility**\n   - Ensure pytest, pytest-cov, and coverage versions are compatible\n   - Review requirements.txt for version conflicts\n\n**MEDIUM PRIORITY:**\n4. **Isolate Test Issues**\n   - Run without coverage first: `pytest --no-cov`\n   - Then add coverage: `pytest --cov=your_module`\n\n## Risk Assessment\n**SEVERE RISK** - Current state:\n- ✅ **No test validation** of code changes\n- ✅ **Undetected regressions** likely\n- ✅ **Deployment blocking** - cannot verify stability\n- ✅ **Development halted** until resolved\n\n**Immediate Action Required:** Fix test infrastructure before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 299,
+      "completion_tokens": 442,
+      "total_tokens": 741,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 235
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

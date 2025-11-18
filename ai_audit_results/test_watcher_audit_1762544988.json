@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762544988,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\uvicorn\\main.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\server.py",
+    ".venv\\Lib\\site-packages\\click\\core.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\config.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\importer.py",
+    ".venv314\\Lib\\site-packages\\win32\\lib\\pywin32_bootstrap.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762544974.072907,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data collected for any files\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- Zero coverage across all files\n- No test execution occurred\n- Coverage instrumentation likely failed to initialize\n\n## Potential Issues with Recent Changes\n**ENVIRONMENT CORRUPTION DETECTED:**\n- Modified files in `.venv/` and `.venv314/` indicate virtual environment corruption\n- Changes to core packages (`uvicorn`, `click`, `pywin32`) suggest:\n  - Package installation conflicts\n  - Broken dependencies\n  - Possible version incompatibilities\n  - Virtual environment cross-contamination\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Recreate virtual environments:**\n   ```bash\n   rm -rf .venv .venv314\n   python -m venv .venv\n   source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\n   pip install -r requirements.txt\n   ```\n\n2. **Verify test runner configuration:**\n   - Check pytest/coverage configuration files\n   - Ensure proper test discovery patterns\n\n3. **Run basic diagnostics:**\n   ```bash\n   python -c \"import uvicorn, click; print('Imports OK')\"\n   pytest --collect-only\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Development environment instability** - cannot trust test results\n- **Potential deployment risks** - production environment may have similar issues\n- **Code quality unknown** - no validation of recent changes\n\n**Priority:** Fix environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 226,
+      "completion_tokens": 399,
+      "total_tokens": 625,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 162
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

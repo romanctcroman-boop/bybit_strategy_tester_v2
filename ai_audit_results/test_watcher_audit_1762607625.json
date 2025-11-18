@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762607625,
+  "changed_files": [
+    "mcp-server\\api\\providers\\base.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762607609.1630976,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either severe test infrastructure issues or catastrophic code errors.\n\n## Coverage Analysis\n**0.00% coverage** - All coverage data is invalid due to test failure. No reliable coverage metrics can be derived.\n\n## Potential Issues with Recent Changes\n1. **Base provider modification** (`mcp-server\\api\\providers\\base.py`) likely introduced breaking changes\n2. Possible issues:\n   - Syntax errors in base class\n   - Import/circular dependency problems\n   - Abstract method implementation violations\n   - Critical exceptions during module import\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check Python syntax: `python -m py_compile mcp-server\\api\\providers\\base.py`\n   - Run with verbose output to see failure point\n   - Test import isolation: `python -c \"from mcp-server.api.providers.base import *\"`\n\n2. **Debug sequence**:\n   - Run single test to isolate failure\n   - Check for unhandled exceptions in base provider\n   - Verify all abstract methods are properly implemented\n\n3. **Infrastructure check**:\n   - Ensure test dependencies are installed\n   - Verify Python environment compatibility\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- Unknown impact of base provider changes\n- No validation of core functionality\n- Potential for runtime failures in dependent components\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 335,
+      "total_tokens": 465,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

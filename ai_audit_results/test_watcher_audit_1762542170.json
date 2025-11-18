@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762542170,
+  "changed_files": [
+    "demo_prometheus_metrics.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762542155.602226,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete test coverage failure:\n- No files were executed during testing\n- All code changes in `demo_prometheus_metrics.py` are completely untested\n- No baseline coverage established\n\n## Potential Issues with Recent Changes\n1. **Syntax/Runtime Errors** in `demo_prometheus_metrics.py` likely preventing import/execution\n2. **Missing Dependencies** - Prometheus client library may not be installed\n3. **Import/Circular Dependency** issues blocking test initialization\n4. **Test Configuration** - Test runner setup may be broken\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Run `python -m py_compile demo_prometheus_metrics.py` to check syntax\n   - Verify Prometheus client installation: `pip install prometheus-client`\n   - Run minimal test: `python -c \"import demo_prometheus_metrics\"`\n\n2. **Add Basic Test Scaffolding**:\n   ```python\n   # test_demo_prometheus_metrics.py\n   import pytest\n   def test_import():\n       import demo_prometheus_metrics  # Basic smoke test\n   ```\n\n3. **Validate Test Configuration**:\n   - Check pytest/coverage configuration files\n   - Verify test discovery patterns\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- Zero test validation of metrics collection code\n- Potential production crashes from uncaught exceptions\n- No visibility into whether Prometheus integration works\n- Complete lack of quality gates\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 388,
+      "total_tokens": 514,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

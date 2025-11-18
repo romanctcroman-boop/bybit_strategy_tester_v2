@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762722709,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\python.py",
+    "tests\\test_circuit_breaker.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\_pytest\\assertion\\rewrite.py",
+    ".venv\\Lib\\site-packages\\_pytest\\pathlib.py",
+    "reliability\\circuit_breaker.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762722694.5911164,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental infrastructure or configuration issues rather than test logic problems.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data** for any files, including the main `circuit_breaker.py`\n- **Critical gap**: Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **Virtual environment corruption** - Multiple pytest files in `.venv` were modified\n2. **Test runner configuration** - Exit code -1 suggests test framework failure\n3. **Path/dependency issues** - Modified pytest core files indicate environment problems\n4. **Possible version conflicts** - Changes to pytest internals suggest incompatible modifications\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Recreate virtual environment** - Delete `.venv` and rebuild with clean dependencies\n2. **Verify pytest installation** - Reinstall pytest without modifying core files\n3. **Run basic test** - Execute a simple test to validate the test framework\n4. **Check test discovery** - Ensure tests are properly located and named (`test_*.py`)\n\n**Follow-up:**\n5. **Isolate test changes** - Review modifications to `test_circuit_breaker.py`\n6. **Validate imports** - Check that `reliability.circuit_breaker` imports correctly\n7. **Implement basic smoke test** - Add a simple passing test to verify framework\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- No code coverage means untested production code\n- Test infrastructure is compromised\n- Deployment would be blind to potential failures\n- **Priority**: Fix test infrastructure immediately before any further development\n\n**Next Step**: Start with environment recreation and basic pytest validation before addressing test logic or coverage targets.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 243,
+      "completion_tokens": 405,
+      "total_tokens": 648,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 179
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

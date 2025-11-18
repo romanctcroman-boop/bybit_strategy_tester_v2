@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762734355,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762734326.4346888,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0.00% COVERAGE** - No code was executed during testing. This is not a coverage gap but a complete test failure.\n\n## Potential Issues with Recent Changes\n1. **health_check.py likely contains fatal errors** preventing import/execution\n2. **Syntax errors** or **import dependencies** broken in the changed file\n3. **Test infrastructure configuration** issues (missing dependencies, environment setup)\n4. **Test runner crashes** before any code execution\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution failure first** - check test runner logs for specific error messages\n2. **Validate health_check.py syntax** - run `python -m py_compile health_check.py`\n3. **Test import manually** - attempt `import health_check` in Python shell\n4. **Check dependencies** - ensure all imports in health_check.py are available\n5. **Run tests with verbose output** to capture failure details\n\n**FOLLOW-UP:**\n- Fix the root cause preventing test execution\n- Only then address actual test coverage gaps\n- Add pre-commit hooks to catch syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- Unknown if health_check.py functions at all\n- No validation of recent changes\n- Potential for runtime crashes in production\n- **Recommend blocking deployment** until tests execute successfully\n\n**Priority:** Fix test execution failure before any other quality improvements.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 358,
+      "total_tokens": 480,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

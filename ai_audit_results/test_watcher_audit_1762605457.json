@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762605457,
+  "changed_files": [
+    "temp_pg_test.py",
+    "automation\\deepseek_robot\\advanced_architecture.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762605438.8924973,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates either:\n- Test framework crashed before execution\n- Fatal import/configuration errors\n- Environment setup failures\n\n## Coverage Analysis\n**0% coverage is a red flag** - No tests ran successfully. This suggests:\n- Module imports failing due to dependency issues\n- Test discovery/configurations broken\n- Environment path/package conflicts\n\n## Potential Issues with Recent Changes\n1. **Psycopg2 modification** - Editing package files in `.venv` is problematic\n2. **Architecture changes** in `advanced_architecture.py` may have broken imports\n3. **temp_pg_test.py** likely contains the failing test case\n\n## Immediate Recommendations\n1. **Fix Exit Code -1 First**\n   - Check test runner configuration\n   - Verify all dependencies are properly installed\n   - Remove manual edits to psycopg2 in venv (reinstall package)\n\n2. **Debug Test Execution**\n   ```bash\n   python -m pytest temp_pg_test.py -v\n   ```\n   - Run with verbose flag to see specific failure\n   - Check for import errors in test file\n\n3. **Environment Reset**\n   - Recreate virtual environment\n   - Reinstall dependencies from requirements.txt\n   - Verify psycopg2 installation\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential database connection issues\n- Broken development environment\n- All recent changes are effectively untested\n\n**Priority**: Fix test execution before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 159,
+      "completion_tokens": 336,
+      "total_tokens": 495,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 95
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

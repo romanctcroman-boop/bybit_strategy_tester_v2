@@ -1,0 +1,65 @@
+{
+  "test_date": "2025-10-29T13:10:20.669388",
+  "test_type": "100_percent_honest_functional",
+  "duration_seconds": 4.067683,
+  "total_tokens": 0,
+  "estimated_cost_usd": 0.0,
+  "results": [
+    {
+      "tool": "analyze_backtest_results",
+      "status": "FAILED",
+      "error": "'FunctionTool' object is not callable",
+      "quality_score": 0
+    },
+    {
+      "tool": "compare_strategies",
+      "status": "FAILED",
+      "error": "'FunctionTool' object is not callable",
+      "quality_score": 0
+    },
+    {
+      "tool": "risk_management_advice",
+      "status": "FAILED",
+      "error": "'FunctionTool' object is not callable",
+      "quality_score": 0
+    },
+    {
+      "tool": "technical_indicator_research",
+      "status": "FAILED",
+      "error": "'FunctionTool' object is not callable",
+      "quality_score": 0
+    },
+    {
+      "tool": "explain_metric",
+      "status": "FAILED",
+      "error": "'FunctionTool' object is not callable",
+      "quality_score": 0
+    },
+    {
+      "tool": "market_regime_detection",
+      "status": "FAILED",
+      "error": "'FunctionTool' object is not callable",
+      "quality_score": 0
+    },
+    {
+      "tool": "code_review_strategy",
+      "status": "FAILED",
+      "error": "'FunctionTool' object is not callable",
+      "quality_score": 0
+    },
+    {
+      "tool": "generate_test_scenarios",
+      "status": "FAILED",
+      "error": "'FunctionTool' object is not callable",
+      "quality_score": 0
+    }
+  ],
+  "summary": {
+    "total_tools": 8,
+    "passed": 0,
+    "partial": 0,
+    "failed": 8,
+    "quality_score": "0/40",
+    "quality_percentage": "0.0%"
+  }
+}

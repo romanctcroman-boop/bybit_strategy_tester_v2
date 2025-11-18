@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762633411,
+  "changed_files": [
+    "tests\\test_rate_limiter.py",
+    "tests\\test_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762633398.1844559,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (segmentation fault, memory error, or fatal Python interpreter issue).\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No tests executed successfully\n- Critical gap: Entire codebase untested\n\n## Potential Issues with Recent Changes\n1. **Fatal runtime errors** in test files (`test_rate_limiter.py`, `test_circuit_breaker.py`)\n2. Possible causes:\n   - Import errors or circular dependencies\n   - Syntax errors in test files\n   - Missing dependencies or fixtures\n   - Infinite loops or memory exhaustion\n   - Corrupted test environment\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests individually to isolate failing file:\n   ```bash\n   python -m pytest tests/test_rate_limiter.py -v\n   python -m pytest tests/test_circuit_breaker.py -v\n   ```\n2. Check for syntax errors:\n   ```bash\n   python -m py_compile tests/test_rate_limiter.py\n   ```\n3. Verify imports and dependencies\n4. Run with `--tb=short` to get concise error traceback\n\n**FOLLOW-UP:**\n- Fix root cause in failing test files\n- Add basic smoke tests\n- Implement CI pipeline with fail-fast approach\n\n## Risk Assessment\n**HIGH RISK** - Production code is completely untested. Rate limiter and circuit breaker components are critical for system stability and could fail silently in production. Deploying current state could lead to system outages or performance degradation.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 345,
+      "total_tokens": 483,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 74
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

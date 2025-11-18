@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762547496,
+  "changed_files": [
+    "backend\\app.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    "backend\\health_checks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762547471.4990191,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution occurred\n- Critical gap: Entire codebase untested\n\n## Potential Issues with Recent Changes\n1. **FastAPI dependency conflict** - Modified `site-packages\\fastapi\\applications.py` suggests dependency issues or improper environment setup\n2. **Application startup failure** - Changes in `backend\\app.py` may prevent the app from starting\n3. **Environment corruption** - Modifying virtual environment packages indicates serious environment problems\n\n## Immediate Recommendations\n1. **Fix environment first**:\n   - Recreate virtual environment (`rm -rf .venv && python -m venv .venv`)\n   - Reinstall dependencies from requirements.txt\n   - Never modify site-packages directly\n\n2. **Debug application startup**:\n   - Test `backend/app.py` runs independently\n   - Check for import errors or syntax issues\n   - Verify health checks endpoint functionality\n\n3. **Restore test execution**:\n   - Run simplest test first to verify basic functionality\n   - Check test runner configuration\n   - Ensure proper PYTHONPATH and environment variables\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail completely. Current state indicates:\n- Environment instability\n- Potential application crashes\n- Zero test reliability\n- High probability of undetected bugs\n\n**Priority**: Fix environment and basic test execution before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 149,
+      "completion_tokens": 341,
+      "total_tokens": 490,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 85
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

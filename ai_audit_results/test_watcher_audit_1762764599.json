@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762764599,
+  "changed_files": [
+    "analyze_mcp_reliability_crisis.py",
+    "reliability_auto_system\\encryption_key_manager.py",
+    "reliability_auto_system\\intelligent_fallback.py",
+    "reliability_auto_system\\mcp_auto_start.py",
+    "reliability_auto_system\\self_healing_monitor.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762764579.8066573,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n**TOTAL COVERAGE: 0%** - No code was executed during testing. This represents maximum coverage gap - we have no visibility into any functionality.\n\n## Potential Issues with Recent Changes\n1. **System Integration Failure**: New reliability/auto-start modules may have circular dependencies or initialization conflicts\n2. **Environment Configuration**: Missing dependencies, incorrect Python paths, or environment variables\n3. **Critical Exception**: Unhandled error in test setup or module imports crashing entire test suite\n4. **File Structure Changes**: Moved/renamed files breaking import statements\n\n## Immediate Recommendations\n1. **Debug Test Execution**:\n   - Run tests with `-v` flag to see where they fail\n   - Check for import errors in new reliability system modules\n   - Verify all dependencies are installed\n\n2. **Isolate the Failure**:\n   - Test each changed file individually\n   - Start with basic imports before full test suite\n   - Check `mcp_auto_start.py` for initialization issues\n\n3. **Fix Foundation First**:\n   - Ensure tests can run at all before addressing coverage\n   - Add try-catch blocks around new auto-start functionality\n   - Validate module initialization order\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- No validation of encryption key management\n- Unknown if self-healing systems work\n- Potential for production system crashes\n- Security risks from untested encryption components\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 182,
+      "completion_tokens": 365,
+      "total_tokens": 547,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 118
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

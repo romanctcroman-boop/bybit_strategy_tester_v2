@@ -1,0 +1,313 @@
+{
+  "execution_time_minutes": 0,
+  "periods": [
+    {
+      "period": 1,
+      "best_params": {
+        "lookback_bars": 120,
+        "level_tolerance_pct": 0.12,
+        "entry_tolerance_pct": 0.2,
+        "stop_loss_pct": 1.0,
+        "max_holding_bars": 60
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 63
+      }
+    },
+    {
+      "period": 2,
+      "best_params": {
+        "lookback_bars": 100,
+        "level_tolerance_pct": 0.1,
+        "entry_tolerance_pct": 0.15,
+        "stop_loss_pct": 0.8,
+        "max_holding_bars": 48
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 77
+      }
+    },
+    {
+      "period": 3,
+      "best_params": {
+        "lookback_bars": 120,
+        "level_tolerance_pct": 0.12,
+        "entry_tolerance_pct": 0.2,
+        "stop_loss_pct": 1.0,
+        "max_holding_bars": 60
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 61
+      }
+    },
+    {
+      "period": 4,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 92
+      }
+    },
+    {
+      "period": 5,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 93
+      }
+    },
+    {
+      "period": 6,
+      "best_params": {
+        "lookback_bars": 120,
+        "level_tolerance_pct": 0.12,
+        "entry_tolerance_pct": 0.2,
+        "stop_loss_pct": 1.0,
+        "max_holding_bars": 60
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 63
+      }
+    },
+    {
+      "period": 7,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 91
+      }
+    },
+    {
+      "period": 8,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 95
+      }
+    },
+    {
+      "period": 9,
+      "best_params": {
+        "lookback_bars": 100,
+        "level_tolerance_pct": 0.1,
+        "entry_tolerance_pct": 0.15,
+        "stop_loss_pct": 0.8,
+        "max_holding_bars": 48
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 76
+      }
+    },
+    {
+      "period": 10,
+      "best_params": {
+        "lookback_bars": 120,
+        "level_tolerance_pct": 0.12,
+        "entry_tolerance_pct": 0.2,
+        "stop_loss_pct": 1.0,
+        "max_holding_bars": 60
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 63
+      }
+    },
+    {
+      "period": 11,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 93
+      }
+    },
+    {
+      "period": 12,
+      "best_params": {
+        "lookback_bars": 120,
+        "level_tolerance_pct": 0.12,
+        "entry_tolerance_pct": 0.2,
+        "stop_loss_pct": 1.0,
+        "max_holding_bars": 60
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 61
+      }
+    },
+    {
+      "period": 13,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 95
+      }
+    },
+    {
+      "period": 14,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 91
+      }
+    },
+    {
+      "period": 15,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 91
+      }
+    },
+    {
+      "period": 16,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 95
+      }
+    },
+    {
+      "period": 17,
+      "best_params": {
+        "lookback_bars": 120,
+        "level_tolerance_pct": 0.12,
+        "entry_tolerance_pct": 0.2,
+        "stop_loss_pct": 1.0,
+        "max_holding_bars": 60
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 61
+      }
+    },
+    {
+      "period": 18,
+      "best_params": {
+        "lookback_bars": 100,
+        "level_tolerance_pct": 0.1,
+        "entry_tolerance_pct": 0.15,
+        "stop_loss_pct": 0.8,
+        "max_holding_bars": 48
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 73
+      }
+    },
+    {
+      "period": 19,
+      "best_params": {
+        "lookback_bars": 120,
+        "level_tolerance_pct": 0.12,
+        "entry_tolerance_pct": 0.2,
+        "stop_loss_pct": 1.0,
+        "max_holding_bars": 60
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 63
+      }
+    },
+    {
+      "period": 20,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 91
+      }
+    },
+    {
+      "period": 21,
+      "best_params": {
+        "lookback_bars": 100,
+        "level_tolerance_pct": 0.1,
+        "entry_tolerance_pct": 0.15,
+        "stop_loss_pct": 0.8,
+        "max_holding_bars": 48
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 72
+      }
+    },
+    {
+      "period": 22,
+      "best_params": {
+        "lookback_bars": 80,
+        "level_tolerance_pct": 0.08,
+        "entry_tolerance_pct": 0.1,
+        "stop_loss_pct": 0.6,
+        "max_holding_bars": 36
+      },
+      "oos_metrics": {
+        "oos_return": 0,
+        "oos_trades": 95
+      }
+    }
+  ]
+}

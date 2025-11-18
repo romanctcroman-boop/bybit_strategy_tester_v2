@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762631835,
+  "changed_files": [
+    "mcp-server\\providers\\failover_manager.py",
+    "mcp-server\\providers\\health_checker.py",
+    "mcp-server\\providers\\provider_registry.py",
+    "mcp-server\\providers\\__init__.py",
+    "mcp-server\\server.py",
+    "mcp-server\\providers\\load_balancer.py",
+    "mcp-server\\service_factories.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762631822.2486522,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test execution failure\n- 0% coverage suggests tests aren't running at all\n- No coverage data available for analysis\n\n## Coverage Analysis & Gaps\n**Total system failure** - No meaningful coverage data exists. The test infrastructure appears broken.\n\n## Potential Issues with Recent Changes\n1. **Provider system changes** likely broke test execution:\n   - `failover_manager.py`, `health_checker.py`, `provider_registry.py` modifications\n   - New `load_balancer.py` component\n   - Service factory updates in `service_factories.py`\n\n2. **Possible root causes**:\n   - Import/circular dependency issues in new provider architecture\n   - Missing test dependencies or configuration\n   - Breaking changes in server initialization (`server.py`)\n   - Test runner configuration corrupted\n\n## Recommendations for Improvement\n**Immediate Actions (Priority 1)**:\n1. Run tests with `-v` flag to identify where they fail\n2. Check test configuration files and dependencies\n3. Verify all new provider components can be imported independently\n4. Add basic smoke tests for each provider component\n\n**Short-term (Priority 2)**:\n1. Implement health check tests for provider registry\n2. Add unit tests for failover manager logic\n3. Test load balancer routing behavior\n4. Validate service factory instantiation\n\n## Risk Assessment\n**HIGH RISK** - Current state is unacceptable for deployment:\n- No confidence in system stability\n- Provider changes completely untested\n- High probability of runtime failures\n- Critical business logic (failover, load balancing) completely unvalidated\n\n**Next Step**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 202,
+      "completion_tokens": 367,
+      "total_tokens": 569,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 74
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

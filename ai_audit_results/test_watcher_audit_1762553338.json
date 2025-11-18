@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762553338,
+  "changed_files": [
+    "backend\\api\\secure_key_storage.py",
+    "analyze_final_v2_with_deepseek.py",
+    "backend\\api\\lru_ttl_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762553311.8939502,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). This indicates either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage across all files indicates:\n- No tests actually ran successfully\n- Recent changes likely broke test execution entirely\n- Cannot assess actual code coverage due to test failure\n\n## Potential Issues with Recent Changes\nThe changed files suggest:\n1. **`secure_key_storage.py`** - Security-related changes may have introduced import/initialization issues\n2. **`lru_ttl_cache.py`** - Caching logic changes could cause circular imports or initialization failures\n3. **`analyze_final_v2_with_deepseek.py`** - New analysis script may have broken test environment\n\n## Immediate Action Items\n1. **Fix Test Execution First**\n   - Check test runner logs for specific error details\n   - Verify all imports work (run `python -m pytest --collect-only`)\n   - Ensure test dependencies are installed\n\n2. **Validate Recent Changes**\n   - Test each changed file in isolation\n   - Check for circular imports between security and cache modules\n   - Verify new analysis script doesn't interfere with test environment\n\n3. **Quick Wins**\n   - Run tests on individual files to identify the breaking change\n   - Revert recent changes temporarily to confirm working baseline\n\n## Risk Assessment\n**HIGH RISK** - Deploying with broken tests is extremely dangerous:\n- No validation of security changes in key storage\n- Cache logic changes untested\n- Potential regression in core API functionality\n- Security vulnerabilities could be introduced\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 152,
+      "completion_tokens": 386,
+      "total_tokens": 538,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 88
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762554094,
+  "changed_files": [
+    "backend\\api\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554073.3873198,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure, not just poor coverage.\n\n## Potential Issues with Recent Changes\nThe circuit_breaker.py modification likely introduced:\n- **Syntax errors** preventing module import/execution\n- **Import/dependency issues** breaking the module\n- **Runtime exceptions** during test setup/import\n- **Configuration errors** in test environment\n\n## Recommendations for Improvement\n1. **Immediate Action:**\n   - Fix the syntax/import errors in circuit_breaker.py\n   - Run basic syntax check: `python -m py_compile backend\\api\\circuit_breaker.py`\n   - Verify imports and dependencies\n\n2. **Testing Infrastructure:**\n   - Add pre-commit hooks for syntax validation\n   - Implement basic smoke tests before full test suite\n   - Ensure test environment matches development environment\n\n3. **Process Improvements:**\n   - Require all changes to pass basic syntax checks before commit\n   - Add unit tests specifically for circuit_breaker functionality\n   - Implement gradual rollout with canary testing\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable and potentially broken in production. Circuit breaker patterns are critical for system resilience - any defects here could cause cascading failures across the entire system.\n\n**Priority:** Fix immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 336,
+      "total_tokens": 463,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

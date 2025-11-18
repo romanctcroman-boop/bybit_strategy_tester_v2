@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762542072,
+  "changed_files": [
+    "tests\\monitoring\\__init__.py",
+    "tests\\monitoring\\test_metrics_export.py",
+    "automation\\metrics\\prometheus_exporter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762542057.1739688,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- Likely environment or dependency issues preventing test execution\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA AVAILABLE** - This is more severe than low coverage:\n- Tests cannot run to collect any coverage data\n- All code changes are completely untested\n- Impossible to assess what functionality is actually working\n\n## Potential Issues with Recent Changes\n1. **Prometheus exporter changes** likely introduced fatal errors:\n   - C-level extensions crashing (exit code -1)\n   - Memory management issues in metrics collection\n   - Dependency conflicts with prometheus_client\n\n2. **Test infrastructure broken**:\n   - Import errors in test modules\n   - Environment configuration issues\n   - Missing dependencies in test environment\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see which test fails first\n2. Check Python version compatibility\n3. Verify prometheus_client dependency version\n4. Run individual test files to isolate the crash\n\n**STRUCTURAL FIXES:**\n1. Add basic smoke tests that run before full test suite\n2. Implement dependency version pinning\n3. Set up isolated test environment\n4. Add logging to identify crash location\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- Critical functionality may be completely broken\n- No validation that metrics export works\n- Potential for silent failures in monitoring system\n- Could impact production monitoring and alerting\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 152,
+      "completion_tokens": 364,
+      "total_tokens": 516,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 24
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

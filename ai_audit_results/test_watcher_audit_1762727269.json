@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762727269,
+  "changed_files": [
+    "simplified_reliable_mcp.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762727256.2397597,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure before any tests could execute.\n\n## Coverage Analysis\n**0% coverage** confirms no tests ran successfully. This represents a complete testing gap across all code paths.\n\n## Potential Issues with Recent Changes\n1. **Test harness failure** - Likely causes:\n   - Syntax errors in test files or test configuration\n   - Missing dependencies or imports in test setup\n   - Test discovery/runner configuration issues\n   - Critical exceptions in test fixtures or setup\n\n2. **File `simplified_reliable_mcp.py`** may contain breaking changes that prevent test initialization.\n\n## Immediate Recommendations\n1. **Debug test execution**:\n   ```bash\n   python -m pytest -v --tb=short  # Identify specific failure point\n   ```\n2. **Check test configuration** - Verify `pytest.ini`, `conftest.py`, and import paths\n3. **Validate recent changes** - Review `simplified_reliable_mcp.py` for syntax errors or breaking API changes\n4. **Run minimal test** - Create a simple smoke test to verify basic functionality\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected regressions in production code\n- Potential deployment of broken code\n- Complete loss of quality assurance\n- High probability of runtime failures\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 307,
+      "total_tokens": 432,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

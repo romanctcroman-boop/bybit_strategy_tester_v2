@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762594024,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762594007.9539156,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- Zero test execution suggests fundamental infrastructure or import issues\n- No coverage data generated implies tests never reached execution phase\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - All gaps identified:\n- No code executed during test run\n- Missing baseline coverage for core components (mtf_engine, database)\n- Integration and unit tests equally affected\n\n## Potential Issues with Recent Changes\n1. **Import/Dependency Breakage** - Changes in `backend/core/mtf_engine.py` likely broke test imports\n2. **Configuration Failure** - Test runner unable to locate modules or dependencies\n3. **Critical Exception** - Unhandled error in test setup or teardown\n4. **Path/Module Structure** - Recent file changes may have disrupted Python path resolution\n\n## Immediate Recommendations\n1. **DEBUG TEST RUNNER**:\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n2. **CHECK IMPORTS** - Verify `mtf_engine.py` exports expected classes/functions\n3. **VALIDATE DEPENDENCIES** - Ensure all required packages installed and compatible\n4. **ISOLATE FAILURE** - Run tests individually to identify root cause file\n\n## Risk Assessment\n**HIGH RISK** - Deployment blocking:\n- ❌ No safety net for recent changes\n- ❌ Core engine modifications untested\n- ❌ Database optimization changes unverified\n- ❌ Integration tests completely non-functional\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 357,
+      "total_tokens": 542,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 57
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

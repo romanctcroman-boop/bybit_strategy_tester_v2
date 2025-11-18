@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762627201,
+  "changed_files": [
+    "test_deepseek_10_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762627187.5345685,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test suite or codebase. No tests ran successfully.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code coverage achieved\n- **Critical Gap**: Test execution never reached coverage measurement phase\n- **Root Cause**: Likely fatal error during test discovery or import phase\n\n## Potential Issues with Recent Changes\n1. **test_deepseek_10_tools.py** contains syntax errors or import failures\n2. Missing dependencies or broken imports in test file\n3. Test configuration issues (pytest.ini, conftest.py, or environment)\n4. File may be corrupted or contain invalid Python syntax\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m py_compile test_deepseek_10_tools.py` to check for syntax errors\n2. Execute `python -m pytest test_deepseek_10_tools.py -v` to see detailed error output\n3. Check test file imports and dependencies\n4. Verify pytest installation and configuration\n\n**FOLLOW-UP:**\n- Add test discovery validation to CI pipeline\n- Implement pre-commit hooks for syntax checking\n- Create basic smoke test to validate test environment\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No validation of recent changes\n- Potential production-breaking code could be deployed\n- All existing functionality is untested\n- Immediate investigation required before any deployment\n\n**Priority: CRITICAL** - Fix test execution before proceeding with development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 345,
+      "total_tokens": 473,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

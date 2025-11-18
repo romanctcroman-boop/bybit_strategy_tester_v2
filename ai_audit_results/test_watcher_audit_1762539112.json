@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539112,
+  "changed_files": [
+    "tests\\integration\\test_e2e_test_watcher_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539098.5613394,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach any application code\n- **Complete coverage gap** - All code paths remain untested\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure failure** - Likely environment/dependency issues\n2. **Syntax/runtime errors** in `test_e2e_test_watcher_v2.py`\n3. **Missing dependencies** or configuration for integration tests\n4. **Environment setup failure** preventing test execution\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test execution** - Check test runner logs for specific error details\n2. **Verify dependencies** - Ensure all required packages are installed\n3. **Run tests individually** - Isolate the failing test file\n4. **Check environment variables** - Validate test configuration\n\n**Short-term:**\n1. **Add test validation** in CI pipeline to catch setup issues earlier\n2. **Implement basic smoke tests** to verify test environment health\n3. **Add logging** to test setup/teardown processes\n\n## Risk Assessment\n**HIGH RISK** - \n- **Zero test coverage** means no validation of recent changes\n- **Integration tests completely broken** - critical path validation missing\n- **Potential for undetected regressions** in production code\n- **Urgent attention required** before any further deployments\n\n**Priority: Fix immediately** - This indicates a broken test environment that needs resolution before any meaningful testing can occur.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 367,
+      "total_tokens": 502,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

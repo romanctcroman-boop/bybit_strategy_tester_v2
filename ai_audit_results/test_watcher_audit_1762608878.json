@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762608878,
+  "changed_files": [
+    "test_priority_1_unified_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762608863.415619,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates fundamental issues with the test infrastructure or test code itself, making quality assessment impossible until basic execution is resolved.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All tests failed to execute, meaning no code was actually tested. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\n- **test_priority_1_unified_client.py** is the only changed file and likely contains syntax errors, import failures, or configuration issues\n- Possible causes: Missing dependencies, broken imports, infinite loops, environment configuration errors\n- Test runner may be crashing before any tests execute\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest test_priority_1_unified_client.py -v` to see specific error details\n2. Check for syntax errors: `python -m py_compile test_priority_1_unified_client.py`\n3. Verify imports and dependencies are correctly installed\n\n**Follow-up:**\n4. Add test discovery validation to CI pipeline\n5. Implement basic smoke tests to catch execution failures early\n\n## Risk Assessment\n**HIGH RISK** - No tests are running, meaning all code changes are effectively untested. This could allow critical bugs to reach production undetected. The testing pipeline is currently providing false confidence.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 302,
+      "total_tokens": 430,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

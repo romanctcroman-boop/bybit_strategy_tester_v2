@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762542164,
+  "changed_files": [
+    "demo_prometheus_metrics.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762542151.5954347,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful testing occurred. This indicates either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a direct result of test execution failure, not a coverage gap issue.\n\n## Potential Issues with Recent Changes\n- `demo_prometheus_metrics.py` changes likely introduced breaking changes\n- Possible import errors, syntax issues, or dependency conflicts\n- Test environment may lack required Prometheus client library\n\n## Immediate Action Items\n1. **Fix Test Execution First**\n   - Check test runner logs for specific error messages\n   - Verify Python syntax in both test files and `demo_prometheus_metrics.py`\n   - Ensure `prometheus_client` is installed in test environment\n\n2. **Validate Basic Functionality**\n   - Run simple import test: `python -c \"import demo_prometheus_metrics\"`\n   - Check for missing imports or circular dependencies\n\n3. **Restore Test Infrastructure**\n   - Run a minimal passing test to verify framework works\n   - Gradually reintroduce actual test cases\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functioning tests poses significant reliability risk. The codebase is currently untested and may contain runtime errors that won't be caught until production.\n\n## Priority Recommendation\n**Fix test execution immediately** before any further development or deployment. Without working tests, all other quality metrics are meaningless.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 327,
+      "total_tokens": 453,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

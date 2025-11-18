@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762890448,
+  "changed_files": [
+    "tests\\integration\\test_alembic_migration.py",
+    "backend\\core\\engine_adapter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762890430.5254307,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either a catastrophic test infrastructure failure or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **Missing coverage data** suggests test runner crashed before collecting metrics\n- **Critical gap**: Unable to assess actual code coverage due to complete test failure\n\n## Potential Issues with Recent Changes\n1. **Alembic migration tests** (`test_alembic_migration.py`) likely causing test suite crash\n2. **Database engine adapter changes** (`engine_adapter.py`) may have introduced breaking changes\n3. **Possible issues**:\n   - Database connection failures\n   - Migration dependency conflicts\n   - Environment configuration mismatches\n   - Circular import errors\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run Alembic tests in isolation: `pytest tests/integration/test_alembic_migration.py -v`\n2. Check database connectivity and migration state\n3. Verify engine adapter interface compatibility\n4. Examine test logs for specific error details\n\n**Short-term:**\n1. Add try-catch blocks in migration tests\n2. Implement test database isolation\n3. Add pre-flight checks for test dependencies\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- Untested database migrations could cause data loss\n- Engine adapter changes may break production database connections\n- Complete test failure indicates systemic issues\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 141,
+      "completion_tokens": 341,
+      "total_tokens": 482,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 77
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762627966,
+  "changed_files": [
+    "mcp-server\\server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762627952.4489918,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents maximum coverage gap - entire codebase is untested.\n\n## Potential Issues with Recent Changes\nThe `mcp-server/server.py` modification likely introduced:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures\n- **Runtime exceptions** during test setup\n- **Environment configuration** issues\n\n## Recommendations for Improvement\n1. **Immediate Priority: Fix Test Execution**\n   - Check Python syntax: `python -m py_compile mcp-server/server.py`\n   - Verify imports and dependencies\n   - Run with verbose output to identify crash point\n\n2. **Establish Basic Test Foundation**\n   - Add minimal smoke test to verify server starts\n   - Implement basic unit tests for core functions\n   - Set up CI to fail fast on syntax/runtime errors\n\n3. **Coverage Recovery Plan**\n   - Target 70%+ coverage for critical paths first\n   - Focus on error handling and edge cases\n   - Add integration tests for server endpoints\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially unstable. Deployment would be extremely risky. Critical bugs could go undetected until production failures occur.\n\n**Next Action**: Fix the immediate test execution failure before addressing coverage metrics.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 319,
+      "total_tokens": 444,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

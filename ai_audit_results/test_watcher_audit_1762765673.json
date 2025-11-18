@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762765673,
+  "changed_files": [
+    "reliability_auto_system\\encryption_key_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762765659.0961664,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates severe issues in test setup, dependencies, or code syntax.\n\n## Coverage Analysis\n**0.00% coverage** - All tests failed before collecting any coverage data. This is a complete testing failure, not just poor coverage.\n\n## Potential Issues with Recent Changes\nThe encryption_key_manager.py modification likely introduced:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** or imports\n- **Runtime errors** during module loading\n- **Configuration issues** in test environment\n\n## Recommendations\n**Immediate Actions:**\n1. Fix test execution first - check Python syntax and imports in encryption_key_manager.py\n2. Verify all dependencies are installed and compatible\n3. Run tests with `-v` flag to see specific failure points\n4. Test the module in isolation: `python -m reliability_auto_system.encryption_key_manager`\n\n**Follow-up:**\n5. Once tests run, establish baseline coverage\n6. Add unit tests for key generation, storage, and retrieval methods\n7. Implement encryption/decryption validation tests\n\n## Risk Assessment\n**HIGH RISK** - Encryption systems without test validation pose critical security risks:\n- Potential key management vulnerabilities undetected\n- Data corruption or loss possibilities\n- Security compliance failures\n- Zero confidence in encryption reliability\n\n**Priority:** Fix test execution immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 311,
+      "total_tokens": 441,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 66
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

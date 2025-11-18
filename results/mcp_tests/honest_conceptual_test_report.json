@@ -1,0 +1,82 @@
+{
+  "test_date": "2025-10-29T13:19:51.151799",
+  "test_type": "100_percent_honest_conceptual",
+  "duration_seconds": 117.485718,
+  "total_tokens": 6970,
+  "estimated_cost_usd": 0.06970000000000001,
+  "results": [
+    {
+      "tool": "analyze_backtest_results",
+      "status": "PASS",
+      "quality_score": 4,
+      "answer_length": 3565,
+      "tokens": 816,
+      "success": true
+    },
+    {
+      "tool": "compare_strategies",
+      "status": "PASS",
+      "quality_score": 5,
+      "answer_length": 4287,
+      "tokens": 867,
+      "success": true
+    },
+    {
+      "tool": "risk_management_advice",
+      "status": "PASS",
+      "quality_score": 5,
+      "answer_length": 3352,
+      "tokens": 840,
+      "success": true
+    },
+    {
+      "tool": "technical_indicator_research",
+      "status": "PASS",
+      "quality_score": 5,
+      "answer_length": 2995,
+      "tokens": 869,
+      "success": true
+    },
+    {
+      "tool": "explain_metric",
+      "status": "PASS",
+      "quality_score": 4,
+      "answer_length": 3237,
+      "tokens": 771,
+      "success": true
+    },
+    {
+      "tool": "market_regime_detection",
+      "status": "PASS",
+      "quality_score": 5,
+      "answer_length": 3383,
+      "tokens": 795,
+      "success": true
+    },
+    {
+      "tool": "code_review_strategy",
+      "status": "PASS",
+      "quality_score": 4,
+      "answer_length": 4734,
+      "tokens": 1078,
+      "success": true
+    },
+    {
+      "tool": "generate_test_scenarios",
+      "status": "PASS",
+      "quality_score": 5,
+      "answer_length": 4322,
+      "tokens": 934,
+      "success": true
+    }
+  ],
+  "summary": {
+    "total_tools": 8,
+    "passed": 8,
+    "partial": 0,
+    "failed": 0,
+    "pass_rate": "100%",
+    "quality_score": "37/40",
+    "quality_percentage": "92.5%"
+  }
+}

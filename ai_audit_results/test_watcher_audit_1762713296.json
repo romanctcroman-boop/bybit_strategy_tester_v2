@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762713296,
+  "changed_files": [
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713279.5104105,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- Zero test execution suggests fundamental runtime issues\n- No coverage data collected\n\n## Coverage Analysis & Gaps\n**NO COVERAGE** - Complete test infrastructure failure:\n- 0% coverage across all files\n- No test execution occurred\n- Unable to assess actual code coverage gaps\n\n## Potential Issues with Recent Changes\n**HIGH PROBABILITY** - `tests/test_deepseek_client.py` changes caused regression:\n- Likely syntax errors, import failures, or infinite loops in test file\n- Possible circular imports or module initialization issues\n- Test framework configuration broken by recent changes\n- Environment/dependency conflicts introduced\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS REQUIRED**:\n\n1. **Debug Test Execution**:\n   ```bash\n   python -m pytest tests/test_deepseek_client.py -v --tb=short\n   ```\n   - Check for import errors and syntax issues\n   - Verify test dependencies are installed\n\n2. **Isolate the Failure**:\n   - Comment out sections of `test_deepseek_client.py` to identify breaking changes\n   - Run minimal test case to verify basic functionality\n\n3. **Fix Root Cause**:\n   - Review recent changes to test file for obvious errors\n   - Check for missing imports, undefined variables, or configuration issues\n\n4. **Add Safety Nets**:\n   - Implement pre-commit hooks to validate test syntax\n   - Add basic smoke test to catch runtime failures early\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- No confidence in code changes due to complete test failure\n- Potential for undetected regressions in production code\n- Test infrastructure itself may be compromised\n- Requires immediate attention before any further development\n\n**Priority**: Fix test execution before addressing coverage or test quality improvements.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 410,
+      "total_tokens": 537,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

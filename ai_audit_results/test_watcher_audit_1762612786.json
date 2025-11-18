@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762612786,
+  "changed_files": [
+    "test_streaming_quick.py",
+    "test_perplexity_streaming.py",
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762612769.2150803,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exceptions or environment issues)\n- Zero test execution suggests fundamental setup/import problems\n- No coverage data generated implies tests never ran\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete testing vacuum:\n- No code paths exercised\n- No import/initialization validation\n- No API endpoint testing\n- No error handling verification\n\n## Potential Issues with Recent Changes\n1. **Import/Dependency Breakage** - Changes in `perplexity.py` likely broke imports in test files\n2. **API Interface Changes** - Provider modifications incompatible with test expectations\n3. **Environment Configuration** - Missing API keys, environment variables, or dependencies\n4. **Circular Dependencies** - Import conflicts between test files and provider module\n\n## Immediate Recommendations\n1. **Fix Import Chain**:\n   ```python\n   # Add debug to test imports\n   try:\n       from mcp-server.api.providers.perplexity import PerplexityProvider\n   except ImportError as e:\n       print(f\"Import failed: {e}\")\n   ```\n\n2. **Run Tests Isolated**:\n   ```bash\n   python -m pytest test_streaming_quick.py -v\n   python -m pytest test_perplexity_streaming.py -v\n   ```\n\n3. **Check Provider Initialization**:\n   - Verify `PerplexityProvider` constructor requirements\n   - Confirm API key availability\n   - Validate method signatures match tests\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be blind:\n- 100% unknown code behavior\n- Streaming functionality completely untested\n- High probability of runtime failures\n- No regression protection\n\n**Priority**: Fix test execution before any further development or deployment. Start with basic import validation and work upward.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 149,
+      "completion_tokens": 396,
+      "total_tokens": 545,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 85
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

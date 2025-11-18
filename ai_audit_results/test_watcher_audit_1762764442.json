@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762764442,
+  "changed_files": [
+    "tests\\test_protocol.py",
+    "reliability_auto_system\\intelligent_fallback.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762764425.0003855,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure before any tests could execute.\n\n## Coverage Analysis\n**0% coverage** across all files - No code is being tested. This represents a complete testing infrastructure breakdown.\n\n## Potential Issues with Recent Changes\n1. **Test configuration failure** - Likely broken test runner, missing dependencies, or environment issues\n2. **Import/circular dependency problems** - Changes in `intelligent_fallback.py` may have broken test imports\n3. **Test discovery failure** - `test_protocol.py` modifications may have corrupted test structure\n\n## Immediate Action Recommendations\n1. **Fix test execution first**:\n   - Check test runner configuration\n   - Verify all dependencies are installed\n   - Run with `-v` flag to see where execution fails\n   - Validate Python path and import structure\n\n2. **Validate recent changes**:\n   - Review `intelligent_fallback.py` for import/initialization issues\n   - Check `test_protocol.py` for syntax errors or missing fixtures\n   - Ensure test class/method naming follows pytest conventions\n\n3. **Restore basic functionality**:\n   - Start with a single simple test to verify execution\n   - Gradually reintroduce test cases\n   - Implement minimum 70% coverage threshold\n\n## Risk Assessment\n**HIGH RISK** - Deploying without any test validation exposes the system to:\n- Runtime failures in production\n- Regression bugs from `intelligent_fallback` changes\n- Complete loss of quality assurance\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 341,
+      "total_tokens": 479,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 74
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

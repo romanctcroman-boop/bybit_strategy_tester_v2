@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762560445,
+  "changed_files": [
+    "backend\\api\\deepseek_pool.py",
+    "tests\\test_deepseek_pool_deadlock.py",
+    "backend\\security\\key_manager.py",
+    "backend\\security\\master_key_manager.py",
+    "tests\\backend\\conftest.py",
+    "automation\\deepseek_code_agent\\code_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762560429.0524497,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment/setup issues\n- Fatal errors in test code or application code\n- Missing dependencies or configuration\n\n## Coverage Analysis\n**COMPLETE COVERAGE GAP** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Possible import/initialization failures\n- Test discovery/runner configuration issues\n\n## Potential Issues with Recent Changes\n1. **Deadlock Test Introduction** (`test_deepseek_pool_deadlock.py`) - Likely causing test suite to hang or crash\n2. **Security Module Changes** (`key_manager.py`, `master_key_manager.py`) - May have broken initialization\n3. **Conftest Modifications** - Could have disrupted test fixture setup\n4. **Code Agent Integration** - New automation component may have dependency issues\n\n## Immediate Recommendations\n1. **Debug Test Execution**:\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n2. **Isolate Deadlock Test** - Run without the new deadlock test\n3. **Check Security Module Initialization** - Verify key managers load correctly in test environment\n4. **Validate Conftest Fixtures** - Ensure test setup hasn't been broken\n\n## Risk Assessment\n**HIGH RISK** - Cannot validate any functionality due to complete test failure. Recent security changes and deadlock testing introduce:\n- Potential runtime blocking issues\n- Security component initialization failures\n- Test environment instability\n\n**Priority**: Fix test execution immediately before any deployment. Start by running tests individually to identify the failing component.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 357,
+      "total_tokens": 542,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 121
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

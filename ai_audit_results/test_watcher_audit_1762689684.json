@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762689684,
+  "changed_files": [
+    "backend\\api\\schemas.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762689667.0241127,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of the test execution failure, not a measurement of actual coverage.\n\n## Potential Issues with Recent Changes\nThe modified `schemas.py` file likely contains:\n- Import errors or circular dependencies\n- Syntax errors (Python 3.9+ compatibility issues, missing imports)\n- Pydantic schema validation errors preventing module loading\n- Breaking changes to class/method signatures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix Test Execution First**\n   - Run `python -m pytest --collect-only` to identify import/syntax errors\n   - Check Python version compatibility\n   - Verify all dependencies are installed\n\n2. **Debug Schema Changes**\n   - Test `schemas.py` import in isolation\n   - Validate Pydantic model definitions\n   - Check for missing imports from recent changes\n\n3. **Restore Basic Testing**\n   - Add a simple smoke test for schema imports\n   - Ensure tests can at least start executing\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functioning tests is extremely dangerous:\n- Undetected runtime errors likely in production\n- No validation of API request/response schemas\n- Potential data integrity issues from broken serialization\n- Regression risk for all dependent API endpoints\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 355,
+      "total_tokens": 481,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "dashboard": {
+    "refreshIntervalSeconds": 3,
+    "recentEventsCount": 10,
+    "showDetailedStats": true,
+    "colorOutput": true
+  },
+  "storage": {
+    "logFilePath": "D:\\bybit_strategy_tester_v2\\logs\\mcp_monitor_events.jsonl",
+    "ringBufferSize": 100,
+    "enableFileLogging": true,
+    "enableLogRotation": true,
+    "maxLogSizeMB": 10
+  },
+  "mcpServer": {
+    "serverEndpoint": "http://localhost",
+    "serverPort": 8000,
+    "logSource": "file",
+    "enableRemoteLogging": false,
+    "sessionLogPath": "D:\\bybit_strategy_tester_v2\\logs\\mcp_session.log"
+  },
+  "monitoring": {
+    "apis": [
+      {
+        "name": "DeepSeek",
+        "enabled": true,
+        "tools": [
+          "quick_reasoning_analysis",
+          "chain_of_thought_analysis"
+        ]
+      },
+      {
+        "name": "Perplexity",
+        "enabled": true,
+        "tools": [
+          "perplexity_search",
+          "perplexity_search_streaming",
+          "perplexity_analyze_crypto"
+        ]
+      }
+    ]
+  }
+}

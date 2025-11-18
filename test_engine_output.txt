@@ -1,0 +1,23 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-8.4.2, pluggy-1.6.0
+rootdir: D:\bybit_strategy_tester_v2
+configfile: pytest.ini
+plugins: anyio-4.11.0, asyncio-1.2.0, cov-7.0.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 37 items
+
+tests\backend\core\test_backtest_engine.py ................F
+
+================================== FAILURES ===================================
+_____________ TestBacktestExecution.test_run_backtest_empty_data ______________
+tests\backend\core\test_backtest_engine.py:363: in test_run_backtest_empty_data
+    assert results.get('final_capital', 0) == 0
+E   AssertionError: assert 10000.0 == 0
+E    +  where 10000.0 = <built-in method get of dict object at 0x0000029535A31C80>('final_capital', 0)
+E    +    where <built-in method get of dict object at 0x0000029535A31C80> = {'equity_curve': [], 'final_capital': 10000.0, 'losing_trades': 0, 'max_drawdown': 0.0, ...}.get
+------------------------------ Captured log call ------------------------------
+WARNING  backend.core.backtest_engine:backtest_engine.py:140 Empty data provided to backtest engine
+=========================== short test summary info ===========================
+FAILED tests/backend/core/test_backtest_engine.py::TestBacktestExecution::test_run_backtest_empty_data
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+======================== 1 failed, 16 passed in 1.91s =========================

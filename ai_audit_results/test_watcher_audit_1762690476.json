@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762690476,
+  "changed_files": [
+    "temp_pg_test.py",
+    "backend\\api\\routers\\backtests.py",
+    "backend\\api\\error_handling.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762690457.2512674,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage means no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**Total system failure** - No meaningful coverage data available:\n- Zero coverage across all files\n- Test execution halted before any code could be measured\n- Impossible to assess actual code coverage gaps\n\n## Potential Issues with Recent Changes\n**High-risk changes detected:**\n1. **PostgreSQL dependency conflict** - `psycopg2` package modification in virtual environment suggests installation/version issues\n2. **Database connectivity** - `temp_pg_test.py` and backtest router changes likely introduced connection failures\n3. **Error handling changes** - Modifications to `error_handling.py` may have broken exception handling\n4. **Environment corruption** - `.venv` package modifications indicate environment instability\n\n## Recommendations for Improvement\n**Immediate actions (next 2 hours):**\n1. **Fix test infrastructure** - Investigate exit code -1: check for segmentation faults, memory issues, or import errors\n2. **Isolate database issues** - Test PostgreSQL connectivity separately from main test suite\n3. **Restore clean environment** - Recreate virtual environment, verify psycopg2 installation\n4. **Run tests incrementally** - Start with basic unit tests, then integration, then database tests\n\n**Short-term (next 24 hours):**\n1. Add test suite health checks\n2. Implement dependency version locking\n3. Create isolated database test environment\n\n## Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- **Critical**: Cannot validate any code changes\n- **High**: Database connectivity likely broken\n- **Medium**: Error handling modifications untested\n- **Immediate impact**: Zero confidence in current code state\n\n**Priority**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 169,
+      "completion_tokens": 415,
+      "total_tokens": 584,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 105
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

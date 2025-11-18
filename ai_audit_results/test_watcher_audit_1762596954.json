@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762596954,
+  "changed_files": [
+    "automation\\deepseek_robot\\production_autonomous_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762596939.3533926,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- Zero test execution suggests fundamental infrastructure or configuration issues\n- No coverage data implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- 0% coverage across all files\n- No test execution means no meaningful coverage data\n- Critical gap: Entire codebase is untested\n\n## Potential Issues with Recent Changes\n1. **File `production_autonomous_agent.py` likely contains breaking changes**\n2. **Possible causes**:\n   - Syntax errors preventing test discovery/import\n   - Missing dependencies or imports\n   - Infinite loops or blocking operations\n   - Environment configuration issues\n\n## Immediate Recommendations\n**URGENT ACTIONS**:\n1. **Debug test runner** - Check for import errors or syntax issues in changed file\n2. **Run tests individually** to isolate the failure point\n3. **Verify `production_autonomous_agent.py`**:\n   - Check for syntax errors\n   - Validate imports and dependencies\n   - Ensure no blocking operations in module scope\n4. **Restore basic test functionality** before addressing coverage\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- ❌ No test validation of recent changes\n- ❌ Unknown impact of modifications\n- ❌ Potential for runtime failures in production\n- ❌ Complete loss of quality assurance\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 333,
+      "total_tokens": 466,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 69
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762537558,
+  "changed_files": [
+    "automation\\task3_audit_agent\\audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537544.545137,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test execution, likely preventing any tests from running.\n\n## Coverage Analysis\n**0.00% coverage** confirms no code was executed. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\n1. **Fatal runtime error** in `audit_agent.py` - likely syntax errors, import failures, or initialization crashes\n2. **Test infrastructure failure** - test runner configuration or environment issues\n3. **Missing dependencies** - required packages not installed or incompatible versions\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile automation\\task3_audit_agent\\audit_agent.py` to check for syntax errors\n2. Execute tests with `-v` flag to see detailed failure output\n3. Verify all imports and dependencies are available in test environment\n\n**Short-term:**\n1. Fix the fatal error preventing test execution\n2. Add basic smoke tests to verify module can load\n3. Implement minimum 70% coverage requirement\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially broken. Deployment would be extremely risky. The fatal error suggests fundamental issues that could impact system stability.\n\n**Priority:** Fix test execution failure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 287,
+      "total_tokens": 421,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

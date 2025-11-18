@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762738332,
+  "changed_files": [
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762738302.5160482,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data collected due to test failure\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA AVAILABLE** - Tests never executed:\n- 0% coverage across all files\n- Unable to assess actual code coverage gaps\n- Test framework itself may be broken\n\n## Potential Issues with Recent Changes\n**HIGH PROBABILITY** - `tests/test_protocol.py` changes broke test infrastructure:\n- Recent modifications likely introduced syntax errors or import failures\n- Test discovery/execution pipeline broken\n- Possible circular imports or missing dependencies\n- Environment configuration issues (paths, dependencies)\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS REQUIRED**:\n\n1. **Debug Test Failure**:\n   ```bash\n   python -m pytest tests/test_protocol.py -v --tb=short\n   ```\n2. **Check Syntax**:\n   ```bash\n   python -m py_compile tests/test_protocol.py\n   ```\n3. **Validate Imports**:\n   - Review recent changes to `test_protocol.py` imports\n   - Check for missing dependencies in test environment\n4. **Isolate Issue**:\n   - Temporarily revert `test_protocol.py` changes\n   - Run minimal test to verify framework functionality\n\n## Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- ❌ No confidence in code changes\n- ❌ Regression detection completely disabled\n- ❌ Production deployment should be blocked until resolved\n- ❌ All recent changes effectively untested\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 371,
+      "total_tokens": 497,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

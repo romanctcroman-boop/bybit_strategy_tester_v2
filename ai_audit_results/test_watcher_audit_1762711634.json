@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762711634,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762711619.271103,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **Missing coverage:** Entire codebase completely untested\n- **Root cause:** Tests cannot execute, making coverage measurement impossible\n\n## Potential Issues with Recent Changes\nThe file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures\n- **Runtime errors** during module initialization\n- **Infinite loops** or **blocking operations** during import\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution first** - Run the file directly to identify syntax/runtime errors\n2. **Check imports and dependencies** - Verify all required packages are installed\n3. **Add basic smoke test** - Create a minimal test that imports the module successfully\n4. **Isolate the problem** - Test the file in isolation from the test framework\n\n**Technical Steps:**\n```bash\n# Test the problematic file directly\npython full_ai_audit_deepseek_perplexity_deepseek.py\n# Check for syntax errors\npython -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py\n```\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Zero test reliability** - Cannot validate any functionality\n- **Production deployment risk** - Code quality completely unknown\n- **Regression risk** - Future changes cannot be safely validated\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 381,
+      "total_tokens": 516,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762765565,
+  "changed_files": [
+    "auto_diagnostic_system.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762765550.905941,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\n1. **Syntax/Runtime Errors** in `auto_diagnostic_system.py` likely preventing import/execution\n2. **Missing Dependencies** - Required imports may be broken\n3. **Configuration Issues** - Test runner setup may be misconfigured\n4. **Fatal Exceptions** - Unhandled errors during module loading\n\n## Immediate Action Recommendations\n1. **Fix Test Execution First**\n   - Check for syntax errors: `python -m py_compile auto_diagnostic_system.py`\n   - Run with verbose output: `python -m pytest -v --tb=short`\n\n2. **Debug Import Issues**\n   - Test module import: `python -c \"import auto_diagnostic_system\"`\n   - Verify dependencies and imports\n\n3. **Restore Basic Testing**\n   - Add minimal smoke test to verify basic functionality\n   - Ensure tests can at least import and instantiate core components\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code poses severe operational risks:\n- Production failures likely\n- Undetected runtime errors\n- Potential data corruption\n- System instability\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 324,
+      "total_tokens": 450,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762631656,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_protocol.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "mcp-server\\circuit_breaker.py",
+    "tests\\test_mtf_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762631643.4459724,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- Zero test execution suggests fundamental infrastructure or dependency issues\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - All tests failed to execute:\n- Coverage reports empty due to test execution failure\n- Cannot assess actual code coverage gaps\n- This indicates deeper issues than just test failures\n\n## 3. Potential Issues with Recent Changes\n**HIGH RISK AREAS:**\n- `mtf_engine.py` changes likely introduced fatal errors\n- Integration tests (`test_sandbox_integration.py`) may have dependency/environment issues\n- Circuit breaker or database optimization changes causing system instability\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. **Debug test infrastructure** - Check Python environment, dependencies, and test runner configuration\n2. **Isolate the crash** - Run tests individually to identify which file causes the -1 exit code\n3. **Check core modules** - Start with `mtf_engine.py` and `circuit_breaker.py` for fatal errors\n4. **Verify dependencies** - Ensure all required services/databases are available for integration tests\n\n**SHORT-TERM:**\n- Add basic smoke tests to prevent complete test suite collapse\n- Implement test isolation to prevent one failure from breaking entire suite\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code likely contains critical bugs\n- No safety net for deployments\n- Potential for runtime crashes in production\n- Immediate developer intervention required before any further changes\n\n**Priority:** Fix test execution infrastructure first, then address individual test failures.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 195,
+      "completion_tokens": 381,
+      "total_tokens": 576,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 131
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

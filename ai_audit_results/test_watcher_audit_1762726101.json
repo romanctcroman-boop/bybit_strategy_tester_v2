@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762726101,
+  "changed_files": [
+    "simplified_reliable_mcp.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762726087.8389418,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is a direct result of the test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe single changed file `simplified_reliable_mcp.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures  \n- **Runtime errors** during module initialization\n- **Infinite loops** or **blocking operations** during import\n- **Circular imports** breaking the module structure\n\n## Immediate Action Recommendations\n1. **Fix test execution first** - Run tests with verbose output to identify the root cause\n2. **Check syntax** - Run `python -m py_compile simplified_reliable_mcp.py`\n3. **Test imports** - Attempt `import simplified_reliable_mcp` in isolation\n4. **Add basic smoke test** - Create a minimal test that imports and instantiates the module\n5. **Review recent changes** - Compare against previous working version\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable and likely non-functional. Deployment would be extremely risky. Without functioning tests, regression detection is impossible and code quality cannot be verified.\n\n**Priority:** Fix test execution immediately before any further development or analysis.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 325,
+      "total_tokens": 450,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

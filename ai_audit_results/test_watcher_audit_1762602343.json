@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762602343,
+  "changed_files": [
+    "automation\\deepseek_robot\\advanced_architecture.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762602327.8218002,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution means all code paths are untested\n- Critical gap: Entire test infrastructure appears broken\n\n## Potential Issues with Recent Changes\n1. **`advanced_architecture.py` changes** likely introduced breaking changes that crash test environment\n2. **`conftest.py` modifications** may have broken test configuration/fixtures\n3. Possible circular imports, missing dependencies, or syntax errors preventing test discovery/execution\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to identify where crash occurs\n2. Check Python syntax: `python -m py_compile automation/deepseek_robot/advanced_architecture.py`\n3. Validate imports and dependencies in both changed files\n4. Test fixture isolation - run `conftest.py` separately\n\n**Systematic Fixes:**\n1. Add try-catch blocks in test setup to capture initialization errors\n2. Implement basic smoke test before full test suite\n3. Add test environment validation in CI pipeline\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be completely blind:\n- No validation of recent architectural changes\n- Potential runtime errors undetected\n- Critical path failures likely in production\n- **Recommend blocking deployment** until basic test execution is restored\n\n**Priority:** Fix test infrastructure before addressing any feature issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 140,
+      "completion_tokens": 335,
+      "total_tokens": 475,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 76
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

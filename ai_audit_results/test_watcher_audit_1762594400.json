@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762594400,
+  "changed_files": [
+    "automation\\deepseek_robot\\robot.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762594385.3510635,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax errors in test files or code\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal runtime errors during test initialization\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files means:\n- No tests executed successfully\n- All code paths remain untested\n- Recent changes likely broke the test harness itself\n\n## Potential Issues with Recent Changes\nThe modified `automation\\deepseek_robot\\robot.py` likely contains:\n- Breaking syntax errors\n- Missing imports or dependencies\n- Circular imports\n- Incompatible changes with test infrastructure\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see specific failure points\n2. Check `robot.py` for syntax errors: `python -m py_compile automation\\deepseek_robot\\robot.py`\n3. Verify imports and dependencies in the changed file\n4. Run a minimal test to isolate the failure\n\n**Follow-up:**\n5. Add basic smoke tests that run before full test suite\n6. Implement CI checks for syntax and import validation\n7. Consider adding type hints to catch issues earlier\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production readiness cannot be verified\n- Regression detection is completely broken\n- Any bugs in `robot.py` will go undetected\n- Deployment would be extremely risky\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 343,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

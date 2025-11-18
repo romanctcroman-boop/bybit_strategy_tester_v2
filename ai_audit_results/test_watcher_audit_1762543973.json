@@ -1,0 +1,80 @@
+{
+  "timestamp": 1762543973,
+  "changed_files": [
+    "tests\\frontend\\test_smoke.py",
+    "backend\\visualization\\demo_charts.py",
+    "backend\\scaling\\celery_integration.py",
+    "backend\\scripts\\dr_automation.py",
+    "backend\\health_checks.py",
+    "backend\\scripts\\test_dr_system.py",
+    "backend\\strategies\\sr_mean_reversion.py",
+    "backend\\orchestrator\\queue.py",
+    "backend\\utils\\password.py",
+    "backend\\indicators\\__init__.py",
+    "tests\\integration\\test_postgres_upsert.py",
+    "backend\\security\\crypto.py",
+    "backend\\security\\key_manager.py",
+    "backend\\scripts\\restore_database.py",
+    "backend\\security\\ast_validator.py",
+    "backend\\security\\master_key_manager.py",
+    "backend\\visualization\\__init__.py",
+    "tests\\monitoring\\test_health_endpoints.py",
+    "backend\\migrations\\versions\\2f4e6a7b8c9d_autogen_convert_timestamps_to_timestamptz.py",
+    "backend\\utils\\formatting.py",
+    "tests\\test_backtest_task.py",
+    "backend\\strategies\\bollinger_mean_reversion.py",
+    "scripts\\probe_ports.py",
+    "backend\\app.py",
+    "backend\\services\\archival_service.py",
+    "mcp-server\\file_finder_mcp.py",
+    "backend\\services\\adapters\\bybit_async.py",
+    "backend\\security\\rate_limiter.py",
+    "backend\\services\\adapters\\binance.py",
+    "backend\\scaling\\__init__.py",
+    "backend\\scripts\\init_db.py",
+    "backend\\services\\ab_testing_service.py",
+    "backend\\security\\sandbox_executor.py",
+    "scripts\\check_db_connect.py",
+    "backend\\scripts\\backup_database.py",
+    "backend\\services\\anomaly_detection_service.py",
+    "backend\\tasks\\optimize_tasks.py",
+    "backend\\indicators\\rsi.py",
+    "backend\\services\\adapters\\bybit.py",
+    "backend\\visualization\\advanced_charts.py",
+    "backend\\workers\\automl_worker.py",
+    "backend\\security\\logging_middleware.py",
+    "backend\\tasks\\backtest_tasks.py",
+    "backend\\strategies\\support_resistance.py",
+    "backend\\security\\auth_middleware.py",
+    "backend\\strategies\\sr_rsi_strategy.py",
+    "backend\\utils\\__init__.py",
+    "backend\\security\\rbac_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543958.4007983,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- Likely environment/config issue or fatal code error\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - All files show 0% coverage, indicating:\n- Test framework failed to initialize\n- Database connections may be failing\n- Critical dependencies missing\n- Possible circular imports or initialization errors\n\n## 3. Potential Issues with Recent Changes\nHigh-risk areas based on changed files:\n- **Security modules** (`crypto.py`, `key_manager.py`, `master_key_manager.py`) - could have breaking initialization\n- **Database migrations** (`2f4e6a7b8c9d_autogen_convert_timestamps...`) - schema changes may break tests\n- **Celery integration** - task queue configuration issues\n- **Multiple strategy files** - potential import conflicts\n\n## 4. Immediate Recommendations\n**Priority 1 - Fix Test Execution:**\n- Check Python environment and dependencies\n- Verify database connectivity (`check_db_connect.py`)\n- Test individual modules to isolate crashing component\n- Review recent security changes for initialization errors\n\n**Priority 2 - Restore Basic Testing:**\n- Run smoke tests first: `tests\\frontend\\test_smoke.py`\n- Test database operations: `tests\\integration\\test_postgres_upsert.py`\n- Verify health endpoints: `tests\\monitoring\\test_health_endpoints.py`\n\n## 5. Risk Assessment\n**HIGH RISK** - Deployment would be dangerous:\n- No validation of security implementations\n- Database operations untested\n- Financial strategies unverified\n- Potential data corruption or security vulnerabilities\n\n**Immediate Action:** Halt all deployments until basic test suite passes and achieves >70% coverage.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 662,
+      "completion_tokens": 416,
+      "total_tokens": 1078,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 598
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

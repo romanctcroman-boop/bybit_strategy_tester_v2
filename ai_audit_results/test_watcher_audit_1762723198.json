@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762723198,
+  "changed_files": [
+    "tests\\test_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762723174.210789,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1). The test suite is non-functional and provides zero validation of code behavior.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code is being tested\n- No coverage data available for any files\n- Complete testing gap across the entire codebase\n\n## Potential Issues with Recent Changes\n- **tests/test_circuit_breaker.py** modifications likely introduced:\n  - Syntax errors preventing test execution\n  - Import failures or missing dependencies\n  - Infinite loops or fatal exceptions\n  - Configuration issues in test setup/teardown\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution** - Run tests with verbose output to identify the specific failure point\n2. **Check test imports** - Verify all dependencies and imports in test_circuit_breaker.py\n3. **Validate test fixtures** - Ensure setup/teardown methods don't cause fatal errors\n4. **Add basic smoke test** - Create a minimal passing test to verify test infrastructure\n\n**FOLLOW-UP:**\n5. Implement test isolation to prevent single test failure from breaking entire suite\n6. Add CI pipeline validation to catch test failures before merge\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing safety net\n- Potential for undetected production bugs\n- Circuit breaker functionality (critical resilience pattern) is completely untested\n- Deployment carries significant business risk\n\n**Priority: Fix immediately** - Restore test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 337,
+      "total_tokens": 465,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

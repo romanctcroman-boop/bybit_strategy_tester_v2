@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762635288,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_protocol.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_mtf_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762635273.658803,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran properly\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - This is a red flag:\n- 0% coverage across all files indicates complete test execution failure\n- Unable to assess actual code coverage due to execution failure\n- Missing baseline metrics for comparison\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **MTF Engine modifications** (`backend\\core\\mtf_engine.py`) - Core component changes may have broken imports or initialization\n2. **Integration test changes** (`tests\\test_sandbox_integration.py`) - May contain faulty setup/teardown logic\n3. **Database query optimization tests** - Could have introduced dependency issues or configuration problems\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure**:\n   - Run tests with `-v` flag to see which test fails first\n   - Check for import errors in recently modified test files\n   - Verify test dependencies and environment setup\n\n2. **Isolate the Failure**:\n   - Run changed test files individually to identify the breaking change\n   - Test `mtf_engine.py` imports in isolation\n   - Check for circular imports or missing dependencies\n\n3. **Fix Order**:\n   - Start with unit tests (`test_batch_writer.py`) as they should be most isolated\n   - Then protocol tests, followed by integration tests\n   - Verify MTF engine core functionality separately\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents:\n- Regression detection\n- Code quality assessment\n- Safe deployment\n- Continuous integration functionality\n\n**Priority**: Fix test execution immediately before any further development or deployment. The broken test suite represents a critical blocker for development workflow and quality assurance.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 408,
+      "total_tokens": 593,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 57
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

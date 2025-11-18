@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762710477,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\python.py",
+    ".venv\\Lib\\site-packages\\pytest_asyncio\\plugin.py",
+    ".venv\\Lib\\site-packages\\pytest\\__main__.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762710463.3595114,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error before any tests could execute. Test infrastructure appears broken.\n\n## Coverage Analysis\n**0% coverage** confirms no tests ran. This represents maximum coverage gap - the entire codebase is untested in this execution.\n\n## Potential Issues\n1. **Environment Corruption** - Modified pytest core files in `.venv` suggest virtual environment is corrupted or improperly configured\n2. **Plugin Conflicts** - Changes to `pytest_asyncio/plugin.py` may indicate async test configuration issues\n3. **Test Discovery Failure** - Pytest cannot locate or execute any tests\n\n## Recommendations\n**Immediate Actions:**\n1. **Recreate virtual environment** - Delete `.venv` and rebuild with clean dependencies\n2. **Verify test discovery** - Run `pytest --collect-only` to check if tests are found\n3. **Check pytest configuration** - Review `pytest.ini`/`conftest.py` for errors\n\n**Short-term:**\n4. **Isolate the failure** - Run minimal test case to identify root cause\n5. **Validate dependencies** - Ensure pytest and plugins versions are compatible\n\n**Long-term:**\n6. **Implement CI environment isolation** - Prevent accidental modification of test framework files\n7. **Add test health checks** - Basic smoke tests to verify test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected regressions likely\n- Deployment carries significant failure risk\n- Code quality cannot be measured\n- Immediate fix required before any further development\n\n**Priority:** Fix test infrastructure immediately before addressing any application code issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 207,
+      "completion_tokens": 355,
+      "total_tokens": 562,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 143
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

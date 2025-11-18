@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762776254,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762776237.7337856,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental infrastructure or configuration issues rather than test logic problems.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout, making all production code untested and unreliable.\n\n## Potential Issues with Recent Changes\nThe single changed file `tests\\backend\\conftest.py` is highly suspicious:\n- **Pytest configuration corruption** - Likely contains syntax errors, import failures, or fixture definition errors\n- **Plugin conflicts** - Recent changes may have broken pytest plugin integrations\n- **Environment setup failures** - Database connections, API mocks, or test data initialization may be failing\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Rollback** the conftest.py changes and verify tests pass\n2. **Isolate the failure** by running: `pytest tests/backend/conftest.py -v`\n3. **Check syntax** with: `python -m py_compile tests/backend/conftest.py`\n4. **Review recent changes** to conftest.py for obvious errors (missing imports, syntax issues)\n\n**FOLLOW-UP:**\n- Add pre-commit hooks to validate pytest configuration\n- Implement basic smoke tests that run before full test suite\n- Consider splitting complex conftest.py into smaller, focused modules\n\n## Risk Assessment\n**HIGH RISK** - All code changes are effectively untested. Deployment in this state could lead to:\n- Production outages from undetected bugs\n- Data corruption from broken database interactions\n- Security vulnerabilities from untested authentication flows\n\n**Priority:** Fix immediately before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 371,
+      "total_tokens": 498,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

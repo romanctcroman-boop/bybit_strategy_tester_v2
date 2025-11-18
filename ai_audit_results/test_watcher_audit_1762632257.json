@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762632257,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762632243.6803102,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken. Exit code -1 indicates a fatal error before any tests could run. This represents a complete testing infrastructure failure.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This is not a coverage gap but a complete testing system failure.\n\n## Potential Issues with Recent Changes\nThe single changed file `tests\\backend\\conftest.py` is almost certainly the root cause. Likely issues:\n- Syntax errors in pytest configuration/fixtures\n- Import failures in test setup\n- Fixture dependency conflicts\n- Environment configuration errors\n- Plugin compatibility issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug conftest.py** - Check for syntax errors, missing imports, or circular dependencies\n2. **Run pytest with `-v` flag** to see specific error messages\n3. **Test isolation** - Temporarily rename/remove conftest.py to verify it's the culprit\n4. **Check pytest version compatibility** with conftest.py changes\n\n**Process Improvements:**\n- Add pre-commit hooks to validate pytest configuration\n- Implement staged testing (unit → integration → system)\n- Set up automated test environment validation\n\n## Risk Assessment\n**HIGH RISK** - No testing validation means:\n- Undetected breaking changes in production code\n- Potential deployment of broken functionality\n- Regression risks across entire codebase\n- Compliance/quality standard violations\n\n**Priority:** Fix immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 322,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

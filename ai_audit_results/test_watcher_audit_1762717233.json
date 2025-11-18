@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762717233,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\unraisableexception.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762717208.9696965,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates fundamental issues with the test environment or test code structure. No meaningful quality assessment possible since tests didn't run.\n\n## Coverage Analysis\n**0.00% coverage** - Tests failed before coverage could be measured. This is a symptom, not the root problem.\n\n## Potential Issues\n1. **Environment corruption** - Modified file in `.venv\\Lib\\site-packages\\_pytest\\unraisableexception.py` suggests virtual environment issues\n2. **Pytest configuration** - Exit code -1 typically indicates pytest internal failures or environment problems\n3. **Dependency conflicts** - Modified core pytest files indicate potential version mismatches\n\n## Immediate Actions Required\n1. **Recreate virtual environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Verify pytest installation**:\n   ```bash\n   pytest --version\n   pytest --collect-only\n   ```\n3. **Check for custom pytest plugins** that might conflict with core pytest\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means undetected regressions. Development should pause until basic test execution is restored.\n\n## Priority Recommendations\n1. Fix test execution before addressing coverage\n2. Add pre-commit hook to prevent virtual environment modifications\n3. Consider using `pip freeze > requirements.txt` to lock dependencies\n4. Once tests run, establish baseline coverage and set incremental improvement targets\n\n**Next step**: Focus solely on getting tests to execute with a clean exit code (0).",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 137,
+      "completion_tokens": 347,
+      "total_tokens": 484,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 73
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

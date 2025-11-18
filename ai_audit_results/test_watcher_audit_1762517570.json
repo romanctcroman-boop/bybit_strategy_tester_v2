@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762517570,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\coverage\\types.py",
+    ".venv\\Lib\\site-packages\\coverage\\misc.py",
+    ".venv\\Lib\\site-packages\\coverage\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762517552.8012052,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**Critical Failure** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- No tests executed successfully\n- This represents the lowest possible test quality\n\n## 2. Coverage Analysis\n**Zero Coverage** - No code was tested:\n- 0.00% total coverage indicates tests never reached execution phase\n- No files show coverage data, suggesting premature test termination\n\n## 3. Potential Issues with Recent Changes\n**Environment Corruption Suspected**:\n- Modified files are in `.venv\\Lib\\site-packages\\coverage\\` (coverage package internals)\n- These should NEVER be modified directly in a virtual environment\n- Likely causes: Manual edits, corrupted installation, or faulty dependency management\n\n## 4. Recommendations for Improvement\n**Immediate Actions**:\n1. **Recreate virtual environment**: `rm -rf .venv && python -m venv .venv`\n2. **Reinstall dependencies**: `pip install -r requirements.txt`\n3. **Verify coverage installation**: Ensure `coverage` is properly installed\n4. **Run basic test**: Execute a simple test without coverage to verify environment\n\n**Follow-up Steps**:\n- Check for manual modifications to virtual environment files\n- Review dependency installation process\n- Ensure no custom modifications to coverage package\n\n## 5. Risk Assessment\n**HIGH RISK** - Development environment is compromised:\n- Unreliable test results\n- Potential for false positives/negatives\n- Environment instability affecting all development work\n- Immediate remediation required before any further testing or deployment\n\n**Priority**: Fix environment immediately before proceeding with any development or testing activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 171,
+      "completion_tokens": 367,
+      "total_tokens": 538,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 107
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

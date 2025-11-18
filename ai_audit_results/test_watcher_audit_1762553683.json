@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762553683,
+  "changed_files": [
+    "backend\\api\\secure_key_storage.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762553668.3234732,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete test failure means:\n- No code was executed during testing\n- All functionality remains untested\n- Impossible to assess actual coverage gaps\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `secure_key_storage.py`, suggesting:\n1. **Syntax errors** preventing import/execution\n2. **Missing dependencies** or imports in the changed module\n3. **Runtime errors** during module loading\n4. **Infinite loops** or blocking operations during initialization\n5. **Environment configuration** broken by new code\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Check Python syntax: `python -m py_compile backend/api/secure_key_storage.py`\n   - Verify imports and dependencies\n   - Run with verbose logging to identify failure point\n\n2. **Isolate the Issue**:\n   - Temporarily revert `secure_key_storage.py` changes to confirm they cause the failure\n   - Test the module in isolation: `python -c \"import backend.api.secure_key_storage\"`\n\n3. **Add Basic Validation**:\n   - Implement minimal unit tests for core functionality\n   - Add module-level error handling\n\n## Risk Assessment\n**HIGH RISK** - Critical security implications:\n- Key storage module is security-critical infrastructure\n- 0% coverage means potential vulnerabilities are undetected\n- Production deployment would be extremely risky\n- Requires immediate remediation before any further development\n\n**Priority**: Fix test execution as blocking issue before addressing coverage or adding new features.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 377,
+      "total_tokens": 505,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

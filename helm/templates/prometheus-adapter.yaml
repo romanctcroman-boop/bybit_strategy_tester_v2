@@ -1,0 +1,465 @@
+{{- if .Values.prometheusAdapter.enabled }}
+---
+# Prometheus Adapter for Custom Metrics API
+# Provides custom.metrics.k8s.io API for HPA to query LSTM predictions
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus-adapter
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+      - namespaces
+      - pods
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-resource-reader
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+      - pods
+      - services
+      - configmaps
+    verbs:
+      - get
+      - list
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-resource-reader
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-resource-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-server-resources
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - custom.metrics.k8s.io
+    resources:
+      - "*"
+    verbs:
+      - "*"
+  - apiGroups:
+      - external.metrics.k8s.io
+    resources:
+      - "*"
+    verbs:
+      - "*"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-hpa-controller
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-server-resources
+subjects:
+  - kind: ServiceAccount
+    name: horizontal-pod-autoscaler
+    namespace: kube-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-system-auth-delegator
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-auth-reader
+  namespace: kube-system
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-config
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus-adapter
+data:
+  config.yaml: |
+    # Prometheus Adapter Configuration
+    # Maps Prometheus metrics to Kubernetes custom/external metrics API
+    
+    rules:
+      # =====================================================
+      # LSTM Predicted Queue Length (External Metric)
+      # =====================================================
+      - seriesQuery: 'lstm_predicted_queue_length{namespace="{{ .Release.Namespace }}"}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+        name:
+          as: "predicted_queue_length"
+        metricsQuery: 'avg(lstm_predicted_queue_length{namespace="{{ .Release.Namespace }}",horizon_minutes="5"})'
+      
+      # =====================================================
+      # Actual Queue Length (for comparison)
+      # =====================================================
+      - seriesQuery: 'celery_queue_length{namespace="{{ .Release.Namespace }}"}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+        name:
+          as: "actual_queue_length"
+        metricsQuery: 'avg(celery_queue_length{namespace="{{ .Release.Namespace }}"})'
+      
+      # =====================================================
+      # Queue Growth Rate (derived metric)
+      # =====================================================
+      - seriesQuery: 'celery_queue_length{namespace="{{ .Release.Namespace }}"}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+        name:
+          as: "queue_growth_rate"
+        metricsQuery: 'rate(celery_queue_length{namespace="{{ .Release.Namespace }}"}[5m])'
+      
+      # =====================================================
+      # Worker Utilization (CPU-based)
+      # =====================================================
+      - seriesQuery: 'container_cpu_usage_seconds_total{namespace="{{ .Release.Namespace }}",pod=~".*-worker-.*"}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+            pod: {resource: "pod"}
+        name:
+          as: "worker_cpu_utilization"
+        metricsQuery: 'rate(container_cpu_usage_seconds_total{namespace="{{ .Release.Namespace }}",pod=~".*-worker-.*"}[5m])'
+      
+      # =====================================================
+      # Task Processing Rate
+      # =====================================================
+      - seriesQuery: 'celery_tasks_completed_total{namespace="{{ .Release.Namespace }}"}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+        name:
+          as: "task_processing_rate"
+        metricsQuery: 'rate(celery_tasks_completed_total{namespace="{{ .Release.Namespace }}"}[5m])'
+      
+      # =====================================================
+      # LSTM Model Confidence (for HPA decision weighting)
+      # =====================================================
+      - seriesQuery: 'lstm_prediction_confidence{namespace="{{ .Release.Namespace }}"}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+        name:
+          as: "prediction_confidence"
+        metricsQuery: 'avg(lstm_prediction_confidence{namespace="{{ .Release.Namespace }}"})'
+      
+      # =====================================================
+      # Custom Metric: Predicted Queue + Actual Queue Hybrid
+      # (Weighted average for smoother scaling)
+      # =====================================================
+      - seriesQuery: 'lstm_predicted_queue_length{namespace="{{ .Release.Namespace }}"}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+        name:
+          as: "hybrid_queue_metric"
+        metricsQuery: |
+          (
+            avg(lstm_predicted_queue_length{namespace="{{ .Release.Namespace }}",horizon_minutes="5"}) * 0.7 +
+            avg(celery_queue_length{namespace="{{ .Release.Namespace }}"}) * 0.3
+          )
+    
+    # External metrics (for HPA type: External)
+    externalRules:
+      - seriesQuery: 'lstm_predicted_queue_length'
+        resources:
+          template: <<.Resource>>
+        name:
+          as: "predicted_queue_length"
+        metricsQuery: 'avg(lstm_predicted_queue_length{horizon_minutes="5"})'
+      
+      - seriesQuery: 'celery_queue_length'
+        resources:
+          template: <<.Resource>>
+        name:
+          as: "celery_queue_length"
+        metricsQuery: 'avg(celery_queue_length)'
+    
+    # Resource metrics (CPU, memory)
+    resourceRules:
+      cpu:
+        containerQuery: |
+          sum(rate(container_cpu_usage_seconds_total{<<.LabelMatchers>>,container!="POD",container!="",pod!=""}[5m])) by (<<.GroupBy>>)
+        nodeQuery: |
+          sum(rate(container_cpu_usage_seconds_total{<<.LabelMatchers>>,id='/'}[5m])) by (<<.GroupBy>>)
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+            node: {resource: "node"}
+            pod: {resource: "pod"}
+        containerLabel: container
+      
+      memory:
+        containerQuery: |
+          sum(container_memory_working_set_bytes{<<.LabelMatchers>>,container!="POD",container!="",pod!=""}) by (<<.GroupBy>>)
+        nodeQuery: |
+          sum(container_memory_working_set_bytes{<<.LabelMatchers>>,id='/'}) by (<<.GroupBy>>)
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+            node: {resource: "node"}
+            pod: {resource: "pod"}
+        containerLabel: container
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus-adapter
+spec:
+  replicas: {{ .Values.prometheusAdapter.replicas }}
+  selector:
+    matchLabels:
+      {{- include "bybit-strategy-tester.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: prometheus-adapter
+  template:
+    metadata:
+      labels:
+        {{- include "bybit-strategy-tester.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: prometheus-adapter
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/prometheus-adapter.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+      containers:
+        - name: prometheus-adapter
+          image: {{ .Values.prometheusAdapter.image.repository }}:{{ .Values.prometheusAdapter.image.tag }}
+          imagePullPolicy: {{ .Values.prometheusAdapter.image.pullPolicy }}
+          args:
+            - --cert-dir=/var/run/serving-cert
+            - --config=/etc/adapter/config.yaml
+            - --logtostderr=true
+            - --metrics-relist-interval={{ .Values.prometheusAdapter.metricsRelistInterval }}
+            - --prometheus-url={{ .Values.prometheusAdapter.prometheusUrl }}
+            - --secure-port=6443
+            - --v={{ .Values.prometheusAdapter.logLevel }}
+          ports:
+            - containerPort: 6443
+              name: https
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.prometheusAdapter.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+          volumeMounts:
+            - name: config
+              mountPath: /etc/adapter
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: serving-cert
+              mountPath: /var/run/serving-cert
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-config
+        - name: tmp
+          emptyDir: {}
+        - name: serving-cert
+          secret:
+            secretName: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter-cert
+            optional: true
+      {{- with .Values.prometheusAdapter.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.prometheusAdapter.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.prometheusAdapter.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus-adapter
+spec:
+  type: ClusterIP
+  ports:
+    - name: https
+      port: 443
+      targetPort: 6443
+      protocol: TCP
+  selector:
+    {{- include "bybit-strategy-tester.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: prometheus-adapter
+
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.custom.metrics.k8s.io
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+spec:
+  service:
+    name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+  group: custom.metrics.k8s.io
+  version: v1beta1
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 100
+  versionPriority: 100
+
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.external.metrics.k8s.io
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+spec:
+  service:
+    name: {{ include "bybit-strategy-tester.fullname" . }}-prometheus-adapter
+    namespace: {{ .Release.Namespace }}
+  group: external.metrics.k8s.io
+  version: v1beta1
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 100
+  versionPriority: 100
+
+{{- end }}

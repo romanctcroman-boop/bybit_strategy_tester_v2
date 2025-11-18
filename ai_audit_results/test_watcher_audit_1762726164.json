@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762726164,
+  "changed_files": [
+    "simplified_reliable_mcp.py",
+    "tests\\test_perplexity_client.py",
+    "test_encrypted_keys.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762726149.0675547,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **100% coverage gap** - No code executed during testing\n- All test files failed to run, making coverage data unavailable\n- Critical lack of basic test infrastructure validation\n\n## Potential Issues with Recent Changes\n1. **Environment/Setup Failure**: Recent changes in `simplified_reliable_mcp.py` likely broke import chains or dependencies\n2. **Configuration Break**: Modified files suggest encryption/key management changes that may have disrupted test environment\n3. **Dependency Conflict**: New encryption logic in `test_encrypted_keys.py` may require missing dependencies\n4. **Import/Circular Dependencies**: Changes likely created import failures preventing test execution\n\n## Immediate Action Recommendations\n1. **Fix Basic Test Execution**:\n   - Run tests individually to identify which file causes the crash\n   - Check for missing imports in `simplified_reliable_mcp.py`\n   - Verify all dependencies are installed\n\n2. **Add Basic Sanity Tests**:\n   - Create simple smoke tests that validate import and basic functionality\n   - Add test environment validation checks\n\n3. **Investigate Encryption Changes**:\n   - Review `test_encrypted_keys.py` for environment requirements\n   - Ensure encryption dependencies are available in test environment\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- Zero test validation of recent changes\n- Potential encryption/security functionality completely untested\n- High probability of runtime failures in production\n- No confidence in reliability of modified components\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 143,
+      "completion_tokens": 369,
+      "total_tokens": 512,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 79
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

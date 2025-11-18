@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762604888,
+  "changed_files": [
+    "test_load_balancing.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762604873.0392957,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. No meaningful quality assessment possible as tests didn't run.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure suggests:\n- Test runner configuration issues\n- Missing dependencies or imports\n- Syntax errors preventing test discovery\n- Environment setup problems\n\n## Potential Issues with Recent Changes\nThe single changed file `test_load_balancing.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing imports** or dependencies\n- **Configuration errors** in test setup/teardown\n- **Incompatible test framework** changes\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest test_load_balancing.py -v` to see specific error details\n2. Check for syntax errors: `python -m py_compile test_load_balancing.py`\n3. Verify test dependencies and imports\n4. Ensure test discovery configuration is correct\n\n**Follow-up:**\n- Add pre-commit hooks to catch syntax errors\n- Implement basic smoke tests for test files\n- Set up CI to fail fast on test configuration issues\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No validation of load balancing functionality\n- Potential undetected production issues\n- Broken deployment pipeline\n- All subsequent test results are unreliable until fixed\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 326,
+      "total_tokens": 451,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762616487,
+  "changed_files": [
+    "test_enhanced_cross_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762616470.2687912,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test suite or environment. No meaningful quality assessment possible as tests didn't run.\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage confirms no tests executed successfully. This represents a complete testing failure.\n\n## Potential Issues\n1. **Test File Corruption**: `test_enhanced_cross_agent.py` likely contains syntax errors or import failures\n2. **Environment Issues**: Missing dependencies, incorrect Python version, or configuration problems\n3. **Fixtures/Setup Failure**: Test initialization or teardown crashing\n4. **Recent Changes**: The modified test file introduced breaking changes\n\n## Immediate Actions Required\n1. **Debug Test Execution**:\n   - Run tests with verbose output: `pytest -vvs test_enhanced_cross_agent.py`\n   - Check for syntax errors: `python -m py_compile test_enhanced_cross_agent.py`\n   - Verify imports and dependencies\n\n2. **Isolate the Failure**:\n   - Run individual test methods to identify specific failures\n   - Check test configuration and fixtures\n   - Verify all required packages are installed\n\n3. **Rollback Strategy**:\n   - Revert `test_enhanced_cross_agent.py` changes if recently modified\n   - Run previous working version to confirm environment stability\n\n## Risk Assessment\n**HIGH RISK** - Complete testing failure means:\n- No validation of code changes\n- Potential undetected regressions\n- Deployment would be extremely risky\n- Entire test suite is compromised\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 355,
+      "total_tokens": 483,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

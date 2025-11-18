@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762587939,
+  "changed_files": [
+    "tests\\integration\\test_alembic_migration.py",
+    "backend\\services\\adapters\\bybit.py",
+    "backend\\services\\adapters\\binance.py",
+    "backend\\core\\engine_adapter.py",
+    "backend\\tasks\\optimize_tasks.py",
+    "tests\\test_backtest_task.py",
+    "backend\\tasks\\backtest_tasks.py",
+    "tests\\test_stale_idempotency.py",
+    "health_check.py",
+    "tests\\test_backtest_task_errors.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762587922.2356563,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating either:\n- Test environment/setup issues\n- Fatal errors in test code or application code\n- Missing dependencies or configuration\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Possible import/initialization failures\n- No actual test execution occurred\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **Database migration issues** (`test_alembic_migration.py`)\n2. **Exchange adapter integration failures** (Bybit/Binance adapters)\n3. **Task engine/core changes** breaking test setup\n4. **Idempotency or backtest task logic** causing fatal errors\n\n## Immediate Action Recommendations\n\n**HIGH PRIORITY:**\n1. Check test logs for the specific error causing exit code -1\n2. Verify database connectivity and migration state\n3. Test exchange adapter initialization in isolation\n4. Run tests individually to identify the failing component\n\n**MEDIUM PRIORITY:**\n1. Add try-catch blocks around test setup\n2. Implement health checks before test execution\n3. Create smoke tests for critical components\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would likely fail\n- Critical business logic (trading adapters, backtesting) is untested\n- Potential data integrity issues with migrations\n- Financial operations at risk due to exchange adapter failures\n\n**Start by running `pytest -v tests/integration/test_alembic_migration.py` to isolate the migration test failure, as this is often the root cause of complete test suite failures.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 224,
+      "completion_tokens": 377,
+      "total_tokens": 601,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 160
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

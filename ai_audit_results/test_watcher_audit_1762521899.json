@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762521899,
+  "changed_files": [
+    "tests\\test_task_queue.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "backend\\ml\\retrain_scheduler.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\unit\\test_drift_detector.py",
+    "tests\\unit\\test_retrain_scheduler.py",
+    "tests\\backend\\conftest.py",
+    "tests\\unit\\test_ast_validator.py",
+    "tests\\test_walk_forward.py",
+    "tests\\unit\\test_structured_logger.py",
+    "mcp-server\\mcp_cache.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    "tests\\unit\\test_lru_ttl_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762521882.7777402,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates catastrophic test framework failure\n- 0% coverage suggests tests aren't executing properly\n- Likely environment or dependency issues preventing test execution\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - This is a major red flag:\n- Coverage reporting system failed entirely\n- Cannot assess which code paths are tested\n- Impossible to identify untested functionality\n\n## 3. Potential Issues with Recent Changes\n- **Modified test framework files** (conftest.py, terminal.py) may have broken test infrastructure\n- **Multiple test files changed** simultaneously suggests widespread refactoring\n- **Virtual environment file modified** (.venv) indicates dependency conflicts\n- **Test execution pipeline failure** rather than individual test failures\n\n## 4. Immediate Recommendations\n**Priority 1 - Fix Test Infrastructure:**\n- Revert changes to pytest files (conftest.py, terminal.py)\n- Check virtual environment integrity\n- Run minimal test to verify framework functionality\n\n**Priority 2 - Isolate the Break:**\n- Run tests individually to identify which change broke execution\n- Check for circular imports or dependency conflicts\n- Verify all test dependencies are properly installed\n\n**Priority 3 - Restore Coverage:**\n- Fix coverage reporting once tests execute\n- Focus on core modules first (walk_forward_optimizer, retrain_scheduler)\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state is unacceptable for deployment:\n- No confidence in code changes\n- Potential for undetected regressions\n- Development blocked until resolved\n- **Do not merge** any changes until test infrastructure is restored\n\n**Immediate Action:** Roll back recent test framework modifications and verify basic test execution works before proceeding.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 272,
+      "completion_tokens": 388,
+      "total_tokens": 660,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 208
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

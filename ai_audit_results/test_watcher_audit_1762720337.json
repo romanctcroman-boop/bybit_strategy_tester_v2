@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762720337,
+  "changed_files": [
+    "tests\\integration\\test_real_api_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762720314.0168648,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) before any meaningful testing occurred. This indicates a fundamental environment or setup issue rather than test quality problems.\n\n## Coverage Analysis\n**0% coverage** - No code was executed due to the test crash. This is a symptom, not the root issue.\n\n## Potential Issues with Recent Changes\n1. **Environment/Dependency Issues**: Missing dependencies, incompatible versions, or broken virtual environment\n2. **Test Fixture/Suite Setup**: Crashes in `setUpClass`, `setUpModule`, or import statements\n3. **API Integration Problems**: Missing API credentials, network connectivity issues, or external service unavailability\n4. **Configuration Errors**: Broken test configuration files or environment variables\n\n## Immediate Recommendations\n1. **Debug Exit Code -1**:\n   - Run tests with `-v` flag to see which specific test method crashes\n   - Check for unhandled exceptions in test setup/teardown\n   - Verify all dependencies are installed and compatible\n\n2. **Isolate the Failure**:\n   ```bash\n   python -m pytest tests/integration/test_real_api_integration.py -v --tb=short\n   ```\n\n3. **Check Integration Prerequisites**:\n   - Validate API credentials/endpoints\n   - Test network connectivity to external services\n   - Verify mock services are running if used\n\n## Risk Assessment\n**HIGH RISK** - Complete test suite failure means:\n- No validation of recent changes\n- Potential undiscovered regressions\n- Broken deployment pipeline\n- **Immediate action required** before any further development\n\n**Priority**: Fix test execution before addressing coverage or test quality improvements.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 355,
+      "total_tokens": 486,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

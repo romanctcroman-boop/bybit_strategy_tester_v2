@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762531005,
+  "changed_files": [
+    "mcp-server\\tools\\analysis\\analysis_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762530990.4236374,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies or environment setup issues\n- Test framework configuration problems\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not an actual coverage measurement.\n\n## Potential Issues with Recent Changes\nThe modified file `analysis_tools.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing imports or dependencies\n- Breaking changes to function signatures or class definitions\n- Circular imports or module loading issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution first** - Run tests with verbose output to identify the specific failure point\n2. **Check syntax** - Validate `analysis_tools.py` for Python syntax compliance\n3. **Verify imports** - Ensure all required dependencies are installed and accessible\n4. **Test isolation** - Run tests for the modified file individually to isolate the issue\n\n**Follow-up:**\n5. Once tests execute, establish baseline coverage for the modified file\n6. Add specific tests for new/changed functionality in `analysis_tools.py`\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely risky because:\n- No functionality has been validated\n- Regression testing is completely absent\n- The nature and impact of changes are unknown\n- Could break dependent systems or features\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 340,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

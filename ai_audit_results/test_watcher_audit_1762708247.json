@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762708247,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762708222.630187,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n- **0% coverage** - No code was executed during testing\n- No coverage data available for any files, including the modified `health_check.py`\n- Entire codebase is effectively untested\n\n## Potential Issues with Recent Changes\n1. **Test runner crash** - Likely caused by:\n   - Syntax errors in test files or test configuration\n   - Missing dependencies in test environment\n   - Broken test discovery mechanism\n   - Critical errors in `health_check.py` that prevent import/execution\n\n2. **`health_check.py` changes** may have introduced:\n   - Import cycles or circular dependencies\n   - Syntax errors preventing module loading\n   - Missing required imports\n\n## Recommendations for Improvement\n**Immediate Actions (Next 2 hours):**\n1. Run tests with `-v` flag to see exact failure point\n2. Check test configuration files for syntax errors\n3. Verify `health_check.py` imports and basic syntax\n4. Test import of `health_check.py` in isolation\n\n**Short-term (Next day):**\n1. Fix test runner configuration\n2. Add basic smoke test for `health_check.py`\n3. Ensure test environment dependencies are properly installed\n\n## Risk Assessment\n**HIGH RISK** - Deploying any code in this state is extremely dangerous:\n- No validation of `health_check.py` functionality\n- Potential runtime errors undetected\n- Regression risk: 100%\n- **Recommendation: Block all deployments until tests are functional**\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 364,
+      "total_tokens": 486,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "timestamp": "2025-11-11T23:39:02.191046",
+  "results": {},
+  "errors": [
+    {
+      "task": "analyze_existing_audits",
+      "error": "UnifiedAgentInterface.send_request() got an unexpected keyword argument 'agent_type'",
+      "timestamp": "2025-11-11T23:39:02.166649"
+    },
+    {
+      "task": "backend_architecture_audit",
+      "error": "UnifiedAgentInterface.send_request() got an unexpected keyword argument 'agent_type'",
+      "timestamp": "2025-11-11T23:39:02.168023"
+    },
+    {
+      "task": "frontend_quality_audit",
+      "error": "UnifiedAgentInterface.send_request() got an unexpected keyword argument 'agent_type'",
+      "timestamp": "2025-11-11T23:39:02.169639"
+    },
+    {
+      "task": "ai_agents_integration_audit",
+      "error": "UnifiedAgentInterface.send_request() got an unexpected keyword argument 'agent_type'",
+      "timestamp": "2025-11-11T23:39:02.171159"
+    },
+    {
+      "task": "database_schema_audit",
+      "error": "UnifiedAgentInterface.send_request() got an unexpected keyword argument 'agent_type'",
+      "timestamp": "2025-11-11T23:39:02.172552"
+    },
+    {
+      "task": "testing_coverage_audit",
+      "error": "UnifiedAgentInterface.send_request() got an unexpected keyword argument 'agent_type'",
+      "timestamp": "2025-11-11T23:39:02.173945"
+    },
+    {
+      "task": "security_audit",
+      "error": "UnifiedAgentInterface.send_request() got an unexpected keyword argument 'agent_type'",
+      "timestamp": "2025-11-11T23:39:02.175931"
+    },
+    {
+      "task": "performance_bottlenecks_audit",
+      "error": "UnifiedAgentInterface.send_request() got an unexpected keyword argument 'agent_type'",
+      "timestamp": "2025-11-11T23:39:02.177651"
+    },
+    {
+      "task": "generate_comprehensive_tz",
+      "error": "UnifiedAgentInterface.send_request() got an unexpected keyword argument 'agent_type'",
+      "timestamp": "2025-11-11T23:39:02.180905"
+    }
+  ],
+  "stats": {
+    "total_tasks": 8,
+    "successful": 0,
+    "failed": 9,
+    "success_rate": 0.0
+  }
+}

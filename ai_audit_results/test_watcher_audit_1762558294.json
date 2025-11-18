@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762558294,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\loguru\\__init__.pyi",
+    ".venv\\Lib\\site-packages\\loguru\\__init__.py",
+    "automation\\deepseek_code_agent\\code_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762558279.3003147,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates fundamental issues with the test environment, dependencies, or test code structure. No meaningful quality assessment possible until tests can run.\n\n## Coverage Analysis\n**0% coverage** - Tests failed before any code execution could be measured. This is a severe regression from any previous state.\n\n## Potential Issues with Recent Changes\n1. **Environment contamination** - Changes to `.venv` packages (loguru) suggest dependency conflicts or virtual environment corruption\n2. **Code agent integration** - `code_agent.py` modifications may have introduced breaking changes\n3. **Import/circular dependency issues** - Common cause of pre-execution failures\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Recreate virtual environment: `rm -rf .venv && python -m venv .venv`\n   - Reinstall dependencies with pinned versions\n   - Run minimal smoke test to verify basic functionality\n\n2. **Debug strategy**:\n   - Check import statements in `code_agent.py`\n   - Verify loguru compatibility with current Python version\n   - Run tests with `-v` flag to see where they fail\n\n3. **Prevention**:\n   - Add pre-commit hooks to prevent accidental `.venv` modifications\n   - Use dependency locking (requirements.txt/pipenv/poetry)\n\n## Risk Assessment\n**HIGH RISK** - Unable to validate any functionality. Deployment would be extremely risky. The team cannot assess impact of recent changes to `code_agent.py` without working tests.\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 168,
+      "completion_tokens": 346,
+      "total_tokens": 514,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 104
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762633568,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    "mcp-server\\orchestrator\\queue\\redis_streams.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\pytest\\__main__.py",
+    "mcp-server\\orchestrator\\api\\models.py",
+    "automation\\task1_test_watcher\\test_watcher.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    "mcp-server\\orchestrator\\api\\metrics.py",
+    "backend\\app.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762633548.5407226,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage means no tests executed successfully\n- Test infrastructure itself appears compromised\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No code coverage data collected\n- All test execution halted before measurement\n- Unable to assess actual code coverage\n\n## Potential Issues with Recent Changes\n\n**HIGH RISK CHANGES IDENTIFIED:**\n1. **Pytest core files modified** - Critical testing infrastructure compromised\n   - `_pytest/main.py`, `_pytest/runner.py`, `_pytest/config/__init__.py`\n   - These should NEVER be modified directly\n\n2. **Pluggy hook system altered** - Plugin infrastructure damaged\n   - `pluggy/_callers.py`, `pluggy/_hooks.py`, `pluggy/_manager.py`\n   - Core pytest plugin system corrupted\n\n3. **Application code changes** - Potential integration issues\n   - `mcp-server/orchestrator/queue/redis_streams.py`\n   - `automation/task1_test_watcher/test_watcher.py`\n   - `backend/app.py`\n\n## Immediate Action Recommendations\n\n**CRITICAL (DO FIRST):**\n1. **Restore testing environment**\n   ```bash\n   # Recreate virtual environment\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify pytest integrity**\n   ```bash\n   pip install --force-reinstall pytest pytest-cov\n   ```\n\n3. **Run minimal test to verify fix**\n   ```bash\n   python -m pytest -v --tb=short automation/task1_test_watcher/test_watcher.py\n   ```\n\n**HIGH PRIORITY:**\n4. **Add environment protection**\n   - Add `.venv` to `.gitignore` if not already\n   - Implement pre-commit hooks to prevent venv modifications\n\n5. **Create isolated test for critical paths**\n   - Test redis_streams.py in isolation\n   - Verify test_watcher functionality separately\n\n## Risk Assessment\n\n**SEVERITY: CRITICAL** 🔴\n- **Testing completely disabled** - no safety net for deployments\n- **Environment corruption** - affects all developers\n- **Undetected regressions** - production stability at risk\n- **Development blocked** - cannot validate changes\n\n**IMMEDIATE IMPACT:**\n- All code changes are untested\n- Deployment to production should be halted\n- Team velocity severely impacted\n\n**LONG-TERM RISK:**\n- Trust in testing infrastructure eroded\n- Potential for similar future incidents\n- Technical debt accumulation\n\n**NEXT STEPS:** Execute critical recommendations immediately, then proceed with high priority items once basic testing is restored.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 400,
+      "completion_tokens": 612,
+      "total_tokens": 1012,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 336
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

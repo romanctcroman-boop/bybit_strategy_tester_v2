@@ -1,0 +1,101 @@
+# AuditAgent Alert Rules
+# Monitors AuditAgent health, coverage, and performance
+
+groups:
+  - name: audit_agent_alerts
+    interval: 30s
+    rules:
+      # CRITICAL: Coverage drop
+      - alert: TestCoverageDrop
+        expr: |
+          audit_agent_coverage_percent < 70
+          and
+          changes(audit_agent_coverage_percent[1h]) < -5
+        for: 10m
+        labels:
+          severity: critical
+          component: audit-agent
+          service: automation-platform
+        annotations:
+          summary: "Test coverage dropped below 70%"
+          description: "Coverage is {{ $value | humanize }}% and has dropped by more than 5% in the last hour."
+          runbook: "Review recent code changes and add missing tests."
+      
+      # WARNING: Low coverage
+      - alert: TestCoverageLow
+        expr: audit_agent_coverage_percent < 80
+        for: 1h
+        labels:
+          severity: warning
+          component: audit-agent
+          service: automation-platform
+        annotations:
+          summary: "Test coverage is below 80%"
+          description: "Current test coverage is {{ $value | humanize }}% (target: 85%+)."
+          runbook: "Identify uncovered code paths and add tests."
+      
+      # WARNING: High error rate
+      - alert: AuditAgentHighErrors
+        expr: rate(audit_agent_errors_total[10m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: audit-agent
+          service: automation-platform
+        annotations:
+          summary: "AuditAgent has high error rate"
+          description: "Experiencing {{ $value | humanize }} errors per second."
+          runbook: "Check audit logs and investigate error causes."
+      
+      # WARNING: Slow audit runs
+      - alert: AuditAgentSlowRuns
+        expr: histogram_quantile(0.95, rate(audit_agent_run_duration_seconds_bucket[10m])) > 600
+        for: 15m
+        labels:
+          severity: warning
+          component: audit-agent
+          service: automation-platform
+        annotations:
+          summary: "Audit runs are taking too long"
+          description: "95th percentile audit duration is {{ $value | humanize }}s (threshold: 10 minutes)."
+          runbook: "Optimize audit process or increase resources."
+      
+      # WARNING: No recent audit runs
+      - alert: AuditAgentNoRecentRuns
+        expr: time() - audit_agent_last_run_timestamp > 7200  # 2 hours
+        for: 10m
+        labels:
+          severity: warning
+          component: audit-agent
+          service: automation-platform
+        annotations:
+          summary: "No audit runs in the last 2 hours"
+          description: "Last audit was {{ $value | humanizeDuration }} ago."
+          runbook: "Check if scheduled audits are running correctly."
+      
+      # INFO: Completion marker detected
+      - alert: CompletionMarkerDetected
+        expr: increase(audit_agent_completion_markers_found_total[1m]) > 0
+        labels:
+          severity: info
+          component: audit-agent
+          service: automation-platform
+        annotations:
+          summary: "Completion marker detected"
+          description: "A completion marker was found, triggering automated audit."
+          runbook: "This is normal behavior. Audit will run automatically."
+      
+      # INFO: Coverage improved
+      - alert: TestCoverageImproved
+        expr: |
+          audit_agent_coverage_percent > 85
+          and
+          changes(audit_agent_coverage_percent[1h]) > 5
+        labels:
+          severity: info
+          component: audit-agent
+          service: automation-platform
+        annotations:
+          summary: "Test coverage improved to {{ $value | humanize }}%"
+          description: "Coverage increased by more than 5% in the last hour."
+          runbook: "Great job! Keep up the good testing practices."

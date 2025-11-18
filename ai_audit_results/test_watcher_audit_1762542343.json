@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762542343,
+  "changed_files": [
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    "tests\\monitoring\\test_metrics_export.py",
+    "tests\\monitoring\\__init__.py",
+    "automation\\metrics\\custom_metrics.py",
+    "automation\\metrics\\__init__.py",
+    "automation\\metrics\\collectors\\system_collector.py",
+    "automation\\metrics\\collectors\\audit_agent_collector.py",
+    "automation\\metrics\\prometheus_exporter.py",
+    "demo_prometheus_metrics.py",
+    "automation\\metrics\\collectors\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762542328.5905638,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. Zero coverage suggests tests aren't even running.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code is being executed during testing\n- **Critical Gap**: Test infrastructure failure preventing any meaningful coverage measurement\n- **Missing**: Basic test execution validation across all modified files\n\n## Potential Issues with Recent Changes\n1. **Dependency Break**: Likely missing imports, broken dependencies, or environment configuration in the metrics collection system\n2. **Initialization Failure**: `__init__.py` files or collector initialization may be failing\n3. **Prometheus Integration**: Issues in `prometheus_exporter.py` or `demo_prometheus_metrics.py` breaking test setup\n4. **Circular Imports**: Possible import conflicts between collector modules\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to identify which specific test is failing first\n2. Check test environment setup and dependencies\n3. Verify all `__init__.py` files are properly configured\n4. Test individual collectors in isolation\n\n**Short-term:**\n1. Add basic smoke tests for each collector class\n2. Implement test fixtures for Prometheus client mocking\n3. Add import validation in `__init__.py` files\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production metrics collection may be broken\n- No validation of recent changes to monitoring system\n- Potential for silent failures in production monitoring\n- Critical functionality completely untested\n\n**Priority**: Fix test execution immediately before any deployment. Start with simplest collector tests and build up to complex integrations.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 242,
+      "completion_tokens": 372,
+      "total_tokens": 614,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 178
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

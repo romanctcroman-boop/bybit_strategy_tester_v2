@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762554097,
+  "changed_files": [
+    "backend\\api\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554069.4969075,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage data was collected. This represents a complete testing gap across the entire codebase. The circuit_breaker.py changes are completely untested.\n\n## Potential Issues with Recent Changes\n1. **Circuit Breaker Implementation Defects**: The new circuit_breaker.py file likely contains syntax errors, import issues, or runtime exceptions that prevent test execution\n2. **Dependency Conflicts**: Missing imports or incompatible dependencies\n3. **Configuration Issues**: Environment setup or test configuration problems\n4. **Critical Logic Errors**: Code that fails during module loading or initialization\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix Test Execution**: Run tests with verbose output to identify the specific failure point\n2. **Isolate Circuit Breaker**: Test circuit_breaker.py in isolation to identify syntax/runtime errors\n3. **Check Imports**: Verify all dependencies and imports in the new file\n4. **Add Basic Unit Tests**: Create minimal tests for circuit_breaker.py before addressing coverage\n\n**FOLLOW-UP:**\n5. Implement circuit breaker pattern tests (open/closed/half-open states, failure thresholds)\n6. Add integration tests for API endpoints using the circuit breaker\n7. Set coverage targets (aim for 80%+ on critical components)\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- **Critical Risk**: Untested circuit breaker logic could cause complete API failure\n- **Operational Risk**: No fallback mechanism testing could lead to cascading failures\n- **Quality Risk**: 0% coverage indicates potential for multiple undetected defects\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 414,
+      "total_tokens": 541,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

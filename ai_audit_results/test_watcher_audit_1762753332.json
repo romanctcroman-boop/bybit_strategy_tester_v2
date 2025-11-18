@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762753332,
+  "changed_files": [
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762753302.4663837,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero quality assurance. This indicates either catastrophic test infrastructure issues or severe code defects.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout with:\n- No function/method coverage\n- No branch coverage\n- No line coverage\n- No import validation\n\n## Potential Issues with Recent Changes\nThe failure likely stems from `tests/test_protocol.py` changes:\n- Syntax errors in test file\n- Missing dependencies/imports\n- Test infrastructure configuration issues\n- Fixture/setup failures preventing test execution\n- Environment compatibility problems\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution**: Run `python -m pytest tests/test_protocol.py -v` to identify specific failure point\n2. **Check syntax**: Validate `test_protocol.py` for Python syntax compliance\n3. **Verify imports**: Ensure all required modules and dependencies are available\n4. **Review test configuration**: Check pytest configuration, conftest.py, and environment setup\n\n**FOLLOW-UP:**\n- Implement basic smoke tests to prevent complete test suite collapse\n- Add pre-commit hooks to validate test syntax\n- Set up CI pipeline to catch test failures before merge\n\n## Risk Assessment\n**HIGH RISK** - Current state represents maximum risk:\n- **Code quality**: Unknown - no validation occurring\n- **Regression risk**: 100% - no protection against breaking changes\n- **Deployment risk**: Critical - shipping untested code\n- **Maintenance risk**: High - test infrastructure is broken\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 378,
+      "total_tokens": 504,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762552376,
+  "changed_files": [
+    "backend\\api\\parallel_deepseek_client_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552361.3817368,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or code syntax that prevent any meaningful testing.\n\n## Coverage Analysis & Gaps\n- **0% coverage** - No tests executed successfully\n- No coverage data available for analysis\n- Complete testing gap across all codebase\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `parallel_deepseek_client_v2.py` likely causing test runner crash\n2. **Missing Dependencies** - New imports or requirements not installed\n3. **Configuration Issues** - Test setup/teardown failures\n4. **Environment Incompatibility** - Python version or system dependency mismatch\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix Exit Code -1 First** - Run tests with verbose output to identify root cause\n2. **Check Syntax** - Validate `parallel_deepseek_client_v2.py` for basic Python syntax\n3. **Verify Dependencies** - Ensure all imports and requirements are available\n4. **Test Isolation** - Run minimal test case to verify basic functionality\n\n**Follow-up:**\n5. Add basic smoke tests for new client functionality\n6. Implement error handling for API client initialization\n7. Set up continuous integration with dependency validation\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would likely fail\n- No regression protection for existing functionality\n- Potential runtime errors in production\n- Complete loss of test feedback loop\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 337,
+      "total_tokens": 468,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

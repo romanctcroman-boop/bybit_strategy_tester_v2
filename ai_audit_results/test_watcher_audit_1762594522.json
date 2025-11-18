@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762594522,
+  "changed_files": [
+    "automation\\deepseek_robot\\test_advanced_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762594507.006677,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite failed to execute (Exit Code -1) and produced 0% coverage, indicating fundamental issues with the test infrastructure or recent changes.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - Complete test failure\n- **No files covered** - Tests didn't reach any code execution\n- **Critical gap**: Entire codebase is untested in this run\n\n## Potential Issues with Recent Changes\n1. **Test file corruption**: `test_advanced_integration.py` may contain syntax errors or import failures\n2. **Environment issues**: Missing dependencies, configuration problems, or environment setup failures\n3. **Fixtures/Setup**: Test initialization or teardown causing crashes\n4. **Integration failures**: External service dependencies unavailable or misconfigured\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check test file syntax: `python -m py_compile automation/deepseek_robot/test_advanced_integration.py`\n3. Verify imports and dependencies in the test file\n4. Run a minimal smoke test to isolate the failure point\n\n**Structural Improvements:**\n1. Add pre-commit hooks to validate test syntax\n2. Implement staged testing (unit → integration)\n3. Add test environment health checks\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback on code changes\n- Potential for undetected regressions\n- Deployment readiness cannot be verified\n- Critical integration paths may be broken\n\n**Priority**: Address test execution failures before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 353,
+      "total_tokens": 486,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 69
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

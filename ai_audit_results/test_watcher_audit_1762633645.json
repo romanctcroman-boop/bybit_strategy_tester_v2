@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762633645,
+  "changed_files": [
+    "tests\\test_rate_limiter.py",
+    "tests\\test_circuit_breaker.py",
+    "tests\\test_di_container.py",
+    "tests\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762633630.4777017,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data collected implies tests never reached execution phase\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete test failure:\n- No files were executed or measured\n- All test modules are effectively dead code in current state\n- Cannot assess actual coverage gaps due to total suite failure\n\n## Potential Issues with Recent Changes\nPrimary suspects in modified files:\n1. **`conftest.py`** - Likely broken fixture/config causing suite crash\n2. **Test dependencies** - Missing imports, broken fixtures, or circular dependencies\n3. **Environment issues** - Path problems, missing test dependencies, or version conflicts\n4. **Test discovery failure** - Potentially broken pytest configuration\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `pytest tests/ -v` to identify crashing test/module\n2. Check `conftest.py` for syntax errors and fixture issues\n3. Verify all test dependencies are installed and compatible\n4. Run tests individually to isolate the failing component\n\n**Systematic Fixes:**\n1. Add test suite health checks to CI pipeline\n2. Implement test dependency validation\n3. Add pytest `--tb=short` for clearer error traces\n4. Consider test containerization for environment consistency\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- No confidence in system stability or recent changes\n- Critical failure suggests potential runtime issues in application code\n- All test safety nets are currently non-functional\n- Requires immediate resolution before any further development\n\n**Priority:** Fix test infrastructure before addressing any feature development or bug fixes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 155,
+      "completion_tokens": 379,
+      "total_tokens": 534,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 91
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

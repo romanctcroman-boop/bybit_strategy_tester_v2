@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762730423,
+  "changed_files": [
+    "test_configurable_jitter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762730410.8507655,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken. Exit code -1 indicates a fatal error before any tests could run. This represents a complete testing infrastructure failure.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is not a coverage gap but a complete testing system failure.\n\n## Potential Issues with Recent Changes\nThe file `test_configurable_jitter.py` is likely causing:\n- **Syntax errors** preventing test discovery/import\n- **Import failures** due to missing dependencies or circular imports\n- **Configuration errors** in test setup/teardown\n- **Environment issues** with test runners or dependencies\n\n## Immediate Recommendations\n1. **Fix test discovery first** - Run `python -m pytest --collect-only` to identify import/syntax issues\n2. **Check test file syntax** - Validate `test_configurable_jitter.py` for Python syntax compliance\n3. **Verify imports** - Ensure all imports in the test file resolve correctly\n4. **Test isolation** - Run the problematic test file alone: `pytest test_configurable_jitter.py -v`\n5. **Check test configuration** - Review pytest.ini, conftest.py, and environment setup\n\n## Risk Assessment\n**HIGH RISK** - No test validation is occurring. Any code changes are completely unverified. This represents a severe quality gate failure that could allow broken code to reach production.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 314,
+      "total_tokens": 439,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

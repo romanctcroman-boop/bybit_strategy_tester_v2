@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762584291,
+  "changed_files": [
+    "test_deepseek_full_capabilities.py",
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762584273.0161023,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental execution issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- Zero coverage across all files\n- No test execution occurred\n- Critical gap: entire codebase untested\n\n## Potential Issues with Recent Changes\n1. **Psycopg2 Integration Problem** - Modified `psycopg2/__init__.py` in virtual environment suggests database connectivity issues\n2. **Environment Corruption** - Modifying site-packages directly indicates environment instability\n3. **Test File Conflicts** - `test_deepseek_full_capabilities.py` and `temp_pg_test.py` may have dependency clashes\n4. **Fatal Runtime Error** - Exit code -1 suggests memory issues, import cycles, or C extension crashes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Restore Clean Environment:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Isolate Test Failure:**\n   - Run tests individually: `python -m pytest test_deepseek_full_capabilities.py -v`\n   - Check for import errors or missing dependencies\n3. **Fix Database Configuration:**\n   - Verify PostgreSQL connection settings\n   - Ensure psycopg2 is properly installed, not modified\n\n**FOLLOW-UP:**\n4. Add basic smoke test to verify test infrastructure\n5. Implement CI environment isolation checks\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No functional test suite\n- Environment instability\n- Potential data corruption from database issues\n- Unknown code quality across entire codebase\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 157,
+      "completion_tokens": 427,
+      "total_tokens": 584,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 93
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

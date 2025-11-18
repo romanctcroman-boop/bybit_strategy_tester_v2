@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762614654,
+  "changed_files": [
+    "backend\\agents\\deepseek.py",
+    "test_enhanced_cross_agent.py",
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762614639.3601208,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/import)\n- 0% coverage suggests tests never executed\n- No coverage data available for analysis\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No files were executed\n- All new/modified code completely untested\n- Test infrastructure itself may be broken\n\n## Potential Issues with Recent Changes\n1. **Import/Circular Dependency Issues** - Changes in `backend\\agents\\deepseek.py` may break imports\n2. **Test Configuration Broken** - `test_enhanced_cross_agent.py` might have fatal syntax/import errors\n3. **Environment/Dependency Issues** - Missing imports or version conflicts\n4. **Health Check Interference** - `health_check.py` might be interfering with test initialization\n\n## Immediate Action Recommendations\n1. **DEBUG TEST SETUP:**\n   ```bash\n   python -m pytest test_enhanced_cross_agent.py -v --tb=short\n   ```\n2. **CHECK IMPORTS:**\n   - Verify `deepseek.py` imports work in isolation\n   - Test `health_check.py` doesn't have side effects\n3. **VALIDATE TEST CONFIGURATION:**\n   - Check pytest.ini/pyproject.toml for configuration errors\n   - Verify all dependencies installed\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be completely blind:\n- 100% of new code untested\n- Critical failures likely in production\n- No safety net for regression\n\n**URGENT PRIORITY** - Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 365,
+      "total_tokens": 507,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

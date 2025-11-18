@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540290,
+  "changed_files": [
+    "tests\\stress\\test_parallel_execution.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540276.6425035,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1), indicating severe infrastructure or environment issues rather than test logic failures. The test suite is non-functional.\n\n## Coverage Analysis\n**0% coverage** - No code was executed during test run. This is not a coverage gap but a complete system failure.\n\n## Potential Issues with Recent Changes\nThe modified stress test (`test_parallel_execution.py`) likely contains:\n- Infinite loops or resource exhaustion\n- Memory leaks causing system crashes\n- Race conditions leading to deadlocks\n- Environment dependency failures\n- Import errors or syntax issues\n\n## Immediate Recommendations\n\n**Priority 1 - Diagnose Crash:**\n```bash\n# Run with verbose output to identify crash point\npython -m pytest tests/stress/test_parallel_execution.py -v -s\n\n# Check for memory limits or resource constraints\npython -c \"import tests.stress.test_parallel_execution\"\n```\n\n**Priority 2 - Isolate the Issue:**\n- Run stress test in isolation with timeout\n- Add debug logging to identify hang/crash location\n- Verify environment dependencies and resource limits\n\n**Priority 3 - Implement Safeguards:**\n- Add timeout decorators to stress tests\n- Implement resource monitoring during execution\n- Create test environment validation checks\n\n## Risk Assessment\n**HIGH RISK** - Complete test suite failure means:\n- No validation of any functionality\n- Potential production issues undetected\n- Development blocked until resolved\n- Critical bugs could be deployed\n\n**Action:** Stop all deployments until test infrastructure is restored. The stress test modification is the primary suspect - revert it immediately to restore testing capability.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 344,
+      "total_tokens": 473,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

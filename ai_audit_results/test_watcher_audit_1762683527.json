@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762683527,
+  "changed_files": [
+    "tests\\test_edge_cases_stress.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762683510.9674573,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). This indicates severe infrastructure or code issues rather than test failures. The test suite is non-functional.\n\n## Coverage Analysis & Gaps\n- **0% coverage** - No code was executed successfully\n- **Complete gap** - All test execution failed before coverage could be measured\n- **Critical infrastructure failure** - Unable to assess actual code coverage\n\n## Potential Issues with Recent Changes\n1. **tests\\test_edge_cases_stress.py** likely contains code that:\n   - Crashes the test runner (syntax errors, import failures)\n   - Contains infinite loops or resource exhaustion\n   - Has severe memory leaks or system resource issues\n   - Modifies critical test infrastructure\n\n## Immediate Recommendations\n1. **ROLLBACK** the recent test file changes immediately\n2. **Isolate the problematic test** by running it separately: `python -m pytest tests/test_edge_cases_stress.py -v`\n3. **Check for syntax errors**: `python -m py_compile tests/test_edge_cases_stress.py`\n4. **Add test isolation** - Ensure stress tests run in separate processes with resource limits\n5. **Implement test staging** - Run new tests in isolation before full suite integration\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- ❌ No test coverage validation\n- ❌ Unable to detect regressions\n- ❌ Development pipeline blocked\n- ❌ Production deployment risky\n\n**Priority**: Fix immediately - this blocks all quality assurance and deployment activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 328,
+      "total_tokens": 456,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

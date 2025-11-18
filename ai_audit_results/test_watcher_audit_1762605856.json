@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762605856,
+  "changed_files": [
+    "automation\\deepseek_robot\\test_memory_leaks.py",
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762605834.6376991,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- 0% overall coverage = no code being tested\n- Missing: All functional testing, integration testing, unit testing\n- Critical gap: Entire codebase untested\n\n## Potential Issues with Recent Changes\n1. **Memory leak test file** (`test_memory_leaks.py`) likely contains fatal errors\n2. **Architecture changes** (`advanced_architecture.py`) may have broken test infrastructure\n3. Possible circular imports or dependency conflicts between new modules\n4. Test runner configuration may be incompatible with new architecture\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure:**\n   - Check for import errors in `test_memory_leaks.py`\n   - Verify test discovery configuration\n   - Run tests with `-v` flag to see which tests fail first\n\n2. **Isolate the Break:**\n   - Temporarily remove new test files to see if existing tests run\n   - Test `advanced_architecture.py` imports in isolation\n   - Check for missing dependencies in new architecture\n\n3. **Fix Foundational Issues:**\n   - Add exception handling in test setup/teardown\n   - Ensure test runner compatibility with project structure\n   - Validate Python path and module resolution\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression protection\n- Potential production-breaking changes undetected\n- Memory leak risks unverified despite dedicated tests\n- Architecture changes deployed without validation\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 145,
+      "completion_tokens": 379,
+      "total_tokens": 524,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 17
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

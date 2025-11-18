@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762616128,
+  "changed_files": [
+    "test_enhanced_cross_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762616114.3162189,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test suite or environment. No tests ran successfully.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure suggests:\n- Test runner configuration issues\n- Import/syntax errors in test files\n- Environment/dependency problems\n- Test discovery failures\n\n## Potential Issues with Recent Changes\n**Primary suspect: test_enhanced_cross_agent.py**\n- Likely contains syntax errors or import failures\n- May have broken test infrastructure\n- Could be missing dependencies or configuration\n- Possible circular imports or module conflicts\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution**: Run `python -m pytest test_enhanced_cross_agent.py -v` to identify specific failures\n2. **Check syntax**: Validate Python syntax in the modified test file\n3. **Verify imports**: Ensure all imported modules exist and are accessible\n4. **Test isolation**: Run individual test methods to isolate the breaking change\n\n**FOLLOW-UP:**\n5. Add pre-commit hooks to catch syntax errors\n6. Implement CI pipeline with incremental testing\n7. Add basic smoke tests for test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- ❌ No test validation of code changes\n- ❌ Complete testing breakdown\n- ❌ High probability of undetected regressions\n- ❌ Deployment would be extremely risky\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 331,
+      "total_tokens": 459,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

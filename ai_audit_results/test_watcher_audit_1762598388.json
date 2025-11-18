@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762598388,
+  "changed_files": [
+    "automation\\deepseek_robot\\dual_analytics_engine.py",
+    "backend\\api\\deepseek_pool.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762598371.277236,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test framework failure\n- Zero test execution suggests broken test environment or configuration\n- No coverage data collected implies tests didn't even start\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BLACKOUT**:\n- 0% coverage across all files\n- No test execution means all code paths are untested\n- Modified files `dual_analytics_engine.py` and `deepseek_pool.py` have zero validation\n\n## Potential Issues with Recent Changes\n1. **Environment/Configuration Break**:\n   - Test runner cannot initialize\n   - Possible missing dependencies or broken virtual environment\n   - Path configuration issues with new file structure\n\n2. **Code Integration Problems**:\n   - Import errors in modified files\n   - Circular dependencies between analytics engine and API pool\n   - Breaking changes to shared interfaces\n\n## Immediate Action Recommendations\n1. **Diagnose Test Framework**:\n   ```bash\n   python -m pytest --version  # Verify installation\n   python -c \"import pytest\"   # Check importability\n   ```\n\n2. **Check Modified Files for Syntax**:\n   ```bash\n   python -m py_compile automation/deepseek_robot/dual_analytics_engine.py\n   python -m py_compile backend/api/deepseek_pool.py\n   ```\n\n3. **Run Tests with Verbose Output**:\n   ```bash\n   pytest -v --tb=short\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No validation of analytics engine logic\n- API pool changes completely untested\n- High probability of runtime failures in production\n- **Recommend blocking deployments** until basic test execution is restored\n\n**Priority**: Fix test execution before any code review or further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 144,
+      "completion_tokens": 388,
+      "total_tokens": 532,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 80
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

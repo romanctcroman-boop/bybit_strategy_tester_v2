@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762539072,
+  "changed_files": [
+    "tests\\integration\\test_e2e_test_watcher.py",
+    ".venv\\Lib\\site-packages\\watchdog\\events.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539048.5287392,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error before any tests could execute. This represents a complete breakdown in test infrastructure.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is not a coverage gap but a complete test execution failure.\n\n## Potential Issues with Recent Changes\n1. **Modified dependency file** (`watchdog/events.py`) suggests dependency conflicts or version incompatibility\n2. **Integration test changes** may have introduced fatal configuration errors\n3. Possible environment corruption in virtual environment (`.venv`)\n\n## Immediate Action Recommendations\n1. **Investigate test runner configuration** - Check pytest/runner setup and environment variables\n2. **Verify dependency integrity** - Restore original `watchdog` package and test\n3. **Check virtual environment** - Recreate `.venv` and reinstall dependencies\n4. **Run minimal test** - Execute a single simple test to isolate the failure point\n5. **Review recent commits** - Identify what changed in test configuration or dependencies\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means undetected production issues are likely. Code changes cannot be safely deployed until resolved.\n\n**Priority: Fix immediately** - This blocks all development and deployment activities.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 150,
+      "completion_tokens": 275,
+      "total_tokens": 425,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 86
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

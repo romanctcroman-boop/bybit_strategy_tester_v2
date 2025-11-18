@@ -1,0 +1,75 @@
+# Docker Compose для E2E тестирования
+# Рекомендация от DeepSeek для управления зависимостями
+
+version: "3.8"
+
+services:
+  # PostgreSQL для тестов (опционально, если нужна реальная БД)
+  postgres-test:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: test_db
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+
+  # Backend API для тестов
+  backend-test:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: >
+      sh -c "
+        echo '⏳ Running database migrations...' &&
+        python -m alembic upgrade head &&
+        echo '✅ Migrations complete' &&
+        echo '⏳ Loading test fixtures...' &&
+        python -m backend.scripts.init_db &&
+        echo '✅ Fixtures loaded' &&
+        echo '🚀 Starting API server...' &&
+        uvicorn backend.api.app:app --host 0.0.0.0 --port 8000
+      "
+    environment:
+      DATABASE_URL: postgresql://test_user:test_password@postgres-test:5432/test_db
+      TESTING: "true"
+      JWT_SECRET_KEY: test-secret-key-do-not-use-in-production
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Frontend Vite для тестов
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.test
+    command: npm run dev -- --host 0.0.0.0
+    environment:
+      VITE_API_BASE_URL: http://backend-test:8000/api/v1
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend-test:
+        condition: service_healthy
+
+volumes:
+  postgres-test-data:
+
+networks:
+  default:
+    name: bybit-test-network

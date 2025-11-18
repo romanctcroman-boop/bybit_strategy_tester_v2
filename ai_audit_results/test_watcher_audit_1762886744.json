@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762886744,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\alembic\\script\\revision.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762886730.1996257,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates either:\n- Test environment setup failure\n- Syntax errors in test files\n- Missing dependencies\n- Test framework configuration issues\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a direct result of the test execution failure, not an actual measurement of test coverage.\n\n## Potential Issues with Recent Changes\n- **Modified dependency file**: The change in `alembic\\script\\revision.py` (a third-party package) suggests environment corruption\n- **Virtual environment contamination**: Modifying files in `.venv` indicates the virtual environment may be compromised\n- **Dependency version conflicts**: Alembic changes could indicate migration tool compatibility issues\n\n## Immediate Recommendations\n1. **Recreate virtual environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify test runner configuration**:\n   - Check pytest/unittest configuration files\n   - Ensure test discovery patterns are correct\n\n3. **Isolate the failure**:\n   ```bash\n   python -m pytest --collect-only  # Check if tests are discovered\n   python -m pytest -v tests/  # Run with verbose output\n   ```\n\n4. **Check for syntax errors**:\n   ```bash\n   python -m py_compile your_app/\n   ```\n\n## Risk Assessment\n**HIGH RISK** - The development environment is unstable:\n- No reliable testing is possible\n- Deployment would be extremely risky\n- Code quality cannot be verified\n- Potential for undetected breaking changes\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 368,
+      "total_tokens": 506,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 138
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

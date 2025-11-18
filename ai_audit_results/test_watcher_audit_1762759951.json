@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762759951,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762759931.9356158,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- Zero test execution suggests fundamental environment or code issues\n- No coverage data collected due to premature test termination\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - All metrics show 0%:\n- Tests never reached execution phase\n- Cannot assess actual code coverage\n- Critical gap: Unknown what code paths are untested\n\n## Potential Issues with Recent Changes\n**HIGH RISK CHANGE DETECTED**:\n- Modified pytest internals (`_pytest/terminal.py`)\n- Likely introduced fatal error in test runner itself\n- Possible causes:\n  - Syntax errors in modified pytest files\n  - Circular imports or initialization failures\n  - Environment corruption from virtual env modifications\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS**:\n1. **Revert the pytest modification** - Restore original `terminal.py`\n2. **Run basic pytest validation**: `python -m pytest --version`\n3. **Test with minimal test case** to isolate environment vs. code issues\n4. **Check Python environment integrity**: `python -c \"import pytest; print('OK')\"`\n\n**FOLLOW-UP**:\n- Use pytest hooks instead of modifying internal files\n- Implement proper test environment isolation\n- Add pre-commit validation of test runner functionality\n\n## Risk Assessment\n**SEVERE RISK** - Current state:\n- ❌ No test feedback on code changes\n- ❌ Undetected regressions likely\n- ❌ Deployment blocking (no test pass)\n- ❌ Environment instability\n\n**Priority**: Fix immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 367,
+      "total_tokens": 501,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 70
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

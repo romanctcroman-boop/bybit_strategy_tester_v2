@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762538218,
+  "changed_files": [
+    "backend\\security\\secure_storage.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538203.0965476,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe modified file `secure_storage.py` likely contains:\n- Syntax errors preventing import/execution\n- Breaking changes to class/method signatures\n- Missing imports or dependencies\n- Circular import issues\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Run `python -m pytest -v` to see specific error details\n   - Check for syntax errors in `secure_storage.py`\n   - Verify all imports and dependencies are available\n\n2. **Debug Sequence**\n   ```bash\n   python -c \"from backend.security.secure_storage import *\"  # Test import\n   python -m py_compile backend/security/secure_storage.py  # Syntax check\n   ```\n\n3. **Restore Basic Testing**\n   - Fix the fatal error preventing test execution\n   - Add a simple smoke test for `secure_storage.py`\n   - Ensure tests can at least import and instantiate core classes\n\n## Risk Assessment\n**HIGH RISK** - Deploying without any test validation:\n- Security vulnerabilities in storage module undetected\n- Data corruption or loss potential\n- Complete lack of quality assurance\n- Unknown breaking changes in critical security component\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 361,
+      "total_tokens": 488,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

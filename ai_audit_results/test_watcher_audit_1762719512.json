@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762719512,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_protocol.py",
+    "tests\\integration\\test_real_api_integration.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762719500.0313954,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment/setup failure\n- Critical code syntax/runtime errors\n- Missing dependencies or configuration\n\n## Coverage Analysis\n**COMPLETE COVERAGE GAP** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Possible import/initialization failures\n- Environment not properly configured\n\n## Potential Issues with Recent Changes\n1. **Backend core changes** (`mtf_engine.py`) likely broke test infrastructure\n2. **Multiple test files modified** - potential conflicts or broken fixtures\n3. **New integration tests** may have environment dependencies not met\n4. **Configuration files** (`conftest.py`) changes might have broken test discovery\n\n## Immediate Recommendations\n1. **Debug Exit Code -1**: Check test runner logs for specific error\n2. **Verify dependencies**: Ensure all required packages/services are available\n3. **Test isolation**: Run tests individually to identify failing component\n4. **Check conftest.py**: Review pytest configuration for recent breaking changes\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No validation of recent changes\n- Potential production-breaking issues undetected\n- All modified components untested\n\n**Priority**: Fix test execution immediately before any deployment. Start with basic unit tests, then integration tests.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 229,
+      "completion_tokens": 301,
+      "total_tokens": 530,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 165
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

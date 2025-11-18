@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762717065,
+  "changed_files": [
+    "tests\\integration\\test_real_api_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762717052.5325322,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) with zero coverage, indicating fundamental infrastructure or configuration issues rather than test failures.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during test run\n- **No coverage data generated** - Test framework failed before collecting any metrics\n- **Critical gap**: Unable to assess actual code coverage due to execution failure\n\n## Potential Issues with Recent Changes\n1. **Integration test crash** - `test_real_api_integration.py` likely contains fatal errors\n2. **Possible causes**:\n   - Missing API dependencies/credentials\n   - Infinite loops or timeout issues\n   - Environment configuration problems\n   - Syntax errors in test code\n   - Resource exhaustion (memory/connections)\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug integration test** - Run `test_real_api_integration.py` in isolation with verbose output\n2. **Check test infrastructure** - Verify test runner configuration and dependencies\n3. **Add error handling** - Implement try-catch blocks around API calls\n4. **Use test doubles** - Replace real API calls with mocks during initial development\n\n**Long-term:**\n1. Implement staged testing (unit → integration → E2E)\n2. Add test environment validation at startup\n3. Create smoke tests to verify test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in code quality:\n- No reliable test feedback\n- Potential production issues undetectable\n- Development blocked until resolved\n- Integration testing completely broken\n\n**Priority**: Resolve immediately before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 353,
+      "total_tokens": 484,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

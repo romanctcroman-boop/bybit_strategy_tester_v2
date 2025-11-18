@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762720118,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\cryptography\\fernet.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762720106.93057,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure before any tests could execute. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This means:\n- Zero functional validation\n- Zero regression detection\n- All code changes are completely untested\n\n## Potential Issues with Recent Changes\n**High-risk cryptography library modification** - The changed file (`cryptography\\fernet.py`) suggests:\n- Possible breaking changes to encryption/decryption logic\n- Environment contamination (.venv modification indicates development environment issues)\n- Dependency version conflicts or corrupted installation\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test environment** - Recreate virtual environment and reinstall dependencies\n2. **Run isolated test** - Execute a single simple test to verify basic functionality\n3. **Check dependency versions** - Ensure cryptography library compatibility\n4. **Validate installation** - Verify package integrity and installation process\n\n**Follow-up:**\n5. Restore test execution before addressing coverage gaps\n6. Add environment validation to test suite\n7. Implement dependency version locking\n\n## Risk Assessment\n**SEVERITY: CRITICAL**\n- **Security Risk**: Cryptography changes without validation\n- **Functional Risk**: No assurance any code works\n- **Deployment Risk**: Cannot safely release changes\n- **Regression Risk**: Undetected breaking changes likely\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 318,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

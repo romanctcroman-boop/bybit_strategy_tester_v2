@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762596276,
+  "changed_files": [
+    "automation\\deepseek_robot\\autonomous_agent_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762596262.0847032,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero value in current state. This represents a complete breakdown in test infrastructure.\n\n## Coverage Analysis & Gaps\n**0% coverage across all files** - No code is being tested. The test framework isn't even reaching the execution phase. This indicates either:\n- Test environment setup failure\n- Critical syntax/runtime errors in test files\n- Missing dependencies or configuration\n\n## Potential Issues with Recent Changes\nThe changed file `autonomous_agent_test.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing imports** or dependencies\n- **Configuration issues** in test setup/teardown\n- **Infinite loops** or fatal exceptions during test discovery\n\n## Immediate Recommendations\n1. **Debug test discovery**: Run `python -m pytest automation/deepseek_robot/autonomous_agent_test.py -v` to see specific error\n2. **Check syntax**: Validate Python syntax in the test file\n3. **Verify imports**: Ensure all required modules are available\n4. **Test isolation**: Run a minimal test case to isolate the failure\n5. **Review recent commits**: Check what changed in the test file that broke execution\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected regressions in production code\n- No validation of autonomous agent functionality\n- Potential deployment of broken code\n- Complete loss of CI/CD quality gates\n\n**ACTION**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 132,
+      "completion_tokens": 333,
+      "total_tokens": 465,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 4
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

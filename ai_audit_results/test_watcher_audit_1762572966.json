@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762572966,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762572939.388969,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage means:\n- No tests executed at all\n- Entire codebase completely untested\n- Impossible to assess actual coverage gaps\n\n## Potential Issues with Recent Changes\nThe file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures\n- **Runtime exceptions** during test discovery\n- **Environment configuration issues**\n\n## Immediate Recommendations\n\n**1. Fix Test Execution First:**\n```bash\npython -m pytest --collect-only  # Identify test discovery issues\npython -c \"import full_ai_audit_deepseek_perplexity_deepseek\"  # Check import\n```\n\n**2. Debug Steps:**\n- Check Python version compatibility\n- Verify all dependencies installed\n- Add try/except blocks to identify crashing code\n- Run with `--tb=short` to see error details\n\n**3. Implementation Priority:**\n- Fix import/runtime errors\n- Add basic smoke tests\n- Achieve >70% line coverage\n- Add integration tests for critical paths\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code is dangerous:\n- **Critical bugs** likely undetected\n- **Zero quality assurance**\n- **Regression risk**: 100%\n- **Production failure probability**: Very High\n\n**Action:** Block deployments until tests execute successfully and achieve minimum 80% coverage.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 358,
+      "total_tokens": 493,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

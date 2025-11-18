@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762765822,
+  "changed_files": [
+    "load_keys_and_analyze.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762765806.5904229,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1). No meaningful test quality assessment possible as tests didn't run successfully. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage data collected. This suggests:\n- Tests crashed before coverage collection could begin\n- Test environment setup failed\n- Import/initialization errors in the changed file\n\n## Potential Issues with Recent Changes\nThe single changed file `load_keys_and_analyze.py` likely contains:\n- **Syntax errors** preventing module import\n- **Missing dependencies** causing import failures\n- **Runtime exceptions** during module initialization\n- **Infinite loops** or **blocking operations** hanging test execution\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Run tests locally** to identify the specific crash point\n2. **Check syntax** of `load_keys_and_analyze.py` with `python -m py_compile`\n3. **Verify imports** and dependencies are available in test environment\n4. **Add basic exception handling** to prevent catastrophic failures\n\n**FOLLOW-UP:**\n5. Implement minimal smoke test to verify basic functionality\n6. Add logging to identify where execution fails\n7. Ensure test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail completely. The code appears fundamentally broken and untestable in current state. No safety net exists to catch regressions.\n\n**Priority:** Fix test execution failure before any other development continues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 336,
+      "total_tokens": 462,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

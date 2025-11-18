@@ -1,0 +1,70 @@
+{
+  // 🔐 Model Context Protocol (MCP) Server Configuration
+  // Максимальные права для Bybit Strategy Tester MCP server
+  // Источник: MCP_PERMISSIONS_GUIDE.md
+  
+  "servers": {
+    "bybit-strategy-tester": {
+      "type": "stdio",
+      "command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+      "args": [
+        "D:\\bybit_strategy_tester_v2\\mcp-server\\server.py"
+      ],
+      
+      // 📁 Environment Variables - все необходимые настройки
+      "env": {
+        // API Keys
+        "PERPLEXITY_API_KEY": "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",
+        "DEEPSEEK_API_KEY": "sk-1630fbba63c64f88952c16ad33337242",
+        
+        // Project Paths
+        "PROJECT_ROOT": "D:\\bybit_strategy_tester_v2",
+        "MCP_SERVER_ROOT": "D:\\bybit_strategy_tester_v2\\mcp-server",
+        
+        // Python Settings
+        "PYTHONPATH": "D:\\bybit_strategy_tester_v2",
+        "PYTHONUNBUFFERED": "1",
+        
+        // Debug Settings
+        "MCP_DEBUG": "1",
+        "LOG_LEVEL": "DEBUG",
+        
+        // ✨ DeepSeek recommendation: системный debugging
+        "MCP_SERVER_DEBUG": "1",
+        "MCP_MAX_MEMORY": "4096MB",  // ⚠️ Изменено с unlimited: защита от утечек памяти
+        
+        // ✨ DeepSeek optimization recommendation #1 (MEDIUM priority)
+        "MCP_CACHE_SIZE": "512MB"  // Оптимизация производительности кэша
+      },
+      
+      // 🎯 Capabilities - явно разрешаем ВСЕ MCP возможности
+      // ✨ DeepSeek recommendations: logging + notifications (MEDIUM priority)
+      "capabilities": {
+        "tools": true,
+        "resources": true,
+        "prompts": true,
+        "sampling": true,
+        "roots": true,
+        "logging": true,
+        "notifications": true  // ⚡ NEW: системные уведомления
+      },
+      
+      // ✅ Always Allow - автоматически разрешать все операции
+      // ✨ DeepSeek recommendations: mcp_servers + resources/list (LOW priority)
+      "alwaysAllow": [
+        "tools/call",
+        "resources/read",
+        "resources/write",
+        "resources/list",  // ⚡ NEW: удобное управление файловой структурой
+        "prompts/get",
+        "prompts/list",
+        "sampling/createMessage",
+        "roots/list",
+        "mcp_servers/list",
+        "mcp_servers/read",
+        "mcp_servers/write",
+        "mcp_servers/delete"
+      ]
+    }
+  }
+}

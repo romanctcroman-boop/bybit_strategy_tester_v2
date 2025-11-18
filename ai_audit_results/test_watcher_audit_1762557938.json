@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762557938,
+  "changed_files": [
+    "health_check.py",
+    "automation\\deepseek_code_agent\\code_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762557923.3664806,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Critical runtime exceptions during test import/execution\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe changed files suggest:\n1. **health_check.py** - May contain syntax errors or import issues\n2. **code_agent.py** - Could have breaking changes affecting test discovery/import\n3. **Possible circular imports** between these modules\n4. **Missing dependencies** for the automation components\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Run `python -m pytest --collect-only` to identify import/syntax errors\n   - Check for Python version compatibility issues\n   - Verify all dependencies are installed\n\n2. **Validate Recent Changes**:\n   - Manually import and test `health_check.py` and `code_agent.py`\n   - Check for missing imports or undefined variables\n   - Look for syntax errors (missing colons, parentheses, etc.)\n\n3. **Infrastructure Check**:\n   - Verify test runner configuration\n   - Ensure PYTHONPATH includes all necessary directories\n   - Check for file permission issues\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable:\n- No safety net for regression detection\n- High probability of undetected bugs in production\n- Deployment would be extremely risky\n- Team velocity impacted until resolved\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 370,
+      "total_tokens": 506,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

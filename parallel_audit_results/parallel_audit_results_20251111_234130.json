@@ -1,0 +1,57 @@
+{
+  "timestamp": "2025-11-11T23:41:30.218180",
+  "results": {},
+  "errors": [
+    {
+      "task": "analyze_existing_audits",
+      "error": "AgentRequest.__init__() got an unexpected keyword argument 'max_tokens'",
+      "timestamp": "2025-11-11T23:41:30.216956"
+    },
+    {
+      "task": "backend_architecture_audit",
+      "error": "AgentRequest.__init__() got an unexpected keyword argument 'max_tokens'",
+      "timestamp": "2025-11-11T23:41:30.217086"
+    },
+    {
+      "task": "frontend_quality_audit",
+      "error": "AgentRequest.__init__() got an unexpected keyword argument 'max_tokens'",
+      "timestamp": "2025-11-11T23:41:30.217195"
+    },
+    {
+      "task": "ai_agents_integration_audit",
+      "error": "AgentRequest.__init__() got an unexpected keyword argument 'max_tokens'",
+      "timestamp": "2025-11-11T23:41:30.217293"
+    },
+    {
+      "task": "database_schema_audit",
+      "error": "AgentRequest.__init__() got an unexpected keyword argument 'max_tokens'",
+      "timestamp": "2025-11-11T23:41:30.217388"
+    },
+    {
+      "task": "testing_coverage_audit",
+      "error": "AgentRequest.__init__() got an unexpected keyword argument 'max_tokens'",
+      "timestamp": "2025-11-11T23:41:30.217482"
+    },
+    {
+      "task": "security_audit",
+      "error": "AgentRequest.__init__() got an unexpected keyword argument 'max_tokens'",
+      "timestamp": "2025-11-11T23:41:30.217577"
+    },
+    {
+      "task": "performance_bottlenecks_audit",
+      "error": "AgentRequest.__init__() got an unexpected keyword argument 'max_tokens'",
+      "timestamp": "2025-11-11T23:41:30.217668"
+    },
+    {
+      "task": "generate_comprehensive_tz",
+      "error": "AgentRequest.__init__() got an unexpected keyword argument 'max_tokens'",
+      "timestamp": "2025-11-11T23:41:30.217879"
+    }
+  ],
+  "stats": {
+    "total_tasks": 8,
+    "successful": 0,
+    "failed": 9,
+    "success_rate": 0.0
+  }
+}

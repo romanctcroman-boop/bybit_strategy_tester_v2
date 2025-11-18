@@ -1,0 +1,121 @@
+{
+  "editor.formatOnSave": true,
+  "prettier.requireConfig": true,
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+  "python.sortImports.path": ["isort"],
+  "python.sortImports.args": ["--settings-path", "${workspaceFolder}\\.isort.cfg"],
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "python.testing.unittestArgs": [
+    "-v",
+    "-s",
+    ".",
+    "-p",
+    "*test.py"
+  ],
+  "python.testing.pytestEnabled": false,
+  "python.testing.unittestEnabled": true,
+  // Suppress noisy local validation from the GitHub Actions extension when offline/not signed-in.
+  // Workflows with actions/checkout@v4 are valid on GitHub; this only affects VS Code diagnostics.
+  "github-actions.validate.enabled": false,
+  // Perplexity AI Assistant
+  // NOTE: API key should be in .env file (PERPLEXITY_API_KEY=pplx-YOUR_KEY)
+  // For VS Code extension, you may need to configure it in extension settings
+  "perplexity-ai-assistant.apiKey": "${env:PERPLEXITY_API_KEY}",
+  // 🔐 MCP Server Configuration (located in .vscode/mcp.json)
+  // Максимальные права: см. MCP_PERMISSIONS_GUIDE.md
+  "mcp.autoStart": true,
+  "mcp.debug": true,
+  "mcp.logLevel": "debug",
+  "mcp.autoReload": true,  // ⚡ DeepSeek recommendation #4 (HIGH priority): auto-reload при изменениях
+  
+  // GitHub Copilot MCP Integration
+  "github.copilot.advanced": {
+    "mcp.enabled": true,
+    "mcp.autoApprove": true
+  },
+  
+  // JSON Schema validation
+  "json.validate.enable": true,
+  "json.schemas": [
+    {
+      "fileMatch": [".vscode/mcp.json"],
+      "schema": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "servers": {
+            "type": "object",
+            "description": "Model Context Protocol server configurations (official format)",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["command"],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "Transport type (stdio, http, https)",
+                  "enum": ["stdio", "http", "https"]
+                },
+                "command": { 
+                  "type": "string",
+                  "description": "Path to the executable"
+                },
+                "args": { 
+                  "type": "array", 
+                  "items": { "type": "string" },
+                  "description": "Command-line arguments"
+                },
+                "env": { 
+                  "type": "object",
+                  "description": "Environment variables",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

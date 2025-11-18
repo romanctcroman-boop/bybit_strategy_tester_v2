@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762644343,
+  "changed_files": [
+    "backend\\strategies\\bollinger_mean_reversion.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762644329.9524477,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure, not just gaps in coverage.\n\n## Potential Issues with Recent Changes\nThe Bollinger Mean Reversion strategy modification likely contains:\n- **Syntax errors** preventing module import/execution\n- **Fatal runtime errors** during module initialization\n- **Missing dependencies** or imports causing import failures\n- **Infinite loops** or blocking operations halting test execution\n\n## Recommendations for Improvement\n1. **Immediate Priority**: Fix the test execution failure\n   - Check syntax in `bollinger_mean_reversion.py`\n   - Verify all imports are valid and available\n   - Add basic error handling to prevent complete test failure\n\n2. **Add Basic Validation**:\n   ```python\n   # Add to test suite\n   def test_module_import():\n       import backend.strategies.bollinger_mean_reversion\n   ```\n\n3. **Implement Progressive Testing**:\n   - Start with module import tests\n   - Add function-level unit tests\n   - Progress to integration tests\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable and potentially unstable. Any deployment would be extremely risky without resolving the fundamental test execution issues.\n\n**Immediate Action Required**: Fix the root cause of test execution failure before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 335,
+      "total_tokens": 466,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

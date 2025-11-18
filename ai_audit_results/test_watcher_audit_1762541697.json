@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762541697,
+  "changed_files": [
+    "tests\\recovery\\test_component_crash.py",
+    "tests\\test_sync_async_wrapper.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541675.0220225,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental runtime issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- Zero coverage across all files indicates no code executed\n- No meaningful coverage data to analyze\n- Test infrastructure itself may be broken\n\n## Potential Issues with Recent Changes\n**HIGH SUSPICION ON RECENT MODIFICATIONS:**\n1. `tests\\recovery\\test_component_crash.py` - Likely contains code causing fatal errors\n2. `tests\\test_sync_async_wrapper.py` - May have async/sync compatibility issues\n3. Possible infinite loops, memory exhaustion, or import circularities\n4. Test environment setup/teardown failures\n\n## Immediate Recommendations\n**URGENT ACTIONS REQUIRED:**\n1. **Isolate the failure**: Run each test file individually to identify which causes the crash\n2. **Check test dependencies**: Verify all required packages and test fixtures\n3. **Add debug logging**: Insert basic print statements to trace execution flow\n4. **Review recent commits**: Focus on changes to the two modified test files\n5. **Run with `-v` flag**: Use verbose mode to see which test fails first\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential for undetected regressions\n- Possible environment instability\n- Blocked development workflow until resolved\n\n**NEXT STEPS:** Start by running `python -m pytest tests/recovery/test_component_crash.py -v` to isolate the crashing test, then examine stack traces for root cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 384,
+      "total_tokens": 526,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

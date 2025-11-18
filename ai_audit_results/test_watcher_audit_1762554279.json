@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762554279,
+  "changed_files": [
+    "backend\\api\\parallel_deepseek_client_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554265.7595975,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete coverage gap across the entire codebase, not just the changed file.\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `parallel_deepseek_client_v2.py` likely preventing module import\n2. **Missing Dependencies** - New imports that aren't available in test environment\n3. **Runtime Configuration** - Environment variables or config files required but missing\n4. **Initialization Failures** - Code that executes on import causing immediate crashes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m py_compile backend/api/parallel_deepseek_client_v2.py` to check for syntax errors\n2. Test import manually: `python -c \"from backend.api.parallel_deepseek_client_v2 import *\"`\n3. Check test runner configuration and dependencies\n4. Add basic smoke test that validates module can be imported\n\n**FOLLOW-UP:**\n- Implement minimal unit test for the new client class\n- Add error handling for initialization failures\n- Ensure test environment matches production dependencies\n\n## Risk Assessment\n**HIGH RISK** - Deployment would likely fail in production. The complete test failure suggests the code may not even load properly, indicating potential:\n- Runtime crashes on application startup\n- Service unavailability\n- Dependency compatibility issues\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 361,
+      "total_tokens": 492,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

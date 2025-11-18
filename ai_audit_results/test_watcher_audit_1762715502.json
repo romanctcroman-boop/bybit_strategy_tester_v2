@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762715502,
+  "changed_files": [
+    "tests\\test_mcp_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762715491.1175263,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files\n- Import failures or dependency issues\n- Test framework configuration problems\n- Critical exceptions during test setup\n\n## Coverage Analysis\n**0.00% coverage** - All code changes are completely untested. This represents maximum testing risk.\n\n## Potential Issues with Recent Changes\nThe failure is isolated to `tests\\test_mcp_manager.py`, suggesting:\n- Broken test imports or fixtures\n- Missing dependencies for MCP (Model Context Protocol) components\n- Syntax errors in test assertions or setup\n- Environment configuration issues\n\n## Immediate Recommendations\n\n1. **Debug Test Failure**\n   ```bash\n   python -m pytest tests/test_mcp_manager.py -v\n   ```\n   Check the full error traceback to identify root cause\n\n2. **Validate Test File Syntax**\n   - Check for Python syntax errors\n   - Verify all imports resolve correctly\n   - Ensure test dependencies are installed\n\n3. **Fix Basic Test Execution**\n   - Start with making tests run (even if they fail)\n   - Add minimal smoke tests to verify basic functionality\n\n## Risk Assessment\n**HIGH RISK** - Code changes are completely unvalidated. Potential for:\n- Runtime errors in production\n- Regression bugs\n- Integration failures\n- Security vulnerabilities in MCP components\n\n**Priority:** Fix test execution immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 302,
+      "total_tokens": 428,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

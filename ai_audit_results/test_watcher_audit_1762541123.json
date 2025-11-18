@@ -1,0 +1,55 @@
+{
+  "timestamp": 1762541123,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "automation\\task1_test_watcher\\test_watcher.py",
+    "tests\\recovery\\__init__.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\recovery\\test_component_crash.py",
+    "tests\\test_mtf_engine.py",
+    "automation\\task2_key_manager\\key_manager.py",
+    "automation\\sync_async_wrapper.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_sandbox_integration.py",
+    "automation\\task2_key_manager\\test_key_manager.py",
+    "tests\\test_phase1_security.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "automation\\task2_key_manager\\encrypt_secrets.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\test_protocol.py",
+    "tests\\backend\\conftest.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\recovery\\test_disk_full.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\recovery\\test_network_failure.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541103.8598514,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code: -1) with 0% coverage. This indicates either:\n- Test environment setup failure\n- Critical code errors preventing test execution\n- Missing dependencies or configuration\n- Test framework misconfiguration\n\n## Coverage Analysis\n**COMPLETE COVERAGE BREAKDOWN** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Possible import errors or module loading failures\n- Environment variables/secrets missing\n- Database/API connections failing\n\n## Potential Issues with Recent Changes\n1. **Backend Core Changes** (`mtf_engine.py`) - Likely contains breaking changes\n2. **ML Component** (`lstm_queue_predictor.py`, `lstm_predictions.py`) - New ML components may have dependency issues\n3. **Security/Automation** (`test_phase1_security.py`, key manager files) - Encryption/security changes blocking execution\n4. **Recovery Tests** - Crash/disk/network failure tests might be affecting test environment\n\n## Immediate Actions Required\n1. **Debug Test Failure Root Cause**:\n   - Check test logs for specific error messages\n   - Verify all dependencies are installed\n   - Confirm environment variables and secrets are configured\n\n2. **Isolate Problem Areas**:\n   ```bash\n   # Test backend core independently\n   pytest tests/test_mtf_engine.py -v\n   \n   # Test ML components separately\n   pytest tests/backend/test_marketdata_ingest.py -v\n   \n   # Check security tests\n   pytest tests/test_phase1_security.py -v\n   ```\n\n3. **Fix Critical Path**:\n   - Start with `backend/core/mtf_engine.py` - likely core dependency\n   - Then `backend/ml/lstm_queue_predictor.py` - ML dependencies\n   - Finally security/automation components\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would likely fail\n- No validation of recent changes\n- Potential security vulnerabilities untested\n- Recovery mechanisms unverified\n\n## Priority Recommendations\n1. **Fix test execution immediately** - this is blocking all quality checks\n2. **Add basic smoke tests** that run before full test suite\n3. **Implement staged testing** - run core tests before ML/security components\n4. **Add better error reporting** to identify why tests aren't executing\n\n**Immediate next step**: Check the test runner logs to identify the specific error causing exit code -1.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 405,
+      "completion_tokens": 535,
+      "total_tokens": 940,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 341
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

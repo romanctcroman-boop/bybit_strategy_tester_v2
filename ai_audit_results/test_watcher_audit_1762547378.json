@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762547378,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\httpx\\_exceptions.py",
+    ".venv\\Lib\\site-packages\\httpx\\_urls.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\default.py",
+    ".venv\\Lib\\site-packages\\httpx\\_status_codes.py",
+    ".venv\\Lib\\site-packages\\httpx\\_api.py",
+    ".venv\\Lib\\site-packages\\httpx\\_content.py",
+    ".venv\\Lib\\site-packages\\httpx\\_client.py",
+    ".venv\\Lib\\site-packages\\httpx\\__init__.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\asgi.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\base.py",
+    ".venv\\Lib\\site-packages\\httpx\\_types.py",
+    ".venv\\Lib\\site-packages\\httpx\\_models.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\mock.py",
+    ".venv\\Lib\\site-packages\\httpx\\_config.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\wsgi.py",
+    ".venv\\Lib\\site-packages\\httpx\\_auth.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762547360.124566,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage means no tests executed successfully\n- No coverage data available suggests test runner crashed before collection\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- Zero test execution - all code paths untested\n- No coverage data generated indicates fundamental infrastructure failure\n- All httpx library components show as \"changed\" but this appears to be environment corruption\n\n## Potential Issues with Recent Changes\n**ENVIRONMENT CORRUPTION DETECTED**:\n- Modified files are all in `.venv/Lib/site-packages/httpx/` - this should NEVER happen\n- Virtual environment packages have been manually altered\n- Likely causes:\n  - Development in activated virtual environment instead of source directory\n  - Accidental modification of installed packages\n  - Version control tracking virtual environment files\n\n## Recommendations for Improvement\n\n**IMMEDIATE ACTIONS**:\n1. **Recreate virtual environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\n   pip install -r requirements.txt\n   ```\n\n2. **Verify .gitignore** includes:\n   ```\n   .venv/\n   __pycache__/\n   *.pyc\n   ```\n\n3. **Run basic test sanity check**:\n   ```bash\n   python -m pytest --version\n   python -c \"import httpx; print(httpx.__version__)\"\n   ```\n\n**PROCEDURAL FIXES**:\n4. Implement pre-commit hooks to prevent virtual environment modification\n5. Use `pip install -e .` for development mode instead of modifying site-packages\n6. Add CI step to validate virtual environment integrity\n\n## Risk Assessment\n**HIGH RISK** - Development environment is corrupted:\n- ❌ **Test reliability**: Completely compromised\n- ❌ **Code quality**: Unable to measure\n- ❌ **Deployment risk**: Environment inconsistencies will cause production failures\n- ❌ **Team collaboration**: Environment-specific issues not reproducible\n\n**Priority**: Fix environment immediately before any further development or testing.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 434,
+      "completion_tokens": 485,
+      "total_tokens": 919,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 370
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

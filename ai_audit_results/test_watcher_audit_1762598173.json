@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762598173,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py",
+    "tests\\test_sandbox_integration.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762598155.9592416,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment/setup issues\n- Fatal errors in test code or dependencies\n- Major breaking changes in application code\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Potential import/initialization failures\n- Missing test dependencies or configuration\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **`mtf_engine.py` changes** - Core engine modifications may have broken imports or initialization\n2. **Sandbox integration tests** - New integration points may have dependency issues\n3. **Protocol changes** - API/interface modifications breaking existing tests\n4. **Database query optimization** - Schema or query logic changes affecting test setup\n\n## Immediate Recommendations\n\n**Priority 1: Fix Test Execution**\n```bash\n# Run with verbose output to identify failure point\npytest -v --tb=short\n# Check specific failing test\npytest tests/test_mtf_engine.py -v\n```\n\n**Priority 2: Investigate Core Dependencies**\n- Verify `mtf_engine` imports and initialization\n- Check database connections in test setup\n- Validate sandbox environment availability\n\n**Priority 3: Add Diagnostic Tests**\n- Create minimal smoke tests for core components\n- Add test environment validation checks\n- Implement basic import tests for each module\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No validation of recent changes\n- Potential production-breaking issues undetected\n- Complete loss of CI/CD safety net\n\n**Immediate Action Required**: Fix test execution before any further deployments. The entire test suite is currently providing zero safety coverage.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 203,
+      "completion_tokens": 387,
+      "total_tokens": 590,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 139
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

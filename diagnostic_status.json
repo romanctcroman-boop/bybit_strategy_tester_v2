@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-11-18T21:06:20.164665",
+  "stats": {
+    "total_cycles": 237,
+    "mcp_checks": 237,
+    "mcp_available": 231,
+    "deepseek_checks": 237,
+    "deepseek_working": 236,
+    "perplexity_checks": 237,
+    "perplexity_working": 234,
+    "last_agent_analysis": "2025-11-18T20:36:18.505136"
+  },
+  "uptime_seconds": 14220
+}

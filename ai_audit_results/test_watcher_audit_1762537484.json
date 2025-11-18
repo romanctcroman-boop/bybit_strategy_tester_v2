@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762537484,
+  "changed_files": [
+    "automation\\task3_audit_agent\\audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537470.2110713,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or system error). No tests executed successfully.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents complete test infrastructure failure rather than just poor coverage.\n\n## Potential Issues with Recent Changes\n1. **audit_agent.py changes likely broke test execution**\n2. Possible causes:\n   - Syntax errors preventing import\n   - Missing dependencies in test environment\n   - Infinite loops or blocking operations\n   - Test runner configuration issues\n   - Critical exceptions during module import\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check Python syntax: `python -m py_compile automation\\task3_audit_agent\\audit_agent.py`\n3. Verify imports and dependencies are available in test environment\n4. Add try-catch blocks around test setup to capture initialization errors\n\n**Short-term:**\n1. Implement basic smoke test to verify module can be imported\n2. Add test logging to capture failure context\n3. Set up test isolation to prevent environment contamination\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback mechanism\n- Potential production issues undetectable\n- Complete loss of quality assurance\n- Deployment would be extremely risky\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 315,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

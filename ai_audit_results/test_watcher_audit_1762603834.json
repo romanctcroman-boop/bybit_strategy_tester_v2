@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762603834,
+  "changed_files": [
+    "deepseek_meta_analysis_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762603815.170069,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed as tests didn't run successfully. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files confirms no tests executed. The coverage report is empty, suggesting:\n- Test runner crashed before collecting coverage\n- Import/initialization failures in test suite\n- Critical syntax/runtime errors in test code\n\n## Potential Issues with Recent Changes\nThe single changed file `deepseek_meta_analysis_v2.py` likely contains:\n- **Syntax errors** preventing module import\n- **Missing dependencies** causing import failures\n- **Runtime exceptions** during module initialization\n- **Circular imports** or namespace conflicts\n- **Breaking changes** to function/class signatures\n\n## Recommendations for Improvement\n\n**IMMEDIATE ACTIONS:**\n1. **Debug test failure**: Run tests with verbose output (`pytest -v`) to identify the specific crash point\n2. **Check syntax**: Validate `deepseek_meta_analysis_v2.py` for Python syntax compliance\n3. **Verify imports**: Ensure all dependencies are available and properly imported\n4. **Isolate the issue**: Temporarily comment out new code in the changed file to identify the breaking change\n\n**FOLLOW-UP:**\n5. Add basic smoke tests that validate module import and initialization\n6. Implement CI pipeline that fails fast on syntax/import issues\n7. Add pre-commit hooks for basic static analysis\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Deployment risk**: Code cannot be reliably tested\n- **Regression risk**: No validation of existing functionality\n- **Quality risk**: Zero test coverage means undetected defects\n- **Maintenance risk**: Unable to safely make future changes\n\n**Priority**: Resolve test execution failure before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 416,
+      "total_tokens": 544,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

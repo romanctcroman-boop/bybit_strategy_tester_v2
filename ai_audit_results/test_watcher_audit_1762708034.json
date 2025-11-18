@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762708034,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py",
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762708018.5222385,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure before any tests could execute. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This means:\n- All new functionality in `full_ai_audit_deepseek_perplexity_deepseek.py` is untested\n- No regression testing occurred\n- Entire codebase is effectively unvalidated\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `full_ai_audit_deepseek_perplexity_deepseek.py` - Most likely cause of pre-test failure\n2. **Circular Dependencies** - Changes in `reliability\\__init__.py` may create import loops\n3. **Missing Dependencies** - New imports not available in test environment\n4. **Configuration Issues** - Test runner setup broken by recent changes\n\n## Immediate Recommendations\n1. **Fix Import/Syntax Issues First**\n   ```bash\n   python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py\n   ```\n2. **Isolate the Failure**\n   - Test each changed file independently\n   - Check for missing imports in both files\n3. **Restore Basic Testing**\n   - Create minimal test that imports both files\n   - Verify no runtime errors on import\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- 100% uncertainty about code functionality\n- High probability of runtime crashes\n- Potential data corruption or system instability\n- No validation of AI audit logic\n\n**ACTION:** Block deployment until basic tests pass and coverage reaches minimum 70%.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 143,
+      "completion_tokens": 372,
+      "total_tokens": 515,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 79
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

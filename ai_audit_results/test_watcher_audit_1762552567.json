@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762552567,
+  "changed_files": [
+    "backend\\api\\circuit_breaker.py",
+    "backend\\api\\parallel_deepseek_client_v2.py",
+    "test_improved_parallel_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552542.7094564,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or system error). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All code changes are completely untested. Critical gaps:\n- Circuit breaker implementation untested\n- Parallel client logic untested\n- Integration points between components unverified\n\n## Potential Issues with Recent Changes\n1. **Fatal runtime errors** - Code likely contains syntax errors, import issues, or fatal exceptions\n2. **Missing dependencies** - New imports may be unavailable in test environment\n3. **Configuration issues** - Environment setup may be broken\n4. **Test framework corruption** - Test runner itself may be failing\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check Python syntax: `python -m py_compile backend/api/*.py`\n3. Verify imports work in isolation\n4. Run minimal smoke test to validate basic functionality\n\n**Short-term:**\n1. Add basic unit tests for each new function/method\n2. Test circuit breaker states (open/closed/half-open) independently\n3. Mock external dependencies in parallel client tests\n4. Aim for 70%+ coverage on new code\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- No validation of circuit breaker logic (could cause cascading failures)\n- Parallel client untested (potential performance/memory issues)\n- Zero confidence in integration behavior\n- High probability of production outages\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 151,
+      "completion_tokens": 356,
+      "total_tokens": 507,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 87
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

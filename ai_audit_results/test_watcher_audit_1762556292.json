@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762556292,
+  "changed_files": [
+    "backend\\migrations\\versions\\20251020_merge_heads.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762556280.1020324,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental issues with the test environment, dependencies, or codebase integrity.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All files show 0% coverage because:\n- Tests failed to execute at all\n- No code was actually exercised\n- This represents a complete testing blackout\n\n## Potential Issues with Recent Changes\nThe migration file `20251020_merge_heads.py` suggests:\n- **Database schema conflicts** - Merge migrations often cause dependency issues\n- **Migration dependency chain broken** - Missing prerequisite migrations\n- **Environment mismatch** - Database state doesn't match expected schema\n- **Import/circular dependency issues** in migration files\n\n## Immediate Recommendations\n1. **Fix migration dependencies first**:\n   ```bash\n   python manage.py migrate --fake\n   ```\n2. **Run isolated migration test**:\n   ```bash\n   python manage.py migrate backend --dry-run\n   ```\n3. **Check database state**:\n   ```bash\n   python manage.py showmigrations\n   ```\n4. **Test database connectivity** and ensure test database can be created\n\n## Risk Assessment\n**HIGH RISK** - Deployment would likely fail with:\n- Database migration failures in production\n- Service startup failures\n- Data integrity risks\n- Complete absence of regression protection\n\n**Priority**: Fix immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 304,
+      "total_tokens": 438,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 70
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

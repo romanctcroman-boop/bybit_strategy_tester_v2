@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762714392,
+  "changed_files": [
+    "reliability\\perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762714368.0355132,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\nThe modified `perplexity_client.py` likely contains:\n- Import errors or circular dependencies\n- Syntax errors preventing module loading\n- Missing required dependencies\n- Runtime errors during module initialization\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile reliability\\perplexity_client.py` to check for syntax errors\n2. Execute tests with `-v` flag to see specific failure details\n3. Verify all imports and dependencies are available in test environment\n4. Check test configuration and ensure proper test discovery\n\n**Follow-up:**\n5. Add basic smoke tests to verify module can be imported\n6. Implement CI pipeline to catch these issues before merge\n7. Add logging to identify where initialization fails\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable and potentially broken:\n- Production deployments could fail unexpectedly\n- No validation that recent changes work correctly\n- Regression detection is impossible\n- Critical bugs could go undetected\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 321,
+      "total_tokens": 447,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

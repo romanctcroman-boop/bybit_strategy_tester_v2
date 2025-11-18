@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762541428,
+  "changed_files": [
+    "tests\\recovery\\test_component_crash.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541413.5638955,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data collected due to test failure\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA AVAILABLE** - Tests failed before coverage could be measured:\n- 0.00% total coverage indicates tests never executed\n- Coverage by file is empty {} - no files were instrumented/executed\n\n## Potential Issues with Recent Changes\nThe modified file `tests\\recovery\\test_component_crash.py` likely contains:\n- Syntax errors preventing test discovery/import\n- Fixture/setup code causing crashes during test collection\n- Import errors or missing dependencies\n- Infinite loops or resource exhaustion in test setup\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test discovery**: Run `python -m pytest tests/recovery/test_component_crash.py --tb=short` to identify the specific failure point\n2. **Check syntax**: Validate Python syntax in the modified test file\n3. **Isolate the issue**: Temporarily rename/disable the problematic test file to verify other tests pass\n\n**FOLLOW-UP:**\n4. Add pre-commit hooks to catch syntax errors\n5. Implement test isolation to prevent single test failures from breaking entire suite\n6. Add test health monitoring with early failure detection\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- ❌ No test validation of code changes\n- ❌ Undetected regressions possible in production\n- ❌ Deployment pipeline is effectively blind\n- ❌ Recovery component specifically affected (critical system)\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 373,
+      "total_tokens": 503,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

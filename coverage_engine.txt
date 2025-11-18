@@ -1,0 +1,159 @@
+﻿.................................ss..                                    [100%]
+============================== warnings summary ===============================
+tests/backend/core/test_backtest_engine.py::TestErrorHandling::test_backtest_with_nan_prices
+  D:\bybit_strategy_tester_v2\backend\core\backtest_engine.py:743: FutureWarning: The default fill_method='pad' in Series.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+    returns = pd.Series(equity_values).pct_change().dropna()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.13.3-final-0 _______________
+
+Name                                             Stmts   Miss Branch BrPart   Cover   Missing
+---------------------------------------------------------------------------------------------
+backend\agents\__init__.py                           2      2      0      0   0.00%   13-21
+backend\agents\agent_background_service.py         173    173     26      0   0.00%   19-325
+backend\agents\agent_to_agent_communicator.py      217    217     50      0   0.00%   7-627
+backend\agents\deepseek.py                         334    334     64      0   0.00%   15-909
+backend\agents\deepseek_cli.py                     188    188     36      0   0.00%   34-502
+backend\agents\unified_agent_interface.py          207    207     34      0   0.00%   12-461
+backend\api\__init__.py                              2      2      0      0   0.00%   5-7
+backend\api\agent_to_agent_api.py                  241    241     44      0   0.00%   6-676
+backend\api\app.py                                 205    205     10      0   0.00%   1-360
+backend\api\circuit_breaker.py                     165    165     56      0   0.00%   10-455
+backend\api\deepseek_client.py                      20     20      2      0   0.00%   6-37
+backend\api\deepseek_pool.py                        80     80      8      0   0.00%   26-237
+backend\api\error_handling.py                       95     95     28      0   0.00%   10-326
+backend\api\lru_ttl_cache.py                       126    126     32      0   0.00%   16-350
+backend\api\parallel_deepseek_client.py            137    137     20      0   0.00%   27-433
+backend\api\parallel_deepseek_client_v2.py         244    244     68      0   0.00%   19-662
+backend\api\perplexity_client.py                    74     74     12      0   0.00%   15-191
+backend\api\routers\__init__.py                      3      3      0      0   0.00%   1-4
+backend\api\routers\ab_testing.py                   69     69      0      0   0.00%   29-435
+backend\api\routers\active_deals.py                 62     62      8      0   0.00%   1-115
+backend\api\routers\admin.py                       304    304     52      0   0.00%   1-606
+backend\api\routers\ai.py                           47     47      4      0   0.00%   6-150
+backend\api\routers\analytics_ws.py                142    142     40      0   0.00%   15-540
+backend\api\routers\anomaly_detection.py           210    210     18      0   0.00%   17-577
+backend\api\routers\automl.py                      138    138      6      0   0.00%   14-565
+backend\api\routers\backtests.py                   279    279    102      0   0.00%   1-698
+backend\api\routers\backups.py                     141    141     20      0   0.00%   6-424
+backend\api\routers\bots.py                         74     74     12      0   0.00%   1-130
+backend\api\routers\cache.py                        61     61     10      0   0.00%   10-217
+backend\api\routers\csv_export.py                   83     83     10      0   0.00%   10-244
+backend\api\routers\dashboard.py                    15     15      0      0   0.00%   6-83
+backend\api\routers\dashboard_metrics.py           118    118     16      0   0.00%   8-455
+backend\api\routers\health.py                      114    114     14      0   0.00%   13-328
+backend\api\routers\health_monitoring.py           175    175     42      0   0.00%   15-519
+backend\api\routers\live.py                         76     76     24      0   0.00%   1-115
+backend\api\routers\lstm_predictions.py            145    145     10      0   0.00%   14-478
+backend\api\routers\marketdata.py                  348    348     76      0   0.00%   1-633
+backend\api\routers\metrics.py                      39     39      4      0   0.00%   8-161
+backend\api\routers\mock_backtests.py              583    583    194      0   0.00%   1-930
+backend\api\routers\optimizations.py               170    170     44      0   0.00%   1-416
+backend\api\routers\queue.py                       100    100     14      0   0.00%   10-323
+backend\api\routers\reasoning.py                   165    165     18      0   0.00%   16-426
+backend\api\routers\sandbox.py                     113    113      6      0   0.00%   13-361
+backend\api\routers\security.py                     98     98     18      0   0.00%   6-307
+backend\api\routers\strategies.py                   79     79     30      0   0.00%   1-121
+backend\api\routers\strategy_templates.py           77     77     32      0   0.00%   16-429
+backend\api\routers\test.py                         66     66      6      0   0.00%   6-185
+backend\api\routers\tournament.py                  139    139     16      0   0.00%   8-469
+backend\api\routers\wizard.py                       25     25      2      0   0.00%   1-88
+backend\api\schemas.py                             360    360      8      0   0.00%   1-613
+backend\api\secure_key_storage.py                  219    219     72      0   0.00%   17-704
+backend\app.py                                      37     37      6      0   0.00%   6-108
+backend\config.py                                   20     20      2      0   0.00%   11-71
+backend\database\batch_writer.py                   118    118     24      0   0.00%   75-435
+backend\database\pool_monitor.py                    88     88     22      0   0.00%   6-262
+backend\health_checks.py                           131    131     24      0   0.00%   6-404
+backend\indicators\rsi.py                           45     45     14      0   0.00%   6-119
+backend\middleware\__init__.py                       2      2      0      0   0.00%   9-11
+backend\middleware\cache_headers.py                 69     69     30      0   0.00%   18-259
+backend\middleware\rate_limiter.py                 152    152     38      0   0.00%   6-382
+backend\ml\__init__.py                              10     10      2      0   0.00%   10-50
+backend\ml\drift_detector.py                        90     90     18      0   0.00%   15-376
+backend\ml\lstm_queue_predictor.py                 345    345     76      0   0.00%   61-940
+backend\ml\market_regime_detector.py               224    224     50      0   0.00%   8-502
+backend\ml\model_manager.py                        188    188     32      0   0.00%   22-644
+backend\ml\optimizer.py                            327    327     84      0   0.00%   7-711
+backend\ml\optuna_optimizer.py                     178    178     52      0   0.00%   8-468
+backend\ml\prompts.py                               27     27      2      0   0.00%   8-431
+backend\ml\retrain_scheduler.py                    221    221     60      0   0.00%   24-685
+backend\ml\retrain_scheduler_runner.py              98     98     24      0   0.00%   20-335
+backend\models\backfill_progress.py                 11     11      0      0   0.00%   1-17
+backend\models\backfill_run.py                      16     16      0      0   0.00%   1-22
+backend\models\bybit_kline_audit.py                 22     22      0      0   0.00%   1-30
+backend\models\saga_audit_log.py                    24     24      0      0   0.00%   12-161
+backend\models\saga_checkpoint.py                   18     18      0      0   0.00%   11-122
+backend\models\task.py                              30     30      0      0   0.00%   32-100
+backend\optimization\__init__.py                     4      4      0      0   0.00%   10-20
+backend\optimization\grid_optimizer.py             169    169     40      0   0.00%   16-413
+backend\optimization\monte_carlo.py                122    122     42      0   0.00%   21-385
+backend\optimization\monte_carlo_simulator.py       82     82     28      0   0.00%   25-290
+backend\optimization\walk_forward.py               234    234     70      0   0.00%   23-598
+backend\optimization\walk_forward_optimizer.py     153    153     30      0   0.00%   26-504
+backend\orchestrator\__init__.py                     3      3      0      0   0.00%   5-22
+backend\orchestrator\queue.py                      168    168     38      0   0.00%   17-466
+backend\orchestrator\saga.py                       202    202     28      0   0.00%   18-477
+backend\queue\__init__.py                            4      4      0      0   0.00%   7-11
+backend\queue\adapter.py                            73     73      8      0   0.00%   8-277
+backend\queue\autoscaler.py                        168    168     40      0   0.00%   7-358
+backend\queue\redis_queue_manager.py               205    205     32      0   0.00%   6-412
+backend\queue\task_handlers.py                      80     80     14      0   0.00%   5-237
+backend\queue\worker_cli.py                         69     69     14      0   0.00%   5-145
+backend\sandbox\__init__.py                          5      5      0      0   0.00%   6-11
+backend\sandbox\docker_sandbox.py                   95     95     10      0   0.00%   6-300
+backend\sandbox\resource_limiter.py                123    123     24      0   0.00%   5-280
+backend\sandbox\sandbox_manager.py                 129    129     32      0   0.00%   6-351
+backend\sandbox\security_validator.py              103    103     52      0   0.00%   6-273
+backend\scaling\__init__.py                          5      5      0      0   0.00%   14-40
+backend\scaling\celery_integration.py               76     76     12      0   0.00%   8-276
+backend\scaling\dynamic_worker_scaling.py          175    175     46      0   0.00%   11-438
+backend\scaling\health_checks.py                   202    202     52      0   0.00%   11-470
+backend\scaling\load_balancer.py                   151    151     52      0   0.00%   11-372
+backend\scaling\redis_consumer_groups.py           138    138     26      0   0.00%   11-457
+backend\security\__init__.py                        10     10      0      0   0.00%   4-31
+backend\security\ast_validator.py                  142    142     56      0   0.00%   21-497
+backend\security\audit_logger.py                   121    121     36      0   0.00%   5-541
+backend\security\auth_middleware.py                121    121     36      0   0.00%   6-372
+backend\security\crypto.py                          48     48      8      0   0.00%   5-138
+backend\security\jwt_manager.py                    170    170     28      0   0.00%   11-586
+backend\security\key_manager.py                    116    116     40      0   0.00%   5-272
+backend\security\key_rotation.py                   144    144     32      0   0.00%   5-341
+backend\security\logging_middleware.py              47     47     12      0   0.00%   5-195
+backend\security\master_key_manager.py              59     59     14      0   0.00%   5-157
+backend\security\rate_limiter.py                   130    130     44      0   0.00%   6-344
+backend\security\rbac_manager.py                   103    103     22      0   0.00%   6-410
+backend\security\sandbox_executor.py               112    112     18      0   0.00%   6-361
+backend\security\secure_logger.py                  131    131     36      0   0.00%   6-368
+backend\security\secure_storage.py                 207    207     38      0   0.00%   5-358
+backend\settings.py                                 96     96      4      0   0.00%   9-136
+backend\strategies\sr_mean_reversion.py             60     60     18      0   0.00%   1-104
+backend\strategies\sr_rsi_strategy.py               63     63     16      0   0.00%   16-291
+backend\strategies\support_resistance.py            63     63     22      0   0.00%   1-92
+backend\tasks\__init__.py                            2      2      0      0   0.00%   6-8
+backend\tasks\backfill_tasks.py                     82     82     12      0   0.00%   5-159
+backend\tasks\backtest_tasks.py                    175    175     50      0   0.00%   7-469
+backend\tasks\optimize_tasks.py                    235    235     50      0   0.00%   7-744
+backend\utils\__init__.py                            2      2      0      0   0.00%   7-21
+backend\utils\formatting.py                         86     86     32      0   0.00%   11-393
+backend\utils\password.py                           10     10      0      0   0.00%   3-36
+backend\utils\serialization.py                      14     14      8      0   0.00%   8-75
+backend\visualization\__init__.py                    2      2      0      0   0.00%   5-12
+backend\visualization\advanced_charts.py            86     86     20      0   0.00%   12-431
+backend\visualization\demo_charts.py               100    100     10      0   0.00%   12-240
+backend\strategies\bollinger_mean_reversion.py     147    129     64      1   9.00%   46-80, 85, 95-115, 120-132, 173-194, 203-221, 239-284, 288-294, 304-310, 322-355, 359
+backend\strategies\factory.py                       30     17      6      0  36.11%   41-55, 74-77, 91, 111-116
+backend\database\__init__.py                        71     32     16      4  56.32%   27->37, 34-35, 51-52, 60-61, 74-76, 80, 103-149, 160-164
+backend\core\backtest_engine.py                    475    177    180     28  58.63%   35-37, 43-45, 62->64, 64->exit, 146-148, 162-168, 174-176, 183-186, 191-192, 197-199, 203-206, 225, 231, 330-357, 373, 375, 389->419, 406-407, 411-416, 435, 445, 455-456, 498, 502->516, 507->516, 510-513, 525-528, 533-542, 546-548, 566-591, 607, 616, 633-636, 645, 694-696, 756-757, 845->857, 909-1023, 1051-1101
+backend\strategies\base.py                          10      3      0      0  70.00%   25-26, 88
+backend\models\data_types.py                       203     21      8      0  86.26%   37-43, 99-103, 200-202, 245-250, 419-423
+backend\api\routers\rbac.py                          0      0      0      0 100.00%
+backend\indicators\__init__.py                       0      0      0      0 100.00%
+backend\models\__init__.py                         114      0      0      0 100.00%
+backend\strategies\__init__.py                       4      0      0      0 100.00%
+---------------------------------------------------------------------------------------------
+TOTAL                                            16567  15892   3604     33   3.83%
+Coverage HTML written to dir htmlcov
+Coverage XML written to file coverage.xml
+Coverage JSON written to file coverage.json

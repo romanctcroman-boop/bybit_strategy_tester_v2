@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762725946,
+  "changed_files": [
+    "test_reliable_mcp.py",
+    "reliability\\reliable_mcp_server.py",
+    "mcp-server\\reliable_mcp_server.py",
+    "simplified_reliable_mcp.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762725930.819406,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception during test setup/import)\n- 0% coverage confirms no tests actually executed\n- Test infrastructure itself appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No files were executed or measured\n- All production code remains completely untested\n- Test reliability cannot be assessed\n\n## Potential Issues with Recent Changes\n1. **Import/Module Resolution Failure** - Likely circular imports or missing dependencies between the 4 modified files\n2. **Architecture Conflict** - Multiple MCP server implementations (`reliability\\`, `mcp-server\\`, simplified version) causing namespace collisions\n3. **Test Configuration Broken** - pytest/setup configuration may reference non-existent modules or paths\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see which specific import/module fails\n2. Check `__init__.py` files and import statements across all 4 modified files\n3. Consolidate duplicate MCP server implementations to single source\n4. Verify PYTHONPATH and module structure consistency\n\n**FOLLOW-UP:**\n- Add basic smoke test that imports main modules before complex tests\n- Implement CI step to validate test execution before coverage measurement\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code changes are completely untested\n- Multiple similar implementations suggest architectural confusion\n- Deployment would be extremely risky without any validation\n- Team velocity blocked until test infrastructure is restored\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 155,
+      "completion_tokens": 357,
+      "total_tokens": 512,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 91
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

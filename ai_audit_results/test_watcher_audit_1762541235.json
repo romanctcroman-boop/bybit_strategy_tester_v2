@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762541235,
+  "changed_files": [
+    "tests\\recovery\\test_network_failure.py",
+    "tests\\recovery\\test_component_crash.py",
+    "tests\\recovery\\test_disk_full.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541214.3129728,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken. Exit code -1 indicates a fatal error before any tests could run. This suggests fundamental issues in the test environment, dependencies, or test infrastructure.\n\n## Coverage Analysis\n**0% coverage is a red flag** - No code is being executed during test runs. This means:\n- Tests aren't reaching the application code\n- Import failures or configuration issues\n- Possible environment/setup problems\n\n## Potential Issues with Recent Changes\nThe 3 modified recovery test files likely introduced:\n- **Syntax errors** in test files\n- **Missing imports** or dependencies\n- **Configuration conflicts** in test setup\n- **Environment requirements** not met (network, disk space simulation)\n- **Fixture/setup teardown** failures\n\n## Immediate Recommendations\n1. **Debug test execution first**:\n   ```bash\n   python -m pytest tests/recovery/ -v --tb=short\n   ```\n2. **Check test imports** in the 3 modified files\n3. **Verify pytest configuration** and conftest.py files\n4. **Run tests individually** to isolate the failing component\n5. **Review recent dependency changes** and environment setup\n\n## Risk Assessment\n**HIGH RISK** - Recovery tests are critical for system reliability. With 0% coverage and broken execution:\n- Recovery mechanisms are completely untested\n- System failure scenarios aren't validated\n- Potential for undetected production failures\n- Emergency recovery procedures unverified\n\n**Priority**: Fix test execution immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 155,
+      "completion_tokens": 325,
+      "total_tokens": 480,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 91
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

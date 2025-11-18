@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762628292,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\aiohttp\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762628276.960307,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception or environment crash)\n- Zero test execution suggests fundamental setup/configuration issues\n- No meaningful quality assessment possible since tests didn't run\n\n## Coverage Analysis\n**0% coverage** - All code changes are completely untested:\n- No coverage data collected due to test failure\n- Impossible to assess impact of changes to aiohttp package\n- Complete testing gap for all modified code\n\n## Potential Issues with Recent Changes\n1. **Environment corruption** - Virtual env package modification (.venv changes) suggests improper setup\n2. **Dependency conflict** - Modifying installed package in venv indicates version/dependency issues\n3. **Import/system path issues** - Likely Python path or import configuration problems\n4. **Test runner crash** - Possible infinite loop, memory issue, or fatal error in test setup\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test environment** - Delete and recreate virtual environment from scratch\n2. **Verify dependencies** - Use requirements.txt with pinned versions, reinstall dependencies\n3. **Run isolated test** - Execute a single simple test to verify basic functionality\n4. **Check test configuration** - Review pytest/unittest configuration files\n\n**Follow-up:**\n5. Add environment validation in CI/CD pipeline\n6. Implement dependency vulnerability scanning\n7. Create basic smoke tests for test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Deployment risk:** Cannot validate any code changes\n- **Regression risk:** All existing functionality potentially broken\n- **Environment instability:** Virtual environment corruption affects entire team\n- **Urgency:** Must resolve before any further development or deployment\n\n**Priority:** Fix test infrastructure immediately before addressing any feature development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 137,
+      "completion_tokens": 384,
+      "total_tokens": 521,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 73
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

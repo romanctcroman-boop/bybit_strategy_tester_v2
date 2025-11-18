@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762626771,
+  "changed_files": [
+    "mcp-server\\server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762626758.3086698,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed as tests didn't run successfully. This indicates either fatal test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\n1. **Fatal runtime error** in `mcp-server/server.py` preventing test execution\n2. **Import/circular dependency issues** - likely broken imports or module initialization failures\n3. **Syntax errors** - recent changes may have introduced invalid Python syntax\n4. **Missing dependencies** - required packages not installed or available during test run\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution first** - run tests locally to identify the fatal error\n2. **Check server.py syntax** - validate Python syntax and imports\n3. **Verify dependencies** - ensure all required packages are installed\n4. **Add basic smoke test** - create a minimal test that verifies the server can start\n\n**FOLLOW-UP:**\n5. Implement basic unit tests for core functionality\n6. Add integration tests for server endpoints\n7. Set up CI pipeline with dependency installation steps\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and contains fatal errors. Deployment would likely fail in production. The server component is critical infrastructure and currently unreliable.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 331,
+      "total_tokens": 456,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

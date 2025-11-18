@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762756350,
+  "changed_files": [
+    "reliability\\distributed_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762756332.2677422,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution occurred\n- Distributed cache changes completely untested\n- Critical gap: Entire test infrastructure appears broken\n\n## Potential Issues with Recent Changes\n1. **distributed_cache.py changes** likely introduced breaking changes that crash the test environment\n2. Possible issues:\n   - Import/circular dependency problems\n   - Missing dependencies for distributed components\n   - Syntax errors or runtime exceptions on module load\n   - Environment configuration broken\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Run tests with `-v` flag to see failure details\n   - Check for import errors in distributed_cache.py\n   - Verify all dependencies are installed\n\n2. **Debug steps**:\n   ```bash\n   python -m py_compile reliability/distributed_cache.py\n   python -c \"import reliability.distributed_cache\"\n   ```\n\n3. **After fixing execution**:\n   - Add unit tests for distributed_cache core functionality\n   - Mock external dependencies (network, databases)\n   - Test connection handling, error cases, cache invalidation\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- Distributed cache changes completely untested\n- Potential for system-wide failures\n- Data corruption/loss possible in cache layer\n- **Do not deploy until basic tests pass and coverage >80%**\n\n**Priority**: Fix test execution immediately, then add comprehensive tests for cache operations, failure scenarios, and data consistency.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 357,
+      "total_tokens": 482,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

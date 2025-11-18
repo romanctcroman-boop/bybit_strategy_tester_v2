@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762539220,
+  "changed_files": [
+    "test_1.py",
+    "test_0.py",
+    "test_2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539201.9986725,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage confirms no tests executed successfully\n- Likely environment or dependency issues preventing test execution\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files were executed, resulting in 0% coverage across all modules\n- All production code remains untested\n- Coverage data is empty, indicating test runner crashed before collecting any metrics\n\n## Potential Issues with Recent Changes\n**HIGH PROBABILITY ROOT CAUSES:**\n1. **Fatal import errors** in test files (circular imports, missing dependencies)\n2. **Environment corruption** (Python interpreter issues, virtual environment problems)\n3. **Test framework configuration errors** (pytest/unitest setup broken)\n4. **Memory issues** or resource constraints causing crashes\n5. **Syntax errors** in test files preventing import/execution\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Run tests individually** to identify which specific test file causes the crash:\n   ```bash\n   python -m pytest test_0.py -v\n   python -m pytest test_1.py -v  \n   python -m pytest test_2.py -v\n   ```\n2. **Check Python environment**:\n   ```bash\n   python --version\n   pip list\n   ```\n3. **Verify test dependencies** and reinstall test framework\n4. **Add basic smoke test** that runs before full test suite\n\n**FOLLOW-UP:**\n5. Implement test isolation and proper error handling in test setup\n6. Add CI pipeline step to validate test environment before execution\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- **Critical**: No validation of code functionality\n- **High**: Potential undetected regressions in all modified components  \n- **Medium**: Development velocity impacted until resolved\n- **Immediate Action Required**: Fix test execution before any further development or deployment\n\n**Priority**: Resolve test execution failure as blocker before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 456,
+      "total_tokens": 591,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 71
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmp36cgddqp",
+    "debounce_seconds": 2
+  }
+}

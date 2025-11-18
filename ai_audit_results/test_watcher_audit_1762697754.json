@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762697754,
+  "changed_files": [
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762697738.910524,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional. Exit code -1 indicates catastrophic failure (likely segmentation fault, environment crash, or fatal Python error). Zero coverage suggests tests aren't even executing.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code is being tested\n- **No file-specific coverage data** - Execution halting before coverage collection\n- **Critical gap**: Entire test infrastructure is compromised\n\n## Potential Issues with Recent Changes\n1. **MTF Engine changes** (`mtf_engine.py`) likely introduced fatal errors\n2. **Database query optimization tests** may be causing environment crashes\n3. **Sandbox integration** could be triggering fatal system interactions\n4. **Protocol changes** might be incompatible with test environment\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Isolate the crash**: Run tests individually to identify which file causes the -1 exit\n2. **Check environment**: Verify Python installation, dependencies, and memory limits\n3. **Add debug logging**: Insert try/catch blocks and print statements in test setup\n\n**Short-term:**\n4. **Rollback recent MTF engine changes** and test incrementally\n5. **Run with `-v` flag** to see which test executes last before crash\n6. **Check for infinite loops** or memory exhaustion in batch writer/protocol tests\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would be extremely risky\n- No regression detection capability\n- Potential for undetected critical bugs\n- Development is effectively flying blind\n\n**Priority**: Fix test execution before any further feature development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 350,
+      "total_tokens": 535,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 57
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

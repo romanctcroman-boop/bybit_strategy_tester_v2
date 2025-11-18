@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762587777,
+  "changed_files": [
+    "automation\\deepseek_robot\\demo.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762587763.2158928,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage was collected. This represents a complete testing blackout. The entire codebase is currently untested and unverified.\n\n## Potential Issues with Recent Changes\n- **demo.py modifications likely introduced fatal errors** preventing test execution\n- Possible syntax errors, import failures, or runtime exceptions in demo.py\n- Test infrastructure may be broken (missing dependencies, configuration issues)\n- Test runner itself might be failing before reaching actual tests\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution first** - Run tests with verbose output to identify why they're failing\n2. **Check demo.py for obvious errors** - syntax, imports, dependencies\n3. **Verify test environment** - dependencies, Python version, paths\n4. **Run minimal smoke test** to confirm basic functionality\n\n**FOLLOW-UP:**\n5. Once tests execute, implement basic unit tests for demo.py\n6. Aim for >70% coverage on critical paths\n7. Add pre-commit test validation\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky. Critical business logic may be broken without detection.\n\n**Priority: CRITICAL** - Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 321,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762891029,
+  "changed_files": [
+    "fix_datetime_utcnow.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762891016.0140681,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - All code changes are completely untested. No coverage data generated suggests tests never reached execution phase.\n\n## Potential Issues with Recent Changes\n1. **fix_datetime_utcnow.py changes likely introduced breaking changes** that prevent test execution\n2. Possible issues:\n   - Syntax errors in modified code\n   - Import/circular dependency problems\n   - Environment configuration conflicts\n   - Critical exceptions during module import\n\n## Recommendations\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution first** - Run tests with verbose output to identify crash cause\n2. **Check syntax** - Validate `fix_datetime_utcnow.py` for basic Python syntax\n3. **Test isolation** - Run minimal test to verify basic functionality\n4. **Add error handling** - Ensure tests handle exceptions gracefully\n\n**FOLLOW-UP:**\n- Implement basic smoke tests for datetime functionality\n- Add unit tests covering UTC datetime scenarios\n- Set up pre-commit hooks to catch syntax issues\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- Zero test coverage means unknown behavior\n- Critical failure suggests fundamental code issues\n- No validation of datetime logic changes\n- Potential for runtime crashes in production\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 319,
+      "total_tokens": 446,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

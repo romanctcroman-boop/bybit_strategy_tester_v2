@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762645393,
+  "changed_files": [
+    "backend\\middleware\\rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762645378.5533948,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run. This indicates either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a direct result of test execution failure, not a coverage gap issue.\n\n## Potential Issues with Recent Changes\nThe rate_limiter.py modification likely introduced:\n- **Syntax errors** preventing import/execution\n- **Breaking changes** to imports or dependencies\n- **Configuration issues** with the rate limiting implementation\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check Python syntax in rate_limiter.py\n   - Verify all imports and dependencies are available\n   - Run `python -m py_compile backend/middleware/rate_limiter.py` to validate syntax\n\n2. **Debug test framework**:\n   - Run tests with `-v` flag for verbose output\n   - Check test configuration and environment setup\n   - Ensure test discovery is working correctly\n\n3. **Validate rate limiter changes**:\n   - Test the rate_limiter module in isolation\n   - Verify no circular imports were introduced\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely risky because:\n- No tests executed to validate functionality\n- Rate limiting is critical infrastructure\n- Potential for production outages if broken\n- Zero visibility into what actually works\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 340,
+      "total_tokens": 469,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

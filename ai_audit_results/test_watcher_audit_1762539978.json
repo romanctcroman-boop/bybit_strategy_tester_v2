@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762539978,
+  "changed_files": [
+    "test_0.py",
+    "test_1.py",
+    "test_2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539962.7538211,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage confirms no tests executed successfully\n- Test files exist but fail to run\n\n## Coverage Analysis & Gaps\n**Total coverage: 0%** - All gaps:\n- No code executed from any module\n- Test infrastructure itself is failing\n- Cannot assess actual application coverage\n\n## Potential Issues with Recent Changes\n1. **Fatal runtime error** in test environment:\n   - Memory corruption or segmentation fault\n   - Critical Python interpreter issue\n   - Circular imports causing import locks\n   - Corrupted test dependencies\n\n2. **Test file modifications** (test_0.py, test_1.py, test_2.py) likely introduced:\n   - Infinite loops or recursion\n   - Global state corruption\n   - Module-level code with fatal errors\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests individually to identify failing file:\n   ```bash\n   python -m pytest test_0.py -v\n   python -m pytest test_1.py -v  \n   python -m pytest test_2.py -v\n   ```\n\n2. Check for module-level code execution:\n   - Remove any code outside functions/classes in test files\n   - Verify imports aren't executing problematic code\n\n3. Test environment sanity check:\n   - Verify Python installation integrity\n   - Check for memory limits/OS constraints\n\n**FOLLOW-UP:**\n- Add test isolation (pytest fixtures)\n- Implement CI pipeline with fail-fast approach\n- Add basic smoke test before coverage measurement\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- **Deployment Risk:** Critical - No reliable test feedback\n- **Code Quality Risk:** Severe - Unknown if recent changes broke core functionality\n- **Maintenance Risk:** High - Test suite is unreliable\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 423,
+      "total_tokens": 558,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmpdrvqt311",
+    "debounce_seconds": 2
+  }
+}

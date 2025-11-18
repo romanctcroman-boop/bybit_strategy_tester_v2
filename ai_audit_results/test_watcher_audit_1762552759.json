@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762552759,
+  "changed_files": [
+    "backend\\api\\lru_ttl_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552746.0037172,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or code syntax/imports.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of the test failure, not an actual coverage measurement.\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `lru_ttl_cache.py` likely preventing module import\n2. **Missing Dependencies** - Required packages may not be installed\n3. **Runtime Errors** - Code crashes during module initialization\n4. **Test Configuration** - Test runner may be misconfigured\n\n## Recommendations\n**Immediate Actions:**\n1. Check Python syntax: `python -m py_compile backend\\api\\lru_ttl_cache.py`\n2. Verify imports and dependencies are available\n3. Run tests with `-v` flag to see specific failure details\n4. Test import manually: `python -c \"from backend.api import lru_ttl_cache\"`\n\n**Follow-up:**\n5. Add basic smoke tests to verify module can be imported\n6. Ensure test dependencies match runtime environment\n7. Check for circular imports or missing `__init__.py` files\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky without resolving test execution issues first.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 318,
+      "total_tokens": 447,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762540585,
+  "changed_files": [
+    "tests\\stress\\test_memory_leaks.py",
+    ".venv\\Lib\\site-packages\\_pytest\\unraisableexception.py",
+    "tests\\stress\\test_parallel_execution.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540572.1259925,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code is being tested\n- **No coverage data available** - Tests aren't even reaching execution phase\n- **Complete testing gap** - Entire codebase is untested\n\n## Potential Issues with Recent Changes\n1. **Modified test files** (`test_memory_leaks.py`, `test_parallel_execution.py`) likely contain syntax errors or import issues\n2. **Pytest internals modification** (`.venv\\Lib\\site-packages\\_pytest\\unraisableexception.py`) suggests environment corruption\n3. **Environment corruption** - Modifying vendored pytest files indicates serious environment issues\n\n## Immediate Recommendations\n1. **Restore clean environment**: Delete and recreate `.venv` completely\n2. **Validate test syntax**: Run `python -m py_compile` on modified test files\n3. **Isolate changes**: Test each modified file individually to identify the breaking change\n4. **Run basic pytest**: Execute `pytest --collect-only` to verify test discovery works\n\n## Risk Assessment\n**HIGH RISK** - No testing protection exists. Any code changes deploy untested. Critical issues:\n- Production failures likely\n- Memory leaks undetected\n- Parallel execution issues unverified\n- Complete loss of CI/CD reliability\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 161,
+      "completion_tokens": 328,
+      "total_tokens": 489,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 97
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

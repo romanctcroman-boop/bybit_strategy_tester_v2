@@ -1,0 +1,218 @@
+/* Left Panel Styles */
+
+.left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Error Message */
+.error-message {
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 8px;
+  padding: 20px;
+  color: #ff6b6b;
+}
+
+.error-message h3 {
+  margin: 0 0 12px 0;
+  color: #ff6b6b;
+}
+
+.error-message p {
+  margin: 8px 0;
+  color: #ffb3b3;
+}
+
+/* Chart Placeholder */
+.chart-placeholder {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 20px;
+  min-height: 300px;
+}
+
+.chart-placeholder h3 {
+  margin: 0 0 12px 0;
+  color: #a0b0ff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.chart-placeholder p {
+  color: #7080c0;
+  font-size: 14px;
+  margin: 0 0 16px 0;
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 200px;
+  justify-content: space-around;
+}
+
+.placeholder-line {
+  height: 4px;
+  background: linear-gradient(90deg, transparent, #4dabf7, transparent);
+  border-radius: 2px;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+
+/* Metrics Cards */
+.metrics-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.metric-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.metric-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.metric-label {
+  font-size: 12px;
+  color: #8090d0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #c0d0ff;
+}
+
+.metric-value.positive {
+  color: #51cf66;
+}
+
+.metric-value.negative {
+  color: #ff6b6b;
+}
+
+/* WFO Period Table */
+.wfo-table-container {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.wfo-table-container h3 {
+  margin: 0 0 16px 0;
+  color: #a0b0ff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.table-loading {
+  padding: 40px;
+  text-align: center;
+  color: #7080c0;
+  font-size: 14px;
+}
+
+.wfo-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.wfo-table thead {
+  background: rgba(0, 0, 51, 0.5);
+}
+
+.wfo-table th {
+  padding: 12px 16px;
+  text-align: left;
+  color: #8090d0;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.wfo-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s;
+}
+
+.wfo-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+
+.wfo-table td {
+  padding: 10px 16px;
+  color: #b0c0e0;
+}
+
+.wfo-table td.positive {
+  color: #51cf66;
+  font-weight: 600;
+}
+
+.wfo-table td.negative {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(81, 207, 102, 0.2);
+  color: #51cf66;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+  .metrics-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .metrics-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

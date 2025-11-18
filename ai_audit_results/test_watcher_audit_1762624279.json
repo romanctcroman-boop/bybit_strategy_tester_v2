@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762624279,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\aiohttp\\client_reqrep.py",
+    ".venv\\Lib\\site-packages\\aiohttp\\streams.py",
+    ".venv\\Lib\\site-packages\\aiohttp\\helpers.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762624265.5506155,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional\n- Exit code -1 indicates catastrophic test failure\n- No tests executed successfully\n- Test infrastructure appears broken\n\n## 2. Coverage Analysis\n**ZERO COVERAGE** - All files show 0.00%\n- No code paths were executed during testing\n- This suggests tests failed before reaching any application code\n\n## 3. Potential Issues\n**Environment/Infrastructure Problems:**\n- Modified files are in `.venv` (virtual environment) - this is highly unusual\n- Likely corrupted virtual environment or dependency issues\n- Possible version conflicts with aiohttp packages\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. **Rebuild virtual environment:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify test runner configuration**\n3. **Check for circular imports or initialization issues**\n4. **Run tests with verbose output to identify failure point**\n\n**FOLLOW-UP:**\n- Ensure no manual modifications to package files\n- Implement dependency version locking\n- Add environment sanity checks to CI/CD\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing mechanism\n- Potential environment corruption\n- Unverified code changes\n- High probability of undetected regressions\n\n**Priority:** Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 175,
+      "completion_tokens": 330,
+      "total_tokens": 505,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 111
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

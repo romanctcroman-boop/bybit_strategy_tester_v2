@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762686648,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762686632.9569077,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental infrastructure or configuration issues rather than test logic problems.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents a complete testing blackout, making all code changes effectively untested.\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `tests\\backend\\conftest.py`, suggesting:\n- **Pytest configuration corruption** - Fixtures, hooks, or plugin configurations may be broken\n- **Import/dependency issues** - Critical imports failing in test setup\n- **Environment misconfiguration** - Test environment requirements not met\n\n## Recommendations for Improvement\n**Immediate Actions (Next 2 hours):**\n1. **Debug conftest.py** - Comment out recent changes to isolate the breaking modification\n2. **Check pytest output** - Run with `-v` flag to see specific error before exit\n3. **Verify dependencies** - Ensure all test requirements are installed and compatible\n\n**Short-term (Next day):**\n1. **Add pre-commit test validation** - Prevent broken test configurations from merging\n2. **Implement smoke tests** - Basic tests that validate test infrastructure\n3. **Create test environment checklist** - Document required setup steps\n\n## Risk Assessment\n**HIGH RISK** - Current state means:\n- All production code changes are untested\n- Critical bugs could reach production undetected\n- Team velocity blocked until resolved\n- Technical debt accumulating rapidly\n\n**Priority: CRITICAL** - Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 341,
+      "total_tokens": 468,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762890512,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762890497.8467937,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates either:\n- Syntax errors in test files or code\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal errors during test setup\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a direct result of the test execution failure, not an actual coverage measurement.\n\n## Potential Issues with Recent Changes\nThe modified file `backend\\core\\mtf_engine.py` likely contains:\n- Syntax errors preventing import/execution\n- Breaking changes to class/method signatures\n- Missing dependencies or imports\n- Circular import issues\n\n## Immediate Recommendations\n\n**Priority 1 - Fix Test Execution:**\n```bash\n# Run with verbose output to identify failure point\npython -m pytest -v --tb=short\n# Check for syntax errors\npython -m py_compile backend/core/mtf_engine.py\n```\n\n**Priority 2 - Investigation Steps:**\n1. Check recent changes to `mtf_engine.py` for syntax issues\n2. Verify all imports and dependencies are available\n3. Examine test configuration and setup/teardown methods\n4. Review test discovery patterns\n\n**Priority 3 - Prevention:**\n- Add pre-commit hooks for syntax checking\n- Implement basic smoke tests before full test suite\n- Use incremental testing for modified files\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable, meaning:\n- No validation of recent changes\n- Potential runtime errors in production\n- Broken functionality undetectable\n- Deployment would be extremely risky\n\n**Immediate Action Required:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 360,
+      "total_tokens": 488,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

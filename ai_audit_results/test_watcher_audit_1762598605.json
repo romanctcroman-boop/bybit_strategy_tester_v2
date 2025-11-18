@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762598605,
+  "changed_files": [
+    "automation\\deepseek_robot\\api_clients.py",
+    "ask_deepseek_optimization.py",
+    "automation\\deepseek_robot\\robot.py",
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762598570.440286,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage suggests tests never executed properly\n- No file-specific coverage data available\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- Zero coverage across all files indicates fundamental execution failure\n- No meaningful data to analyze specific gaps\n- Test infrastructure appears broken\n\n## Potential Issues with Recent Changes\n1. **API Client Changes** (`api_clients.py`) - Likely introduced breaking interface changes or authentication issues\n2. **Robot Framework Integration** (`robot.py`) - Possible circular imports or dependency conflicts\n3. **Architecture Changes** (`advanced_architecture.py`) - May have broken existing test setup/teardown\n4. **Optimization Script** (`ask_deepseek_optimization.py`) - Could be causing import conflicts or environment pollution\n\n## Immediate Action Recommendations\n**PRIORITY 1 - RESTORE TEST EXECUTION:**\n- Check test runner configuration and dependencies\n- Verify Python environment and package versions\n- Add try-catch blocks around test execution to capture stack traces\n- Run tests with `-v` flag for verbose output\n\n**PRIORITY 2 - ISOLATE FAILURE:**\n- Test each changed file in isolation\n- Roll back recent changes incrementally to identify breaking commit\n- Check for missing imports or dependency updates\n\n**PRIORITY 3 - IMPROVE RESILIENCE:**\n- Add basic smoke tests that run before full test suite\n- Implement test environment validation\n- Add logging to capture pre-failure state\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable quality gate for recent changes\n- Potential production-breaking issues undetected\n- Development blocked until tests are restored\n- Technical debt accumulating with each untested change\n\n**IMMEDIATE NEXT STEP:** Run `python -m pytest -xvs --tb=short` to get detailed failure information and share the specific error message.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 164,
+      "completion_tokens": 439,
+      "total_tokens": 603,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 100
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

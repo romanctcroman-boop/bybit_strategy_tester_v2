@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762718055,
+  "changed_files": [
+    "tests\\integration\\load_api_keys.py",
+    "tests\\integration\\test_real_api_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762718043.8742483,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error before any tests could execute. This represents a complete breakdown in test infrastructure.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is not a coverage gap but a complete test execution failure.\n\n## Potential Issues with Recent Changes\n1. **Integration test files** (`load_api_keys.py`, `test_real_api_integration.py`) likely contain:\n   - Fatal import errors or syntax issues\n   - Missing dependencies or environment setup\n   - Infinite loops or blocking operations\n   - Configuration errors preventing test discovery\n\n## Immediate Recommendations\n1. **Debug test discovery**: Run `python -m pytest --collect-only` to identify why tests aren't loading\n2. **Check imports**: Verify all imports in the changed integration test files\n3. **Validate environment**: Ensure required API keys and external dependencies are available\n4. **Isolate the failure**: Test each changed file individually to identify the breaking change\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means undetected regressions could be deployed. The entire test suite is compromised until this is resolved.\n\n**Priority Action**: Fix the test execution failure before any other development continues. Without working tests, code quality cannot be verified.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 279,
+      "total_tokens": 421,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

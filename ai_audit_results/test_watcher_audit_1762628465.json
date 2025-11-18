@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762628465,
+  "changed_files": [
+    "analyze_gap_to_100.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762628451.7102578,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete test infrastructure failure:\n- No files measured for coverage\n- Zero test execution\n- Likely test runner crash before any tests could run\n\n## Potential Issues with Recent Changes\n**analyze_gap_to_100.py** likely contains:\n- Syntax errors preventing import/execution\n- Fatal runtime exceptions during module load\n- Missing dependencies or imports\n- Infinite loops or resource exhaustion\n- Environment compatibility issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test runner** - Check for unhandled exceptions in test setup\n2. **Validate analyze_gap_to_100.py syntax** - Run `python -m py_compile analyze_gap_to_100.py`\n3. **Test isolation** - Run tests individually to identify crashing component\n4. **Add error handling** - Wrap test setup in try/catch blocks\n\n**FOLLOW-UP:**\n5. Implement basic smoke test before coverage measurement\n6. Add test environment validation checks\n7. Monitor resource usage during test execution\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No validation of recent code changes\n- Unknown if core functionality works\n- Potential for runtime crashes in production\n- Complete loss of test feedback loop\n\n**Priority: Fix immediately before any further development or deployment.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 329,
+      "total_tokens": 455,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

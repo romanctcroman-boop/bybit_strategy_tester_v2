@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762607550,
+  "changed_files": [
+    "mcp-server\\api\\providers\\base.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762607534.0203593,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All coverage metrics are invalid due to test failure. No reliable coverage data exists for analysis.\n\n## Potential Issues with Recent Changes\nThe failure likely stems from changes in `mcp-server\\api\\providers\\base.py`:\n- **Syntax errors** - Python interpreter cannot parse the file\n- **Import/circular dependency** issues preventing module loading\n- **Missing dependencies** or broken imports\n- **Critical runtime exceptions** during test setup/import phase\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution first** - Run `python -m py_compile mcp-server/api/providers/base.py` to check for syntax errors\n2. **Verify imports** - Manually import the module to identify dependency issues\n3. **Check test configuration** - Ensure pytest/runner configuration is valid\n\n**Follow-up:**\n4. Add basic smoke tests that verify module importability\n5. Implement CI checks for syntax validation pre-commit\n6. Add logging to test setup to capture failure points\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail completely. The codebase is currently untestable and potentially broken. No safety net exists for the recent changes to the providers module.\n\n**Priority:** Fix test execution immediately before any further development or analysis.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 331,
+      "total_tokens": 461,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 66
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

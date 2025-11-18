@@ -1,0 +1,169 @@
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Authorization Policy (Optional)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: backend
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/bybit-strategy-tester/sa/*"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        paths: ["/api/*"]
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Destination Rule for Backend (Circuit Breaking)
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  host: bybit-strategy-tester-backend
+  trafficPolicy:
+    connectionPool:
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+      tcp:
+        maxConnections: 100
+    outlierDetection:
+      baseEjectionTime: 30s
+      consecutiveErrors: 5
+      interval: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+    tls:
+      mode: STRICT
+  subsets:
+  - name: v1
+    labels:
+      version: 1.0.0
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Istio Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: bybit-strategy-tester-gateway
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+spec:
+  selector:
+    istio: ingressgateway  # Use Istio default gateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "api.bybit-strategy-tester.example.com"
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "api.bybit-strategy-tester.example.com"
+    tls:
+      mode: SIMPLE
+      credentialName: backend-tls
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Peer Authentication (mTLS)
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: bybit-strategy-tester
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+spec:
+  mtls:
+    mode: STRICT
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Virtual Service for Backend
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  hosts:
+  - "api.bybit-strategy-tester.example.com"
+  gateways:
+  - "bybit-gateway"
+  http:
+  - match:
+    - uri:
+        prefix: /api/v1
+    route:
+    - destination:
+        host: backend
+        port:
+          number: 8000
+      weight: 90
+    - destination:
+        host: backend-canary
+        port:
+          number: 8000
+      weight: 10
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+    timeout: 10s

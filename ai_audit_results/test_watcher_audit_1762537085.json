@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762537085,
+  "changed_files": [
+    "tests\\test_safe_async_bridge_final.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537063.1914442,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1), indicating either:\n- Syntax errors in test files\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal exceptions during test discovery/setup\n\n## Coverage Analysis\n**0% coverage** - No code was executed, suggesting:\n- Tests failed before any actual test execution\n- Test discovery/import phase is broken\n- Missing dependencies or environment setup issues\n\n## Potential Issues with Recent Changes\nThe changed file `tests\\test_safe_async_bridge_final.py` likely contains:\n- Syntax errors (Python version incompatibility, missing imports)\n- Broken imports or circular dependencies\n- Configuration errors in test fixtures/setup\n- Missing test dependencies\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix test discovery**: Check syntax in `test_safe_async_bridge_final.py`\n2. **Verify imports**: Ensure all required modules are available\n3. **Run individual test**: `python -m pytest tests/test_safe_async_bridge_final.py -v` to isolate the failure\n4. **Check dependencies**: Verify test requirements are installed\n\n**Follow-up:**\n5. Add basic smoke test to prevent complete test suite failure\n6. Implement CI pipeline that fails fast on syntax/import issues\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- No test validation of code changes\n- Potential production issues undetected\n- Development blocked until tests are functional\n- Zero confidence in code changes\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 338,
+      "total_tokens": 469,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

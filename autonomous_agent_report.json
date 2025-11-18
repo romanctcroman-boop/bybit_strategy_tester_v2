@@ -1,0 +1,72 @@
+{
+  "success": false,
+  "cycles": 5,
+  "duration": 115.10794043540955,
+  "final_quality": 0.6000000000000001,
+  "target_quality": 1.0,
+  "files_analyzed": 250,
+  "issues_found": 1975,
+  "fixes_applied": 50,
+  "history": [
+    {
+      "cycle": 1,
+      "timestamp": "2025-11-08T13:06:37.930251",
+      "duration": 104.22487187385559,
+      "files_analyzed": 50,
+      "issues_found": 395,
+      "fixes_applied": 10,
+      "tests_passed": 3,
+      "test_success_rate": 1.0,
+      "overall_quality": 0.4,
+      "cache_hit_rate": 0.0
+    },
+    {
+      "cycle": 2,
+      "timestamp": "2025-11-08T13:06:40.778689",
+      "duration": 1.8356873989105225,
+      "files_analyzed": 50,
+      "issues_found": 395,
+      "fixes_applied": 10,
+      "tests_passed": 3,
+      "test_success_rate": 1.0,
+      "overall_quality": 0.6000000000000001,
+      "cache_hit_rate": 1.0
+    },
+    {
+      "cycle": 3,
+      "timestamp": "2025-11-08T13:06:43.389799",
+      "duration": 1.6046123504638672,
+      "files_analyzed": 50,
+      "issues_found": 395,
+      "fixes_applied": 10,
+      "tests_passed": 3,
+      "test_success_rate": 1.0,
+      "overall_quality": 0.6000000000000001,
+      "cache_hit_rate": 1.0
+    },
+    {
+      "cycle": 4,
+      "timestamp": "2025-11-08T13:06:46.059784",
+      "duration": 1.663834810256958,
+      "files_analyzed": 50,
+      "issues_found": 395,
+      "fixes_applied": 10,
+      "tests_passed": 3,
+      "test_success_rate": 1.0,
+      "overall_quality": 0.6000000000000001,
+      "cache_hit_rate": 1.0
+    },
+    {
+      "cycle": 5,
+      "timestamp": "2025-11-08T13:06:48.811823",
+      "duration": 1.739818811416626,
+      "files_analyzed": 50,
+      "issues_found": 395,
+      "fixes_applied": 10,
+      "tests_passed": 3,
+      "test_success_rate": 1.0,
+      "overall_quality": 0.6000000000000001,
+      "cache_hit_rate": 1.0
+    }
+  ]
+}

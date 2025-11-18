@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762760702,
+  "changed_files": [
+    "test_medium_tasks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762760685.0020127,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test code\n- Import failures\n- Test framework configuration issues\n- Fatal exceptions during test discovery\n\n## Coverage Analysis\n**0% COVERAGE** - No code coverage data collected due to test execution failure. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `test_medium_tasks.py`. Likely issues:\n- Broken imports or dependencies\n- Syntax errors in test code\n- Missing test fixtures or setup\n- Infinite loops or fatal exceptions in test code\n- Test framework compatibility issues\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check `test_medium_tasks.py` for syntax errors\n   - Verify imports and dependencies\n   - Run tests individually to isolate the failure\n\n2. **Emergency Actions**\n   - Revert changes to `test_medium_tasks.py` if possible\n   - Add basic smoke test to verify test framework functionality\n   - Implement test validation in CI pipeline to catch similar failures\n\n3. **Process Improvements**\n   - Add pre-commit hooks to validate test syntax\n   - Implement staged testing (unit → integration → full suite)\n   - Add test health monitoring\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback\n- Potential undetected regressions\n- Broken deployment pipeline\n- Development blocked until resolved\n\n**Priority: IMMEDIATE** - Address test execution failure before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 336,
+      "total_tokens": 461,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

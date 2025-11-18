@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762756793,
+  "changed_files": [
+    "test_integration_phase3_extended_fixed.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762756776.1589196,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1) with 0% coverage. This indicates either:\n- Syntax/runtime errors preventing test execution\n- Test framework configuration issues\n- Critical failures in test setup/teardown\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- No tests actually executed\n- Possible import/module resolution failures\n- Test discovery completely broken\n\n## Potential Issues with Recent Changes\nThe modified file `test_integration_phase3_extended_fixed.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Configuration errors in test fixtures/setup\n- Infinite loops or fatal exceptions\n\n## Recommendations\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution**: Check for syntax errors in the modified test file\n2. **Verify imports**: Ensure all dependencies and modules are properly imported\n3. **Test isolation**: Run the specific failing test file individually to identify the exact failure point\n4. **Check test configuration**: Review pytest/unittest configuration and fixtures\n\n**FOLLOW-UP:**\n5. Add basic smoke tests to prevent complete test suite collapse\n6. Implement CI pipeline checks for syntax validation before test execution\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential undetected regressions in production code\n- Broken development workflow\n- All test investments currently providing zero value\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 334,
+      "total_tokens": 465,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

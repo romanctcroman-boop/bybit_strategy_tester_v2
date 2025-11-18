@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762749341,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762749326.6314397,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\n- `health_check.py` modifications likely introduced breaking changes\n- Possible syntax errors, import issues, or runtime exceptions\n- Environment/dependency mismatches (missing imports, version conflicts)\n- Test configuration broken by recent changes\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix test execution first** - Run tests with verbose output to identify the root cause\n2. **Check `health_check.py` syntax** - Validate Python syntax and imports\n3. **Verify test configuration** - Ensure pytest/unittest configuration is valid\n4. **Review dependency changes** - Check requirements.txt and environment setup\n\n**Follow-up:**\n5. Once tests execute, establish baseline coverage\n6. Add specific tests for `health_check.py` functionality\n7. Implement CI pipeline to catch similar issues earlier\n\n## Risk Assessment\n**HIGH RISK** - Codebase is completely untested and potentially broken. Deployment would be extremely risky without:\n- ✅ Passing test suite\n- ✅ Measured code coverage\n- ✅ Validation of `health_check.py` functionality\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 332,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

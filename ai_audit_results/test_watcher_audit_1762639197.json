@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762639197,
+  "changed_files": [
+    "mcp-server\\server.py",
+    "test_perplexity_bitcoin.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762639183.1503181,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, crash, or fatal error)\n- Zero test execution suggests fundamental runtime issues\n- No coverage data implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**NO COVERAGE** - 0.00% across all files:\n- Tests are failing before any code execution\n- Cannot assess actual coverage gaps without test execution\n- Critical path testing is completely absent\n\n## Potential Issues with Recent Changes\n1. **Server changes (`mcp-server\\server.py`) likely introduced fatal errors**\n   - Runtime crashes preventing test execution\n   - Possible infinite loops, import errors, or syntax issues\n\n2. **New test file (`test_perplexity_bitcoin.py`) may contain fatal flaws**\n   - Could have broken imports or dependencies\n   - May contain code that crashes Python interpreter\n\n## Immediate Recommendations\n1. **Debug the crash first:**\n   ```bash\n   python -m py_compile mcp-server/server.py\n   python -c \"import mcp-server.server\"\n   python test_perplexity_bitcoin.py\n   ```\n\n2. **Check for common issues:**\n   - Circular imports in server changes\n   - Missing dependencies in new test\n   - Syntax errors in Python 3.9+ compatibility\n\n3. **Add basic smoke test:**\n   - Create minimal test that imports modules without execution\n   - Verify server starts without crashing\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code likely unstable\n- No regression protection\n- Potential deployment blockers\n- Critical functionality untested\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 361,
+      "total_tokens": 495,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 70
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

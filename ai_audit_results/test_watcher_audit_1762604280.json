@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762604280,
+  "changed_files": [
+    "automation\\deepseek_robot\\dual_analytics_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762604257.8785832,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% overall coverage confirms no tests executed. The coverage report is empty, suggesting:\n- Test runner crashed before collecting any coverage data\n- Import/initialization failures in test setup\n- Fatal errors in test configuration\n\n## Potential Issues with Recent Changes\nThe single changed file `dual_analytics_engine.py` likely contains:\n- **Syntax errors** preventing module import\n- **Missing dependencies** causing import failures\n- **Circular imports** or namespace conflicts\n- **Runtime exceptions** during module initialization\n- **Breaking changes** to class/method signatures\n\n## Recommendations for Improvement\n1. **Immediate Actions:**\n   - Run tests with `-v` flag to see specific failure points\n   - Check Python syntax: `python -m py_compile dual_analytics_engine.py`\n   - Verify imports work in isolation\n\n2. **Debugging Steps:**\n   - Test import directly: `python -c \"from automation.deepseek_robot import dual_analytics_engine\"`\n   - Add basic smoke test to verify module loads\n   - Check for missing imports or dependency issues\n\n3. **Prevention:**\n   - Add pre-commit hooks for syntax checking\n   - Implement basic smoke tests in CI pipeline\n   - Require minimal test coverage for merge approval\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Production Risk:** Untested code changes deployed\n- **Regression Risk:** No validation of functionality\n- **Maintenance Risk:** Broken test suite blocks future development\n\n**Priority:** Resolve test execution failures immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 391,
+      "total_tokens": 524,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 5
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

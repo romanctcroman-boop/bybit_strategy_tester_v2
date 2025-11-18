@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762713209,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\__init__.py",
+    "tests\\conftest.py",
+    ".venv\\Lib\\site-packages\\_pytest\\monkeypatch.py",
+    ".venv\\Lib\\site-packages\\_pytest\\fixtures.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713194.3407717,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken\n- Exit code -1 indicates abnormal termination (segmentation fault, crash, or fatal error)\n- No tests executed successfully\n- Test infrastructure itself may be compromised\n\n## 2. Coverage Analysis\n**ZERO COVERAGE** - All metrics at 0.00%\n- No code was executed during test run\n- This indicates tests never reached actual test execution phase\n- Coverage reporting system may have failed entirely\n\n## 3. Potential Issues\n**High Risk Changes Detected:**\n- Pytest core files modified in `.venv` (should never happen)\n- `conftest.py` changes combined with pytest internal modifications\n- Likely causes:\n  - Corrupted virtual environment\n  - Monkeypatching gone wrong in conftest\n  - Fixture conflicts causing pytest crash\n\n## 4. Recommendations\n**Immediate Actions:**\n1. **Recreate virtual environment** - Delete `.venv` and start fresh\n2. **Verify conftest.py** - Check for dangerous monkeypatching or fixture overrides\n3. **Run minimal test** - Start with single simple test to isolate the crash\n4. **Check pytest version** - Ensure compatible pytest version\n\n**Follow-up:**\n- Review recent changes to `conftest.py` for pytest internals modification\n- Remove any patches to pytest internal modules\n- Implement test environment isolation\n\n## 5. Risk Assessment\n**HIGH RISK** - Development/testing blocked\n- No reliable testing possible\n- Production code changes cannot be validated\n- Critical bugs could go undetected\n- **Priority: Fix immediately before any further development**\n\n**Root Cause Likelihood:** Corrupted test environment (85%), Dangerous conftest modifications (15%)",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 181,
+      "completion_tokens": 387,
+      "total_tokens": 568,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 117
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

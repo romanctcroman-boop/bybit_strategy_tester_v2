@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762627747,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\httpx\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762627735.5594065,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test execution, likely preventing any tests from running.\n\n## Coverage Analysis\n**0.00% coverage** confirms no tests executed successfully. This represents maximum coverage risk.\n\n## Potential Issues\n1. **Environment corruption** - Modified httpx package in virtual environment suggests dependency issues\n2. **Test configuration failure** - Test runner unable to initialize or execute\n3. **Dependency conflicts** - Manual changes to installed packages breaking test infrastructure\n4. **Path/import issues** - Possible Python path or import resolution failures\n\n## Immediate Actions Required\n1. **Restore clean environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify test configuration**:\n   - Check pytest/unittest configuration files\n   - Validate test discovery patterns\n   - Ensure test dependencies are properly installed\n\n3. **Run basic test sanity check**:\n   ```bash\n   python -m pytest --version\n   python -m pytest tests/ -v --tb=short\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Zero test execution means:\n- No regression protection\n- Undetected breaking changes\n- Deployment blocking\n- Complete quality assurance failure\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 301,
+      "total_tokens": 437,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

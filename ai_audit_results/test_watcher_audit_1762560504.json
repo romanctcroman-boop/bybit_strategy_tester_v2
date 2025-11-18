@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762560504,
+  "changed_files": [
+    "backend\\api\\deepseek_pool.py",
+    "tests\\test_deepseek_pool_deadlock.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762560487.4977577,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in test infrastructure or code under test.\n\n## Coverage Analysis & Gaps\n- **0% coverage across all files** - No tests executed successfully\n- Complete lack of visibility into code behavior\n- Unable to assess actual coverage gaps due to test failure\n\n## Potential Issues with Recent Changes\n1. **Test deadlock detection** - The new `test_deepseek_pool_deadlock.py` suggests concurrency issues\n2. **Pool implementation defects** - Likely race conditions or resource management problems in `deepseek_pool.py`\n3. **Environment/infrastructure issues** - Possible dependency conflicts or configuration problems\n\n## Immediate Recommendations\n1. **Debug test execution**:\n   - Run tests with `-v` flag to see which specific test fails\n   - Check for infinite loops or hanging processes\n   - Verify test dependencies and environment setup\n\n2. **Isolate the failure**:\n   - Run `test_deepseek_pool_deadlock.py` separately\n   - Test `deepseek_pool.py` with minimal unit tests first\n   - Add timeout decorators to prevent hanging\n\n3. **Fix concurrency issues**:\n   - Review thread/process synchronization in pool implementation\n   - Add proper resource cleanup in `__exit__` methods\n   - Implement connection/timeout limits\n\n## Risk Assessment\n**HIGH RISK** - Production system vulnerable to:\n- Deadlocks causing service unavailability\n- Resource leaks leading to memory exhaustion\n- Complete lack of test validation for critical pool functionality\n\n**Priority**: Fix test execution immediately before any deployment. The deadlock tests likely exposed existing concurrency bugs in the pool implementation.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 370,
+      "total_tokens": 512,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762708534,
+  "changed_files": [
+    "tests\\test_key_rotation.py",
+    "reliability\\key_rotation.py",
+    "tests\\test_integration_retry_circuit_breaker.py",
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762708520.3891711,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution entirely. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% coverage is catastrophic** - No code is being tested. This suggests:\n- Test runner configuration failure\n- Import/syntax errors in test files\n- Environment setup issues\n- Possible circular imports or module loading failures\n\n## Potential Issues with Recent Changes\nThe changed files indicate reliability features (key rotation, circuit breaker), likely introducing:\n- **Import/dependency issues** in `reliability/__init__.py`\n- **Syntax errors** in new test files preventing import\n- **Configuration conflicts** between test modules\n- **Missing dependencies** for new reliability modules\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check Python syntax: `python -m py_compile reliability/key_rotation.py`\n   - Verify imports: `python -c \"import reliability.key_rotation\"`\n   - Run tests individually to isolate failing module\n\n2. **Investigate Root Cause**\n   - Examine test runner configuration\n   - Check for missing `__init__.py` files or incorrect imports\n   - Verify all dependencies are installed\n\n3. **Restore Basic Testing**\n   - Get at least one test passing before addressing coverage\n   - Add simple smoke tests for import validation\n\n## Risk Assessment\n**HIGH RISK** - Deploying without any test validation is extremely dangerous. The reliability changes (key rotation, circuit breakers) are critical infrastructure components that could cause production outages if faulty.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 159,
+      "completion_tokens": 350,
+      "total_tokens": 509,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 95
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

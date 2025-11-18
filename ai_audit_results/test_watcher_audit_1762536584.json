@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762536584,
+  "changed_files": [
+    "tests\\test_safe_async_bridge_simple.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762536569.9376,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental issues with the test suite or environment setup.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage was collected, which means:\n- Tests failed before any meaningful execution\n- No production code was exercised\n- Complete lack of visibility into what code paths work\n\n## Potential Issues with Recent Changes\nThe modified file `tests/test_safe_async_bridge_simple.py` likely contains:\n- Syntax errors preventing test discovery/execution\n- Import failures or missing dependencies\n- Configuration issues in test setup\n- Runtime exceptions during test collection\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution first** - Run tests with `-v` flag to see which specific test fails\n2. **Check test file syntax** - Validate Python syntax in the modified test file\n3. **Verify imports** - Ensure all imports resolve correctly\n4. **Run minimal test** - Create a simple passing test to verify test framework works\n\n**FOLLOW-UP:**\n5. Add test discovery verification to CI pipeline\n6. Implement basic smoke tests that run before full test suite\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in code quality:\n- No regression detection capability\n- Potential production bugs undetected\n- Deployment would be completely blind\n- Urgent fix required before any further development\n\n**Priority: Fix immediately** - Test infrastructure must be restored before addressing any other issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 332,
+      "total_tokens": 463,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

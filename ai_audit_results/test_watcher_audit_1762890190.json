@@ -1,0 +1,65 @@
+{
+  "timestamp": 1762890190,
+  "changed_files": [
+    "backend\\migrations\\env.py",
+    "tests\\test_optimize_tasks.py",
+    "scripts\\check_db_connect.py",
+    "backend\\tasks\\backtest_tasks.py",
+    "tests\\test_protocol.py",
+    "tests\\backend\\test_bybit_persistence.py",
+    "tests\\test_mtf_engine.py",
+    "scripts\\probe_ports.py",
+    "backend\\tasks\\optimize_tasks.py",
+    "reliability\\deepseek_client.py",
+    "backend\\migrations\\versions\\0001_convert_timestamps_to_timestamptz.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\test_perplexity_client.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_backtest_task.py",
+    "tests\\test_deepseek_client.py",
+    "tests\\test_backtest_task_errors.py",
+    "tests\\integration\\test_postgres_upsert.py",
+    "backend\\services\\data_service.py",
+    "tests\\test_stale_idempotency.py",
+    "tests\\test_integration_retry_circuit_breaker.py",
+    "backend\\database\\__init__.py",
+    "backend\\models\\bybit_kline_audit.py",
+    "tests\\test_sandbox_integration.py",
+    "backend\\services\\adapters\\bybit.py",
+    "tests\\frontend\\test_smoke.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\backend\\test_bybit_adapter_edgecases.py",
+    "backend\\migrations\\versions\\2f4e6a7b8c9d_autogen_convert_timestamps_to_timestamptz.py",
+    "backend\\services\\adapters\\binance.py",
+    "tests\\integration\\test_redis_streams_live.py",
+    "mcp-server\\file_finder_mcp.py",
+    "tests\\backend\\test_bybit_adapter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762890173.4524221,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests aren't even executing properly\n- Likely environment/config issues or fatal code errors\n\n## 2. Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE**:\n- No files show coverage data\n- All test suites appear to be failing to execute\n- This represents a complete testing infrastructure breakdown\n\n## 3. Potential Issues with Recent Changes\n**High-risk areas based on changed files**:\n- **Database migrations** (`backend/migrations/`): Schema changes may have broken test environment setup\n- **Task system modifications** (`backend/tasks/`): Backtest and optimize tasks could have introduced fatal errors\n- **Adapter changes** (Bybit/Binance): External API integration issues\n- **New test files**: May contain syntax errors or incompatible dependencies\n\n## 4. Immediate Recommendations\n\n**Priority 1 - Fix Test Execution**:\n```bash\n# Run with verbose output to identify crash point\npython -m pytest -v --tb=short tests/\n# Check for import/syntax errors\npython -m py_compile [recently-changed-files]\n```\n\n**Priority 2 - Environment & Dependencies**:\n- Verify database connectivity (check_db_connect.py)\n- Confirm all migration versions are compatible\n- Check for circular imports in new service files\n\n**Priority 3 - Isolate Failure**:\n- Run tests individually to identify which module causes the crash\n- Start with basic unit tests before integration tests\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state is unacceptable for deployment:\n- **Critical**: No working test suite means undetected production failures are likely\n- **High**: Database migration issues could corrupt production data\n- **Medium**: External API adapter changes may cause live trading errors\n\n**Immediate Action**: Halt all deployments until basic test execution is restored and achieves >80% coverage.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 528,
+      "completion_tokens": 445,
+      "total_tokens": 973,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 464
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

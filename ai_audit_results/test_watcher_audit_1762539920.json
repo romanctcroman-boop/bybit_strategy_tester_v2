@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539920,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539906.361365,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1), indicating severe infrastructure or configuration issues rather than test failures. The test suite is non-functional.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality or functionality.\n\n## Potential Issues with Recent Changes\nThe single changed file (`test_e2e_audit_agent.py`) likely contains:\n- Syntax errors preventing test discovery/import\n- Missing dependencies or imports\n- Configuration errors in test setup/teardown\n- Infinite loops or resource exhaustion\n- Environment compatibility issues\n\n## Recommendations for Improvement\n**Immediate Actions (Priority 1):**\n1. Run `python -m pytest tests/integration/test_e2e_audit_agent.py -v` to isolate the crash\n2. Check for Python syntax errors: `python -m py_compile tests/integration/test_e2e_audit_agent.py`\n3. Verify test dependencies and environment setup\n4. Add try-catch blocks around test setup to capture crash details\n\n**Short-term (Priority 2):**\n1. Implement test isolation to prevent single test from breaking entire suite\n2. Add pre-commit hooks for basic syntax validation\n3. Set up test environment health checks\n\n## Risk Assessment\n**HIGH RISK** - Complete testing failure means:\n- No validation of recent changes\n- Undetected regressions likely in production\n- Broken deployment pipeline\n- All code changes are effectively untested\n\n**Urgent fix required before any further deployments.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 343,
+      "total_tokens": 477,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

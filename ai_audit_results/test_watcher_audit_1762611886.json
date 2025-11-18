@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762611886,
+  "changed_files": [
+    "mcp-server\\api\\providers\\base.py",
+    "mcp-server\\api\\providers\\__init__.py",
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762611870.7283363,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely test runner crash or environment issue). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - All files show 0% coverage, confirming no tests ran. This represents a complete testing breakdown.\n\n## Potential Issues with Recent Changes\n1. **Provider module changes** likely introduced:\n   - Import/circular dependency issues in `__init__.py`\n   - Breaking changes in base class interface\n   - Missing dependencies for Perplexity provider\n   - Syntax errors preventing test discovery\n\n## Immediate Recommendations\n1. **Diagnose Test Runner Failure**:\n   ```bash\n   python -m pytest --collect-only  # Check test discovery\n   python -m pytest -v --tb=short   # Get detailed failure info\n   ```\n\n2. **Check Provider Imports**:\n   - Verify `__init__.py` exports are correct\n   - Ensure all dependencies are installed\n   - Test imports in isolation: `python -c \"from api.providers import perplexity\"`\n\n3. **Fix Base Class First**:\n   - Start with unit tests for `base.py`\n   - Ensure abstract methods are properly implemented\n   - Check for missing required dependencies\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- No validation of provider functionality\n- Potential runtime errors in production\n- Possible breaking changes to API contracts\n- Regression risk: 100% (unknown impact)\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 160,
+      "completion_tokens": 338,
+      "total_tokens": 498,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 96
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

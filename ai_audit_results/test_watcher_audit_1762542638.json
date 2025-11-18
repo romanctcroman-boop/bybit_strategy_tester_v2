@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762542638,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762542625.8146002,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). This indicates fundamental issues with test setup, dependencies, or syntax errors preventing any test execution.\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a direct result of test execution failure, not a measurement of actual coverage.\n\n## Potential Issues with Recent Changes\n1. **health_check.py likely contains breaking changes**:\n   - Syntax errors preventing import/execution\n   - Missing dependencies or imports\n   - Runtime errors during module loading\n   - Circular imports or initialization failures\n\n## Recommendations\n**Immediate Actions:**\n1. Run `python -m py_compile health_check.py` to check for syntax errors\n2. Execute `python -c \"import health_check\"` to test module import\n3. Check test runner configuration and dependencies\n4. Review recent changes to health_check.py for obvious errors\n\n**Follow-up:**\n- Add basic smoke tests to verify module can be imported\n- Implement CI checks that fail fast on syntax/import issues\n- Ensure test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail. The codebase cannot be validated until test execution is restored. All recent changes to health_check.py should be considered suspect until basic tests pass.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 293,
+      "total_tokens": 415,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

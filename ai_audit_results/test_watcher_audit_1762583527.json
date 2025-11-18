@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762583527,
+  "changed_files": [
+    "analyze_ide_direct.py",
+    "tests\\backend\\conftest.py",
+    "fix_ide_problems_direct.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762583498.9317775,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates either:\n- Syntax errors in test files or code\n- Fixture/config setup failures in conftest.py\n- Import errors or dependency issues\n- Test environment misconfiguration\n\n## Coverage Analysis\n**0% coverage is a red flag** - Tests aren't even executing. This suggests:\n- Test discovery is failing\n- Pytest configuration issues\n- Critical errors before test collection\n\n## Potential Issues with Recent Changes\n1. **conftest.py modifications** - Likely causing fixture/setup failures\n2. **IDE-related files** (`analyze_ide_direct.py`, `fix_ide_problems_direct.py`) - May contain syntax errors or breaking changes\n3. **Import/circular dependency issues** between test files and modules\n\n## Immediate Actions Required\n1. **Check conftest.py first** - Review recent changes to fixtures, hooks, or configuration\n2. **Run pytest with `-v` flag** to see which specific test fails first\n3. **Test isolation** - Run tests individually to identify the breaking point\n4. **Syntax validation** - Manually verify Python syntax in all changed files\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No test feedback on code changes\n- Potential production-breaking issues undetected\n- Development blocked until resolved\n\n## Priority Recommendations\n1. **Fix test execution first** - Address the Exit Code -1 immediately\n2. **Add basic smoke tests** to prevent complete test suite collapse\n3. **Review conftest.py changes** - This is the most likely culprit\n4. **Implement CI pipeline checks** for syntax and basic import validation before test execution\n\n**Start with:** `pytest tests/ -v --tb=short` to identify the specific failure point.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 145,
+      "completion_tokens": 391,
+      "total_tokens": 536,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 81
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

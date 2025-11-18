@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762688758,
+  "changed_files": [
+    "tests\\test_stale_idempotency.py",
+    "backend\\strategies\\bollinger_mean_reversion.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\test_backtest_task_errors.py",
+    "backend\\core\\backtest_engine.py",
+    "tests\\test_backtest_task.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762688739.1782694,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data collected due to test failure\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA AVAILABLE** - Tests never executed:\n- Cannot assess coverage gaps when tests don't run\n- All modified files (backend and tests) remain unvalidated\n- Backtest engine changes completely untested\n\n## Potential Issues with Recent Changes\n1. **Import/Dependency Breakage** - Likely circular imports or missing dependencies in modified files\n2. **Test Infrastructure Failure** - Test runner configuration or fixture issues\n3. **Critical Code Defects** - Syntax errors or runtime exceptions preventing test execution\n4. **Backtest Engine Regression** - Changes to `backtest_engine.py` may have broken core functionality\n\n## Immediate Action Recommendations\n1. **Fix Test Execution First**:\n   - Run tests individually to identify failing module\n   - Check for syntax errors in modified Python files\n   - Verify test dependencies and imports\n\n2. **Priority Debugging Order**:\n   - Start with `backend/core/backtest_engine.py` (core component)\n   - Then `backend/strategies/bollinger_mean_reversion.py` (strategy logic)\n   - Finally test files to ensure they load correctly\n\n3. **Add Basic Sanity Checks**:\n   ```python\n   # Temporary test to verify basic functionality\n   def test_imports():\n       from backend.core.backtest_engine import BacktestEngine\n       from backend.strategies.bollinger_mean_reversion import BollingerStrategy\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be dangerous:\n- Core trading engine modifications completely unvalidated\n- Zero confidence in strategy logic changes\n- Potential for runtime crashes or incorrect trading behavior\n- **Recommendation**: Block all deployments until basic test execution is restored and critical path coverage >80%",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 422,
+      "total_tokens": 607,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 121
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762712781,
+  "changed_files": [
+    "tests\\test_deepseek_client.py",
+    "reliability\\key_rotation.py",
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762712767.6243608,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. Zero coverage suggests tests aren't even running.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- Tests aren't executing at all\n- No meaningful coverage data available to analyze gaps\n\n## Potential Issues with Recent Changes\n1. **Test file corruption** - `tests\\test_deepseek_client.py` may contain syntax errors or import failures\n2. **Dependency issues** - New reliability modules (`key_rotation.py`) may have broken imports or missing dependencies\n3. **Environment configuration** - Test runner configuration or environment variables may be misconfigured\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see specific failure points\n2. Check test file for syntax errors: `python -m py_compile tests/test_deepseek_client.py`\n3. Verify imports in test files match actual module structure\n4. Ensure `reliability` package has proper `__init__.py` exports\n\n**Follow-up:**\n- Fix Exit Code -1 before analyzing coverage\n- Add basic smoke tests for reliability modules\n- Implement CI pipeline with dependency validation\n\n## Risk Assessment\n**HIGH RISK** - Production readiness is questionable when:\n- Zero test execution indicates potential runtime failures\n- New reliability modules untested\n- No confidence in key rotation functionality\n- Deployment could introduce critical failures\n\n**Priority:** Fix test execution immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 143,
+      "completion_tokens": 331,
+      "total_tokens": 474,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 79
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

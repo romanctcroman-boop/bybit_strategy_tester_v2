@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762565768,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762565738.9977376,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Test execution halted before coverage collection\n- **Critical gap**: Entire codebase remains untested\n\n## Potential Issues with Recent Changes\n1. **File `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:**\n   - Syntax errors preventing import/execution\n   - Fatal runtime errors during module loading\n   - Missing dependencies or imports\n   - Infinite loops or blocking operations\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test execution failure:**\n   ```bash\n   python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py\n   ```\n2. **Run tests with verbose output to identify failure point**\n3. **Check for missing imports or dependencies**\n4. **Validate file executes without errors:**\n   ```python\n   python -c \"import full_ai_audit_deepseek_perplexity_deepseek\"\n   ```\n\n**Follow-up:**\n5. Add basic smoke tests before comprehensive coverage\n6. Implement CI pipeline with syntax checking\n7. Add module-level try/except blocks for better error reporting\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may be completely broken\n- No validation of functionality\n- Potential deployment of non-functional code\n- Complete lack of quality assurance\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 373,
+      "total_tokens": 508,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

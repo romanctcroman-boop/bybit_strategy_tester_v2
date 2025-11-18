@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762544223,
+  "changed_files": [
+    "tests\\monitoring\\test_health_endpoints.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762544204.1601868,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates fundamental issues with the test environment, dependencies, or test code structure that prevent any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach execution phase\n- **Critical gap**: Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **Test file `test_health_endpoints.py` likely contains syntax errors** or import failures\n2. **Missing dependencies** - Required packages not installed or incompatible versions\n3. **Environment configuration issues** - Path problems, missing environment variables\n4. **Test framework setup errors** - pytest/unittest configuration problems\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile tests/monitoring/test_health_endpoints.py` to check for syntax errors\n2. Verify test dependencies: `pip list` and compare with requirements\n3. Execute tests with `pytest -xvs tests/monitoring/test_health_endpoints.py` for detailed error output\n4. Check test discovery configuration in `pytest.ini`/`setup.cfg`\n\n**Follow-up:**\n- Add pre-commit hooks to validate test syntax\n- Implement CI pipeline that fails fast on test compilation errors\n- Create smoke tests to verify test environment health\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression testing capability\n- Potential production issues undetectable\n- Development blocked until resolved\n- High likelihood of undetected bugs in health monitoring endpoints\n\n**Priority: Fix immediately** - This blocks all meaningful quality assurance.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 370,
+      "total_tokens": 500,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 66
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

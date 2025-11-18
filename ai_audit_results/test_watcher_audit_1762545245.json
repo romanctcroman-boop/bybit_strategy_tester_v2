@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762545245,
+  "changed_files": [
+    "backend\\migrations\\versions\\perf_indexes_001_add_performance_indexes.py",
+    "backend\\migrations\\versions\\add_reasoning_kb_001.py",
+    "backend\\migrations\\versions\\20251107_merge_all_heads.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762545230.8360572,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken\n- Exit code -1 indicates catastrophic test failure (likely unhandled exceptions)\n- Zero test execution suggests fundamental infrastructure issues\n- No meaningful quality assessment possible until basic test execution is restored\n\n## 2. Coverage Analysis\n**0% coverage indicates:**\n- Tests aren't running at all\n- Possible causes: database connection failures, import errors, configuration issues\n- Migration files suggest database schema changes that may have broken test setup\n\n## 3. Potential Issues with Recent Changes\n**Migration-related risks:**\n- Multiple migration files (`perf_indexes_001`, `add_reasoning_kb_001`, `merge_all_heads`)\n- Database schema inconsistencies between test and development environments\n- Possible migration dependency conflicts or missing dependencies\n\n## 4. Immediate Recommendations\n\n**Priority 1 - Restore Test Execution:**\n```bash\n# Check test database connectivity\n# Verify migration state matches between environments\n# Run tests with verbose output to identify root cause\npython -m pytest -v --tb=short\n```\n\n**Priority 2 - Infrastructure Fixes:**\n- Verify test database is properly migrated and seeded\n- Check environment variables and configuration files\n- Ensure all migration dependencies are satisfied\n\n**Priority 3 - Prevention:**\n- Add pre-commit hooks to verify test execution\n- Implement database state validation in CI/CD\n- Add migration rollback tests\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state prevents deployment\n- No confidence in code changes due to complete test failure\n- Migration changes could introduce production database issues\n- Potential data integrity risks from untested schema changes\n\n**Immediate Action Required:** Fix test infrastructure before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 174,
+      "completion_tokens": 379,
+      "total_tokens": 553,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 110
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

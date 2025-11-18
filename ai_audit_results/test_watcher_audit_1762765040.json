@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762765040,
+  "changed_files": [
+    "quick_start_reliability.py",
+    "reliability_auto_system\\__init__.py",
+    "reliability_auto_system\\mcp_reliability_orchestrator.py",
+    "test_reliability_system.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762765022.4783266,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test execution failure\n- 0% coverage suggests tests never ran or crashed immediately\n- Likely test infrastructure or import/dependency issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No files show any coverage data\n- Entire reliability system untested\n- Impossible to assess actual code coverage\n\n## Potential Issues with Recent Changes\n1. **Import/Dependency Issues** - New modules may have broken imports\n2. **Test Configuration** - Test runner configuration likely corrupted\n3. **Environment Setup** - Missing dependencies or environment variables\n4. **File Structure Changes** - Module reorganization broke test discovery\n\n## Immediate Action Recommendations\n\n**HIGH PRIORITY:**\n1. **Fix Test Execution First**\n   ```bash\n   python -m pytest test_reliability_system.py -v\n   ```\n   - Identify specific failure point\n   - Check for import errors in test file\n\n2. **Verify Module Structure**\n   - Ensure `reliability_auto_system` package has proper `__init__.py`\n   - Check all imports in changed files\n\n3. **Test Minimal Viable Case**\n   - Create simple smoke test to verify basic functionality\n   - Isolate which change broke test execution\n\n**MEDIUM PRIORITY:**\n4. **Add Basic Unit Tests**\n   - Focus on core reliability orchestrator functions first\n   - Ensure tests run before expanding coverage\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- Zero test verification of reliability system changes\n- Potential for silent failures in production\n- No safety net for critical reliability functionality\n\n**CRITICAL PATH:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 164,
+      "completion_tokens": 379,
+      "total_tokens": 543,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 100
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

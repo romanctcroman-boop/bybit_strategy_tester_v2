@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762677058,
+  "changed_files": [
+    "run_deepseek_frontend_analysis.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762677042.60448,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files confirms no code was executed. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\nThe single changed file `run_deepseek_frontend_analysis.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Runtime errors during module loading\n- Infinite loops or fatal exceptions on initialization\n\n## Immediate Action Recommendations\n\n**URGENT - Execute within 24 hours:**\n1. **Debug the test runner**: Run `python -m pytest -v` to see specific failure details\n2. **Check syntax**: Run `python -c \"import run_deepseek_frontend_analysis\"` to isolate import errors\n3. **Validate dependencies**: Ensure all required packages are installed and compatible\n4. **Add basic smoke test**: Create a minimal test that imports the module without executing logic\n\n**Short-term (48 hours):**\n5. Implement CI pipeline that fails fast on syntax/runtime errors\n6. Add static analysis (pylint, flake8) to catch basic issues pre-commit\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No validation of code functionality\n- Potential production-breaking changes\n- Complete loss of test feedback loop\n- High probability of undetected regressions\n\n**Priority:** Resolve test execution failure before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 343,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

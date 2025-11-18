@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762570914,
+  "changed_files": [
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_phase1_security.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762570886.1328912,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional with exit code -1 and 0% coverage. This indicates either:\n- Test environment setup failure\n- Critical syntax/runtime errors in test files\n- Missing dependencies or configuration\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Possible import failures or module resolution issues\n- Test discovery/runner configuration problems\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **LSTM components** (`lstm_predictions.py`, `lstm_queue_predictor.py`) - ML dependencies may be missing\n2. **MTF Engine** (`mtf_engine.py`) - Core trading engine changes breaking imports\n3. **Security tests** (`test_phase1_security.py`) - Authentication/env configuration issues\n4. **Database optimization tests** - Connection/query setup failures\n\n## Immediate Action Recommendations\n1. **Diagnose Root Cause**:\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   Check specific error messages\n\n2. **Check Dependencies**:\n   - Verify all ML/trading libraries installed\n   - Confirm database connections\n   - Validate environment variables\n\n3. **Isolate Failure**:\n   - Run tests individually to identify broken module\n   - Start with basic unit tests before integration tests\n\n4. **Fix Order**:\n   - Address import/syntax errors first\n   - Resolve environment configuration\n   - Then tackle functional test failures\n\n## Risk Assessment\n**HIGH RISK** - Cannot deploy with 0% test coverage. Critical issues likely in:\n- Market data ingestion/upload functionality\n- Trading engine operations  \n- ML prediction services\n- Security compliance\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 281,
+      "completion_tokens": 402,
+      "total_tokens": 683,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 25
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

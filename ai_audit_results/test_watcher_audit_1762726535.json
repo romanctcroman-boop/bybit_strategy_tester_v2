@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762726535,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "send_audit_requests.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762726521.354166,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**Critical Failure** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, crash, or fatal error)\n- Zero test execution suggests fundamental environment or code issues\n\n## 2. Coverage Analysis\n**No Coverage Data** - Tests didn't run successfully:\n- 0.00% coverage means no code was executed\n- Coverage reports are empty, indicating test framework failure\n\n## 3. Potential Issues\n**Immediate concerns:**\n- **Environment corruption**: Modified `.venv` package files suggest virtual environment issues\n- **Database dependency problems**: `psycopg2` modifications indicate potential PostgreSQL connection/config issues\n- **Code syntax/runtime errors**: Files may contain fatal errors preventing test execution\n\n## 4. Recommendations\n**Immediate Actions:**\n1. **Reset virtual environment**: Delete and recreate `.venv` completely\n2. **Verify database connectivity**: Test PostgreSQL connections independently\n3. **Run syntax checks**: Use `python -m py_compile` on changed files\n4. **Test isolation**: Run each test file individually to identify the crash source\n\n**Follow-up:**\n- Add basic smoke tests to catch environment setup issues\n- Implement pre-commit hooks to prevent virtual environment modifications\n- Set up database connection health checks\n\n## 5. Risk Assessment\n**HIGH RISK** - Production deployment would fail:\n- Critical system dependencies are compromised\n- No validation of recent changes to audit and database code\n- Complete test suite failure indicates systemic issues\n\n**Priority**: Address environment and dependency issues before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 155,
+      "completion_tokens": 345,
+      "total_tokens": 500,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 91
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

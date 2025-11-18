@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762621106,
+  "changed_files": [
+    "auto_add_logging_to_tools.py",
+    "backend\\cache\\cache_manager.py",
+    "backend\\config.py",
+    "auto_add_logging_all.py",
+    "backend\\celery_app.py",
+    "backend\\agents\\deepseek.py",
+    "backend\\api\\deepseek_pool.py",
+    "auto_add_type_hints.py",
+    "backend\\agents\\__init__.py",
+    "auto_enhance_tools.py",
+    "backend_api_deepseek_pool_temp.py",
+    "backend\\api\\app.py",
+    "backend\\auth\\jwt_bearer.py",
+    "ask_deepseek_api_keys_security.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762621088.856383,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test framework failure\n- 0% coverage suggests tests aren't even executing\n- Likely environment, dependency, or configuration issues\n\n## Coverage Analysis & Gaps\n**Total System Failure** - No meaningful data available:\n- Zero coverage across all files\n- Cannot assess actual code coverage\n- Test infrastructure itself appears broken\n\n## Potential Issues with Recent Changes\n**High Risk Areas Identified:**\n1. **Multiple auto-generated files** (`auto_add_logging_*.py`, `auto_add_type_hints.py`) - These may have introduced syntax errors or broken imports\n2. **DeepSeek API integration** (`deepseek.py`, `deepseek_pool.py`) - New external dependencies may be missing\n3. **Security-related changes** (`jwt_bearer.py`, `ask_deepseek_api_keys_security.py`) - Could be causing authentication failures\n4. **Cache and config modifications** - May have broken application bootstrap\n\n## Immediate Recommendations\n1. **Fix Test Infrastructure First:**\n   - Check Python environment and dependencies\n   - Verify test configuration files\n   - Run tests with `-v` flag to see specific failures\n\n2. **Validate Auto-Generated Code:**\n   - Review all `auto_*.py` files for syntax errors\n   - Ensure generated code follows project conventions\n\n3. **Check External Dependencies:**\n   - Verify DeepSeek API credentials and connectivity\n   - Confirm cache system (Redis/Memcached) is running\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No functional test suite means unknown regression impact\n- Security changes untested (JWT, API keys)\n- Core infrastructure modifications unverified\n- **Recommendation: Block all deployments until tests are functional and show reasonable coverage**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 247,
+      "completion_tokens": 394,
+      "total_tokens": 641,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 183
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

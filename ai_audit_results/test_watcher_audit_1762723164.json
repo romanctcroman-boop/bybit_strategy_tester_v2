@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762723164,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_circuit_breaker.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_protocol.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762723149.303356,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during test run\n- **Critical Gap**: Entire test suite failed to initialize/execute\n- **No meaningful coverage data** available due to execution failure\n\n## Potential Issues with Recent Changes\n1. **MTF Engine Changes** (`mtf_engine.py`) likely introduced breaking changes\n2. **Database/Query Optimization** tests may have environment dependencies failing\n3. **Perplexity Client** integration could be causing initialization crashes\n4. **Test Configuration** (`conftest.py`) may have broken fixtures or imports\n5. **Protocol/Edge Case** tests might be exposing unhandled exceptions\n\n## Immediate Recommendations\n1. **Debug Execution Failure**:\n   - Run tests with `-v` flag to see which test fails first\n   - Check for import errors in `conftest.py`\n   - Verify all dependencies are installed\n\n2. **Isolate Breaking Changes**:\n   - Temporarily revert `mtf_engine.py` changes and retest\n   - Run tests file-by-file to identify the failure point\n   - Check `perplexity_client.py` for API/client initialization issues\n\n3. **Fix Test Infrastructure**:\n   - Ensure test database connections are valid\n   - Verify external service dependencies (Perplexity client)\n   - Check for missing environment variables\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely risky:\n- No validation of core MTF engine changes\n- Database optimizations completely untested\n- Integration points unverified\n- Edge cases and stress scenarios not exercised\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 226,
+      "completion_tokens": 394,
+      "total_tokens": 620,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 162
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762604158,
+  "changed_files": [
+    "deepseek_meta_analysis_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762604138.742138,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No tests executed successfully\n- Coverage reporting system failed to collect any data\n- Complete absence of test validation for recent changes\n\n## Potential Issues with Recent Changes\n1. **Test runner configuration broken** - Likely issues in pytest configuration, test discovery, or environment setup\n2. **Syntax errors** in test files or the changed `deepseek_meta_analysis_v2.py`\n3. **Missing dependencies** or incompatible versions\n4. **Import failures** preventing test module loading\n5. **Critical exceptions** during test collection phase\n\n## Immediate Recommendations\n\n### 🔴 HIGH PRIORITY\n1. **Fix test runner configuration**\n   - Check `pytest.ini`/`pyproject.toml` for syntax errors\n   - Verify Python path and test discovery patterns\n   - Run `pytest --collect-only` to diagnose collection issues\n\n2. **Validate changed file syntax**\n   - Run `python -m py_compile deepseek_meta_analysis_v2.py`\n   - Check for import cycles or missing dependencies\n\n3. **Restore basic test execution**\n   - Create a minimal smoke test to verify test infrastructure\n   - Fix environment setup and dependency installation\n\n### 🟡 MEDIUM PRIORITY\n4. **Add basic unit tests** for `deepseek_meta_analysis_v2.py` core functionality\n5. **Implement CI pipeline validation** to prevent recurrence\n\n## Risk Assessment\n**SEVERE RISK** - Deploying without test validation exposes:\n- Runtime crashes in production\n- Data corruption risks\n- Undetected logical errors\n- Complete loss of quality assurance\n\n**Immediate Action Required**: Halt deployments until test infrastructure is restored and basic test coverage is established.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 415,
+      "total_tokens": 543,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

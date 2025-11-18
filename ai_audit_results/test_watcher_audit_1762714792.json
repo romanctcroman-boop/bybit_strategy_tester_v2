@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762714792,
+  "changed_files": [
+    "tests\\test_perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762714779.0382574,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files\n- Import/dependency failures\n- Test framework configuration issues\n- Fatal errors during test discovery/setup\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\nThe changed file `tests/test_perplexity_client.py` likely contains:\n- Broken imports or syntax errors\n- Missing dependencies for Perplexity client\n- Configuration errors in test setup/teardown\n- Test discovery failures\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Run `python -m pytest tests/test_perplexity_client.py -v` to see specific errors\n   - Check for syntax errors in the test file\n   - Verify all imports and dependencies are available\n\n2. **Debug Steps**\n   - Add `print(\"Test starting\")` at top of test file to verify execution\n   - Check pytest configuration and conftest.py files\n   - Verify Python environment and installed packages\n\n3. **Validation**\n   - Once tests run, focus on achieving meaningful coverage\n   - Ensure Perplexity client integration is properly mocked/tested\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected regressions in Perplexity client integration\n- Potential production failures in API interactions\n- No safety net for related code changes\n\n**Priority:** Fix test execution immediately before any further development on this component.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 339,
+      "total_tokens": 466,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "timestamp": 1762642425,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    "mcp-server\\orchestrator\\api\\models.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    "mcp-server\\providers\\__init__.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    "mcp-server\\providers\\failover_manager.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    "mcp-server\\providers\\health_checker.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    "mcp-server\\providers\\load_balancer.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    "mcp-server\\providers\\provider_registry.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762642406.8266947,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely crash/segfault)\n- 0% coverage suggests tests never executed properly\n- No coverage data collected for any files\n\n## Coverage Analysis & Gaps\n**Total Failure** - No meaningful coverage data exists:\n- Coverage system failed to initialize or collect data\n- All application code (mcp-server/) shows 0% coverage\n- No baseline for comparison or gap identification\n\n## Potential Issues with Recent Changes\n**Environment Corruption Suspected**:\n- Multiple virtual environment files modified (.venv/)\n- Changes to pytest internals and coverage modules\n- Possible version conflicts or corrupted installations\n- FastAPI application module also modified\n\n## Recommendations for Improvement\n\n**IMMEDIATE ACTIONS**:\n1. **Recreate Virtual Environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Run Basic Test Diagnostics**:\n   ```bash\n   python -m pytest --version\n   python -m pytest --collect-only\n   python -m pytest -v --tb=short\n   ```\n\n3. **Verify Test Configuration**:\n   - Check pytest.ini/pyproject.toml for coverage configuration\n   - Ensure coverage.py is properly installed and configured\n\n**FOLLOW-UP ACTIONS**:\n4. **Isolate Test Failures**:\n   - Run tests without coverage first\n   - Add coverage incrementally\n   - Test individual modules to identify specific failures\n\n5. **Implement Basic Sanity Tests**:\n   - Add simple smoke tests for core components\n   - Verify provider registry initialization\n   - Test health checker basic functionality\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- No validation of core functionality (load balancing, failover, health checks)\n- Critical path testing completely absent\n- Potential for silent failures in production\n- **Recommend blocking deployments until basic test suite passes**\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 428,
+      "completion_tokens": 443,
+      "total_tokens": 871,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 364
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

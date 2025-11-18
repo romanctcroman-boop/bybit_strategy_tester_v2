@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762534734,
+  "changed_files": [
+    "backend\\ml\\retrain_scheduler.py",
+    "tests\\unit\\test_retrain_scheduler.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    "tests\\unit\\test_ast_validator.py",
+    "tests\\test_task_queue.py",
+    "tests\\unit\\test_structured_logger.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "tests\\unit\\test_lru_ttl_cache.py",
+    "tests\\unit\\test_batch_writer.py",
+    "mcp-server\\mcp_cache.py",
+    "tests\\unit\\test_drift_detector.py",
+    "tests\\test_walk_forward.py",
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762534718.919837,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- Likely environment or dependency issues\n\n## 2. Coverage Analysis\n**COMPLETE COVERAGE FAILURE**:\n- No files show any coverage data\n- All test execution appears to have been interrupted\n- This indicates fundamental infrastructure problems\n\n## 3. Potential Issues\n**Immediate suspects**:\n- `.venv\\Lib\\site-packages\\_pytest\\terminal.py` modification suggests corrupted pytest installation\n- Environment conflicts or broken dependencies\n- Memory issues causing segmentation faults\n- Circular imports or initialization errors\n\n## 4. Recommendations\n\n**IMMEDIATE ACTIONS**:\n1. **Restore clean environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify pytest installation**:\n   ```bash\n   pytest --version\n   pytest tests/ -v --tb=short\n   ```\n\n3. **Check for memory issues**:\n   - Run tests with `pytest -x` to stop on first failure\n   - Monitor memory usage during test execution\n\n**FOLLOW-UP**:\n4. Run isolated module tests to identify problematic components\n5. Add basic smoke tests to catch environment issues earlier\n\n## 5. Risk Assessment\n**HIGH RISK** - Deployment should be blocked until:\n- Basic test suite passes with meaningful coverage\n- Exit code returns to 0 (normal success)\n- Root cause of abnormal termination is identified and fixed\n\n**Priority**: Fix test infrastructure before addressing any feature changes or new tests.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 267,
+      "completion_tokens": 389,
+      "total_tokens": 656,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 203
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

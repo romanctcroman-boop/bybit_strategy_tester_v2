@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762558265,
+  "changed_files": [
+    "backend\\api\\app.py",
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "backend\\api\\parallel_deepseek_client_v2.py",
+    "add_deepseek_keys.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762558247.651065,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated for any files\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- Zero coverage across all files indicates tests didn't run\n- No meaningful coverage data to analyze\n- Critical gap: entire test infrastructure appears broken\n\n## Potential Issues with Recent Changes\n**HIGH RISK CHANGES IDENTIFIED:**\n1. **Database/Psycopg2 modifications** - Changes to `psycopg2/__init__.py` suggest database connectivity alterations that may be causing fatal errors\n2. **API client changes** - `parallel_deepseek_client_v2.py` modifications could introduce memory leaks or infinite loops\n3. **Environment contamination** - Modifying `.venv` packages directly is dangerous and likely causing compatibility issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test infrastructure first:**\n   - Run tests with `-v` flag to see where they fail\n   - Check for segmentation faults in C extensions (likely psycopg2)\n   - Verify Python environment integrity\n\n2. **Isolate database changes:**\n   - Revert `psycopg2` modifications in virtual environment\n   - Test database connectivity separately\n   - Use connection pooling/timeouts to prevent hangs\n\n3. **Client code review:**\n   - Add explicit resource cleanup in `parallel_deepseek_client_v2.py`\n   - Implement timeout mechanisms for parallel operations\n   - Add memory usage monitoring\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be catastrophic:\n- **Critical**: No functioning test suite\n- **High**: Database connectivity likely compromised  \n- **Medium**: API client changes may introduce production failures\n- **Urgent**: Must fix test infrastructure before any further development\n\n**Priority:** Fix test execution immediately, then address coverage gaps once tests run successfully.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 176,
+      "completion_tokens": 438,
+      "total_tokens": 614,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 112
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762598892,
+  "changed_files": [
+    "automation\\deepseek_robot\\dual_analytics_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762598874.7979515,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal errors during test setup\n\n## Coverage Analysis\n**0.00% coverage** - This is a complete testing failure, not just low coverage. The coverage system couldn't even initialize, suggesting fundamental issues with the test environment or code structure.\n\n## Potential Issues with Recent Changes\nThe modified file `dual_analytics_engine.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** or imports\n- **Circular imports** causing import failures\n- **Breaking changes** to class/method signatures\n\n## Immediate Recommendations\n\n1. **Fix Test Execution First**:\n   ```bash\n   python -m py_compile automation/deepseek_robot/dual_analytics_engine.py\n   ```\n   Check for syntax errors before running tests\n\n2. **Verify Imports**:\n   - Check all imports in the changed file\n   - Ensure dependencies are installed\n   - Test import isolation: `python -c \"from automation.deepseek_robot.dual_analytics_engine import *\"`\n\n3. **Run Tests with Verbose Output**:\n   ```bash\n   pytest -v --tb=long\n   ```\n   To see exactly where the failure occurs\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable:\n- No validation of recent changes\n- Potential runtime errors in production\n- Broken functionality likely\n- Zero quality assurance coverage\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 362,
+      "total_tokens": 495,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 5
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

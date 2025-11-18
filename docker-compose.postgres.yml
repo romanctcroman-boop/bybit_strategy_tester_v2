@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bybit
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  runner:
+    image: python:3.12-slim
+    depends_on:
+      - postgres
+    working_dir: /app
+    volumes:
+      - ./:/app
+    environment:
+      # Use service DNS name 'postgres' to access the DB from within the compose network
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/bybit
+    # Keep the container idle; exec into it to run alembic or scripts as needed
+    command: ["tail", "-f", "/dev/null"]
+
+volumes:
+  pgdata:

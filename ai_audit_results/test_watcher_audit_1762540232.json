@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762540232,
+  "changed_files": [
+    "tests\\stress\\test_api_rate_limits.py",
+    "tests\\stress\\test_parallel_execution.py",
+    "tests\\stress\\test_memory_leaks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540211.989684,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete test failure:\n- No code executed during test run\n- All test scenarios failed to provide any validation\n- Impossible to assess actual code coverage\n\n## Potential Issues with Recent Changes\nThe stress test files modified likely contain:\n- **Environment dependencies** missing or misconfigured\n- **Resource exhaustion** causing system crashes\n- **Infinite loops** or **memory corruption** in parallel execution tests\n- **Rate limit tests** overwhelming system resources\n- **Import/circular dependency** issues preventing test loading\n\n## Immediate Recommendations\n1. **Debug Exit Code -1**:\n   - Check system logs for segmentation faults or OOM killer\n   - Run tests with `python -m pytest -xvs` to see first failure\n   - Verify Python environment integrity\n\n2. **Isolate Stress Tests**:\n   ```bash\n   pytest tests/stress/test_api_rate_limits.py --tb=short\n   pytest tests/stress/test_parallel_execution.py --tb=short  \n   pytest tests/stress/test_memory_leaks.py --tb=short\n   ```\n\n3. **Add Safety Guards**:\n   - Implement timeouts on all stress tests\n   - Add resource monitoring during execution\n   - Use test isolation to prevent cascade failures\n\n## Risk Assessment\n**HIGH RISK** - Production deployment blocked:\n- ❌ No validation of recent changes\n- ❌ Potential memory leaks/performance issues undetected  \n- ❌ Rate limiting logic completely untested\n- ❌ Parallel execution safety unknown\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 153,
+      "completion_tokens": 397,
+      "total_tokens": 550,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 89
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

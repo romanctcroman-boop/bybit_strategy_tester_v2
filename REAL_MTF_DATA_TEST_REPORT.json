@@ -1,0 +1,291 @@
+{
+  "data_loaded": {
+    "5": {
+      "candles_loaded": 1000,
+      "candles_required": 25920,
+      "coverage_pct": 3.8580246913580245,
+      "period_start": "2025-10-25T23:40:00",
+      "period_end": "2025-10-29T10:55:00",
+      "period_days": 3
+    },
+    "15": {
+      "candles_loaded": 1000,
+      "candles_required": 8640,
+      "coverage_pct": 11.574074074074074,
+      "period_start": "2025-10-19T01:00:00",
+      "period_end": "2025-10-29T10:45:00",
+      "period_days": 10
+    },
+    "30": {
+      "candles_loaded": 1000,
+      "candles_required": 4320,
+      "coverage_pct": 23.14814814814815,
+      "period_start": "2025-10-08T15:00:00",
+      "period_end": "2025-10-29T10:30:00",
+      "period_days": 20
+    }
+  },
+  "grid_search_results": {
+    "5": [
+      {
+        "params": {
+          "fast_ema": 9,
+          "slow_ema": 21,
+          "name": "Fast (9/21)"
+        },
+        "total_return": 0.00013825864106520314,
+        "total_return_pct": 0.013825864106520314,
+        "sharpe_ratio": -0.2118029633087221,
+        "sortino_ratio": -0.18832137997479165,
+        "max_drawdown": 0.020536982778500346,
+        "max_drawdown_pct": 2.053698277850035,
+        "total_trades": 3,
+        "win_rate": 0.3333333333333333,
+        "profit_factor": 1.420692769291369,
+        "final_capital": 10001.382586410653
+      },
+      {
+        "params": {
+          "fast_ema": 12,
+          "slow_ema": 26,
+          "name": "MACD-based (12/26)"
+        },
+        "total_return": 0.00013391085374259148,
+        "total_return_pct": 0.013391085374259148,
+        "sharpe_ratio": -0.21190135929842474,
+        "sortino_ratio": -0.18937668190952806,
+        "max_drawdown": 0.02054130804909637,
+        "max_drawdown_pct": 2.054130804909637,
+        "total_trades": 3,
+        "win_rate": 0.3333333333333333,
+        "profit_factor": 1.4056805436368387,
+        "final_capital": 10001.339108537426
+      },
+      {
+        "params": {
+          "fast_ema": 20,
+          "slow_ema": 50,
+          "name": "Medium (20/50)"
+        },
+        "total_return": -0.0001255979913131755,
+        "total_return_pct": -0.01255979913131755,
+        "sharpe_ratio": -0.17760806014702996,
+        "sortino_ratio": -0.1422663319895037,
+        "max_drawdown": 0.02068269345081644,
+        "max_drawdown_pct": 2.068269345081644,
+        "total_trades": 4,
+        "win_rate": 0.25,
+        "profit_factor": 0.8763720664943375,
+        "final_capital": 9998.744020086868
+      },
+      {
+        "params": {
+          "fast_ema": 15,
+          "slow_ema": 45,
+          "name": "Alternative (15/45)"
+        },
+        "total_return": -0.000134755325025937,
+        "total_return_pct": -0.013475532502593701,
+        "sharpe_ratio": -0.17765354935741295,
+        "sortino_ratio": -0.1435135773265159,
+        "max_drawdown": 0.020705038183415122,
+        "max_drawdown_pct": 2.0705038183415123,
+        "total_trades": 4,
+        "win_rate": 0.25,
+        "profit_factor": 0.864378413808241,
+        "final_capital": 9998.65244674974
+      },
+      {
+        "params": {
+          "fast_ema": 10,
+          "slow_ema": 30,
+          "name": "Short (10/30)"
+        },
+        "total_return": 0.00023069574970047135,
+        "total_return_pct": 0.023069574970047135,
+        "sharpe_ratio": -0.21082021312813348,
+        "sortino_ratio": -0.1820904744995785,
+        "max_drawdown": 0.020402446371709265,
+        "max_drawdown_pct": 2.0402446371709266,
+        "total_trades": 3,
+        "win_rate": 0.6666666666666666,
+        "profit_factor": 1.821864131931902,
+        "final_capital": 10002.306957497005
+      }
+    ],
+    "15": [
+      {
+        "params": {
+          "fast_ema": 9,
+          "slow_ema": 21,
+          "name": "Fast (9/21)"
+        },
+        "total_return": 0.0012138429481518553,
+        "total_return_pct": 0.12138429481518553,
+        "sharpe_ratio": -0.10202162431478681,
+        "sortino_ratio": -0.08527472022953773,
+        "max_drawdown": 0.0203973343716003,
+        "max_drawdown_pct": 2.03973343716003,
+        "total_trades": 8,
+        "win_rate": 0.5,
+        "profit_factor": 2.285704940083441,
+        "final_capital": 10012.138429481518
+      },
+      {
+        "params": {
+          "fast_ema": 12,
+          "slow_ema": 26,
+          "name": "MACD-based (12/26)"
+        },
+        "total_return": 0.0008641810391598614,
+        "total_return_pct": 0.08641810391598614,
+        "sharpe_ratio": -0.09561116008912722,
+        "sortino_ratio": -0.07608255398395897,
+        "max_drawdown": 0.020740379670270887,
+        "max_drawdown_pct": 2.0740379670270888,
+        "total_trades": 9,
+        "win_rate": 0.4444444444444444,
+        "profit_factor": 1.712861426189922,
+        "final_capital": 10008.641810391598
+      },
+      {
+        "params": {
+          "fast_ema": 20,
+          "slow_ema": 50,
+          "name": "Medium (20/50)"
+        },
+        "total_return": 0.0019390019104887912,
+        "total_return_pct": 0.19390019104887912,
+        "sharpe_ratio": 0.03125426086144335,
+        "sortino_ratio": 0.02055073697570292,
+        "max_drawdown": 0.020352475308099745,
+        "max_drawdown_pct": 2.0352475308099747,
+        "total_trades": 5,
+        "win_rate": 0.8,
+        "profit_factor": 7.204153127797768,
+        "final_capital": 10019.390019104889
+      },
+      {
+        "params": {
+          "fast_ema": 15,
+          "slow_ema": 45,
+          "name": "Alternative (15/45)"
+        },
+        "total_return": 0.0008210259454946023,
+        "total_return_pct": 0.08210259454946023,
+        "sharpe_ratio": -0.09580108576109665,
+        "sortino_ratio": -0.07318690233639827,
+        "max_drawdown": 0.020783580112520395,
+        "max_drawdown_pct": 2.0783580112520395,
+        "total_trades": 9,
+        "win_rate": 0.4444444444444444,
+        "profit_factor": 1.6598506869511986,
+        "final_capital": 10008.210259454947
+      },
+      {
+        "params": {
+          "fast_ema": 10,
+          "slow_ema": 30,
+          "name": "Short (10/30)"
+        },
+        "total_return": 0.000868877711098559,
+        "total_return_pct": 0.0868877711098559,
+        "sharpe_ratio": -0.0955694308517899,
+        "sortino_ratio": -0.07709155257233985,
+        "max_drawdown": 0.020735678062937586,
+        "max_drawdown_pct": 2.0735678062937586,
+        "total_trades": 9,
+        "win_rate": 0.4444444444444444,
+        "profit_factor": 1.718835730957223,
+        "final_capital": 10008.688777110985
+      }
+    ],
+    "30": [
+      {
+        "params": {
+          "fast_ema": 9,
+          "slow_ema": 21,
+          "name": "Fast (9/21)"
+        },
+        "total_return": -0.0003136892818980108,
+        "total_return_pct": -0.03136892818980108,
+        "sharpe_ratio": -0.06734736020000151,
+        "sortino_ratio": -0.051508789038693784,
+        "max_drawdown": 0.02154646211403742,
+        "max_drawdown_pct": 2.154646211403742,
+        "total_trades": 15,
+        "win_rate": 0.3333333333333333,
+        "profit_factor": 0.9510436619140183,
+        "final_capital": 9996.86310718102
+      },
+      {
+        "params": {
+          "fast_ema": 12,
+          "slow_ema": 26,
+          "name": "MACD-based (12/26)"
+        },
+        "total_return": -5.328170971441448e-05,
+        "total_return_pct": -0.005328170971441448,
+        "sharpe_ratio": 0.02348722905683806,
+        "sortino_ratio": 0.016750056508458226,
+        "max_drawdown": 0.021249784746192928,
+        "max_drawdown_pct": 2.124978474619293,
+        "total_trades": 11,
+        "win_rate": 0.36363636363636365,
+        "profit_factor": 1.0301520068625034,
+        "final_capital": 9999.467182902856
+      },
+      {
+        "params": {
+          "fast_ema": 20,
+          "slow_ema": 50,
+          "name": "Medium (20/50)"
+        },
+        "total_return": -0.00019249033614454625,
+        "total_return_pct": -0.019249033614454625,
+        "sharpe_ratio": 0.016164201037374933,
+        "sortino_ratio": 0.009997420118706035,
+        "max_drawdown": 0.02082648343758865,
+        "max_drawdown_pct": 2.0826483437588648,
+        "total_trades": 6,
+        "win_rate": 0.3333333333333333,
+        "profit_factor": 0.9013698935807086,
+        "final_capital": 9998.075096638555
+      },
+      {
+        "params": {
+          "fast_ema": 15,
+          "slow_ema": 45,
+          "name": "Alternative (15/45)"
+        },
+        "total_return": -0.0008556118207461161,
+        "total_return_pct": -0.08556118207461161,
+        "sharpe_ratio": 0.014955816049777356,
+        "sortino_ratio": 0.010020170406092,
+        "max_drawdown": 0.021496992324122038,
+        "max_drawdown_pct": 2.1496992324122037,
+        "total_trades": 8,
+        "win_rate": 0.25,
+        "profit_factor": 0.600799119744222,
+        "final_capital": 9991.443881792538
+      },
+      {
+        "params": {
+          "fast_ema": 10,
+          "slow_ema": 30,
+          "name": "Short (10/30)"
+        },
+        "total_return": -5.328170971441448e-05,
+        "total_return_pct": -0.005328170971441448,
+        "sharpe_ratio": 0.023490992813560225,
+        "sortino_ratio": 0.016654731935254245,
+        "max_drawdown": 0.021249784746192928,
+        "max_drawdown_pct": 2.124978474619293,
+        "total_trades": 11,
+        "win_rate": 0.36363636363636365,
+        "profit_factor": 1.0301520068625034,
+        "final_capital": 9999.467182902856
+      }
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762725874,
+  "changed_files": [
+    "reliability\\request_deduplication.py",
+    "reliability\\reliable_mcp_server.py",
+    "test_reliable_mcp.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762725857.8588996,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception during test setup/execution). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **100% coverage gap** - No code was executed during testing\n- All modified files show 0% coverage, indicating fundamental test infrastructure issues\n- No baseline comparison available due to complete test failure\n\n## Potential Issues with Recent Changes\n1. **Test environment broken** - Likely import errors, missing dependencies, or configuration issues\n2. **Recent file changes may have introduced breaking changes** to test runners or imports\n3. **Possible circular imports** between the three modified files\n4. **Test discovery failure** - pytest/unitest cannot locate or load tests\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Run with `-v` flag to see specific failure points\n   - Check for import errors in `test_reliable_mcp.py`\n   - Verify all dependencies are installed\n\n2. **Debug specific areas**:\n   - Test if individual files can be imported separately\n   - Check for missing `__init__.py` files in reliability package\n   - Validate recent changes didn't break module structure\n\n3. **Add basic smoke tests**:\n   - Create minimal test that imports each changed file\n   - Verify basic functionality before comprehensive testing\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes is extremely dangerous:\n- Zero validation of reliability module changes\n- Potential runtime errors undetected\n- Critical path code (reliability) completely untested\n- **Recommendation**: Block deployment until basic test execution is restored and >80% coverage achieved",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 144,
+      "completion_tokens": 365,
+      "total_tokens": 509,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 80
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

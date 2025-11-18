@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762706402,
+  "changed_files": [
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762706389.456843,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is not a coverage gap but a complete test failure.\n\n## Potential Issues with Recent Changes\n- The changed file `reliability\\__init__.py` likely contains syntax errors, import issues, or runtime exceptions\n- Possible circular imports or missing dependencies\n- Environment configuration problems (Python path, missing packages)\n- Test runner configuration issues\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check `reliability\\__init__.py` for syntax errors\n   - Verify all imports resolve correctly\n   - Run with `python -m py_compile reliability\\__init__.py` to validate syntax\n\n2. **Debug Infrastructure**\n   - Run tests with `-v` flag for verbose output\n   - Check test runner configuration\n   - Verify Python environment and dependencies\n\n3. **Isolate the Problem**\n   - Test the module directly: `python -c \"import reliability\"`\n   - Run minimal test case to identify root cause\n\n## Risk Assessment\n**HIGH RISK** - Production code cannot be validated. Any changes in the reliability module are completely untested and may contain critical defects. Deployment should be blocked until tests execute successfully.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 301,
+      "total_tokens": 426,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

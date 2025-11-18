@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762582452,
+  "changed_files": [
+    "tests\\test_task_queue_new.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762582438.0204165,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental issues in test setup or code under test.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% overall coverage confirms no tests executed. All code paths are untested.\n\n## Potential Issues with Recent Changes\n1. **test_task_queue_new.py** likely contains syntax errors, import failures, or runtime exceptions\n2. Possible circular imports or missing dependencies in the new test file\n3. Test infrastructure may be broken (fixtures, setup/teardown methods)\n4. Recent code changes may have introduced breaking changes to the test environment\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m pytest tests/test_task_queue_new.py -v` to see specific error details\n2. Check for syntax errors in the new test file\n3. Verify all imports and dependencies are available\n4. Examine test setup/teardown methods for exceptions\n\n**FOLLOW-UP:**\n5. Fix the root cause preventing test execution\n6. Add basic smoke tests to validate test infrastructure\n7. Implement CI checks to catch test failures before merge\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Production code changes are completely untested\n- Regression risks are extremely high\n- Deployment carries significant stability concerns\n- Critical bugs could reach production undetected\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 322,
+      "total_tokens": 448,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

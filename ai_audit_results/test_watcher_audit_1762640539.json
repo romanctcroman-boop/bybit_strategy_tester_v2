@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762640539,
+  "changed_files": [
+    "backend\\services\\deepseek_agent.py",
+    "backend\\api\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762640524.4539566,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test framework failure\n- 0% coverage suggests tests aren't even executing\n- No coverage data available for analysis\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No coverage data collected\n- Entire codebase effectively untested\n- Recent changes in `deepseek_agent.py` and `circuit_breaker.py` completely unvalidated\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure Failure:**\n   - Test runner crashing before execution\n   - Possible configuration issues in test setup\n   - Dependency conflicts with new changes\n\n2. **Code Changes Impact:**\n   - `circuit_breaker.py` modifications may have broken imports or dependencies\n   - `deepseek_agent.py` changes could have introduced syntax errors or circular imports\n\n## Immediate Recommendations\n1. **Diagnose Test Failure:**\n   ```bash\n   python -m pytest --tb=short -v  # Identify failing test\n   python -c \"import backend.services.deepseek_agent\"  # Check import issues\n   ```\n\n2. **Fix Critical Issues:**\n   - Check for syntax errors in modified files\n   - Verify all imports work correctly\n   - Ensure test configuration files are intact\n\n3. **Restore Basic Testing:**\n   - Get tests running (even if failing) to collect coverage data\n   - Add simple smoke tests for core functionality\n   - Implement basic circuit breaker and agent validation\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- No validation of critical circuit breaker logic\n- AI agent functionality completely untested\n- High probability of runtime errors in production\n- Potential service outages from unvalidated changes\n\n**Priority:** Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 391,
+      "total_tokens": 529,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 74
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

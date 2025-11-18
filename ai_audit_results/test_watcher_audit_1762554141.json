@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762554141,
+  "changed_files": [
+    "backend\\api\\circuit_breaker.py",
+    "test_circuit_breaker_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554124.9885435,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files\n- Import/circular dependency issues\n- Test framework configuration problems\n- Fatal errors during test setup\n\n## Coverage Analysis\n**0% coverage** - This is not a coverage gap but a complete test execution failure. The coverage report is empty because no tests actually ran.\n\n## Potential Issues with Recent Changes\n1. **Circuit Breaker Implementation**: The new `circuit_breaker.py` likely contains syntax errors or import issues\n2. **Test File Issues**: `test_circuit_breaker_v2.py` may have:\n   - Broken imports from the circuit_breaker module\n   - Syntax errors\n   - Missing dependencies\n   - Incorrect test configuration\n\n## Immediate Action Plan\n1. **Fix Test Execution First**:\n   ```bash\n   python -m pytest test_circuit_breaker_v2.py -v\n   ```\n   Check for specific error messages\n\n2. **Validate Syntax**:\n   ```bash\n   python -m py_compile backend/api/circuit_breaker.py\n   python -m py_compile test_circuit_breaker_v2.py\n   ```\n\n3. **Check Imports**:\n   - Verify `test_circuit_breaker_v2.py` correctly imports from `backend.api.circuit_breaker`\n   - Ensure all dependencies are installed\n\n## Risk Assessment\n**HIGH RISK** - Code changes cannot be validated without working tests. The circuit breaker pattern is critical for system resilience - deploying without tests could cause:\n- Cascading failures\n- Unhandled exceptions\n- Production outages\n\n## Priority Recommendations\n1. **Fix test execution immediately** - this blocks all other quality metrics\n2. **Add basic smoke tests** once execution works\n3. **Implement circuit breaker state tests** (open/closed/half-open)\n4. **Add integration tests** for failure scenarios\n\n**Next Step**: Run tests with verbose output to identify the specific failure cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 432,
+      "total_tokens": 570,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 10
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

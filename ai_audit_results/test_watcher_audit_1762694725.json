@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762694725,
+  "changed_files": [
+    "run_full_project_audit.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762694709.62471,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates fundamental issues in the test infrastructure or codebase that prevent any meaningful testing.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **No file-specific coverage data** - Tests didn't reach any implementation code\n- **Complete testing blackout** - Unable to assess actual code coverage\n\n## Potential Issues with Recent Changes\nThe modified `run_full_project_audit.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Runtime errors during module loading\n- Infinite loops or fatal exceptions\n- Environment configuration issues\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check `run_full_project_audit.py` for syntax errors\n   - Verify all imports and dependencies are available\n   - Run with `python -m py_compile` to validate syntax\n\n2. **Debug Execution Flow**\n   - Add debug prints to identify where execution fails\n   - Check for unhandled exceptions with try/catch blocks\n   - Validate environment variables and paths\n\n3. **Restore Basic Testing**\n   - Create minimal test that imports the module successfully\n   - Add basic smoke tests before comprehensive coverage\n   - Verify test runner configuration\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No validation of code functionality\n- Potential deployment of broken code\n- Undetected regressions in production\n- Complete loss of testing safety net\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 348,
+      "total_tokens": 474,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

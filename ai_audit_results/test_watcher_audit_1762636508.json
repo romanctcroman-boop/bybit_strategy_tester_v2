@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762636508,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\openai\\resources\\chat\\completions\\completions.py",
+    ".venv\\Lib\\site-packages\\openai\\_utils\\_utils.py",
+    ".venv\\Lib\\site-packages\\openai\\_base_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762636491.8521073,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests did not execute successfully (Exit Code -1). This indicates either:\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n- Environment setup problems\n- Critical code failures preventing test execution\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage confirms no tests actually ran. This is a severe testing infrastructure failure, not just poor coverage.\n\n## Potential Issues with Recent Changes\nThe modified files suggest OpenAI library updates may be causing conflicts:\n- `.venv\\Lib\\site-packages\\openai\\resources\\chat\\completions\\completions.py` - Core API functionality\n- `.venv\\Lib\\site-packages\\openai\\_utils\\_utils.py` - Utility functions\n- `.venv\\Lib\\site-packages\\openai\\_base_client.py` - Base client implementation\n\n**Likely causes:**\n- Breaking changes in OpenAI library version\n- Dependency conflicts\n- Environment corruption in `.venv`\n\n## Immediate Recommendations\n\n1. **Fix Test Execution First:**\n   - Run tests with `-v` flag to see specific failure points\n   - Check Python environment: `python --version` and `pip list`\n   - Verify test discovery: `pytest --collect-only`\n\n2. **Environment Reset:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n3. **Dependency Management:**\n   - Pin OpenAI library version in requirements\n   - Test with previous known-working version\n   - Check for version compatibility issues\n\n4. **Isolate the Problem:**\n   - Create minimal test case to verify basic test execution\n   - Test without OpenAI dependencies first\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback\n- Potential production-breaking changes\n- Dependency instability\n- Complete loss of quality assurance\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 181,
+      "completion_tokens": 428,
+      "total_tokens": 609,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 117
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

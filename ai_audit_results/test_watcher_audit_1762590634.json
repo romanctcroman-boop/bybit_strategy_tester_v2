@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762590634,
+  "changed_files": [
+    "deepseek_self_analysis.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762590618.4287086,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `deepseek_self_analysis.py` - Likely breaking changes preventing test execution\n2. **Missing Dependencies** - Required imports or packages not available\n3. **Environment Configuration** - Test runner setup issues or path problems\n4. **Critical Runtime Errors** - Unhandled exceptions crashing the test framework\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix Basic Execution** - Run `python -m py_compile deepseek_self_analysis.py` to check syntax\n2. **Test Isolation** - Run minimal test: `python -c \"import deepseek_self_analysis\"`\n3. **Debug Exit Code -1** - Check test runner logs for stack traces\n4. **Verify Dependencies** - Ensure all imports are available in test environment\n\n**FOLLOW-UP:**\n5. Add basic smoke test that imports the module\n6. Implement error handling in test setup\n7. Add logging to identify where execution fails\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially broken. Deployment would be extremely risky. The -1 exit code suggests fundamental issues that could affect production functionality.\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 343,
+      "total_tokens": 469,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

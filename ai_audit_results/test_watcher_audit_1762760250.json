@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762760250,
+  "changed_files": [
+    "reliability\\distributed_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762760232.7696414,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality assessment possible as tests didn't run to completion. This indicates either:\n- Syntax errors in test code\n- Critical runtime failures during test setup\n- Missing dependencies or configuration\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of the test execution failure, not an indication of actual coverage gaps.\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `reliability\\distributed_cache.py`:\n- Likely introduced breaking changes that prevent test execution\n- Possible syntax errors or import issues\n- May have broken test infrastructure or dependencies\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix test execution first** - Run tests locally to identify the specific failure point\n2. **Check syntax** in both test files and the modified cache module\n3. **Verify imports** and dependencies in the distributed cache implementation\n4. **Run isolated tests** on the changed file to pinpoint the issue\n\n**Follow-up:**\n- Once tests execute, establish baseline coverage\n- Add specific unit tests for distributed cache functionality\n- Implement integration tests for cache distribution scenarios\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely risky:\n- No validation of distributed cache functionality\n- Potential runtime failures in production\n- Possible data consistency issues in cache operations\n- Could break dependent services relying on cache system\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 327,
+      "total_tokens": 452,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

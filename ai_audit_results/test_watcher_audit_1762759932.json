@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762759932,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    "mcp-server\\orchestrator\\api\\models.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762759907.2803986,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution. This represents a complete testing breakdown.\n\n## Coverage Analysis\n**0% coverage** confirms no tests executed successfully. This represents maximum testing risk - no code paths are being validated.\n\n## Potential Issues\n1. **Environment corruption** - Modified files in `.venv/` suggest virtual environment instability\n2. **Test framework conflict** - Changes to pytest, pluggy, and coverage files indicate dependency issues\n3. **Configuration problem** - Likely test runner or coverage configuration failure\n4. **Import/circular dependency** - Possible issue in `mcp-server\\orchestrator\\api\\models.py` preventing test discovery\n\n## Immediate Actions Required\n1. **Recreate virtual environment**:\n   ```bash\n   rm -rf .venv/\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify test configuration**:\n   - Check `pytest.ini`/`pyproject.toml` for valid settings\n   - Ensure coverage configuration is correct\n\n3. **Run basic test isolation**:\n   ```bash\n   python -m pytest --collect-only  # Verify test discovery\n   python -m pytest -v tests/  # Run without coverage first\n   ```\n\n4. **Check `models.py`** for import issues or syntax errors\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected regressions likely\n- Production deployment extremely risky\n- Code quality cannot be measured\n- Potential runtime failures in production\n\n## Priority Recommendations\n1. **Fix test execution immediately** - This blocks all quality metrics\n2. **Validate environment stability** before any code changes\n3. **Implement basic smoke tests** once execution is restored\n4. **Monitor dependency versions** to prevent similar issues\n\nThe root cause appears environmental rather than code-related. Focus on restoring the testing infrastructure before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 362,
+      "completion_tokens": 423,
+      "total_tokens": 785,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 298
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

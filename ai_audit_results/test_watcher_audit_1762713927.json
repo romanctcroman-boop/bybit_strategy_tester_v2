@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762713927,
+  "changed_files": [
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713914.2556393,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code coverage data collected due to test execution failure. This represents maximum risk as no code paths were validated.\n\n## Potential Issues with Recent Changes\nThe failure likely relates to `reliability\\deepseek_client.py` changes:\n- Import/circular dependency issues\n- Breaking API changes affecting test setup\n- Missing required modules/packages\n- Syntax errors in the modified file\n\n## Recommendations\n\n**IMMEDIATE ACTIONS:**\n1. **Fix Test Execution First**\n   - Check test runner logs for specific error messages\n   - Verify all dependencies are installed\n   - Run a simple smoke test to validate environment\n\n2. **Validate `deepseek_client.py`**\n   - Check for syntax errors: `python -m py_compile reliability\\deepseek_client.py`\n   - Verify imports and dependencies\n   - Test module import in isolation\n\n3. **Restore Basic Testing**\n   - Start with minimal test case to verify setup\n   - Gradually reintroduce test suite\n   - Fix failing tests incrementally\n\n## Risk Assessment\n**HIGH RISK** - Current state represents complete testing failure:\n- No validation of recent changes\n- Potential undetected regressions\n- Production deployment would be extremely risky\n- All code changes since last successful test run are unverified\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 350,
+      "total_tokens": 475,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

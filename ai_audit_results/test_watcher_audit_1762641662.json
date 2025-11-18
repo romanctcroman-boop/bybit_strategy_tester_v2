@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762641662,
+  "changed_files": [
+    "apply_deepseek_improvements.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762641649.361246,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite failed to execute properly (Exit Code: -1), indicating fundamental issues with the test environment, dependencies, or test code structure. Zero coverage suggests tests didn't run at all.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **No coverage data** for any files, including the modified `apply_deepseek_improvements.py`\n- **Complete testing gap** - Unable to assess actual code quality\n\n## Potential Issues with Recent Changes\n1. **Test execution blocked** - Likely caused by:\n   - Syntax errors in test files or test configuration\n   - Missing dependencies or environment setup issues\n   - Test framework configuration problems\n   - Import errors in `apply_deepseek_improvements.py`\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Run tests with verbose output to identify the specific failure\n   - Check test runner configuration (pytest, unittest, etc.)\n   - Verify all dependencies are installed and compatible\n\n2. **Debug the failure**:\n   - Run a simple smoke test to verify basic functionality\n   - Check for syntax errors in test files\n   - Validate imports in the changed file\n\n3. **Once tests run**:\n   - Establish baseline coverage for `apply_deepseek_improvements.py`\n   - Add specific tests for new functionality\n   - Aim for >80% coverage on changed code\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code:\n- Unknown functionality of `apply_deepseek_improvements.py`\n- Potential runtime errors in production\n- No validation of recent changes\n- Regression risk for existing features\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 377,
+      "total_tokens": 504,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

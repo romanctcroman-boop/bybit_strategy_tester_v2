@@ -1,0 +1,18 @@
+{
+  "timestamp": "2025-10-30T16:33:52.181828",
+  "citations": [
+    "https://www.soumendrak.com/blog/semaphores-python-async-programming/",
+    "https://www.dataleadsfuture.com/mastering-synchronization-primitives-in-python-asyncio-a-comprehensive-guide/",
+    "https://discuss.python.org/t/asyncio-semaphore-with-support-for-priorities/51072",
+    "https://community.openai.com/t/best-strategy-on-managing-concurrent-calls-python-asyncio/849702",
+    "https://realpython.com/async-io-python/"
+  ],
+  "code_size": 11374,
+  "features": [
+    "Concurrency Limit (Semaphore)",
+    "Connection Pooling (aiohttp)",
+    "Intelligent Switching",
+    "Retry with backoff",
+    "Performance Benchmarks"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762589127,
+  "changed_files": [
+    "test_deepseek_robot.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762589111.3512592,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely broken. Exit code -1 indicates a fatal error during test execution, preventing any tests from running.\n\n## Coverage Analysis\n**0% coverage** confirms no tests executed successfully. This represents a complete testing blackout.\n\n## Potential Issues\n1. **Fatal runtime error** - Likely syntax errors, import failures, or environment issues in `test_deepseek_robot.py`\n2. **Dependency problems** - Missing imports or incompatible versions\n3. **Test configuration errors** - Incorrect setup/teardown methods\n4. **File corruption** - The test file may be malformed or incomplete\n\n## Immediate Actions Required\n1. **Check test file syntax**: Run `python -m py_compile test_deepseek_robot.py`\n2. **Verify imports**: Ensure all dependencies are installed and accessible\n3. **Run with verbose output**: Use `pytest -v test_deepseek_robot.py` to see specific error details\n4. **Test isolation**: Run a simple smoke test to verify the testing framework works\n\n## Risk Assessment\n**HIGH RISK** - No test validation is occurring, meaning:\n- Undetected regressions are guaranteed\n- Code quality cannot be measured\n- Deployment carries significant failure risk\n- All recent changes are untested\n\n## Priority Recommendations\n1. **Fix test execution immediately** - This blocks all quality assurance\n2. **Add basic smoke tests** - Ensure test framework functions before complex tests\n3. **Implement CI/CD guardrails** - Prevent deployment when tests don't execute\n4. **Review recent changes to test_deepseek_robot.py** - This file likely contains the breaking change\n\n**Next step**: Share the specific error message from verbose test output to diagnose the root cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 378,
+      "total_tokens": 504,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

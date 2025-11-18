@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762642073,
+  "changed_files": [
+    "apply_deepseek_improvements.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762642058.2001872,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe file `apply_deepseek_improvements.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing imports or dependencies\n- Runtime errors during module loading\n- Circular imports or initialization issues\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix Test Execution First**\n   - Check Python syntax: `python -m py_compile apply_deepseek_improvements.py`\n   - Run tests with verbose output to identify failure point\n   - Verify test discovery: `python -m pytest --collect-only`\n\n2. **Debug the Failing File**\n   - Import the module directly to isolate errors\n   - Check for missing dependencies in imports\n   - Validate file encoding and line endings\n\n3. **Restore Basic Testing**\n   - Get at least one test passing before addressing coverage\n   - Add simple smoke test for module import\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky without:\n- ✅ Basic test execution working\n- ✅ Minimum 70%+ coverage\n- ✅ Verification that core functionality works\n\n**Priority:** Fix test execution failure immediately before any other quality metrics can be assessed.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 350,
+      "total_tokens": 477,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

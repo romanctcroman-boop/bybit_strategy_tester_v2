@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762598992,
+  "changed_files": [
+    "automation\\deepseek_robot\\api_clients.py",
+    "automation\\deepseek_robot\\dual_analytics_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762598972.309046,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment issue)\n- Zero test execution suggests fundamental infrastructure problems\n- No meaningful quality assessment possible until basic test execution is resolved\n\n## Coverage Analysis\n**COVERAGE: 0%** - Complete coverage failure:\n- No files were actually tested\n- Coverage data is empty, indicating tests never ran\n- This represents maximum coverage gap - entire codebase is untested\n\n## Potential Issues with Recent Changes\n1. **API Clients Changes**: Likely introduced breaking changes that prevent test initialization\n2. **Dual Analytics Engine**: Complex changes may have dependency or import issues\n3. **Environment/Configuration**: Missing dependencies, broken imports, or configuration errors\n4. **Test Infrastructure**: Test runner, pytest configuration, or environment setup broken\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Check for import errors in changed files\n   - Verify all dependencies are installed\n   - Run with `-v` flag to see specific failure points\n   - Check Python path and module structure\n\n2. **Validate Recent Changes**:\n   - Review `api_clients.py` for syntax errors or broken imports\n   - Check `dual_analytics_engine.py` for circular dependencies\n   - Ensure all required environment variables are set\n\n3. **Add Basic Smoke Tests**:\n   - Create simple import tests for both changed files\n   - Add minimal unit tests to verify basic functionality\n   - Test in isolation before integration\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- Zero test validation of recent changes\n- Unknown if core functionality is broken\n- High probability of runtime failures in production\n- **Recommendation**: Block all deployments until tests execute successfully and achieve >80% coverage\n\n## Immediate Action Plan\n1. Run `python -m pytest -v --tb=short` to identify specific failure\n2. Check import statements in both changed files\n3. Verify all required packages in requirements.txt\n4. Add basic test to verify modules can be imported\n5. Only proceed with feature work after tests execute successfully",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 146,
+      "completion_tokens": 457,
+      "total_tokens": 603,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 82
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762561541,
+  "changed_files": [
+    "tests\\test_integration_full.py",
+    "health_check.py",
+    "backend\\config\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762561524.9636137,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code: -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **No test data collected**: Coverage report is empty {}\n- **Critical gap**: Unable to execute any tests to measure actual coverage\n\n## Potential Issues with Recent Changes\n1. **Integration test failure**: `tests\\test_integration_full.py` likely contains fatal errors\n2. **Configuration issues**: Changes to `backend\\config\\__init__.py` may have broken imports or environment setup\n3. **Health check problems**: `health_check.py` modifications could be causing early termination\n4. **Dependency conflicts**: Missing imports or version incompatibilities\n5. **Environment setup**: Possibly missing test dependencies or environment variables\n\n## Immediate Recommendations\n1. **Debug test execution**:\n   - Run tests with `-v` flag to see specific failure points\n   - Check for unhandled exceptions in `test_integration_full.py`\n   - Verify all test dependencies are installed\n\n2. **Fix configuration**:\n   - Review `backend\\config\\__init__.py` for import cycles or syntax errors\n   - Ensure health check endpoints return expected responses\n\n3. **Isolate the failure**:\n   - Run integration tests separately from unit tests\n   - Test health_check.py functionality independently\n   - Add try-catch blocks to identify specific failing components\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would likely fail\n- No confidence in any code changes\n- Potential for undetected regressions\n- Critical path testing completely broken\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 382,
+      "total_tokens": 524,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762535288,
+  "changed_files": [
+    "automation\\safe_async_bridge.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762535274.748874,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality.\n\n## Potential Issues with Recent Changes\n1. **Safe Async Bridge modifications** likely introduced:\n   - Syntax errors preventing import/execution\n   - Runtime errors during module initialization\n   - Dependency conflicts or missing imports\n   - Infinite loops or blocking operations during import\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile automation\\safe_async_bridge.py` to check for syntax errors\n2. Execute `python -c \"import automation.safe_async_bridge\"` to identify import-time failures\n3. Run tests with `-v` flag to see where execution fails\n4. Check test runner configuration and dependencies\n\n**Follow-up:**\n- Add basic smoke tests that validate module can be imported\n- Implement minimal unit tests for core functionality\n- Set up pre-commit hooks to catch syntax errors\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure means:\n- No validation of recent changes\n- Potential production-breaking defects undetected\n- All existing functionality is now unverified\n- Deployment would be extremely risky\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 315,
+      "total_tokens": 442,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

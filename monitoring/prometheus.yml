@@ -1,0 +1,77 @@
+# Prometheus Configuration for Bybit Strategy Tester v2
+# Phase 1 Monitoring: All security & scaling metrics
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'production'
+    environment: 'prod'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load rules
+rule_files:
+  - 'alerts/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Backend API metrics
+  - job_name: 'backend-api'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    
+  # Celery worker metrics
+  - job_name: 'celery-workers'
+    static_configs:
+      - targets: ['celery-worker:9091']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    
+  # PostgreSQL metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 30s
+    
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+# Custom metrics for Phase 1 features
+# These are exposed by backend API at /metrics endpoint:
+#
+# Security Metrics:
+# - jwt_tokens_issued_total: Total JWT tokens issued
+# - jwt_tokens_validated_total: Total JWT tokens validated
+# - jwt_tokens_rejected_total: Total JWT tokens rejected
+# - rate_limit_exceeded_total: Total rate limit violations
+# - sandbox_executions_total: Total sandbox executions
+# - sandbox_timeouts_total: Total sandbox timeouts
+# - sandbox_memory_violations_total: Total memory limit violations
+#
+# Scaling Metrics:
+# - celery_workers_active: Current active workers
+# - celery_queue_depth: Current queue depth
+# - celery_tasks_processed_total: Total tasks processed
+# - celery_tasks_failed_total: Total failed tasks
+# - worker_scaling_events_total: Total scaling events
+# - worker_health_checks_failed_total: Failed health checks
+#
+# Logging Metrics:
+# - audit_log_entries_total: Total audit log entries
+# - sensitive_data_filtered_total: Sensitive data redactions
+# - log_errors_total: Total log errors

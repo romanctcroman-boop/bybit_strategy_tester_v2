@@ -1,0 +1,356 @@
+groups:
+  - name: bybit_strategy_tester_critical_alerts
+    interval: 30s
+    rules:
+      # ========================================
+      # CRITICAL ALERTS (Severity: critical)
+      # ========================================
+      
+      - alert: WorkerDown
+        expr: worker_up{cluster_name="bybit_strategy_tester"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: worker
+          team: backend
+        annotations:
+          summary: "Worker {{$labels.worker_name}} is DOWN"
+          description: |
+            Worker {{$labels.worker_name}} (ID: {{$labels.worker_id}}) has been down for more than 2 minutes.
+            
+            **Impact**: Tasks may be stuck in queue, reduced processing capacity.
+            
+            **Action Required**:
+            1. Check worker logs: `docker logs {{$labels.worker_id}}`
+            2. Verify worker health: `redis-cli GET worker:heartbeat:{{$labels.worker_id}}`
+            3. Restart worker if necessary
+            
+            **Current State**: 
+            - Worker Status: DOWN
+            - Last Seen: {{$value}}
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+      
+      - alert: RedisNodeDown
+        expr: redis_cluster_node_up{cluster_name="bybit_strategy_tester"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: redis
+          team: infrastructure
+        annotations:
+          summary: "Redis node {{$labels.node_id}} ({{$labels.role}}) is DOWN"
+          description: |
+            Redis Cluster node {{$labels.node_id}} (role: {{$labels.role}}) is unreachable.
+            
+            **Impact**: 
+            - If MASTER: Data loss risk, failover in progress
+            - If REPLICA: Reduced redundancy, increased master load
+            
+            **Action Required**:
+            1. Check cluster status: `redis-cli --cluster check localhost:7000`
+            2. Check node logs: `docker logs redis-{{$labels.node_id}}`
+            3. Verify network connectivity
+            4. Manual failover if needed: `redis-cli --cluster failover`
+            
+            **Current State**:
+            - Node Status: UNHEALTHY
+            - Role: {{$labels.role}}
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+      
+      - alert: AllWorkersDown
+        expr: sum(worker_up{cluster_name="bybit_strategy_tester"}) == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: worker
+          team: backend
+        annotations:
+          summary: "ALL WORKERS ARE DOWN - System Outage"
+          description: |
+            **CRITICAL**: All workers are down. No task processing is happening.
+            
+            **Impact**: Complete system outage, all tasks stuck in queue.
+            
+            **Immediate Actions**:
+            1. Check Redis Cluster health
+            2. Check Docker containers: `docker ps | grep worker`
+            3. Check system resources (CPU, memory, disk)
+            4. Restart all workers: `docker-compose restart worker`
+            5. Escalate to on-call engineer immediately
+            
+            **Runbook**: https://docs.example.com/runbooks/all-workers-down
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+      
+      - alert: RedisClusterMajorityDown
+        expr: (sum(redis_cluster_node_up{cluster_name="bybit_strategy_tester", role="master"}) / 3) < 0.5
+        for: 30s
+        labels:
+          severity: critical
+          component: redis
+          team: infrastructure
+        annotations:
+          summary: "Redis Cluster losing quorum - Majority of masters DOWN"
+          description: |
+            **CRITICAL**: More than 50% of Redis master nodes are down.
+            
+            **Impact**: Cluster may enter fail state, data loss risk.
+            
+            **Immediate Actions**:
+            1. Check cluster status immediately
+            2. Do NOT restart nodes without coordination
+            3. Contact DBA team
+            4. Prepare for manual cluster recovery
+            
+            **Current Masters Up**: {{$value | humanizePercentage}}
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+
+  - name: bybit_strategy_tester_warning_alerts
+    interval: 1m
+    rules:
+      # ========================================
+      # WARNING ALERTS (Severity: warning)
+      # ========================================
+      
+      - alert: HighReplicationLag
+        expr: redis_cluster_replication_lag_seconds{cluster_name="bybit_strategy_tester"} > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+          team: infrastructure
+        annotations:
+          summary: "High replication lag detected on replica {{$labels.replica_id}}"
+          description: |
+            Replication lag from master {{$labels.master_id}} to replica {{$labels.replica_id}} exceeds 5 seconds.
+            
+            **Impact**: Replica data is stale, failover may cause data loss.
+            
+            **Potential Causes**:
+            - Network latency
+            - High master write load
+            - Slow replica disk I/O
+            
+            **Action**:
+            1. Check network latency: `ping {{$labels.replica_id}}`
+            2. Check replica load: `redis-cli -h {{$labels.replica_id}} INFO replication`
+            3. Monitor master ops/sec
+            4. Consider replica scaling
+            
+            **Current Lag**: {{$value}}s
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+      
+      - alert: HighTaskFailureRate
+        expr: |
+          (
+            rate(worker_tasks_failed_total{cluster_name="bybit_strategy_tester"}[5m]) 
+            / 
+            rate(worker_tasks_processed_total{cluster_name="bybit_strategy_tester"}[5m])
+          ) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: worker
+          team: backend
+        annotations:
+          summary: "High task failure rate on worker {{$labels.worker_name}}"
+          description: |
+            Worker {{$labels.worker_name}} has a task failure rate exceeding 10% for the last 10 minutes.
+            
+            **Impact**: Tasks are failing repeatedly, may indicate code/data issues.
+            
+            **Action**:
+            1. Check worker logs for error patterns
+            2. Review recent failed tasks in database
+            3. Check if specific strategy is causing failures
+            4. Verify data quality (Bybit API responses)
+            
+            **Current Failure Rate**: {{$value | humanizePercentage}}
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+      
+      - alert: HighMemoryUsage
+        expr: redis_cluster_memory_bytes{cluster_name="bybit_strategy_tester"} / (1024 * 1024 * 1024) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+          team: infrastructure
+        annotations:
+          summary: "Redis node {{$labels.node_id}} memory usage is HIGH"
+          description: |
+            Redis node {{$labels.node_id}} ({{$labels.role}}) is using more than 90% of allocated memory.
+            
+            **Impact**: Risk of OOM (Out of Memory), performance degradation.
+            
+            **Action**:
+            1. Check memory breakdown: `redis-cli -h {{$labels.node_id}} MEMORY STATS`
+            2. Check for memory leaks in application code
+            3. Consider increasing maxmemory limit
+            4. Review eviction policy (currently: allkeys-lru)
+            
+            **Current Usage**: {{$value | humanize}}GB
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+      
+      - alert: FrequentWorkerRestarts
+        expr: increase(dead_workers_detected_total{cluster_name="bybit_strategy_tester"}[1h]) > 5
+        for: 0m
+        labels:
+          severity: warning
+          component: worker
+          team: backend
+        annotations:
+          summary: "Frequent worker restarts detected ({{$value}} in last hour)"
+          description: |
+            More than 5 workers have died and been detected in the last hour.
+            
+            **Impact**: Instability, potential task reassignment overhead.
+            
+            **Potential Causes**:
+            - OOM kills (check `dmesg | grep oom`)
+            - Unhandled exceptions
+            - Resource constraints (CPU/memory)
+            - Docker container issues
+            
+            **Action**:
+            1. Review worker crash logs
+            2. Check system resource usage
+            3. Investigate common crash patterns
+            4. Consider increasing worker memory limits
+            
+            **Dead Workers Count**: {{$value}}
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+      
+      - alert: TaskQueueBacklog
+        expr: |
+          sum by (stream_name) (
+            redis_stream_length{cluster_name="bybit_strategy_tester"}
+          ) > 100
+        for: 15m
+        labels:
+          severity: warning
+          component: task_queue
+          team: backend
+        annotations:
+          summary: "Task queue {{$labels.stream_name}} has backlog ({{$value}} tasks)"
+          description: |
+            Task queue {{$labels.stream_name}} has more than 100 pending tasks for 15+ minutes.
+            
+            **Impact**: Tasks are accumulating faster than processing, latency increasing.
+            
+            **Action**:
+            1. Check worker count: `docker ps | grep worker | wc -l`
+            2. Scale up workers: `docker-compose up -d --scale worker=10`
+            3. Check if specific tasks are slow (blocking queue)
+            4. Review worker logs for bottlenecks
+            
+            **Pending Tasks**: {{$value}}
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+      
+      - alert: LowWorkerCount
+        expr: sum(worker_up{cluster_name="bybit_strategy_tester"}) < 3
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+          team: backend
+        annotations:
+          summary: "Low worker count detected ({{$value}} active workers)"
+          description: |
+            Less than 3 workers are active for 5+ minutes.
+            
+            **Impact**: Reduced processing capacity, slower task completion.
+            
+            **Action**:
+            1. Check if workers crashed: `docker ps -a | grep worker`
+            2. Restart workers: `docker-compose restart worker`
+            3. Scale workers: `docker-compose up -d --scale worker=5`
+            4. Check system resources
+            
+            **Active Workers**: {{$value}}
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+
+  - name: bybit_strategy_tester_info_alerts
+    interval: 5m
+    rules:
+      # ========================================
+      # INFO ALERTS (Severity: info)
+      # ========================================
+      
+      - alert: WorkerRecovered
+        expr: |
+          (worker_up{cluster_name="bybit_strategy_tester"} == 1)
+          and
+          (worker_up{cluster_name="bybit_strategy_tester"} offset 5m == 0)
+        for: 1m
+        labels:
+          severity: info
+          component: worker
+          team: backend
+        annotations:
+          summary: "Worker {{$labels.worker_name}} has RECOVERED"
+          description: |
+            Worker {{$labels.worker_name}} was down but is now back online.
+            
+            **Action**: Monitor for stability, check if tasks were reassigned.
+            
+            **Uptime**: {{$value}}s
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+      
+      - alert: HighThroughput
+        expr: |
+          sum(rate(worker_tasks_processed_total{cluster_name="bybit_strategy_tester"}[5m])) > 50
+        for: 5m
+        labels:
+          severity: info
+          component: worker
+          team: backend
+        annotations:
+          summary: "High task processing throughput ({{$value}} tasks/sec)"
+          description: |
+            System is processing more than 50 tasks per second.
+            
+            **Action**: Monitor for sustained high load, ensure resources are adequate.
+            
+            **Current Rate**: {{$value}} tasks/sec
+          dashboard_url: "https://grafana.example.com/d/bybit-strategy-tester"
+
+  - name: bybit_strategy_tester_recording_rules
+    interval: 30s
+    rules:
+      # ========================================
+      # RECORDING RULES (Performance Optimization)
+      # ========================================
+      
+      # Pre-aggregate task processing rate (per worker)
+      - record: job:worker_task_rate:5m
+        expr: rate(worker_tasks_processed_total{cluster_name="bybit_strategy_tester"}[5m])
+      
+      # Pre-aggregate task failure rate (per worker)
+      - record: job:worker_failure_rate:5m
+        expr: rate(worker_tasks_failed_total{cluster_name="bybit_strategy_tester"}[5m])
+      
+      # Pre-aggregate total system throughput
+      - record: job:system_task_rate:5m
+        expr: sum(rate(worker_tasks_processed_total{cluster_name="bybit_strategy_tester"}[5m]))
+      
+      # Pre-aggregate worker success rate (percentage)
+      - record: job:worker_success_rate:5m
+        expr: |
+          (
+            rate(worker_tasks_processed_total{cluster_name="bybit_strategy_tester"}[5m])
+            -
+            rate(worker_tasks_failed_total{cluster_name="bybit_strategy_tester"}[5m])
+          )
+          /
+          rate(worker_tasks_processed_total{cluster_name="bybit_strategy_tester"}[5m])
+          * 100
+      
+      # Pre-aggregate Redis Cluster health score
+      - record: job:redis_cluster_health:instant
+        expr: |
+          (
+            sum(redis_cluster_node_up{cluster_name="bybit_strategy_tester"}) / 6
+          ) * 100
+      
+      # Pre-aggregate total active workers
+      - record: job:active_workers:instant
+        expr: sum(worker_up{cluster_name="bybit_strategy_tester"})

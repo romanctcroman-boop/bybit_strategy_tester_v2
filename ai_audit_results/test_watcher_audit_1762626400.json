@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762626400,
+  "changed_files": [
+    "deepseek_generate_7_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762626383.5343614,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This suggests fundamental issues with the test environment, dependencies, or test configuration.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\n1. **File `deepseek_generate_7_tools.py`** likely contains:\n   - Syntax errors preventing import/execution\n   - Missing dependencies or imports\n   - Configuration issues in test setup\n   - Circular imports or module loading problems\n\n## Immediate Actions Required\n1. **Fix test execution first**:\n   - Check Python syntax: `python -m py_compile deepseek_generate_7_tools.py`\n   - Verify imports and dependencies\n   - Run tests with `-v` flag to see where they fail\n\n2. **Basic test structure**:\n   - Ensure `__init__.py` files exist if needed\n   - Verify test discovery configuration\n   - Check for missing test dependencies\n\n3. **Quick validation**:\n   ```bash\n   python -c \"import deepseek_generate_7_tools; print('Module loads')\"\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested. Any changes could introduce undetected bugs. Deployment would be extremely risky without functional tests.\n\n## Priority Recommendations\n1. **Fix test execution immediately** - This is blocking all quality assessment\n2. **Add basic smoke tests** once execution works\n3. **Aim for 70%+ coverage** on critical paths first\n4. **Implement CI pipeline** to prevent regression\n\n**Start with making tests runnable - this is the most urgent issue.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 380,
+      "total_tokens": 508,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

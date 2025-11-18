@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762538334,
+  "changed_files": [
+    "backend\\security\\secure_storage.py",
+    "mcp-server\\tools\\analysis\\analysis_tools.py",
+    "backend\\security\\key_rotation.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538310.948271,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (segmentation fault, memory error, or fatal Python interpreter crash).\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files - no tests are executing successfully\n- No coverage data available due to complete test suite failure\n- Critical security files (secure_storage.py, key_rotation.py) completely untested\n\n## Potential Issues with Recent Changes\n1. **Security module changes likely causing crashes** - modifications to secure_storage.py or key_rotation.py may be introducing fatal errors\n2. **Analysis tools integration issues** - mcp-server changes might be conflicting with security modules\n3. **Memory/Resource leaks** - exit code -1 suggests low-level system issues\n4. **Import/circular dependency problems** - recent file changes may have broken module imports\n\n## Immediate Recommendations\n1. **Run tests individually** to isolate the crashing module:\n   ```bash\n   python -m pytest backend/security/secure_storage.py -v\n   python -m pytest backend/security/key_rotation.py -v\n   python -m pytest mcp-server/tools/analysis/analysis_tools.py -v\n   ```\n\n2. **Check for syntax errors** in changed files:\n   ```bash\n   python -m py_compile backend/security/secure_storage.py\n   ```\n\n3. **Add debug logging** to identify crash location\n4. **Review recent commits** for memory-intensive operations or system calls\n\n## Risk Assessment\n**HIGH RISK** - Critical security functionality is completely untested and potentially broken. Deployment would expose:\n- Potential data exposure via secure_storage\n- Key management vulnerabilities  \n- Complete loss of security audit capability\n\n**Priority: Fix immediately before any further development or deployment.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 151,
+      "completion_tokens": 381,
+      "total_tokens": 532,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 87
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

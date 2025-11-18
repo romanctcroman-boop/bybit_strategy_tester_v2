@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762764241,
+  "changed_files": [
+    "reliability_auto_system\\mcp_auto_start.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762764224.6028776,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No tests executed successfully\n- Coverage reporting system failed to collect any data\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\nThe modified file `reliability_auto_system\\mcp_auto_start.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Runtime errors during module loading\n- Infinite loops or blocking operations\n- Environment configuration issues\n\n## Recommendations for Improvement\n**Immediate Actions (Next 2 hours):**\n1. Run `python -m py_compile reliability_auto_system\\mcp_auto_start.py` to check for syntax errors\n2. Execute the file directly to identify runtime errors\n3. Check for missing imports or circular dependencies\n4. Verify the test runner configuration and environment\n\n**Short-term (Next day):**\n1. Add basic smoke tests that verify module can be imported\n2. Implement minimal unit tests for core functions\n3. Set up pre-commit hooks to catch syntax errors\n4. Add import guards and error handling in the modified module\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely dangerous:\n- No validation of functionality\n- Potential for production crashes\n- Unknown impact on system reliability\n- Complete lack of quality assurance\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 335,
+      "total_tokens": 466,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

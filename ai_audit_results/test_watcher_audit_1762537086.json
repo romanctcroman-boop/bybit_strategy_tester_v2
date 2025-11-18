@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762537086,
+  "changed_files": [
+    "tests\\test_safe_async_bridge_final.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537060.5663195,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1) with zero coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% coverage across all files** - No code was executed during testing. This represents a complete testing blackout and renders coverage metrics meaningless until execution is restored.\n\n## Potential Issues with Recent Changes\n1. **Test file corruption**: `tests\\test_safe_async_bridge_final.py` may contain syntax errors, import failures, or infinite loops\n2. **Environment breakdown**: Missing dependencies, configuration errors, or incompatible Python versions\n3. **Infrastructure failure**: Test runner crashes, memory issues, or permission problems\n4. **Code integration issues**: Recent changes broke fundamental imports or initialization\n\n## Immediate Recommendations\n1. **Debug test execution**:\n   - Run `python -m pytest tests/test_safe_async_bridge_final.py -v` to see specific error\n   - Check for syntax errors in the test file\n   - Verify all imports and dependencies are available\n\n2. **Isolate the failure**:\n   - Run a simple smoke test to verify test infrastructure\n   - Test individual components before the full suite\n   - Check for circular imports or initialization deadlocks\n\n3. **Restore basic functionality**:\n   - Fix the immediate crash cause\n   - Ensure at least one test passes before addressing coverage\n   - Validate environment setup and configuration\n\n## Risk Assessment\n**HIGH RISK** - Zero test execution means:\n- No validation of recent changes\n- Potential undiscovered production-breaking bugs\n- Complete loss of quality assurance\n- Deployment would be extremely hazardous\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 370,
+      "total_tokens": 501,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

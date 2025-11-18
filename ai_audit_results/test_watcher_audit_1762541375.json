@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762541375,
+  "changed_files": [
+    "tests\\recovery\\test_network_failure.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541352.789526,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero validation of code behavior. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code coverage achieved\n- **Missing Coverage: 100%** - Entire codebase is untested\n- **Critical Gap**: Network failure recovery logic is completely unvalidated\n\n## Potential Issues with Recent Changes\nThe modified `test_network_failure.py` file likely contains:\n- Syntax errors preventing test execution\n- Import failures or missing dependencies\n- Configuration issues in test setup/teardown\n- Infinite loops or resource exhaustion\n- Environment-specific failures\n\n## Recommendations for Improvement\n**Immediate Actions (Next 2 hours):**\n1. Run `python -m pytest tests/recovery/test_network_failure.py -v` to see specific error details\n2. Check test file for syntax errors and import statements\n3. Verify test dependencies and environment setup\n\n**Short-term (Next day):**\n1. Fix the failing test to restore basic test execution\n2. Add minimal test cases to validate critical network recovery paths\n3. Implement CI pipeline that fails fast on test execution errors\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functional tests exposes:\n- Network recovery features may be completely broken\n- No regression detection for critical infrastructure components\n- High probability of production outages from network-related issues\n- Zero confidence in system reliability under failure conditions\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 340,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "MigratorImage": "",
+  "MigratorPython": "3.12-slim",
+  "DefaultMigrationMode": "container",
+  "BuildMigrator": false
+}

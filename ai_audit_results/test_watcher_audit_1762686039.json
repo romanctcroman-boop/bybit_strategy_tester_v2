@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762686039,
+  "changed_files": [
+    "backend\\api\\schemas.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762686025.1473722,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery\n\n## Coverage Analysis\n**0.00% coverage** - All code changes are completely untested. This represents maximum testing risk.\n\n## Potential Issues with Recent Changes\nThe `schemas.py` modification likely introduced:\n- Breaking changes to API contracts\n- Schema validation errors\n- Import/circular dependency issues\n- Data serialization/deserialization problems\n\n## Recommendations\n**Immediate Actions (Priority 1):**\n1. Fix test execution failure first - check test runner configuration and dependencies\n2. Add basic smoke tests for `schemas.py` to validate schema definitions\n3. Ensure test environment matches development environment\n\n**Short-term (Priority 2):**\n1. Implement schema validation tests\n2. Add unit tests for schema serialization/deserialization\n3. Set up minimum 80% coverage requirement for new code\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- 100% chance of undetected bugs in production\n- Potential API breaking changes\n- No safety net for future modifications\n- High maintenance burden\n\n**Critical Path:** Fix test execution → Add basic validation → Achieve minimum coverage → Deploy",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 302,
+      "total_tokens": 428,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

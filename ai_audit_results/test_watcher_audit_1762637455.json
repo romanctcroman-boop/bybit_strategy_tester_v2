@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762637455,
+  "changed_files": [
+    "mcp-server\\server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762637443.5071507,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (segmentation fault, memory error, or fatal Python interpreter crash).\n\n## Coverage Analysis\n**0% coverage** confirms no tests executed successfully. This represents maximum testing gap - entire codebase is untested in this run.\n\n## Potential Issues with Recent Changes\nThe crash likely stems from `mcp-server\\server.py` changes:\n- Memory management errors (circular references, improper cleanup)\n- Infinite recursion or stack overflow\n- Native extension conflicts\n- Resource exhaustion (file handles, sockets)\n- Syntax errors preventing import/execution\n\n## Immediate Recommendations\n\n1. **Debug the Crash**\n   ```bash\n   python -m py_compile mcp-server\\server.py  # Check syntax\n   python -c \"from mcp-server import server\"  # Test import\n   ```\n\n2. **Isolate the Failure**\n   - Run tests with `--tb=short` to identify crash location\n   - Use `pdb` or debugger to trace execution\n   - Check system resources and logs\n\n3. **Add Basic Sanity Tests**\n   - Start with import tests\n   - Add module-level initialization checks\n   - Verify basic object creation\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No functional verification\n- Potential data corruption or security issues\n- Complete absence of regression protection\n\n**Priority:** Fix test execution crash before any other development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 312,
+      "total_tokens": 437,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

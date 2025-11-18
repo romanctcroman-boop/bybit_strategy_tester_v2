@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762634890,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762634877.4333708,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Test framework likely crashed before collecting metrics\n- **Critical gap**: Unable to assess actual code coverage due to complete test failure\n\n## Potential Issues with Recent Changes\n1. **File `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:**\n   - Syntax errors preventing import/execution\n   - Fatal runtime errors during module loading\n   - Missing dependencies or imports\n   - Infinite loops or memory issues during initialization\n\n## Immediate Recommendations\n1. **Debug the test failure:**\n   - Run `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py` to check for syntax errors\n   - Execute the file directly to identify runtime errors\n   - Check for missing imports or dependencies\n\n2. **Fix test infrastructure:**\n   - Ensure test runner can import the module\n   - Verify all dependencies are installed\n   - Check for environment configuration issues\n\n3. **Add basic validation:**\n   - Create simple smoke tests before comprehensive testing\n   - Implement try-catch around module imports in test setup\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may be completely broken\n- No safety net for regression testing\n- Potential deployment of non-functional code\n- Urgent attention required before any further development\n\n**Priority:** Fix test execution immediately before addressing coverage or test quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 368,
+      "total_tokens": 503,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

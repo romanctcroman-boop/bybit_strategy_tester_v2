@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762705779,
+  "changed_files": [
+    "tests\\test_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762705766.5338616,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero validation of code behavior.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code is being tested. The entire codebase lacks any test validation, making reliability impossible to assess.\n\n## Potential Issues with Recent Changes\n- **tests/test_circuit_breaker.py** likely contains syntax errors, import failures, or configuration issues\n- Possible causes: missing dependencies, broken test fixtures, incorrect test discovery configuration\n- The test file itself may be failing before any actual tests execute\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with verbose output to identify the specific failure point\n2. Check test file for syntax errors and import statements\n3. Verify test configuration (pytest.ini, conftest.py, or unittest setup)\n4. Ensure all dependencies are installed and accessible\n\n**FOLLOW-UP:**\n- Fix the root cause preventing test execution\n- Add basic smoke tests to validate test infrastructure\n- Implement minimal coverage targets (aim for 70%+ once tests run)\n\n## Risk Assessment\n**HIGH RISK** - Code changes cannot be validated. Deploying without functioning tests risks:\n- Production failures undetected by CI/CD\n- Regression bugs going unnoticed\n- Inability to safely refactor or add features\n- Complete loss of test-driven development benefits\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 317,
+      "total_tokens": 445,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

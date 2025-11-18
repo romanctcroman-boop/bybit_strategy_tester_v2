@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762543537,
+  "changed_files": [
+    "monitoring\\test_alerts.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543523.4029305,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero quality assurance. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage was collected, indicating:\n- Tests failed before any meaningful execution\n- Potential configuration issues with coverage tools\n- Test environment may not be properly initialized\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `monitoring\\test_alerts.py`, suggesting:\n- Syntax errors in test file\n- Missing imports or dependencies\n- Test setup/teardown failures\n- Configuration changes breaking test execution\n- Circular imports or module loading issues\n\n## Immediate Action Recommendations\n1. **Debug Test Execution**\n   - Run `python -m pytest monitoring/test_alerts.py -v` to see specific error\n   - Check for Python syntax errors in the test file\n   - Verify all imports are valid and available\n\n2. **Fix Basic Test Infrastructure**\n   - Ensure pytest is properly installed and configured\n   - Check for missing test dependencies\n   - Validate test environment setup\n\n3. **Restore Baseline Functionality**\n   - Revert `test_alerts.py` changes if recently modified\n   - Run minimal smoke test to confirm basic functionality\n   - Re-establish code coverage collection\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback loop\n- Potential for undetected regressions\n- Deployment risks significantly increased\n- Code quality cannot be measured or assured\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 343,
+      "total_tokens": 468,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

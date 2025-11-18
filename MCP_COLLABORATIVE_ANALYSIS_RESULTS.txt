@@ -1,0 +1,947 @@
+================================================================================
+DEEPSEEK + PERPLEXITY AI - COLLABORATIVE ANALYSIS RESULTS
+================================================================================
+
+Session ID: mcp_analysis_2025_11_01
+Task Type: requirements_analysis
+Total Messages: 8
+
+================================================================================
+
+PHASE 1: RESEARCH (Perplexity AI)
+--------------------------------------------------------------------------------
+
+Duration: 22.12s
+Initiator: deepseek
+Responder: perplexity
+
+--------------------------------------------------------------------------------
+RESPONSE:
+--------------------------------------------------------------------------------
+**Model Context Protocol (MCP) servers in 2025 are defined by modular, secure, and composable architectures that enable AI agents and applications to interact with tools, data, and services through standardized protocols.** Best practices span architecture, multi-agent systems, deployment, and adherence to evolving community standards.
+
+---
+
+### 1. MCP Server Architecture
+
+**Standard Patterns and Conventions**
+- **Client-Host-Server Model:** MCP servers operate within a three-part architecture: the *host* (AI application), *client* (protocol handler), and *server* (capability provider)[2][5][3].
+- **Separation of Concerns:** Hosts orchestrate workflows and aggregate context, clients manage protocol communication, and servers expose focused capabilities (e.g., database, filesystem, APIs)[2][5].
+- **Composability:** Servers are designed to be modular and composable, allowing multiple servers to be combined seamlessly for richer AI workflows[5][10].
+
+**Communication Protocols**
+- **JSON-RPC 2.0:** The primary protocol for message exchange, providing structured request/response semantics[2][4].
+- **Transports:**
+  - **Stdio:** For local, high-performance communication between processes on the same machine[2][4].
+  - **HTTP (with optional Server-Sent Events):** For remote or distributed deployments, supporting standard HTTP authentication (bearer tokens, API keys, OAuth)[2][4].
+
+**Tool Registration and Management**
+- **Capability Negotiation:** On initialization, clients and servers negotiate supported protocol versions and features[3][4].
+- **Tool Discovery:** Clients request a list of available tools from each server, building a unified registry for the host application[3].
+- **Dynamic Updates:** Servers can notify clients of changes (e.g., new tools or configuration updates), prompting registry refreshes[3][4].
+
+**Error Handling Strategies**
+- **Structured Error Responses:** Errors are communicated using JSON-RPC error objects, including standardized error codes and messages[2][4].
+- **Progress and Notifications:** Long-running operations use progress notifications; servers can send asynchronous notifications for state changes or failures[4].
+- **Graceful Degradation:** Servers are expected to handle partial failures and communicate degraded capabilities clearly to clients[5].
+
+---
+
+### 2. Multi-Agent Systems
+
+**Agent-to-Agent Communication Patterns**
+- **Host-Mediated Communication:** Agents (clients) do not communicate directly; the host mediates all context sharing and message routing, enforcing isolation and security boundaries[5].
+- **Session Isolation:** Each client maintains a stateful session with its server, preventing cross-server data leakage[5].
+
+**Context Sharing Between AI Agents**
+- **Controlled Context Aggregation:** The host aggregates context from multiple servers and selectively shares relevant information with each agent, ensuring privacy and minimizing unnecessary data exposure[5][2].
+- **Prompt and Resource Sharing:** Hosts can synthesize prompts or resources from multiple servers for collaborative agent workflows[5].
+
+**Collaborative Workflows**
+- **Orchestration by Host:** The host coordinates multi-step workflows, invoking tools across different servers and managing dependencies between agent actions[5][2].
+- **Composable Pipelines:** Modular server design enables chaining of capabilities for complex, multi-agent tasks[5][10].
+
+**Performance Optimization**
+- **Parallel Connections:** Hosts can maintain multiple concurrent client-server sessions, enabling parallel tool invocations and reducing latency[2][5].
+- **Local vs. Remote Execution:** Use stdio for low-latency, local operations; use HTTP for scalable, distributed deployments[4].
+- **Incremental Updates:** Servers support incremental notifications and streaming responses for efficient, real-time context updates[4].
+
+---
+
+### 3. Production Deployment
+
+**Scalability Considerations**
+- **Stateless Server Design:** Servers are typically stateless, enabling horizontal scaling and easy orchestration in containerized/cloud environments[10][1].
+- **Transport Flexibility:** Support for both local (stdio) and remote (HTTP) transports allows deployment across diverse infrastructure[4][2].
+
+**Security Best Practices**
+- **Authentication and Authorization:** Use OAuth, bearer tokens, or API keys for secure client-server authentication; hosts enforce user consent and access controls[4][5].
+- **Isolation:** Each server connection is isolated; servers cannot access full conversation history or data from other servers[5].
+- **Auditability:** Hosts and servers log protocol interactions for compliance and traceability[1][5].
+
+**Monitoring and Observability**
+- **Structured Logging:** All protocol messages, errors, and notifications are logged in structured formats for monitoring and debugging[5].
+- **Metrics Collection:** Track connection counts, tool invocation rates, error rates, and latency for operational insight[10].
+- **Health Checks:** Servers expose health endpoints or status notifications for automated monitoring[10].
+
+**Resource Management**
+- **Connection Lifecycle Management:** Hosts manage client connection lifecycles, including initialization, capability negotiation, and graceful termination[4][5].
+- **Quota and Rate Limiting:** Servers may enforce quotas or rate limits to prevent abuse and ensure fair resource allocation[5].
+
+---
+
+### 4. AI Community Standards
+
+**Latest MCP Specifications**
+- **2025 Specification:** MCP 2025 emphasizes modularity, composability, and security, with backwards compatibility and progressive capability negotiation[5].
+- **Core Primitives:** Tools, resources, prompts, and notifications are standardized protocol primitives[4][5].
+
+**Common Pitfalls to Avoid**
+- **Overexposing Context:** Servers should only receive minimal necessary context; avoid leaking full conversation history or sensitive data[5].
+- **Tight Coupling:** Avoid embedding business logic in servers; keep them focused and composable[5][10].
+- **Ignoring Capability Negotiation:** Always implement robust version and feature negotiation to ensure compatibility[3][5].
+
+**Performance Benchmarks**
+- **Low-Latency Local Calls:** Stdio transport achieves sub-millisecond round-trip times for local tool invocations[4][10].
+- **Scalable Remote Calls:** HTTP transport supports thousands of concurrent sessions with proper load balancing and stateless server design[10][1].
+
+**Integration Patterns**
+- **Unified Capability Registry:** Hosts aggregate tool registries from multiple servers, presenting a unified interface to the AI model[3][2].
+- **Progressive Enhancement:** Start with minimal server capabilities and negotiate additional features as needed, supporting incremental adoption and extensibility[5][4].
+- **Composable Microservices:** Deploy servers as independent microservices, each exposing a focused set of tools or resources[5][10].
+
+---
+
+**Summary of Best Practices:**
+- **Modular, composable server design**
+- **Strict context isolation and security**
+- **Robust capability negotiation and error handling**
+- **Flexible transport and deployment options**
+- **Host-mediated orchestration for multi-agent workflows**
+- **Comprehensive monitoring, logging, and resource management**
+- **Adherence to evolving MCP specifications and community standards**
+
+================================================================================
+
+PHASE 2: ANALYSIS (DeepSeek)
+--------------------------------------------------------------------------------
+
+Duration: 44.59s
+Initiator: perplexity
+Responder: deepseek
+
+--------------------------------------------------------------------------------
+RESPONSE:
+--------------------------------------------------------------------------------
+# MCP Server Implementation Analysis & Roadmap
+
+## 1. Gap Analysis
+
+### **Critical Gaps Identified:**
+
+**Architecture & Security:**
+- ❌ **No authentication/authorization** for agent communication
+- ❌ **Missing input validation** and sanitization
+- ❌ **No rate limiting** or resource quotas
+- ❌ **Lack of audit logging** for compliance
+
+**Protocol Compliance:**
+- ❌ **Incomplete JSON-RPC 2.0** implementation (batch requests, notifications)
+- ❌ **Missing MCP protocol versioning**
+- ❌ **No capability discovery** mechanism
+- ❌ **Incomplete error handling** per MCP spec
+
+**Production Readiness:**
+- ❌ **No health checks** or readiness probes
+- ❌ **Missing observability** (metrics, distributed tracing)
+- ❌ **No configuration management** (env-specific settings)
+- ❌ **Incomplete deployment** strategy
+
+## 2. Compliance Assessment
+
+### **✅ Well Aligned:**
+- **Modular Architecture**: Clear separation with dedicated components
+- **Performance Optimization**: Caching, circuit breakers, parallel execution
+- **Tool Registration**: 41 tools with proper interfaces
+- **Multi-Agent Support**: Direct agent communication implemented
+
+### **❌ Non-Compliant Areas:**
+```python
+# MISSING: Protocol versioning
+# Current: Hardcoded endpoints
+# Required: Versioned API routes (/v1/, /v2/)
+
+# MISSING: Capability discovery
+# Current: Static tool registration  
+# Required: Dynamic capability negotiation
+
+# MISSING: Proper error taxonomy
+# Current: Generic exceptions
+# Required: MCP-standard error codes (-32700 to -32000)
+```
+
+## 3. Risk Assessment
+
+### **High Risk:**
+- **Security**: No authentication exposes system to unauthorized access
+- **Reliability**: Missing health checks could lead to silent failures
+- **Compliance**: No audit trail for regulated environments
+
+### **Medium Risk:**
+- **Protocol Drift**: Custom implementations may diverge from MCP standards
+- **Resource Exhaustion**: No rate limiting could lead to DoS
+- **Configuration Issues**: Hardcoded settings limit deployment flexibility
+
+### **Low Risk:**
+- **Performance**: Current optimizations are adequate
+- **Testing**: Comprehensive test coverage exists
+
+## 4. Priority Recommendations
+
+### **Phase 1: Critical Security & Compliance (Week 1-2)**
+```python
+# 1. Add Authentication Middleware
+class MCPSecurityMiddleware:
+    def __init__(self):
+        self.api_keys = {}  # Load from secure config
+        self.rate_limiter = TokenBucketRateLimiter()
+    
+    async def authenticate(self, request):
+        # JWT or API key validation
+        # Rate limiting per client
+        # Request logging for audit
+
+# 2. Implement MCP Protocol Compliance
+class MCPCompliantServer:
+    async def handle_jsonrpc_2_0(self, request):
+        # Full JSON-RPC 2.0 compliance
+        # Batch request support
+        # Proper error code mapping
+```
+
+### **Phase 2: Production Hardening (Week 3-4)**
+```python
+# 3. Add Observability
+class MCPObservability:
+    def __init__(self):
+        self.metrics = PrometheusMetrics()
+        self.tracer = OpenTelemetryTracer()
+    
+    async def instrument_tool_call(self, tool_name, duration, success):
+        # Metrics collection
+        # Distributed tracing
+        # Structured logging
+
+# 4. Health Checks & Readiness
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "dependencies": check_dependencies()
+    }
+```
+
+### **Phase 3: Advanced Features (Week 5-6)**
+```python
+# 5. Dynamic Capability Discovery
+class MCPServiceDiscovery:
+    async def list_capabilities(self):
+        return {
+            "protocol_version": "2024-11-05",
+            "capabilities": {
+                "tools": await self.list_tools(),
+                "resources": await self.list_resources(),
+                "prompts": await self.list_prompts()
+            }
+        }
+```
+
+## 5. Implementation Roadmap
+
+### **Immediate Actions (Next 48 hours):**
+1. **Add basic authentication** to agent communication layer
+2. **Implement health check endpoint** 
+3. **Add request validation** with Pydantic models
+4. **Create deployment configuration** for different environments
+
+### **Week 1: Security Foundation**
+```bash
+# Priority Tasks:
+- [ ] Implement JWT authentication
+- [ ] Add API key management
+- [ ] Create rate limiting middleware
+- [ ] Set up audit logging
+- [ ] Add input sanitization
+```
+
+### **Week 2: Protocol Compliance**
+```bash
+- [ ] Full JSON-RPC 2.0 implementation
+- [ ] MCP protocol versioning
+- [ ] Standard error code mapping
+- [ ] Capability discovery endpoint
+- [ ] Batch request support
+```
+
+### **Week 3: Production Readiness**
+```bash
+- [ ] Add Prometheus metrics
+- [ ] Implement distributed tracing
+- [ ] Create Docker deployment
+- [ ] Add configuration management
+- [ ] Set up monitoring alerts
+```
+
+### **Week 4: Advanced Features**
+```bash
+- [ ] Dynamic tool registration
+- [ ] Resource management
+- [ ] Prompt templates
+- [ ] Workflow orchestration
+- [ ] Performance optimization
+```
+
+## Critical Success Factors
+
+1. **Security First**: Authentication before any production deployment
+2. **Standards Compliance**: Full MCP protocol adherence
+3. **Observability**: Comprehensive monitoring from day one
+4. **Configuration Management**: Environment-specific settings
+5. **Documentation**: API docs and deployment guides
+
+## Risk Mitigation Strategy
+
+- **Rolling Deployment**: Deploy to staging with canary releases
+- **Feature Flags**: Control experimental features
+- **Circuit Breakers**: Already implemented - maintain and enhance
+- **Backup & Recovery**: Regular backups and disaster recovery testing
+
+The current implementation has excellent technical foundations but requires immediate attention to security and production readiness before deployment.
+
+================================================================================
+
+PHASE 3: PLANNING (DeepSeek)
+--------------------------------------------------------------------------------
+
+Duration: 100.03s
+Initiator: perplexity
+Responder: deepseek
+
+--------------------------------------------------------------------------------
+RESPONSE:
+--------------------------------------------------------------------------------
+# MCP Server Production-Ready Implementation Plan
+
+## 1. Detailed Code Structure
+
+### **Core Security Layer**
+```
+src/
+├── security/
+│   ├── auth/
+│   │   ├── JWTValidator.ts
+│   │   ├── APIKeyAuth.ts
+│   │   └── RBACAuthorizer.ts
+│   ├── validation/
+│   │   ├── SchemaValidator.ts
+│   │   ├── InputSanitizer.ts
+│   │   └── RateLimiter.ts
+│   └── audit/
+│       ├── AuditLogger.ts
+│       └── ComplianceTracker.ts
+```
+
+**JWTValidator.ts**
+```typescript
+export class JWTValidator {
+  private publicKey: string;
+  
+  constructor(publicKey: string) {
+    this.publicKey = publicKey;
+  }
+  
+  async validateToken(token: string): Promise<AuthContext> {
+    try {
+      const decoded = await jwt.verify(token, this.publicKey, {
+        algorithms: ['RS256'],
+        issuer: 'mcp-server'
+      });
+      
+      return {
+        userId: decoded.sub,
+        roles: decoded.roles || [],
+        permissions: decoded.permissions || []
+      };
+    } catch (error) {
+      throw new AuthenticationError('Invalid JWT token');
+    }
+  }
+}
+```
+
+**RateLimiter.ts**
+```typescript
+export class RateLimiter {
+  private redis: Redis;
+  private limits: Map<string, RateLimitConfig>;
+  
+  constructor(redisClient: Redis) {
+    this.redis = redisClient;
+    this.limits = new Map([
+      ['tool_call', { windowMs: 60000, max: 100 }],
+      ['resource_access', { windowMs: 30000, max: 50 }]
+    ]);
+  }
+  
+  async checkLimit(key: string, identifier: string): Promise<boolean> {
+    const config = this.limits.get(key);
+    if (!config) return true;
+    
+    const redisKey = `rate_limit:${key}:${identifier}`;
+    const current = await this.redis.incr(redisKey);
+    
+    if (current === 1) {
+      await this.redis.expire(redisKey, config.windowMs / 1000);
+    }
+    
+    return current <= config.max;
+  }
+}
+```
+
+### **Protocol Compliance Layer**
+```
+src/
+├── protocol/
+│   ├── JSONRPC2Completer.ts
+│   ├── MCPVersioning.ts
+│   ├── CapabilityDiscovery.ts
+│   └── ErrorHandler.ts
+```
+
+**JSONRPC2Completer.ts**
+```typescript
+export class JSONRPC2Completer {
+  static validateRequest(request: any): void {
+    if (!request.jsonrpc || request.jsonrpc !== '2.0') {
+      throw new InvalidRequestError('Invalid JSON-RPC version');
+    }
+    
+    if (!request.method) {
+      throw new InvalidRequestError('Method is required');
+    }
+    
+    if (Array.isArray(request)) {
+      // Batch request validation
+      if (request.length === 0) {
+        throw new InvalidRequestError('Empty batch request');
+      }
+      request.forEach(req => this.validateRequest(req));
+    }
+  }
+  
+  static createNotification(method: string, params?: any): JSONRPCNotification {
+    return {
+      jsonrpc: '2.0',
+      method,
+      params
+    };
+  }
+  
+  static createBatchResponse(responses: JSONRPCResponse[]): JSONRPCResponse[] {
+    return responses.filter(response => response !== null);
+  }
+}
+```
+
+### **Production Infrastructure**
+```
+src/
+├── health/
+│   ├── HealthChecker.ts
+│   └── ReadinessProbe.ts
+├── observability/
+│   ├── MetricsCollector.ts
+│   ├── DistributedTracer.ts
+│   └── LogAggregator.ts
+├── config/
+│   ├── ConfigManager.ts
+│   └── Environment.ts
+└── deployment/
+    ├── Dockerfile
+    ├── docker-compose.yml
+    └── kubernetes/
+```
+
+## 2. Integration Points with Existing Code
+
+### **Authentication Integration**
+```typescript
+// Existing MCP Server main class
+export class MCPServer {
+  private authValidator: JWTValidator;
+  private rateLimiter: RateLimiter;
+  
+  constructor() {
+    this.authValidator = new JWTValidator(process.env.JWT_PUBLIC_KEY);
+    this.rateLimiter = new RateLimiter(redisClient);
+    
+    // Wrap existing handlers with security
+    this.initializeSecureHandlers();
+  }
+  
+  private initializeSecureHandlers() {
+    const originalHandle = this.handleRequest.bind(this);
+    
+    this.handleRequest = async (request: any, context: any) => {
+      // Authentication check
+      const authContext = await this.authValidator.validateToken(
+        context.headers.authorization
+      );
+      
+      // Rate limiting
+      const allowed = await this.rateLimiter.checkLimit(
+        'mcp_request',
+        authContext.userId
+      );
+      
+      if (!allowed) {
+        throw new RateLimitExceededError('Too many requests');
+      }
+      
+      // Audit logging
+      this.auditLogger.logRequest(request, authContext);
+      
+      return originalHandle(request, { ...context, auth: authContext });
+    };
+  }
+}
+```
+
+### **Protocol Compliance Integration**
+```typescript
+// Enhance existing request processing
+export class RequestProcessor {
+  private jsonrpcCompleter: JSONRPC2Completer;
+  private capabilityDiscovery: CapabilityDiscovery;
+  
+  async processRequest(rawRequest: any): Promise<any> {
+    try {
+      // Validate JSON-RPC 2.0 compliance
+      this.jsonrpcCompleter.validateRequest(rawRequest);
+      
+      // Handle batch requests
+      if (Array.isArray(rawRequest)) {
+        const batchResults = await Promise.all(
+          rawRequest.map(req => this.processSingleRequest(req))
+        );
+        return this.jsonrpcCompleter.createBatchResponse(batchResults);
+      }
+      
+      return await this.processSingleRequest(rawRequest);
+    } catch (error) {
+      return this.errorHandler.createErrorResponse(error);
+    }
+  }
+}
+```
+
+## 3. Testing Strategy
+
+### **Test Structure**
+```
+tests/
+├── unit/
+│   ├── security/
+│   ├── protocol/
+│   └── health/
+├── integration/
+│   ├── auth-flow.test.ts
+│   ├── protocol-compliance.test.ts
+│   └── rate-limiting.test.ts
+├── e2e/
+│   ├── production-scenarios.test.ts
+│   └── load-testing.test.ts
+└── fixtures/
+    ├── test-tokens/
+    └── mock-requests/
+```
+
+**Security Test Example**
+```typescript
+describe('Authentication', () => {
+  let validator: JWTValidator;
+  
+  beforeEach(() => {
+    validator = new JWTValidator(testPublicKey);
+  });
+  
+  it('should validate valid JWT token', async () => {
+    const validToken = generateTestToken();
+    const context = await validator.validateToken(validToken);
+    
+    expect(context.userId).toBe('test-user');
+    expect(context.roles).toContain('mcp-client');
+  });
+  
+  it('should reject expired token', async () => {
+    const expiredToken = generateExpiredToken();
+    
+    await expect(validator.validateToken(expiredToken))
+      .rejects.toThrow(AuthenticationError);
+  });
+});
+```
+
+**Protocol Compliance Test**
+```typescript
+describe('JSON-RPC 2.0 Compliance', () => {
+  it('should handle batch requests correctly', async () => {
+    const batchRequest = [
+      { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+      { jsonrpc: '2.0', method: 'resources/list', id: 2 }
+    ];
+    
+    const response = await server.processRequest(batchRequest);
+    
+    expect(Array.isArray(response)).toBe(true);
+    expect(response).toHaveLength(2);
+    expect(response[0].id).toBe(1);
+    expect(response[1].id).toBe(2);
+  });
+  
+  it('should handle notifications without response', async () => {
+    const notification = {
+      jsonrpc: '2.0',
+      method: 'logging/event',
+      params: { event: 'test' }
+    };
+    
+    const response = await server.processRequest(notification);
+    
+    expect(response).toBeNull(); // Notifications don't get responses
+  });
+});
+```
+
+## 4. Deployment Checklist
+
+### **Pre-Deployment Validation**
+```yaml
+# deployment/checklist.yaml
+pre_deployment:
+  - [ ] Security audit completed
+  - [ ] All tests passing (unit, integration, e2e)
+  - [ ] Performance benchmarks met
+  - [ ] Load testing completed
+  - [ ] Security scanning (SAST, DAST)
+  - [ ] Dependency vulnerability check
+  - [ ] Documentation updated
+
+infrastructure:
+  - [ ] Kubernetes manifests validated
+  - [ ] SSL certificates provisioned
+  - [ ] Database migrations applied
+  - [ ] Redis cluster configured
+  - [ ] Monitoring stack deployed
+  - [ ] Backup strategy verified
+
+configuration:
+  - [ ] Environment-specific configs validated
+  - [ ] Secrets properly encrypted
+  - [ ] Feature flags configured
+  - [ ] Rate limits calibrated
+```
+
+### **Docker Configuration**
+```dockerfile
+# deployment/Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Security: non-root user
+RUN addgroup -g 1001 -S mcp && \
+    adduser -S mcp -u 1001
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY dist/ ./dist/
+
+USER mcp
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node dist/health/health-check.js
+
+EXPOSE 3000
+CMD ["node", "dist/server.js"]
+```
+
+## 5. Monitoring Setup
+
+### **Metrics Collection**
+```typescript
+export class MetricsCollector {
+  private promClient: prometheus;
+  
+  constructor() {
+    this.initializeMetrics();
+  }
+  
+  private initializeMetrics() {
+    this.requestDuration = new prometheus.Histogram({
+      name: 'mcp_request_duration_seconds',
+      help: 'Duration of MCP requests in seconds',
+      labelNames: ['method', 'status_code'],
+      buckets: [0.1, 0.5, 1, 2, 5]
+    });
+    
+    this.rateLimitHits = new prometheus.Counter({
+      name: 'mcp_rate_limit_hits_total',
+      help: 'Total number of rate limit hits',
+      labelNames: ['limit_key', 'user_id']
+    });
+  }
+  
+  recordRequest(method: string, statusCode: number, duration: number) {
+    this.requestDuration.labels(method, statusCode.toString()).observe(duration);
+  }
+}
+```
+
+### **Distributed Tracing**
+```typescript
+export class DistributedTracer {
+  private tracer: Tracer;
+  
+  constructor(serviceName: string) {
+    this.tracer = new Tracer(serviceName);
+  }
+  
+  startSpan(name: string, context?: any): Span {
+    const span = this.tracer.startSpan(name);
+    
+    if (context?.traceparent) {
+      // Extract trace context from headers
+      const carrier = { traceparent: context.traceparent };
+      this.tracer.extract(span, carrier);
+    }
+    
+    return span;
+  }
+  
+  async traceOperation<T>(
+    operationName: string,
+    operation: (span: Span) => Promise<T>,
+    context?: any
+  ): Promise<T> {
+    const span = this.startSpan(operationName, context);
+    
+    try {
+      const result = await operation(span);
+      span.finish();
+      return result;
+    } catch (error) {
+      span.setTag('error', true);
+      span.log({ 'error.message': error.message });
+      span.finish();
+      throw error;
+    }
+  }
+}
+```
+
+## 6. Time Estimates & Task Breakdown
+
+### **Phase 1: Security Foundation (Week 1-2)**
+- **Authentication System**: 3 days
+- **Input Validation & Sanitization**: 2 days  
+- **Rate Limiting**: 2 days
+- **Audit Logging**: 1 day
+- **Security Testing**: 2 days
+- **Total**: 10 days
+
+### **Phase 2: Protocol Compliance (Week 3)**
+- **JSON-RPC 2.0 Completer**: 3 days
+- **MCP Versioning**: 1 day
+- **Capability Discovery**: 2 days
+- **Enhanced Error Handling**: 2 days
+- **Protocol Testing**: 2 days
+- **Total**: 10 days
+
+### **Phase 3: Production Infrastructure (Week 4)**
+- **Health Checks & Probes**: 2 days
+- **Metrics & Observability**: 3 days
+- **Configuration Management**: 2 days
+- **Docker & K8s Setup**: 3 days
+- **Total**: 10 days
+
+### **Phase 4: Testing & Deployment (Week 5)**
+- **Integration Testing**: 3 days
+- **Load Testing**: 2 days
+- **Security Auditing**: 2 days
+- **Deployment Pipeline**: 3 days
+- **Total**: 10 days
+
+### **Total Estimated Time: 6-7 weeks**
+
+## 7. Risk Mitigation
+
+### **Rollback Strategy**
+```yaml
+# deployment/rollback-plan.yaml
+triggers:
+  - error_rate > 5% for 5 minutes
+  - p99_latency > 2s for 10 minutes
+  - memory_usage > 80% for 15 minutes
+
+actions:
+  - scale_down_new_version
+  - scale_up_previous_version
+  - notify_engineering_team
+  - preserve_error_logs
+```
+
+### **Feature Flags**
+```typescript
+export class FeatureManager {
+  async isEnabled(feature: string, context: AuthContext): Promise<boolean> {
+    // Gradual rollout based on user ID hash
+    const userHash = this.hashUserId(context.userId);
+    const rolloutPercentage = await this.getRolloutPercentage(feature);
+    
+    return userHash <= rolloutPercentage;
+  }
+  
+  private hashUserId(userId: string): number {
+    return parseInt(
+      crypto.createHash('md5').update(userId).digest('hex').substring(0, 8),
+      16
+    ) % 100;
+  }
+}
+```
+
+This implementation plan provides a comprehensive roadmap for transforming the MCP Server into a production-ready system with enterprise-grade security, compliance, and observability features.
+
+================================================================================
+
+PHASE 4: VALIDATION (Perplexity AI)
+--------------------------------------------------------------------------------
+
+Duration: 23.75s
+Initiator: deepseek
+Responder: perplexity
+
+--------------------------------------------------------------------------------
+RESPONSE:
+--------------------------------------------------------------------------------
+The provided implementation plan for the MCP Server aligns with many industry standards and community best practices, but there are areas where further detail or explicit controls are recommended to ensure full compliance, especially for a production-ready deployment.
+
+---
+
+**1. Compliance with MCP Specifications**
+
+- **Authentication & Authorization:**  
+  The use of a dedicated `JWTValidator.ts` and `RBACAuthorizer.ts` matches best practices for strong, consistent authentication and role-based access control (RBAC), as recommended for MCP servers[1][2][3][5][9].  
+  *Recommendation:* Ensure JWTs are validated with strict issuer/audience checks, short-lived tokens, and sender-constrained tokens (e.g., OAuth 2.1 PKCE), and avoid hard-coded secrets[2][9].
+
+- **Input Validation & Sanitization:**  
+  The presence of `SchemaValidator.ts` and `InputSanitizer.ts` is in line with the requirement for strict input validation to prevent injection attacks and enforce schema contracts[1][2].  
+  *Recommendation:* Validate all API inputs against JSON Schema or Protobuf, reject unknown fields, and sanitize outputs as well[2].
+
+- **Rate Limiting:**  
+  `RateLimiter.ts` addresses API abuse and DoS protection, a core MCP security checklist item[1][2].
+
+- **Audit Logging & Compliance:**  
+  `AuditLogger.ts` and `ComplianceTracker.ts` provide observability and traceability, which are critical for incident response and compliance[1][2][3].
+
+---
+
+**2. Security Considerations**
+
+- **Transport Security:**  
+  The plan should explicitly require **TLS 1.2+** for all communications, with certificate validation and, where possible, mutual TLS (mTLS)[1][2].  
+  *Recommendation:* Add explicit configuration for TLS, certificate pinning, and regular review of cipher suites[2].
+
+- **Credential Management:**  
+  Avoid hard-coded secrets; use environment variables or a secrets manager. Implement key rotation for API keys and credentials[1][2].
+
+- **Process & Resource Isolation:**  
+  While not shown in the code structure, MCP best practices require sandboxing of untrusted code, strict resource boundaries, and OS-level isolation (e.g., containers, AppArmor, SELinux)[1][2].
+
+- **Token Scope & Storage:**  
+  Limit JWT and API key scopes to the minimum required (least privilege), and store tokens securely[1][2].
+
+- **Background Activity Monitoring:**  
+  Ensure all background processes are monitored and cleaned up on shutdown, with health checks and activity restrictions[1].
+
+- **Sensitive Data Handling:**  
+  Enforce data minimization, encryption at rest and in transit, and strict access controls on sensitive data[1].
+
+---
+
+**3. Performance Optimization**
+
+- **Rate Limiting:**  
+  Implement adaptive rate limiting to balance performance and protection against abuse[1][2].
+
+- **Efficient Validation:**  
+  Use efficient schema validation libraries and cache validation results where possible to reduce overhead[2].
+
+- **Audit Logging:**  
+  Ensure audit logging is asynchronous and non-blocking to avoid impacting request latency[2].
+
+---
+
+**4. Scalability Planning**
+
+- **Modular Code Structure:**  
+  The directory structure supports modularity and separation of concerns, aiding scalability.
+
+- **Statelessness:**  
+  Ensure authentication and authorization logic is stateless to support horizontal scaling.
+
+- **Distributed Rate Limiting:**  
+  For multi-instance deployments, use distributed rate limiting (e.g., Redis-backed) to prevent bypassing limits[2].
+
+- **Resource Limits:**  
+  Enforce per-resource and per-user quotas to prevent resource exhaustion[1].
+
+---
+
+**5. Maintenance and Monitoring**
+
+- **Audit & Observability:**  
+  The inclusion of audit logging and compliance tracking is essential. Integrate with SIEM or monitoring platforms for real-time alerting and incident response[2][3].
+
+- **Health Checks:**  
+  Implement regular health checks for all components, including background processes[1].
+
+- **Automated Testing:**  
+  Regularly test security controls, including input validation, authentication, and rate limiting, as part of CI/CD.
+
+- **Key Rotation & Session Revocation:**  
+  Automate key rotation and provide mechanisms for instant session revocation in case of compromise[2].
+
+---
+
+**Final Recommendations and Approval/Concerns**
+
+**Approval:**  
+The plan demonstrates strong alignment with MCP security checklists and best practices, particularly in authentication, input validation, RBAC, rate limiting, and audit logging[1][2][3][5][9].
+
+**Concerns & Recommendations:**  
+- **Explicit Transport Security:** Add explicit TLS/mTLS configuration and certificate validation.
+- **Credential Management:** Ensure secrets are not hard-coded and are rotated regularly.
+- **Sandboxing & Isolation:** Implement sandboxing for untrusted code and OS-level isolation for server processes.
+- **Distributed Controls:** Plan for distributed rate limiting and session management in multi-instance deployments.
+- **Sensitive Data Handling:** Explicitly document encryption and data minimization strategies.
+- **Comprehensive Monitoring:** Integrate audit logs with centralized monitoring and alerting systems.
+
+**Summary:**  
+With these enhancements, the implementation plan will meet or exceed current industry standards and community best practices for MCP server security, scalability, and maintainability[1][2][3].
+
+================================================================================

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762719337,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762719324.617679,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates fundamental issues with the test infrastructure or environment.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is not a coverage gap but a complete test execution failure.\n\n## Potential Issues with Recent Changes\n1. **health_check.py changes likely broke test execution**\n2. Possible causes:\n   - Syntax errors in the modified file\n   - Import/circular dependency issues\n   - Missing dependencies or environment setup\n   - Test framework configuration broken\n   - Critical exceptions during test discovery/import\n\n## Recommendations\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution first** - Run tests locally to identify the root cause\n2. **Check health_check.py for syntax/import errors**\n3. **Verify test dependencies and environment setup**\n4. **Run with verbose output** to see where execution fails\n\n**FOLLOW-UP:**\n5. Once tests run, establish baseline coverage\n6. Add specific tests for health_check.py functionality\n7. Implement pre-commit hooks to catch syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functioning tests is extremely dangerous. The codebase is currently untested and may contain critical bugs. No safety net exists for future changes.\n\n**Priority: Fix test execution immediately before any further development.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 305,
+      "total_tokens": 427,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

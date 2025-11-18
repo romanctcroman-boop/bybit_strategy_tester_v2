@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762534605,
+  "changed_files": [
+    "health_check.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762534589.565412,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental environment or setup issues\n- No coverage data means tests didn't even start running\n\n## Coverage Analysis & Gaps\n**NO COVERAGE** - All gaps identified:\n- 0% coverage across all files\n- No test execution means no meaningful coverage data\n- Critical business logic in `health_check.py` completely untested\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` modification suggests broken virtual environment\n2. **Database Dependency Failure**: `temp_pg_test.py` and psycopg2 changes indicate PostgreSQL connection issues\n3. **Import/Module Conflicts**: Modified package files likely causing import failures\n\n## Immediate Action Recommendations\n1. **Restore Clean Environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Fix Database Dependencies**:\n   - Ensure PostgreSQL is running\n   - Verify connection strings in `temp_pg_test.py`\n   - Check psycopg2 installation isn't corrupted\n\n3. **Validate Test Setup**:\n   - Run simplest test first: `python -m pytest -v --tb=short`\n   - Check for missing test dependencies\n   - Verify test discovery configuration\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be dangerous:\n- No validation of `health_check.py` functionality\n- Database integration completely untested\n- Potential for silent failures in production\n- **Recommendation**: Block all deployments until basic test suite passes\n\n**Priority**: Fix test environment immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 151,
+      "completion_tokens": 388,
+      "total_tokens": 539,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 87
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

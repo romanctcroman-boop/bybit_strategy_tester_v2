@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762708124,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    "tests\\test_key_rotation.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    "tests\\test_protocol.py",
+    "tests\\test_edge_cases_stress.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    "tests\\unit\\test_batch_writer.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762708107.0377576,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely segmentation fault or environment crash)\n- 0% coverage suggests no tests executed successfully\n- Test framework itself may be corrupted\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No code coverage data collected\n- All test files failed before execution\n- Environment appears unstable\n\n## Potential Issues with Recent Changes\n**HIGH-RISK CHANGES IDENTIFIED:**\n1. **Virtual environment corruption** - Multiple `.venv` package files modified\n2. **Database integration issues** - `psycopg2` and test database files changed\n3. **Test framework interference** - Pytest and coverage internal files modified\n4. **Core engine changes** - `mtf_engine.py` modifications without proper testing\n\n## Immediate Action Recommendations\n**PRIORITY 1 - ENVIRONMENT STABILIZATION:**\n```bash\n# Recreate virtual environment\nrm -rf .venv\npython -m venv .venv\npip install -r requirements.txt\n```\n\n**PRIORITY 2 - ISOLATE FAILURE:**\n1. Run single test: `pytest tests/test_mtf_engine.py -v`\n2. Test without coverage: `pytest --no-cov`\n3. Check database connectivity separately\n\n**PRIORITY 3 - INFRASTRUCTURE:**\n- Remove `temp_pg_test.py` from version control\n- Audit why pytest/coverage internal files were modified\n- Implement pre-commit hooks to prevent venv file changes\n\n## Risk Assessment\n**SEVERE RISK (IMMEDIATE ACTION REQUIRED):**\n- **Production Risk:** High - Core engine changes untested\n- **Development Block:** Complete - No tests passing\n- **Regression Risk:** Critical - No safety net for changes\n\n**ROOT CAUSE LIKELY:** Virtual environment corruption combined with database integration changes causing test framework collapse.\n\n**NEXT STEPS:** Environment recreation → Single test verification → Incremental test restoration → Coverage re-enablement.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 359,
+      "completion_tokens": 451,
+      "total_tokens": 810,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 295
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

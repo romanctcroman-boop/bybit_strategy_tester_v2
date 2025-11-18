@@ -1,0 +1,278 @@
+{{- if .Values.prometheusOperator.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: anomaly-detection-alerts
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Chart.Name }}
+    release: {{ .Release.Name }}
+    prometheus: kube-prometheus
+spec:
+  groups:
+    # === Anomaly Detection Alerts ===
+    - name: anomaly_detection_alerts
+      interval: 30s
+      rules:
+        # High Anomaly Rate
+        - alert: HighAnomalyRate
+          expr: |
+            rate(anomaly_detections_total{severity!="info"}[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: anomaly-detection
+          annotations:
+            summary: "High anomaly detection rate"
+            description: |
+              Anomaly detection rate is {{ $value | humanizePercentage }} (threshold: 10%).
+              This indicates unusual market behavior or potential model drift.
+              
+              Detected anomalies per minute: {{ $value | humanize }}
+              
+              Action: Review recent anomalies and consider model retraining.
+        
+        # Critical Anomaly Detected
+        - alert: CriticalAnomalyDetected
+          expr: |
+            anomaly_detections_total{severity="critical"} > 0
+          for: 1m
+          labels:
+            severity: critical
+            component: anomaly-detection
+          annotations:
+            summary: "Critical market anomaly detected"
+            description: |
+              Critical anomaly detected with score < -0.5.
+              This indicates extreme market deviation requiring immediate attention.
+              
+              Symbol: {{ $labels.symbol }}
+              Anomaly count: {{ $value }}
+              
+              Action: Investigate immediately. Consider halting trading if risk is high.
+        
+        # Anomaly Score Threshold
+        - alert: LowAnomalyScore
+          expr: |
+            anomaly_score_current{} < -0.3
+          for: 2m
+          labels:
+            severity: warning
+            component: anomaly-detection
+          annotations:
+            summary: "Low anomaly score detected"
+            description: |
+              Current anomaly score is {{ $value | printf "%.3f" }} (threshold: -0.3).
+              This indicates potential market anomaly.
+              
+              Symbol: {{ $labels.symbol }}
+              Timeframe: {{ $labels.timeframe }}
+              
+              Action: Monitor closely. Review price/volume patterns.
+        
+        # Model Not Trained
+        - alert: AnomalyModelNotTrained
+          expr: |
+            absent(anomaly_score_current{})
+          for: 5m
+          labels:
+            severity: warning
+            component: anomaly-detection
+          annotations:
+            summary: "Anomaly detection model not trained"
+            description: |
+              No anomaly scores detected. Model may not be trained or service is down.
+              
+              Action: Train model via /api/v1/anomalies/train endpoint.
+        
+        # High Detection Latency
+        - alert: HighAnomalyDetectionLatency
+          expr: |
+            histogram_quantile(0.99, rate(anomaly_detection_latency_seconds_bucket[5m])) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: anomaly-detection
+          annotations:
+            summary: "High anomaly detection latency"
+            description: |
+              P99 detection latency is {{ $value | humanizeDuration }} (threshold: 100ms).
+              This may delay anomaly alerts and affect real-time detection.
+              
+              Action: Check model performance and resource allocation.
+        
+        # Anomaly Spike
+        - alert: AnomalySpikeDetected
+          expr: |
+            rate(anomaly_detections_total[1m]) > 5 * rate(anomaly_detections_total[10m])
+          for: 2m
+          labels:
+            severity: warning
+            component: anomaly-detection
+          annotations:
+            summary: "Sudden spike in anomaly detections"
+            description: |
+              Anomaly detection rate increased 5x in last minute.
+              This may indicate:
+              - Flash crash or extreme volatility
+              - Market manipulation
+              - Model drift
+              - Data quality issues
+              
+              Current rate: {{ $value | humanize }} anomalies/sec
+              
+              Action: Investigate immediately. Review market conditions.
+        
+        # No Recent Detections
+        - alert: NoRecentAnomalyDetections
+          expr: |
+            rate(anomaly_detections_total[1h]) == 0
+          for: 2h
+          labels:
+            severity: info
+            component: anomaly-detection
+          annotations:
+            summary: "No anomaly detections in last 2 hours"
+            description: |
+              No anomalies detected in 2 hours. This may be normal during low volatility,
+              but could also indicate:
+              - Service not running
+              - Data feed issues
+              - Model issues
+              
+              Action: Verify service is running and receiving data.
+
+    # === Model Performance Alerts ===
+    - name: anomaly_model_performance
+      interval: 1m
+      rules:
+        # Long Training Duration
+        - alert: LongAnomalyModelTraining
+          expr: |
+            histogram_quantile(0.95, rate(anomaly_model_training_duration_seconds_bucket[10m])) > 300
+          for: 5m
+          labels:
+            severity: warning
+            component: anomaly-detection
+          annotations:
+            summary: "Anomaly model training takes too long"
+            description: |
+              P95 training duration is {{ $value | humanizeDuration }} (threshold: 5 minutes).
+              
+              This may indicate:
+              - Large training dataset
+              - Insufficient CPU/memory
+              - Model complexity issues
+              
+              Action: Review model configuration and resource allocation.
+        
+        # Historical Data Size
+        - alert: LowHistoricalDataSize
+          expr: |
+            anomaly_historical_data_size{} < 10000
+          for: 10m
+          labels:
+            severity: warning
+            component: anomaly-detection
+          annotations:
+            summary: "Insufficient historical data for training"
+            description: |
+              Only {{ $value }} data points available (recommended: >10,000).
+              Model accuracy may be degraded with insufficient training data.
+              
+              Action: Increase lookback period or check data loading service.
+
+    # === Real-Time Detection Alerts ===
+    - name: realtime_anomaly_detection
+      interval: 30s
+      rules:
+        # Consecutive Anomalies
+        - alert: ConsecutiveAnomalies
+          expr: |
+            sum(increase(anomaly_detections_total[5m])) > 10
+          for: 5m
+          labels:
+            severity: warning
+            component: anomaly-detection
+          annotations:
+            summary: "Multiple consecutive anomalies detected"
+            description: |
+              {{ $value }} anomalies detected in 5 minutes.
+              
+              This sustained anomaly pattern may indicate:
+              - Market regime change (trending → ranging or vice versa)
+              - Flash crash recovery
+              - Persistent volatility spike
+              - Model drift (needs retraining)
+              
+              Action: Review market conditions and consider model update.
+        
+        # Anomaly Pattern Change
+        - alert: AnomalyPatternChange
+          expr: |
+            abs(
+              rate(anomaly_detections_total{severity="critical"}[10m]) -
+              rate(anomaly_detections_total{severity="critical"}[1h] offset 1h)
+            ) > 0.5
+          for: 10m
+          labels:
+            severity: info
+            component: anomaly-detection
+          annotations:
+            summary: "Change in anomaly detection patterns"
+            description: |
+              Anomaly detection patterns changed significantly compared to 1 hour ago.
+              
+              This may indicate:
+              - Market regime shift
+              - Model adaptation working correctly
+              - Data quality change
+              
+              Action: Monitor. No immediate action required unless anomalies are critical.
+
+    # === Service Health Alerts ===
+    - name: anomaly_service_health
+      interval: 1m
+      rules:
+        # Service Down
+        - alert: AnomalyDetectionServiceDown
+          expr: |
+            up{job="anomaly-detection"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: anomaly-detection
+          annotations:
+            summary: "Anomaly detection service is down"
+            description: |
+              Anomaly detection service is not responding.
+              
+              Impact:
+              - No real-time anomaly detection
+              - Alerts will not trigger
+              - Trading risk increases
+              
+              Action: Restart service immediately. Check logs for errors.
+        
+        # High Memory Usage
+        - alert: AnomalyServiceHighMemory
+          expr: |
+            process_resident_memory_bytes{job="anomaly-detection"} > 2e9
+          for: 5m
+          labels:
+            severity: warning
+            component: anomaly-detection
+          annotations:
+            summary: "Anomaly detection service high memory usage"
+            description: |
+              Memory usage is {{ $value | humanize1024 }}B (threshold: 2GB).
+              
+              This may indicate:
+              - Memory leak
+              - Large model size
+              - Excessive feature caching
+              
+              Action: Review memory usage patterns. Consider restarting service.
+
+{{- end }}

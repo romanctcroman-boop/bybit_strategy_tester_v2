@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762713678,
+  "changed_files": [
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713664.8965635,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates fundamental issues with the test infrastructure or code under test, making quality assessment impossible until basic execution is resolved.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code is being executed. This is a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\n1. **Test file corruption** - `tests\\test_deepseek_client.py` may contain syntax errors or import failures\n2. **Dependency issues** - Missing imports or broken dependencies in the test file\n3. **Environment configuration** - Test runner configuration or environment setup problems\n4. **Fixtures/Setup failures** - Critical setup code failing before any tests run\n\n## Immediate Recommendations\n1. **Debug test execution**:\n   ```bash\n   python -m pytest tests/test_deepseek_client.py -v\n   ```\n2. **Check for syntax errors**:\n   ```bash\n   python -m py_compile tests/test_deepseek_client.py\n   ```\n3. **Verify imports** - Ensure all imports in the test file resolve correctly\n4. **Run minimal test** - Create a simple passing test to verify basic functionality\n\n## Risk Assessment\n**HIGH RISK** - No testing validation is occurring. Any code changes are completely unverified, creating significant deployment risks.\n\n## Priority Actions\n1. Fix test execution (Exit Code -1)\n2. Achieve basic test pass (Success: True)\n3. Then address coverage gaps\n\nThe complete testing failure must be resolved before any meaningful quality assessment can be made.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 339,
+      "total_tokens": 466,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762626064,
+  "changed_files": [
+    "mcp-server\\server.py",
+    "deepseek_self_integration_check.py",
+    "test_deepseek_self_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762626050.1779141,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment issue)\n- Zero test execution suggests fundamental problems in test setup or code structure\n- No coverage data generated implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- 0% coverage across all files indicates no code was executed\n- All business logic, error handling, and integration points are untested\n- Critical gap: Entire codebase is effectively unvalidated\n\n## Potential Issues with Recent Changes\n1. **mcp-server/server.py changes** likely introduced breaking changes\n2. **deepseek_self_integration_check.py** may have dependency or import issues\n3. **test_deepseek_self_check.py** possibly contains syntax errors or missing dependencies\n4. Environment configuration mismatch or missing requirements\n\n## Immediate Recommendations\n1. **Debug Test Execution:**\n   - Run tests with `-v` flag to see specific failure points\n   - Check Python environment and dependencies\n   - Verify imports in test files\n\n2. **Fix Foundation First:**\n   - Ensure basic test setup/teardown works\n   - Add simple smoke test to verify test framework\n   - Check for circular imports or missing modules\n\n3. **Priority Actions:**\n   - Fix exit code -1 before addressing coverage\n   - Add error handling in test fixtures\n   - Verify MCP server dependencies are installed\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployments are flying blind\n- Recent changes could have broken core functionality\n- No safety net for regression detection\n- High probability of undetected bugs in production\n\n**Start with making tests executable, then build coverage systematically.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 146,
+      "completion_tokens": 376,
+      "total_tokens": 522,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 82
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

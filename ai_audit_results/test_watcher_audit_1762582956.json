@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762582956,
+  "changed_files": [
+    "backend\\security\\sandbox_executor.py",
+    "backend\\middleware\\rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762582940.6247413,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **100% coverage gap** - No code was executed during testing\n- Both modified files (`sandbox_executor.py`, `rate_limiter.py`) have unknown impact\n- Entire test suite is effectively useless in current state\n\n## Potential Issues with Recent Changes\n1. **Sandbox executor** likely introduced fatal errors (security/sandbox code often causes environment crashes)\n2. **Rate limiter changes** may have broken import chains or initialization\n3. Possible circular imports or dependency conflicts between these modules\n4. Environment configuration may be incompatible with new code\n\n## Immediate Recommendations\n1. **Fix test execution first** - Run tests with `-v` flag to see which test crashes first\n2. **Isolate the crash** - Temporarily remove both changed files to confirm they're the cause\n3. **Check imports** - Verify no circular dependencies between security and middleware modules\n4. **Add basic smoke tests** - Create minimal tests that validate module loading before complex logic\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely dangerous:\n- Zero test validation means potential security vulnerabilities in sandbox code\n- Rate limiting could be completely broken\n- No safety net for future changes\n- Critical functionality (security + rate limiting) is completely untested\n\n**Priority:** Fix test execution immediately before any other development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 140,
+      "completion_tokens": 329,
+      "total_tokens": 469,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 76
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

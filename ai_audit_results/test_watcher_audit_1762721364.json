@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762721364,
+  "changed_files": [
+    "tests\\test_distributed_rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762721350.2421918,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1), indicating fundamental issues:\n- Test infrastructure or environment problems\n- Syntax errors or import failures in test files\n- Possible infinite loops or resource exhaustion\n\n## Coverage Analysis\n**COMPLETE FAILURE** - 0% coverage means:\n- No tests executed successfully\n- All code paths remain untested\n- Recent changes likely broke the test runner itself\n\n## Potential Issues with Recent Changes\nThe modified `test_distributed_rate_limiter.py` likely contains:\n- Fatal syntax errors (missing imports, invalid Python)\n- Environment dependencies not met (Redis, network services)\n- Infinite loops or resource constraints (memory/CPU)\n- Test framework configuration errors\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test execution**: Run with `-v` flag to see which test fails first\n2. **Check syntax**: Validate `test_distributed_rate_limiter.py` for basic Python syntax\n3. **Verify dependencies**: Ensure required services (Redis, databases) are running\n4. **Isolate the failure**: Run this test file alone with `pytest tests/test_distributed_rate_limiter.py -v`\n\n**Follow-up:**\n5. Add test environment validation at module import\n6. Implement timeout guards for distributed operations\n7. Create smoke tests that run before full test suite\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may be completely untested\n- Distributed rate limiting logic could fail silently\n- No safety net for critical infrastructure component\n- Potential for cascading failures in dependent systems\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 356,
+      "total_tokens": 485,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

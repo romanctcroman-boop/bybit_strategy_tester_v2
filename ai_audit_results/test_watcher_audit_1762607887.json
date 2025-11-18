@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762607887,
+  "changed_files": [
+    "mcp-server\\api\\providers\\perplexity.py",
+    "mcp-server\\api\\providers\\__init__.py",
+    "mcp-server\\api\\providers\\deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762607869.8107712,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed successfully.\n\n## Coverage Analysis & Gaps\n- **100% coverage gap** - No code was executed during testing\n- All provider files (Perplexity, DeepSeek) completely untested\n- Test infrastructure itself appears broken\n\n## Potential Issues with Recent Changes\n1. **Provider initialization failures** - New providers may have missing dependencies or configuration errors\n2. **Import/circular dependency issues** - Changes in `__init__.py` may break module loading\n3. **Environment/config mismatches** - API keys, endpoints, or dependencies missing\n4. **Breaking interface changes** - Provider APIs may not match expected contracts\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check test runner configuration\n   - Verify all dependencies installed\n   - Add try/catch around test initialization to capture errors\n\n2. **Add basic smoke tests**:\n   ```python\n   # Test provider imports work\n   def test_provider_imports():\n       from api.providers import perplexity, deepseek\n   ```\n\n3. **Validate provider configuration**:\n   - Check required environment variables\n   - Verify API client initialization\n   - Test minimal API calls with mocks\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates deployed code is completely untested. Recent provider additions could:\n- Break existing functionality\n- Introduce runtime exceptions\n- Cause service outages\n- Expose security vulnerabilities\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 161,
+      "completion_tokens": 348,
+      "total_tokens": 509,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 97
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

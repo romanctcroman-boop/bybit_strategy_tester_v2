@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762548388,
+  "changed_files": [
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_phase1_security.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\test_protocol.py",
+    "tests\\backend\\conftest.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "backend\\core\\mtf_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762548369.316789,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1), indicating fundamental issues with test infrastructure or environment setup. No meaningful quality assessment possible until basic execution is resolved.\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0.00% coverage suggests:\n- Test environment/dependencies not properly configured\n- Critical imports failing or missing dependencies\n- Database connections/API endpoints unavailable\n- Test discovery/collection mechanism broken\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **`backend/core/mtf_engine.py`** - Core engine changes may have broken imports or initialization\n2. **`backend/ml/lstm_queue_predictor.py`** - ML model dependencies or data pipeline issues\n3. **`tests/backend/conftest.py`** - Pytest configuration/fixtures broken\n4. **Database/API integration** - Multiple test files suggest connectivity issues\n\n## Immediate Action Plan\n\n### 1. **Diagnose Root Cause** (Today)\n```bash\n# Run with verbose output to identify first failure\npytest -v -x --tb=short tests/\n# Check specific problematic modules\npython -c \"from backend.core.mtf_engine import *; print('MTF engine imports OK')\"\n```\n\n### 2. **Fix Environment** \n- Verify all dependencies in `requirements.txt`\n- Check database connections and API endpoints\n- Validate pytest configuration in `conftest.py`\n\n### 3. **Test Isolation**\n```bash\n# Test core components individually\npytest tests/test_phase1_security.py -v\npytest tests/backend/test_marketdata_ingest.py -v\n```\n\n## Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- No test validation of recent ML and engine changes\n- Security tests (`test_phase1_security.py`) completely untested\n- Database optimization changes unverified\n- Zero confidence in system stability\n\n## Priority Recommendations\n1. **Fix test execution immediately** - Block all deployments until resolved\n2. **Add environment validation** to test setup\n3. **Implement smoke tests** that run before full test suite\n4. **Monitor** database/API connectivity in CI/CD pipeline\n\n**Next Step**: Run isolated tests to identify the first point of failure, then systematically resolve dependency/environment issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 499,
+      "total_tokens": 790,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 227
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

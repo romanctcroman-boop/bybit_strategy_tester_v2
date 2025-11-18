@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762555951,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\uvicorn\\server.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\main.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\importer.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    ".venv\\Lib\\site-packages\\click\\core.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\config.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762555925.774847,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated for any files\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No test execution occurred\n- All files show 0% coverage\n- Test infrastructure appears broken\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: Modified files in `.venv\\Lib\\site-packages\\` suggest virtual environment was directly edited (antipattern)\n2. **Dependency Conflicts**: Changes to uvicorn and click packages could break test runner compatibility\n3. **Import/Initialization Failures**: Test suite likely crashes during setup\n4. **Path/Module Resolution**: Modified `uvicorn\\importer.py` may affect test discovery\n\n## Immediate Action Recommendations\n1. **Restore Clean Environment:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Debug Test Failure:**\n   ```bash\n   python -m pytest -v --tb=short  # Get specific error details\n   ```\n\n3. **Fix Dependency Management:**\n   - Never manually edit files in `site-packages`\n   - Use proper dependency versioning in requirements.txt\n   - Consider poetry/pipenv for better isolation\n\n4. **Add Test Infrastructure Validation:**\n   - Create smoke test that validates test environment\n   - Add pre-test sanity checks\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing capability\n- Potential environment corruption\n- Unverified code changes in production path\n- High probability of undetected regressions\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 230,
+      "completion_tokens": 395,
+      "total_tokens": 625,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 166
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

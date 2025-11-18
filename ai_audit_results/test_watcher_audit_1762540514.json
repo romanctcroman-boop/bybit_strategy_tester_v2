@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540514,
+  "changed_files": [
+    "tests\\stress\\test_memory_leaks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540500.9870448,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). The test suite is non-functional and provides zero validation of code behavior. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code coverage data collected\n- **No files analyzed** - Coverage reporting failed entirely\n- **Critical gap**: Unable to assess what code paths are untested\n\n## Potential Issues with Recent Changes\n- **Memory leak test file** (`test_memory_leaks.py`) is likely causing the crash\n- Possible infinite loops or resource exhaustion in stress tests\n- Test infrastructure may be overwhelmed by memory-intensive operations\n- Test framework compatibility issues with stress testing approach\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Isolate and fix the crashing test** - Run `test_memory_leaks.py` in isolation to identify the crash cause\n2. **Add timeout protection** to memory leak tests to prevent hangs\n3. **Implement test segmentation** - Run memory-intensive tests separately from main test suite\n\n**SHORT-TERM:**\n4. **Add better error handling** in test infrastructure to capture crash details\n5. **Use resource limits** (memory, CPU) for stress tests\n6. **Implement progressive testing** - start with basic tests before stress tests\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- **Deployment Risk**: Extremely high - no reliable test feedback\n- **Regression Risk**: Critical - undetected bugs likely\n- **Quality Risk**: Severe - cannot validate code changes\n- **Immediate Impact**: Development blocked until basic testing restored\n\n**Priority**: Fix test execution crash before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 366,
+      "total_tokens": 495,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

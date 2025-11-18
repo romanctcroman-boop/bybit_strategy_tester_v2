@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762684970,
+  "changed_files": [
+    "tests\\test_edge_cases_stress.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762684954.4352458,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). This indicates severe infrastructure or code issues rather than test failures. The test suite is non-functional.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed. This isn't a coverage gap but a complete execution failure. All production code remains untested.\n\n## Potential Issues with Recent Changes\nThe changed file `tests\\test_edge_cases_stress.py` likely contains:\n- Syntax errors preventing import/execution\n- Infinite loops or resource exhaustion\n- Missing dependencies or imports\n- Environment configuration issues\n- Memory leaks or system resource crashes\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug the test crash** - Run `python -m pytest tests/test_edge_cases_stress.py -v` to see the exact error\n2. **Check for syntax errors** - Run `python -m py_compile tests/test_edge_cases_stress.py`\n3. **Isolate the issue** - Temporarily remove/comment out the changed test file and verify other tests run\n\n**Follow-up:**\n4. Add test environment validation at suite startup\n5. Implement resource limits for stress tests\n6. Add CI pipeline step to validate test syntax before execution\n\n## Risk Assessment\n**HIGH RISK** - The entire test suite is compromised:\n- No regression protection\n- Undetected production bugs likely\n- Deployment blocking capability lost\n- Urgent fix required before any further development\n\n**Priority:** Fix the test execution crash immediately before addressing any other quality issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 331,
+      "total_tokens": 459,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

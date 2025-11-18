@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762642705,
+  "changed_files": [
+    "tests\\unit\\test_ast_validator.py",
+    "mcp-server\\mcp_cache.py",
+    "backend\\ml\\market_regime_detector.py",
+    "tests\\unit\\test_lru_ttl_cache.py",
+    "backend\\ml\\optuna_optimizer.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    "backend\\ml\\__init__.py",
+    "tests\\unit\\test_retrain_scheduler.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "backend\\ml\\retrain_scheduler.py",
+    "backend\\ml\\optimizer.py",
+    "tests\\test_walk_forward.py",
+    "tests\\unit\\test_structured_logger.py",
+    "tests\\unit\\test_drift_detector.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762642688.0420282,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage suggests tests aren't even executing\n- No coverage data generated implies fundamental infrastructure issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- Zero coverage across all files indicates tests aren't running\n- No module imports or function calls being measured\n- Critical ML components (`market_regime_detector`, `optuna_optimizer`) completely untested\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure Broken** - Likely in `test_ast_validator.py` or modified pytest files\n2. **Environment Corruption** - `.venv\\Lib\\site-packages\\_pytest\\terminal.py` modification suspicious\n3. **Import/Dependency Issues** - Common cause of -1 exit codes\n4. **Configuration Changes** - Coverage setup may be misconfigured\n\n## Immediate Action Plan\n1. **DIAGNOSE FAILURE ROOT CAUSE:**\n   - Run `pytest -v` to see which test fails first\n   - Check for syntax errors in modified test files\n   - Verify pytest installation isn't corrupted\n\n2. **RESTORE TEST INFRASTRUCTURE:**\n   - Revert changes to pytest core files\n   - Run basic smoke test: `python -m pytest tests/unit/test_structured_logger.py -v`\n   - Verify imports work in isolation\n\n3. **PRIORITY FIXES:**\n   - Fix initial test failure causing -1 exit\n   - Restore basic test execution before addressing coverage\n   - Validate core ML components manually\n\n## Risk Assessment\n**HIGH RISK** - Deployment should be blocked:\n- No confidence in ML model changes\n- Critical financial components untested\n- Potential runtime failures in production\n- Regression detection impossible\n\n**NEXT STEPS:** Start with diagnosing the first failing test - the -1 exit code suggests an uncaught exception during test collection or setup.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 286,
+      "completion_tokens": 435,
+      "total_tokens": 721,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 222
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

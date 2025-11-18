@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762537148,
+  "changed_files": [
+    "tests\\test_safe_async_bridge_final.py",
+    "automation\\sync_async_wrapper.py",
+    "tests\\test_sync_async_wrapper.py",
+    "tests\\test_safe_async_bridge_simple.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537133.053609,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- Likely environment or dependency issues preventing test execution\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA COLLECTED** - Critical gap:\n- Zero coverage across all files indicates tests didn't run\n- Cannot assess actual code coverage without execution\n- Missing baseline for coverage improvement\n\n## Potential Issues with Recent Changes\n1. **Fatal Runtime Errors** in modified files:\n   - `sync_async_wrapper.py` likely contains blocking code causing crashes\n   - Async/sync bridge implementations may have infinite loops or deadlocks\n   - Possible import cycles or circular dependencies\n\n2. **Test Infrastructure Problems**:\n   - Test discovery/import failures\n   - Missing dependencies or environment setup\n   - Configuration issues in test runners\n\n## Immediate Recommendations\n1. **Debug Test Execution**:\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   Run with minimal configuration to identify root cause\n\n2. **Isolate Problem Components**:\n   - Test each changed file individually\n   - Check for syntax errors and import issues\n   - Validate async/sync bridge implementations\n\n3. **Fix Core Issues**:\n   - Address fatal errors in `sync_async_wrapper.py` first\n   - Ensure proper async event loop management\n   - Add timeout protection for async operations\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code likely contains critical bugs\n- No validation of recent changes\n- Potential deployment of broken functionality\n- Async/sync integration points are unstable\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 167,
+      "completion_tokens": 383,
+      "total_tokens": 550,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 103
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

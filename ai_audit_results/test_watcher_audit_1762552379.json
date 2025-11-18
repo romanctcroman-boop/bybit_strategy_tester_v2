@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762552379,
+  "changed_files": [
+    "backend\\api\\parallel_deepseek_client_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552365.4239686,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run. This indicates either:\n- Fatal configuration/import errors\n- Missing dependencies\n- Syntax errors in test code or implementation\n\n## Coverage Analysis\n**0% coverage** - Tests didn't execute, so no coverage data collected. This represents maximum risk level.\n\n## Potential Issues with Recent Changes\nThe parallel_deepseek_client_v2.py changes likely introduced:\n- **Syntax errors** preventing import/execution\n- **Breaking API changes** affecting test setup\n- **Missing dependencies** for the new parallel implementation\n- **Configuration issues** with the DeepSeek client integration\n\n## Recommendations for Improvement\n\n**Immediate Actions:**\n1. **Fix test execution** - Run tests locally to identify the root cause of Exit Code -1\n2. **Check syntax** - Validate parallel_deepseek_client_v2.py for Python syntax compliance\n3. **Verify imports** - Ensure all dependencies are installed and import paths correct\n\n**Short-term:**\n4. **Add basic smoke test** for the new client before comprehensive testing\n5. **Implement error handling** in test setup to provide better diagnostics\n\n**Long-term:**\n6. **Set up pre-commit hooks** to catch syntax errors before commit\n7. **Add CI pipeline** with dependency installation and basic validation\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable and potentially broken:\n- **Deployment Risk**: High - Cannot verify functionality\n- **Regression Risk**: High - No validation of parallel client changes\n- **Maintenance Risk**: High - Test infrastructure compromised\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 369,
+      "total_tokens": 500,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

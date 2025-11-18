@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762602402,
+  "changed_files": [
+    "automation\\deepseek_robot\\advanced_architecture.py",
+    "automation\\deepseek_robot\\dual_analytics_engine.py",
+    "automation\\deepseek_robot\\api_clients.py",
+    "test_optimizations.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762602386.0988553,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax errors in test files or code\n- Import failures due to broken dependencies\n- Test framework configuration issues\n- Critical runtime exceptions during test setup\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- No code paths are being exercised\n- Potentially missing test discovery configuration\n\n## Potential Issues with Recent Changes\n1. **API Clients** (`api_clients.py`) - Likely breaking changes in imports or dependencies\n2. **Architecture Changes** (`advanced_architecture.py`) - Possible circular imports or initialization failures\n3. **Analytics Engine** (`dual_analytics_engine.py`) - Complex dependencies may be failing to load\n4. **Test Optimizations** (`test_optimizations.py`) - Test configuration may be broken\n\n## Immediate Action Recommendations\n1. **Debug Test Execution**\n   ```bash\n   python -m pytest test_optimizations.py -v --tb=short\n   ```\n2. **Check Import Chains**\n   - Verify all imports in changed files resolve correctly\n   - Check for circular imports between architecture components\n3. **Validate Dependencies**\n   - Ensure all required packages are installed\n   - Check for version conflicts in analytics/API dependencies\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely risky with:\n- No test validation of core automation components\n- Unknown stability of API clients and analytics engines\n- Potential for runtime failures in production\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 166,
+      "completion_tokens": 360,
+      "total_tokens": 526,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 102
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

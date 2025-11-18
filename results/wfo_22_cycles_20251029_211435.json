@@ -1,0 +1,451 @@
+{
+  "execution_time_minutes": 14.461780533333332,
+  "periods": [
+    {
+      "period": 1,
+      "start_idx": 0,
+      "is_start": 0,
+      "is_end": 8000,
+      "oos_start": 8000,
+      "oos_end": 10000,
+      "best_params": {
+        "fast_ema": 15,
+        "slow_ema": 38
+      },
+      "is_sharpe": -0.21181817941942566,
+      "is_return": -28.57735267046757,
+      "is_trades": 211,
+      "oos_sharpe": -3.538945402900801,
+      "oos_return": -11.499103451608262,
+      "oos_trades": 54,
+      "efficiency": 0
+    },
+    {
+      "period": 2,
+      "start_idx": 2000,
+      "is_start": 2000,
+      "is_end": 10000,
+      "oos_start": 10000,
+      "oos_end": 12000,
+      "best_params": {
+        "fast_ema": 15,
+        "slow_ema": 38
+      },
+      "is_sharpe": -1.3319436885169869,
+      "is_return": -34.70342596720768,
+      "is_trades": 220,
+      "oos_sharpe": 4.2017908975466725,
+      "oos_return": 2.4558548993625844,
+      "oos_trades": 40,
+      "efficiency": 0
+    },
+    {
+      "period": 3,
+      "start_idx": 4000,
+      "is_start": 4000,
+      "is_end": 12000,
+      "oos_start": 12000,
+      "oos_end": 14000,
+      "best_params": {
+        "fast_ema": 17,
+        "slow_ema": 41
+      },
+      "is_sharpe": 0.6734529871867027,
+      "is_return": -20.02280808601423,
+      "is_trades": 179,
+      "oos_sharpe": -0.7824541530021841,
+      "oos_return": -7.871421972336866,
+      "oos_trades": 44,
+      "efficiency": -116.18541574384061
+    },
+    {
+      "period": 4,
+      "start_idx": 6000,
+      "is_start": 6000,
+      "is_end": 14000,
+      "oos_start": 14000,
+      "oos_end": 16000,
+      "best_params": {
+        "fast_ema": 17,
+        "slow_ema": 41
+      },
+      "is_sharpe": 0.9304745310790853,
+      "is_return": -18.38814519042581,
+      "is_trades": 177,
+      "oos_sharpe": -0.8581647701076903,
+      "oos_return": -10.025446399064222,
+      "oos_trades": 56,
+      "efficiency": -92.22872216743684
+    },
+    {
+      "period": 5,
+      "start_idx": 8000,
+      "is_start": 8000,
+      "is_end": 16000,
+      "oos_start": 16000,
+      "oos_end": 18000,
+      "best_params": {
+        "fast_ema": 17,
+        "slow_ema": 41
+      },
+      "is_sharpe": 0.68948898305732,
+      "is_return": -19.29458252432757,
+      "is_trades": 174,
+      "oos_sharpe": -3.1535488940942713,
+      "oos_return": -12.525976668595105,
+      "oos_trades": 59,
+      "efficiency": -457.37480533929056
+    },
+    {
+      "period": 6,
+      "start_idx": 10000,
+      "is_start": 10000,
+      "is_end": 18000,
+      "oos_start": 18000,
+      "oos_end": 20000,
+      "best_params": {
+        "fast_ema": 15,
+        "slow_ema": 38
+      },
+      "is_sharpe": 0.4553733762022411,
+      "is_return": -23.235273810559864,
+      "is_trades": 198,
+      "oos_sharpe": -1.2451594602692904,
+      "oos_return": -8.893422554151458,
+      "oos_trades": 52,
+      "efficiency": -273.43703548366614
+    },
+    {
+      "period": 7,
+      "start_idx": 12000,
+      "is_start": 12000,
+      "is_end": 20000,
+      "oos_start": 20000,
+      "oos_end": 22000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 39
+      },
+      "is_sharpe": -0.7868932707814879,
+      "is_return": -31.81360042660249,
+      "is_trades": 214,
+      "oos_sharpe": 0.9112067332254554,
+      "oos_return": -4.494503451729543,
+      "oos_trades": 48,
+      "efficiency": 0
+    },
+    {
+      "period": 8,
+      "start_idx": 14000,
+      "is_start": 14000,
+      "is_end": 22000,
+      "oos_start": 22000,
+      "oos_end": 24000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 38
+      },
+      "is_sharpe": -0.14849634075866955,
+      "is_return": -29.601830953761127,
+      "is_trades": 221,
+      "oos_sharpe": -3.113625616593858,
+      "oos_return": -11.487502327562398,
+      "oos_trades": 51,
+      "efficiency": 0
+    },
+    {
+      "period": 9,
+      "start_idx": 16000,
+      "is_start": 16000,
+      "is_end": 24000,
+      "oos_start": 24000,
+      "oos_end": 26000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 38
+      },
+      "is_sharpe": -0.720928630671209,
+      "is_return": -32.75434095672806,
+      "is_trades": 221,
+      "oos_sharpe": -2.9237124152821816,
+      "oos_return": -15.672849049294127,
+      "oos_trades": 74,
+      "efficiency": 0
+    },
+    {
+      "period": 10,
+      "start_idx": 18000,
+      "is_start": 18000,
+      "is_end": 26000,
+      "oos_start": 26000,
+      "oos_end": 28000,
+      "best_params": {
+        "fast_ema": 14,
+        "slow_ema": 39
+      },
+      "is_sharpe": -0.7106506608713311,
+      "is_return": -32.40432757933745,
+      "is_trades": 217,
+      "oos_sharpe": -5.228161907663019,
+      "oos_return": -16.318098072712747,
+      "oos_trades": 61,
+      "efficiency": 0
+    },
+    {
+      "period": 11,
+      "start_idx": 20000,
+      "is_start": 20000,
+      "is_end": 28000,
+      "oos_start": 28000,
+      "oos_end": 30000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 38
+      },
+      "is_sharpe": -1.5199899130194743,
+      "is_return": -39.1497626542348,
+      "is_trades": 235,
+      "oos_sharpe": 0.5945933076926874,
+      "oos_return": -7.235352706646099,
+      "oos_trades": 57,
+      "efficiency": 0
+    },
+    {
+      "period": 12,
+      "start_idx": 22000,
+      "is_start": 22000,
+      "is_end": 30000,
+      "oos_start": 30000,
+      "oos_end": 32000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 42
+      },
+      "is_sharpe": -1.6577943480792576,
+      "is_return": -36.065936446177155,
+      "is_trades": 218,
+      "oos_sharpe": -0.5535810981451722,
+      "oos_return": -11.256621574107411,
+      "oos_trades": 68,
+      "efficiency": 0
+    },
+    {
+      "period": 13,
+      "start_idx": 24000,
+      "is_start": 24000,
+      "is_end": 32000,
+      "oos_start": 32000,
+      "oos_end": 34000,
+      "best_params": {
+        "fast_ema": 17,
+        "slow_ema": 42
+      },
+      "is_sharpe": -0.6494547250523295,
+      "is_return": -29.980755236274366,
+      "is_trades": 201,
+      "oos_sharpe": -2.7918699392210025,
+      "oos_return": -12.263727236299655,
+      "oos_trades": 47,
+      "efficiency": 0
+    },
+    {
+      "period": 14,
+      "start_idx": 26000,
+      "is_start": 26000,
+      "is_end": 34000,
+      "oos_start": 34000,
+      "oos_end": 36000,
+      "best_params": {
+        "fast_ema": 15,
+        "slow_ema": 38
+      },
+      "is_sharpe": -0.7033091324122351,
+      "is_return": -32.16580850739816,
+      "is_trades": 215,
+      "oos_sharpe": -2.585385883824478,
+      "oos_return": -11.775301620164955,
+      "oos_trades": 55,
+      "efficiency": 0
+    },
+    {
+      "period": 15,
+      "start_idx": 28000,
+      "is_start": 28000,
+      "is_end": 36000,
+      "oos_start": 36000,
+      "oos_end": 38000,
+      "best_params": {
+        "fast_ema": 17,
+        "slow_ema": 42
+      },
+      "is_sharpe": -0.1592698069832668,
+      "is_return": -25.798360416356108,
+      "is_trades": 187,
+      "oos_sharpe": 1.7032760462858054,
+      "oos_return": -4.36405291805564,
+      "oos_trades": 46,
+      "efficiency": 0
+    },
+    {
+      "period": 16,
+      "start_idx": 30000,
+      "is_start": 30000,
+      "is_end": 38000,
+      "oos_start": 38000,
+      "oos_end": 40000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 38
+      },
+      "is_sharpe": -0.34421135050532725,
+      "is_return": -31.38511871963572,
+      "is_trades": 229,
+      "oos_sharpe": -3.1566179273225963,
+      "oos_return": -13.117130102845639,
+      "oos_trades": 65,
+      "efficiency": 0
+    },
+    {
+      "period": 17,
+      "start_idx": 32000,
+      "is_start": 32000,
+      "is_end": 40000,
+      "oos_start": 40000,
+      "oos_end": 42000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 39
+      },
+      "is_sharpe": -0.8195019473041589,
+      "is_return": -32.22583158123382,
+      "is_trades": 220,
+      "oos_sharpe": -0.4631092401971684,
+      "oos_return": -8.824851325737182,
+      "oos_trades": 56,
+      "efficiency": 0
+    },
+    {
+      "period": 18,
+      "start_idx": 34000,
+      "is_start": 34000,
+      "is_end": 42000,
+      "oos_start": 42000,
+      "oos_end": 44000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 42
+      },
+      "is_sharpe": -0.5470344237272384,
+      "is_return": -31.38438808212617,
+      "is_trades": 227,
+      "oos_sharpe": 0.9932285528571686,
+      "oos_return": -6.218424034303516,
+      "oos_trades": 55,
+      "efficiency": 0
+    },
+    {
+      "period": 19,
+      "start_idx": 36000,
+      "is_start": 36000,
+      "is_end": 44000,
+      "oos_start": 44000,
+      "oos_end": 46000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 42
+      },
+      "is_sharpe": 0.2535384681183732,
+      "is_return": -27.47648866662195,
+      "is_trades": 223,
+      "oos_sharpe": 0.9536173222131358,
+      "oos_return": -6.023933337610943,
+      "oos_trades": 52,
+      "efficiency": 376.12332727667444
+    },
+    {
+      "period": 20,
+      "start_idx": 38000,
+      "is_start": 38000,
+      "is_end": 46000,
+      "oos_start": 46000,
+      "oos_end": 48000,
+      "best_params": {
+        "fast_ema": 13,
+        "slow_ema": 42
+      },
+      "is_sharpe": -0.06596191667093042,
+      "is_return": -28.99821599348397,
+      "is_trades": 223,
+      "oos_sharpe": 0.6643685798432714,
+      "oos_return": -5.416995087910818,
+      "oos_trades": 51,
+      "efficiency": 0
+    },
+    {
+      "period": 21,
+      "start_idx": 40000,
+      "is_start": 40000,
+      "is_end": 48000,
+      "oos_start": 48000,
+      "oos_end": 50000,
+      "best_params": {
+        "fast_ema": 17,
+        "slow_ema": 42
+      },
+      "is_sharpe": 0.9348535010377,
+      "is_return": -18.930920260640697,
+      "is_trades": 196,
+      "oos_sharpe": 1.1007259500094588,
+      "oos_return": -5.059652699316775,
+      "oos_trades": 55,
+      "efficiency": 117.74314893056913
+    },
+    {
+      "period": 22,
+      "start_idx": 42000,
+      "is_start": 42000,
+      "is_end": 50000,
+      "oos_start": 50000,
+      "oos_end": 52000,
+      "best_params": {
+        "fast_ema": 17,
+        "slow_ema": 42
+      },
+      "is_sharpe": 1.3127029005891917,
+      "is_return": -14.848065559541155,
+      "is_trades": 198,
+      "oos_sharpe": -0.40084237326945454,
+      "oos_return": -7.379833067418186,
+      "oos_trades": 46,
+      "efficiency": -30.535650762220534
+    }
+  ],
+  "overall_metrics": {
+    "avg_is_sharpe": -0.23306243579557792,
+    "avg_oos_sharpe": -0.8941987132827052,
+    "efficiency": 0,
+    "avg_is_return": -28.14569728587073,
+    "avg_oos_return": -8.875833852641316,
+    "param_stability": 0.5592592640103933,
+    "consistency_cv": 0.4738152113964183
+  },
+  "config": {
+    "in_sample": 8000,
+    "out_sample": 2000,
+    "step": 2000,
+    "fast_emas": [
+      13,
+      14,
+      15,
+      16,
+      17
+    ],
+    "slow_emas": [
+      38,
+      39,
+      40,
+      41,
+      42
+    ]
+  }
+}

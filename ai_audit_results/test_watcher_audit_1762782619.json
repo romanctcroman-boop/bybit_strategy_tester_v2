@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762782619,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    "mcp-server\\orchestrator\\api\\models.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762782601.6094115,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely segmentation fault or environment crash)\n- 0% coverage confirms no tests executed successfully\n- Test infrastructure itself appears compromised\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- No code coverage data collected\n- All test execution halted before meaningful assessment\n- Impossible to identify actual code coverage gaps\n\n## Potential Issues with Recent Changes\n**ENVIRONMENT CORRUPTION DETECTED**:\n- Multiple pytest core files modified (.venv/\\_pytest/\\*)\n- Coverage tool files altered (.venv/coverage/\\*)\n- Pluggy (pytest plugin system) files changed\n- **Critical finding**: Virtual environment packages modified - this should NEVER happen in normal development\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS**:\n1. **Rebuild virtual environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify test isolation**:\n   - Ensure tests don't modify package files\n   - Check for improper mocking/patching\n   - Validate file permissions\n\n3. **Diagnose root cause**:\n   - Run simplest test first: `pytest -v --tb=short`\n   - Check for circular imports in `mcp-server/orchestrator/api/models.py`\n   - Verify no test code imports development tools as modules\n\n## Risk Assessment\n**HIGH RISK** - Environment instability:\n- ❌ **Test reliability**: Complete failure\n- ❌ **Deployment risk**: Unknown code quality\n- ❌ **Development blocker**: Cannot validate changes\n- ✅ **Mitigation**: Clear path to resolution via environment rebuild\n\n**Priority**: Fix immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 362,
+      "completion_tokens": 394,
+      "total_tokens": 756,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 298
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

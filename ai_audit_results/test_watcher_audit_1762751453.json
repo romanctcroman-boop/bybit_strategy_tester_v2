@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762751453,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762751436.9226296,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests did not execute successfully (Exit Code -1). This indicates either:\n- Syntax errors in test files or code\n- Import failures or module loading issues\n- Test framework configuration problems\n- Fatal errors during test setup\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Circular imports or module initialization errors\n- Code that crashes during module load\n\n## Immediate Action Recommendations\n\n1. **Debug Test Execution**\n   ```bash\n   python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py\n   ```\n   Check for syntax errors first\n\n2. **Isolate the Failure**\n   - Try importing the module directly: `python -c \"import full_ai_audit_deepseek_perplexity_deepseek\"`\n   - Run minimal test to identify crash point\n\n3. **Check Dependencies**\n   - Verify all imports are available\n   - Check for missing packages in requirements\n\n4. **Review Recent Changes**\n   - Examine git diff for the changed file\n   - Look for obvious syntax issues or broken imports\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable and potentially broken. No validation of functionality exists. Deployment in this state would be extremely risky.\n\n## Priority Actions\n1. Fix test execution (syntax/import issues)\n2. Achieve basic test pass (Exit Code 0)\n3. Then address coverage gaps\n\n**Start with making tests runnable before worrying about coverage percentages.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 389,
+      "total_tokens": 524,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762583410,
+  "changed_files": [
+    "fix_ide_problems_direct.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762583396.110247,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception or system error). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents complete testing failure, not just poor coverage.\n\n## Potential Issues with Recent Changes\nThe file `fix_ide_problems_direct.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Runtime errors during module loading\n- Infinite loops or blocking operations\n- Environment configuration issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile fix_ide_problems_direct.py` to check for syntax errors\n2. Execute the file directly: `python fix_ide_problems_direct.py` to identify runtime issues\n3. Add basic error handling and logging to diagnose startup failures\n4. Verify all imports and dependencies are available\n\n**Testing Fixes:**\n- Start with minimal test that imports the module\n- Add unit tests for individual functions before integration\n- Implement try-catch blocks around test setup\n\n## Risk Assessment\n**HIGH RISK** - The codebase is completely untested and potentially unstable. Deployment would be extremely risky. This indicates fundamental issues with code quality or development environment.\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 297,
+      "total_tokens": 424,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,58 @@
+groups:
+  - name: mcp-service
+    interval: 15s
+    rules:
+      - alert: MCPHighErrorRate
+        expr: rate(mcp_tool_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: mcp
+        annotations:
+          summary: "High MCP tool error rate detected"
+          description: "MCP tool error rate is {{ $value | humanize }} per second (threshold: 0.1/s). Check tool health and agent connectivity."
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/MCP-Troubleshooting#high-error-rate"
+
+      - alert: MCPHealthCheckFailing
+        expr: absent_over_time(up{job="mcp-service"}[1m])
+        for: 1m
+        labels:
+          severity: critical
+          component: mcp
+        annotations:
+          summary: "MCP service health check failing"
+          description: "MCP service has not reported 'up' metric for 1 minute. Service may be down or unreachable."
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/MCP-Troubleshooting#service-down"
+
+      - alert: MCPLowTraffic
+        expr: rate(mcp_tool_calls_total[5m]) < 0.01
+        for: 10m
+        labels:
+          severity: info
+          component: mcp
+        annotations:
+          summary: "Low MCP tool call rate"
+          description: "MCP tool call rate is {{ $value | humanize }} per second (below expected baseline). May indicate client connectivity issues or reduced usage."
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/MCP-Troubleshooting#low-traffic"
+
+      - alert: MCPHighLatency
+        expr: histogram_quantile(0.95, rate(mcp_tool_duration_seconds_bucket[5m])) > 5.0
+        for: 5m
+        labels:
+          severity: warning
+          component: mcp
+        annotations:
+          summary: "High MCP tool latency (P95)"
+          description: "95th percentile MCP tool latency is {{ $value | humanize }} seconds (threshold: 5s). Check agent response times and network connectivity."
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/MCP-Troubleshooting#high-latency"
+
+      - alert: MCPHealthDegraded
+        expr: mcp_health_status{status="degraded"} == 1
+        for: 2m
+        labels:
+          severity: warning
+          component: mcp
+        annotations:
+          summary: "MCP health status degraded"
+          description: "MCP /health endpoint reports degraded status. One or more health checks failing."
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/MCP-Troubleshooting#degraded-health"

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539432,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539418.8549395,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) before any meaningful testing occurred. This indicates a fundamental environment, dependency, or code issue rather than test failures.\n\n## Coverage Analysis & Gaps\n- **0% coverage** confirms no tests actually ran\n- Complete absence of execution data suggests system-level failure\n- No file-specific coverage data available due to premature termination\n\n## Potential Issues with Recent Changes\n1. **Environment/Dependency Break**: Likely missing dependencies or version conflicts\n2. **Syntax/Import Errors**: Recent changes to `test_e2e_audit_agent.py` may contain fatal errors\n3. **Configuration Issues**: Test runner configuration or environment setup broken\n4. **Resource Constraints**: Possible memory issues or resource exhaustion\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see exact failure point\n2. Check Python/pytest version compatibility\n3. Validate all dependencies are installed (`pip list`)\n4. Examine `test_e2e_audit_agent.py` for syntax/import errors\n\n**Systematic Fixes:**\n1. Add pre-test validation script to catch environment issues early\n2. Implement CI pipeline with dependency caching\n3. Add basic smoke tests before full test suite execution\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No validation of recent changes\n- Potential production-breaking issues undetected\n- All test investments currently providing zero value\n- Urgent attention required before further development\n\n**Priority:** Fix test execution environment immediately before proceeding with any code changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 337,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 70
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

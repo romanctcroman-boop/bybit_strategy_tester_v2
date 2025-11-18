@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762756160,
+  "changed_files": [
+    "test_critical_fixes.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762756143.4129577,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1), indicating fundamental issues with the test environment, dependencies, or test code structure.\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage across all files suggests:\n- Tests aren't executing any application code\n- Possible import failures or environment misconfiguration\n- Test discovery/execution pipeline broken\n\n## Potential Issues with Recent Changes\n1. **test_critical_fixes.py** likely contains syntax errors, import issues, or environment dependencies\n2. Test runner configuration may be incorrect\n3. Missing test dependencies or virtual environment issues\n4. Possible infinite loops or resource exhaustion causing exit code -1\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Run `python -m pytest test_critical_fixes.py -v` to see specific errors\n   - Check for Python syntax errors in the test file\n   - Verify all imports and dependencies are available\n\n2. **Environment Check**:\n   - Confirm Python version compatibility\n   - Verify test dependencies are installed\n   - Check for sufficient system resources\n\n3. **Debug Steps**:\n   - Add `print(\"Test starting\")` at top of test file to verify execution\n   - Test minimal example: `def test_basic(): assert True`\n\n## Risk Assessment\n**HIGH RISK** - Zero test coverage means:\n- No validation of recent changes in test_critical_fixes.py\n- Potential undetected regressions in production code\n- Complete loss of test feedback loop\n- Critical fixes may be broken or incomplete\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 349,
+      "total_tokens": 474,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

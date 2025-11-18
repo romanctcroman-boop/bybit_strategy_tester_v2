@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762892966,
+  "changed_files": [
+    "backend\\agents\\agent_background_service.py",
+    "automation\\task2_key_manager\\key_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762892953.2508445,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n**TOTAL COVERAGE: 0%** - No code was executed during testing. This represents complete testing failure, not just gaps.\n\n## Potential Issues with Recent Changes\n1. **Agent Background Service** (`agent_background_service.py`):\n   - Likely contains unhandled exceptions that crash the test runner\n   - Possible infinite loops or blocking operations\n   - Dependency issues (missing imports/services)\n\n2. **Key Manager** (`key_manager.py`):\n   - May have breaking API changes\n   - Could be causing initialization failures\n   - Potential security/permission issues with key operations\n\n## Immediate Recommendations\n1. **Debug Test Runner**:\n   ```bash\n   python -m pytest -v --tb=short  # Get minimal traceback\n   python -m pytest -x --pdb       # Debug on first failure\n   ```\n\n2. **Isolate Components**:\n   - Test each changed file independently\n   - Check for missing environment variables/configs\n   - Verify all dependencies are installed\n\n3. **Add Basic Sanity Tests**:\n   - Simple import tests for each module\n   - Minimal initialization tests\n   - Mock external dependencies\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be blind:\n- No validation of core agent/key management functionality\n- Potential runtime crashes in production\n- Security risks in key handling unverified\n- Regression detection completely disabled\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 140,
+      "completion_tokens": 353,
+      "total_tokens": 493,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 76
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

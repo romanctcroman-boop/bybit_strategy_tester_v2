@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762535016,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762535002.6746593,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with either the test suite or codebase. No meaningful quality assessment possible until basic test execution is resolved.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure suggests:\n- Tests cannot execute at all\n- Possible import errors or runtime crashes\n- Test configuration issues\n- Missing dependencies or environment setup\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `health_check.py`, likely culprits:\n- Syntax errors in the modified file\n- Breaking changes to imports/API\n- Missing required dependencies\n- Infinite loops or crashes during module import\n- Circular imports introduced\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile health_check.py` to check for syntax errors\n2. Execute `python -c \"import health_check\"` to test basic import functionality\n3. Check test runner configuration and dependencies\n4. Review recent changes to `health_check.py` for obvious bugs\n\n**Follow-up:**\n- Add basic smoke tests before comprehensive test suites\n- Implement CI checks for syntax and import validation\n- Consider test isolation to prevent single file changes from breaking entire suite\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback loop\n- Potential undiscovered regressions\n- Deployment risks significantly increased\n- Code quality cannot be measured or assured\n\n**Priority:** Resolve test execution failure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 323,
+      "total_tokens": 445,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

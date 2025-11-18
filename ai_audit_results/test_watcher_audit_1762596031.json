@@ -1,0 +1,83 @@
+{
+  "timestamp": 1762596031,
+  "changed_files": [
+    "apply_critical_fixes.py",
+    "ask_deepseek_chat_directly.py",
+    "analyze_test_hang.py",
+    "auto_enhance_tools.py",
+    "audit_agent_quick_check.py",
+    "ask_deepseek_about_deadlock.py",
+    "benchmark_batch_writer.py",
+    "analyze_tests_with_deepseek.py",
+    "ask_deepseek_direct.py",
+    "auto_encrypt_keys.py",
+    "add_logging_wrapper.py",
+    "apply_log_sync_decorator.py",
+    "analyze_ide_with_edits.py",
+    "analyze_mcp_improvements.py",
+    "conduct_project_audit.py",
+    "adapt_phase2_tests.py",
+    "add_minimal_logging.py",
+    "ask_deepseek_api_keys_security.py",
+    "create_complete_modules.py",
+    "apply_deepseek_improvements.py",
+    "backend_api_deepseek_pool_temp.py",
+    "analyze_ide_problems.py",
+    "auto_add_type_hints.py",
+    "automation\\deepseek_robot\\autonomous_agent_test.py",
+    "add_logging_to_tools.py",
+    "batch_add_logging.py",
+    "benchmark_bollinger.py",
+    "analyze_parallel_with_deepseek.py",
+    "create_final_modules.py",
+    "analyze_ide_direct.py",
+    "auto_add_logging_to_tools.py",
+    "add_logging_to_all_tools.py",
+    "analyze_sr_wfo.py",
+    "apply_p1_optimizations.py",
+    "check_actual_coverage.py",
+    "check_db_data.py",
+    "analyze_project_with_mcp.py",
+    "ask_ai_about_warnings.py",
+    "collaborative_mcp_analysis.py",
+    "check_timeframes.py",
+    "analyze_with_deepseek.py",
+    "analyze_with_perplexity.py",
+    "analyze_data_cache.py",
+    "analyze_p1_performance.py",
+    "audit_agent_deep_check.py",
+    "auto_add_logging_all.py",
+    "ai_ai_full_collaboration.py",
+    "analyze_project_deepseek.py",
+    "complete_backtest_vectorization.py",
+    "add_deepseek_keys.py",
+    "analyze_final_v2_with_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762596013.3279114,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- 0% coverage means no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files show any coverage data\n- Either tests aren't running or all tests are failing before execution\n- No meaningful coverage metrics available\n\n## Potential Issues with Recent Changes\n**MASSIVE LOGGING/ANALYSIS OVERLOAD:**\n- 50+ files modified, predominantly logging/analysis tools (`add_logging_*`, `analyze_*`, `auto_*`)\n- High risk of circular dependencies or import conflicts\n- Likely introduced breaking changes in test infrastructure\n- Possible infinite loops in logging decorators or analysis tools\n\n## Recommendations for Improvement\n\n**IMMEDIATE ACTIONS:**\n1. **Roll back recent logging/analysis changes** - Start with most recent `add_logging_*` and `analyze_*` files\n2. **Check test runner configuration** - Verify pytest/unitest setup isn't broken\n3. **Test minimal case** - Run single simple test to isolate the failure\n4. **Review `apply_log_sync_decorator.py`** - Decorators often break test execution\n\n**STRUCTURAL FIXES:**\n1. **Implement changes incrementally** - Avoid mass modifications\n2. **Add integration tests for logging infrastructure**\n3. **Use feature flags for experimental changes**\n4. **Establish pre-commit test validation**\n\n## Risk Assessment\n**HIGH RISK** - Production readiness severely compromised:\n- ❌ No test validation of recent changes\n- ❌ Complete test infrastructure failure  \n- ❌ High probability of runtime failures in production\n- ❌ Technical debt accumulating rapidly\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 566,
+      "completion_tokens": 405,
+      "total_tokens": 971,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 502
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

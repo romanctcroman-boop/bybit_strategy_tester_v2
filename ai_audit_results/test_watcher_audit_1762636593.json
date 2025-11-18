@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762636593,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pydantic\\main.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762636581.0741389,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test execution, likely preventing any tests from running.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues\n1. **Environment corruption** - Modified file in `.venv\\Lib\\site-packages\\` suggests virtual environment is compromised\n2. **Dependency conflict** - Pydantic modification may indicate version mismatch or manual tampering\n3. **Test configuration error** - Test runner may be misconfigured or failing to discover tests\n\n## Immediate Actions Required\n1. **Recreate virtual environment:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Verify test discovery:**\n   ```bash\n   python -m pytest --collect-only\n   ```\n3. **Check for test configuration files** (pytest.ini, setup.cfg, tox.ini)\n\n## Risk Assessment\n**HIGH RISK** - No testing validation means:\n- Undetected regressions likely\n- Production deployment extremely risky\n- Code quality cannot be assessed\n\n## Quick Validation\nAfter environment reset, run:\n```bash\npython -m pytest -v --cov-report=term-missing --cov=.\n```\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 314,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 71
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

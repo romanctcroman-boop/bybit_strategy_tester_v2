@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762626627,
+  "changed_files": [
+    "DEEPSEEK_7_NEW_TOOLS_GENERATED.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762626611.8108556,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite failed completely (Exit Code -1) with 0% coverage, indicating either:\n- Syntax errors preventing test execution\n- Fatal runtime errors during import/setup\n- Missing test framework configuration\n- Test discovery failures\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage means:\n- No tests executed successfully\n- All code paths completely untested\n- No validation of DEEPSEEK_7_NEW_TOOLS_GENERATED.py functionality\n\n## Potential Issues with Recent Changes\n1. **File DEEPSEEK_7_NEW_TOOLS_GENERATED.py likely contains:**\n   - Syntax errors (Python 2/3 incompatibility, missing imports)\n   - Circular imports or module initialization failures\n   - Missing dependencies causing import crashes\n\n2. **Test infrastructure issues:**\n   - Incorrect test runner configuration\n   - Missing __init__.py files in test directories\n   - Environment/path issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m py_compile DEEPSEEK_7_NEW_TOOLS_GENERATED.py` to check for syntax errors\n2. Execute tests with `python -m pytest -v` to see detailed failure reasons\n3. Add basic smoke test: `import DEEPSEEK_7_NEW_TOOLS_GENERATED` in isolation\n\n**SHORT TERM:**\n1. Fix syntax/runtime errors in the main module\n2. Add minimal test that imports and instantiates key classes\n3. Verify test discovery configuration\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code likely non-functional\n- Zero confidence in code correctness\n- High probability of runtime failures\n- Untested changes pose deployment risks\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 403,
+      "total_tokens": 536,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 69
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

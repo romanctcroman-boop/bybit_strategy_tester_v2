@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762596323,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "automation\\deepseek_robot\\autonomous_agent_test.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762596304.914692,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage confirms no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No code executed during test run\n- All production code untested\n- Coverage reporting system non-functional\n\n## Potential Issues with Recent Changes\n1. **Virtual environment corruption** - `.venv` modifications suggest dependency issues\n2. **Database connection problems** - `psycopg2` changes + `temp_pg_test.py` indicate Postgres connectivity failures\n3. **Test framework configuration** - Tests unable to initialize/run\n4. **Environment setup broken** - Likely missing dependencies or configuration\n\n## Immediate Action Recommendations\n1. **Debug test infrastructure:**\n   - Run tests with `python -m pytest -v` to see specific errors\n   - Check Python environment: `python --version` and `pip list`\n   - Verify database connectivity separately\n\n2. **Fix dependencies:**\n   - Recreate virtual environment: `rm -rf .venv && python -m venv .venv`\n   - Reinstall requirements: `pip install -r requirements.txt`\n\n3. **Isolate the failure:**\n   - Run simplest test first to verify basic functionality\n   - Test database connection independently\n   - Check for circular imports or initialization errors\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing capability\n- Potential production environment instability\n- Database integration likely broken\n- Deployment would be extremely risky\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 161,
+      "completion_tokens": 368,
+      "total_tokens": 529,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 97
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

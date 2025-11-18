@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762636020,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "backend\\security\\key_manager.py",
+    "add_deepseek_keys_interactive.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762636006.0372694,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates fundamental issues with the test environment or test code structure. The 0% coverage is a symptom, not the root problem.\n\n## Coverage Analysis & Gaps\n- **No coverage data collected** - Tests crashed before coverage measurement\n- **Environment contamination** - Virtual environment files (.venv) modified, suggesting dependency issues\n- **Missing test infrastructure** - No actual test files detected in changed files\n\n## Potential Issues with Recent Changes\n1. **Database dependency problems** - `psycopg2` modifications suggest PostgreSQL connection issues\n2. **Security module instability** - `key_manager.py` changes may have broken imports or dependencies\n3. **Script execution failures** - Interactive scripts (`add_deepseek_keys_interactive.py`) may be blocking test execution\n4. **Environment corruption** - Modifying site-packages indicates dependency management failure\n\n## Immediate Action Recommendations\n1. **Fix test execution first**:\n   - Check Python environment integrity: `python -m pytest --version`\n   - Verify dependencies: `pip list | grep psycopg2`\n   - Run minimal test: `python -c \"import psycopg2; print('Import OK')\"`\n\n2. **Isolate test environment**:\n   - Recreate virtual environment\n   - Install dependencies from clean requirements.txt\n   - Remove interactive scripts from test path\n\n3. **Add basic smoke tests**:\n   - Create simple test for key_manager imports\n   - Add database connection test\n   - Verify no interactive prompts in test mode\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- Security risks from broken key management\n- Data integrity risks from database connection failures\n- Zero confidence in recent changes\n- Deployment would be extremely risky\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 165,
+      "completion_tokens": 400,
+      "total_tokens": 565,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 101
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

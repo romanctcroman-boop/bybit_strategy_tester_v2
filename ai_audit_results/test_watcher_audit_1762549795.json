@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762549795,
+  "changed_files": [
+    "mcp-server\\multi_agent_router.py",
+    "backend\\migrations\\versions\\20251022_consolidate_heads.py",
+    "backend\\migrations\\versions\\add_tournament_tables.py",
+    "mcp-server\\agent_communication.py",
+    "backend\\migrations\\versions\\20251020_add_bybit_kline_audit.py",
+    "backend\\migrations\\versions\\20251022_backfill_open_time_dt.py",
+    "backend\\migrations\\versions\\20251029_add_interval_to_kline_audit.py",
+    "backend\\migrations\\versions\\2f4e6a7b8c9d_autogen_convert_timestamps_to_timestamptz.py",
+    "backend\\migrations\\versions\\add_saga_tables.py",
+    "backend\\migrations\\versions\\20251021_add_backfill_runs.py",
+    "backend\\migrations\\versions\\0001_convert_timestamps_to_timestamptz.py",
+    "backend\\migrations\\versions\\20251020_merge_heads.py",
+    "backend\\migrations\\versions\\1a2b3c4d5e6f_convert_timestamps_to_timestamptz.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762549770.763123,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test execution failure\n- 0% coverage suggests tests aren't even running\n- No coverage data available for any files\n\n## Coverage Analysis & Gaps\n**Total system failure** - No meaningful coverage data exists:\n- Zero coverage across all files\n- Migration files heavily represented but untested\n- Core application logic (multi_agent_router.py, agent_communication.py) completely uncovered\n\n## Potential Issues with Recent Changes\n**Migration-heavy changeset** - High risk areas:\n- 11/13 changed files are database migrations\n- Multiple timestamp conversion migrations (potential schema conflicts)\n- \"Consolidate heads\" and \"merge heads\" migrations suggest complex branching\n- Possible migration dependency issues preventing test startup\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test infrastructure** - Investigate why tests don't execute\n2. **Check database connectivity** - Migration-heavy changes likely require DB access\n3. **Verify migration order** - Ensure proper dependency resolution\n4. **Add basic smoke tests** - Validate core components before comprehensive testing\n\n**Short-term:**\n- Create minimal test harness to verify basic functionality\n- Add migration validation tests\n- Implement database connection testing\n\n## Risk Assessment\n**HIGH RISK** - Deployment should be blocked:\n- **Critical**: Unknown if application functions at all\n- **High**: Database schema changes without validation\n- **Medium**: Core agent communication logic untested\n- **Block release** until basic test execution is restored and >70% coverage achieved\n\n**Priority**: Fix test execution immediately - this indicates deeper infrastructure issues beyond just test quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 381,
+      "completion_tokens": 353,
+      "total_tokens": 734,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 317
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

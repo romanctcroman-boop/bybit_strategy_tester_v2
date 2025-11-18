@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762630391,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pytest_asyncio\\plugin.py",
+    "tests\\test_deepseek_tools.py",
+    "tests\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762630378.162034,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental runtime issues\n\n## Coverage Analysis & Gaps\n**Total Failure** - No meaningful coverage data available:\n- Zero coverage across all files indicates tests crashed before execution\n- Cannot assess actual code coverage gaps due to premature termination\n\n## Potential Issues with Recent Changes\n**Primary Suspects:**\n1. **pytest_asyncio plugin modification** - Async test framework corruption\n2. **conftest.py changes** - Broken test configuration/fixtures\n3. **Environment corruption** - Virtual environment package conflicts\n\n## Recommendations for Improvement\n\n**Immediate Actions:**\n1. **Restore pytest_asyncio** - Revert changes to plugin.py or reinstall package\n2. **Isolate conftest.py** - Comment out recent changes to identify breaking configuration\n3. **Run minimal test** - Execute single simple test to verify basic functionality\n\n**Diagnostic Steps:**\n4. Check Python/pytest version compatibility\n5. Run with `-v` flag to see where tests fail\n6. Test without coverage to isolate instrumentation issues\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback for recent changes\n- Potential environment instability affecting development\n- Risk of undetected regressions in production code\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 327,
+      "total_tokens": 483,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

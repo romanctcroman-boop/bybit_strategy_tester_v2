@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762576001,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762575985.925233,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental infrastructure or configuration issues rather than test logic problems.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% overall coverage confirms no tests executed. All code paths are currently untested.\n\n## Potential Issues with Recent Changes\nThe modified `tests\\backend\\conftest.py` file likely contains the root cause:\n- **Fixture configuration errors** - Broken pytest fixtures or setup/teardown logic\n- **Import/dependency issues** - Missing imports or circular dependencies\n- **Environment configuration** - Incorrect test environment setup\n- **Plugin conflicts** - Incompatible pytest plugins or hooks\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug conftest.py** - Isolate the failing fixture/configuration\n2. **Run with verbose output** - Use `pytest -vvs` to see specific error details\n3. **Check fixture dependencies** - Verify all required test data and setup\n4. **Validate imports** - Ensure all modules are properly imported\n\n**STRUCTURAL FIXES:**\n1. Add basic smoke tests to validate test infrastructure\n2. Implement fixture error handling with meaningful error messages\n3. Create isolated test environments to prevent configuration conflicts\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **No test validation** of any functionality\n- **Undetected regressions** likely in production\n- **Broken deployment pipeline** if tests block deployments\n- **Urgent fix required** before any further development\n\n**Priority: CRITICAL** - Fix test infrastructure immediately before proceeding with feature development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 363,
+      "total_tokens": 490,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

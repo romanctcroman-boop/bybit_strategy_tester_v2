@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762625853,
+  "changed_files": [
+    "deepseek_self_integration_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762625837.4916275,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax errors in test files or code\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal runtime errors during test discovery\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- Tests never executed due to fatal errors\n- No actual test execution occurred\n- Possible issues with test discovery or runner configuration\n\n## Potential Issues with Recent Changes\nFocus on `deepseek_self_integration_check.py`:\n- Likely contains syntax errors or import issues\n- May have broken dependencies or environment requirements\n- Could be missing required test fixtures or setup\n- Possible circular imports or module loading issues\n\n## Immediate Recommendations\n1. **Debug Test Execution**:\n   - Run tests with `-v` flag to see specific failure points\n   - Check Python syntax: `python -m py_compile deepseek_self_integration_check.py`\n   - Verify imports and dependencies\n\n2. **Fix Core Issues**:\n   - Start with basic smoke test to ensure test framework works\n   - Add simple passing test to validate setup\n   - Check for missing `__init__.py` files or package structure issues\n\n3. **Prevention**:\n   - Add pre-commit hooks to validate syntax\n   - Implement basic smoke tests in CI pipeline\n   - Ensure test dependencies are properly installed\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No confidence in code changes\n- Potential production-breaking issues undetected\n- Development blocked until resolved\n- All subsequent changes carry unknown risk\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 376,
+      "total_tokens": 504,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

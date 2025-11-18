@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762764669,
+  "changed_files": [
+    "reliability_auto_system\\__init__.py",
+    "reliability_auto_system\\mcp_reliability_orchestrator.py",
+    "test_reliability_system.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762764649.8301947,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or system error). Test infrastructure appears broken.\n\n## Coverage Analysis & Gaps\n**0% coverage** means:\n- No tests are executing successfully\n- Entire codebase is untested from measurement perspective\n- All business logic is completely unvalidated\n\n## Potential Issues with Recent Changes\n1. **Broken imports/dependencies** - Recent changes to `mcp_reliability_orchestrator.py` or `__init__.py` likely introduced fatal import errors\n2. **Configuration issues** - Test runner configuration may be broken\n3. **Environment problems** - Missing dependencies or environment setup\n4. **Circular imports** - Common issue with package restructuring\n\n## Immediate Action Plan\n\n**Priority 1 - Fix Test Execution:**\n```bash\n# Run with verbose output to see failure details\npython -m pytest -v --tb=short\n# Check for import errors\npython -c \"from reliability_auto_system import *\"\n```\n\n**Priority 2 - Investigate:**\n- Check `__init__.py` for proper exports\n- Verify `mcp_reliability_orchestrator` imports work\n- Review recent changes to package structure\n\n**Priority 3 - Restore Baseline:**\n- Add minimal smoke test to verify basic functionality\n- Achieve at least 70% line coverage for critical paths\n- Focus on orchestrator core logic first\n\n## Risk Assessment\n**HIGH RISK** - Deploying any code changes is extremely dangerous:\n- Zero validation of reliability system functionality\n- Potential for production outages\n- No regression detection capability\n- All changes are effectively untested\n\n**Recommendation:** Halt all feature development until basic test execution is restored and critical path coverage reaches minimum 70%.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 388,
+      "total_tokens": 544,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

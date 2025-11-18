@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762536864,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\_pytest\\unraisableexception.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762536851.5137043,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests did not execute successfully (Exit Code -1). This indicates fundamental issues with the test environment, dependencies, or test code structure. No meaningful quality assessment possible until execution is fixed.\n\n## Coverage Analysis\n**0.00% coverage** - Tests failed before any code execution could be measured. Coverage data is completely invalid.\n\n## Potential Issues with Recent Changes\n1. **Virtual environment corruption** - Modified file in `.venv\\Lib\\site-packages\\_pytest\\unraisableexception.py` suggests pytest installation is corrupted\n2. **Dependency conflicts** - Pytest core files should not be modified; indicates broken installation\n3. **Environment isolation failure** - Tests may be running with incorrect Python environment\n\n## Immediate Recommendations\n1. **Recreate virtual environment:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\n   pip install -r requirements.txt\n   ```\n\n2. **Verify pytest installation:**\n   ```bash\n   pip install --force-reinstall pytest\n   pytest --version\n   ```\n\n3. **Run basic test validation:**\n   ```bash\n   pytest -v --tb=short\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in code quality. Cannot detect regressions, bugs, or validate functionality. Must be addressed before any further development.\n\n**Priority:** Fix test execution immediately before proceeding with any code changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 137,
+      "completion_tokens": 330,
+      "total_tokens": 467,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 9
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

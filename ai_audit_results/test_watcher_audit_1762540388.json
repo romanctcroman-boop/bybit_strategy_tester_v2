@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540388,
+  "changed_files": [
+    "tests\\stress\\test_parallel_execution.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540376.1275635,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1), indicating severe infrastructure or environment issues rather than test logic failures. No meaningful quality assessment possible until execution stabilizes.\n\n## Coverage Analysis\n**0% COVERAGE** - Complete coverage failure suggests:\n- Tests never executed due to fatal errors\n- Environment/config issues preventing test discovery\n- Possible circular imports or dependency conflicts\n\n## Potential Issues with Recent Changes\nThe modified `test_parallel_execution.py` likely contains:\n- **Fatal syntax errors** preventing import/execution\n- **Missing dependencies** for parallel execution libraries\n- **Environment configuration** issues (missing env vars, resource limits)\n- **Infinite loops** or **resource exhaustion** crashing test runner\n\n## Immediate Recommendations\n1. **Debug Exit Code -1**: Check test runner logs for stack traces and system error messages\n2. **Isolate the failing test**: Run `test_parallel_execution.py` in isolation to identify specific crash cause\n3. **Validate test dependencies**: Ensure all parallel execution libraries (multiprocessing, threading, etc.) are properly installed and configured\n4. **Check resource limits**: Verify system resources (memory, file descriptors) aren't being exhausted\n\n## Risk Assessment\n**HIGH RISK** - Complete test suite failure means:\n- No regression protection for any code changes\n- Potential production issues undetected\n- Development blocked until resolved\n\n**Priority**: Resolve immediately before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 310,
+      "total_tokens": 439,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

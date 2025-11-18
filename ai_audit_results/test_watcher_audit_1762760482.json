@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762760482,
+  "changed_files": [
+    "reliability\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762760463.9359565,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - All code changes are completely untested. No coverage data available suggests tests didn't even start executing.\n\n## Potential Issues with Recent Changes\n1. **Circuit breaker implementation likely contains fatal errors** causing test framework crash\n2. **Syntax errors** or **import cycles** in `circuit_breaker.py`\n3. **Missing dependencies** or **environment configuration** issues\n4. **Infinite loops** or **blocking operations** preventing test execution\n\n## Immediate Actions Required\n1. **Fix test execution first** - Run tests with verbose output to identify crash cause\n2. **Check syntax** - Validate `circuit_breaker.py` for basic Python syntax compliance\n3. **Add basic smoke test** - Create minimal test to verify module can be imported\n4. **Isolate the failure** - Temporarily comment out new code to identify problematic section\n\n## Risk Assessment\n**HIGH RISK** - Circuit breaker pattern is critical infrastructure. 0% coverage with test crashes indicates unstable code that could cause production outages.\n\n## Priority Recommendations\n1. **Immediate**: Fix test execution crash - this is blocking all quality assessment\n2. **High**: Add basic unit tests for circuit breaker states (closed, open, half-open)\n3. **Medium**: Implement integration tests for failure scenarios\n4. **Low**: Add performance tests for timeout and threshold behaviors\n\n**Start with debugging the test crash - without functioning tests, all other quality metrics are meaningless.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 350,
+      "total_tokens": 475,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

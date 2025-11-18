@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539468,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539455.9168553,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1), indicating severe infrastructure or configuration issues rather than test failures. The test suite is non-functional.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality or functionality.\n\n## Potential Issues with Recent Changes\nThe single changed file (`test_e2e_audit_agent.py`) likely contains:\n- Fatal syntax errors\n- Missing imports or dependencies\n- Configuration errors in test setup\n- Infinite loops or resource exhaustion\n- Environment compatibility issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check test logs for stack traces and error messages\n3. Validate test environment setup and dependencies\n4. Run a simple smoke test to verify basic test infrastructure\n\n**Short-term:**\n1. Isolate and fix the crashing test\n2. Add basic unit tests with guaranteed execution\n3. Implement test environment validation\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure means:\n- No regression detection capability\n- Undetected bugs likely in production\n- Deployment pipeline is effectively blind\n- Urgent attention required before any further deployments\n\n**Priority:** Fix test execution immediately before addressing any other development tasks.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 294,
+      "total_tokens": 428,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

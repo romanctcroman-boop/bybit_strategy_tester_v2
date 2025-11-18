@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762708934,
+  "changed_files": [
+    "reliability\\service_monitor.py",
+    "tests\\test_service_monitor.py",
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762708920.8370101,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception during test setup/execution). Test infrastructure appears broken.\n\n## Coverage Analysis\n**0% coverage** across all files suggests:\n- Tests aren't executing at all\n- Recent changes may have broken test runner/imports\n- Possible circular imports or syntax errors\n\n## Potential Issues with Recent Changes\n1. **Import/Dependency Issues** - Changes in `reliability\\__init__.py` may have broken module imports\n2. **Syntax Errors** - Recent edits likely introduced fatal Python errors\n3. **Test Configuration** - `test_service_monitor.py` may have broken test discovery\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   - Identify the specific failure point\n   - Check for import errors in test files\n\n2. **Validate Module Structure**\n   - Verify `reliability/__init__.py` exports correctly\n   - Ensure `service_monitor.py` imports work\n\n3. **Add Basic Smoke Test**\n   - Create minimal test that imports modules without execution\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functioning tests is extremely dangerous:\n- No regression detection\n- Potential runtime failures in production\n- Service monitoring reliability compromised\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 309,
+      "total_tokens": 451,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 78
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

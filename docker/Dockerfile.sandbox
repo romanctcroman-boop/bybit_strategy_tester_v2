@@ -1,0 +1,99 @@
+# =============================================================================
+# Dockerfile.sandbox - Isolated Python environment for strategy execution
+# =============================================================================
+# 
+# Security Features:
+#   - Non-root user (sandboxuser)
+#   - No network access (--network=none)
+#   - Read-only filesystem (--read-only)
+#   - Resource limits (CPU/RAM)
+#   - Minimal base image (python:3.11-slim)
+#   - No pip/network tools installed
+#
+# Usage:
+#   docker build -f docker/Dockerfile.sandbox -t bybit-sandbox:latest .
+#   docker run --rm --network=none --read-only \
+#       --cpus=2 --memory=4g --memory-swap=4g \
+#       -v /path/to/code:/workspace:ro \
+#       -v /tmp/sandbox-output:/output:rw \
+#       bybit-sandbox:latest python /workspace/strategy.py
+#
+# =============================================================================
+
+FROM python:3.11-slim
+
+# Metadata
+LABEL maintainer="Bybit Strategy Tester"
+LABEL description="Isolated sandbox for executing generated trading strategies"
+LABEL version="1.0"
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install only essential dependencies (no build tools, no network tools)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # No gcc, no curl, no wget - minimalist approach
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages needed for strategy execution
+# NOTE: These are pre-installed to avoid network access during runtime
+COPY docker/sandbox-requirements.txt /tmp/sandbox-requirements.txt
+RUN pip install --no-cache-dir -r /tmp/sandbox-requirements.txt \
+    && rm /tmp/sandbox-requirements.txt
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash sandboxuser
+
+# Create workspace directories
+RUN mkdir -p /workspace /output /tmp/sandbox \
+    && chown -R sandboxuser:sandboxuser /workspace /output /tmp/sandbox
+
+# Switch to non-root user
+USER sandboxuser
+
+# Working directory
+WORKDIR /workspace
+
+# Health check (optional - for monitoring)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=1 \
+    CMD python -c "import sys; sys.exit(0)" || exit 1
+
+# Default command (will be overridden)
+CMD ["python", "--version"]
+
+# =============================================================================
+# Security Notes:
+# =============================================================================
+#
+# 1. **Network Isolation**: 
+#    Run with --network=none to prevent any network access
+#
+# 2. **Filesystem Protection**:
+#    - Mount code as read-only: -v code:/workspace:ro
+#    - Output directory: -v output:/output:rw
+#    - Use --read-only flag for container filesystem
+#
+# 3. **Resource Limits**:
+#    - CPU: --cpus=2 (2 cores max)
+#    - RAM: --memory=4g (4GB max)
+#    - Swap: --memory-swap=4g (prevent swap abuse)
+#    - Execution time: Use timeout command or docker stop after N seconds
+#
+# 4. **User Isolation**:
+#    - sandboxuser (UID 1000, non-root)
+#    - No sudo, no privilege escalation
+#
+# 5. **Capabilities**:
+#    - Drop all capabilities: --cap-drop=ALL
+#    - No privileged mode
+#
+# 6. **Monitoring**:
+#    - Use docker stats to monitor resource usage
+#    - Use docker logs to capture output
+#    - Use docker inspect to check container state
+#
+# =============================================================================

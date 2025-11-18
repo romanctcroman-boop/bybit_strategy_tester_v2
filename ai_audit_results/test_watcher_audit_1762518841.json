@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762518841,
+  "changed_files": [
+    "send_compact_to_deepseek.py",
+    "send_to_deepseek_full_analysis.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762518825.2964423,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely segmentation fault, memory issues, or environment problems).\n\n## Coverage Analysis\n**0% coverage** across all files - No tests are executing successfully. This represents maximum risk level.\n\n## Potential Issues with Recent Changes\n1. **Environment/Infrastructure**: Recent changes in `send_compact_to_deepseek.py` or `send_to_deepseek_full_analysis.py` may have introduced:\n   - Memory leaks or segmentation faults\n   - Missing dependencies or broken imports\n   - Infinite loops or blocking operations\n   - Environment configuration issues\n\n2. **Integration Problems**: Files suggest API/client implementations that may have authentication, network, or resource exhaustion issues.\n\n## Immediate Actions Required\n1. **Debug Exit Code -1**:\n   ```bash\n   python -m pytest -v --tb=short  # Identify failing test\n   python -c \"import send_compact_to_deepseek\"  # Check basic import\n   ```\n\n2. **Isolate the Failure**:\n   - Test each file independently\n   - Check for missing environment variables\n   - Verify API credentials/endpoints aren't causing crashes\n\n3. **Add Basic Sanity Tests**:\n   - Simple import tests\n   - Minimal function unit tests\n   - Mock external dependencies\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No code validation through tests\n- Potential runtime crashes in production\n- Undetected regression bugs\n- Complete lack of quality assurance\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 343,
+      "total_tokens": 481,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 74
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

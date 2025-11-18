@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762613460,
+  "changed_files": [
+    "backend\\services\\deepseek_agent.py",
+    "deepseek_final_assessment.py",
+    "deepseek_comprehensive_analysis.py",
+    "deepseek_perplexity_full_tz_audit.py",
+    "deepseek_real_analysis.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762613442.4575396,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- 0% coverage across all files\n- No test execution means all code paths are untested\n- Critical gap: Entire test suite is non-operational\n\n## Potential Issues with Recent Changes\n1. **Deepseek agent/service integration failures**\n   - New deepseek_*.py files may have broken imports or dependencies\n   - Possible circular imports or missing requirements\n\n2. **Environment/configuration issues**\n   - Missing environment variables or API keys\n   - Dependency version conflicts\n   - Path/import resolution failures\n\n3. **Test infrastructure collapse**\n   - Test runner configuration broken\n   - Pytest/coverage setup corrupted\n\n## Immediate Action Recommendations\n\n**HIGH PRIORITY:**\n1. **Fix test execution first** - Run with `--tb=short` to identify crash source\n2. **Check imports** - Verify all new deepseek modules can be imported\n3. **Validate dependencies** - Ensure all required packages are installed\n4. **Test isolation** - Run tests individually to identify failing component\n\n**MEDIUM PRIORITY:**\n5. **Add basic smoke tests** - Create minimal tests to verify system functionality\n6. **Fix coverage setup** - Ensure coverage configuration is working\n\n## Risk Assessment\n**SEVERITY: CRITICAL** 🔴\n- **Code Quality Risk:** High - No validation of recent changes\n- **Regression Risk:** Extreme - All functionality unverified  \n- **Deployment Risk:** Severe - Cannot guarantee system stability\n- **Business Impact:** Critical - Production failures likely undetected\n\n**Immediate Action Required:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 168,
+      "completion_tokens": 409,
+      "total_tokens": 577,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 104
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

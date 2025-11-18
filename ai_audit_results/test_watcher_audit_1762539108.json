@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539108,
+  "changed_files": [
+    "tests\\integration\\test_e2e_test_watcher_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539095.341754,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken. Exit code -1 indicates a fatal error during test execution, not just test failures.\n\n## 2. Coverage Analysis\n**0% coverage** across all files suggests:\n- Tests cannot execute at all\n- Possible import errors or environment issues\n- Test infrastructure may be misconfigured\n\n## 3. Potential Issues with Recent Changes\nThe modified file `test_e2e_test_watcher_v2.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Configuration errors in test setup\n- Environment compatibility issues\n\n## 4. Immediate Recommendations\n**Priority Actions:**\n1. **Fix test execution** - Check for syntax errors in the modified test file\n2. **Verify imports** - Ensure all required modules are available\n3. **Test isolation** - Run this specific test file separately to identify the root cause\n4. **Environment check** - Confirm test dependencies and Python environment\n\n**Follow-up:**\n- Add pre-commit hooks to catch syntax errors\n- Implement basic smoke tests for test files\n- Set up test environment validation in CI/CD\n\n## 5. Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential for undetected regressions\n- Broken CI/CD pipeline\n- Development blocked until resolved\n\n**Immediate action required** - Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 320,
+      "total_tokens": 455,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 71
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

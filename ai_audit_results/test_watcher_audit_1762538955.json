@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762538955,
+  "changed_files": [
+    "backend\\security\\key_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538941.6465633,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run to completion. This indicates either fatal test infrastructure issues or code that prevents test execution.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure, not just poor coverage.\n\n## Potential Issues with Recent Changes\nThe `key_manager.py` changes likely introduced:\n- **Syntax errors** preventing import/execution\n- **Fatal runtime errors** during module initialization\n- **Missing dependencies** or broken imports\n- **Circular imports** causing import failures\n\n## Immediate Recommendations\n1. **Fix test execution first** - Run tests with `-v` flag to see specific failure point\n2. **Check key_manager.py syntax** - Validate Python syntax and imports\n3. **Test isolation** - Run key_manager.py tests separately: `pytest backend/security/test_key_manager.py -v`\n4. **Verify imports** - Ensure all dependencies in key_manager.py are available\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially broken. Security-related code (key management) failing tests poses significant security and operational risks. Do not deploy until tests execute successfully and achieve meaningful coverage.\n\n## Priority Actions\n1. Fix test execution failure\n2. Achieve basic test execution (>70% coverage)\n3. Add specific tests for key generation/management functionality\n4. Implement security-specific test cases for cryptographic operations",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 320,
+      "total_tokens": 446,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

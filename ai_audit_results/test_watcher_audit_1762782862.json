@@ -1,0 +1,41 @@
+{
+  "timestamp": 1762782862,
+  "changed_files": [
+    "tests\\unit\\test_retrain_scheduler.py",
+    "tests\\unit\\test_ast_validator.py",
+    "mcp-server\\mcp_cache.py",
+    "tests\\unit\\test_drift_detector.py",
+    "tests\\unit\\test_structured_logger.py",
+    "health_check.py",
+    "tests\\test_walk_forward.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    "tests\\unit\\test_lru_ttl_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762782834.6401365,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment/setup issues\n- Fatal errors in test code or dependencies\n- Major breaking changes in application code\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** across all files suggests:\n- Tests aren't executing at all\n- Possible import/initialization failures\n- Environment configuration problems\n\n## Potential Issues with Recent Changes\n1. **Modified test files** (`test_retrain_scheduler.py`, `test_ast_validator.py`, etc.) may contain syntax errors or breaking changes\n2. **Modified dependencies** (`.venv\\Lib\\site-packages\\_pytest\\terminal.py`) - manual edits to pytest internals are highly risky\n3. **Application code changes** (`mcp_cache.py`, `health_check.py`) may have introduced import/dependency issues\n\n## Immediate Recommendations\n1. **Debug Exit Code -1**: Run `pytest -v` to see specific error messages\n2. **Check test environment**: Verify Python path, dependencies, and virtual environment\n3. **Validate recent test changes**: Review modified test files for syntax/import errors\n4. **Restore pytest files**: Never manually edit `site-packages` - use pytest plugins/hooks instead\n5. **Run tests individually**: Isolate which specific test file is causing the failure\n\n## Risk Assessment\n**HIGH RISK** - Complete test suite failure means:\n- No validation of recent code changes\n- Potential undiscovered regressions\n- Deployment blockers until resolved\n- Possible environment corruption from manual package edits\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 223,
+      "completion_tokens": 363,
+      "total_tokens": 586,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 159
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

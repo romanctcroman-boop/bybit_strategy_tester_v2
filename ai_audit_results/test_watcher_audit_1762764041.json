@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762764041,
+  "changed_files": [
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762764023.3560545,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated\n\n## Coverage Analysis & Gaps\n**NO MEASURABLE COVERAGE** - Critical gaps:\n- Zero test execution means no code paths were validated\n- All business logic remains untested\n- No baseline established for code quality\n\n## Potential Issues with Recent Changes\n1. **Psycopg2 dependency** - Modified package file suggests database connection issues\n2. **Environment corruption** - Virtual env package modification indicates possible installation problems\n3. **Test infrastructure failure** - Abnormal exit suggests environment or dependency conflicts\n4. **Database connectivity** - `temp_pg_test.py` and health check imply Postgres-related failures\n\n## Immediate Recommendations\n1. **Environment Reset**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Isolate Database Issues**:\n   - Test Postgres connection independently\n   - Verify credentials and network access\n   - Check if `health_check.py` runs standalone\n\n3. **Debug Test Execution**:\n   ```bash\n   python -m pytest -v --tb=short temp_pg_test.py\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would likely fail\n- No safety net for regression detection\n- Potential data corruption if database interactions are broken\n- Urgent attention required before any further development\n\n**Priority**: Fix test infrastructure immediately before proceeding with feature work.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 151,
+      "completion_tokens": 359,
+      "total_tokens": 510,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 87
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

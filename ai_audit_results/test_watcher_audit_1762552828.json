@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762552828,
+  "changed_files": [
+    "backend\\api\\secure_key_storage.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552813.6010008,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests, suggesting fundamental configuration or dependency issues.\n\n## 2. Coverage Analysis\n**0% coverage** confirms no tests executed successfully. This represents a complete testing gap across the entire codebase.\n\n## 3. Potential Issues with Recent Changes\n- **secure_key_storage.py changes** likely introduced breaking changes that prevent test execution\n- Possible causes: missing imports, syntax errors, circular dependencies, or environment configuration issues\n- The file modification directly correlates with test suite failure\n\n## 4. Immediate Recommendations\n**Priority 1 - Fix Test Execution:**\n- Check for syntax errors in `secure_key_storage.py`\n- Verify all imports and dependencies are available\n- Run tests with `-v` flag to identify specific failure point\n- Ensure test configuration files are intact\n\n**Priority 2 - Restore Coverage:**\n- Once tests run, focus on `secure_key_storage.py` unit tests\n- Implement tests for key management functionality\n- Aim for >80% coverage on security-critical modules\n\n## 5. Risk Assessment\n**HIGH RISK** - Deploying without resolution is dangerous:\n- Security vulnerabilities in key storage could go undetected\n- No validation of encryption/decryption logic\n- Potential data exposure or system compromise\n- **Recommend blocking deployment until tests pass with meaningful coverage**\n\n**Immediate action:** Revert `secure_key_storage.py` changes or fix the breaking issues, then validate test execution before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 343,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

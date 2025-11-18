@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762616085,
+  "changed_files": [
+    "ai_ai_full_collaboration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762616071.3449168,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. No meaningful quality assessment possible as tests didn't run.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure suggests:\n- Test runner cannot execute at all\n- Module imports failing in test environment\n- Missing dependencies or configuration\n- Test discovery mechanism broken\n\n## Potential Issues with Recent Changes\nThe file `ai_ai_full_collaboration.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing imports** or dependency issues\n- **Environment-specific code** not portable to test environment\n- **Circular imports** or module loading issues\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Check Python syntax: `python -m py_compile ai_ai_full_collaboration.py`\n   - Verify imports work in isolation\n   - Run with `python -m pytest -v` to see specific errors\n\n2. **Environment Setup**:\n   - Ensure test dependencies match development environment\n   - Verify PYTHONPATH includes necessary directories\n   - Check for missing __init__.py files in package structure\n\n3. **Add Basic Smoke Test**:\n   ```python\n   def test_module_import():\n       import ai_ai_full_collaboration  # Should not raise exceptions\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky without resolving these fundamental issues.\n\n**Priority**: Fix test execution immediately before any further development or analysis.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 349,
+      "total_tokens": 477,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

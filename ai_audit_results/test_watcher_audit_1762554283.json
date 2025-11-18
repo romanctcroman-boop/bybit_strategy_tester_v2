@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762554283,
+  "changed_files": [
+    "backend\\api\\parallel_deepseek_client_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554269.6417222,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% overall coverage confirms no tests executed. The coverage report is empty, suggesting the test run terminated before any coverage data could be collected.\n\n## Potential Issues with Recent Changes\nThe modified file `backend\\api\\parallel_deepseek_client_v2.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing imports** or dependencies\n- **Breaking changes** to class/method signatures\n- **Configuration issues** in the client implementation\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check test runner logs for specific error messages\n   - Verify Python syntax in the modified file\n   - Ensure all imports and dependencies are available\n\n2. **Validate the Modified Client**\n   ```python\n   # Quick syntax check\n   python -m py_compile backend/api/parallel_deepseek_client_v2.py\n   ```\n\n3. **Isolate the Issue**\n   - Run tests on individual files to identify the breaking point\n   - Check for circular imports or initialization issues\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely risky because:\n- No functionality has been validated\n- The client modification may have introduced critical bugs\n- Zero test coverage means unknown regression impact\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 347,
+      "total_tokens": 478,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

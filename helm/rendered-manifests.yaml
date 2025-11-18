@@ -1,0 +1,862 @@
+﻿helm : install.go:225: 2025-11-05 21:42:49.5689796 +0300 MSK m=+0.199115401 [debug] Original chart version: ""
+D:\bybit_strategy_tester_v2\scripts\test_helm_chart.ps1:111 знак:27
++ ... ateOutput = helm template bybit-strategy-tester helm --debug 2>&1 | O ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (install.go:225:...art version: "":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+install.go:242: 2025-11-05 21:42:49.5689796 +0300 MSK m=+0.199115401 [debug] CHART PATH: D:\bybit_strategy_tester_v2\helm
+
+---
+# Source: bybit-strategy-tester/templates/rbac.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - port: 8000
+      protocol: TCP
+  - ports:
+    - port: 5432
+      protocol: TCP
+    to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+  - ports:
+    - port: 6379
+      protocol: TCP
+    to:
+    - podSelector:
+        matchLabels:
+          app: redis
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+# Source: bybit-strategy-tester/templates/rbac.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bybit-strategy-tester-worker
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: worker
+    component: executor
+    tier: backend
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: worker
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - port: 6379
+      protocol: TCP
+    to:
+    - podSelector:
+        matchLabels:
+          app: redis
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+# Source: bybit-strategy-tester/templates/backend-deployment.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: backend
+---
+# Source: bybit-strategy-tester/templates/worker-deployment.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: bybit-strategy-tester-worker
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: worker
+    component: executor
+    tier: backend
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: worker
+---
+# Source: bybit-strategy-tester/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bybit-strategy-tester
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+---
+# Source: bybit-strategy-tester/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: bybit-strategy-tester
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+---
+# Source: bybit-strategy-tester/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: bybit-strategy-tester
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: bybit-strategy-tester
+subjects:
+- kind: ServiceAccount
+  name: bybit-strategy-tester
+  namespace: bybit-strategy-tester
+---
+# Source: bybit-strategy-tester/templates/backend-deployment.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app: backend
+---
+# Source: bybit-strategy-tester/templates/worker-deployment.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: bybit-strategy-tester-worker
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: worker
+    component: executor
+    tier: backend
+  annotations:
+    prometheus.io/path: /metrics
+    prometheus.io/port: "8001"
+    prometheus.io/scrape: "true"
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for worker metrics
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app: worker
+---
+# Source: bybit-strategy-tester/templates/backend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "true"
+      labels:
+        app.kubernetes.io/name: bybit-strategy-tester
+        app.kubernetes.io/instance: bybit-strategy-tester
+        app: backend
+        version: 1.0.0
+    spec:
+      serviceAccountName: bybit-strategy-tester
+      securityContext:
+        capabilities:
+          drop:
+          - ALL
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: backend
+        image: "bybit-strategy-tester/backend:1.0.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              key: connection-string
+              name: postgresql-secret
+        - name: REDIS_URL
+          value: "redis://redis-cluster:6379"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: WORKERS_COUNT
+          value: "4"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: KUBERNETES_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: bybit-strategy-tester-backend-config
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - backend
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+---
+# Source: bybit-strategy-tester/templates/worker-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bybit-strategy-tester-worker
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: worker
+    component: executor
+    tier: backend
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "true"
+      labels:
+        app.kubernetes.io/name: bybit-strategy-tester
+        app.kubernetes.io/instance: bybit-strategy-tester
+        app: worker
+        version: 1.0.0
+    spec:
+      serviceAccountName: bybit-strategy-tester
+      securityContext:
+        capabilities:
+          drop:
+          - ALL
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: worker
+        image: "bybit-strategy-tester/worker:1.0.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: metrics
+          containerPort: 8001
+          protocol: TCP
+        env:
+        - name: REDIS_URL
+          value: "redis://redis-cluster:6379"
+        - name: WORKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: HEARTBEAT_INTERVAL
+          value: "30"
+        - name: MAX_TASKS_PER_WORKER
+          value: "10"
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: metrics
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          failureThreshold: 2
+          httpGet:
+            path: /ready
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - worker
+            topologyKey: kubernetes.io/hostname
+---
+# Source: bybit-strategy-tester/templates/backend-deployment.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bybit-strategy-tester-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        averageValue: "100"
+        type: AverageValue
+    type: Pods
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 4
+        periodSeconds: 30
+      selectPolicy: Max
+---
+# Source: bybit-strategy-tester/templates/worker-deployment.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bybit-strategy-tester-worker
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: worker
+    component: executor
+    tier: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bybit-strategy-tester-worker
+  minReplicas: 5
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - external:
+      metric:
+        name: redis_stream_length
+        selector:
+          matchLabels:
+            stream_name: backtest_tasks
+      target:
+        averageValue: "10"
+        type: AverageValue
+    type: External
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 30
+        periodSeconds: 90
+      - type: Pods
+        value: 2
+        periodSeconds: 90
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 5
+        periodSeconds: 15
+      selectPolicy: Max
+---
+# Source: bybit-strategy-tester/templates/backend-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - "api.bybit-strategy-tester.example.com"
+      secretName: backend-tls
+  rules:
+    - host: "api.bybit-strategy-tester.example.com"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bybit-strategy-tester-backend
+                port:
+                  number: 8000
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Authorization Policy (Optional)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bybit-strategy-tester
+      app.kubernetes.io/instance: bybit-strategy-tester
+      app: backend
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/bybit-strategy-tester/sa/*"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        paths: ["/api/*"]
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Destination Rule for Backend (Circuit Breaking)
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  host: bybit-strategy-tester-backend
+  trafficPolicy:
+    connectionPool:
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+      tcp:
+        maxConnections: 100
+    outlierDetection:
+      baseEjectionTime: 30s
+      consecutiveErrors: 5
+      interval: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+    tls:
+      mode: STRICT
+  subsets:
+  - name: v1
+    labels:
+      version: 1.0.0
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Istio Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: bybit-strategy-tester-gateway
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+spec:
+  selector:
+    istio: ingressgateway  # Use Istio default gateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "api.bybit-strategy-tester.example.com"
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "api.bybit-strategy-tester.example.com"
+    tls:
+      mode: SIMPLE
+      credentialName: backend-tls
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Peer Authentication (mTLS)
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: bybit-strategy-tester
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+spec:
+  mtls:
+    mode: STRICT
+---
+# Source: bybit-strategy-tester/templates/istio.yaml
+# Virtual Service for Backend
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: bybit-strategy-tester-backend
+  namespace: bybit-strategy-tester
+  labels:
+    helm.sh/chart: bybit-strategy-tester-1.0.0
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/instance: bybit-strategy-tester
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+    environment: production
+    app: backend
+    component: api
+    tier: backend
+spec:
+  hosts:
+  - "api.bybit-strategy-tester.example.com"
+  gateways:
+  - "bybit-gateway"
+  http:
+  - match:
+    - uri:
+        prefix: /api/v1
+    route:
+    - destination:
+        host: backend
+        port:
+          number: 8000
+      weight: 90
+    - destination:
+        host: backend-canary
+        port:
+          number: 8000
+      weight: 10
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+    timeout: 10s
+

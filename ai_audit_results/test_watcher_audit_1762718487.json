@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762718487,
+  "changed_files": [
+    "tests\\integration\\test_real_api_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762718462.7161841,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach execution phase\n- **Integration test file modified** - Focus on `test_real_api_integration.py`\n\n## Potential Issues with Recent Changes\n1. **Test environment configuration** - Missing API endpoints, credentials, or environment variables\n2. **Dependency issues** - Missing packages or version conflicts\n3. **Syntax/runtime errors** in the modified integration test file\n4. **Network/connectivity** problems with external APIs\n5. **Test setup/teardown failures** preventing test execution\n\n## Recommendations for Improvement\n**Immediate Actions:**\n- Run tests with `-v` flag to see specific failure details\n- Check test logs for stack traces and error messages\n- Verify API endpoints and authentication are accessible\n- Validate test environment configuration matches production\n\n**Technical Steps:**\n1. Isolate the failing test: `pytest tests/integration/test_real_api_integration.py -v`\n2. Check for missing imports or dependencies in the test file\n3. Verify mock data/setup fixtures are properly configured\n4. Ensure API rate limits aren't being exceeded\n\n## Risk Assessment\n**HIGH RISK** - Integration tests are failing completely, meaning:\n- No validation of API integrations\n- Potential production-breaking changes could go undetected\n- Critical business functionality may be compromised\n- **Immediate attention required** before any deployment\n\n**Priority:** Fix integration test execution before proceeding with further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 372,
+      "total_tokens": 503,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762693848,
+  "changed_files": [
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762693832.0021522,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests aren't executing properly\n- Recent changes to core engine and multiple test files likely introduced breaking changes\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE**:\n- No files show any coverage data\n- Entire codebase is untested in this execution\n- This indicates either test infrastructure failure or catastrophic code errors\n\n## Potential Issues with Recent Changes\n1. **MTF Engine Changes** (`backend/core/mtf_engine.py`) likely broke test infrastructure\n2. **Multiple test file modifications** suggest widespread refactoring gone wrong\n3. **Database query optimization tests** may have introduced dependency issues\n4. **Sandbox integration** changes could be causing environment failures\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Run tests individually to identify which file causes the crash\n   - Check for uncaught exceptions in test setup/teardown\n   - Verify test dependencies and environment configuration\n\n2. **Investigate Core Changes**:\n   - Review `mtf_engine.py` modifications for breaking API changes\n   - Check if recent changes broke test fixtures or mocking\n\n3. **Restore Basic Functionality**:\n   - Get at least one test passing before addressing coverage\n   - Focus on unit tests before integration tests\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback loop\n- Potential production-breaking changes\n- Undetected regressions across entire system\n- Development is effectively flying blind\n\n**Priority**: Fix test execution immediately before any further development. The broken test suite represents the highest priority issue in the codebase.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 373,
+      "total_tokens": 558,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 57
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

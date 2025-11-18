@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762624771,
+  "changed_files": [
+    "test_deepseek_8_keys.py",
+    "backend_api_deepseek_pool_temp.py",
+    "tests\\backend\\conftest.py",
+    "backend\\agents\\deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762624755.512506,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage confirms no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No files were executed due to test suite failure\n- All recent changes (deepseek integration files) remain completely untested\n- Zero visibility into code quality or functionality\n\n## Potential Issues with Recent Changes\n1. **Integration Breakage**: New `deepseek.py` agent or API pool changes likely introduced fatal errors\n2. **Configuration Conflicts**: `conftest.py` modifications may have broken test environment setup\n3. **Import/Dependency Issues**: New modules may have missing dependencies or circular imports\n4. **Authentication/Connection Failures**: DeepSeek API integration could be failing to initialize\n\n## Immediate Recommendations\n1. **DEBUG TEST INFRASTRUCTURE FIRST:**\n   - Run tests with `-v` flag to see which test fails first\n   - Check pytest configuration in `conftest.py` for recent changes\n   - Verify all imports in new deepseek modules resolve correctly\n\n2. **ISOLATE THE FAILURE:**\n   ```bash\n   pytest tests/ -x --tb=short  # Stop on first failure with short traceback\n   ```\n\n3. **VALIDATE NEW DEPENDENCIES:**\n   - Ensure DeepSeek API credentials/config are properly mocked for tests\n   - Check for missing packages in test environment\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be blind:\n- No verification that new DeepSeek integration works\n- Potential runtime failures in production\n- Possible API cost implications from untested code\n- Regression risk for existing functionality\n\n**Priority:** Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 157,
+      "completion_tokens": 395,
+      "total_tokens": 552,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 93
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

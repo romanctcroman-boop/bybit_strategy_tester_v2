@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762892546,
+  "changed_files": [
+    "reliability_auto_system\\__init__.py",
+    "run_perplexity_audit.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762892530.2803824,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1 indicates abnormal termination). No meaningful test quality can be assessed since tests didn't run to completion.\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage indicates:\n- Tests may be crashing before execution\n- Test runner configuration issues\n- Missing test dependencies or environment setup\n\n## Potential Issues with Recent Changes\n\n1. **Environment/Dependency Problems**\n   - `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` modification suggests PostgreSQL dependency issues\n   - Virtual environment corruption or missing packages\n\n2. **Code Integration Issues**\n   - `reliability_auto_system` and `run_perplexity_audit.py` changes may have broken imports\n   - Database connectivity failures in `temp_pg_test.py`\n\n3. **Test Configuration**\n   - Test discovery failure\n   - Missing test files or incorrect paths\n\n## Immediate Recommendations\n\n1. **Debug Test Execution**\n   ```bash\n   python -m pytest -v --tb=short  # Identify crashing tests\n   python -c \"import reliability_auto_system\"  # Check imports\n   ```\n\n2. **Verify Dependencies**\n   - Reinstall psycopg2: `pip install --force-reinstall psycopg2-binary`\n   - Check PostgreSQL connection in `temp_pg_test.py`\n\n3. **Fix Test Infrastructure**\n   - Ensure test files follow naming convention (`test_*.py`)\n   - Verify `__init__.py` files aren't empty/corrupted\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- No test validation of recent changes\n- Potential database connectivity issues\n- Unknown reliability of `reliability_auto_system`\n\n**Priority**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 168,
+      "completion_tokens": 397,
+      "total_tokens": 565,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 104
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

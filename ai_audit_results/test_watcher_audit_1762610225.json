@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762610225,
+  "changed_files": [
+    "test_perplexity_multi_key.py",
+    "analyze_perplexity_agent_architecture.py",
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762610208.8804572,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data implies tests never ran successfully\n\n## Coverage Analysis\n**NO COVERAGE** - All files show 0.00%:\n- Test framework likely crashed before any execution\n- No meaningful coverage data to analyze\n- Complete testing gap across all changed files\n\n## Potential Issues with Recent Changes\n1. **test_perplexity_multi_key.py** - May contain syntax errors or import failures\n2. **analyze_perplexity_agent_architecture.py** - Could have breaking changes affecting test setup\n3. **mcp-server\\api\\providers\\perplexity.py** - Provider implementation might have incompatible API changes\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure**:\n   - Check Python environment and dependencies\n   - Run tests with `-v` flag to see where they fail\n   - Verify imports and module structure\n\n2. **Isolate the Failure**:\n   - Run each test file individually\n   - Check for syntax errors in test files\n   - Validate provider API compatibility\n\n3. **Fix Foundation First**:\n   - Ensure basic test runner works with simple test case\n   - Verify all dependencies are installed and compatible\n   - Check for circular imports or missing modules\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression protection for perplexity-related features\n- Potential production issues undetected\n- Broken development workflow\n- Urgent attention required before any further changes\n\n**Priority**: Fix test infrastructure immediately before addressing any feature changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 153,
+      "completion_tokens": 357,
+      "total_tokens": 510,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 89
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

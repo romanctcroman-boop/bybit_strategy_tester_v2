@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762542635,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762542620.2583537,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\n- `health_check.py` modifications likely introduced breaking changes\n- Possible import errors, syntax issues, or runtime exceptions\n- Missing dependencies required by the new code\n- Test configuration incompatible with changes\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix test execution** - Run tests with verbose output to identify the root cause\n2. **Check syntax** - Validate `health_check.py` for Python syntax compliance\n3. **Verify imports** - Ensure all dependencies are available and properly imported\n4. **Test isolation** - Run a minimal test case to verify basic functionality\n\n**Follow-up:**\n5. Add basic smoke tests for `health_check.py`\n6. Implement CI pipeline checks to catch similar issues earlier\n7. Consider adding static analysis (pylint, mypy) to prevent syntax issues\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untested and potentially broken. Deploying this code would be extremely risky as:\n- No functionality verification exists\n- Regression potential is unknown\n- Production failures are likely\n- Debugging will be difficult without working tests\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 346,
+      "total_tokens": 468,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

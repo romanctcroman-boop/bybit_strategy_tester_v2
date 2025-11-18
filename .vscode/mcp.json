@@ -1,0 +1,45 @@
+{
+  // 🔐 Model Context Protocol (MCP) Server Configuration
+  // Максимальные права для Bybit Strategy Tester MCP server
+  // Источник: MCP_PERMISSIONS_GUIDE.md
+  
+  "servers": {
+    "bybit-strategy-tester": {
+      "type": "stdio",
+      "command": "powershell.exe",
+      "args": [
+        "-ExecutionPolicy", "Bypass",
+        "-File", "D:\\bybit_strategy_tester_v2\\scripts\\start_mcp_server.ps1"
+      ],
+      
+      // 📁 Environment Variables - все необходимые настройки
+      "env": {
+        // API Keys (loaded from .env by PowerShell script)
+        "PERPLEXITY_API_KEY": "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",
+        "DEEPSEEK_API_KEY": "sk-1630fbba63c64f88952c16ad33337242",
+        
+        // Project Paths
+        "PROJECT_ROOT": "D:\\bybit_strategy_tester_v2",
+        "MCP_SERVER_ROOT": "D:\\bybit_strategy_tester_v2\\mcp-server",
+        
+        // Python Settings
+        "PYTHONPATH": "D:\\bybit_strategy_tester_v2",
+        "PYTHONUNBUFFERED": "1",
+        
+        // Debug Settings (Production mode) ✅
+        "MCP_DEBUG": "0",
+        "LOG_LEVEL": "INFO",
+        
+        // ✨ DeepSeek recommendation: системный debugging (Production mode)
+        "MCP_SERVER_DEBUG": "0",
+        "MCP_MAX_MEMORY": "4096MB",  // ⚠️ Изменено с unlimited: защита от утечек памяти
+        
+        // ✨ DeepSeek optimization recommendation #1 (MEDIUM priority)
+        "MCP_CACHE_SIZE": "512MB"  // Оптимизация производительности кэша
+      },
+      
+      // Note: capabilities and alwaysAllow are not supported in current MCP version
+      // MCP server will expose all its tools/resources/prompts automatically
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762556424,
+  "changed_files": [
+    "backend\\migrations\\versions\\20251108_merge_triple_heads.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762556410.1937175,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Fatal import/configuration errors\n- Database migration conflicts\n- Critical syntax/runtime errors in test suite\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a severe indicator that the test environment is broken.\n\n## Potential Issues with Recent Changes\nThe migration file `20251108_merge_triple_heads.py` suggests:\n- **Database schema conflicts** - Triple head merge indicates complex branching\n- **Migration dependency issues** - Possible missing prerequisite migrations\n- **Environment state mismatch** - Database may be in inconsistent state\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Run `python -m pytest --collect-only` to identify test discovery issues\n   - Check database connectivity and migration state\n   - Verify test dependencies are installed\n\n2. **Investigate Migration Conflicts**\n   - Run `alembic current` to check database state\n   - Validate migration dependencies with `alembic history`\n   - Consider rolling back to stable state and reapplying migrations\n\n3. **Environment Verification**\n   - Confirm test database is properly configured\n   - Check for missing environment variables\n   - Verify all required services are running\n\n## Risk Assessment\n**HIGH RISK** - Cannot deploy with 0% test coverage and failing test suite. Critical issues likely exist in:\n- Database schema integrity\n- Application startup/initialization\n- Core functionality reliability\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 137,
+      "completion_tokens": 336,
+      "total_tokens": 473,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 73
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

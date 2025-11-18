@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762588934,
+  "changed_files": [
+    "test_deepseek_robot.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762588917.2403393,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- Likely environment or dependency issues preventing test execution\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA AVAILABLE** - Tests failed before coverage could be measured:\n- Zero coverage across all files\n- Unable to assess actual code coverage gaps\n- Critical path testing completely blocked\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: Modified `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` suggests manual package edits\n2. **Database Dependency**: `psycopg2` modifications likely broke PostgreSQL connectivity\n3. **Test Isolation**: `temp_pg_test.py` indicates potential test database configuration issues\n4. **Virtual Environment**: Manual package modifications corrupted the test environment\n\n## Immediate Recommendations\n1. **Restore Clean Environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Verify Database Connectivity**:\n   - Test PostgreSQL connection independently\n   - Ensure test database is accessible\n3. **Run Tests Sequentially**:\n   ```bash\n   python -m pytest test_deepseek_robot.py -v\n   python -m pytest temp_pg_test.py -v\n   ```\n4. **Remove Manual Package Modifications** - Reinstall psycopg2 cleanly\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would likely fail\n- No reliable test feedback for code changes\n- Database integration completely broken\n- Environment instability affecting entire team\n\n**Priority**: Fix environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 155,
+      "completion_tokens": 390,
+      "total_tokens": 545,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 91
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

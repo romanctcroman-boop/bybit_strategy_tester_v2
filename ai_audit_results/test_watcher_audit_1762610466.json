@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762610466,
+  "changed_files": [
+    "test_perplexity_multi_key_unit.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762610443.9115639,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero value in current state. No meaningful quality assessment possible until basic execution is fixed.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure. All code paths untested. This indicates either:\n- Test infrastructure failure\n- Fatal errors preventing test execution\n- Missing or broken test configuration\n\n## Potential Issues with Recent Changes\nThe single changed file `test_perplexity_multi_key_unit.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** or imports\n- **Configuration errors** in test setup\n- **Infinite loops** or fatal exceptions\n- **Broken test fixtures** or setup/teardown\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Run `python -m pytest test_perplexity_multi_key_unit.py -v` to see specific error\n   - Check for Python syntax errors in the test file\n   - Verify all imports and dependencies are available\n\n2. **Debug Steps**:\n   - Add `print(\"Test starting\")` at file beginning to verify execution\n   - Comment out test methods to isolate failing component\n   - Check for missing `__init__.py` files in test directories\n\n3. **Infrastructure Check**:\n   - Verify pytest installation and version compatibility\n   - Check test runner configuration (pytest.ini, conftest.py)\n   - Ensure Python path includes test directory\n\n## Risk Assessment\n**HIGH RISK** - Deployment with 0% test coverage is extremely dangerous:\n- No regression detection\n- Undetected breaking changes likely\n- Production failures highly probable\n- **Block deployment** until tests execute successfully\n\n**Priority**: Fix test execution immediately before any other development work.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 391,
+      "total_tokens": 519,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

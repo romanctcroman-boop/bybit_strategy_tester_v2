@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762625414,
+  "changed_files": [
+    "test_deepseek_mcp_tools.py",
+    "test_deepseek_tools_via_list.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762625401.4955194,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure before any tests could execute.\n\n## Coverage Analysis\n**0% coverage** across all files confirms no tests ran successfully. This represents a complete testing breakdown.\n\n## Potential Issues\n1. **Test Harness Failure**: Likely environment setup, import errors, or configuration issues\n2. **Recent Changes Impact**: Modified test files (`test_deepseek_mcp_tools.py`, `test_deepseek_tools_via_list.py`) may contain:\n   - Syntax errors\n   - Missing dependencies\n   - Broken imports\n   - Configuration conflicts\n\n## Immediate Actions Required\n1. **Diagnose Root Cause**:\n   - Check test runner output/logs for specific error messages\n   - Verify Python environment and dependencies\n   - Validate import statements in changed test files\n\n2. **Fix Test Execution**:\n   - Run tests individually to isolate failing component\n   - Check for missing `__init__.py` files or package structure issues\n   - Verify test configuration (pytest.ini, conftest.py)\n\n3. **Restore Baseline**:\n   - Get at least one test passing to establish working foundation\n   - Implement basic smoke test to prevent complete breakdown\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected regressions in production code\n- No quality gates for recent changes\n- Potential deployment of broken code\n- Complete loss of CI/CD reliability\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 140,
+      "completion_tokens": 325,
+      "total_tokens": 465,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 76
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

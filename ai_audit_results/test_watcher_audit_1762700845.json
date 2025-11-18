@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762700845,
+  "changed_files": [
+    "get_agent_recommendations.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762700831.174132,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely test harness/setup issues).\n\n## Coverage Analysis\n**0% coverage** across all files suggests:\n- Tests aren't executing at all\n- No test suite may be properly configured\n- Possible import/configuration errors\n\n## Potential Issues with Recent Changes\nThe `get_agent_recommendations.py` modification likely introduced:\n- Syntax errors preventing test execution\n- Import/dependency issues\n- Environment configuration breaks\n- Test runner configuration conflicts\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check for syntax errors in test files\n   - Verify test runner configuration\n   - Ensure all dependencies are installed\n\n2. **Validate Recent Changes**\n   - Review `get_agent_recommendations.py` for obvious syntax issues\n   - Check imports and function signatures\n   - Verify no circular dependencies\n\n3. **Restore Basic Testing**\n   - Run a simple smoke test first\n   - Add basic unit test for the changed file\n   - Ensure tests can at least start executing\n\n## Risk Assessment\n**HIGH RISK** - Deploying with 0% test coverage and broken test suite is extremely dangerous. Code changes cannot be validated, risking:\n- Runtime failures in production\n- Regression bugs\n- Data corruption potential\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 298,
+      "total_tokens": 425,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

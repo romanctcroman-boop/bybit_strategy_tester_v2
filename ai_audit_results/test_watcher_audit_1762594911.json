@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762594911,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762594894.0746195,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental infrastructure or configuration issues.\n\n## Coverage Analysis & Gaps\n**0% coverage** across all files - This represents a complete testing failure, not just low coverage. The test framework isn't executing any code.\n\n## Potential Issues with Recent Changes\nThe failure likely stems from `tests\\backend\\conftest.py` changes:\n- **Fixture configuration errors** - Broken pytest fixtures or imports\n- **Plugin conflicts** - Incompatible pytest plugins or hooks\n- **Environment setup failures** - Database connections, API clients, or resource initialization\n- **Syntax/import errors** - Python syntax issues or missing dependencies in conftest\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug conftest.py** - Check for syntax errors, missing imports, or fixture conflicts\n2. **Run with verbose output** - Use `pytest -vvs` to identify the exact failure point\n3. **Isolate the issue** - Temporarily rename conftest.py to confirm it's the root cause\n4. **Check pytest configuration** - Verify pytest.ini and plugin compatibility\n\n**Systematic Fixes:**\n5. **Add fixture validation** - Implement fixture teardown and error handling\n6. **Create smoke tests** - Basic tests that verify test infrastructure works\n7. **Implement CI pipeline checks** - Fail fast on configuration changes\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Zero test protection** - All code changes are untested\n- **Regression risk** - Critical bugs could reach production\n- **Development blocked** - No reliable testing feedback loop\n- **Technical debt** - Accumulating untested code\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 387,
+      "total_tokens": 514,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

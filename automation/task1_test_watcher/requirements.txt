@@ -1,0 +1,18 @@
+# Test Watcher Dependencies
+
+# File system monitoring
+watchdog>=3.0.0
+
+# Testing framework
+pytest>=7.0.0
+pytest-cov>=4.0.0
+coverage>=7.0.0
+
+# Async HTTP client
+httpx>=0.24.0
+
+# Logging
+loguru>=0.7.0
+
+# Environment variables
+python-dotenv>=1.0.0

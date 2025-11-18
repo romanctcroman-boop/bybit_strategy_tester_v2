@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762543344,
+  "changed_files": [
+    "monitoring\\test_alerts.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543319.431449,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test code\n- Import failures\n- Test framework configuration issues\n- Fatal exceptions during test discovery/setup\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is a direct result of the test execution failure, not an actual coverage measurement.\n\n## Potential Issues with Recent Changes\nThe failure is directly linked to `monitoring\\test_alerts.py` changes:\n- Likely contains syntax errors or broken imports\n- May have incompatible test framework changes\n- Could be missing dependencies or configuration\n- Possibly contains infinite loops or fatal exceptions\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution first** - Run `python -m pytest monitoring/test_alerts.py -v` to see specific error details\n2. **Check syntax** - Validate Python syntax in the changed test file\n3. **Verify imports** - Ensure all imports in test_alerts.py are valid and available\n4. **Review test configuration** - Check for pytest.ini, conftest.py, or environment issues\n\n**Follow-up:**\n- Add pre-commit hooks to catch syntax errors\n- Implement CI pipeline that fails fast on test execution issues\n- Ensure tests run in isolation before checking coverage\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in code quality:\n- No functional validation of monitoring alerts\n- Undetected production issues possible\n- Broken test suite blocks deployment pipelines\n- Team may be unaware of critical failures\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 357,
+      "total_tokens": 482,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

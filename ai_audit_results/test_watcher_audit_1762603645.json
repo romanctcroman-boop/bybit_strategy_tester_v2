@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762603645,
+  "changed_files": [
+    "test_optimizations.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762603627.8267736,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) indicating severe issues:\n- Tests cannot run to completion\n- Likely syntax errors, import failures, or environment issues\n- Zero test coverage suggests fundamental execution problems\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0.00% coverage reveals:\n- No code is being executed during test runs\n- All test infrastructure may be broken\n- Critical gap: Entire codebase is untested\n\n## Potential Issues with Recent Changes\n**test_optimizations.py modifications likely caused regression:**\n- File changes directly correlate with test failure\n- Possible syntax errors or breaking imports\n- Test configuration/dependencies may be broken\n- Environment setup issues in test file\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution** - Check syntax, imports, and dependencies in test_optimizations.py\n2. **Verify test environment** - Ensure all required packages are installed\n3. **Run tests individually** - Isolate the failing test to identify root cause\n4. **Add basic smoke test** - Create minimal test to verify test framework works\n\n**FOLLOW-UP:**\n5. Restore previous version of test_optimizations.py if recent changes are problematic\n6. Implement test discovery verification\n7. Add coverage tracking once tests execute successfully\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Code quality risk:** No validation of functionality\n- **Regression risk:** Changes cannot be safely deployed\n- **Development blocker:** Cannot verify any code changes\n- **Urgency:** Requires immediate attention before further development\n\n**Priority:** Fix test execution infrastructure before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 124,
+      "completion_tokens": 363,
+      "total_tokens": 487,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 60
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

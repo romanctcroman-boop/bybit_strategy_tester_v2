@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762716125,
+  "changed_files": [
+    "reliability\\mcp_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762716102.7768404,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution occurred\n- Complete testing blackout - no code paths validated\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `reliability\\mcp_manager.py`:\n- Likely introduced fatal runtime error\n- Possible syntax errors or import failures\n- May have broken module initialization\n- Could be incompatible dependencies or environment issues\n\n## Immediate Recommendations\n1. **Debug the crash**: Run tests with `-v` flag to see error details\n2. **Check syntax**: `python -m py_compile reliability\\mcp_manager.py`\n3. **Test isolation**: Run minimal test on unchanged code to verify environment\n4. **Incremental validation**: Revert recent changes and test incrementally\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No validated code functionality\n- Potential for runtime crashes in production\n- Complete loss of test safety net\n- Requires immediate resolution before any further development\n\n**Priority**: Fix test execution before addressing coverage gaps. The system is currently untestable.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 278,
+      "total_tokens": 403,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

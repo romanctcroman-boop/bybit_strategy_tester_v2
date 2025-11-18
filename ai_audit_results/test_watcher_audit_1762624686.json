@@ -1,0 +1,43 @@
+{
+  "timestamp": 1762624686,
+  "changed_files": [
+    "mcp-server\\test_deepseek_quick_win5.py",
+    "test_deepseek_8_keys.py",
+    "temp_pg_test.py",
+    "mcp-server\\test_deepseek_code_review.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "mcp-server\\test_deepseek_final_score.py",
+    "test_deepseek_max_permissions.py",
+    "mcp-server\\test_deepseek_verify_fixes.py",
+    "test_deepseek_105_perfection.py",
+    "mcp-server\\test_deepseek_perfect_10.py",
+    "mcp-server\\test_deepseek_api.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762624674.1701696,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Exit code -1 indicates catastrophic test execution failure, not just test failures. The entire test suite appears to be non-functional.\n\n## Coverage Analysis\n**0.00% coverage** suggests:\n- Tests aren't executing at all\n- Possible import/configuration errors\n- Test discovery completely broken\n\n## Potential Issues with Recent Changes\n1. **Environment corruption** - `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` modification indicates manual package tampering\n2. **Test file proliferation** - 11 test files with similar names suggests duplication or experimental code\n3. **Path conflicts** - Mixed `mcp-server\\` and root-level test files may indicate import issues\n\n## Immediate Action Items\n1. **Restore clean environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Validate test discovery**:\n   ```bash\n   python -m pytest --collect-only\n   ```\n\n3. **Check for circular imports** - Review test file imports, especially between `mcp-server\\` and root\n\n4. **Consolidate test structure** - Reduce 11 similar test files to avoid conflicts\n\n## Risk Assessment\n**HIGH RISK** - Current state provides zero confidence in code quality. Cannot detect regressions or validate functionality.\n\n**Priority**: Fix test execution before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 263,
+      "completion_tokens": 311,
+      "total_tokens": 574,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 199
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

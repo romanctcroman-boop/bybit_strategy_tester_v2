@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762541387,
+  "changed_files": [
+    "tests\\recovery\\__init__.py",
+    "tests\\recovery\\test_disk_full.py",
+    "tests\\recovery\\test_component_crash.py",
+    "tests\\recovery\\test_network_failure.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541374.1530943,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero tests executed successfully\n- No coverage data collected\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**\n- 0% overall coverage - no tests ran\n- No file-specific coverage data available\n- Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure failure** - Likely in test configuration or imports\n2. **Dependency issues** - Missing imports or broken dependencies in new recovery tests\n3. **Test discovery failure** - `__init__.py` changes may have broken test collection\n4. **Environment setup** - Possible missing test dependencies or configuration\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run individual test files to isolate the failure point\n2. Check test runner configuration and dependencies\n3. Verify `tests/recovery/__init__.py` doesn't contain broken imports\n4. Add basic smoke test to validate test environment\n\n**STRUCTURAL IMPROVEMENTS:**\n1. Implement test suite health checks\n2. Add CI pipeline validation for test execution\n3. Create isolated test environments to prevent dependency conflicts\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback for recent changes\n- Potential undetected regressions in production code\n- Recovery testing (critical path) completely untested\n- Urgent attention required before further deployments\n\n**Priority:** Fix test execution immediately before any additional development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 166,
+      "completion_tokens": 339,
+      "total_tokens": 505,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 102
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

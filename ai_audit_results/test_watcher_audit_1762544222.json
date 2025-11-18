@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762544222,
+  "changed_files": [
+    "tests\\monitoring\\test_health_endpoints.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762544199.5499885,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates fundamental issues with the test environment, dependencies, or test code structure that prevent any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach execution phase\n- **Critical gap**: Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **File**: `tests\\monitoring\\test_health_endpoints.py`\n   - Syntax errors in test file\n   - Missing imports or dependencies\n   - Test fixture/configurations broken\n   - Environment setup failures\n   - Import cycles or module loading issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check Python syntax: `python -m py_compile tests/monitoring/test_health_endpoints.py`\n3. Verify test dependencies and imports\n4. Run a single simple test to isolate the issue\n\n**Systematic Fixes:**\n1. Add pre-commit hooks for syntax validation\n2. Implement CI pipeline with dependency verification\n3. Create smoke tests to validate test environment\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- No test validation of monitoring endpoints\n- Production health checks potentially unreliable\n- Zero confidence in monitoring system functionality\n- Critical system failures may go undetected\n\n**Priority**: Fix test execution immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 326,
+      "total_tokens": 456,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 66
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

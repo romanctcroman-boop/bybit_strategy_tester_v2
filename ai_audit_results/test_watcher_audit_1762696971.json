@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762696971,
+  "changed_files": [
+    "backend\\security\\secure_logger.py",
+    "backend\\security\\jwt_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762696954.2164464,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run. This indicates either:\n- Syntax errors in test files or code\n- Missing dependencies\n- Configuration issues\n- Fatal import errors\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a direct result of test execution failure, not a measurement of actual coverage.\n\n## Potential Issues with Recent Changes\nThe security-related changes (`secure_logger.py`, `jwt_manager.py`) likely introduced:\n- **Import/circular dependency issues** - Common with security modules\n- **Syntax errors** - Breaking Python interpreter\n- **Missing dependencies** - Security libraries not installed\n- **Configuration conflicts** - Environment setup problems\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check Python syntax: `python -m py_compile backend/security/*.py`\n   - Verify imports: `python -c \"from backend.security import secure_logger, jwt_manager\"`\n   - Review test runner configuration\n\n2. **Security-Specific Checks**\n   - Validate JWT dependency installation (PyJWT/cryptography)\n   - Check logging configuration doesn't conflict with secure_logger\n   - Verify no circular imports between security modules\n\n3. **Infrastructure**\n   - Ensure test dependencies match development environment\n   - Check pytest/unittest configuration files\n\n## Risk Assessment\n**HIGH RISK** - Security changes are deployed without any test validation. Potential vulnerabilities in:\n- Token handling (JWT)\n- Secure logging practices\n- Authentication/authorization flows\n\n**Priority**: Fix test execution immediately before any deployment. Security code requires rigorous testing.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 137,
+      "completion_tokens": 356,
+      "total_tokens": 493,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 73
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

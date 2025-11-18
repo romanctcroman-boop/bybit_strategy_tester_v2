@@ -1,0 +1,33 @@
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+include = '\\.pyi?$'
+
+# Ruff >=0.6 moved linter options under [tool.ruff.lint]. Update to avoid deprecation warnings.
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+exclude = [
+	"tests",
+	"scripts",
+	"frontend",
+	"dist",
+	"node_modules",
+	"venv",
+	".venv",
+]
+
+[tool.ruff.lint]
+# Explicit, pinned ruleset (pycodestyle E, pyflakes F, import sorting I).
+# Gradually stricter: enable UP (pyupgrade), B (bugbear), SIM (simplify)
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# Pragmatic ignores while we roll in stricter rules:
+# - E501: long lines
+# - E402: module level import not at top
+# - UP035: gradual migration off typing.* to builtins (dict, list, ...)
+# - SIM105: try/except/pass simplifications (we'll convert incrementally)
+# - B904: raise from pattern in except; keep as-is for Celery retry paths
+ignore = ["E501", "E402", "SIM105", "B904"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend", "tests"]

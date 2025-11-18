@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762722933,
+  "changed_files": [
+    "tests\\test_circuit_breaker.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "temp_pg_test.py",
+    "tests\\test_rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762722919.4893486,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental execution issues\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - Critical gaps:\n- Zero test execution means no code paths were validated\n- Missing baseline coverage for core functionality\n- Unable to assess any test effectiveness\n\n## Potential Issues with Recent Changes\n1. **Environment corruption**: `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` modification suggests broken virtual environment\n2. **Test infrastructure failure**: Exit code -1 points to interpreter-level crashes\n3. **Dependency conflicts**: Modified package files indicate environment instability\n4. **New test files** (`test_circuit_breaker.py`, `test_rate_limiter.py`) may contain fatal errors\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Rebuild virtual environment** from scratch\n2. **Run tests individually** to identify crashing test\n3. **Check for native library issues** (psycopg2 C extensions)\n4. **Validate test dependencies** and installation\n\n**FOLLOW-UP:**\n5. Add basic smoke test to verify test harness functionality\n6. Implement test isolation to prevent cascade failures\n7. Set up pre-commit hooks to detect environment issues\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code is completely untested\n- Environment instability threatens development velocity\n- Potential for undetected regressions in deployed code\n- Test suite provides zero safety net for changes\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 167,
+      "completion_tokens": 376,
+      "total_tokens": 543,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 103
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

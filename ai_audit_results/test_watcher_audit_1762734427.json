@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762734427,
+  "changed_files": [
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762734412.0726664,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data collected due to test failure\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- 0% coverage across all files\n- No code paths were executed\n- Unable to assess actual coverage gaps due to test suite crash\n\n## Potential Issues with Recent Changes\n**Primary Suspect:** `tests/test_protocol.py` modifications caused:\n- Syntax errors in test file\n- Import failures or circular dependencies\n- Fixture/config setup crashes\n- Environment compatibility issues\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure:**\n   - Run `python -m pytest tests/test_protocol.py -v` to see specific error\n   - Check for Python version compatibility\n   - Verify dependencies are installed\n\n2. **Fix Test Protocol:**\n   - Review recent changes to `test_protocol.py`\n   - Check imports, fixtures, and setup/teardown methods\n   - Ensure no infinite loops or memory issues\n\n3. **Restore Baseline:**\n   - Get at least one passing test before addressing coverage\n   - Implement basic smoke test to verify test framework functionality\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing mechanism\n- Potential undetected regressions\n- Deployment would be extremely risky\n- Urgent fix required before any further development\n\n**Priority:** Fix test execution immediately before addressing coverage or adding features.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 337,
+      "total_tokens": 463,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

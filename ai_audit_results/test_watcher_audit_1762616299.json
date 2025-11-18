@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762616299,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "test_single_deepseek.py",
+    "tests\\test_protocol.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\core\\mtf_engine.py",
+    "test_enhanced_cross_agent.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762616282.643082,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates catastrophic failure (likely unhandled exceptions or environment issues)\n- 0% coverage suggests tests aren't even executing properly\n- Multiple test files modified simultaneously increases risk\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No coverage data available due to test execution failure\n- All modified files (8 total) are completely untested in current state\n- Core engine file (`mtf_engine.py`) changes are unvalidated\n\n## Potential Issues with Recent Changes\n1. **Integration Breakage**: `test_sandbox_integration.py` changes likely broke test environment\n2. **Core Component Risk**: `mtf_engine.py` modifications without validation\n3. **Database Impact**: Query optimization changes untested\n4. **Multiple Simultaneous Changes**: High risk of cross-dependencies causing cascade failures\n\n## Immediate Recommendations\n1. **ISOLATE THE FAILURE**:\n   - Run tests individually to identify breaking change\n   - Start with `test_sandbox_integration.py` (most likely culprit)\n   - Check test environment setup and dependencies\n\n2. **ROLLBACK STRATEGY**:\n   - Revert recent changes in batches to identify root cause\n   - Prioritize fixing core engine tests first\n\n3. **RE-ESTABLISH BASELINE**:\n   - Get at least one test passing to restore coverage reporting\n   - Focus on unit tests before integration tests\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be catastrophic:\n- Core engine changes completely unvalidated\n- Multiple integration points potentially broken\n- Zero quality gates currently functional\n- Database layer modifications untested\n\n**ACTION: Stop all further development until test suite is restored and core coverage reaches minimum 80%.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 205,
+      "completion_tokens": 389,
+      "total_tokens": 594,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 141
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

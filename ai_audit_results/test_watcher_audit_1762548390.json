@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762548390,
+  "changed_files": [
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\test_protocol.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_phase1_security.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762548373.1259003,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete test failure:\n- No files were executed to collect coverage\n- All test modules appear compromised\n- Critical gap: Entire codebase untested in this run\n\n## Potential Issues with Recent Changes\n1. **Infrastructure Breakage** - Likely in `tests/backend/conftest.py` or shared fixtures\n2. **Dependency Conflicts** - Recent ML additions (`lstm_predictions.py`, `lstm_queue_predictor.py`) may have incompatible dependencies\n3. **Database/Engine Issues** - `mtf_engine.py` changes possibly broke test environment setup\n4. **Import/Circular Dependency** - New modules may have broken import chains\n\n## Immediate Actions Required\n1. **DEBUG CONFTEST** - Start with `tests/backend/conftest.py` - likely pytest fixture failure\n2. **ISOLATE FAILURE** - Run tests individually to identify first breaking point\n3. **CHECK ENVIRONMENT** - Verify all dependencies are installed and compatible\n4. **VALIDATE IMPORTS** - Test import chains for new ML modules\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be reckless:\n- Zero confidence in any functionality\n- ML pipeline changes untested\n- Core engine modifications unverified\n- Database operations potentially broken\n\n## Priority Recommendations\n1. **FIX TEST INFRASTRUCTURE FIRST** - Don't write new tests until basic execution works\n2. **ADD SMOKE TEST** - Create minimal test that verifies environment sanity\n3. **VALIDATE ML DEPENDENCIES** - Ensure TensorFlow/Keras versions don't conflict with existing stack\n4. **ROLLBACK RECENT CHANGES** if quick fix not found - revert to last working state\n\n**Start with:** `pytest tests/backend/conftest.py -v` to diagnose configuration issues",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 454,
+      "total_tokens": 745,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 227
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

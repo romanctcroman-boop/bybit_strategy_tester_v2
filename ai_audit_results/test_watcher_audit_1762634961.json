@@ -1,0 +1,41 @@
+{
+  "timestamp": 1762634961,
+  "changed_files": [
+    "backend\\agents\\deepseek.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\server.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\__init__.py",
+    "backend\\agents\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\main.py",
+    "mcp-server\\server.py",
+    "backend\\services\\deepseek_agent.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762634945.4676468,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception or environment crash)\n- 0% coverage suggests tests never executed successfully\n- No coverage data collected for any files\n\n## Coverage Analysis & Gaps\n**COMPLETE TESTING BREAKDOWN:**\n- Zero coverage across all files indicates fundamental infrastructure failure\n- No test execution occurred - this is worse than low coverage\n- Critical business logic in `backend/agents/` and `backend/services/` completely untested\n\n## Potential Issues with Recent Changes\n**HIGH-RISK MODIFICATIONS DETECTED:**\n1. **Environment corruption** - Changes to `.venv/` packages suggest dependency conflicts\n2. **DeepSeek agent integration** - Multiple backend agent files modified simultaneously\n3. **MCP server changes** - FastMCP package modifications could break core functionality\n4. **Environment configuration** - Dotenv changes may have broken environment loading\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test infrastructure first:**\n   - Check Python environment integrity\n   - Verify test runner configuration\n   - Ensure dependencies are properly installed\n\n2. **Isolate the breaking change:**\n   - Revert recent `.venv/` modifications\n   - Test MCP server changes in isolation\n   - Validate environment variable loading\n\n3. **Restore basic testing:**\n   - Start with simple unit tests for `backend/services/deepseek_agent.py`\n   - Add integration tests gradually\n   - Implement health checks for agent initialization\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- **Critical**: Core functionality likely broken\n- **High**: Agent services may be non-operational  \n- **Medium**: Environment configuration instability\n- **Low**: Test infrastructure requires complete rebuild\n\n**Priority**: Fix test execution before addressing coverage gaps. Current state suggests fundamental system failure rather than test quality issues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 253,
+      "completion_tokens": 417,
+      "total_tokens": 670,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 189
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

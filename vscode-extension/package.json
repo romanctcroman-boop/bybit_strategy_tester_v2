@@ -1,0 +1,121 @@
+{
+  "name": "agent-to-agent-bridge",
+  "displayName": "Agent-to-Agent Communication Bridge",
+  "description": "Bridges GitHub Copilot with DeepSeek/Perplexity agents via WebSocket",
+  "version": "1.0.0",
+  "publisher": "bybit-strategy-tester",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "agent-bridge.sendToDeepSeek",
+        "title": "Send to DeepSeek Agent",
+        "category": "Agent Bridge"
+      },
+      {
+        "command": "agent-bridge.sendToPerplexity",
+        "title": "Send to Perplexity Agent",
+        "category": "Agent Bridge"
+      },
+      {
+        "command": "agent-bridge.startConversation",
+        "title": "Start Agent Conversation",
+        "category": "Agent Bridge"
+      },
+      {
+        "command": "agent-bridge.getConsensus",
+        "title": "Get Multi-Agent Consensus",
+        "category": "Agent Bridge"
+      },
+      {
+        "command": "agent-bridge.toggleConnection",
+        "title": "Toggle WebSocket Connection",
+        "category": "Agent Bridge"
+      }
+    ],
+    "configuration": {
+      "title": "Agent-to-Agent Bridge",
+      "properties": {
+        "agentBridge.serverUrl": {
+          "type": "string",
+          "default": "ws://localhost:8000/api/v1/agent/ws",
+          "description": "WebSocket server URL for agent communication"
+        },
+        "agentBridge.autoConnect": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically connect to agent server on startup"
+        },
+        "agentBridge.defaultAgent": {
+          "type": "string",
+          "enum": [
+            "deepseek",
+            "perplexity",
+            "auto"
+          ],
+          "default": "auto",
+          "description": "Default agent for queries"
+        },
+        "agentBridge.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications for agent responses"
+        },
+        "agentBridge.maxResponseLength": {
+          "type": "number",
+          "default": 5000,
+          "description": "Maximum length of agent response to display"
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorHasSelection",
+          "command": "agent-bridge.sendToDeepSeek",
+          "group": "9_agent@1"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "agent-bridge.sendToPerplexity",
+          "group": "9_agent@2"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "agent-bridge.getConsensus",
+          "group": "9_agent@3"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.130",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

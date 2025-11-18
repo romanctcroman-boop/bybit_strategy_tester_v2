@@ -1,0 +1,27 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-8.4.2, pluggy-1.6.0
+rootdir: D:\bybit_strategy_tester_v2
+configfile: pytest.ini
+plugins: anyio-4.11.0, asyncio-1.2.0, cov-7.0.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 0 items / 1 error
+
+=================================== ERRORS ====================================
+_________ ERROR collecting tests/backend/tasks/test_backtest_tasks.py _________
+ImportError while importing test module 'D:\bybit_strategy_tester_v2\tests\backend\tasks\test_backtest_tasks.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\roman\AppData\Local\Programs\Python\Python313\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\backend\tasks\test_backtest_tasks.py:23: in <module>
+    from backend.tasks.backtest_tasks import (
+backend\tasks\__init__.py:6: in <module>
+    from . import backfill_tasks, backtest_tasks, optimize_tasks
+backend\tasks\optimize_tasks.py:16: in <module>
+    from backend.database import Optimization, SessionLocal
+E   ImportError: cannot import name 'Optimization' from 'backend.database' (D:\bybit_strategy_tester_v2\backend\database\__init__.py)
+=========================== short test summary info ===========================
+ERROR tests/backend/tasks/test_backtest_tasks.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+============================== 1 error in 2.28s ===============================

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762529060,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762529031.8768024,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run successfully. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage confirms no tests executed. All code paths are untested. This represents maximum testing risk.\n\n## Potential Issues with Recent Changes\nThe file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures\n- **Runtime errors** during module initialization\n- **Infinite loops** or **blocking operations** during import\n- **Environment configuration** issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution failure** - Check test logs for specific error messages\n2. **Validate file syntax** - Run `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py`\n3. **Test import isolation** - Attempt to import the module directly\n4. **Check dependencies** - Verify all required packages are installed\n\n**FOLLOW-UP:**\n5. **Add basic smoke tests** before comprehensive coverage\n6. **Implement CI pipeline checks** to catch similar failures earlier\n7. **Add module-level error handling** to prevent complete test failure\n\n## Risk Assessment\n**HIGH RISK** - Current state represents maximum risk:\n- **Deployment Risk**: Code cannot be validated\n- **Regression Risk**: All functionality untested\n- **Quality Risk**: Unknown if code works at all\n- **Maintenance Risk**: Future changes cannot be safely made\n\n**Priority**: Resolve test execution failure before any other quality initiatives.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 389,
+      "total_tokens": 524,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

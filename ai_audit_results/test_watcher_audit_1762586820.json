@@ -1,0 +1,60 @@
+{
+  "timestamp": 1762586820,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    "tests\\test_mtf_engine.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    "backend\\services\\data_service.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    "backend\\models\\__init__.py",
+    "backend\\api\\routers\\live.py",
+    "tests\\test_sandbox_integration.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    "backend\\api\\routers\\health.py",
+    "backend\\core\\logging_config.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    "backend\\core\\mtf_engine.py",
+    "backend\\sandbox\\docker_sandbox.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    "backend\\database\\__init__.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    "backend\\settings.py",
+    "tests\\test_protocol.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    "backend\\api\\routers\\admin.py",
+    "backend\\sandbox\\security_validator.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762586798.7337534,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- No tests executed successfully\n- 0% coverage suggests fundamental execution issues\n\n## 2. Coverage Analysis\n**COMPLETE COVERAGE FAILURE**\n- No code coverage data collected\n- All backend modules (routers, services, core) untested\n- Critical components like MTF engine, sandbox security, database layers completely uncovered\n\n## 3. Potential Issues with Recent Changes\n**HIGH RISK CHANGES IDENTIFIED:**\n- Modified virtual environment packages (pytest, coverage, pluggy) - likely corrupted test environment\n- Changes to core engine (`mtf_engine.py`) and sandbox components without test validation\n- Multiple router updates with no test verification\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. **Restore test environment**\n   - Recreate virtual environment from clean state\n   - Reinstall test dependencies (pytest, coverage)\n   - Verify pytest installation isn't corrupted\n\n2. **Debug test execution**\n   - Run simplest test first: `pytest -v tests/ -k \"simple\"`\n   - Check for import errors or circular dependencies\n   - Verify Python path and module imports\n\n3. **Isolate problematic changes**\n   - Revert virtual environment package modifications\n   - Test core functionality before integration changes\n\n**MEDIUM TERM:**\n- Implement basic smoke tests for critical paths\n- Add health check tests for API routers\n- Set up pre-commit hooks to prevent env corruption\n\n## 5. Risk Assessment\n**HIGH RISK** - Production deployment should be blocked\n- Core functionality untested and potentially broken\n- Security components (sandbox, validators) unverified\n- Database operations and API endpoints unvalidated\n\n**Priority:** Fix test environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 503,
+      "completion_tokens": 425,
+      "total_tokens": 928,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 439
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

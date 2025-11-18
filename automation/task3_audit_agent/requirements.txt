@@ -1,0 +1,10 @@
+# Audit Agent Dependencies
+
+# Scheduler для периодических задач
+APScheduler>=3.10.4
+
+# File system monitoring
+watchdog>=3.0.0
+
+# Code coverage (уже установлен)
+coverage>=7.0.0

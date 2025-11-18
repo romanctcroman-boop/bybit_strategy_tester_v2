@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762723033,
+  "changed_files": [
+    "tests\\test_circuit_breaker.py",
+    "create_cb_tests.py",
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762723018.1088898,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/execution). Test suite is unreliable and provides zero validation.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure. No code is being executed during tests. This suggests:\n- Test runner configuration issues\n- Import failures in test modules\n- Missing test dependencies\n- Test discovery failures\n\n## Potential Issues with Recent Changes\nThe changed files indicate circuit breaker pattern implementation:\n1. **`tests/test_circuit_breaker.py`** - Likely contains broken test imports or setup\n2. **`create_cb_tests.py`** - Possibly a test generator with syntax errors\n3. **`reliability/__init__.py`** - Package initialization issues affecting imports\n\n## Immediate Action Recommendations\n1. **Debug Test Execution**\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   Check for import errors or syntax issues\n\n2. **Verify Test Discovery**\n   - Ensure `tests/` is properly configured in pytest.ini/pyproject.toml\n   - Check `__init__.py` files in test directories\n\n3. **Check Dependencies**\n   - Verify all required packages are installed\n   - Confirm Python path includes project root\n\n4. **Test Circuit Breaker Module First**\n   ```python\n   python -c \"from reliability import circuit_breaker; print('Import OK')\"\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functional tests poses severe reliability risks:\n- Circuit breaker logic (critical infrastructure) is completely untested\n- No regression protection for reliability features\n- High probability of production failures\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 144,
+      "completion_tokens": 388,
+      "total_tokens": 532,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 80
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762728472,
+  "changed_files": [
+    "parallel_audit_submission.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762728458.670361,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/execution).\n\n## Coverage Analysis\n**0% coverage** - No code is being executed during tests. This represents complete test infrastructure failure rather than just low coverage.\n\n## Potential Issues with Recent Changes\n1. **parallel_audit_submission.py changes** likely introduced:\n   - Syntax errors preventing import/execution\n   - Missing dependencies or imports\n   - Runtime errors during module loading\n   - Broken test configuration/setup\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Run tests with `-v` flag to see specific failure\n   - Check for syntax errors in changed file\n   - Verify imports and dependencies\n   - Examine test configuration files\n\n2. **Debug sequence**:\n   ```bash\n   python -m py_compile parallel_audit_submission.py  # Check syntax\n   python -c \"import parallel_audit_submission\"       # Test import\n   pytest -xvs                                        # See first failure\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested. Any deployment would be extremely risky. The -1 exit code suggests fundamental problems that could affect production runtime.\n\n**Priority**: Fix test execution immediately before any other development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 287,
+      "total_tokens": 413,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

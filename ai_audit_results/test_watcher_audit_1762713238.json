@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762713238,
+  "changed_files": [
+    "fix_error_tests_properly.py",
+    "fix_error_handling_tests.py",
+    "fix_tests_with_monkeypatch.py",
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713224.7009146,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage confirms no tests executed successfully\n- Recent changes to test files suggest broken test infrastructure\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- No files have any coverage (0% across all modules)\n- Test execution isn't reaching any application code\n- Entire codebase is untested in current state\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure Broken** - Changes in `fix_error_tests_properly.py` and related files likely introduced fatal errors\n2. **Import/Setup Failures** - Possible circular imports, missing dependencies, or configuration errors\n3. **Monkeypatch Misuse** - `fix_tests_with_monkeypatch.py` changes may be patching critical system components incorrectly\n\n## Immediate Recommendations\n1. **Debug Test Runner**:\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   Identify the root cause of the exit code -1\n\n2. **Check Test Dependencies**:\n   - Verify all fixtures and imports in changed test files\n   - Ensure `test_deepseek_client.py` dependencies are available\n\n3. **Rollback Recent Changes**:\n   - Temporarily revert the 4 modified test files\n   - Re-establish baseline functionality before incremental fixes\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No code validation occurring\n- Undetected regressions guaranteed\n- Critical bugs could reach production undetected\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 157,
+      "completion_tokens": 361,
+      "total_tokens": 518,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 93
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

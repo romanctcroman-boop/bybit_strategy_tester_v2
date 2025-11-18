@@ -1,0 +1,144 @@
+{{- if and .Values.global.istio.enabled .Values.istio.enabled -}}
+---
+# Istio Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-gateway
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+spec:
+  selector:
+    istio: ingressgateway  # Use Istio default gateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    {{- range .Values.istio.virtualServices.backend.hosts }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- if .Values.backend.ingress.tls }}
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    {{- range .Values.istio.virtualServices.backend.hosts }}
+    - {{ . | quote }}
+    {{- end }}
+    tls:
+      mode: SIMPLE
+      credentialName: {{ (index .Values.backend.ingress.tls 0).secretName }}
+    {{- end }}
+---
+# Virtual Service for Backend
+{{- if .Values.istio.virtualServices.backend.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-backend
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+spec:
+  hosts:
+  {{- range .Values.istio.virtualServices.backend.hosts }}
+  - {{ . | quote }}
+  {{- end }}
+  gateways:
+  {{- range .Values.istio.virtualServices.backend.gateways }}
+  - {{ . | quote }}
+  {{- end }}
+  http:
+  {{- range .Values.istio.virtualServices.backend.http }}
+  - match:
+    {{- toYaml .match | nindent 4 }}
+    route:
+    {{- toYaml .route | nindent 4 }}
+    {{- if .retries }}
+    retries:
+      {{- toYaml .retries | nindent 6 }}
+    {{- end }}
+    {{- if .timeout }}
+    timeout: {{ .timeout }}
+    {{- end }}
+    {{- if .fault }}
+    fault:
+      {{- toYaml .fault | nindent 6 }}
+    {{- end }}
+    {{- if .mirror }}
+    mirror:
+      {{- toYaml .mirror | nindent 6 }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+---
+# Destination Rule for Backend (Circuit Breaking)
+{{- if .Values.istio.destinationRules.backend.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-backend
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+spec:
+  host: {{ include "bybit-strategy-tester.fullname" . }}-backend
+  trafficPolicy:
+    {{- toYaml .Values.istio.destinationRules.backend.trafficPolicy | nindent 4 }}
+    {{- if .Values.global.istio.mtls.mode }}
+    tls:
+      mode: {{ .Values.global.istio.mtls.mode }}
+    {{- end }}
+  subsets:
+  - name: v1
+    labels:
+      version: {{ .Values.backend.image.tag }}
+  {{- if .Values.backend.canary }}
+  - name: canary
+    labels:
+      version: {{ .Values.backend.canary.tag }}
+  {{- end }}
+{{- end }}
+---
+# Peer Authentication (mTLS)
+{{- if .Values.global.istio.mtls.mode }}
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+spec:
+  mtls:
+    mode: {{ .Values.global.istio.mtls.mode }}
+{{- end }}
+---
+# Authorization Policy (Optional)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-backend
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "backend.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "backend.selectorLabels" . | nindent 6 }}
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Values.global.namespace }}/sa/*"]
+    to:
+    - operation:
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        paths: ["/api/*"]
+{{- end }}

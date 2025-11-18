@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762541473,
+  "changed_files": [
+    "test_0.py",
+    "test_1.py",
+    "test_2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541460.1108658,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely environment/configuration issues). Zero coverage suggests tests aren't even executing.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code is being tested\n- **No file-specific coverage data** - Tests aren't reaching any source files\n- **Gap**: Entire test infrastructure appears broken\n\n## Potential Issues with Recent Changes\n1. **test_0.py, test_1.py, test_2.py changes** likely introduced breaking changes\n2. Possible issues:\n   - Import errors in test files\n   - Missing dependencies\n   - Test runner configuration broken\n   - Syntax errors in test files\n   - Environment setup failures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run individual test files to identify which one fails first\n2. Check test runner configuration (pytest, unittest config)\n3. Verify imports and dependencies in all three changed test files\n4. Run with `-v` flag to see specific error messages\n\n**Short-term:**\n1. Fix the first failing test file before addressing others\n2. Add basic smoke tests to prevent complete test suite collapse\n3. Implement CI checks for test execution (not just existence)\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected production bugs likely\n- Code changes are effectively untested\n- Deployment carries significant risk\n- Immediate attention required before any further development\n\n**Priority: Fix test execution immediately** - This is blocking all quality assurance.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 333,
+      "total_tokens": 468,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmpt11_o351",
+    "debounce_seconds": 2
+  }
+}

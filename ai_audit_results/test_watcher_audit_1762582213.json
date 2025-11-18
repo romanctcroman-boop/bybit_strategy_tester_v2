@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762582213,
+  "changed_files": [
+    "analyze_test_hang.py",
+    "automation\\deepseek_code_agent\\code_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762582196.5338867,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely crash or hang)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data means tests didn't run at all\n\n## Coverage Analysis & Gaps\n**NO COVERAGE** - All metrics at 0%:\n- No files were tested\n- No code paths executed\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\nThe changed files suggest:\n1. **`analyze_test_hang.py`** - Likely contains test analysis logic that may be causing the hang\n2. **`code_agent.py`** - Automation agent that might be stuck in infinite loops or blocking operations\n3. **Possible deadlocks** between these components\n4. **Missing dependencies** or broken imports in the test environment\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `--timeout` flag to detect hangs\n2. Add debug logging to identify where execution stops\n3. Test components in isolation:\n   ```bash\n   python -m pytest analyze_test_hang.py -v\n   python -m pytest automation/deepseek_code_agent/code_agent.py -v\n   ```\n\n**Short-term:**\n4. Add timeout decorators to prevent infinite loops\n5. Implement health checks in agent components\n6. Add basic smoke tests before full test suite\n\n## Risk Assessment\n**HIGH RISK** - Production readiness severely compromised:\n- ❌ No test validation of recent changes\n- ❌ Potential regression issues undetected  \n- ❌ Critical bugs could reach production\n- ❌ Development blocked until resolved\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 138,
+      "completion_tokens": 364,
+      "total_tokens": 502,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 74
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

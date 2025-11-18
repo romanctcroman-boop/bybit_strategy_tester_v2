@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762584131,
+  "changed_files": [
+    "backend\\api\\deepseek_pool_refactored.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762584115.0055556,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe refactored `deepseek_pool_refactored.py` likely contains:\n- Import/circular dependency issues\n- Syntax errors preventing module loading\n- Missing required dependencies\n- Breaking changes to class/method signatures\n- Environment-specific configuration problems\n\n## Immediate Action Recommendations\n\n1. **Fix Test Execution First**\n   - Run `python -m pytest --collect-only` to identify test discovery issues\n   - Check for syntax errors: `python -m py_compile backend/api/deepseek_pool_refactored.py`\n   - Verify imports work in isolation\n\n2. **Debug the Refactored Code**\n   - Test the module import directly: `python -c \"from backend.api.deepseek_pool_refactored import *\"`\n   - Check for missing dependencies in requirements.txt\n   - Validate environment variables and configuration\n\n3. **Restore Basic Testing**\n   - Add a simple smoke test to verify basic functionality\n   - Ensure tests can at least import and instantiate key classes\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely dangerous:\n- No validation of refactored logic\n- Potential runtime failures in production\n- Possible data corruption or service outages\n- Complete loss of test safety net\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 375,
+      "total_tokens": 506,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

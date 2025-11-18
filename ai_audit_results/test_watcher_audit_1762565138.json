@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762565138,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762565125.570252,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is not a coverage gap but a complete testing infrastructure failure.\n\n## Potential Issues with Recent Changes\n1. **health_check.py changes likely broke test infrastructure**\n2. Possible syntax errors preventing test discovery/import\n3. Test configuration or runner issues\n4. Missing dependencies or import failures\n\n## Immediate Recommendations\n1. **Fix test execution first** - Run tests with verbose output to identify the crash cause\n2. Check for syntax errors in health_check.py: `python -m py_compile health_check.py`\n3. Verify test discovery: `python -m pytest --collect-only`\n4. Review recent changes to health_check.py for breaking changes\n5. Ensure all imports and dependencies are available\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested. Any deployment carries significant risk of runtime failures. The testing pipeline itself is broken, making it impossible to validate any changes.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 256,
+      "total_tokens": 378,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

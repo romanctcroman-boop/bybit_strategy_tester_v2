@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762525196,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\test_phase1_security.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\test_protocol.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762525178.2789834,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data implies tests didn't run at all\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - All gaps identified:\n- No tests executed across 13 modified files\n- Critical backend components untested (MTF engine, LSTM predictors, APIs)\n- Database and protocol layers completely unvalidated\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure Broken**: Likely environment/config issues in test runner\n2. **Dependency Conflicts**: Recent changes may have broken test dependencies\n3. **Import/Circular Dependencies**: Changes in `backend/core/mtf_engine.py` or ML modules may prevent test imports\n4. **Database Connectivity**: Test database may be unavailable or misconfigured\n\n## Immediate Action Plan\n1. **Diagnose Test Runner**:\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   Check for import errors or environment issues\n\n2. **Validate Dependencies**:\n   - Verify test requirements are installed\n   - Check for version conflicts in ML/libs\n\n3. **Isolate Failure**:\n   - Run tests individually from changed files\n   - Start with simplest test to identify root cause\n\n4. **Fix Priority Order**:\n   - MTF engine tests first (core trading logic)\n   - Database optimization tests\n   - API integration tests\n\n## Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- 🚨 Core trading engine changes untested\n- 🚨 ML prediction pipeline unvalidated  \n- 🚨 API endpoints potentially broken\n- 🚨 Database performance changes unverified\n\n**Recommendation**: Halt all deployments until test suite is functional and shows meaningful coverage recovery.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 281,
+      "completion_tokens": 397,
+      "total_tokens": 678,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 217
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

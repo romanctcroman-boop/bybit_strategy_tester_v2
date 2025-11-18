@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762610323,
+  "changed_files": [
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762610303.987575,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run. This indicates either fatal configuration issues or severe code defects preventing test initialization.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is a direct result of the test execution failure, not an actual coverage measurement.\n\n## Potential Issues with Recent Changes\nThe failure likely stems from changes in `mcp-server\\api\\providers\\perplexity.py`:\n- **Syntax errors** preventing module import\n- **Missing dependencies** or imports\n- **Runtime exceptions** during module loading\n- **Configuration issues** in test setup/teardown\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution** - Check for syntax errors in perplexity.py\n2. **Verify imports** - Ensure all dependencies are available\n3. **Run isolated test** - Test perplexity.py module directly to identify loading issues\n4. **Check test configuration** - Review pytest configuration and conftest files\n\n**Follow-up:**\n5. Once tests execute, establish baseline coverage\n6. Add unit tests specifically for perplexity.py functionality\n7. Implement CI checks to prevent zero-coverage commits\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- No validation of recent changes\n- Unknown if core functionality is broken\n- Potential for runtime failures in production\n- Complete lack of quality assurance\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 132,
+      "completion_tokens": 331,
+      "total_tokens": 463,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 4
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

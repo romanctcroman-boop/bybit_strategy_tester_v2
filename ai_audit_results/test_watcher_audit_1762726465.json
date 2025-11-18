@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762726465,
+  "changed_files": [
+    "send_audit_requests.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762726439.1254556,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - Zero code coverage indicates:\n- Test infrastructure failure\n- Tests not reaching any application code\n- Possible import errors or environment misconfiguration\n\n## Potential Issues with Recent Changes\n`send_audit_requests.py` modifications likely caused:\n- **Import/circular dependency issues**\n- **Syntax errors** preventing module loading\n- **Missing dependencies** in test environment\n- **Environment variable/config requirements** not met\n\n## Immediate Action Items\n1. **Check test runner output** for stack traces\n2. **Validate `send_audit_requests.py` syntax** - run `python -m py_compile send_audit_requests.py`\n3. **Test imports manually** - run `python -c \"import send_audit_requests\"`\n4. **Verify test dependencies** - ensure all imports available in test environment\n\n## Risk Assessment\n**HIGH RISK** - Changes are completely blocking testing pipeline. Cannot validate functionality or prevent regressions. Deployment would be extremely risky.\n\n## Priority Recommendations\n1. **Fix test execution first** - address the -1 exit code before analyzing coverage\n2. **Add basic smoke test** to verify module can be imported\n3. **Check CI environment** matches development setup\n4. **Implement error handling** in test setup to provide better failure diagnostics\n\n**Start with the exit code -1 root cause** - this is blocking all other quality metrics.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 339,
+      "total_tokens": 465,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

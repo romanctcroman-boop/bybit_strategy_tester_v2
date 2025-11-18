@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762553339,
+  "changed_files": [
+    "analyze_final_v2_with_deepseek.py",
+    "backend\\api\\secure_key_storage.py",
+    "backend\\api\\lru_ttl_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762553315.2752268,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data collected implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- 0.00% coverage across all files\n- No test execution means no code paths were validated\n- All business logic is currently untested and unverified\n\n## Potential Issues with Recent Changes\n1. **analyze_final_v2_with_deepseek.py** - Likely contains breaking changes that crash test environment\n2. **secure_key_storage.py** - Security-related changes may have dependency or initialization issues\n3. **lru_ttl_cache.py** - Caching logic could be causing import cycles or runtime exceptions\n\n## Immediate Action Recommendations\n1. **DEBUG TEST INFRASTRUCTURE:**\n   - Check test runner configuration and dependencies\n   - Verify Python environment and package versions\n   - Run with `--tb=long` to get full traceback\n\n2. **ISOLATE THE FAILURE:**\n   ```bash\n   python -m pytest -xvs  # Stop on first failure with verbose output\n   ```\n\n3. **VALIDATE IMPORTS:**\n   - Check all new imports in changed files\n   - Verify circular import dependencies\n   - Test module initialization separately\n\n4. **CREATE BASIC SANITY TEST:**\n   ```python\n   # test_sanity.py\n   def test_imports():\n       import analyze_final_v2_with_deepseek\n       import backend.api.secure_key_storage\n       import backend.api.lru_ttl_cache\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Current state represents production deployment risk:\n- All new code changes are completely untested\n- Potential for runtime crashes in production\n- Security implications from untested key storage logic\n- No validation of caching behavior or memory leaks\n\n**Priority:** Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 152,
+      "completion_tokens": 437,
+      "total_tokens": 589,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 88
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

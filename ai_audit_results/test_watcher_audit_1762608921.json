@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762608921,
+  "changed_files": [
+    "backend\\api\\perplexity_client.py",
+    "test_perplexity_quick_wins.py",
+    "test_priority_1_unified_client.py",
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762608902.6465018,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests never executed properly\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files show any coverage data\n- Either tests crashed before execution or coverage collection is misconfigured\n- All modified files (Perplexity client components) are completely untested\n\n## Potential Issues with Recent Changes\n1. **Import/Initialization Failures** - New Perplexity client files likely have dependency issues\n2. **Configuration Problems** - API keys, environment variables missing\n3. **Breaking Interface Changes** - Unified client modifications incompatible with existing tests\n4. **Test Suite Corruption** - Test files themselves may contain syntax errors\n\n## Immediate Action Recommendations\n1. **Debug Test Execution:**\n   - Run tests with `-v` flag to see where they fail\n   - Check for missing imports in new Perplexity client files\n   - Verify all dependencies are installed\n\n2. **Fix Infrastructure First:**\n   - Ensure pytest/coverage configuration is valid\n   - Check for circular imports between client modules\n   - Validate environment setup (API keys, config files)\n\n3. **Priority Testing:**\n   - Start with isolated unit tests for `perplexity_client.py`\n   - Add basic smoke tests before comprehensive coverage\n   - Fix `test_perplexity_quick_wins.py` first as likely simplest\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production client code is completely untested\n- Potential runtime failures in API integrations\n- No safety net for Perplexity API changes\n- Deployment could introduce critical failures\n\n**IMMEDIATE ACTION REQUIRED:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 165,
+      "completion_tokens": 393,
+      "total_tokens": 558,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 101
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

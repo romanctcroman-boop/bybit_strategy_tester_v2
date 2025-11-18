@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762705616,
+  "changed_files": [
+    "reliability\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762705601.6660335,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** across all files - This is not just low coverage, but indicates:\n- Test suite cannot even initialize/run\n- No code paths executed whatsoever\n- Complete testing blackout\n\n## Potential Issues with Recent Changes\nThe circuit_breaker.py modification likely introduced:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures  \n- **Breaking changes** to class/method signatures\n- **Runtime exceptions** during module loading\n- **Infinite loops** or **blocking operations** preventing test execution\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution** - Check for syntax errors in circuit_breaker.py\n2. **Verify imports** - Ensure all dependencies are available in test environment\n3. **Add basic smoke test** - Create minimal test to verify module loads\n4. **Check test configuration** - Validate pytest/unittest setup\n\n**Short-term:**\n- Add try/except blocks around test setup\n- Implement health check tests\n- Ensure 70%+ coverage before further development\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Undetectable regressions** - No safety net for changes\n- **Production deployment risk** - Untested code changes\n- **Development blocked** - Cannot validate any functionality\n- **Urgent fix required** - Must resolve before continuing development\n\n**Priority: Fix test execution immediately before making any additional changes.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 348,
+      "total_tokens": 473,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762537266,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_phase1_security.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\backend\\conftest.py",
+    "tests\\backend\\test_marketdata_ingest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537250.650295,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional\n- Exit code -1 indicates catastrophic test framework failure\n- Zero test execution suggests fundamental infrastructure issues\n- Likely environment/config problems rather than test logic failures\n\n## 2. Coverage Analysis\n**0% coverage across all files** - No meaningful data available\n- Tests aren't running at all, making coverage metrics useless\n- Cannot assess actual code coverage until tests execute\n\n## 3. Potential Issues with Recent Changes\n**Primary suspects:**\n- `backend\\core\\mtf_engine.py` - Core engine changes may have broken imports\n- `tests\\backend\\conftest.py` - Pytest configuration likely corrupted\n- Environment dependencies (missing packages, version conflicts)\n- Path/import restructuring breaking test discovery\n\n## 4. Immediate Recommendations\n\n**🔴 CRITICAL (Do First):**\n1. Check pytest configuration in `conftest.py` for syntax/import errors\n2. Verify Python environment and dependencies are intact\n3. Run simplest possible test to isolate framework issues\n4. Check for circular imports in recently modified core modules\n\n**🟡 HIGH PRIORITY:**\n1. Restore basic test execution before assessing coverage\n2. Validate import paths in all test files\n3. Check for missing `__init__.py` files in test directories\n\n## 5. Risk Assessment\n**HIGH RISK** - Deployment blocking\n- No test validation means unknown production stability\n- Recent changes to core engine (`mtf_engine.py`) untested\n- ML components (`lstm_queue_predictor.py`) potentially broken\n- Security tests (`test_phase1_security.py`) not running\n\n**First action:** Run `pytest -v tests/` with `--tb=short` to identify the root failure cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 397,
+      "total_tokens": 688,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 227
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

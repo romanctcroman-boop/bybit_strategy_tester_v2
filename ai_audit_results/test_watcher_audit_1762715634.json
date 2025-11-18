@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762715634,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_protocol.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762715607.8703156,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests aren't executing properly\n- No coverage data generated implies fundamental runtime issues\n\n## Coverage Analysis & Gaps\n**Complete coverage failure** - No meaningful data available due to test execution failure. All code changes are effectively untested.\n\n## Potential Issues with Recent Changes\n1. **Configuration/Environment**: Modified `conftest.py` likely introduced breaking changes to test setup\n2. **Integration Dependencies**: `test_sandbox_integration.py` and `test_mtf_engine.py` changes may have broken external dependencies\n3. **Database Issues**: `test_query_optimization.py` modifications could indicate DB connection/schema problems\n4. **Import/Circular Dependencies**: Changes across multiple test files may have created import conflicts\n\n## Immediate Action Plan\n1. **Debug Test Infrastructure**:\n   - Run tests with `-v` flag to identify where failure occurs\n   - Check `conftest.py` fixtures for syntax/import errors\n   - Verify all dependencies are available in test environment\n\n2. **Isolate the Failure**:\n   ```bash\n   pytest tests/backend/conftest.py --collect-only\n   pytest tests/test_mtf_engine.py -v --tb=short\n   ```\n\n3. **Fix Core Issues**:\n   - Restore basic test execution before addressing coverage\n   - Validate database connections and sandbox environments\n   - Check for missing migrations or schema changes\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No validation of core engine changes (`mtf_engine.py`)\n- Database optimization changes completely untested\n- Protocol and edge case scenarios unverified\n- All recent modifications effectively deployed blind\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 399,
+      "total_tokens": 605,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

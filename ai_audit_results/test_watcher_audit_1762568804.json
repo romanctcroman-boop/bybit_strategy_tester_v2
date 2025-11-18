@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762568804,
+  "changed_files": [
+    "tests\\test_integration_full.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762568786.549554,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero quality assurance. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage was collected, indicating:\n- Tests failed before any meaningful execution\n- Possible configuration/import errors\n- Test environment setup failures\n- Critical exceptions in test setup/teardown\n\n## Potential Issues with Recent Changes\nThe failure correlates with changes to `tests\\test_integration_full.py`:\n- **Syntax errors** in test file\n- **Missing dependencies** or imports\n- **Configuration issues** (paths, environment variables)\n- **Test fixture failures** preventing test execution\n- **Integration point failures** (database, APIs, external services)\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test failure**: Run `pytest tests/test_integration_full.py -v` to see specific error\n2. **Check syntax**: Validate Python syntax in the changed test file\n3. **Verify dependencies**: Ensure all required packages are installed\n4. **Isolate the issue**: Temporarily disable this test file to verify other tests pass\n\n**STRUCTURAL FIXES:**\n1. Add pre-commit hooks to validate test syntax\n2. Implement CI pipeline that fails fast on syntax errors\n3. Create smoke tests that validate test environment before full suite runs\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- **No test feedback** on code changes\n- **Undetected regressions** likely\n- **Production deployment** would be extremely risky\n- **Development blocked** until resolved\n\n**Priority: CRITICAL** - Fix test execution before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 378,
+      "total_tokens": 505,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

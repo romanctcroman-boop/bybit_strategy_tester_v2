@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762554306,
+  "changed_files": [
+    "backend\\api\\parallel_deepseek_client_v2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554293.4238555,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either severe configuration issues or fatal errors in test setup/code.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is not a coverage gap but a complete test execution failure.\n\n## Potential Issues with Recent Changes\n1. **Fatal import/initialization errors** in `parallel_deepseek_client_v2.py`\n2. **Missing dependencies** or broken imports\n3. **Syntax errors** preventing module loading\n4. **Configuration issues** with test environment\n5. **Circular imports** or initialization failures\n\n## Recommendations for Improvement\n1. **Immediate:**\n   - Run tests with `-v` flag to see specific failure point\n   - Check Python syntax: `python -m py_compile backend/api/parallel_deepseek_client_v2.py`\n   - Verify all imports and dependencies are available\n\n2. **Short-term:**\n   - Add basic smoke test to verify module can be imported\n   - Check for missing `__init__.py` files in package structure\n   - Validate environment variables and configuration\n\n3. **Structural:**\n   - Implement CI pipeline that fails fast on import/syntax errors\n   - Add module-level unit tests before integration tests\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail. The codebase cannot be validated until basic execution is restored. This suggests potential runtime failures in production environment.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 343,
+      "total_tokens": 474,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762730615,
+  "changed_files": [
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762730591.5191274,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental issues in the test suite or codebase.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No code was executed during test run\n- Complete coverage gap - unable to assess actual code quality\n\n## Potential Issues with Recent Changes\n1. **tests/test_protocol.py modifications** likely introduced:\n   - Syntax errors or import failures\n   - Configuration issues in test setup\n   - Dependency conflicts or missing imports\n   - Infinite loops or resource exhaustion\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test failure first** - run tests with verbose output to identify root cause\n2. **Check test_protocol.py** for syntax errors, missing imports, or configuration issues\n3. **Verify test dependencies** and environment setup\n4. **Run individual test methods** to isolate the failing component\n\n**FOLLOW-UP:**\n5. Once tests pass, implement meaningful coverage targets (aim for 80%+)\n6. Add integration tests for protocol functionality\n7. Implement CI pipeline to catch failures early\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback on code changes\n- Potential production-breaking issues undetected\n- Development halted until test suite is functional\n- Complete lack of quality assurance\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 313,
+      "total_tokens": 439,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

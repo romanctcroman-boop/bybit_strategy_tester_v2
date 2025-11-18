@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762598753,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\httpx\\_client.py",
+    ".venv\\Lib\\site-packages\\httpcore\\_async\\http11.py",
+    ".venv\\Lib\\site-packages\\httpcore\\_backends\\anyio.py",
+    ".venv\\Lib\\site-packages\\httpcore\\_async\\connection_pool.py",
+    ".venv\\Lib\\site-packages\\httpcore\\_exceptions.py",
+    ".venv\\Lib\\site-packages\\httpx\\_models.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\default.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762598737.8472674,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates abnormal termination, likely due to configuration issues or environment problems rather than test failures.\n\n## Coverage Analysis\n**0.00% coverage** - No tests executed successfully. This represents maximum risk - we have zero visibility into code quality or regression detection.\n\n## Potential Issues with Recent Changes\n1. **Virtual environment corruption** - Modified files are all in `.venv/` (third-party packages: httpx, httpcore)\n2. **Dependency conflicts** - Changes to httpcore/httpx transport layers suggest version mismatches or installation issues\n3. **Environment isolation failure** - Tests shouldn't modify package files; indicates environment contamination\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Recreate virtual environment** - Delete `.venv` and rebuild with clean dependencies\n2. **Verify dependency versions** - Check for compatible httpx/httpcore versions in requirements\n3. **Run basic smoke test** - Execute a simple test to verify environment functionality\n4. **Check test configuration** - Review pytest/coverage configuration files\n\n**FOLLOW-UP:**\n5. **Implement isolation** - Ensure tests run in clean, isolated environments\n6. **Add environment validation** - Pre-test checks for environment sanity\n\n## Risk Assessment\n**SEVERITY: CRITICAL**\n- **Regression Risk**: 100% - No test coverage means undetected breaks\n- **Deployment Risk**: Extreme - Cannot validate any functionality\n- **Maintenance Risk**: High - Environment instability affects all development\n\n**Priority**: Fix environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 251,
+      "completion_tokens": 349,
+      "total_tokens": 600,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 187
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

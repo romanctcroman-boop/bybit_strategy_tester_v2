@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762556913,
+  "changed_files": [
+    "automation\\deepseek_code_agent\\code_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762556897.3906224,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No meaningful quality assessment possible without working tests\n\n## Coverage Analysis\n**0% coverage = Complete testing gap**\n- No code paths are being exercised\n- All business logic is untested\n- Regression risk is maximum\n\n## Potential Issues with Recent Changes\n1. **Code Agent Breakage**: Recent changes to `code_agent.py` likely introduced:\n   - Import/syntax errors preventing test discovery\n   - Runtime exceptions during test setup\n   - Broken dependencies or environment configuration\n\n## Immediate Recommendations\n\n**Priority 1 - Restore Test Execution:**\n```bash\n# Debug test discovery\npython -m pytest automation/deepseek_code_agent/ --collect-only -v\n\n# Check for syntax errors\npython -m py_compile automation/deepseek_code_agent/code_agent.py\n```\n\n**Priority 2 - Infrastructure Fixes:**\n- Verify Python environment and dependencies\n- Check test configuration (pytest.ini, conftest.py)\n- Ensure proper import paths and module structure\n\n**Priority 3 - Add Basic Coverage:**\n- Start with simple unit tests for core functions\n- Aim for 70%+ coverage on critical paths\n- Implement CI blocking for <50% coverage\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked until:\n- [ ] Tests execute successfully (exit code 0)\n- [ ] Basic coverage >50% achieved\n- [ ] Critical path functionality verified\n\n**Immediate Action**: Revert `code_agent.py` changes or fix test infrastructure before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 361,
+      "total_tokens": 492,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

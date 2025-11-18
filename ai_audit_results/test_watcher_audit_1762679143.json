@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762679143,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762679127.2196589,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental issues with the test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files. No code was executed during testing, making coverage metrics meaningless until test execution is fixed.\n\n## Potential Issues with Recent Changes\nThe failure likely stems from changes in `tests\\backend\\conftest.py`:\n- **Fixture failures** - Pytest configuration/setup fixtures may be broken\n- **Import errors** - Missing dependencies or incorrect imports in conftest\n- **Configuration errors** - Invalid pytest configuration or hooks\n- **Environment issues** - Missing environment variables or test dependencies\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug conftest.py** - Check for syntax errors, import issues, or fixture failures\n2. **Run pytest with `-v` flag** to see specific error messages\n3. **Test isolation** - Temporarily remove/comment out conftest.py changes to identify the breaking change\n4. **Check dependencies** - Verify all test requirements are installed\n\n**FOLLOW-UP:**\n- Add pre-commit hooks to validate pytest configuration\n- Implement CI pipeline that fails fast on configuration errors\n- Create smoke tests for test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - The entire test suite is non-functional, meaning:\n- No regression detection\n- Potential undetected production bugs\n- Deployment blocking until resolved\n- All code changes are effectively untested\n\n**Priority: Fix immediately** - This blocks all meaningful quality assurance and deployment processes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 358,
+      "total_tokens": 485,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

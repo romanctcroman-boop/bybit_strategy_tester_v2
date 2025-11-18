@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762675127,
+  "changed_files": [
+    "tests\\unit\\test_batch_writer.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762675110.825439,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach the coverage measurement phase\n- **Complete testing gap** - Entire codebase remains untested\n\n## Potential Issues with Recent Changes\n1. **Test file modification** (`test_batch_writer.py`) likely introduced fatal errors\n2. **Environment corruption** - Changes to pytest internals (`.venv\\Lib\\site-packages\\_pytest\\terminal.py`) suggest virtual environment issues\n3. **Possible causes:**\n   - Syntax errors in test code\n   - Missing dependencies or imports\n   - Corrupted pytest installation\n   - Test configuration errors\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution first** - Run individual tests to identify the failure point\n2. **Restore clean environment** - Recreate virtual environment and reinstall dependencies\n3. **Validate test_batch_writer.py** - Check for syntax errors, missing imports, or logical errors\n4. **Run with verbose output** - Use `pytest -v` to see which test fails and why\n\n**FOLLOW-UP:**\n5. Once tests pass, focus on increasing coverage from 0%\n6. Implement basic smoke tests to prevent complete test suite failure\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing pipeline\n- Potential for undetected production bugs\n- Development blocked until tests are functional\n- Possible environment instability affecting entire team\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 146,
+      "completion_tokens": 383,
+      "total_tokens": 529,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 82
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

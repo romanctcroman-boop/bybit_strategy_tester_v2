@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762547481,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    "backend\\app.py",
+    "backend\\health_checks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762547468.6180193,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely environment/configuration issues). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code is being tested. This represents maximum risk exposure. All business logic, error handling, and edge cases are completely untested.\n\n## Potential Issues with Recent Changes\n1. **Environment corruption** - `.venv` modifications suggest virtual environment issues\n2. **FastAPI dependency conflicts** - Changes in FastAPI package files indicate potential version mismatches\n3. **Application initialization failures** - `app.py` changes may have broken startup sequence\n4. **Health check integration** - `health_checks.py` modifications might have introduced circular imports or runtime errors\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Recreate virtual environment: `rm -rf .venv && python -m venv .venv`\n2. Verify dependency compatibility: `pip freeze | grep fastapi`\n3. Test application startup: `python backend/app.py`\n4. Run basic smoke test before full test suite\n\n**SHORT TERM:**\n- Fix test runner configuration\n- Add basic health check endpoint tests\n- Ensure tests can run in isolation from application startup\n\n## Risk Assessment\n**SEVERE RISK** - Production deployment would be extremely hazardous:\n- No validation of API endpoints\n- No error handling verification\n- Potential runtime crashes undetected\n- Complete lack of regression protection\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 149,
+      "completion_tokens": 332,
+      "total_tokens": 481,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 85
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

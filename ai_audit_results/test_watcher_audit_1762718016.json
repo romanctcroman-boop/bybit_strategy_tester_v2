@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762718016,
+  "changed_files": [
+    "tests\\integration\\load_api_keys.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762717993.1507375,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (Exit Code -1) indicating severe infrastructure or configuration issues. No meaningful test execution occurred.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - Complete coverage failure\n- **No files analyzed** - Coverage system failed to initialize\n- **Root cause**: Tests never executed properly to collect coverage data\n\n## Potential Issues with Recent Changes\n- **File `tests/integration/load_api_keys.py`** likely contains:\n  - Syntax errors preventing import/execution\n  - Missing dependencies or environment variables\n  - Infinite loops or fatal exceptions\n  - Configuration conflicts with test runner\n\n## Immediate Recommendations\n1. **Debug the crash**: Run `python -m pytest tests/integration/load_api_keys.py -v` to see specific error\n2. **Check dependencies**: Verify all required packages and API keys are available in test environment\n3. **Isolate the failure**: Temporarily remove/comment out load_api_keys.py tests to verify other tests pass\n4. **Add error handling**: Wrap API key loading in try-catch blocks with descriptive error messages\n\n## Risk Assessment\n**HIGH RISK** - Entire test suite is non-functional. Deployment would be blind to:\n- Regression defects\n- Integration failures  \n- Security vulnerabilities from API key mishandling\n\n**Priority**: Fix immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 296,
+      "total_tokens": 424,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

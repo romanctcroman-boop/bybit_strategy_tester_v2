@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762700173,
+  "changed_files": [
+    "temp_pg_test.py",
+    "ultimate_reliability_system.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "tests\\test_edge_cases_stress.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762700155.369197,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely segmentation fault or system error)\n- 0% coverage means no tests executed successfully\n- Test infrastructure itself appears broken\n\n## Coverage Analysis & Gaps\n**TOTAL COVERAGE BREAKDOWN: 0%**\n- No code executed during test run\n- All coverage gaps exist since tests never ran\n- Critical reliability systems untested\n\n## Potential Issues with Recent Changes\n1. **Database dependency failure** - `temp_pg_test.py` and psycopg2 changes suggest PostgreSQL connection issues\n2. **Environment corruption** - `.venv` package modifications indicate dependency conflicts\n3. **Stress test failures** - `test_edge_cases_stress.py` likely causing system crashes\n4. **Import/circular dependency** - Ultimate reliability system may have initialization race conditions\n\n## Immediate Action Recommendations\n1. **ISOLATE FAILURE**: Run tests individually to identify crashing component\n   ```bash\n   python -m pytest tests/test_edge_cases_stress.py -v --tb=short\n   ```\n\n2. **CHECK DEPENDENCIES**: Verify PostgreSQL connectivity and psycopg2 installation\n   ```bash\n   python -c \"import psycopg2; print('DB connection OK')\"\n   ```\n\n3. **ROLLBACK CHANGES**: Temporarily revert `temp_pg_test.py` and stress tests to restore baseline functionality\n\n4. **ADD SAFETY CHECKS**: Implement try/except blocks around database initialization in reliability system\n\n## Risk Assessment\n**SEVERITY: CRITICAL** - Production readiness completely compromised\n- Reliability system changes may introduce production outages\n- No safety net exists with 0% test coverage\n- Database connectivity issues could cause data loss\n- **Immediate action required** before any deployment",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 166,
+      "completion_tokens": 392,
+      "total_tokens": 558,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 102
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

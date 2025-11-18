@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762556182,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\alembic\\command.py",
+    "backend\\migrations\\versions\\20251108_merge_triple_heads.py",
+    ".venv\\Lib\\site-packages\\alembic\\util\\pyfiles.py",
+    ".venv\\Lib\\site-packages\\alembic\\__main__.py",
+    ".venv\\Lib\\site-packages\\mako\\util.py",
+    ".venv\\Lib\\site-packages\\mako\\template.py",
+    ".venv\\Lib\\site-packages\\alembic\\script\\base.py",
+    ".venv\\Lib\\site-packages\\alembic\\config.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762556165.9687803,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates either:\n- Test framework crashed before execution\n- Critical import/configuration errors\n- Environment setup failures\n\n## Coverage Analysis\n**0.00% coverage is a red flag** - Tests didn't run at all, making coverage data meaningless. This suggests fundamental execution problems rather than test quality issues.\n\n## Potential Issues with Recent Changes\n1. **Alembic migration conflicts** - The merge triple heads file (`20251108_merge_triple_heads.py`) suggests database migration issues\n2. **Virtual environment corruption** - Modified `.venv` package files indicate potential environment instability\n3. **Template/Mako issues** - Changes to Mako template files could indicate rendering problems\n\n## Immediate Recommendations\n\n**Priority 1 - Fix Test Execution:**\n```bash\n# Recreate clean virtual environment\nrm -rf .venv\npython -m venv .venv\nsource .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\npip install -r requirements.txt\n```\n\n**Priority 2 - Verify Database State:**\n```bash\n# Check migration status\nalembic current\n# Resolve merge conflicts if needed\nalembic heads\n```\n\n**Priority 3 - Run Basic Diagnostics:**\n```bash\npython -m pytest --collect-only  # Verify test discovery\npython -c \"import backend\"       # Check basic imports\n```\n\n## Risk Assessment\n**HIGH RISK** - Cannot trust any test results until execution is fixed. Deployment would be extremely risky without functioning tests.\n\n## Next Steps\n1. Fix environment and run basic smoke test\n2. Once tests execute, reassess actual coverage\n3. Address any migration conflicts before proceeding\n4. Consider adding a pre-test health check to catch environment issues earlier\n\nThe primary issue is environmental, not test quality. Focus on restoring stable test execution first.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 268,
+      "completion_tokens": 409,
+      "total_tokens": 677,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 204
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

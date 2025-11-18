@@ -1,0 +1,325 @@
+{{- if .Values.automl.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-automl-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: automl
+data:
+  # Optuna storage configuration
+  optuna-storage.conf: |
+    # PostgreSQL storage for distributed optimization
+    OPTUNA_STORAGE_URL={{ .Values.automl.storage.url | default (printf "postgresql://%s:%s@%s-postgresql:5432/optuna" .Values.postgresql.auth.username .Values.postgresql.auth.password (include "bybit-strategy-tester.fullname" .)) }}
+    OPTUNA_STORAGE_ENGINE_KWARGS={"pool_size": 10, "max_overflow": 20}
+  
+  # Study configuration template
+  study-config.json: |
+    {
+      "sampler": "{{ .Values.automl.defaultSampler }}",
+      "pruner": "{{ .Values.automl.defaultPruner }}",
+      "n_jobs": {{ .Values.automl.defaultJobs }},
+      "timeout": {{ .Values.automl.defaultTimeout | default "null" }}
+    }
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-automl
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: automl
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-automl
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+rules:
+  # Allow AutoML jobs to read ConfigMaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+  # Allow AutoML jobs to read Secrets (for DB credentials)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  # Allow AutoML jobs to create/read pods (for distributed execution)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create"]
+  # Allow AutoML jobs to read Services (for backend API)
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-automl
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "bybit-strategy-tester.fullname" . }}-automl
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "bybit-strategy-tester.fullname" . }}-automl
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# AutoML Optimization Job Template
+# This is a template - actual jobs are created via API
+# Example usage:
+#   helm template . --set automl.enabled=true | kubectl apply -f -
+#   kubectl create job automl-study-123 --from=cronjob/automl-template
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-automl-template
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: automl
+    job-type: optimization
+  annotations:
+    description: "Distributed Optuna optimization job for strategy hyperparameter tuning"
+    # This is a template job - not meant to be run directly
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  # Parallel execution: multiple workers optimizing simultaneously
+  parallelism: {{ .Values.automl.parallelism }}
+  # Total trials = completions (distributed across workers)
+  completions: {{ .Values.automl.completions }}
+  # Backoff limit for failed trials
+  backoffLimit: {{ .Values.automl.backoffLimit }}
+  # Active deadline (max job duration)
+  activeDeadlineSeconds: {{ .Values.automl.activeDeadlineSeconds }}
+  # Cleanup finished jobs after 1 day
+  ttlSecondsAfterFinished: {{ .Values.automl.ttlSecondsAfterFinished }}
+  
+  template:
+    metadata:
+      labels:
+        {{- include "bybit-strategy-tester.labels" . | nindent 8 }}
+        app.kubernetes.io/component: automl-worker
+        job-type: optimization
+      annotations:
+        # Istio sidecar injection
+        sidecar.istio.io/inject: "{{ .Values.istio.enabled }}"
+        # Prometheus scraping
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    
+    spec:
+      serviceAccountName: {{ include "bybit-strategy-tester.fullname" . }}-automl
+      restartPolicy: OnFailure
+      
+      # Init container: wait for database
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h {{ include "bybit-strategy-tester.fullname" . }}-postgresql -p 5432 -U {{ .Values.postgresql.auth.username }}; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready!"
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bybit-strategy-tester.fullname" . }}-postgresql
+                  key: password
+      
+      containers:
+        - name: optuna-worker
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          
+          command:
+            - python
+            - -m
+            - backend.workers.automl_worker
+          
+          env:
+            # Study ID (passed via Job spec)
+            - name: AUTOML_STUDY_ID
+              value: "REPLACE_WITH_STUDY_ID"  # Replaced when creating actual job
+            
+            # Worker ID (unique per pod)
+            - name: AUTOML_WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            
+            # Optuna storage (PostgreSQL)
+            - name: OPTUNA_STORAGE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "bybit-strategy-tester.fullname" . }}-automl-config
+                  key: optuna-storage.conf
+            
+            # Backend API URL
+            - name: BACKEND_API_URL
+              value: "http://{{ include "bybit-strategy-tester.fullname" . }}-backend:{{ .Values.backend.service.port }}"
+            
+            # Database connection
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ include "bybit-strategy-tester.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+            
+            # Redis connection (for shared state)
+            - name: REDIS_URL
+              value: "redis://{{ include "bybit-strategy-tester.fullname" . }}-redis-master:6379/0"
+            
+            # Celery broker (for backtest execution)
+            - name: CELERY_BROKER_URL
+              value: "redis://{{ include "bybit-strategy-tester.fullname" . }}-redis-master:6379/1"
+            
+            # Celery result backend
+            - name: CELERY_RESULT_BACKEND
+              value: "redis://{{ include "bybit-strategy-tester.fullname" . }}-redis-master:6379/2"
+            
+            # Python path
+            - name: PYTHONPATH
+              value: "/app"
+            
+            # Optimization parameters (from ConfigMap)
+            - name: AUTOML_SAMPLER
+              value: "{{ .Values.automl.defaultSampler }}"
+            
+            - name: AUTOML_PRUNER
+              value: "{{ .Values.automl.defaultPruner }}"
+            
+            # Logging
+            - name: LOG_LEVEL
+              value: "{{ .Values.automl.logLevel }}"
+            
+            # Prometheus metrics port
+            - name: METRICS_PORT
+              value: "9090"
+          
+          resources:
+            {{- toYaml .Values.automl.resources | nindent 12 }}
+          
+          volumeMounts:
+            - name: config
+              mountPath: /etc/automl
+              readOnly: true
+            
+            # Shared storage for study results (optional)
+            {{- if .Values.automl.persistence.enabled }}
+            - name: automl-data
+              mountPath: /data/automl
+            {{- end }}
+          
+          # Liveness probe: check if worker is responsive
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import os; print('Worker alive:', os.getenv('AUTOML_WORKER_ID'))"
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+          
+          # Readiness probe: check if worker can accept trials
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "bybit-strategy-tester.fullname" . }}-automl-config
+        
+        {{- if .Values.automl.persistence.enabled }}
+        - name: automl-data
+          persistentVolumeClaim:
+            claimName: {{ include "bybit-strategy-tester.fullname" . }}-automl-pvc
+        {{- end }}
+      
+      {{- with .Values.automl.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.automl.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      {{- with .Values.automl.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- if .Values.automl.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-automl-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: automl
+spec:
+  accessModes:
+    - ReadWriteMany  # Multiple workers can access simultaneously
+  storageClassName: {{ .Values.automl.persistence.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.automl.persistence.size }}
+{{- end }}
+
+---
+# Service for AutoML metrics (Prometheus)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-automl-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: automl
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for pod discovery
+  selector:
+    {{- include "bybit-strategy-tester.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: automl-worker
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+
+{{- end }}

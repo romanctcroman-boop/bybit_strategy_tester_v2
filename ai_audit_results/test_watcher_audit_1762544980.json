@@ -1,0 +1,74 @@
+{
+  "timestamp": 1762544980,
+  "changed_files": [
+    "audit_agent_deep_check.py",
+    "automation\\task1_test_watcher\\test_watcher.py",
+    ".venv314\\Lib\\site-packages\\win32\\lib\\pywin32_bootstrap.py",
+    "automation\\task2_key_manager\\key_manager.py",
+    "audit_agent_quick_check.py",
+    "automation\\sync_async_wrapper.py",
+    "automation\\task3_audit_agent\\config.py",
+    "tests\\test_safe_async_bridge.py",
+    "backend\\security\\secure_storage.py",
+    "test_watcher_quick_check.py",
+    "tests\\stress\\test_api_rate_limits.py",
+    "test_apis_simple.py",
+    "tests\\test_safe_async_bridge_final.py",
+    "deepseek_automation_tasks_query.py",
+    "backend\\security\\key_rotation.py",
+    "test_decryption.py",
+    "tests\\integration\\test_e2e_test_watcher_v2.py",
+    "automation\\task2_key_manager\\test_key_manager.py",
+    "mcp-server\\server.py",
+    "send_compact_to_deepseek.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\importer.py",
+    "automation\\task3_audit_agent\\audit_agent.py",
+    "send_validation_to_ai.py",
+    ".venv\\Lib\\site-packages\\click\\core.py",
+    "automation\\task2_key_manager\\encrypt_secrets.py",
+    "tests\\stress\\test_parallel_execution.py",
+    "tests\\stress\\test_memory_leaks.py",
+    "test_watcher_deep_check.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\main.py",
+    "tests\\test_security_enhancements.py",
+    "deepseek_automation_full_response.py",
+    "auto_encrypt_keys.py",
+    "send_to_deepseek_full_analysis.py",
+    "send_full_analysis_to_deepseek.py",
+    "automation\\safe_async_bridge.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\config.py",
+    "deepseek_automation_split_tasks.py",
+    "tests\\test_audit_agent_integration.py",
+    "tests\\integration\\test_e2e_audit_agent.py",
+    ".venv\\Lib\\site-packages\\uvicorn\\server.py",
+    "tests\\integration\\test_e2e_test_watcher.py",
+    "tests\\test_safe_async_bridge_simple.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762544945.2174196,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests didn't execute properly\n- Likely environment or dependency issues preventing test execution\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - This is a major red flag:\n- Coverage report is empty (`{}`)\n- Either tests crashed before collecting coverage or coverage tool failed\n- Cannot assess which code paths are tested\n\n## 3. Potential Issues with Recent Changes\n**High-risk areas based on changed files:**\n- Security modules (`key_manager.py`, `secure_storage.py`, `key_rotation.py`) - critical if broken\n- Async bridge components - potential race conditions or event loop issues\n- Uvicorn dependencies modified - could indicate server/startup problems\n- Multiple test files changed - possible test framework corruption\n\n## 4. Immediate Recommendations\n\n**Priority 1 - Fix Test Execution:**\n```bash\n# Run with verbose output to identify crash point\npython -m pytest -v --tb=long\n# Check for environment issues\npython -c \"import sys; print(sys.version)\"\n```\n\n**Priority 2 - Environment Reset:**\n- Recreate virtual environment (`.venv` files modified)\n- Reinstall dependencies, especially pywin32 and uvicorn\n- Verify Python version compatibility\n\n**Priority 3 - Isolate the Crash:**\n- Run tests individually to identify failing module\n- Check for circular imports or initialization issues\n- Test security modules separately first\n\n## 5. Risk Assessment\n**HIGH RISK** - Cannot deploy:\n- Security components potentially compromised\n- No validation of encryption/decryption functionality\n- Async operations untested (race condition risk)\n- Complete test suite failure indicates systemic issue\n\n**Immediate Action:** Stop all deployments until basic test execution is restored and security modules are verified.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 646,
+      "completion_tokens": 420,
+      "total_tokens": 1066,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 582
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

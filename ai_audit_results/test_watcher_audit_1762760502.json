@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762760502,
+  "changed_files": [
+    "reliability\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762760487.9882648,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests, suggesting fundamental configuration or dependency issues.\n\n## 2. Coverage Analysis\n**0% coverage** - No code was executed during testing. This represents a complete testing failure, not just gaps in coverage.\n\n## 3. Potential Issues\n- **Test configuration errors** (pytest configuration, import paths)\n- **Missing dependencies** or broken imports in test setup\n- **Syntax errors** in test files or the circuit_breaker module\n- **Environment issues** (Python version conflicts, virtual environment problems)\n\n## 4. Immediate Actions Required\n1. **Fix test runner execution** - Check pytest configuration and test discovery\n2. **Verify imports** - Ensure circuit_breaker.py can be imported without errors\n3. **Run basic syntax check**: `python -m py_compile reliability/circuit_breaker.py`\n4. **Test minimal functionality**: Create a simple smoke test to verify basic execution\n\n## 5. Risk Assessment\n**HIGH RISK** - The circuit_breaker changes cannot be validated. This component is likely critical for system reliability, making any deployment extremely risky without test verification.\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 286,
+      "total_tokens": 411,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762536921,
+  "changed_files": [
+    "tests\\test_safe_async_bridge_final.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762536907.0760677,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). This indicates fundamental issues with the test environment, dependencies, or test code structure that prevent any meaningful testing.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed. This is not a coverage gap but a complete test execution failure. The coverage report is empty because tests never ran.\n\n## Potential Issues with Recent Changes\n1. **Test file corruption** - `tests\\test_safe_async_bridge_final.py` may contain syntax errors or import failures\n2. **Environment mismatch** - Missing dependencies, incompatible Python versions, or broken virtual environment\n3. **Configuration issues** - Incorrect test runner configuration or path resolution problems\n4. **Fixtures/Setup failures** - Critical setup code crashing before tests begin\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check test file syntax: `python -m py_compile tests/test_safe_async_bridge_final.py`\n3. Verify imports work in isolation\n4. Run minimal test case to isolate the crash point\n\n**STRUCTURAL FIXES:**\n1. Add try/catch blocks around test setup\n2. Implement test isolation - ensure tests can run independently\n3. Add basic smoke test that validates test environment\n\n## Risk Assessment\n**HIGH RISK** - The codebase is completely untested. Any changes could introduce undetected regressions. This represents a severe quality gate failure that should block deployments until resolved.\n\n**Priority:** Fix test execution before addressing coverage or test quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 351,
+      "total_tokens": 482,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

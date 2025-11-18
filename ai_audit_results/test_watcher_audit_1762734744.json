@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762734744,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762734711.8443022,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code: -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code is being tested\n- **Critical gap**: Tests cannot execute at all, making coverage metrics meaningless\n- **Root cause**: Likely a fatal error during test setup/import phase\n\n## Potential Issues with Recent Changes\n1. **Broken imports/dependencies** in modified files (especially `backend\\core\\mtf_engine.py` or `tests\\backend\\conftest.py`)\n2. **Configuration errors** in test infrastructure\n3. **Missing dependencies** or environment setup issues\n4. **Syntax errors** in recently modified Python files\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Run `python -m pytest tests/ -v` to identify the specific failure point\n   - Check for import errors in modified files\n   - Verify `conftest.py` doesn't have syntax/import issues\n\n2. **Priority debugging order**:\n   - Start with `tests\\backend\\conftest.py` (test configuration)\n   - Then `backend\\core\\mtf_engine.py` (core component)\n   - Finally integration tests (`test_sandbox_integration.py`)\n\n3. **Add basic smoke test** to verify test infrastructure works before complex tests\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected breaking changes in production code\n- No validation of recent modifications to core engine\n- Potential deployment of completely broken code\n- All reliability and edge case testing is ineffective\n\n**Action**: Stop all feature development until test infrastructure is restored. This should be treated as a blocking issue.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 388,
+      "total_tokens": 594,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762538997,
+  "changed_files": [
+    "tests\\integration\\test_e2e_test_watcher.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538983.9652703,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1), indicating severe infrastructure or configuration issues rather than test failures. No meaningful quality assessment possible as zero tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure suggests:\n- Test environment not properly initialized\n- Dependencies missing or incompatible\n- Critical configuration errors\n- Test discovery/execution framework broken\n\n## Potential Issues with Recent Changes\nThe single changed file `tests/integration/test_e2e_test_watcher.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing imports or dependencies\n- Infinite loops or resource exhaustion\n- Environment-specific assumptions that failed\n- Integration with broken external systems\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution** - Check test runner logs for crash details\n2. **Isolate the failing test** - Run this specific test file independently\n3. **Validate test environment** - Verify all dependencies and configurations\n4. **Add test discovery verification** - Ensure tests are being collected properly\n\n**FOLLOW-UP:**\n5. Implement pre-commit test validation\n6. Add health checks for test infrastructure\n7. Create smoke tests for critical integration points\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No confidence in any code changes\n- Potential undiscovered regressions\n- Deployment blockers until resolved\n- Possible production issues if deployed without testing\n\n**Priority:** Resolve immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 328,
+      "total_tokens": 461,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 5
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

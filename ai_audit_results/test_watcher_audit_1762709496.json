@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762709496,
+  "changed_files": [
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762709480.203063,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. No meaningful quality assessment possible as tests didn't run.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage confirms no tests executed successfully. All code paths are untested, including the modified `deepseek_client.py`.\n\n## Potential Issues with Recent Changes\n1. **Dependency/Import Issues** - Changes in `deepseek_client.py` likely broke imports or dependencies\n2. **Syntax/Initialization Errors** - Possible syntax errors or initialization failures preventing test execution\n3. **Environment Configuration** - Missing environment variables, API keys, or configuration files\n4. **Breaking Interface Changes** - Modified class/method signatures without updating tests\n\n## Recommendations for Improvement\n1. **Immediate Action:**\n   - Run tests with `-v` flag to see specific failure details\n   - Check Python syntax: `python -m py_compile reliability/deepseek_client.py`\n   - Verify imports and dependencies are installed\n\n2. **Fix Priority:**\n   - Resolve Exit Code -1 first (environment/import issues)\n   - Add basic smoke tests for `deepseek_client.py`\n   - Implement minimal unit tests covering core functionality\n\n3. **Testing Strategy:**\n   - Start with simple connection/initialization tests\n   - Mock external dependencies (API calls)\n   - Add error handling tests\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely risky:\n- Zero test coverage means undetected bugs are guaranteed\n- Exit Code -1 suggests fundamental stability issues\n- No validation of the modified client functionality\n- Potential for production outages or data corruption\n\n**Next Steps:** Fix the test execution failure before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 389,
+      "total_tokens": 514,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

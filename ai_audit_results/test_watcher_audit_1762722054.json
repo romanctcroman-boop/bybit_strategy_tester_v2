@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762722054,
+  "changed_files": [
+    "reliability\\request_deduplication.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762722031.5242417,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely segmentation fault, memory error, or fatal Python interpreter crash).\n\n## Coverage Analysis\n**0% coverage** - No code execution occurred. This is worse than low coverage - it indicates the test infrastructure itself is broken.\n\n## Potential Issues with Recent Changes\n1. **Fatal runtime error** in `reliability\\request_deduplication.py`:\n   - Infinite recursion causing stack overflow\n   - Memory corruption or segmentation fault\n   - Import cycle or circular dependencies\n   - Syntax error that crashes interpreter\n\n## Recommendations\n**Immediate Actions:**\n1. **Debug test runner** - Run with `python -m pytest -v --tb=short` to identify crash location\n2. **Isolate the module** - Test `request_deduplication.py` in isolation with minimal imports\n3. **Check for infinite loops** - Add recursion limits and timeout guards\n\n**Technical Fixes:**\n1. Add basic smoke test: `python -c \"import reliability.request_deduplication\"`\n2. Implement try/except blocks around module imports\n3. Validate class constructors and decorators aren't causing circular imports\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail catastrophically. The module may crash entire applications rather than just failing gracefully.\n\n**Priority:** Fix immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 300,
+      "total_tokens": 426,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

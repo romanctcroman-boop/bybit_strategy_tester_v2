@@ -1,0 +1,54 @@
+{
+  "test_date": "2025-10-29T13:04:51.373103",
+  "test_type": "real_functional_api",
+  "duration_seconds": 0.001846,
+  "total_tokens": 0,
+  "results": [
+    {
+      "tool": "analyze_backtest_results",
+      "success": false,
+      "error": "'FunctionTool' object is not callable"
+    },
+    {
+      "tool": "compare_strategies",
+      "success": false,
+      "error": "'FunctionTool' object is not callable"
+    },
+    {
+      "tool": "risk_management_advice",
+      "success": false,
+      "error": "'FunctionTool' object is not callable"
+    },
+    {
+      "tool": "technical_indicator_research",
+      "success": false,
+      "error": "'FunctionTool' object is not callable"
+    },
+    {
+      "tool": "explain_metric",
+      "success": false,
+      "error": "'FunctionTool' object is not callable"
+    },
+    {
+      "tool": "market_regime_detection",
+      "success": false,
+      "error": "'FunctionTool' object is not callable"
+    },
+    {
+      "tool": "code_review_strategy",
+      "success": false,
+      "error": "'FunctionTool' object is not callable"
+    },
+    {
+      "tool": "generate_test_scenarios",
+      "success": false,
+      "error": "'FunctionTool' object is not callable"
+    }
+  ],
+  "summary": {
+    "total_tools": 8,
+    "successful": 0,
+    "failed": 8,
+    "success_rate": "0.0%"
+  }
+}

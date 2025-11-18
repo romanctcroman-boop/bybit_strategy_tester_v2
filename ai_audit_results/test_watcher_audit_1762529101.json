@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762529101,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762529085.5682814,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating fundamental infrastructure or configuration issues rather than test logic problems.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality or functionality.\n\n## Potential Issues with Recent Changes\nThe single changed file `tests\\backend\\conftest.py` is highly suspicious:\n- Likely contains pytest configuration/fixtures that broke the entire test framework\n- Possible causes: Syntax errors, import failures, fixture conflicts, or environment setup failures\n- May have introduced circular dependencies or broken test discovery\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Rollback** the conftest.py changes and verify tests run\n2. **Isolate the failure** by running: `pytest tests/backend/conftest.py -v`\n3. **Check syntax**: `python -m py_compile tests/backend/conftest.py`\n4. **Validate imports** and fixture dependencies\n\n**FOLLOW-UP:**\n- Add pre-commit hooks to validate pytest configuration\n- Implement basic smoke tests for test infrastructure\n- Consider splitting complex conftest files\n\n## Risk Assessment\n**HIGH RISK** - Deploying without test validation exposes the system to:\n- Undetected regressions and bugs\n- Potential production failures\n- Security vulnerabilities going unnoticed\n- Complete loss of quality assurance capability\n\n**Priority:** Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 336,
+      "total_tokens": 463,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762538188,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "temp_pg_test.py",
+    "backend\\security\\key_rotation.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538162.117289,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates either:\n- Test framework configuration issues\n- Fatal errors during test setup/import\n- Environment/dependency problems\n\n## Coverage Analysis\n**0% coverage is a major red flag** - No tests ran successfully. The empty coverage report suggests:\n- Tests crashed before collecting any coverage data\n- Coverage configuration may be broken\n- Test discovery failed completely\n\n## Potential Issues with Recent Changes\n1. **Psycopg2 modification** - Changes to database driver in virtual environment suggest dependency conflicts or manual edits that broke imports\n2. **Key rotation changes** - Security-related code modifications may have introduced breaking changes\n3. **temp_pg_test.py** - Temporary test files indicate incomplete test development or debugging artifacts\n\n## Recommendations\n**Immediate Actions:**\n1. Fix test execution first - check pytest/unitest configuration and dependencies\n2. Remove manual edits to `.venv` packages - use proper dependency management\n3. Clean up temporary test files from test runs\n4. Verify database connections in key_rotation tests aren't causing fatal errors\n\n**Short-term:**\n- Run tests with `-v` flag to see where they fail\n- Check for import errors in test modules\n- Validate psycopg2 installation and connection strings\n\n## Risk Assessment\n**HIGH RISK** - Cannot validate any functionality:\n- Security risks from untested key rotation logic\n- Database integration completely unverified\n- No confidence in recent changes\n- Potential production deployment risks\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 341,
+      "total_tokens": 497,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

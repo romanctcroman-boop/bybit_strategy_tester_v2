@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762538134,
+  "changed_files": [
+    "backend\\security\\master_key_manager.py",
+    "backend\\security\\crypto.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538119.4800603,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during testing\n- **Missing**: All security-critical components (master_key_manager.py, crypto.py) completely untested\n- **Critical Gap**: Security modules have zero validation\n\n## Potential Issues with Recent Changes\n1. **Breaking Changes**: Recent modifications to security files likely introduced fatal errors\n2. **Dependency Issues**: Missing imports or incompatible dependencies in security modules\n3. **Initialization Failures**: Crypto initialization or key management may be crashing\n4. **Environment Configuration**: Security modules may require specific environment setup\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see specific failure points\n2. Check security module imports and dependencies\n3. Validate environment variables for crypto operations\n4. Add try-catch blocks around security initialization\n\n**Short-term:**\n1. Create isolated unit tests for each security function\n2. Add mock-based tests for crypto operations\n3. Implement basic integration tests with test keys\n4. Set up security-specific test environment\n\n## Risk Assessment\n**HIGH RISK** - Security modules are completely untested and crashing:\n- **Security Vulnerabilities**: Potential crypto implementation flaws undetected\n- **Production Failure**: Security services will likely crash in production\n- **Data Protection Risk**: Encryption/decryption may be non-functional\n- **Compliance Issues**: Security controls cannot be validated\n\n**Priority**: Fix test execution immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 355,
+      "total_tokens": 491,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

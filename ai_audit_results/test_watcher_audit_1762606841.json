@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762606841,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762606822.2350945,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code quality or functionality.\n\n## Potential Issues with Recent Changes\nThe failure likely stems from `health_check.py` changes:\n- **Syntax errors** preventing module import/execution\n- **Import/dependency issues** breaking the module\n- **Runtime errors** during test setup/import phase\n- **Missing dependencies** required by the changed file\n\n## Recommendations for Improvement\n1. **IMMEDIATE: Fix test execution**\n   - Check `health_check.py` for syntax errors\n   - Verify imports and dependencies\n   - Run basic Python syntax check: `python -m py_compile health_check.py`\n\n2. **Restore testing capability**\n   - Run minimal smoke test to verify basic functionality\n   - Add simple test that imports the module successfully\n   - Fix any import/circular dependency issues\n\n3. **Prevent recurrence**\n   - Add pre-commit hooks for syntax validation\n   - Implement basic import testing in CI pipeline\n   - Ensure tests can run even with partial failures\n\n## Risk Assessment\n**HIGH RISK** - Deploying without any test validation. The codebase is completely untested and may contain critical runtime errors that could cause production failures. All deployments should be blocked until basic test execution is restored.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 332,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

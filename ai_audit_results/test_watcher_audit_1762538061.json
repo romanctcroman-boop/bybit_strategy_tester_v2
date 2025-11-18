@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762538061,
+  "changed_files": [
+    "tests\\test_audit_agent_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538044.7730458,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure.\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage confirms no tests executed successfully. This represents a complete testing blackout.\n\n## Potential Issues\n1. **Test Harness Failure**: Exit code -1 suggests environment/dependency issues\n2. **Integration Break**: Recent changes to `test_audit_agent_integration.py` likely broke the test runner\n3. **Missing Dependencies**: Possible missing imports, configuration, or service dependencies\n4. **Syntax/Import Errors**: File may contain fatal Python errors preventing execution\n\n## Immediate Actions Required\n1. **Fix Test Execution First**:\n   - Check for Python syntax errors in the modified test file\n   - Verify all imports and dependencies are available\n   - Run tests with `-v` flag to see specific failure points\n\n2. **Validate Test Environment**:\n   - Ensure test database/API dependencies are running\n   - Check environment variables and configuration files\n   - Verify Python path and module structure\n\n3. **Rollback Strategy**:\n   - Consider temporarily reverting the changed test file\n   - Isolate the integration test from main test suite if unstable\n\n## Risk Assessment\n**HIGH RISK** - Zero test coverage means:\n- No validation of recent changes\n- Potential undetected regressions in production code\n- Broken deployment pipeline\n- All existing functionality is currently unverified\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 337,
+      "total_tokens": 468,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

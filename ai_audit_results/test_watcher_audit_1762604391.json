@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762604391,
+  "changed_files": [
+    "test_quick_wins.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762604371.3843777,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero quality assurance. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code is being tested. All production code is completely unprotected. This indicates either:\n- Test runner configuration failure\n- Test discovery issues\n- Critical errors preventing test execution\n- Missing or broken test imports\n\n## Potential Issues with Recent Changes\nThe single changed file `test_quick_wins.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Configuration errors in test setup/teardown\n- Infinite loops or resource exhaustion\n- Environment compatibility issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution** - Run tests with verbose output to identify the root cause\n2. **Check test_quick_wins.py** - Review for syntax errors, missing imports, infinite loops\n3. **Verify test configuration** - Ensure pytest/unittest configuration is correct\n4. **Run tests individually** - Isolate the failing test case\n\n**FOLLOW-UP:**\n- Implement test execution monitoring\n- Add pre-commit test validation\n- Set up continuous integration with failure alerts\n\n## Risk Assessment\n**HIGH RISK** - Deploying code in this state is extremely dangerous:\n- **Critical**: All production code changes are untested\n- **High**: Undetected regressions likely\n- **Medium**: Development velocity impacted by broken feedback loop\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 348,
+      "total_tokens": 473,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

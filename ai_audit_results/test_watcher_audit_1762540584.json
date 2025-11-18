@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762540584,
+  "changed_files": [
+    "tests\\stress\\test_parallel_execution.py",
+    "tests\\stress\\test_memory_leaks.py",
+    ".venv\\Lib\\site-packages\\_pytest\\unraisableexception.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540568.5237443,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, system interrupt, or fatal error)\n- Zero test execution suggests fundamental environment or dependency issues\n- No coverage data generated implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Critical gaps:\n- No code execution measured\n- Missing baseline coverage for stress tests\n- Unable to assess memory leak detection effectiveness\n- Parallel execution testing completely failed\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: `.venv` modifications suggest virtual environment issues\n2. **Pytest Plugin Conflict**: `_pytest/unraisableexception.py` changes may indicate plugin compatibility problems\n3. **Stress Test Configuration**: Parallel execution tests might be causing system resource exhaustion\n4. **Dependency Version Mismatch**: Recent package updates may have introduced breaking changes\n\n## Recommendations for Improvement\n**Immediate Actions (Priority 1):**\n- Recreate virtual environment from scratch\n- Run basic unit tests first to validate environment\n- Check system resource limits for stress tests\n- Verify pytest version compatibility\n\n**Short-term (Priority 2):**\n- Implement test isolation for stress tests\n- Add resource monitoring during test execution\n- Create environment validation checks in CI/CD\n\n**Long-term (Priority 3):**\n- Add test suite health monitoring\n- Implement gradual test execution (unit → integration → stress)\n- Set up test environment consistency checks\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production readiness cannot be verified\n- Memory leaks and performance issues may go undetected\n- Parallel execution safety is unvalidated\n- Critical system failures possible in production\n\n**Urgent attention required** - Fix environment issues before proceeding with any feature development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 161,
+      "completion_tokens": 382,
+      "total_tokens": 543,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 97
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

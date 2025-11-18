@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762756764,
+  "changed_files": [
+    "test_integration_phase3_extended_fixed.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762756746.7957354,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero value in current state. No meaningful quality assessment possible beyond complete failure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage achieved. All production code remains untested. This represents maximum testing gap possible.\n\n## Potential Issues with Recent Changes\n- **test_integration_phase3_extended_fixed.py** likely contains syntax errors, import failures, or runtime exceptions\n- Test file may be attempting to import/modules that don't exist\n- Possible infinite loops or resource exhaustion causing crash\n- Environment/dependency issues (missing packages, version conflicts)\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run test file directly: `python test_integration_phase3_extended_fixed.py` to see specific error\n2. Check Python syntax: `python -m py_compile test_integration_phase3_extended_fixed.py`\n3. Verify imports and dependencies are available\n4. Add basic try/catch blocks to capture and report errors\n\n**STRUCTURAL FIXES:**\n- Start with minimal passing test before complex integration\n- Implement test isolation and proper setup/teardown\n- Add logging to identify failure points\n\n## Risk Assessment\n**HIGH RISK** - Deployment with 0% test coverage and broken test suite exposes all code to undetected regressions. Cannot validate any functionality changes. Immediate remediation required before further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 323,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

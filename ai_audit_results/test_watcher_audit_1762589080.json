@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762589080,
+  "changed_files": [
+    "test_deepseek_robot.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762589065.6161418,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional. Exit code -1 indicates a fatal error preventing test execution entirely.\n\n## Coverage Analysis\n**0% coverage** confirms no tests ran successfully. This represents a complete testing blackout.\n\n## Potential Issues\n1. **Fatal configuration error** in test setup or environment\n2. **Syntax errors** in `test_deepseek_robot.py` preventing import/execution\n3. **Missing dependencies** or broken imports\n4. **Test runner configuration** issues (pytest/unittest configuration)\n\n## Immediate Actions Required\n1. **Check test file syntax**: `python -m py_compile test_deepseek_robot.py`\n2. **Run with verbose output**: `pytest -v test_deepseek_robot.py` (or equivalent)\n3. **Verify imports**: Ensure all dependencies are installed and accessible\n4. **Examine test configuration**: Check `pytest.ini`, `conftest.py`, or unittest setup\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected regressions likely\n- Production failures probable\n- Code quality completely unverified\n\n## Priority Recommendations\n1. **Fix test execution first** - address the fatal error preventing any tests from running\n2. **Add basic smoke tests** once execution is restored\n3. **Implement incremental coverage** starting with critical paths\n4. **Set up CI validation** to prevent recurrence\n\n**Start by identifying why tests won't run at all** - this is the blocking issue.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 328,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

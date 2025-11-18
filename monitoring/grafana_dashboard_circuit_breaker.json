@@ -1,0 +1,475 @@
+{
+  "dashboard": {
+    "title": "Circuit Breaker & API Performance Monitoring",
+    "tags": ["circuit-breaker", "deepseek", "api", "prometheus"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Circuit Breaker States by Key",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "circuit_breaker_state{provider=\"deepseek\"}",
+            "legendFormat": "{{key_id}} - {{provider}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "stepAfter",
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "showPoints": "auto"
+            },
+            "color": {
+              "mode": "palette-classic"
+            },
+            "mappings": [
+              {
+                "type": "value",
+                "options": {
+                  "0": {
+                    "text": "CLOSED",
+                    "color": "green"
+                  },
+                  "1": {
+                    "text": "HALF_OPEN",
+                    "color": "yellow"
+                  },
+                  "2": {
+                    "text": "OPEN",
+                    "color": "red"
+                  }
+                }
+              }
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 1,
+                  "color": "yellow"
+                },
+                {
+                  "value": 2,
+                  "color": "red"
+                }
+              ]
+            },
+            "unit": "short",
+            "min": 0,
+            "max": 2
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          },
+          "legend": {
+            "showLegend": true,
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "description": "Real-time circuit breaker state per API key. 0=CLOSED (healthy), 1=HALF_OPEN (testing), 2=OPEN (failing)."
+      },
+      {
+        "id": 2,
+        "title": "Circuit Breaker Trip Counter",
+        "type": "stat",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "sum(circuit_breaker_trips_total{provider=\"deepseek\"})",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 5,
+                  "color": "yellow"
+                },
+                {
+                  "value": 10,
+                  "color": "red"
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "textMode": "value_and_name",
+          "colorMode": "background"
+        },
+        "description": "Total circuit breaker trips (CLOSED/HALF_OPEN -> OPEN transitions)."
+      },
+      {
+        "id": 3,
+        "title": "Keys with OPEN Circuit Breaker",
+        "type": "stat",
+        "gridPos": {
+          "x": 18,
+          "y": 0,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "sum(circuit_breaker_state{provider=\"deepseek\"} == 2)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "green"
+                },
+                {
+                  "value": 1,
+                  "color": "yellow"
+                },
+                {
+                  "value": 3,
+                  "color": "red"
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "graphMode": "none",
+          "textMode": "value_and_name",
+          "colorMode": "background"
+        },
+        "description": "Number of API keys currently with OPEN circuit breaker (critical if all keys are open)."
+      },
+      {
+        "id": 4,
+        "title": "Failure Count by Key",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 12,
+          "y": 4,
+          "w": 12,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "circuit_breaker_failure_count{provider=\"deepseek\"}",
+            "legendFormat": "{{key_id}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "fillOpacity": 10
+            },
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "showLegend": true,
+            "displayMode": "list",
+            "placement": "bottom"
+          }
+        },
+        "description": "Current failure count per API key. Resets on success or state transition."
+      },
+      {
+        "id": 5,
+        "title": "State Transitions (All Keys)",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "rate(circuit_breaker_transitions_total{provider=\"deepseek\"}[5m])",
+            "legendFormat": "{{key_id}}: {{from_state}} -> {{to_state}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "bars",
+              "lineWidth": 1,
+              "fillOpacity": 80
+            },
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "ops"
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "showLegend": true,
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["sum"]
+          }
+        },
+        "description": "Rate of state transitions per 5 minutes. High rate indicates flapping circuit breaker."
+      },
+      {
+        "id": 6,
+        "title": "Time in Each State",
+        "type": "timeseries",
+        "gridPos": {
+          "x": 12,
+          "y": 8,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "circuit_breaker_state_duration_seconds{provider=\"deepseek\"}",
+            "legendFormat": "{{key_id}} - {{state}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 1,
+              "fillOpacity": 10
+            },
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "s"
+          }
+        },
+        "options": {
+          "tooltip": {
+            "mode": "multi"
+          },
+          "legend": {
+            "showLegend": true,
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": ["mean", "max"]
+          }
+        },
+        "description": "Duration spent in each circuit breaker state (CLOSED, HALF_OPEN, OPEN)."
+      },
+      {
+        "id": 7,
+        "title": "Success Count (HALF_OPEN State)",
+        "type": "gauge",
+        "gridPos": {
+          "x": 0,
+          "y": 14,
+          "w": 6,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "circuit_breaker_success_count{provider=\"deepseek\"}",
+            "legendFormat": "{{key_id}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "red"
+                },
+                {
+                  "value": 1,
+                  "color": "yellow"
+                },
+                {
+                  "value": 2,
+                  "color": "green"
+                }
+              ]
+            },
+            "min": 0,
+            "max": 2,
+            "unit": "short"
+          }
+        },
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "description": "Success count in HALF_OPEN state. 2 successes needed to transition to CLOSED."
+      },
+      {
+        "id": 8,
+        "title": "API Request Rate",
+        "type": "graph",
+        "gridPos": {
+          "x": 6,
+          "y": 14,
+          "w": 9,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "rate(circuit_breaker_transitions_total{provider=\"deepseek\"}[1m])",
+            "legendFormat": "Transitions/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2
+            },
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "reqps"
+          }
+        },
+        "description": "Request rate based on state transition activity."
+      },
+      {
+        "id": 9,
+        "title": "Alert Status Summary",
+        "type": "alertlist",
+        "gridPos": {
+          "x": 15,
+          "y": 14,
+          "w": 9,
+          "h": 6
+        },
+        "options": {
+          "showOptions": "current",
+          "maxItems": 20,
+          "sortOrder": 1,
+          "dashboardAlerts": false,
+          "alertName": "",
+          "dashboardTitle": "",
+          "tags": ["circuit-breaker"],
+          "stateFilter": {
+            "firing": true,
+            "pending": true,
+            "noData": false,
+            "normal": false,
+            "error": true
+          }
+        },
+        "description": "Active alerts related to circuit breaker health."
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "ALERTS{alertname=~\"CircuitBreaker.*\"}",
+          "iconColor": "red",
+          "name": "Circuit Breaker Alerts",
+          "step": "60s",
+          "tagKeys": "alertname,severity",
+          "textFormat": "{{alertname}}: {{key_id}}",
+          "titleFormat": "Alert"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "key_id",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(circuit_breaker_state{provider=\"deepseek\"}, key_id)",
+          "refresh": 1,
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*"
+        },
+        {
+          "name": "provider",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(circuit_breaker_state, provider)",
+          "refresh": 1,
+          "multi": false,
+          "current": {
+            "text": "deepseek",
+            "value": "deepseek"
+          }
+        }
+      ]
+    }
+  }
+}

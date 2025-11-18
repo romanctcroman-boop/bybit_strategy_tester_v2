@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762711997,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_protocol.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762711982.4140854,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran\n\n## Coverage Analysis\n**COVERAGE: 0%** - All gaps identified:\n- No code executed during test run\n- Complete absence of functional validation\n- Missing: Unit, integration, and system test execution\n\n## Potential Issues with Recent Changes\n1. **Infrastructure Breakage** - Likely in `backend\\core\\mtf_engine.py` or test configuration\n2. **Dependency Conflict** - New changes may have broken test environment\n3. **Configuration Error** - `tests\\backend\\conftest.py` modifications may have disrupted test setup\n4. **Import/Circular Dependency** - Critical failure during test collection/import\n\n## Immediate Action Recommendations\n1. **Debug Test Infrastructure** (HIGH PRIORITY):\n   ```bash\n   python -m pytest tests/ --collect-only -v\n   ```\n   Identify where test collection fails\n\n2. **Check Core Module**:\n   - Validate imports in `mtf_engine.py`\n   - Verify no syntax errors or missing dependencies\n\n3. **Test Configuration**:\n   - Review `conftest.py` for breaking changes\n   - Check pytest.ini/pyproject.toml configuration\n\n4. **Isolate Failure**:\n   ```bash\n   python -c \"from backend.core import mtf_engine\"\n   ```\n   Test basic import functionality\n\n## Risk Assessment\n**SEVERE RISK** - Deployment would be completely untested:\n- All recent changes are unvalidated\n- High probability of production-breaking bugs\n- Zero confidence in system stability\n- **Recommendation: Block all deployments until resolved**\n\n**Next Steps**: Start with test collection debugging and module import validation to identify the root cause of complete test suite failure.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 412,
+      "total_tokens": 618,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 142
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

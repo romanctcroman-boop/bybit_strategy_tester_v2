@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762553655,
+  "changed_files": [
+    "backend\\api\\secure_key_storage.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762553641.2823284,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (exit code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates severe infrastructure or configuration issues.\n\n## Coverage Analysis\n**0% COVERAGE** - Complete coverage failure suggests:\n- Test runner configuration errors\n- Missing test discovery patterns\n- Environment/dependency issues preventing test execution\n- Possible import failures in test modules\n\n## Potential Issues with Recent Changes\nThe modified `secure_key_storage.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Configuration changes breaking test environment\n- Circular imports or module initialization issues\n\n## Immediate Recommendations\n1. **Debug Test Execution**\n   - Check test runner configuration (pytest/unittest settings)\n   - Verify Python path and module discovery\n   - Run with `-v` flag for detailed error output\n\n2. **Validate Recent Changes**\n   - Manually import `secure_key_storage` to identify syntax/issues\n   - Check for missing imports or dependency changes\n   - Verify no side effects in `__init__.py` files\n\n3. **Quick Fixes**\n   - Revert `secure_key_storage.py` changes to confirm baseline functionality\n   - Add basic smoke test for the module\n   - Verify test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - Critical security implications:\n- `secure_key_storage` modifications without validation\n- Zero test coverage for security-sensitive code\n- Potential production deployment of untested cryptographic code\n\n**Priority**: Resolve test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 337,
+      "total_tokens": 465,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

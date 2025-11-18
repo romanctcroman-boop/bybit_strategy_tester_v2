@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540387,
+  "changed_files": [
+    "tests\\stress\\test_parallel_execution.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540372.608822,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1) with zero coverage. This indicates either a catastrophic test infrastructure failure or severe code defects preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **No coverage data generated** - Execution halted before coverage collection\n- **Critical gap**: Unable to assess actual code coverage due to complete test failure\n\n## Potential Issues with Recent Changes\n1. **Parallel execution test file** (`test_parallel_execution.py`) likely contains fatal errors\n2. Possible causes:\n   - Infinite loops or deadlocks in parallel test logic\n   - Resource exhaustion (memory, file handles, threads)\n   - Import/circular dependency issues\n   - Environment configuration problems\n   - Race conditions causing system instability\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Isolate the failing test**: Run `test_parallel_execution.py` separately to identify the specific failure\n2. **Add timeout protection**: Implement test timeouts to prevent hanging\n3. **Check resource limits**: Verify system resources and add cleanup mechanisms\n4. **Review parallelization logic**: Ensure proper thread/process management\n\n**SHORT-TERM:**\n5. Implement test segmentation to prevent single test failures from blocking entire suite\n6. Add better error handling and logging in test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- No confidence in code functionality\n- Undetected regressions likely present\n- Deployment would be extremely risky\n- Test infrastructure itself may be compromised\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 364,
+      "total_tokens": 493,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

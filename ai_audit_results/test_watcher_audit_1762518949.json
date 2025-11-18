@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762518949,
+  "changed_files": [
+    "mcp-server\\server.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762518933.2491398,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout, making it impossible to assess actual code coverage or identify coverage gaps.\n\n## Potential Issues with Recent Changes\n- **server.py modifications likely introduced fatal errors** preventing test execution\n- Possible issues: syntax errors, import failures, infinite loops, or environment dependencies\n- Test framework may be unable to load/execute due to broken module structure\n\n## Recommendations for Improvement\n1. **IMMEDIATE: Fix test execution**\n   - Run `python -m py_compile mcp-server/server.py` to check for syntax errors\n   - Verify imports and dependencies are intact\n   - Check for infinite loops or blocking operations\n\n2. **PRIORITY: Isolate the failure**\n   - Run minimal test: `python -c \"from mcp-server import server\"`\n   - Execute tests with `-v` flag for detailed failure information\n   - Check test configuration and environment setup\n\n3. **ESTABLISH BASELINE**\n   - Get at least one test passing to establish 0% → measurable coverage\n   - Focus on critical path testing first\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky:\n- Unknown if code is functionally correct\n- No regression protection\n- Potential for runtime failures in production\n- Complete lack of quality metrics\n\n**Action:** Block deployments until basic test execution is restored and >70% coverage achieved.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 360,
+      "total_tokens": 485,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

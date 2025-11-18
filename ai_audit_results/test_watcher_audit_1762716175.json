@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762716175,
+  "changed_files": [
+    "tests\\test_mcp_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762716161.962943,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test suite or codebase. No tests ran successfully.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage across all files means:\n- No code paths were executed\n- All business logic remains untested\n- No validation of existing functionality\n\n## Potential Issues with Recent Changes\n1. **Test File Corruption**: `tests\\test_mcp_manager.py` likely contains syntax errors, import failures, or configuration issues\n2. **Dependency Problems**: Missing imports, broken dependencies, or environment setup issues\n3. **Configuration Errors**: pytest configuration, path setup, or test discovery failures\n\n## Immediate Recommendations\n1. **Debug Test Execution**:\n   ```bash\n   python -m pytest tests/test_mcp_manager.py -v\n   ```\n   Check for specific error messages\n\n2. **Validate Test File**:\n   - Check syntax and imports in `test_mcp_manager.py`\n   - Verify all dependencies are installed\n   - Ensure test classes/functions are properly defined\n\n3. **Basic Test Fix**:\n   - Start with a simple smoke test\n   - Add minimal test that imports and instantiates core components\n   - Verify test discovery works\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression protection\n- Potential production bugs undetected\n- Code changes made without validation\n- Critical need for immediate test suite repair\n\n**Priority**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 331,
+      "total_tokens": 457,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

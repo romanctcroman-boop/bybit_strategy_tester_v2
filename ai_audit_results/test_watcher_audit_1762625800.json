@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762625800,
+  "changed_files": [
+    "test_deepseek_self_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762625786.3823757,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero value in current state.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code is being tested\n- **No coverage data generated** - Tests didn't execute sufficiently to collect metrics\n- **Complete testing gap** - All functionality is untested\n\n## Potential Issues with Recent Changes\n1. **test_deepseek_self_check.py** likely contains syntax errors or import failures\n2. Test infrastructure may be broken (fixtures, setup/teardown)\n3. Dependencies missing or incompatible\n4. Test file may be attempting to test non-existent modules\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest test_deepseek_self_check.py -v` to see specific error details\n2. Check for syntax errors: `python -m py_compile test_deepseek_self_check.py`\n3. Verify imports and dependencies are available\n\n**Short-term:**\n1. Fix the failing test to achieve basic execution\n2. Add simple smoke tests to verify test infrastructure works\n3. Implement minimum 70% coverage threshold requirement\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected regressions in production code\n- No safety net for code changes\n- Potential deployment of broken code\n- Complete loss of CI/CD reliability\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 322,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

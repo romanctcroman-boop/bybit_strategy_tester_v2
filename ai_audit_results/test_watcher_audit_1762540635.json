@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762540635,
+  "changed_files": [
+    "tests\\stress\\test_parallel_execution.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540620.2618246,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with zero coverage. This indicates either a catastrophic test infrastructure failure or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during testing\n- **No coverage data available** - Test framework failed before collecting any metrics\n- **Critical gap**: Unable to assess actual code coverage due to execution failure\n\n## Potential Issues with Recent Changes\n- **Primary suspect**: `tests\\stress\\test_parallel_execution.py` modifications\n- Likely causes:\n  - Infinite loops or resource exhaustion in stress tests\n  - Race conditions causing deadlocks\n  - Memory leaks crashing test runner\n  - Import/circular dependency issues\n  - Environment configuration problems\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Isolate the failing test**: Run `test_parallel_execution.py` in isolation with debug output\n2. **Add timeout protection**: Implement test timeouts to prevent hanging\n3. **Check resource limits**: Monitor memory/CPU usage during stress test execution\n4. **Review recent changes**: Audit modifications to the stress test file\n\n**Technical Fixes:**\n- Implement graceful degradation for stress test failures\n- Add test isolation to prevent cascading failures\n- Set up resource monitoring during test execution\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- No confidence in code functionality\n- Potential production issues undetectable\n- Development blocked until resolved\n- Critical path: Must fix before further development\n\n**Priority**: Resolve test execution failure immediately before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 351,
+      "total_tokens": 480,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

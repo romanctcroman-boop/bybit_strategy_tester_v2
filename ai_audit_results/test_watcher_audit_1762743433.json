@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762743433,
+  "changed_files": [
+    "tests\\test_deepseek_client.py",
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762743402.4686809,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- Zero test execution suggests fundamental runtime issues\n- No coverage data collected due to premature test termination\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - Tests never reached execution phase:\n- 0.00% coverage across all files\n- Unable to assess actual code coverage\n- Test infrastructure itself may be compromised\n\n## Potential Issues with Recent Changes\nBased on modified files:\n1. **`deepseek_client.py` changes** likely introduced:\n   - Import cycles or circular dependencies\n   - Syntax errors preventing module loading\n   - Runtime exceptions during import/initialization\n   - Memory allocation issues\n\n2. **`test_deepseek_client.py` changes** may contain:\n   - Fixture/setup code causing crashes\n   - Global state corruption\n   - Test configuration errors\n\n## Immediate Recommendations\n1. **Debug Test Infrastructure:**\n   - Run tests with `-v` flag to identify crash point\n   - Check Python version compatibility\n   - Verify dependencies are properly installed\n\n2. **Isolate the Crash:**\n   - Run `python -c \"import reliability.deepseek_client\"` to test module import\n   - Execute tests individually to identify failing test case\n   - Add `--tb=long` for detailed traceback\n\n3. **Fix Import/Runtime Issues:**\n   - Check for missing imports in `deepseek_client.py`\n   - Validate class/method definitions\n   - Ensure no infinite loops or recursion\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may be completely untested\n- Potential runtime crashes in application\n- No safety net for future changes\n- Urgent fix required before any deployments\n\n**Priority:** Fix test execution before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 399,
+      "total_tokens": 534,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762534932,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762534918.5046184,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies/environment setup\n- Test framework configuration issues\n- Fatal errors during test discovery/import\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This is a direct result of test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe `health_check.py` modification likely introduced:\n- Import errors or circular dependencies\n- Syntax errors preventing module loading\n- Runtime errors during module initialization\n- Breaking changes to class/method signatures\n\n## Recommendations\n**Immediate Actions:**\n1. **Fix test execution first** - Run tests with `-v` flag to see specific failure details\n2. **Check `health_check.py` syntax** - Validate Python syntax and imports\n3. **Verify test discovery** - Ensure test files are properly named and located\n4. **Review test configuration** - Check pytest/unittest configuration files\n\n**Follow-up:**\n5. Add basic smoke tests for module import/initialization\n6. Implement CI pipeline to catch similar issues earlier\n\n## Risk Assessment\n**HIGH RISK** - Deploying this code would be extremely risky because:\n- No functionality was verified\n- Critical failures may exist in production code\n- The entire test suite is effectively broken\n- Zero confidence in recent changes\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 322,
+      "total_tokens": 444,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

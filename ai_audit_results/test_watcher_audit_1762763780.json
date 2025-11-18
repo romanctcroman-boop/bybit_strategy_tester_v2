@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762763780,
+  "changed_files": [
+    "analyze_mcp_reliability_crisis.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762763763.272117,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0% coverage** - No tests executed successfully. This represents complete testing failure, not just gaps.\n\n## Potential Issues\n1. **Syntax errors** in `analyze_mcp_reliability_crisis.py` preventing import/execution\n2. **Missing dependencies** or environment configuration issues\n3. **Test framework configuration** errors (pytest/unittest setup)\n4. **Fatal runtime errors** during test discovery/collection\n\n## Immediate Actions Required\n1. **Check syntax**: `python -m py_compile analyze_mcp_reliability_crisis.py`\n2. **Verify imports**: Run minimal import test on the changed file\n3. **Test isolation**: Run single test file to identify specific failure point\n4. **Review recent changes** to `analyze_mcp_reliability_crisis.py` for obvious syntax/logic errors\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky.\n\n## Priority Recommendations\n1. **Fix test execution** before addressing coverage\n2. **Add basic smoke tests** to verify module loads\n3. **Implement CI pipeline** to catch these failures earlier\n4. **Roll back changes** if immediate fix isn't possible\n\n**Next step**: Identify why tests won't run - this is blocking all other quality assessment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 319,
+      "total_tokens": 447,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

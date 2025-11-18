@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762742536,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762742503.717155,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests aren't even executing properly\n- Likely environment or dependency issues preventing test execution\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA AVAILABLE** - Tests aren't running to completion. This is more critical than low coverage.\n\n## Potential Issues with Recent Changes\n1. **Environment/Dependency Breakage** - Recent changes to `backend\\core\\mtf_engine.py` or `reliability\\perplexity_client.py` may have introduced:\n   - Circular imports or initialization conflicts\n   - Missing dependencies in test environment\n   - Version compatibility issues\n\n2. **Test Infrastructure Failure** - Changes to `tests\\backend\\conftest.py` may have broken test setup/teardown\n\n3. **Resource Exhaustion** - New stress tests (`test_edge_cases_stress.py`) could be causing memory leaks or resource conflicts\n\n## Immediate Recommendations\n\n**HIGH PRIORITY:**\n1. **Isolate the Failure**:\n   ```bash\n   python -m pytest tests/ -v --tb=short --maxfail=1\n   ```\n2. **Check Dependencies**: Verify test environment matches development environment\n3. **Test Minimal Configuration**: Run tests without new stress tests to isolate the issue\n\n**MEDIUM PRIORITY:**\n4. **Fix Test Infrastructure First** before addressing coverage\n5. **Add Basic Sanity Tests** that run before full test suite\n\n## Risk Assessment\n**HIGH RISK** - Deployment should be blocked:\n- No confidence in code changes due to complete test failure\n- Potential for production crashes if similar environment issues exist\n- Critical functionality (MTF engine, database optimization) untested\n\n**Immediate Action**: Fix test execution before analyzing coverage or test quality further. The 0% coverage is a symptom, not the root problem.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 420,
+      "total_tokens": 626,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

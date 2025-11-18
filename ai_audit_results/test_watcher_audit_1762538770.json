@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762538770,
+  "changed_files": [
+    "test_0.py",
+    "test_1.py",
+    "test_2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538753.886799,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception)\n- Zero test execution suggests fundamental infrastructure issues\n- No files were actually tested despite 3 test files modified\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete test infrastructure failure:\n- No code was executed during test run\n- Coverage data is empty ({})\n- Either tests don't run or target code isn't reachable\n\n## Potential Issues with Recent Changes\n1. **Test Configuration Broken** - Recent changes to test_*.py files likely broke test discovery/execution\n2. **Import/Dependency Issues** - Missing imports or circular dependencies preventing test loading\n3. **Environment Setup Failure** - Test runner cannot initialize properly\n4. **Syntax Errors** - Recent changes introduced fatal syntax errors in test files\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests individually to identify which file causes the crash:\n   ```bash\n   python -m pytest test_0.py -v\n   python -m pytest test_1.py -v  \n   python -m pytest test_2.py -v\n   ```\n2. Check for syntax errors:\n   ```bash\n   python -m py_compile test_0.py test_1.py test_2.py\n   ```\n3. Verify test discovery works:\n   ```bash\n   python -m pytest --collect-only\n   ```\n\n**STRUCTURAL FIXES:**\n- Add try-catch blocks in test setup to capture initialization errors\n- Implement basic smoke tests that validate test environment\n- Set up CI to run tests on isolated clean environment\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing capability\n- Potential for undetected production bugs\n- Development is effectively flying blind\n- Recent changes likely introduced breaking changes\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 412,
+      "total_tokens": 547,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 71
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmp2umv80v8",
+    "debounce_seconds": 2
+  }
+}

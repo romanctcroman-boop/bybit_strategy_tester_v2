@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762545216,
+  "changed_files": [
+    "backend\\migrations\\versions\\perf_indexes_001_add_performance_indexes.py",
+    "backend\\migrations\\versions\\add_reasoning_traces.py",
+    "backend\\migrations\\versions\\add_reasoning_kb_001.py",
+    "backend\\migrations\\versions\\20251107_merge_all_heads.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762545191.449024,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test failure or system error\n- Zero test execution suggests fundamental environment/configuration issues\n- No coverage data means tests didn't run at all\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete test infrastructure failure:\n- No files were tested\n- No code paths executed\n- Impossible to assess actual code coverage\n\n## Potential Issues with Recent Changes\n**Migration files likely causing test environment failure:**\n- Multiple database migration files modified/added\n- `20251107_merge_all_heads.py` suggests complex branching/merge conflicts\n- Database schema inconsistencies may be preventing test startup\n- Migration dependency issues or failed migrations\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test environment first:**\n   - Check database connectivity and migration state\n   - Run `alembic current` to verify migration state\n   - Ensure test database is properly created/migrated\n\n2. **Debug test execution:**\n   - Run tests with `-v` flag to see specific failure points\n   - Check for missing dependencies in test environment\n   - Verify pytest configuration files\n\n3. **Validate migrations:**\n   - Test migrations in isolation: `alembic upgrade head`\n   - Check for circular dependencies in migration chain\n   - Ensure all migrations are properly reversible\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- **Critical**: No validation of recent database schema changes\n- **High**: Migration-related changes could break production\n- **Medium**: Multiple concurrent migration files suggest coordination issues\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 191,
+      "completion_tokens": 361,
+      "total_tokens": 552,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 127
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

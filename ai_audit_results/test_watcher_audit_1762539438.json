@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539438,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539425.0600348,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests failed before any meaningful execution\n- **Critical gap**: Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **Integration test failure** in `test_e2e_audit_agent.py` likely caused the cascade failure\n2. Possible issues:\n   - Environment configuration errors\n   - Missing dependencies or imports\n   - Syntax errors in test files\n   - Database/API connectivity issues\n   - Authentication/authorization failures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests individually to isolate the failing test\n2. Check test logs for specific error messages\n3. Verify environment setup and dependencies\n4. Run `python -m pytest tests/integration/test_e2e_audit_agent.py -v` to debug\n\n**Short-term:**\n1. Fix the integration test failure first\n2. Add proper error handling and logging\n3. Implement test isolation to prevent cascade failures\n\n**Long-term:**\n1. Set up continuous integration with fail-fast approach\n2. Add unit test coverage before integration tests\n3. Implement test retries for flaky integration tests\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential deployment of broken code\n- Unknown code quality\n- Integration points are unstable\n\n**Priority**: Fix integration test failure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 360,
+      "total_tokens": 494,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

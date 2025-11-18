@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762720386,
+  "changed_files": [
+    "tests\\integration\\test_real_api_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762720374.6106613,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) indicating severe infrastructure or configuration issues, not just test failures. Zero coverage suggests tests didn't even start executing properly.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during test run\n- **No coverage data generated** - This is worse than low coverage; it indicates complete test execution failure\n- **Integration test file modified** - Focus should be on API integration test reliability\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure broken** - Environment setup, dependencies, or configuration likely corrupted\n2. **Integration test dependencies** - External API endpoints, authentication, or network connectivity issues\n3. **Test harness failure** - pytest/runner configuration problems or fatal exceptions in test setup\n4. **Recent changes to `test_real_api_integration.py`** may contain syntax errors or breaking changes\n\n## Immediate Recommendations\n1. **Check test runner logs** - Identify the fatal error causing exit code -1\n2. **Validate test environment** - Verify API endpoints, credentials, and network access\n3. **Run tests locally** - Isolate whether issue is environment-specific\n4. **Add try-catch blocks** - Wrap integration tests to handle external service failures gracefully\n5. **Implement health checks** - Add pre-test validation for external dependencies\n\n## Risk Assessment\n**HIGH RISK** - Cannot trust any test results until this is resolved. Integration testing is completely broken, leaving API-dependent functionality untested. Deployment blocking until fixed.\n\n**Priority Action**: Fix the fatal test execution error before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 345,
+      "total_tokens": 476,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

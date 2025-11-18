@@ -1,0 +1,47 @@
+{
+  "timestamp": 1762603409,
+  "changed_files": [
+    "tests\\unit\\test_drift_detector.py",
+    "mcp-server\\mcp_cache.py",
+    "backend\\ml\\market_regime_detector.py",
+    "tests\\unit\\test_structured_logger.py",
+    "backend\\ml\\optimizer.py",
+    "backend\\ml\\drift_detector.py",
+    "backend\\ml\\__init__.py",
+    "tests\\unit\\test_lru_ttl_cache.py",
+    "tests\\unit\\test_retrain_scheduler.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "backend\\ml\\optuna_optimizer.py",
+    "backend\\ml\\retrain_scheduler.py",
+    "backend\\security\\ast_validator.py",
+    "tests\\test_walk_forward.py",
+    "tests\\unit\\test_ast_validator.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762603382.5217042,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment issue)\n- 0% coverage suggests tests aren't even executing properly\n- No coverage data generated implies fundamental infrastructure problems\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- Zero coverage across all files indicates tests aren't running at all\n- Critical ML components (drift detection, optimization, regime detection) completely untested\n- Security validation and caching layers have no validation\n\n## Potential Issues with Recent Changes\n1. **Environment/Configuration**: Likely missing dependencies or broken test configuration\n2. **Import/Circular Dependencies**: Recent ML module additions may have broken imports\n3. **Test Infrastructure**: Test runner/framework configuration corrupted\n4. **Breaking Changes**: Major refactoring in ML components without test updates\n\n## Immediate Action Recommendations\n**PRIORITY 1 - RESTORE TEST EXECUTION**:\n```bash\n# 1. Check test dependencies\npip list | grep -E \"(pytest|coverage|testing)\"\n\n# 2. Run with verbose output to identify root cause\npytest -v --tb=short tests/unit/test_drift_detector.py\n\n# 3. Check for import errors\npython -c \"from backend.ml.drift_detector import *\"\n```\n\n**PRIORITY 2 - FOUNDATIONAL FIXES**:\n- Fix any import/circular dependency issues in ML modules\n- Verify `__init__.py` files properly expose public interfaces\n- Ensure test configuration (pytest.ini, conftest.py) is valid\n\n**PRIORITY 3 - CRITICAL COVERAGE**:\n1. Start with security components (`ast_validator.py`) - highest risk\n2. Add basic smoke tests for ML core (`drift_detector.py`, `optimizer.py`)\n3. Validate caching layer (`mcp_cache.py`, `lru_ttl_cache.py`)\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- 🚨 **Critical**: ML components untested - potential model failures undetectable\n- 🚨 **Critical**: Security validation untested - possible injection vulnerabilities\n- 🔴 **High**: No regression protection for optimization algorithms\n- 🔴 **High**: Caching layer unvalidated - performance/reliability risks\n\n**IMMEDIATE NEXT STEPS**:\n1. Fix test execution (exit code -1) before any other development\n2. Add basic smoke tests for critical paths\n3. Implement CI gate to prevent 0% coverage merges\n4. Prioritize security and ML core testing once execution restored",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 578,
+      "total_tokens": 869,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 227
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

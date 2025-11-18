@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762541395,
+  "changed_files": [
+    "tests\\recovery\\test_network_failure.py",
+    "tests\\recovery\\test_component_crash.py",
+    "tests\\recovery\\__init__.py",
+    "tests\\recovery\\test_disk_full.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541382.5756516,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely environment/config issues or fatal import errors). Test quality is effectively zero.\n\n## Coverage Analysis\n**0% coverage** across all files suggests:\n- Tests aren't executing at all\n- Possible import failures or missing dependencies\n- Environment not properly configured\n\n## Potential Issues with Recent Changes\n1. **Import/Module Issues**: Recent recovery test additions may have broken imports\n2. **Dependency Problems**: Missing test dependencies or environment setup\n3. **Configuration Errors**: pytest configuration or conftest.py issues\n4. **Syntax Errors**: Potentially broken Python syntax in new test files\n\n## Recommendations\n**Immediate Actions (Next 2 hours):**\n1. Run `pytest -v tests/recovery/` to see specific error messages\n2. Check for import errors in new test files\n3. Verify `__init__.py` files aren't causing circular imports\n4. Run individual test files to isolate the breaking change\n\n**Short-term (Today):**\n1. Add basic smoke test to verify test infrastructure works\n2. Check test dependencies in requirements/test.txt\n3. Validate pytest configuration\n\n## Risk Assessment\n**HIGH RISK** - Recovery tests are critical for system reliability. Current state means:\n- No validation of recovery mechanisms\n- Potential undetected regressions in failure handling\n- Production risk if actual failures occur\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 166,
+      "completion_tokens": 314,
+      "total_tokens": 480,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 102
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

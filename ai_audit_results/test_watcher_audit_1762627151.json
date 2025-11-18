@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762627151,
+  "changed_files": [
+    "deepseek_security_audit_request.py",
+    "backend\\security\\crypto.py",
+    "deepseek_verify_complete.py",
+    "deployment\\production_deploy.py",
+    "deepseek_weaknesses_analysis.py",
+    "deepseek_real_analysis.py",
+    "deepseek_self_diagnostic.py",
+    "deepseek_final_assessment.py",
+    "backend\\security\\master_key_manager.py",
+    "deepseek_verify_fixes.py",
+    "conduct_project_audit.py",
+    "complete_backtest_vectorization.py",
+    "backend\\security\\key_manager.py",
+    "test_deepseek_10_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762627137.8155167,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test framework failure\n- 0% coverage suggests tests aren't even executing\n- No coverage data available for any files\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- Zero coverage across all 14 modified files\n- Security-critical components (crypto.py, key_manager.py) completely untested\n- No evidence of test execution whatsoever\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure Failure**: Likely broken test runner, configuration, or dependencies\n2. **Import/Module Issues**: Recent file changes may have broken imports or module structure\n3. **Security Code Changes**: Crypto/key management modifications may have introduced runtime errors preventing test execution\n\n## Immediate Recommendations\n\n**URGENT ACTIONS (Next 2 hours)**:\n1. Check test runner configuration and dependencies\n2. Verify Python path and import statements in test files\n3. Run tests with `-v` flag to identify where they fail\n4. Test individual security modules in isolation\n\n**SHORT-TERM (Next 24 hours)**:\n1. Fix test infrastructure before any deployment\n2. Add basic smoke tests for crypto and key management\n3. Validate security module functionality manually\n4. Implement CI pipeline health checks\n\n**MEDIUM-TERM**:\n1. Establish minimum 80% coverage for security modules\n2. Add integration tests for crypto operations\n3. Implement security-specific test suites\n\n## Risk Assessment\n**CRITICAL RISK** - Do not deploy:\n- Security components completely untested\n- Potential cryptographic vulnerabilities undetected\n- Production deployment would be extremely risky\n- Compliance and audit concerns for security code\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 246,
+      "completion_tokens": 381,
+      "total_tokens": 627,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 182
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

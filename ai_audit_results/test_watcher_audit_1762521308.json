@@ -1,0 +1,54 @@
+{
+  "timestamp": 1762521308,
+  "changed_files": [
+    "backend\\celery_app.py",
+    "backend\\services\\adapters\\bybit.py",
+    "backend\\api\\routers\\admin.py",
+    "backend\\api\\routers\\wizard.py",
+    "backend\\services\\backfill_service.py",
+    "backend\\api\\routers\\bots.py",
+    "backend\\api\\routers\\strategies.py",
+    "backend\\api\\routers\\__init__.py",
+    "backend\\settings.py",
+    "backend\\models\\backfill_progress.py",
+    "backend\\services\\mtf_manager.py",
+    "backend\\services\\candle_cache.py",
+    "backend\\api\\routers\\active_deals.py",
+    "backend\\models\\bybit_kline_audit.py",
+    "backend\\api\\routers\\marketdata.py",
+    "backend\\api\\routers\\live.py",
+    "backend\\api\\routers\\backtests.py",
+    "backend\\api\\schemas.py",
+    "backend\\api\\routers\\optimizations.py",
+    "backend\\api\\app.py",
+    "backend\\tasks\\backtest_tasks.py",
+    "backend\\services\\bybit_ws_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762521289.1359863,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates catastrophic test failure\n- 0% coverage suggests tests aren't even running\n- Likely runtime errors preventing test execution\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - This is worse than low coverage:\n- Coverage system failed to collect any data\n- Either tests crashed immediately or coverage setup is broken\n- Cannot assess which code paths are untested\n\n## 3. Potential Issues with Recent Changes\n**High-risk areas in modified files:**\n- `celery_app.py` - Task queue system changes could break async operations\n- Multiple API routers modified - Risk of breaking API endpoints\n- `bybit.py` and `bybit_ws_manager.py` - Exchange integration changes\n- `backfill_service.py` and related models - Data pipeline modifications\n\n## 4. Immediate Recommendations\n\n**Priority 1 - Fix Test Infrastructure:**\n```bash\n# Run with verbose output to see failure details\npytest -v --tb=short\n# Check for import/setup errors\npython -m pytest --collect-only\n```\n\n**Priority 2 - Isolate Breaking Changes:**\n- Revert recent changes to identify which modification broke tests\n- Test API routers individually\n- Verify Celery configuration changes\n\n**Priority 3 - Add Basic Smoke Tests:**\n- Create minimal tests for critical paths\n- Test API health endpoints first\n- Verify database connections and external service integrations\n\n## 5. Risk Assessment\n**HIGH RISK** - Do not deploy:\n- Unknown impact of changes across 22 modified files\n- No validation of API endpoint functionality\n- Potential data corruption in backfill/cache systems\n- Exchange integration changes could cause financial impact\n\n**Immediate Action:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 357,
+      "completion_tokens": 398,
+      "total_tokens": 755,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 293
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

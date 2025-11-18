@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762631886,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "mcp-server\\server.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762631874.4241538,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage means no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**NO COVERAGE DATA** - Zero tests ran to completion:\n- No files show any coverage percentages\n- Cannot assess actual code coverage gaps\n- Test execution is blocked before coverage measurement\n\n## Potential Issues with Recent Changes\n1. **Environment contamination**: `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` modification suggests virtual env corruption\n2. **Server dependency failure**: `mcp-server\\server.py` changes may have broken database connectivity\n3. **Test script issues**: `temp_pg_test.py` likely contains fatal errors\n\n## Immediate Action Recommendations\n1. **Fix test environment**:\n   - Recreate virtual environment (`rm -rf .venv && python -m venv .venv`)\n   - Reinstall dependencies from requirements\n2. **Debug test execution**:\n   - Run `temp_pg_test.py` directly to identify specific exceptions\n   - Check database connectivity and psycopg2 installation\n3. **Isolate the failure**:\n   - Test database connection independently\n   - Verify MCP server starts without errors\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential production issues undetectable\n- Database connectivity likely compromised\n- Deployment would be extremely risky\n\n**Priority**: Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 154,
+      "completion_tokens": 338,
+      "total_tokens": 492,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 90
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762696475,
+  "changed_files": [
+    "backend\\security\\rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762696461.5794392,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution entirely.\n\n## Coverage Analysis\n**0% coverage** - No tests are running successfully. This represents maximum coverage risk.\n\n## Potential Issues with Recent Changes\nThe rate_limiter.py modification likely introduced:\n- Syntax errors preventing import/execution\n- Circular imports or dependency issues\n- Runtime errors during test setup/import\n- Missing dependencies or incompatible changes\n\n## Immediate Recommendations\n\n1. **Diagnose Test Failure Root Cause**\n   ```bash\n   python -m pytest backend/security/ -v --tb=short\n   ```\n   Check for import errors or syntax issues in rate_limiter.py\n\n2. **Fix Basic Test Execution**\n   - Verify rate_limiter.py syntax and imports\n   - Check for missing dependencies\n   - Ensure test discovery is working\n\n3. **Implement Critical Tests First**\n   - Basic import/smoke tests for rate_limiter\n   - Core functionality tests before edge cases\n   - Aim for >80% coverage on security components\n\n## Risk Assessment\n**HIGH RISK** - Security component with zero test coverage:\n- Rate limiting bypass vulnerabilities possible\n- No regression detection for security logic\n- Production failures likely\n- Compliance/audit concerns\n\n**Priority**: Fix test execution immediately before any deployment. Security components require robust testing.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 293,
+      "total_tokens": 421,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

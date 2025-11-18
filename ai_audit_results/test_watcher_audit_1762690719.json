@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762690719,
+  "changed_files": [
+    "backend\\api\\routers\\backtests.py",
+    "backend\\api\\error_handling.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762690703.1597815,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (segmentation fault, memory error, or fatal Python interpreter issue).\n\n## Coverage Analysis\n**0% coverage** - No code is being executed during test runs. This represents complete test infrastructure failure.\n\n## Potential Issues with Recent Changes\n1. **Fatal runtime errors** in either `backtests.py` or `error_handling.py`\n2. **Import/circular dependency** issues preventing module loading\n3. **Syntax errors** or incompatible Python version requirements\n4. **Missing dependencies** causing import failures\n\n## Immediate Recommendations\n1. **Run tests individually** to isolate the crashing module:\n   ```bash\n   python -m pytest backend/api/routers/backtests.py -v\n   python -m pytest backend/api/error_handling.py -v\n   ```\n\n2. **Check for basic syntax**:\n   ```bash\n   python -m py_compile backend/api/routers/backtests.py\n   python -m py_compile backend/api/error_handling.py\n   ```\n\n3. **Review recent changes** to both files for:\n   - Infinite recursion\n   - Memory-intensive operations\n   - System-level calls\n   - Import loops\n\n4. **Add debug logging** at module import level to identify crash point\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No functional test suite\n- Potential for runtime crashes in production\n- Undetected regressions in error handling\n- Complete loss of test-driven development safety net\n\n**Priority: Fix immediately** - The test infrastructure must be restored before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 140,
+      "completion_tokens": 354,
+      "total_tokens": 494,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 76
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

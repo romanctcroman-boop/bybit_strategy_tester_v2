@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762538063,
+  "changed_files": [
+    "tests\\test_audit_agent_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538048.8547833,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates either:\n- Syntax errors in test code\n- Missing dependencies/imports\n- Test environment setup failures\n- Fatal exceptions during test discovery/execution\n\n## Coverage Analysis\n**ZERO COVERAGE** - No code was executed during testing. This is a direct result of the test execution failure, not a coverage measurement issue.\n\n## Potential Issues with Recent Changes\nThe modified file `tests/test_audit_agent_integration.py` likely contains:\n- Broken imports or syntax errors\n- Missing test fixtures or setup\n- Incompatible changes with test dependencies\n- Configuration errors in test discovery\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Run tests with verbose output to identify the specific failure point\n   - Check for syntax errors in the modified test file\n   - Verify all imports and dependencies are available\n\n2. **Debug Steps**\n   ```bash\n   python -m pytest tests/test_audit_agent_integration.py -v\n   python -c \"import tests.test_audit_agent_integration\"  # Check imports\n   ```\n\n3. **Validation**\n   - Ensure test environment matches development environment\n   - Verify pytest configuration and conftest files\n   - Check for circular imports or module initialization issues\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected regressions in production code\n- Potential integration issues with audit agent\n- No validation of recent changes\n- Deployment would be extremely risky\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 348,
+      "total_tokens": 479,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

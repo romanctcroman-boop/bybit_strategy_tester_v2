@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762601481,
+  "changed_files": [
+    "adapt_phase2_tests.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762601467.4551969,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely broken. Exit code -1 indicates a fatal error preventing test execution, likely due to syntax errors, import failures, or environment issues in `adapt_phase2_tests.py`.\n\n## Coverage Analysis\n**0% coverage** confirms no tests executed successfully. This represents a complete testing gap where no code validation occurred.\n\n## Potential Issues with Recent Changes\n- **Syntax/Import Errors**: `adapt_phase2_tests.py` likely contains fatal Python errors\n- **Environment Dependencies**: Missing imports, packages, or configuration\n- **Test Infrastructure**: Broken test runners or framework integration\n\n## Immediate Recommendations\n1. **Fix Syntax Errors**: Run `python -m py_compile adapt_phase2_tests.py` to identify compilation issues\n2. **Validate Imports**: Check all imports in the test file exist and are accessible\n3. **Run Individual Test**: Execute the problematic file directly to see specific error messages\n4. **Check Test Framework**: Verify pytest/unittest configuration and dependencies\n\n## Risk Assessment\n**HIGH RISK** - No code validation occurred, meaning undetected bugs could be deployed. This represents a complete testing failure that should block any deployment until resolved.\n\n**Priority Action**: Immediately fix the fatal error in `adapt_phase2_tests.py` before any other testing improvements.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 283,
+      "total_tokens": 409,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

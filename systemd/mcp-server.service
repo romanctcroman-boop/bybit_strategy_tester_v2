@@ -1,0 +1,31 @@
+[Unit]
+Description=MCP Server for Bybit Strategy Tester
+After=network.target
+
+[Service]
+Type=simple
+User=roman
+WorkingDirectory=D:/bybit_strategy_tester_v2/mcp-server
+ExecStart=D:/bybit_strategy_tester_v2/.venv/Scripts/python.exe server.py
+
+# Restart policy (Perplexity Agent recommendation)
+Restart=always
+RestartSec=5
+
+# Rate limiting restarts (max 3 in 60 seconds)
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Logging (goes to systemd journal)
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=D:/bybit_strategy_tester_v2
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

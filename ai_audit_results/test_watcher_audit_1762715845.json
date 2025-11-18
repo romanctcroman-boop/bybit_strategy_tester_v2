@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762715845,
+  "changed_files": [
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762715818.9149153,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates fundamental issues in test setup or code structure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\n1. **Import/Initialization Failure** - The changed `reliability\\__init__.py` likely contains syntax errors, import cycles, or initialization code that crashes\n2. **Module Loading Issues** - Python cannot properly import/load the reliability module\n3. **Test Configuration Problems** - Test runner cannot discover or execute tests\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix Import Issues** - Check `__init__.py` for syntax errors, circular imports, or missing dependencies\n2. **Verify Module Structure** - Ensure `reliability/` directory has proper `__init__.py` and accessible modules\n3. **Run Basic Python Check** - Execute `python -c \"import reliability\"` to isolate the import failure\n4. **Check Test Discovery** - Verify test files are properly named (test_*.py) and located in discoverable paths\n\n**FOLLOW-UP:**\n- Add basic smoke tests to verify module imports\n- Implement test environment validation in CI/CD pipeline\n\n## Risk Assessment\n**HIGH RISK** - No testing validation exists for the reliability module. Any defects could go undetected, potentially affecting system stability and data integrity. The codebase is currently untested and potentially broken.\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 356,
+      "total_tokens": 481,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

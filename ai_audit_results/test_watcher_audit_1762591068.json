@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762591068,
+  "changed_files": [
+    "apply_deepseek_improvements.py",
+    "tests\\backend\\conftest.py",
+    "backend\\api\\deepseek_pool.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762591051.0424078,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BLACKOUT**:\n- 0% coverage across all files\n- No test execution means no code validation\n- All recent changes are completely untested\n\n## Potential Issues with Recent Changes\n1. **`apply_deepseek_improvements.py`** - Likely contains breaking changes that crash test environment\n2. **`tests\\backend\\conftest.py`** - Fixture/modification may be causing test framework failure\n3. **`backend\\api\\deepseek_pool.py`** - New API implementation may have initialization errors\n\n## Immediate Action Recommendations\n1. **Debug Test Infrastructure**:\n   - Check pytest configuration in `conftest.py` for syntax errors\n   - Verify all dependencies are installed and compatible\n   - Run with `-v` flag to see where tests fail\n\n2. **Isolate the Breaking Change**:\n   - Revert `apply_deepseek_improvements.py` and test incrementally\n   - Test each changed file independently to identify the culprit\n   - Check for circular imports or missing dependencies\n\n3. **Emergency Validation**:\n   - Manually test core functionality of changed components\n   - Verify API endpoints are responding\n   - Check application logs for runtime errors\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- Zero confidence in code changes\n- Potential for runtime crashes in production\n- Data corruption or service disruption likely\n- All modified components are effectively untested\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 148,
+      "completion_tokens": 386,
+      "total_tokens": 534,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 84
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762723421,
+  "changed_files": [
+    "tests\\test_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762723397.4459577,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1). The test suite is non-functional and provides zero validation of code behavior.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code is being tested\n- No coverage data available for any files\n- Complete testing gap across the entire codebase\n\n## Potential Issues with Recent Changes\n- **tests/test_circuit_breaker.py** modifications likely introduced:\n  - Syntax errors\n  - Import failures\n  - Configuration issues\n  - Missing dependencies\n  - Infinite loops or crashes\n\n## Recommendations for Improvement\n1. **Immediate Action**: Fix test execution failure\n   - Run `python -m pytest tests/test_circuit_breaker.py -v` to see specific error\n   - Check for syntax errors in the modified test file\n   - Verify imports and dependencies\n\n2. **Short-term**:\n   - Ensure tests run successfully before measuring coverage\n   - Add basic smoke tests to prevent complete test suite failure\n\n3. **Long-term**:\n   - Implement CI pipeline with test execution validation\n   - Add pre-commit hooks to catch syntax errors\n\n## Risk Assessment\n**HIGH RISK** - No working tests means:\n- Undetected regressions in production code\n- No validation of circuit breaker functionality\n- Potential production outages from broken logic\n- Complete loss of development feedback loop\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 308,
+      "total_tokens": 436,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

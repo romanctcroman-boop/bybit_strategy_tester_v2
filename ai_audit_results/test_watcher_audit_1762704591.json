@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762704591,
+  "changed_files": [
+    "fix_mcp_print_statements.py",
+    "mcp-server\\server.py",
+    "tests\\unit\\test_batch_writer.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762704577.3255432,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely crash)\n- 0% coverage suggests tests never executed properly\n- This represents a complete testing breakdown\n\n## Coverage Analysis & Gaps\n**ALL COVERAGE MISSING** - Critical gaps:\n- No code coverage data collected\n- Unable to assess which components are tested\n- Test infrastructure itself may be broken\n\n## Potential Issues with Recent Changes\n**HIGH RISK CHANGES DETECTED**:\n1. **Modified pytest internals** (.venv\\Lib\\site-packages\\_pytest\\terminal.py) - NEVER modify vendored packages\n2. **MCP server changes** (mcp-server\\server.py) - Core service component\n3. **Test file modifications** (tests\\unit\\test_batch_writer.py) - Test logic itself changed\n4. **Print statement fixes** (fix_mcp_print_statements.py) - Suggests debugging artifacts\n\n## Immediate Recommendations\n1. **REVERT pytest modifications** - Restore original terminal.py immediately\n2. **Run tests in isolation** - Test each changed component separately\n3. **Check test dependencies** - Verify pytest installation isn't corrupted\n4. **Validate MCP server startup** - Ensure server doesn't crash during test init\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- Production readiness: UNACCEPTABLE\n- Regression risk: EXTREME\n- Deployment risk: CRITICAL - DO NOT DEPLOY\n- Test reliability: COMPROMISED\n\n**Priority Action**: Restore pytest to original state and verify basic test execution before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 163,
+      "completion_tokens": 354,
+      "total_tokens": 517,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 99
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

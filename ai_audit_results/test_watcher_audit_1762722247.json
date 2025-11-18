@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762722247,
+  "changed_files": [
+    "tests\\test_request_deduplication.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762722223.881152,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test suite or codebase. No tests actually ran successfully.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% coverage confirms no code was executed. This represents a complete testing blackout.\n\n## Potential Issues with Recent Changes\n1. **Test File Corruption**: `tests\\test_request_deduplication.py` likely contains syntax errors, import failures, or configuration issues\n2. **Dependency Break**: Missing imports or broken dependencies in the test module\n3. **Environment Issues**: Test runner configuration or environment setup failures\n4. **Fixtures/Setup Failure**: Critical setup code (setUp/tearDown) crashing before tests execute\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m pytest tests/test_request_deduplication.py -v` to see specific error details\n2. Check for syntax errors in the test file\n3. Verify all imports are valid and dependencies installed\n4. Examine test configuration and environment variables\n\n**SHORT-TERM:**\n1. Fix the failing test file to restore basic test execution\n2. Add smoke tests to catch setup failures early\n3. Implement CI checks to prevent merging broken tests\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No functional testing validation\n- Potential undetected production bugs\n- Broken development workflow\n- Possible regression issues in request deduplication logic\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 337,
+      "total_tokens": 464,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

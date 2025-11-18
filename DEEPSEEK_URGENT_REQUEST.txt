@@ -1,0 +1,327 @@
+"""
+URGENT REQUEST TO DEEPSEEK AGENT
+=================================
+
+Проект: bybit_strategy_tester_v2
+Дата: 2025-11-11
+Разработчик: Нуждается в экспертной помощи DeepSeek
+
+КРАТКОЕ РЕЗЮМЕ
+--------------
+Redis Queue Manager работает END-TO-END успешно:
+✅ Workers обрабатывают backtests за 0.25s
+✅ Database integration работает
+✅ Integration test PASSED
+
+НО есть 2 критические проблемы требующие решения!
+
+════════════════════════════════════════════════════════════════
+
+ПРОБЛЕМА 1 [КРИТИЧЕСКАЯ]: Pytest Collection Errors
+════════════════════════════════════════════════════════════════
+
+СИМПТОМЫ:
+---------
+```
+ValueError: I/O operation on closed file.
+  File "_pytest/capture.py", line 591, in snap
+    self.tmpfile.seek(0)
+
+collected 1036 items / 8 errors in 4.67s
+```
+
+ДЕТАЛИ:
+-------
+- Python 3.13.3 + Pytest 8.4.2
+- 1036 тестов собираются успешно
+- 8 ошибок при сборе (collection errors)
+- ❌ Массовый запуск ПАДАЕТ
+- ✅ Индивидуальные тесты РАБОТАЮТ
+
+ВОСПРОИЗВЕДЕНИЕ:
+----------------
+# FAILS:
+pytest tests/ -v --tb=short
+
+# WORKS:
+pytest tests/test_buy_hold_simple.py::test_buy_hold_return_exists -v
+
+ГИПОТЕЗЫ:
+---------
+1. Pytest capture plugin bug с большим количеством тестов
+2. File descriptor leak
+3. Memory exhaustion при 1036 тестах
+4. Async fixtures не очищаются корректно
+5. Python 3.13.3 compatibility issue
+
+ЗАПРОС К DEEPSEEK:
+------------------
+🔥 Проанализировать traceback и найти root cause
+🔥 Предложить working solution для запуска всех 1036 тестов
+🔥 Возможно нужны изменения в pytest.ini или conftest.py
+
+════════════════════════════════════════════════════════════════
+
+ПРОБЛЕМА 2 [ВЫСОКАЯ]: Redis Metrics не синхронизируются
+════════════════════════════════════════════════════════════════
+
+СИМПТОМЫ:
+---------
+API endpoint /api/v1/queue/metrics ВСЕГДА возвращает:
+```json
+{
+  "tasks_submitted": 0,
+  "tasks_completed": 0,  ← ДОЛЖНО БЫТЬ > 0
+  "tasks_failed": 0
+}
+```
+
+Но workers успешно обработали 8+ backtests!
+
+ROOT CAUSE:
+-----------
+Multi-process environment с in-memory metrics:
+
+Process 1 (API):
+  RedisQueueManager.metrics = {"completed": 0}
+
+Process 2 (Worker1):
+  RedisQueueManager.metrics = {"completed": 5}
+
+Process 3 (Worker2):
+  RedisQueueManager.metrics = {"completed": 3}
+
+API читает СВОИ metrics (0), не видит metrics других процессов!
+
+ТЕКУЩИЙ КОД (НЕПРАВИЛЬНЫЙ):
+----------------------------
+```python
+# backend/queue/redis_queue_manager.py
+class RedisQueueManager:
+    def __init__(self):
+        self.metrics = {
+            "tasks_submitted": 0,
+            "tasks_completed": 0,  # IN-MEMORY!!!
+        }
+    
+    def get_metrics(self) -> Dict[str, int]:
+        # Пытается читать из Redis Stream
+        info = self.redis.xinfo_stream(self.stream_name)
+        stream_length = info.get('length', 0)
+        
+        # Но completed tasks удаляются после XACK
+        local_completed = self.metrics.get('tasks_completed', 0)
+        
+        return {
+            "tasks_completed": local_completed,  # ВСЕГДА 0 в API!
+        }
+```
+
+ОЖИДАЕМОЕ РЕШЕНИЕ:
+------------------
+Централизованное хранение в Redis Hash:
+
+```python
+class RedisQueueManager:
+    
+    async def submit_task(self, ...):
+        # Submit to stream
+        task_id = await self.redis.xadd(...)
+        
+        # Increment global counter
+        await self.redis.hincrby("bybit:metrics", "tasks_submitted", 1)
+    
+    async def _process_message(self, ...):
+        try:
+            result = await handler(payload)
+            await self.redis.xack(...)
+            
+            # Increment global counter
+            await self.redis.hincrby("bybit:metrics", "tasks_completed", 1)
+        except:
+            # Increment global counter
+            await self.redis.hincrby("bybit:metrics", "tasks_failed", 1)
+    
+    def get_metrics(self) -> Dict[str, int]:
+        # Read from centralized storage
+        metrics = self.redis.hgetall("bybit:metrics")
+        return {
+            "tasks_submitted": int(metrics.get(b"tasks_submitted", 0)),
+            "tasks_completed": int(metrics.get(b"tasks_completed", 0)),
+            "tasks_failed": int(metrics.get(b"tasks_failed", 0)),
+        }
+```
+
+ЗАПРОС К DEEPSEEK:
+------------------
+🔥 Реализовать централизованные metrics через Redis Hash
+🔥 Обеспечить atomic increments через HINCRBY
+🔥 Гарантировать consistency между API и Workers
+🔥 Добавить error handling для Redis недоступности
+
+════════════════════════════════════════════════════════════════
+
+УСПЕШНО РАБОТАЮЩИЕ КОМПОНЕНТЫ (ДЛЯ КОНТЕКСТА)
+════════════════════════════════════════════════════════════════
+
+✅ Redis Queue Manager:
+   - Workers подключаются к Redis
+   - Consumer Groups работают
+   - Task handlers регистрируются
+   - Tasks обрабатываются успешно
+
+✅ Backtest Processing:
+   Worker logs:
+   ```
+   12:58:56.085 | INFO    | Processing task 3a466861...
+   12:58:56.168 | INFO    | Claimed backtest 8
+   12:58:56.181 | INFO    | Loaded 720 candles
+   12:58:56.332 | SUCCESS | Backtest 8 completed: final_capital=10009.75
+   12:58:56.332 | SUCCESS | Task completed in 0.25s
+   ```
+
+✅ Integration Test:
+   ```
+   Status: completed ✅
+   Final capital: 10009.753790125998 ✅
+   Integration test completed! ✅
+   ```
+
+✅ Database:
+   ```sql
+   SELECT * FROM backtests WHERE id IN (7,8,9);
+   -- Все со status='completed', final_capital корректно рассчитан
+   ```
+
+✅ Retry Logic:
+   - 3 attempts с exponential backoff (2s, 4s, 8s)
+   - Dead Letter Queue для failed tasks
+
+════════════════════════════════════════════════════════════════
+
+ИСПРАВЛЕННЫЕ BUGS (В ЭТОЙ СЕССИИ)
+════════════════════════════════════════════════════════════════
+
+1. Cache Decorator:
+   ```python
+   # БЫЛО (bug):
+   return wrapper if not asyncio.iscoroutinefunction(func) else async_wrapper
+   
+   # СТАЛО (fixed):
+   return async_wrapper  # Всегда async для FastAPI
+   ```
+
+2. Task Handler - NoneType:
+   ```python
+   # БЫЛО:
+   if candles.empty:  # ❌ Crash если candles=None
+   
+   # СТАЛО:
+   if candles is None or candles.empty:  # ✅
+   ```
+
+3. BacktestEngine kwargs:
+   ```python
+   # БЫЛО:
+   engine = get_engine(data_service=ds, slippage=0.0001)
+   
+   # СТАЛО:
+   engine = get_engine(slippage_pct=0.0001)
+   ```
+
+4. SQLAlchemy dict unpacking:
+   ```python
+   # БЫЛО:
+   ds.update_backtest_results(backtest_id=id, **results)
+   # ❌ results содержит nested dicts
+   
+   # СТАЛО:
+   scalar_results = {k: v for k, v in results.items() if k in scalar_keys}
+   ds.update_backtest_results(backtest_id=id, **scalar_results)
+   ```
+
+════════════════════════════════════════════════════════════════
+
+ВАЖНЫЕ ФАЙЛЫ
+════════════════════════════════════════════════════════════════
+
+1. backend/queue/redis_queue_manager.py (354 lines)
+   - Основной queue manager
+   - НУЖДАЕТСЯ: Централизованные metrics
+
+2. backend/queue/task_handlers.py (230 lines)
+   - Backtest/optimization handlers
+   - ИСПРАВЛЕНО: NoneType, kwargs bugs
+
+3. backend/cache/decorators.py
+   - Cache decorator для FastAPI
+   - ИСПРАВЛЕНО: Всегда return async_wrapper
+
+4. tests/ (1036 тестов)
+   - ПРОБЛЕМА: Падает при массовом запуске
+
+5. test_full_queue_integration.py
+   - РАБОТАЕТ: End-to-end test проходит
+
+════════════════════════════════════════════════════════════════
+
+ENVIRONMENT
+════════════════════════════════════════════════════════════════
+
+OS: Windows 11
+Python: 3.13.3
+Pytest: 8.4.2
+Redis: 6.x (localhost:6379)
+FastAPI: Latest
+SQLAlchemy: Latest
+
+Processes:
+- 1 API process (uvicorn)
+- 2 Worker processes
+- Total: 3+ Python processes
+
+════════════════════════════════════════════════════════════════
+
+ОЖИДАНИЯ ОТ DEEPSEEK AGENT
+════════════════════════════════════════════════════════════════
+
+1. 🎯 Root cause analysis для pytest errors
+2. 🎯 Working solution для запуска 1036 тестов
+3. 🎯 Реализация централизованных Redis metrics
+4. 🎯 Code review текущих исправлений
+5. 🎯 Best practices для production deployment
+
+════════════════════════════════════════════════════════════════
+
+ПРИОРИТЕТЫ
+════════════════════════════════════════════════════════════════
+
+🔴 КРИТИЧЕСКИЙ: Pytest errors (блокирует CI/CD)
+🟠 ВЫСОКИЙ: Metrics sync (некорректные данные в API)
+🟡 СРЕДНИЙ: Code review (quality assurance)
+
+════════════════════════════════════════════════════════════════
+
+КОМАНДЫ ДЛЯ ВОСПРОИЗВЕДЕНИЯ
+════════════════════════════════════════════════════════════════
+
+# Pytest errors:
+cd D:\\bybit_strategy_tester_v2
+.venv\\Scripts\\python.exe -m pytest tests/ -v --tb=short
+
+# Metrics check (показывает 0):
+curl http://127.0.0.1:8000/api/v1/queue/metrics
+
+# Integration test (работает):
+.venv\\Scripts\\python.exe test_full_queue_integration.py
+
+# Database check (работает):
+.venv\\Scripts\\python.exe -c "from backend.database import SessionLocal; from backend.models import Backtest; db = SessionLocal(); bt = db.query(Backtest).filter(Backtest.id == 7).first(); print(f'{bt.status}: {bt.final_capital}'); db.close()"
+
+════════════════════════════════════════════════════════════════
+
+THANK YOU DEEPSEEK! 🙏
+Ваш анализ критически важен для проекта!
+
+════════════════════════════════════════════════════════════════
+"""

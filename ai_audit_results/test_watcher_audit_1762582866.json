@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762582866,
+  "changed_files": [
+    "tests\\test_shared_circuit_breaker.py",
+    "backend\\api\\deepseek_pool.py",
+    "tests\\test_deepseek_pool_deadlock.py",
+    "backend\\api\\task_queue.py",
+    "tests\\test_integration_full.py",
+    "tests\\test_task_queue_new.py",
+    "backend\\config\\__init__.py",
+    "scripts\\test_tournament_fixed.py",
+    "backend\\config\\timeout_config.py",
+    "backend\\api\\shared_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762582847.1643996,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests aren't even running to completion\n- This represents a complete testing infrastructure failure\n\n## Coverage Analysis & Gaps\n**NO MEANINGFUL COVERAGE DATA** - All files show 0% coverage because:\n- Tests are crashing before coverage collection\n- Cannot assess actual code coverage gaps without successful test execution\n\n## Potential Issues with Recent Changes\nHigh-risk areas based on changed files:\n\n1. **Circuit Breaker Changes** (`shared_circuit_breaker.py`, `test_shared_circuit_breaker.py`)\n   - Likely introduced breaking changes to error handling\n   - May be causing early test termination\n\n2. **Task Queue Modifications** (`task_queue.py`, `test_task_queue_new.py`)\n   - New queue implementation could have concurrency issues\n   - Potential deadlock scenarios (evidenced by deadlock test file)\n\n3. **Integration Test Failures** (`test_integration_full.py`)\n   - End-to-end tests failing suggests systemic issues\n   - Could be configuration or dependency problems\n\n## Immediate Action Recommendations\n\n**PRIORITY 1 - Fix Test Execution:**\n```bash\n# Run tests with verbose output to identify crash point\npytest -v --tb=short tests/\n# Check for import/setup issues\npython -m pytest --collect-only\n```\n\n**PRIORITY 2 - Isolate Breaking Changes:**\n- Temporarily revert circuit breaker changes\n- Run task queue tests in isolation\n- Check timeout configuration values\n\n**PRIORITY 3 - Infrastructure Fixes:**\n- Add try/except blocks in test setup\n- Implement test logging to capture crash details\n- Verify test dependencies and environment\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents:\n- Regression detection\n- Code quality assessment\n- Safe deployment\n- Confidence in recent changes\n\n**Immediate Impact:** All development blocked until test infrastructure is restored. No reliable way to validate code changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 227,
+      "completion_tokens": 442,
+      "total_tokens": 669,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 163
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762556210,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\sqlalchemy\\util\\langhelpers.py",
+    ".venv\\Lib\\site-packages\\sqlalchemy\\pool\\base.py",
+    "backend\\migrations\\env.py",
+    ".venv\\Lib\\site-packages\\sqlalchemy\\engine\\default.py",
+    ".venv\\Lib\\site-packages\\psycopg\\connection.py",
+    ".venv\\Lib\\site-packages\\sqlalchemy\\engine\\create.py",
+    ".venv\\Lib\\site-packages\\sqlalchemy\\pool\\impl.py",
+    ".venv\\Lib\\site-packages\\sqlalchemy\\engine\\base.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762556193.4575748,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates either:\n- Test framework crashed before execution\n- Environment setup failures\n- Critical import/dependency issues\n- Test discovery failures\n\n## Coverage Analysis\n**0.00% coverage is a red flag** - No tests actually ran. This means:\n- All code changes are completely untested\n- No regression protection exists\n- Coverage metrics are meaningless until tests execute\n\n## Potential Issues with Recent Changes\n**Environment contamination detected** - Modified files include:\n- SQLAlchemy core files in `.venv/` (🚨 **Critical** - never modify package files directly)\n- Database migration files\n- Multiple database connection/pool files\n\n**Likely root causes:**\n1. Virtual environment corruption\n2. Direct package modifications (anti-pattern)\n3. Database connection/config issues\n4. Migration conflicts\n\n## Recommendations for Improvement\n\n**IMMEDIATE ACTIONS:**\n1. **Recreate virtual environment** - Delete `.venv` and rebuild from requirements\n2. **Verify no package modifications** - Use `pip check` to validate integrity\n3. **Run isolated test** - Execute single simple test to verify basic functionality\n4. **Check database connectivity** - Test DB connections outside test framework\n\n**STRUCTURAL FIXES:**\n1. Add pre-commit hook to prevent package modifications\n2. Implement basic smoke test that runs before full test suite\n3. Set up CI environment with clean installations\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- 🔴 **Deployment Risk**: Cannot verify any functionality works\n- 🔴 **Regression Risk**: No test protection for changes\n- 🔴 **Environment Risk**: Corrupted development environment\n- 🟡 **Data Risk**: Migration files changed without validation\n\n**Priority**: Fix environment immediately before any further development or deployment.\n\n**Next step**: Start with `rm -rf .venv && python -m venv .venv` and reinstall dependencies.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 266,
+      "completion_tokens": 423,
+      "total_tokens": 689,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 202
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

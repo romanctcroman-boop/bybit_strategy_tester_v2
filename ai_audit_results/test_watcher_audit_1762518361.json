@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762518361,
+  "changed_files": [
+    "automation\\task2_key_manager\\test_key_manager.py",
+    "automation\\task3_audit_agent\\config.py",
+    "send_to_deepseek_full_analysis.py",
+    "automation\\task2_key_manager\\key_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762518342.6053503,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test execution failure\n- 0% coverage suggests tests aren't running at all\n- Likely test infrastructure or environment issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No files are being measured (empty coverage report)\n- All business logic (key_manager.py, config.py) completely untested\n- Test files themselves may be failing to execute\n\n## Potential Issues with Recent Changes\n1. **Test Execution Environment**: Missing dependencies, broken imports, or environment configuration\n2. **File Structure Changes**: Modified imports in `test_key_manager.py` may reference incorrect paths\n3. **Configuration Issues**: `config.py` changes may have broken test setup/teardown\n4. **Script Interference**: `send_to_deepseek_full_analysis.py` may have altered test execution context\n\n## Immediate Action Recommendations\n**PRIORITY 1 - Fix Test Execution:**\n```bash\n# 1. Run tests with verbose output to identify root cause\npython -m pytest -v --tb=short\n\n# 2. Check for missing dependencies\npip list | grep -E \"(pytest|coverage)\"\n```\n\n**PRIORITY 2 - Infrastructure Repair:**\n- Verify `test_key_manager.py` imports are correct\n- Check if `config.py` contains valid test configurations\n- Ensure test discovery is working (correct naming convention)\n\n**PRIORITY 3 - Restore Coverage:**\n- Once tests execute, add coverage reporting: `pytest --cov=automation`\n- Focus on `key_manager.py` core functionality first\n\n## Risk Assessment\n**HIGH RISK** - Deploying without resolution is dangerous:\n- **Critical**: No validation of key management security logic\n- **High**: Audit agent configuration completely untested  \n- **Medium**: Potential regression in existing functionality\n\n**NEXT STEPS:** Fix test execution before any further development or deployment. The 0% coverage indicates fundamental test infrastructure failure, not just missing test cases.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 167,
+      "completion_tokens": 442,
+      "total_tokens": 609,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 103
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

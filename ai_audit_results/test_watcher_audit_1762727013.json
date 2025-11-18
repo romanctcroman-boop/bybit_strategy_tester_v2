@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762727013,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762726994.9217012,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Exit code -1 indicates a fatal error preventing test execution. The entire test suite failed to run, making quality assessment impossible until the blocking issue is resolved.\n\n## Coverage Analysis\n**0.00% coverage** - No tests executed successfully. This represents maximum coverage risk as we have no visibility into code quality or regression impact.\n\n## Potential Issues with Recent Changes\n1. **Fatal configuration error** - Likely in `tests/backend/conftest.py` or test dependencies\n2. **Breaking changes** in `backend/core/mtf_engine.py` may have broken test infrastructure\n3. **Missing dependencies** - New files like `reliability/perplexity_client.py` may require unavailable resources\n4. **Integration test failures** - `test_sandbox_integration.py` and stress tests may be hitting unreachable endpoints\n\n## Immediate Action Plan\n1. **Fix the blocking issue**:\n   - Check `tests/backend/conftest.py` for syntax errors or import failures\n   - Run tests with `-v` flag to identify the specific failure point\n   - Verify all new dependencies are installed\n\n2. **Isolate the problem**:\n   ```bash\n   python -m pytest tests/backend/conftest.py --tb=short\n   python -m pytest tests/test_mtf_engine.py -v\n   ```\n\n3. **Validate core functionality**:\n   - Test `mtf_engine.py` in isolation first\n   - Check if new reliability module has proper error handling\n\n## Risk Assessment\n**HIGH RISK** - Deployment with 0% test coverage is extremely dangerous. Recent changes to core engine and integration points could have introduced:\n- Runtime crashes in production\n- Data corruption risks\n- Integration failures with external systems\n\n## Priority Recommendations\n1. **Fix test infrastructure immediately** - This is blocking all quality assessment\n2. **Add smoke tests** for core engine before addressing coverage\n3. **Implement gradual rollout** for `mtf_engine.py` changes once tests are running\n4. **Add integration test mocks** to prevent external dependency failures from blocking entire test suite\n\n**Next step**: Identify and fix the root cause preventing test execution before any further analysis or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 471,
+      "total_tokens": 677,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 142
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

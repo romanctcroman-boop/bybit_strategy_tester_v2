@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762631719,
+  "changed_files": [
+    "mcp-server\\di_container.py",
+    "mcp-server\\rate_limiter.py",
+    "mcp-server\\circuit_breaker.py",
+    "mcp-server\\interfaces.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762631708.8585522,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **100% coverage gap** - No code was executed during testing\n- All core components (DI container, rate limiter, circuit breaker) untested\n- Critical infrastructure layer has zero validation\n\n## Potential Issues with Recent Changes\n1. **DI Container changes** likely broke dependency resolution\n2. **Rate Limiter/Circuit Breaker** modifications may have introduced initialization failures\n3. **Interface changes** possibly created incompatible implementations\n4. **Circular dependencies** or import errors in the DI system\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Check for uncaught exceptions in test setup\n   - Verify DI container can initialize without dependencies\n   - Add try-catch around test runner\n\n2. **Add basic smoke tests**:\n   ```python\n   def test_di_container_initialization():\n       container = DIContainer()\n       assert container is not None\n   ```\n\n3. **Isolate components**:\n   - Test DI container independently\n   - Validate rate limiter/circuit breaker in isolation\n   - Mock dependencies to identify breaking points\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No validation of fault tolerance mechanisms\n- Critical infrastructure untested\n- Likely runtime failures in dependency injection\n- Potential cascading failures in production\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 338,
+      "total_tokens": 494,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

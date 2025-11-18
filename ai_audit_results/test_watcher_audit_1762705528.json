@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762705528,
+  "changed_files": [
+    "tests\\test_circuit_breaker.py",
+    "reliability\\circuit_breaker.py",
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762705511.521247,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception during test setup/execution). Zero coverage confirms no tests actually ran.\n\n## Coverage Analysis & Gaps\n- **0% coverage across all files** - No code execution occurred\n- **Complete gap** - Entire circuit breaker implementation untested\n- Test infrastructure itself appears broken\n\n## Potential Issues with Recent Changes\n1. **Test file corruption** - `tests\\test_circuit_breaker.py` may have syntax errors or import failures\n2. **Module initialization** - Changes to `reliability\\__init__.py` might break imports\n3. **Dependency issues** - Missing imports or incompatible changes in `circuit_breaker.py`\n4. **Test configuration** - pytest configuration or conftest.py may be broken\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   ```bash\n   python -m pytest tests/test_circuit_breaker.py -v\n   ```\n   Check for import errors and stack traces\n\n2. **Validate imports**:\n   - Ensure `reliability` package imports work\n   - Check `__init__.py` exports\n\n3. **Test isolation**:\n   - Run tests individually to identify failing component\n   - Check for missing test dependencies\n\n4. **Add basic smoke test**:\n   ```python\n   def test_smoke():\n       from reliability.circuit_breaker import CircuitBreaker\n       assert CircuitBreaker is not None\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Circuit breaker pattern is critical infrastructure. Zero test coverage means:\n- Production failures likely undetected\n- No regression protection\n- Potential cascading failures in dependent services\n- **Do not deploy** until basic tests pass\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 144,
+      "completion_tokens": 395,
+      "total_tokens": 539,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 80
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

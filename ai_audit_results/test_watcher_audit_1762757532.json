@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762757532,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762757503.4893565,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **Critical gap**: Tests aren't even starting execution\n- **Missing**: No coverage data available due to test execution failure\n\n## Potential Issues with Recent Changes\n1. **Environment/Setup Failure**: Likely broken test dependencies or configuration\n2. **Critical Code Break**: Recent changes in `backend\\core\\mtf_engine.py` may have introduced fatal errors\n3. **Integration Issues**: Changes in `reliability\\perplexity_client.py` or sandbox integration tests\n4. **Test Configuration**: Possible issues in `tests\\backend\\conftest.py` affecting all backend tests\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests individually to identify which specific test/file is causing the -1 exit code\n2. Check test dependencies and environment setup\n3. Verify `conftest.py` configurations and fixtures\n4. Examine recent changes to `mtf_engine.py` for breaking changes\n\n**Short-term:**\n1. Implement test isolation to prevent cascade failures\n2. Add basic smoke tests to catch environment issues early\n3. Set up test execution monitoring with better error reporting\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure indicates:\n- Production deployment would be extremely risky\n- No validation of recent changes across multiple components\n- Potential for undetected breaking changes in core engine and reliability modules\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 355,
+      "total_tokens": 561,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

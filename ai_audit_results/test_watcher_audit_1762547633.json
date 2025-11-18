@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762547633,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762547617.5515752,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests didn't execute properly (Exit Code -1). This indicates either:\n- Syntax errors in test files or code\n- Import failures or module dependencies\n- Test framework configuration issues\n- Fatal errors during test setup\n\n## Coverage Analysis\n**0% coverage** - No code was executed during testing. This is a direct result of the test execution failure, not a measurement of actual coverage.\n\n## Potential Issues with Recent Changes\nThe file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Circular imports\n- Runtime errors during module loading\n\n## Immediate Actions Required\n1. **Fix Test Execution First**\n   - Run tests with verbose output to see the actual error\n   - Check Python syntax: `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py`\n   - Verify imports and dependencies\n\n2. **Debug Sequence**\n   - Import the module directly to identify specific errors\n   - Check for missing packages in requirements\n   - Validate test configuration and pytest setup\n\n3. **Quick Validation**\n   ```bash\n   python -c \"import full_ai_audit_deepseek_perplexity_deepseek\"\n   ```\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untestable and potentially broken. No quality metrics can be established until tests execute successfully. Deployment would be extremely risky.\n\n## Priority Recommendations\n1. **Fix the fatal error** preventing test execution\n2. **Add basic smoke tests** to verify module can load\n3. **Implement minimal test coverage** before addressing broader coverage gaps\n4. **Establish test execution monitoring** to catch similar failures earlier\n\n**Next Step**: Identify and resolve the specific error causing Exit Code -1 before any other quality improvements.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 399,
+      "total_tokens": 534,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

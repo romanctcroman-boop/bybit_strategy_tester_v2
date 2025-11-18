@@ -1,0 +1,116 @@
+# System Alert Rules
+# Monitors system resource usage and health
+
+groups:
+  - name: system_alerts
+    interval: 30s
+    rules:
+      # CRITICAL: High CPU usage
+      - alert: HighCPUUsage
+        expr: system_cpu_percent > 90
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+          service: automation-platform
+        annotations:
+          summary: "System CPU usage is critically high"
+          description: "CPU usage is {{ $value | humanize }}% (threshold: 90%)."
+          runbook: "Identify CPU-intensive processes and optimize or scale resources."
+      
+      # CRITICAL: High memory usage
+      - alert: HighMemoryUsage
+        expr: system_memory_percent > 90
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+          service: automation-platform
+        annotations:
+          summary: "System memory usage is critically high"
+          description: "Memory usage is {{ $value | humanize }}% (threshold: 90%)."
+          runbook: "Check for memory leaks and consider increasing available memory."
+      
+      # CRITICAL: Memory leak detected
+      - alert: MemoryLeakDetected
+        expr: |
+          rate(process_resident_memory_bytes[10m]) > 10485760  # 10 MB/10min
+          and
+          process_resident_memory_bytes > 1073741824  # > 1 GB
+        for: 30m
+        labels:
+          severity: critical
+          component: system
+          service: automation-platform
+        annotations:
+          summary: "Potential memory leak detected"
+          description: "Process memory is growing at {{ $value | humanize }}B/s and is now at {{ query \"process_resident_memory_bytes\" | first | value | humanize }}B."
+          runbook: "Investigate memory leak and restart affected component."
+      
+      # WARNING: Elevated CPU usage
+      - alert: ElevatedCPUUsage
+        expr: system_cpu_percent > 70
+        for: 15m
+        labels:
+          severity: warning
+          component: system
+          service: automation-platform
+        annotations:
+          summary: "System CPU usage is elevated"
+          description: "CPU usage is {{ $value | humanize }}% (threshold: 70%)."
+          runbook: "Monitor CPU usage and consider optimization if sustained."
+      
+      # WARNING: Elevated memory usage
+      - alert: ElevatedMemoryUsage
+        expr: system_memory_percent > 75
+        for: 15m
+        labels:
+          severity: warning
+          component: system
+          service: automation-platform
+        annotations:
+          summary: "System memory usage is elevated"
+          description: "Memory usage is {{ $value | humanize }}% (threshold: 75%)."
+          runbook: "Monitor memory usage and investigate if it continues to grow."
+      
+      # WARNING: High disk usage
+      - alert: HighDiskUsage
+        expr: system_disk_percent > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+          service: automation-platform
+        annotations:
+          summary: "Disk usage is high"
+          description: "Disk usage for {{ $labels.path }} is {{ $value | humanize }}% (threshold: 85%)."
+          runbook: "Clean up old files or expand disk space."
+      
+      # WARNING: High process CPU
+      - alert: ProcessHighCPU
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+          service: automation-platform
+        annotations:
+          summary: "Process CPU usage is high"
+          description: "Process is using {{ $value | humanize }} CPU cores (threshold: 0.8)."
+          runbook: "Investigate CPU usage and optimize process if needed."
+      
+      # INFO: System resources normal
+      - alert: SystemResourcesNormal
+        expr: |
+          system_cpu_percent < 50
+          and
+          system_memory_percent < 60
+        for: 1h
+        labels:
+          severity: info
+          component: system
+          service: automation-platform
+        annotations:
+          summary: "System resources are healthy"
+          description: "CPU: {{ query \"system_cpu_percent\" | first | value | humanize }}%, Memory: {{ query \"system_memory_percent\" | first | value | humanize }}%"
+          runbook: "No action needed. System is operating normally."

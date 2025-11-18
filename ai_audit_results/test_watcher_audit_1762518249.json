@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762518249,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762518233.255152,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or code structure. No meaningful quality assessment possible until basic execution is resolved.\n\n## Coverage Analysis & Gaps\n**0% coverage** - Complete test failure means:\n- No code paths were executed\n- All functionality remains untested\n- Impossible to assess actual coverage gaps\n\n## Potential Issues with Recent Changes\nThe single changed file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** (DeepSeek API, perplexity libraries)\n- **Runtime errors** during module initialization\n- **Environment configuration issues** (API keys, paths)\n\n## Immediate Action Recommendations\n1. **Fix Basic Execution First**\n   - Check Python syntax: `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py`\n   - Verify imports and dependencies are installed\n   - Test module can be imported without errors\n\n2. **Add Basic Smoke Test**\n   - Create minimal test that imports module and instantiates main class\n   - Ensure no runtime errors during initialization\n\n3. **Environment Verification**\n   - Confirm all required API keys/environment variables\n   - Check network connectivity for external services\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure indicates:\n- Production code may be completely broken\n- No safety net for future changes\n- High probability of undetected runtime errors\n- Impossible to deploy with confidence\n\n**Priority:** Fix test execution immediately before any other development continues.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 348,
+      "total_tokens": 483,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 71
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

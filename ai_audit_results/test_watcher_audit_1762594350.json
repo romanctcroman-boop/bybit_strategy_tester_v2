@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762594350,
+  "changed_files": [
+    "automation\\deepseek_robot\\robot.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762594335.3519652,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax errors in test files or code\n- Import failures or dependency issues\n- Test framework configuration problems\n- Fatal runtime errors during test initialization\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage means:\n- No tests executed successfully\n- All code paths completely untested\n- No validation of any functionality\n\n## Potential Issues with Recent Changes\nThe modified `robot.py` file likely contains:\n- Breaking syntax errors\n- Missing imports or dependencies\n- Circular imports\n- Incompatible Python version requirements\n- Runtime initialization failures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m py_compile automation\\deepseek_robot\\robot.py` to check for syntax errors\n2. Execute tests with `-v` flag to see specific failure details\n3. Check test runner configuration and dependencies\n4. Verify Python path and import structure\n\n**Follow-up:**\n5. Add basic smoke test to validate module loading\n6. Implement minimal unit test for core functionality\n7. Set up CI to catch similar failures earlier\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- **Deployment Risk:** Critical - Code is completely untested\n- **Regression Risk:** High - No validation of changes\n- **Maintenance Risk:** High - No safety net for future changes\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 330,
+      "total_tokens": 458,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

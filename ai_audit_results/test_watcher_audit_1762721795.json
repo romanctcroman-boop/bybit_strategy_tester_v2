@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762721795,
+  "changed_files": [
+    "reliability\\distributed_cache.py",
+    "tests\\test_distributed_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762721781.6884363,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test execution, likely preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No tests executed successfully\n- Complete testing blackout for distributed_cache module\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in either test file or implementation\n2. **Configuration Issues** - pytest/setup configuration broken\n3. **Dependency Problems** - Missing imports or broken dependencies\n4. **Test Fixture Failures** - Global setup/teardown crashing\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Run tests with `-v` flag to see specific error\n   - Check for syntax errors in both changed files\n   - Verify imports and dependencies\n\n2. **Debug Priority Order**\n   - Run `python -m py_compile` on both changed files\n   - Execute minimal test: `python -m pytest tests/test_distributed_cache.py::test_simplest_case -v`\n   - Check for circular imports between modules\n\n3. **Restore Basic Testing**\n   - Add simple smoke test to verify basic functionality\n   - Ensure at least one test passes before addressing coverage\n\n## Risk Assessment\n**HIGH RISK** - Code changes are completely untested:\n- Production failures highly likely\n- Distributed cache reliability unknown\n- No validation of recent changes\n- Critical system component potentially broken\n\n**Action**: Stop deployment immediately until basic test execution is restored and critical path tests pass.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 334,
+      "total_tokens": 468,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 70
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

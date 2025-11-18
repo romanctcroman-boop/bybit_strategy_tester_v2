@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762559625,
+  "changed_files": [
+    "ask_deepseek_chat_directly.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762559610.7019734,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This suggests either:\n- Missing test framework dependencies\n- Syntax errors preventing test discovery\n- Configuration issues in test setup\n\n## Coverage Analysis\n**0% coverage** confirms no tests executed. All code paths are untested.\n\n## Potential Issues with Recent Changes\nThe file `ask_deepseek_chat_directly.py` likely contains:\n- Fatal syntax errors (missing imports, invalid syntax)\n- Runtime errors during module import\n- Missing dependencies causing import failures\n- Configuration that breaks test discovery\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check for syntax errors: `python -m py_compile ask_deepseek_chat_directly.py`\n   - Verify imports and dependencies\n   - Run with verbose output: `python -m pytest -v --tb=short`\n\n2. **Basic Test Structure**\n   - Add at least one simple smoke test\n   - Ensure `__init__.py` files exist if using packages\n   - Verify pytest configuration\n\n3. **Debug Steps**\n   - Run file directly: `python ask_deepseek_chat_directly.py`\n   - Check for circular imports\n   - Validate Python version compatibility\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected runtime errors in production\n- Regression risks with any change\n- Potential data loss or system failures\n- Complete lack of quality assurance\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 333,
+      "total_tokens": 462,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

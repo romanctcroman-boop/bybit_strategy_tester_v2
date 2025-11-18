@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762707405,
+  "changed_files": [
+    "reliability\\circuit_breaker.py",
+    "tests\\test_integration_retry_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762707377.7376366,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test execution, likely preventing any tests from running.\n\n## Coverage Analysis\n**0% COVERAGE** - No code coverage was collected, confirming tests didn't execute properly. This represents maximum risk for the changed files.\n\n## Potential Issues\n1. **Test Harness Failure**: Import errors, configuration issues, or environment problems\n2. **Syntax Errors**: Recent changes introduced breaking syntax in test or production code\n3. **Dependency Issues**: Missing imports or broken dependencies in the integration test\n4. **Circular Imports**: Possible between circuit_breaker.py and test_integration_retry_circuit_breaker.py\n\n## Immediate Actions Required\n1. **Run tests individually** to isolate the failure:\n   ```bash\n   python -m pytest tests/test_integration_retry_circuit_breaker.py -v\n   python -m pytest reliability/circuit_breaker.py -v\n   ```\n2. **Check for syntax errors** in both changed files\n3. **Verify imports** - ensure test can import from reliability module\n4. **Examine test setup/teardown** for runtime errors\n\n## Risk Assessment\n**HIGH RISK** - Changes are completely untested. Circuit breaker functionality is critical for system reliability. Integration tests failing suggests broader impact on retry mechanisms.\n\n## Priority Recommendations\n1. **Fix test execution first** - address the fatal error preventing test runs\n2. **Add unit test coverage** for circuit_breaker.py before integration tests\n3. **Verify circuit breaker logic** manually since automated validation is unavailable\n4. **Implement CI gate** to block deployments with 0% coverage on modified files\n\n**Immediate focus**: Resolve the test execution failure, then rebuild test coverage systematically.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 142,
+      "completion_tokens": 387,
+      "total_tokens": 529,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

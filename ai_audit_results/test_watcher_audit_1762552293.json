@@ -1,0 +1,47 @@
+{
+  "timestamp": 1762552293,
+  "changed_files": [
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\test_protocol.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_phase1_security.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "backend\\api\\circuit_breaker.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552277.567155,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- Zero test execution suggests fundamental infrastructure or dependency issues\n\n## 2. Coverage Analysis\n**NO COVERAGE DATA** - All tests failed to execute\n- 0.00% coverage means no code was exercised\n- Coverage reporting system likely crashed before collection\n\n## 3. Potential Issues with Recent Changes\n**High-risk areas:**\n- `mtf_engine.py` and `circuit_breaker.py` - Core trading components that could cause system crashes\n- `lstm_predictions.py` and `lstm_queue_predictor.py` - ML components with potential memory/import issues\n- Multiple test files modified simultaneously suggests rushed changes\n\n## 4. Immediate Recommendations\n\n**Priority 1: Fix Test Infrastructure**\n```bash\n# Run tests individually to isolate crash\npytest tests/test_mtf_engine.py -v\npytest tests/backend/test_active_deals_api_mock.py -v\n```\n\n**Priority 2: Check Dependencies**\n- Verify all imports in modified files\n- Check for circular imports in ML components\n- Validate database connections in query optimization tests\n\n**Priority 3: Systematic Recovery**\n1. Revert recent changes to `conftest.py` first (common test configuration issues)\n2. Test core engine components in isolation\n3. Add try-catch blocks around ML model loading\n\n## 5. Risk Assessment\n**HIGH RISK** - Do not deploy\n- Core trading engine modifications without test validation\n- ML pipeline changes with potential memory leaks\n- Multiple API endpoint tests failing simultaneously\n\n**Immediate Action:** Roll back recent changes and implement a phased testing approach with smaller, verified commits.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 301,
+      "completion_tokens": 393,
+      "total_tokens": 694,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 109
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

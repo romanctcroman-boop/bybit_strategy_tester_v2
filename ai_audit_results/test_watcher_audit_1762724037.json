@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762724037,
+  "changed_files": [
+    "collect_phase_data.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762724024.3450694,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with either test infrastructure or code syntax/runtime errors. No meaningful quality assessment possible as zero tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure. No code was executed during testing, suggesting:\n- Test runner configuration errors\n- Import/module resolution failures\n- Critical exceptions before test execution\n- Missing test dependencies or environment setup\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `collect_phase_data.py`, likely containing:\n- Syntax errors preventing module import\n- Circular imports or dependency issues\n- Missing required imports or dependencies\n- Runtime errors during module initialization\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution** - Check test runner logs for specific error messages\n2. **Validate `collect_phase_data.py` syntax** - Run `python -m py_compile collect_phase_data.py`\n3. **Test module import** - Attempt `import collect_phase_data` in Python shell\n4. **Check dependencies** - Verify all imports are available in test environment\n\n**FOLLOW-UP:**\n5. Add basic smoke tests for module import and initialization\n6. Implement CI pipeline with syntax checking pre-commit\n7. Ensure test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail with same errors. Current state indicates broken code that cannot be tested or validated. Urgent fix required before any further development or deployment.\n\n**Priority:** Fix test execution failure before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 124,
+      "completion_tokens": 344,
+      "total_tokens": 468,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 60
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762760183,
+  "changed_files": [
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "reliability\\distributed_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762760162.578245,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental setup/configuration issues\n- No coverage data means tests didn't even start running\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete test infrastructure failure:\n- No files were executed\n- No code paths tested\n- Entire codebase is effectively untested\n\n## Potential Issues with Recent Changes\n1. **Psycopg2 dependency** - Modified package file suggests database connectivity issues\n2. **Distributed cache changes** - Reliability module modifications may have broken imports or dependencies\n3. **Environment corruption** - Virtual env package modifications indicate possible environment issues\n4. **Test file itself** - `temp_pg_test.py` may contain fatal errors preventing test execution\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test infrastructure first** - Run simplest possible test to verify basic functionality\n2. **Check database connectivity** - Verify PostgreSQL connection in `temp_pg_test.py`\n3. **Restore clean environment** - Recreate virtualenv, don't modify package files\n4. **Add error handling** - Wrap test setup in try-catch to get meaningful error messages\n\n**FOLLOW-UP:**\n5. Create isolated unit tests before integration tests\n6. Implement proper test fixtures for database dependencies\n7. Add logging to identify where tests fail\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Production risk**: Code changes are completely untested\n- **Regression risk**: No safety net for future changes\n- **Integration risk**: Database/cache dependencies may be broken\n- **Team velocity impact**: Blocked testing halts development\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 154,
+      "completion_tokens": 392,
+      "total_tokens": 546,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 90
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762713778,
+  "changed_files": [
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713765.9045677,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files\n- Missing dependencies or imports\n- Test framework configuration issues\n- Fatal errors during test discovery/setup\n\n## Coverage Analysis\n**0% COVERAGE** - No code coverage was collected because:\n- Tests failed before execution could begin\n- No production code was exercised\n- Coverage reporting failed entirely\n\n## Potential Issues with Recent Changes\nThe modified file `tests/test_deepseek_client.py` likely contains:\n- Breaking syntax errors\n- Missing imports or dependencies\n- Incorrect test configuration\n- Circular imports or module loading issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest tests/test_deepseek_client.py -v` to see specific error details\n2. Check for syntax errors in the test file\n3. Verify all imports and dependencies are available\n4. Ensure test framework (pytest) is properly installed\n\n**Follow-up:**\n5. Fix the failing test before any deployment\n6. Add pre-commit hooks to catch syntax errors\n7. Implement CI pipeline that fails fast on syntax issues\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents:\n- Any quality assurance\n- Regression detection\n- Code coverage validation\n- Confidence in recent changes\n\n**Priority:** Fix immediately before proceeding with development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 302,
+      "total_tokens": 429,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

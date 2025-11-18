@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762553679,
+  "changed_files": [
+    "backend\\api\\secure_key_storage.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762553664.7920663,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1), indicating fundamental issues with test setup, dependencies, or code syntax. Zero coverage suggests tests didn't run at all.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during testing\n- **No file-specific coverage data** - Test execution halted before coverage collection\n- **Critical gap**: Unable to assess actual code coverage due to test failure\n\n## Potential Issues with Recent Changes\nThe failure likely relates to `secure_key_storage.py` changes:\n- Syntax errors or import issues in the modified file\n- Breaking changes to dependencies or interfaces\n- Missing required environment variables or configuration\n- Test infrastructure failures (fixtures, setup/teardown)\n\n## Recommendations for Improvement\n1. **Immediate Actions**:\n   - Run tests with verbose output to identify the specific failure point\n   - Check for syntax errors in `secure_key_storage.py`\n   - Verify all imports and dependencies are available\n\n2. **Debugging Steps**:\n   - Run a minimal test case to isolate the failure\n   - Check test environment setup and configuration\n   - Validate recent changes don't break existing interfaces\n\n3. **Prevention**:\n   - Add pre-commit hooks to catch syntax errors\n   - Implement CI pipeline with incremental testing\n   - Add basic smoke tests for critical modules\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky because:\n- No validation of recent security-related changes to key storage\n- Unknown if core functionality remains operational\n- Potential security vulnerabilities could be introduced\n- Zero confidence in system stability\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 361,
+      "total_tokens": 489,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

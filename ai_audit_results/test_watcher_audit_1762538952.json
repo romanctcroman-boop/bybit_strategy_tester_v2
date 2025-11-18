@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762538952,
+  "changed_files": [
+    "backend\\security\\key_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538938.4622383,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here's my analysis:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests, suggesting fundamental infrastructure or configuration issues.\n\n## 2. Coverage Analysis\n**0% coverage** across all files confirms no tests executed. This represents a complete testing blackout.\n\n## 3. Potential Issues with Recent Changes\n- **key_manager.py changes likely broke test infrastructure**\n- Possible import errors, dependency conflicts, or syntax errors in test configuration\n- Test runner unable to initialize or discover tests\n\n## 4. Immediate Recommendations\n\n**URGENT ACTIONS:**\n1. **Fix test runner execution** - Check pytest/unitest configuration and dependencies\n2. **Verify key_manager.py imports** - Ensure no circular imports or missing dependencies\n3. **Run tests with verbose output** to identify the crash point\n4. **Check test discovery patterns** - Ensure tests are being found\n\n**FOLLOW-UP:**\n- Add basic smoke tests for key_manager.py\n- Implement CI pipeline checks to prevent similar failures\n- Set up test environment validation\n\n## 5. Risk Assessment\n**HIGH RISK** - Deploying without test validation poses significant security and stability risks, especially for security-related code (key_manager.py). Complete testing failure means unknown regression impact.\n\n**Priority: Critical** - Must resolve before any deployment or further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 302,
+      "total_tokens": 428,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

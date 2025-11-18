@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762730384,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "reliability\\retry_policy.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762730359.896309,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment setup failure\n- Fatal error before tests could execute\n- Missing test dependencies or configuration\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - No code was executed during testing. Critical gaps:\n- No tests ran against `retry_policy.py` (core functionality)\n- No database connectivity tests for `temp_pg_test.py`\n- Complete absence of any code path validation\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: `.venv` package modifications suggest dependency issues\n2. **Database Connectivity**: `psycopg2` changes indicate possible PostgreSQL connection problems\n3. **Import/Module Errors**: Likely failing during test discovery or import phase\n\n## Immediate Recommendations\n1. **Fix Test Execution First**:\n   - Check test runner configuration\n   - Verify all dependencies are installed (`pip install -r requirements.txt`)\n   - Ensure PostgreSQL is running for `temp_pg_test.py`\n\n2. **Add Basic Smoke Test**:\n   ```python\n   def test_environment_setup():\n       import reliability.retry_policy\n       assert True  # Basic import test\n   ```\n\n3. **Isolate Database Tests**:\n   - Use test database instead of production\n   - Add connection health check before running tests\n\n## Risk Assessment\n**HIGH RISK** - Deploying without any test validation exposes:\n- Complete reliability system failure potential\n- Database connection instability\n- Retry policy logic defects undetected\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 155,
+      "completion_tokens": 352,
+      "total_tokens": 507,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 91
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

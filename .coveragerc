@@ -1,0 +1,70 @@
+# Coverage.py Configuration
+# https://coverage.readthedocs.io/en/latest/config.html
+
+[run]
+source = backend
+omit =
+    */tests/*
+    */test_*.py
+    */__pycache__/*
+    */venv/*
+    */.venv/*
+    */migrations/*
+    */alembic/*
+    backend/celery_app.py
+    backend/__init__.py
+    backend/api/*refactored.py
+
+# Enable branch coverage
+branch = True
+
+# Run in parallel mode for faster execution
+parallel = True
+
+[report]
+# Regexes for lines to exclude from consideration
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+
+    # Don't complain about missing debug-only code:
+    def __repr__
+    def __str__
+
+    # Don't complain if tests don't hit defensive assertion code:
+    raise AssertionError
+    raise NotImplementedError
+
+    # Don't complain if non-runnable code isn't run:
+    if 0:
+    if False:
+    if __name__ == "__main__":
+
+    # Don't complain about abstract methods
+    @(abc\.)?abstractmethod
+
+    # Don't complain about type checking blocks
+    if TYPE_CHECKING:
+
+# Ignore errors
+ignore_errors = True
+
+# Precision for coverage percentage
+precision = 2
+
+# Show missing line numbers
+show_missing = True
+
+# Sort coverage report by coverage percentage
+sort = cover
+
+[html]
+directory = htmlcov
+title = Bybit Strategy Tester - Code Coverage Report
+
+[xml]
+output = coverage.xml
+
+[json]
+output = coverage.json
+pretty_print = True

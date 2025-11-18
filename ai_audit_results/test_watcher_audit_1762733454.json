@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762733454,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762733436.0615053,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run successfully. This indicates fundamental issues with the test environment, dependencies, or test code structure.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is a direct result of the test failure, not an indication of actual coverage gaps.\n\n## Potential Issues with Recent Changes\n1. **File `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:**\n   - Syntax errors preventing import/execution\n   - Missing dependencies or imports\n   - Runtime errors during module loading\n   - Infinite loops or blocking operations\n   - Environment configuration issues\n\n## Immediate Recommendations\n\n### 1. **Debug Test Execution**\n```bash\npython -m pytest -v --tb=short  # Get detailed failure reason\npython -c \"import full_ai_audit_deepseek_perplexity_deepseek\"  # Test import directly\n```\n\n### 2. **Check for Common Issues**\n- Verify all imports are available\n- Check for syntax errors in the changed file\n- Ensure no missing dependencies (check requirements.txt)\n- Validate environment variables and configurations\n\n### 3. **Add Basic Test Structure**\n```python\n# Add minimal test to verify execution\ndef test_module_import():\n    import full_ai_audit_deepseek_perplexity_deepseek\n    assert True  # Basic validation\n```\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure means:\n- No validation of recent changes\n- Potential runtime errors in production\n- Unknown impact on existing functionality\n- Zero confidence in code quality\n\n## Priority Actions\n1. **Fix test execution immediately** - This blocks all quality assessment\n2. **Add basic smoke tests** to prevent complete test suite failures\n3. **Implement error handling** in test setup/teardown\n4. **Monitor dependencies** and environment consistency\n\n**Resolution should focus on making tests runnable before addressing coverage metrics.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 439,
+      "total_tokens": 574,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

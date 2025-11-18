@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762536832,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py",
+    "tests\\test_safe_async_bridge_simple.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762536817.1782103,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates fundamental issues in the test infrastructure or codebase that prevent any tests from running successfully.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code is being executed during testing\n- **No coverage data available** - Test runner cannot collect any metrics\n- **Critical gap**: Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure failure** - Exit code -1 suggests system-level issues (memory, imports, environment)\n2. **File modifications impact**:\n   - `full_ai_audit_deepseek_perplexity_deepseek.py` - Likely contains breaking changes\n   - `tests\\test_safe_async_bridge_simple.py` - Test file itself may be corrupted\n3. **Possible causes**: Missing dependencies, syntax errors, import failures, infinite loops\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check Python environment and dependencies (`pip list`)\n3. Validate file syntax: `python -m py_compile [filename]`\n4. Test imports manually in Python shell\n\n**STRUCTURAL FIXES:**\n1. Add try-catch blocks in test setup to capture initialization errors\n2. Implement basic smoke test that runs before full test suite\n3. Set up continuous integration to catch failures earlier\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing mechanism\n- Potential production-breaking changes undetected\n- Complete loss of quality assurance\n- High probability of undetected bugs in production\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 149,
+      "completion_tokens": 382,
+      "total_tokens": 531,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 85
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

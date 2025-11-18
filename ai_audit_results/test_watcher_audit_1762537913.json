@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762537913,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\coverage\\types.py",
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    ".venv\\Lib\\site-packages\\coverage\\__init__.py",
+    ".venv\\Lib\\site-packages\\coverage\\misc.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762537900.1328492,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test execution, likely preventing any tests from running.\n\n## Coverage Analysis\n**0.00% coverage** confirms no code was executed. This represents a complete testing failure, not just poor coverage.\n\n## Potential Issues\n1. **Environment corruption** - Modified files in `.venv\\Lib\\site-packages\\` suggest virtual environment is compromised\n2. **Coverage tool failure** - Coverage package files were changed, potentially breaking the tool\n3. **Test runner crash** - Exit code -1 typically indicates segmentation fault or fatal Python error\n\n## Immediate Recommendations\n1. **Recreate virtual environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\n   pip install -r requirements.txt\n   ```\n\n2. **Run tests without coverage first**:\n   ```bash\n   python -m pytest  # verify tests work\n   ```\n\n3. **Then add coverage back**:\n   ```bash\n   python -m pytest --cov=your_package\n   ```\n\n4. **Check for system dependencies** - Ensure no missing libraries or permissions issues\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected breaking changes\n- Potential production failures\n- Security vulnerabilities may go unnoticed\n\n**Priority**: Fix immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 205,
+      "completion_tokens": 323,
+      "total_tokens": 528,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 141
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

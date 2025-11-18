@@ -1,0 +1,21 @@
+{
+  "timestamp": 1762541234,
+  "changed_files": [
+    "C:\\Users\\roman\\AppData\\Local\\Temp\\tmp03qhm7_q\\test_disk.py"
+  ],
+  "test_results": {
+    "test_output": "test data",
+    "coverage": 85.0,
+    "timestamp": "2025-01-07T00:00:00"
+  },
+  "analysis_results": {
+    "analysis": "test analysis",
+    "recommendations": [
+      "test rec"
+    ]
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmp03qhm7_q",
+    "debounce_seconds": 0.5
+  }
+}

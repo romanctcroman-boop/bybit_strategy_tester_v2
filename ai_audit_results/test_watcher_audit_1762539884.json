@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762539884,
+  "changed_files": [
+    "tests\\integration\\test_e2e_audit_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762539870.1067455,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests failed before any meaningful execution\n- **Critical gap**: Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **Environment/Setup Failure**: Missing dependencies, configuration issues, or environment variables\n2. **Syntax/Runtime Errors**: Recent changes to `test_e2e_audit_agent.py` likely contain breaking changes\n3. **Import/Dependency Issues**: Missing imports or incompatible library versions\n4. **Test Fixture Problems**: Setup/teardown methods failing\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug Exit Code -1**: Investigate the specific error causing test termination\n2. **Check test_e2e_audit_agent.py**: Review recent changes for syntax errors or logical issues\n3. **Verify Dependencies**: Ensure all required packages are installed and compatible\n4. **Run Tests Individually**: Isolate the failing test to identify root cause\n\n**Systematic Fixes:**\n1. Add proper error handling and logging to tests\n2. Implement CI pipeline with dependency validation\n3. Create smoke tests to validate test environment\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential production issues undetected\n- Development blocked until resolved\n- Critical functionality may be broken\n\n**Priority**: Resolve immediately - this blocks all meaningful testing and deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 359,
+      "total_tokens": 493,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

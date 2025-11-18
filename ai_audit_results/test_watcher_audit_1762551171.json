@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762551171,
+  "changed_files": [
+    "automation\\task2_key_manager\\key_manager.py",
+    "test_parallel_deepseek.py",
+    "backend\\api\\parallel_deepseek_client.py",
+    "automation\\task1_test_watcher\\test_watcher_parallel.py",
+    "add_deepseek_keys.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762551157.3473556,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test infrastructure or recent code changes.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **No coverage data collected** - execution halted before any meaningful tests ran\n- **Critical gap**: Unable to assess actual code coverage due to test infrastructure failure\n\n## Potential Issues with Recent Changes\n1. **Key management changes** (`key_manager.py`) likely broke authentication/API access\n2. **Parallel execution integration** (`test_watcher_parallel.py`, `parallel_deepseek_client.py`) may have introduced race conditions or resource conflicts\n3. **New test files** (`test_parallel_deepseek.py`, `add_deepseek_keys.py`) might contain syntax errors or missing dependencies\n4. **Environment configuration** issues with API keys or parallel execution setup\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests sequentially to isolate the failure point\n2. Check `key_manager.py` authentication logic and API key validation\n3. Verify all dependencies are installed for new parallel execution modules\n4. Test individual components before parallel execution\n\n**Short-term:**\n1. Add proper error handling in parallel execution modules\n2. Implement graceful degradation when API keys are invalid/missing\n3. Add integration tests for key management system\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any meaningful quality assessment:\n- Production readiness cannot be verified\n- Recent changes may have broken core functionality\n- Parallel execution introduces potential instability\n- No safety net for detecting regressions\n\n**Priority**: Fix test infrastructure immediately before proceeding with any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 176,
+      "completion_tokens": 362,
+      "total_tokens": 538,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 112
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

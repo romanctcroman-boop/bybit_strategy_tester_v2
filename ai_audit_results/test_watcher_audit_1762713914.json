@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762713914,
+  "changed_files": [
+    "reliability\\circuit_breaker.py",
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713891.1899984,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely segmentation fault, environment crash, or fatal import errors).\n\n## Coverage Analysis & Gaps\n- **0% coverage** - No tests executed successfully\n- Both modified files (`circuit_breaker.py`, `deepseek_client.py`) have zero coverage data\n- Complete testing infrastructure failure\n\n## Potential Issues with Recent Changes\n1. **Fatal import cycles** - Changes may have broken module dependencies\n2. **Environment corruption** - Missing dependencies or incompatible versions\n3. **Syntax errors** - Recent edits may contain fatal Python syntax issues\n4. **Resource conflicts** - Circuit breaker or client changes causing system crashes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see which test fails first\n2. Check Python syntax: `python -m py_compile reliability/*.py`\n3. Verify imports: `python -c \"from reliability import circuit_breaker, deepseek_client\"`\n4. Examine recent git diff for obvious breaking changes\n\n**FOLLOW-UP:**\n- Add basic smoke tests for import and initialization\n- Implement CI pipeline with dependency validation\n- Add static analysis (pylint, mypy) to catch issues pre-commit\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail catastrophically. The circuit breaker pattern is critical for system stability - any faults could cause cascading failures.\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 328,
+      "total_tokens": 461,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 69
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

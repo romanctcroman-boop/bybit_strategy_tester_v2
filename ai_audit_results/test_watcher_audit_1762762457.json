@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762762457,
+  "changed_files": [
+    "simple_audit_request.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762762439.1123772,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run successfully. This indicates either fatal test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% overall coverage confirms no tests executed. All code paths are untested. The empty coverage report suggests the test runner couldn't even initialize coverage measurement.\n\n## Potential Issues with Recent Changes\n- **simple_audit_request.py changes likely broke test infrastructure** or contain fatal syntax/runtime errors\n- Possible causes: Import cycles, missing dependencies, syntax errors, infinite loops during import, or environment configuration issues\n- Test framework may be failing during setup/import phase before any tests execute\n\n## Recommendations for Improvement\n1. **Immediate**: Run `python -m py_compile simple_audit_request.py` to check for syntax errors\n2. **Debug**: Execute tests with `-v` flag to see where failure occurs\n3. **Isolate**: Test the changed file in isolation: `python -c \"import simple_audit_request\"`\n4. **Check Dependencies**: Verify all imports and requirements are available in test environment\n5. **Add Basic Smoke Test**: Create minimal test that imports and instantiates main classes\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially broken. Deployment would be extremely risky. The exit code -1 suggests system-level failure (segmentation fault, memory issues, or fatal Python interpreter errors).\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 345,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

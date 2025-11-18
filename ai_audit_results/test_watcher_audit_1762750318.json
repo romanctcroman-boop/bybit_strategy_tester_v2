@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762750318,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762750302.5806308,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment/setup failure\n- Critical code errors preventing test execution\n- Missing dependencies or configuration\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Possible import/initialization failures\n- Test discovery or runner configuration issues\n\n## Potential Issues with Recent Changes\n1. **`backend\\core\\mtf_engine.py`** - Likely contains breaking changes affecting imports\n2. **`tests\\backend\\conftest.py`** - Possible fixture/setup configuration errors\n3. **`reliability\\perplexity_client.py`** - New dependency may be missing or misconfigured\n4. Database test files suggest potential connection/configuration issues\n\n## Immediate Recommendations\n1. **Debug Exit Code -1**: Check test runner logs for specific error messages\n2. **Verify Dependencies**: Ensure all new imports and dependencies are properly installed\n3. **Test Conftest**: Validate `tests\\backend\\conftest.py` fixtures and configurations\n4. **Isolate Failure**: Run tests individually to identify the breaking point\n5. **Check Imports**: Verify all changed modules can be imported without errors\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents any quality validation:\n- No regression testing possible\n- Production deployment would be extremely risky\n- Potential for undetected breaking changes\n- Urgent fix required before any further development\n\n**Priority**: Fix test execution immediately before addressing coverage or adding new features.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 359,
+      "total_tokens": 565,
+      "prompt_tokens_details": {
+        "cached_tokens": 192
+      },
+      "prompt_cache_hit_tokens": 192,
+      "prompt_cache_miss_tokens": 14
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

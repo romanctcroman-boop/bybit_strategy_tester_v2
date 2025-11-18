@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762707141,
+  "changed_files": [
+    "reliability\\retry_policy.py",
+    "tests\\test_retry_policy.py",
+    "tests\\test_integration_retry_circuit_breaker.py",
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762707123.2457652,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception during test setup/execution). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code was executed during testing\n- **Critical Gap**: Test infrastructure failure preventing any execution\n- All modified files show no coverage data\n\n## Potential Issues with Recent Changes\n1. **Test Harness Failure**: Recent changes likely broke test runner configuration or import structure\n2. **Dependency Issues**: Missing imports or incompatible changes in `reliability/__init__.py`\n3. **Syntax/Import Errors**: Files may contain Python syntax errors preventing import\n4. **Circular Dependencies**: Integration test changes might create import loops\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which test fails first\n2. Check Python syntax: `python -m py_compile reliability/retry_policy.py`\n3. Verify imports: `python -c \"from reliability import retry_policy\"`\n4. Examine test discovery: Ensure `tests/` directory structure is correct\n\n**Follow-up:**\n5. Add basic smoke test to verify test infrastructure\n6. Implement continuous integration with fail-fast on syntax errors\n7. Add import validation in pre-commit hooks\n\n## Risk Assessment\n**HIGH RISK** - Production reliability code changes cannot be validated. Retry policy and circuit breaker modifications are untested, posing significant stability risks to dependent systems.\n\n**Priority**: Fix test infrastructure immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 162,
+      "completion_tokens": 346,
+      "total_tokens": 508,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 98
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

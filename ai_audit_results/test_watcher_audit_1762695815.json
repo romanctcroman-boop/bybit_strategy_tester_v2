@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762695815,
+  "changed_files": [
+    "backend\\security\\secure_logger.py",
+    "tests\\test_authentication.py",
+    "backend\\security\\jwt_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762695797.2762055,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/execution). Test infrastructure itself appears broken.\n\n## Coverage Analysis\n**0% coverage across all files** - No tests are actually executing. This represents a complete testing blackout situation.\n\n## Potential Issues with Recent Changes\n1. **Security module changes** likely introduced breaking changes:\n   - `secure_logger.py` modifications may have dependency issues\n   - `jwt_manager.py` changes could have broken imports/initialization\n   - Authentication test suite is failing to load/execute\n\n2. **Common root causes:**\n   - Missing dependencies in security modules\n   - Circular imports between changed files\n   - Syntax errors preventing test discovery\n   - Environment configuration issues\n\n## Immediate Actions Required\n1. **Fix test execution first:**\n   ```bash\n   python -m pytest tests/ --tb=short -v\n   ```\n   Identify the specific failure point\n\n2. **Check for syntax/import errors:**\n   - Validate all imports in changed security files\n   - Verify no missing dependencies\n   - Check for Python 3 compatibility issues\n\n3. **Isolate the failure:**\n   - Test each changed file individually\n   - Run with `--collect-only` to verify test discovery\n\n## Risk Assessment\n**HIGH RISK** - Deploying without resolution is dangerous:\n- Security changes are untested\n- Authentication system integrity unknown\n- Potential production authentication failures\n- Compliance violations possible for security logging\n\n## Priority Recommendations\n1. **Immediate:** Fix test execution - this is blocking all quality checks\n2. **Short-term:** Add basic smoke tests for security modules\n3. **Long-term:** Implement pre-commit hooks to prevent 0% coverage commits\n\n**Start with the test execution failure - nothing else can be assessed until tests actually run.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 146,
+      "completion_tokens": 400,
+      "total_tokens": 546,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 82
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

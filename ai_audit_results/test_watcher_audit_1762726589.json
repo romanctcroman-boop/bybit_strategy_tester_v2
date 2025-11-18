@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762726589,
+  "changed_files": [
+    "send_audit_requests.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762726576.517685,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Absolute test failure:\n- No files were tested\n- No code paths executed\n- Complete testing infrastructure failure\n\n## Potential Issues with Recent Changes\n1. **send_audit_requests.py changes likely broke test execution**\n2. Possible causes:\n   - Syntax errors preventing import\n   - Missing dependencies in test environment\n   - Infinite loops or memory issues\n   - Environment configuration conflicts\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check test runner logs for stack traces\n3. Validate `send_audit_requests.py` syntax and imports\n4. Test the module manually: `python -c \"import send_audit_requests\"`\n\n**FOLLOW-UP:**\n5. Add basic smoke test before complex test suites\n6. Implement test environment health checks\n7. Add linting/static analysis to CI pipeline\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- Zero confidence in code functionality\n- Undetected runtime errors likely\n- Potential data loss or system instability\n- Complete absence of regression protection\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 311,
+      "total_tokens": 437,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

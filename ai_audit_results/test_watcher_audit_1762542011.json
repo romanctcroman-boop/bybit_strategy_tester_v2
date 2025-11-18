@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762542011,
+  "changed_files": [
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    "automation\\metrics\\collectors\\system_collector.py",
+    "automation\\metrics\\collectors\\audit_agent_collector.py",
+    "automation\\metrics\\collectors\\__init__.py",
+    "mcp-server\\tools\\analysis\\analysis_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541984.7668629,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure failure or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No tests executed successfully\n- **No file-level coverage data** - Execution halted before coverage collection\n- **Critical gap**: Unable to assess actual code coverage due to test failure\n\n## Potential Issues with Recent Changes\n1. **Import/circular dependency issues** in collectors module (recent `__init__.py` changes)\n2. **Breaking changes** in analysis_tools.py affecting test infrastructure\n3. **Missing dependencies** or environment configuration issues\n4. **Syntax errors** or runtime exceptions in modified files\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test failure**: Run tests with `-v` flag to identify specific failure point\n2. **Check imports**: Verify all collector modules import correctly\n3. **Validate analysis_tools**: Ensure tool changes don't break test runner dependencies\n4. **Test isolation**: Run each collector test individually to identify culprit\n\n**STRUCTURAL FIXES:**\n1. Add pre-commit hooks to catch syntax errors\n2. Implement smoke tests for critical modules\n3. Set up CI pipeline with dependency validation\n\n## Risk Assessment\n**HIGH RISK** - Production deployment blocked:\n- No confidence in recent changes\n- Potential runtime failures in production\n- Collector modules may be non-functional\n- Immediate developer intervention required\n\n**Priority**: Fix test execution before addressing coverage gaps. Current 0% coverage is a symptom, not the root cause.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 192,
+      "completion_tokens": 353,
+      "total_tokens": 545,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 128
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

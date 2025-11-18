@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762680669,
+  "changed_files": [
+    "run_full_project_audit.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762680654.3803372,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **No files executed**: Coverage report is empty\n- **Critical gap**: Unable to assess actual code coverage due to execution failure\n\n## Potential Issues with Recent Changes\nThe failure likely stems from `run_full_project_audit.py` changes:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Infinite loops or fatal exceptions\n- Environment configuration issues\n- Test runner configuration broken\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test execution**: Run tests with verbose output to identify the root cause\n2. **Check syntax**: Validate `run_full_project_audit.py` for basic Python syntax\n3. **Isolate changes**: Test the modified file independently\n4. **Review recent commits**: Examine what changed in the problematic file\n\n**Systematic Fixes:**\n5. Add pre-commit hooks for syntax validation\n6. Implement smoke tests that run before full test suite\n7. Set up test environment validation checks\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential production-breaking changes\n- Complete loss of quality assurance\n- Urgent attention required before any deployment\n\n**Priority**: Fix test execution immediately - this blocks all other quality assessments and poses significant deployment risk.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 328,
+      "total_tokens": 454,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

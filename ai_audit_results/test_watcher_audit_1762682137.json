@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762682137,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762682122.3066177,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - 0.00% overall coverage confirms no tests executed. All code paths are untested, including the modified `health_check.py` file.\n\n## Potential Issues with Recent Changes\n1. **Syntax/Runtime Errors** in `health_check.py` likely preventing import/execution\n2. **Missing Dependencies** - New imports or requirements not satisfied\n3. **Circular Imports** - Changes may have created import loops\n4. **Configuration Issues** - Test runner configuration broken by changes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m py_compile health_check.py` to check for syntax errors\n2. Execute `python -c \"import health_check\"` to identify runtime import issues\n3. Review recent changes to `health_check.py` for obvious bugs\n4. Verify test runner configuration and dependencies\n\n**FOLLOW-UP:**\n- Add basic smoke test for `health_check.py` before comprehensive testing\n- Implement CI pipeline that fails fast on syntax/import issues\n- Add static analysis (pylint, mypy) to catch issues pre-commit\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail. The codebase is completely untested and contains at least one breaking change. Without immediate fixes, all subsequent changes will compound existing issues.\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 345,
+      "total_tokens": 467,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

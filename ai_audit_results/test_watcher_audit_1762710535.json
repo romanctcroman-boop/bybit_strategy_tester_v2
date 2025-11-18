@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762710535,
+  "changed_files": [
+    "fix_test_monitoring.py",
+    "tests\\test_deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762710521.185818,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Exit code -1 indicates test execution crashed before completion. This suggests fundamental issues in test infrastructure or environment setup rather than simple test failures.\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage confirms tests never executed properly. No meaningful coverage data available for analysis.\n\n## Potential Issues with Recent Changes\n1. **Test Harness Failure**: Exit code -1 typically indicates segmentation fault, memory issues, or environment problems\n2. **Dependency Conflicts**: Recent changes in `fix_test_monitoring.py` may have introduced incompatible dependencies\n3. **Import/Module Issues**: Changes to `test_deepseek_client.py` may have broken imports or test discovery\n4. **Environment Configuration**: Possible missing environment variables or configuration files\n\n## Immediate Recommendations\n1. **Debug Test Execution**:\n   - Run tests with `-v` flag to see where execution fails\n   - Check for Python version compatibility issues\n   - Verify all dependencies are installed correctly\n\n2. **Isolate the Problem**:\n   - Run tests individually: `python -m pytest tests/test_deepseek_client.py -v`\n   - Test the monitoring fix separately\n   - Check for circular imports or initialization issues\n\n3. **Environment Check**:\n   - Validate required environment variables\n   - Confirm test database/API connections\n   - Check for missing test data files\n\n## Risk Assessment\n**HIGH RISK** - Unable to validate any functionality. Recent changes may have broken core test infrastructure. No safety net for regression detection.\n\n## Priority Actions\n1. Fix test execution before analyzing coverage\n2. Revert recent changes if quick fix not possible\n3. Add basic smoke tests to prevent complete test harness failure\n4. Implement CI pipeline that fails fast on environment issues",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 134,
+      "completion_tokens": 373,
+      "total_tokens": 507,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 6
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "timestamp": 1762601522,
+  "changed_files": [
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_protocol.py",
+    "tests\\test_mtf_engine.py",
+    "add_logging_to_all_tools.py",
+    "tests\\unit\\test_batch_writer.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "add_deepseek_keys.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762601521.289653,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "error": "API error: 404",
+    "response": "",
+    "success": false
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

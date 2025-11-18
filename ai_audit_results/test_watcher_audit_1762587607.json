@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762587607,
+  "changed_files": [
+    "automation\\deepseek_robot\\ai_integrations.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762587591.9457564,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing failure, not just gaps in coverage.\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `ai_integrations.py` likely preventing module import\n2. **Missing Dependencies** - Required packages may not be installed\n3. **Runtime Exceptions** during module initialization\n4. **Test Configuration Issues** - Test runner may be misconfigured\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m py_compile automation\\deepseek_robot\\ai_integrations.py` to check for syntax errors\n2. Execute tests with `-v` flag to see specific failure details\n3. Check test runner configuration and dependencies\n4. Verify Python environment and path settings\n\n**FOLLOW-UP:**\n- Add basic smoke test to verify module can be imported\n- Implement CI pipeline with dependency validation\n- Add static analysis (pylint, mypy) to catch issues pre-execution\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky. The -1 exit code suggests fundamental issues that could impact system stability.\n\n**Priority:** Resolve test execution failure before any other quality improvements.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 333,
+      "total_tokens": 464,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 67
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

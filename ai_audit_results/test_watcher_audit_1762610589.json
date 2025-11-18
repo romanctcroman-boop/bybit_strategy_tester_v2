@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762610589,
+  "changed_files": [
+    "test_perplexity_multi_key.py",
+    "test_perplexity_multi_key_unit.py",
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762610565.9421487,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental infrastructure issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- Zero coverage across all files indicates tests aren't reaching any code\n- No file-specific metrics available due to test execution failure\n\n## Potential Issues with Recent Changes\n1. **Infrastructure Failure**: Recent changes to test files or perplexity.py likely introduced:\n   - Import/circular dependency issues\n   - Environment configuration breaks\n   - Critical syntax errors preventing test discovery/execution\n\n2. **Test Framework Corruption**: Modified test files may contain:\n   - Invalid test structure preventing test collection\n   - Missing dependencies or imports\n   - Configuration that crashes test runner\n\n## Immediate Recommendations\n\n**HIGH PRIORITY:**\n1. **Debug Test Execution**:\n   ```bash\n   python -m pytest test_perplexity_multi_key.py -v\n   python -m pytest test_perplexity_multi_key_unit.py -v\n   ```\n   Identify which specific test/file causes the crash\n\n2. **Check Import Chain**:\n   - Verify `perplexity.py` imports work correctly\n   - Test individual imports in isolation\n\n3. **Validate Test Structure**:\n   - Ensure test classes/functions follow pytest conventions\n   - Check for missing `__init__.py` files in test directories\n\n**MEDIUM PRIORITY:**\n4. Add basic smoke test that runs before full test suite\n5. Implement test isolation to prevent cascade failures\n\n## Risk Assessment\n**SEVERE RISK** - Current state indicates:\n- **Code Quality Unknown**: No validation of recent changes\n- **Regression Risk**: High probability of undetected bugs\n- **Deployment Block**: Cannot safely deploy without functioning tests\n\n**Immediate Action Required**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 153,
+      "completion_tokens": 425,
+      "total_tokens": 578,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 89
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

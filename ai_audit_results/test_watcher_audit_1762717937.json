@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762717937,
+  "changed_files": [
+    "tests\\integration\\load_api_keys.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762717921.3278987,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code coverage achieved\n- **No files covered** - Empty coverage report indicates tests didn't execute properly\n- **Complete testing gap** - Entire codebase remains untested\n\n## Potential Issues with Recent Changes\n- **Integration test failure**: `tests/integration/load_api_keys.py` appears to be the culprit\n- Likely causes:\n  - Syntax errors in test file\n  - Missing dependencies or imports\n  - Environment configuration issues\n  - API key loading logic broken\n  - Test setup/teardown failures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Fix the failing integration test first\n2. Run tests locally to identify specific error messages\n3. Check test dependencies and environment setup\n4. Validate API key loading logic\n\n**Short-term:**\n1. Add basic unit tests for core functionality\n2. Implement test isolation to prevent cascade failures\n3. Set up continuous integration with proper error reporting\n\n**Long-term:**\n1. Establish minimum 70% coverage threshold\n2. Implement test pyramid (more unit tests, fewer integration tests)\n3. Add automated test quality gates\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- **Deployment Risk**: High - No confidence in code changes\n- **Regression Risk**: Critical - No test protection\n- **Security Risk**: Medium - API key handling potentially compromised\n- **Business Risk**: High - Unverified functionality in production\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 369,
+      "total_tokens": 497,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

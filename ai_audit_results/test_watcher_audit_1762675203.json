@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762675203,
+  "changed_files": [
+    "backend\\core\\metrics.py",
+    "backend\\security\\rate_limiter.py",
+    "backend\\services\\adapters\\bybit.py",
+    "backend\\middleware\\rate_limiter.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762675186.7961874,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/execution). Zero coverage suggests tests never executed properly.\n\n## Coverage Analysis & Gaps\n**100% GAP** - No code coverage achieved. Critical files modified have zero test validation:\n- Rate limiting logic (`rate_limiter.py` files)\n- Exchange adapter (`bybit.py`) \n- Core metrics (`metrics.py`)\n\n## Potential Issues with Recent Changes\n1. **Breaking changes** in modified files preventing test execution\n2. **Missing dependencies** or configuration in test environment\n3. **Syntax errors** or import issues in changed modules\n4. **Test infrastructure failure** (fixtures, setup, environment)\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see specific failure point\n2. Check test logs for uncaught exceptions\n3. Verify all imports in changed files resolve correctly\n4. Test each modified file in isolation to identify breaking changes\n\n**FOLLOW-UP:**\n5. Add basic smoke tests for each modified component\n6. Fix test infrastructure before addressing coverage\n7. Implement health checks for critical paths (rate limiting, exchange connectivity)\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- Core security (rate limiting) and financial (exchange adapter) components untested\n- No validation of modified business logic\n- Potential production outages or security vulnerabilities\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 160,
+      "completion_tokens": 338,
+      "total_tokens": 498,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 96
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

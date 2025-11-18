@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762604435,
+  "changed_files": [
+    "test_quick_wins.py",
+    "automation\\deepseek_robot\\advanced_architecture.py",
+    "automation\\deepseek_robot\\dual_analytics_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762604417.8016055,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN** - 0% across all files indicates:\n- Test runner failed before any test execution\n- Possible import errors or dependency issues\n- Environment configuration problems\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **`advanced_architecture.py`** - Major architectural changes broke test imports/setup\n2. **`dual_analytics_engine.py`** - New dependencies or interface changes\n3. **`test_quick_wins.py`** - Test configuration errors or broken fixtures\n\n## Immediate Action Recommendations\n1. **Diagnose Root Cause**:\n   - Check test runner logs for stack traces\n   - Verify all imports work in isolation\n   - Test basic `python -m pytest test_quick_wins.py --tb=short`\n\n2. **Fix Infrastructure**:\n   - Ensure test dependencies are installed\n   - Check for circular imports in new architecture files\n   - Validate environment variables and paths\n\n3. **Recovery Steps**:\n   - Revert `test_quick_wins.py` to last working version\n   - Test architecture changes incrementally\n   - Add try/except blocks to identify failure points\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be blind:\n- No safety net for recent architectural changes\n- Potential runtime errors undetected\n- Data processing pipelines could fail silently\n\n**Priority**: Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 154,
+      "completion_tokens": 370,
+      "total_tokens": 524,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 90
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762719125,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\httpx\\_api.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\mock.py",
+    ".venv\\Lib\\site-packages\\httpx\\_models.py",
+    ".venv\\Lib\\site-packages\\httpx\\__init__.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\default.py",
+    ".venv\\Lib\\site-packages\\httpx\\_auth.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\wsgi.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\asgi.py",
+    ".venv\\Lib\\site-packages\\httpx\\_content.py",
+    ".venv\\Lib\\site-packages\\httpx\\_types.py",
+    "reliability\\perplexity_client.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\base.py",
+    ".venv\\Lib\\site-packages\\httpx\\_transports\\__init__.py",
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\httpx\\_exceptions.py",
+    ".venv\\Lib\\site-packages\\httpx\\_urls.py",
+    ".venv\\Lib\\site-packages\\httpx\\_status_codes.py",
+    ".venv\\Lib\\site-packages\\httpx\\_config.py",
+    ".venv\\Lib\\site-packages\\httpx\\_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762719112.6397784,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "error": "API error: 404",
+    "response": "",
+    "success": false
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

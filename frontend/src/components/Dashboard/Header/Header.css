@@ -1,0 +1,162 @@
+/* Dashboard Header Styles */
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e0ffe0;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.status-active {
+  background: #4ade80;
+  box-shadow: 0 0 8px #4ade80;
+  animation: pulse 2s infinite;
+}
+
+.status-text {
+  font-size: 12px;
+  color: #c0ffc0;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.header-center {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-group label {
+  font-size: 12px;
+  color: #c0ffc0;
+  white-space: nowrap;
+}
+
+.strategy-select,
+.timeframe-select {
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid #4a7c2c;
+  border-radius: 4px;
+  color: #e0ffe0;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.strategy-select {
+  min-width: 180px;
+}
+
+.timeframe-select {
+  min-width: 120px;
+}
+
+.strategy-select:hover,
+.timeframe-select:hover {
+  border-color: #5a9c3c;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.strategy-select:focus,
+.timeframe-select:focus {
+  outline: none;
+  border-color: #6abc4c;
+  box-shadow: 0 0 0 2px rgba(106, 188, 76, 0.2);
+}
+
+.header-right {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-compare,
+.btn-export {
+  padding: 8px 16px;
+  border: 1px solid #4a7c2c;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-compare {
+  background: rgba(106, 188, 76, 0.2);
+  color: #e0ffe0;
+}
+
+.btn-compare:hover {
+  background: rgba(106, 188, 76, 0.3);
+  border-color: #5a9c3c;
+}
+
+.btn-export {
+  background: rgba(0, 0, 0, 0.3);
+  color: #c0ffc0;
+}
+
+.btn-export:hover {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: #5a9c3c;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .header-title {
+    font-size: 16px;
+  }
+
+  .strategy-select {
+    min-width: 150px;
+  }
+
+  .timeframe-select {
+    min-width: 100px;
+  }
+}

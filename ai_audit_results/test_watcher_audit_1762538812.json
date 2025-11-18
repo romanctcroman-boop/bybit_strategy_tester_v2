@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762538812,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\pytest\\__main__.py",
+    "backend\\api\\routers\\automl.py",
+    "tests\\unit\\test_batch_writer.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    ".venv\\Lib\\site-packages\\_pytest\\python.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    "tests\\integration\\test_e2e_test_watcher.py",
+    ".venv\\Lib\\site-packages\\pytest_asyncio\\plugin.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538795.5454404,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data collected for any files\n\n## Coverage Analysis & Gaps\n**Total coverage: 0.00%** - This is catastrophic:\n- No code was executed during test run\n- All production code remains untested\n- Coverage reporting system failed entirely\n\n## Potential Issues with Recent Changes\n1. **Virtual Environment Corruption** - Multiple `.venv` files modified, suggesting dependency conflicts\n2. **Pytest Framework Issues** - Changes in pytest core files (`runner.py`, `main.py`, `config`) indicate possible version mismatches\n3. **Plugin Conflicts** - `pytest_asyncio` and `pluggy` modifications suggest async/plugin compatibility issues\n4. **Modified Test Files** - `test_batch_writer.py` and `test_e2e_test_watcher.py` changes may contain breaking changes\n\n## Immediate Recommendations\n1. **Isolate Environment Issue**:\n   ```bash\n   # Recreate virtual environment\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Debug Test Execution**:\n   ```bash\n   # Run with minimal setup\n   python -m pytest tests/unit/test_batch_writer.py -v --tb=short\n   ```\n\n3. **Check Dependency Versions**:\n   - Verify pytest, pytest-asyncio, and coverage package compatibility\n   - Ensure no conflicting plugin versions\n\n4. **Test Incrementally**:\n   - Start with single unit test file\n   - Add integration tests separately\n   - Verify coverage collection works on small scale\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code changes are completely untested\n- Potential for runtime crashes in production\n- Development environment instability\n- Impossible to validate any functionality\n\n**Priority**: Fix test execution environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 408,
+      "completion_tokens": 444,
+      "total_tokens": 852,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 344
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

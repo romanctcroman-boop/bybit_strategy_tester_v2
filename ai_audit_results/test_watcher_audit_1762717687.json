@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762717687,
+  "changed_files": [
+    "tests\\integration\\test_real_api_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762717664.4348533,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed (exit code -1) indicating severe infrastructure or configuration issues, not just test failures. Zero coverage suggests tests didn't even start executing properly.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - Complete coverage failure\n- **No files processed** - Coverage collection system failed entirely\n- **Root cause**: Tests crashed before any meaningful execution could occur\n\n## Potential Issues with Recent Changes\n1. **Integration test file**: `test_real_api_integration.py` likely contains external API dependencies\n2. **Possible causes**:\n   - Missing environment variables/credentials\n   - Network connectivity issues to external APIs\n   - Authentication failures\n   - Infinite loops or memory exhaustion\n   - Python interpreter crashes\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests locally with `-v` flag to see exact failure point\n2. Check test infrastructure: pytest version, dependencies, environment setup\n3. Add error handling/wrappers around external API calls\n4. Implement mock/fixture fallbacks for external dependencies\n\n**STRUCTURAL FIXES:**\n1. Add integration test health checks before full test runs\n2. Implement timeout decorators for API calls\n3. Create isolated test environments for external integrations\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback on code changes\n- Potential production issues undetected\n- Integration points completely untested\n- Development velocity impacted by false negatives\n\n**Priority**: Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 336,
+      "total_tokens": 467,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762714643,
+  "changed_files": [
+    "reliability\\perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762714628.935258,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with test setup, dependencies, or code syntax. No meaningful quality assessment possible until tests can execute.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure suggests:\n- Tests cannot import/execute the changed file\n- Test environment missing critical dependencies\n- Syntax errors preventing module loading\n- Import path configuration issues\n\n## Potential Issues with Recent Changes\nThe `perplexity_client.py` modification likely introduced:\n- **Syntax errors** preventing module compilation\n- **Missing imports** or dependency changes\n- **Circular imports** breaking the module structure\n- **Class/method signature changes** breaking existing tests\n\n## Immediate Recommendations\n\n**HIGH PRIORITY:**\n1. **Fix test execution** - Check Python syntax and imports in `perplexity_client.py`\n2. **Verify dependencies** - Ensure all required packages are installed in test environment\n3. **Run module directly** - Test `python -m reliability.perplexity_client` to isolate loading issues\n\n**MEDIUM PRIORITY:**\n4. **Add basic smoke tests** - Create minimal tests that verify module can be imported\n5. **Check test configuration** - Review pytest/unittest setup files for path issues\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail. The complete test failure indicates the codebase may be in an unexecutable state. Without working tests, any further changes risk introducing undetected regressions.\n\n**First action:** Manually verify `perplexity_client.py` can be imported and contains no syntax errors.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 345,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

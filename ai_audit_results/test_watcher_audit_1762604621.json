@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762604621,
+  "changed_files": [
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762604601.5662212,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). No tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage** across all files means:\n- Zero test execution occurred\n- Recent changes likely broke the test runner itself\n- No meaningful coverage data available for analysis\n\n## Potential Issues with Recent Changes\nThe file `automation\\deepseek_robot\\advanced_architecture.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Infinite loops or memory issues crashing the test runner\n- Environment configuration conflicts\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test runner crash** - Run tests with verbose output to identify the root cause\n2. **Validate syntax** - Check `advanced_architecture.py` for basic Python syntax errors\n3. **Isolate the issue** - Temporarily remove/revert the changed file to confirm it's the culprit\n4. **Add basic smoke test** - Create a minimal test that imports the module to catch import-time failures\n\n**Short-term:**\n- Implement try/catch around test initialization\n- Add pre-commit hooks for syntax validation\n- Create environment sanity checks\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No regression protection\n- Potential production issues undetected\n- Development blocked until resolved\n- Entire test suite compromised\n\n**Priority:** Fix test execution before any further development. The inability to run tests poses existential risk to code quality and deployment safety.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 333,
+      "total_tokens": 463,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

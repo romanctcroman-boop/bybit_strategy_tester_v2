@@ -1,0 +1,41 @@
+{
+  "timestamp": 1762555433,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\primitives\\kdf\\__init__.py",
+    "automation\\task2_key_manager\\key_manager.py",
+    "mcp-server\\server.py",
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\primitives\\__init__.py",
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\__init__.py",
+    ".venv\\Lib\\site-packages\\cryptography\\fernet.py",
+    ".venv\\Lib\\site-packages\\cryptography\\__init__.py",
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\primitives\\kdf\\pbkdf2.py",
+    ".venv\\Lib\\site-packages\\cryptography\\hazmat\\primitives\\hashes.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762555416.477915,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution. This represents the lowest possible test quality.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No tests executed successfully\n- Complete absence of meaningful test data\n- Critical gap: Entire codebase is untested\n\n## Potential Issues with Recent Changes\n1. **Virtual environment corruption** - Modified `.venv` packages suggest dependency conflicts\n2. **Cryptography library interference** - Changes to cryptography primitives may have broken imports\n3. **Import/circular dependency issues** - Likely preventing module loading\n4. **Environment configuration problems** - Test runner cannot initialize properly\n\n## Recommendations for Improvement\n**Immediate Actions (Priority 1):**\n- Recreate virtual environment: `rm -rf .venv && python -m venv .venv`\n- Reinstall dependencies with pinned versions\n- Run isolated test on single file to diagnose root cause\n- Check Python path and import statements in test configuration\n\n**Short-term (Priority 2):**\n- Implement basic smoke tests for core modules\n- Add test environment validation checks\n- Set up dependency version locking (requirements.txt/pipfile)\n\n**Medium-term (Priority 3):**\n- Establish minimum 70% coverage threshold\n- Implement CI pipeline with dependency caching\n- Add integration tests for cryptography components\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployments are unreliable\n- Cryptographic functionality may be compromised\n- Zero regression testing capability\n- High probability of undetected bugs in key management and security components\n\n**Critical files at risk:**\n- `key_manager.py` (cryptographic operations)\n- `server.py` (core application logic)\n- All cryptography primitives (security foundation)\n\n**Immediate mitigation required before any further development or deployment.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 313,
+      "completion_tokens": 394,
+      "total_tokens": 707,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 249
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

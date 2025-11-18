@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762718538,
+  "changed_files": [
+    "tests\\integration\\test_real_api_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762718525.3317375,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach execution phase\n- **Integration test failure** - `test_real_api_integration.py` appears to be the culprit\n\n## Potential Issues with Recent Changes\n1. **Integration test dependency failures** - External API endpoints may be unavailable or changed\n2. **Environment configuration issues** - Missing API keys, credentials, or environment variables\n3. **Test setup/teardown failures** - Fixtures or pre-conditions failing before test execution\n4. **Authentication/authorization problems** - API access tokens expired or invalid\n\n## Recommendations for Improvement\n**Immediate Actions:**\n- Check integration test logs for specific error messages\n- Verify API endpoint availability and credentials\n- Add proper error handling and logging to integration tests\n- Implement retry mechanisms for flaky external dependencies\n\n**Strategic Improvements:**\n- Add unit tests mocking external APIs (70%+ coverage target)\n- Implement health checks for external dependencies\n- Create isolated test environments with stable API versions\n- Add integration test failure alerts\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback on code changes\n- Potential production failures undetected\n- Integration points completely untested\n- Deployment confidence: **VERY LOW**\n\n**Priority:** Fix integration test failures immediately before any further deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 340,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

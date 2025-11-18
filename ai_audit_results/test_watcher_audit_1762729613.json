@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762729613,
+  "changed_files": [
+    "mcp-server\\test_deepseek_api.py",
+    "mcp-server\\test_config.py",
+    "mcp-server\\test_server_integration.py",
+    "mcp-server\\test_deepseek_verify_fixes.py",
+    "mcp-server\\test_deepseek_code_review.py",
+    "mcp-server\\test_guide.py",
+    "mcp-server\\test_deepseek_perfect_10.py",
+    "mcp-server\\test_main_integration.py",
+    "mcp-server\\test_security.py",
+    "mcp-server\\test_deepseek_quick_win5.py",
+    "mcp-server\\test_deepseek_final_score.py",
+    "mcp-server\\test_functional.py",
+    "mcp-server\\test_enhanced_router.py",
+    "mcp-server\\test_ai_interaction.py",
+    "mcp-server\\test_ai_interaction_full.py",
+    "test_critical_fixes.py",
+    "mcp-server\\test_agent_communication.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762729598.2875435,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Exit code -1 indicates catastrophic test failure (likely segmentation fault, environment crash, or fatal Python error). Test quality is non-existent as no tests executed successfully.\n\n## Coverage Analysis & Gaps\n**0% coverage across all files** - This is a complete testing failure. No code paths were executed, suggesting:\n- Test environment is broken\n- Import/dependency failures\n- Configuration issues preventing test execution\n- Possible circular imports or initialization errors\n\n## Potential Issues with Recent Changes\n1. **Environment/Configuration**: Likely broken test configuration or missing dependencies\n2. **Import Structure**: Recent file additions may have created circular imports or broken module resolution\n3. **Initialization Code**: Fatal errors in `__init__.py` files or test setup\n4. **Dependencies**: Missing packages or version conflicts causing immediate crashes\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests individually to identify which file causes the crash: `python -m pytest mcp-server/test_config.py -v`\n2. Check for syntax errors: `python -m py_compile mcp-server/*.py`\n3. Verify dependencies: `pip list` and check for missing packages\n\n**Systematic Fixes:**\n1. Add `-x` flag to stop on first failure and identify root cause\n2. Implement basic smoke test with minimal imports\n3. Fix environment setup before adding new test files\n4. Add logging to test initialization to capture crash points\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing pipeline\n- Potential deployment of broken code\n- Undetected regressions in production\n- Complete loss of test-driven development benefits\n\n**Priority**: Fix test execution immediately before any further development. The testing infrastructure itself is broken, making all other quality metrics meaningless.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 324,
+      "completion_tokens": 385,
+      "total_tokens": 709,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 260
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

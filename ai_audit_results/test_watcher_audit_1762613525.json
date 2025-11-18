@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762613525,
+  "changed_files": [
+    "temp_pg_test.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "test_cross_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762613509.6599512,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution, likely due to environment or dependency issues.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code is being executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\n1. **Environment corruption** - Modified files include `.venv\\Lib\\site-packages\\psycopg2\\__init__.py`, suggesting virtual environment tampering\n2. **Dependency conflicts** - Changes to psycopg2 (PostgreSQL adapter) likely broke database connectivity\n3. **Test infrastructure failure** - Modified `temp_pg_test.py` may contain fatal errors\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Recreate virtual environment** - Delete `.venv` and rebuild with clean dependencies\n2. **Verify database connectivity** - Ensure PostgreSQL is running and credentials are correct\n3. **Fix `temp_pg_test.py`** - Review recent changes for syntax errors or import issues\n4. **Run basic connectivity test** before full test suite\n\n**FOLLOW-UP:**\n- Implement pre-commit hooks to prevent venv modifications\n- Add environment sanity checks to test setup\n- Consider using Docker for consistent test environments\n\n## Risk Assessment\n**HIGH RISK** - No testing is occurring, meaning:\n- All code changes are untested\n- Production deployments are extremely risky\n- Potential for undetected regressions and bugs\n- Database integration likely broken\n\n**Priority: Fix immediately before any further development.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 154,
+      "completion_tokens": 345,
+      "total_tokens": 499,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 90
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762711760,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762711736.027482,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error during test setup/execution, not test failures.\n\n## Coverage Analysis\n**0% coverage** - No code is being executed by tests. This represents a complete testing infrastructure breakdown.\n\n## Potential Issues\n1. **Environment Corruption** - Modified files in `.venv/` suggest virtual environment is corrupted or improperly configured\n2. **Pytest Plugin Conflict** - Changes to pluggy and pytest config files indicate plugin system issues\n3. **Import/Configuration Failure** - Tests cannot even start executing\n\n## Immediate Recommendations\n1. **Recreate Virtual Environment**\n   ```bash\n   rm -rf .venv/\n   python -m venv .venv\n   source .venv/bin/activate  # or .venv\\Scripts\\activate on Windows\n   pip install -r requirements.txt\n   ```\n\n2. **Verify Pytest Installation**\n   ```bash\n   pytest --version\n   pytest --collect-only  # Check if tests can be discovered\n   ```\n\n3. **Run Minimal Test**\n   ```python\n   # test_minimal.py\n   def test_basic():\n       assert True\n   ```\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected regressions\n- Broken functionality going unnoticed\n- Deployment of completely broken code\n\n## Priority Actions\n1. Fix test execution environment (immediate)\n2. Verify basic test runs successfully\n3. Only then address coverage gaps\n4. Consider adding environment validation to CI/CD pipeline\n\nThe core issue is environmental, not test quality. Fix the execution environment first.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 190,
+      "completion_tokens": 350,
+      "total_tokens": 540,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 126
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

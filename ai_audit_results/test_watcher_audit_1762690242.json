@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762690242,
+  "changed_files": [
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762690224.9821932,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken. Exit code -1 indicates a fatal error preventing test execution. Zero coverage suggests tests never ran or failed during setup.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during test run\n- **No file-specific coverage data** - All tests failed before collecting metrics\n- **Critical gap**: Unable to assess actual code coverage due to test infrastructure failure\n\n## Potential Issues with Recent Changes\n1. **Test infrastructure broken** - Likely in test configuration, imports, or setup\n2. **Dependency conflicts** - Recent changes to `mtf_engine.py` or protocol may have broken imports\n3. **Environment issues** - Database connections, sandbox setup, or resource dependencies failing\n4. **Breaking API changes** - Modified core components without updating tests\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests individually to identify which test file causes the crash:\n   ```bash\n   python -m pytest tests/test_mtf_engine.py -v\n   ```\n2. Check test configuration and conftest.py files for errors\n3. Verify all imports and dependencies are intact\n4. Examine recent changes to `backend/core/mtf_engine.py` for breaking changes\n\n**Short-term:**\n1. Fix test infrastructure before adding new tests\n2. Add basic smoke tests to prevent complete test suite failure\n3. Implement test isolation to prevent cascade failures\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functioning tests is extremely dangerous:\n- No regression detection\n- Potential production failures undetected\n- All recent changes effectively untested\n- Critical for database and sandbox integration changes\n\n**Priority**: Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 185,
+      "completion_tokens": 375,
+      "total_tokens": 560,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 57
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

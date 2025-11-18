@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762689585,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762689570.088625,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. All test infrastructure has failed.\n\n## Potential Issues with Recent Changes\nThe single changed file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- **Syntax errors** preventing import/execution\n- **Missing dependencies** causing import failures\n- **Infinite loops** or **blocking operations** hanging test execution\n- **Environment configuration** issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution** - Run tests with verbose output to identify crash cause\n2. **Check syntax** - Validate Python syntax in the changed file\n3. **Verify imports** - Ensure all dependencies are available in test environment\n4. **Add basic smoke test** - Create minimal test to verify basic functionality\n\n**STRUCTURAL FIXES:**\n1. Implement test discovery verification\n2. Add pre-commit hooks for syntax checking\n3. Set up CI pipeline with dependency installation\n\n## Risk Assessment\n**HIGH RISK** - Code changes cannot be validated. Potential for:\n- Runtime crashes in production\n- Undetected logical errors\n- Integration failures\n- Complete system instability\n\n**Priority: CRITICAL** - Address immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 312,
+      "total_tokens": 447,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

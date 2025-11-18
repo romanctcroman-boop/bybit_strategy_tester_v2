@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762718954,
+  "changed_files": [
+    "tests\\integration\\test_real_api_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762718941.6072466,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests didn't reach execution phase\n- **Integration test failure** - `test_real_api_integration.py` appears to be the culprit\n\n## Potential Issues with Recent Changes\n1. **Integration test dependency failures** - External API endpoints may be unavailable or changed\n2. **Environment configuration issues** - Missing API keys, credentials, or environment variables\n3. **Test setup/teardown failures** - Fixtures or pre-conditions failing before test execution\n4. **Authentication/authorization problems** - API access tokens expired or invalid\n\n## Recommendations for Improvement\n**Immediate Actions:**\n- Check integration test logs for specific error messages\n- Verify API endpoint availability and credentials\n- Add proper error handling and logging to integration tests\n- Implement retry mechanisms for flaky external dependencies\n\n**Strategic Improvements:**\n- Add unit tests mocking external APIs (70%+ coverage target)\n- Implement health checks for external dependencies\n- Create isolated test environments with stable API versions\n- Add integration test monitoring and alerting\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents reliable deployment\n- **Deployment Risk**: Cannot validate integration with external systems\n- **Quality Risk**: No confidence in API compatibility\n- **Business Risk**: Potential production outages from undetected integration issues\n\n**Priority**: Fix integration test failures immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 349,
+      "total_tokens": 480,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762608235,
+  "changed_files": [
+    "test_perplexity_quick_wins.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762608213.2600965,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken. Exit code -1 indicates a fatal error before tests even started running. The test suite is non-functional.\n\n## Coverage Analysis\n**0% coverage** - No code is being executed during test runs. This suggests either:\n- Test runner configuration issues\n- Import failures preventing test discovery\n- Fatal errors in test setup/teardown\n- Missing test dependencies\n\n## Potential Issues with Recent Changes\nThe changed file `test_perplexity_quick_wins.py` likely contains:\n- Syntax errors preventing import\n- Missing imports causing module loading failures\n- Infinite loops or fatal exceptions in module-level code\n- Configuration that breaks the test runner\n\n## Immediate Action Items\n1. **Debug test execution**:\n   - Run tests with `-v` flag to see where they fail\n   - Check for syntax errors in the changed test file\n   - Verify all imports are valid and available\n\n2. **Fix test runner**:\n   - Ensure pytest/unittest is properly configured\n   - Check for circular imports or module initialization issues\n   - Validate test discovery patterns\n\n3. **Validate test file**:\n   - Remove any module-level code that could crash\n   - Ensure test classes/functions are properly defined\n   - Verify no infinite loops or fatal exceptions\n\n## Risk Assessment\n**HIGH RISK** - Completely unreliable test suite means:\n- No regression detection\n- Undetected breaking changes\n- Production deployment risks\n- All code changes are effectively untested\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 334,
+      "total_tokens": 462,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

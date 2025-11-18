@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762641621,
+  "changed_files": [
+    "apply_deepseek_improvements.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762641607.8648453,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test files or code\n- Missing dependencies or environment issues\n- Test framework configuration problems\n- Fatal errors during test setup\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% across all files indicates:\n- No tests executed successfully\n- Potentially no test files present or discovered\n- `apply_deepseek_improvements.py` completely untested\n\n## Potential Issues with Recent Changes\n1. **File `apply_deepseek_improvements.py` likely contains breaking changes**\n2. Possible syntax errors preventing import/execution\n3. Missing imports or dependencies\n4. Test discovery configuration issues\n\n## Immediate Recommendations\n1. **Fix Test Execution First:**\n   - Check Python syntax in all files: `python -m py_compile *.py`\n   - Verify test discovery: `python -m pytest --collect-only`\n   - Run with verbose output to identify failure point\n\n2. **Address `apply_deepseek_improvements.py`:**\n   - Review recent changes for syntax/import issues\n   - Add basic smoke test to verify module loads\n   - Check for circular imports or missing dependencies\n\n3. **Infrastructure:**\n   - Verify test runner configuration\n   - Check environment/dependency setup\n   - Ensure test files follow naming conventions (`test_*.py`)\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code:\n- Production failures highly likely\n- No safety net for regressions\n- Critical business logic potentially broken\n- **Recommend blocking deployment until tests execute successfully**\n\n**Priority:** Fix test execution → Add basic coverage → Expand test suite",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 369,
+      "total_tokens": 496,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

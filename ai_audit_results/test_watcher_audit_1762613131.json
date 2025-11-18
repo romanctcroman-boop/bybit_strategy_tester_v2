@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762613131,
+  "changed_files": [
+    "test_cross_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762613113.7956915,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test code\n- Import failures or missing dependencies\n- Test framework configuration issues\n- Fatal errors during test setup\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage across all files confirms no code was executed. This represents a complete testing breakdown.\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `test_cross_agent.py`, suggesting:\n- Broken test imports or fixtures\n- Syntax errors in test cases\n- Incompatible test framework changes\n- Missing test dependencies\n\n## Immediate Recommendations\n1. **Fix Test Execution First**\n   - Check `test_cross_agent.py` for syntax errors\n   - Verify all imports and dependencies are available\n   - Run tests with `-v` flag to see specific failure points\n\n2. **Validate Test Environment**\n   - Ensure pytest/unittest is properly installed\n   - Check Python version compatibility\n   - Verify test configuration files\n\n3. **Quick Recovery Steps**\n   ```bash\n   python -m py_compile test_cross_agent.py  # Check syntax\n   python -c \"import pytest\"  # Verify framework\n   pytest test_cross_agent.py -v  # Detailed output\n   ```\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected regressions in production code\n- Potential deployment of broken functionality\n- Complete loss of quality assurance\n- High probability of production incidents\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 346,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

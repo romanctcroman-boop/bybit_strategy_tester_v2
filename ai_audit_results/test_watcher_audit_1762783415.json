@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762783415,
+  "changed_files": [
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_sandbox_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762783389.943755,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken. Exit code -1 indicates a fatal error preventing test execution. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** - No tests executed successfully. All code changes are completely untested. Critical gaps exist across:\n- MTF engine core functionality\n- Protocol implementations  \n- Database query optimization\n- Sandbox integration logic\n\n## Potential Issues with Recent Changes\n1. **Breaking changes** in `backend/core/mtf_engine.py` likely causing import/circular dependency issues\n2. **Test infrastructure failure** - possibly from changes in test files themselves\n3. **Environment/dependency issues** preventing test execution\n4. **Critical syntax errors** in modified files\n\n## Immediate Recommendations\n1. **Fix test execution first** - Run individual test files to identify the breaking point\n2. **Check imports and dependencies** - Verify all modules can be imported without errors\n3. **Validate test configuration** - Ensure pytest configuration and conftest files are intact\n4. **Rollback recent changes** if immediate fix isn't apparent\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- Zero validation of core functionality\n- Potential runtime errors in production\n- Data corruption risk in database operations\n- Integration failures with sandbox environment\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 173,
+      "completion_tokens": 302,
+      "total_tokens": 475,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 109
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

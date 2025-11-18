@@ -1,0 +1,43 @@
+{
+  "timestamp": 1762787188,
+  "changed_files": [
+    "test_mcp_integration.py",
+    "test_deepseek_and_perplexity.py",
+    "test_mcp_logging.py",
+    "mcp-server\\reasoning_engine.py",
+    "test_logging_coverage.py",
+    "ask_ai_about_warnings.py",
+    "test_mcp_enhanced_simple.py",
+    "test_ai_collaboration.py",
+    "test_ai_full_cycle.py",
+    "test_logging_with_api.py",
+    "test_ai_reasoning.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762787166.831843,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exceptions)\n- 0% coverage suggests tests aren't even executing properly\n- No coverage data available for analysis\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- Zero coverage across all files indicates fundamental test infrastructure failure\n- No meaningful data to analyze specific gaps\n- All test files appear equally affected\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure Failure**: Recent changes likely broke the test runner or dependencies\n2. **Import/Dependency Issues**: New MCP server files (`mcp-server\\reasoning_engine.py`) may have broken imports\n3. **Configuration Problems**: Test configuration files may be missing or corrupted\n4. **Environment Issues**: Missing dependencies or environment variables\n\n## Immediate Action Plan\n**Priority 1 - Restore Test Execution**:\n```bash\n# 1. Run tests with verbose output to identify root cause\npytest -v --tb=short\n\n# 2. Check for import errors\npython -c \"import pytest; print('Pytest OK')\"\n\n# 3. Validate test discovery\npytest --collect-only\n```\n\n**Priority 2 - Fix Critical Issues**:\n- Start with simplest test file (`test_mcp_enhanced_simple.py`)\n- Fix import errors in new MCP server module\n- Ensure all dependencies are installed\n- Verify test configuration files\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing capability\n- High probability of undetected bugs in production code\n- Recent changes likely introduced breaking changes\n- All test-related changes since last working state are suspect\n\n## Quick Wins\n1. **Fix one test file first** - Get `test_mcp_enhanced_simple.py` running\n2. **Validate MCP server imports** - Check `mcp-server\\reasoning_engine.py`\n3. **Restore basic coverage** - Aim for 70%+ on critical paths first\n4. **Implement CI checks** - Prevent future complete test failures\n\n**Immediate next step**: Run `pytest -v --tb=short test_mcp_enhanced_simple.py` to identify the specific failure point.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 221,
+      "completion_tokens": 483,
+      "total_tokens": 704,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 157
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

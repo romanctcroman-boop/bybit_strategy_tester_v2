@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762552936,
+  "changed_files": [
+    "analyze_final_v2_with_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552912.8886116,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental setup/configuration issues\n- No coverage data collected due to test failure\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete testing gap:\n- No tests executed successfully\n- No code paths measured\n- Entire codebase untested in this run\n\n## Potential Issues with Recent Changes\nThe file `analyze_final_v2_with_deepseek.py` likely contains:\n- Syntax errors preventing test discovery/import\n- Missing dependencies or imports\n- Configuration issues in test setup\n- Runtime exceptions during module loading\n\n## Immediate Action Recommendations\n1. **Debug Test Execution**\n   - Check for syntax errors in the changed file\n   - Verify imports and dependencies are available\n   - Run with `-v` flag to see specific failure points\n\n2. **Fix Test Infrastructure**\n   - Ensure `__init__.py` files exist if using packages\n   - Verify test discovery configuration (pytest.ini, setup.cfg)\n   - Check for circular imports or module loading issues\n\n3. **Implement Basic Safety Net**\n   - Add simple smoke test to verify basic functionality\n   - Ensure tests can at least import and instantiate main components\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely risky:\n- Zero confidence in code functionality\n- No regression protection\n- Potential for runtime failures in production\n- Recent changes completely break test execution\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 338,
+      "total_tokens": 467,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

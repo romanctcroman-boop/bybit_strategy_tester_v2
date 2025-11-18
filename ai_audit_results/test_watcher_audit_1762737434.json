@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762737434,
+  "changed_files": [
+    "tests\\test_perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762737404.7678955,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test suite or environment setup. No meaningful quality assessment possible as tests didn't run.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - Complete coverage failure suggests:\n- Test environment not properly configured\n- Test discovery/import failures\n- Critical syntax errors in test files\n- Missing dependencies for `perplexity_client`\n\n## Potential Issues with Recent Changes\n1. **`tests/test_perplexity_client.py` likely contains fatal errors**:\n   - Import failures (missing `perplexity_client` module)\n   - Syntax errors\n   - Configuration issues\n2. **Environment/dependency problems**:\n   - Missing required packages\n   - Incorrect Python version\n   - Path/module structure issues\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest tests/test_perplexity_client.py -v` to see specific error details\n2. Check for import errors: Verify `perplexity_client` module exists and is accessible\n3. Validate test file syntax with `python -m py_compile tests/test_perplexity_client.py`\n\n**Follow-up:**\n4. Add basic smoke test to verify test infrastructure\n5. Implement CI pipeline with dependency installation steps\n6. Add test discovery verification step in build process\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No validation of `perplexity_client` functionality\n- Potential production-breaking changes undetected\n- Development blocked until test infrastructure fixed\n- Zero confidence in code changes\n\n**Priority:** Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 353,
+      "total_tokens": 480,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

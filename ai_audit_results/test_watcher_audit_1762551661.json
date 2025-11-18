@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762551661,
+  "changed_files": [
+    "analyze_parallel_with_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762551645.494075,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax/runtime errors preventing test execution\n- Test framework configuration issues\n- Missing dependencies or environment setup problems\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure rather than a coverage gap.\n\n## Potential Issues with Recent Changes\nThe file `analyze_parallel_with_deepseek.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing imports or dependencies\n- Runtime errors during module loading\n- Infinite loops or blocking operations\n- Environment-specific requirements not met\n\n## Immediate Action Items\n1. **Debug the test failure:**\n   ```bash\n   python -m py_compile analyze_parallel_with_deepseek.py\n   ```\n   Check for syntax errors first\n\n2. **Run tests with verbose output** to identify the specific failure point\n\n3. **Verify dependencies** - Ensure all required packages are installed\n\n4. **Test module import** separately:\n   ```python\n   python -c \"import analyze_parallel_with_deepseek\"\n   ```\n\n## Risk Assessment\n**HIGH RISK** - The codebase is completely untested and potentially non-functional. Deployment would be extremely risky without resolving these fundamental issues.\n\n## Priority Recommendations\n1. **Fix test execution** before addressing coverage\n2. **Add basic smoke tests** to verify module functionality\n3. **Implement CI/CD checks** to prevent merging broken code\n4. **Start with simple unit tests** before complex integration testing\n\nThe zero coverage indicates the testing pipeline is broken at the most fundamental level - focus on making tests run before optimizing coverage metrics.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 360,
+      "total_tokens": 487,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

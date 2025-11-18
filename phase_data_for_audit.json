@@ -1,0 +1,137 @@
+{
+  "collection_date": "2025-11-10T00:33:46.810957",
+  "project": "Bybit Strategy Tester v2",
+  "phases": {
+    "phase1": {
+      "title": "Phase 1: Quick Wins & Reliability System",
+      "status": "✅ COMPLETE",
+      "components": [
+        {
+          "name": "retry_policy.py",
+          "path": "reliability\\retry_policy.py",
+          "size_bytes": 12420,
+          "lines": 360
+        },
+        {
+          "name": "key_rotation.py",
+          "path": "reliability\\key_rotation.py",
+          "size_bytes": 15845,
+          "lines": 435
+        },
+        {
+          "name": "service_monitor.py",
+          "path": "reliability\\service_monitor.py",
+          "size_bytes": 15866,
+          "lines": 442
+        }
+      ],
+      "tests": {},
+      "reports": [
+        "PHASE1_WEEK1_COMPLETE.md",
+        "PHASE_1_QUICK_WINS_COMPLETE.md"
+      ],
+      "code_files": [
+        "reliability\\retry_policy.py",
+        "reliability\\key_rotation.py",
+        "reliability\\service_monitor.py",
+        "tests/test_retry_policy.py",
+        "tests/test_key_rotation.py",
+        "tests/test_service_monitor.py"
+      ]
+    },
+    "phase2": {
+      "title": "Phase 2: Integration & Lifecycle Tests",
+      "status": "✅ COMPLETE",
+      "components": [],
+      "tests": {},
+      "reports": [
+        "PHASE_2_COMPLETE.md",
+        "PHASE_2_COMPLETION_REPORT.md",
+        "INTEGRATION_TESTING_COMPLETE_REPORT.md"
+      ],
+      "code_files": []
+    },
+    "phase3": {
+      "title": "Phase 3: Distributed Patterns & Circuit Breaker",
+      "status": "✅ COMPLETE (4/4 components)",
+      "components": [
+        {
+          "name": "distributed_cache.py",
+          "description": "Day 17-18: Cache",
+          "path": "reliability/distributed_cache.py",
+          "size_bytes": 17821,
+          "lines": 576
+        },
+        {
+          "name": "request_deduplication.py",
+          "description": "Day 19-20: Deduplication",
+          "path": "reliability/request_deduplication.py",
+          "size_bytes": 18574,
+          "lines": 568
+        },
+        {
+          "name": "circuit_breaker.py",
+          "description": "Day 21: Circuit Breaker",
+          "path": "reliability/circuit_breaker.py",
+          "size_bytes": 20182,
+          "lines": 593
+        }
+      ],
+      "tests": {
+        "test_rate_limiter.py": {
+          "count": 36,
+          "path": "tests/test_rate_limiter.py"
+        },
+        "test_distributed_cache.py": {
+          "count": 43,
+          "path": "tests/test_distributed_cache.py"
+        },
+        "test_request_deduplication.py": {
+          "count": 44,
+          "path": "tests/test_request_deduplication.py"
+        },
+        "test_circuit_breaker.py": {
+          "count": 40,
+          "path": "tests/test_circuit_breaker.py"
+        }
+      },
+      "reports": [
+        "PHASE3_DAY21_CIRCUIT_BREAKER_COMPLETE.md",
+        "PHASE3_DAY19-20_REQUEST_DEDUPLICATION_COMPLETE.md",
+        "PHASE3_DAY17-18_DISTRIBUTED_CACHE_COMPLETE.md",
+        "PHASE3_PROGRESS_SUMMARY.md",
+        "PHASE_3_PLAN.md"
+      ],
+      "code_files": [
+        "reliability/distributed_cache.py",
+        "reliability/request_deduplication.py",
+        "reliability/circuit_breaker.py",
+        "tests/test_rate_limiter.py",
+        "tests/test_distributed_cache.py",
+        "tests/test_request_deduplication.py",
+        "tests/test_circuit_breaker.py"
+      ],
+      "metrics": {
+        "total_tests": 163,
+        "average_coverage": "95.25%",
+        "components_complete": 4
+      }
+    }
+  },
+  "summary": {
+    "total_phases": 3,
+    "all_phases_complete": true,
+    "phase1": {
+      "components": 3,
+      "test_files": 3
+    },
+    "phase2": {
+      "test_files": 0
+    },
+    "phase3": {
+      "components": 3,
+      "tests": 163,
+      "coverage": "95.25%"
+    }
+  }
+}

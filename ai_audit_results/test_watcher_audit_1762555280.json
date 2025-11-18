@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762555280,
+  "changed_files": [
+    "tests\\monitoring\\test_health_endpoints.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762555266.2158551,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code was executed during testing\n- **No coverage data available** - Test framework failed before collecting any metrics\n- **Critical gap**: Unable to assess actual code coverage due to test execution failure\n\n## Potential Issues with Recent Changes\n1. **Test file corruption**: `tests\\monitoring\\test_health_endpoints.py` may contain syntax errors or import failures\n2. **Environment misconfiguration**: Missing dependencies, incorrect Python version, or environment variables\n3. **Fixture/setup failures**: Test initialization code causing crashes before test execution\n4. **Dependency conflicts**: Recent package updates breaking test infrastructure\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest tests/monitoring/test_health_endpoints.py -v` to isolate the failure\n2. Check test file syntax: `python -m py_compile tests/monitoring/test_health_endpoints.py`\n3. Verify dependencies: `pip list` and compare with requirements\n\n**Systematic Fixes:**\n1. Add test discovery validation in CI pipeline\n2. Implement pre-commit hooks for test syntax checking\n3. Create smoke tests to validate test environment before full suite execution\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback on code changes\n- Potential deployment of broken code to production\n- Complete loss of test-driven development capabilities\n- Urgent attention required to restore testing infrastructure\n\n**Priority**: Fix test execution before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 130,
+      "completion_tokens": 365,
+      "total_tokens": 495,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 2
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

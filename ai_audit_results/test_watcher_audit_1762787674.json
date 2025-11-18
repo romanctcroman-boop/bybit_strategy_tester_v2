@@ -1,0 +1,83 @@
+{
+  "timestamp": 1762787674,
+  "changed_files": [
+    "mcp-server\\config\\feature_flags.py",
+    "mcp-server\\deepseek_auto_refactor_with_tests.py",
+    "backend_api_deepseek_pool_temp.py",
+    "deepseek_final_assessment.py",
+    "mcp-server\\deepseek_direct_call.py",
+    "generate_phase2_integration_tests.py",
+    "mcp-server\\deepseek_full_analysis.py",
+    "deepseek_self_integration_check.py",
+    "deepseek_verify_complete.py",
+    "deepseek_generate_7_tools.py",
+    "extract_mcp_tools.py",
+    "mcp-server\\consult_deepseek_router.py",
+    "deepseek_real_analysis.py",
+    "mcp-server\\ask_deepseek_max_permissions.py",
+    "mcp-server\\deepseek_code_agent.py",
+    "mcp-server\\auto_integrate_all.py",
+    "mcp-server\\deepseek_mcp_server.py",
+    "mcp-server\\ask_deepseek_mcp_permissions.py",
+    "generate_phase3_deployment.py",
+    "mcp-server\\deepseek_auto_refactor.py",
+    "monitoring_prometheus.py",
+    "mcp-server\\auto_integrate_v2.py",
+    "deepseek_review_mcp_server.py",
+    "diagnostic_dashboard.py",
+    "mcp-server\\config\\__init__.py",
+    "load_ml_data_6months.py",
+    "mcp_bridge.py",
+    "finalize_data_service_async.py",
+    "mcp-server\\deepseek_background_analysis.py",
+    "ml_optimizer_perplexity.py",
+    "mcp-server\\batch_integrate_analysis.py",
+    "mcp-server\\deepseek_implement_p1_p2_p3.py",
+    "mcp-server\\ask_sonar_mcp_permissions.py",
+    "deepseek_self_analysis.py",
+    "mcp-server\\agent_communication_layer.py",
+    "deepseek_verify_fixes.py",
+    "deepseek_meta_analysis_v2.py",
+    "generate_phase2_fixes.py",
+    "mcp-server\\batch_integrate.py",
+    "mcp-server\\deepseek_mcp_tools.py",
+    "deepseek_security_audit_request.py",
+    "mcp-server\\config\\settings.py",
+    "deepseek_perplexity_full_tz_audit.py",
+    "deployment\\health_check.py",
+    "deepseek_weaknesses_analysis.py",
+    "deploy_mcp_server.py",
+    "ai_ai_full_collaboration.py",
+    "get_agent_recommendations.py",
+    "mcp-server\\circuit_breaker.py",
+    "deepseek_comprehensive_analysis.py",
+    "mcp-server\\auto_install_deepseek_results.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762787643.2279065,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- 0% coverage suggests tests aren't even executing properly\n- No coverage data available for any files\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- **0% coverage across all 50+ files** - tests are failing before execution begins\n- No test data collected for any module\n- Critical infrastructure files (config, deployment, monitoring) completely untested\n\n## Potential Issues with Recent Changes\n1. **Massive scope expansion** - 50+ files changed simultaneously suggests architectural overhaul\n2. **Integration failures** - MCP server components likely have dependency/import issues\n3. **Configuration problems** - `feature_flags.py` and `settings.py` changes may be breaking test environment\n4. **Circular dependencies** - Multiple analysis/refactor files may create import loops\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test runner** - Start with minimal test to verify basic execution\n2. **Isolate changes** - Test MCP server components separately from analysis modules\n3. **Check dependencies** - Verify all imports and environment setup\n4. **Add basic smoke tests** - Create simple tests for core modules first\n\n**PRIORITY FIXES:**\n- Start with `deployment/health_check.py` - should be simplest to test\n- Then `mcp-server/config/settings.py` - likely configuration issue\n- Finally `mcp-server/deepseek_mcp_server.py` - core component\n\n## Risk Assessment\n**HIGH RISK** - Deployment should be blocked:\n- **Critical**: No working tests means unknown production stability\n- **High**: Multiple interconnected components failing simultaneously\n- **Medium**: Complex MCP server architecture with no validation\n\n**NEXT STEPS:**\n1. Run tests with `-v` flag to see where they're failing\n2. Check test environment setup and dependencies\n3. Verify Python path and import structure\n4. Create minimal test suite before expanding coverage",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 676,
+      "completion_tokens": 455,
+      "total_tokens": 1131,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 612
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

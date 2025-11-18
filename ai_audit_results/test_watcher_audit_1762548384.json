@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762548384,
+  "changed_files": [
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\test_phase1_security.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_protocol.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762548369.3020377,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment/setup failure\n- Critical syntax/runtime errors in test files\n- Missing dependencies or configuration\n\n## Coverage Analysis\n**COMPLETE COVERAGE GAP** - 0% coverage across all files suggests:\n- Tests aren't executing at all\n- Possible import errors or module resolution issues\n- Test discovery/runner configuration problems\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure**: Likely broken test runner or pytest configuration\n2. **Dependencies**: Missing imports or version conflicts in test files\n3. **File Structure**: Incorrect paths or module imports between `tests/` and `backend/`\n4. **Recent Test Additions**: New test files (`test_phase1_security.py`, `test_mtf_engine.py`) may contain syntax errors\n\n## Immediate Recommendations\n1. **Debug Test Execution**:\n   ```bash\n   python -m pytest tests/ -v --tb=short\n   ```\n   Check for specific error messages\n\n2. **Verify Imports**: Ensure all test files can import from `backend/` correctly\n\n3. **Check conftest.py**: Review `tests/backend/conftest.py` for configuration issues\n\n4. **Test Isolation**: Run tests individually to identify failing files:\n   ```bash\n   python -m pytest tests/test_phase1_security.py -v\n   ```\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Undetected breaking changes in LSTM predictions and MTF engine\n- Security vulnerabilities could go unnoticed\n- Database and API changes untested\n- Production deployment would be extremely risky\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 381,
+      "total_tokens": 672,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 227
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

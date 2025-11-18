@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762741332,
+  "changed_files": [
+    "tests\\test_perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762741303.5342162,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates a fatal error preventing test execution entirely. This represents a complete testing breakdown.\n\n## Coverage Analysis & Gaps\n**0% coverage** across all files means:\n- No code is being executed during testing\n- All business logic is completely untested\n- No regression protection exists\n\n## Potential Issues with Recent Changes\nThe modified `tests/test_perplexity_client.py` likely contains:\n- Syntax errors preventing test discovery/import\n- Missing dependencies or imports\n- Configuration errors in test setup\n- Fixture/teardown failures crashing the test runner\n\n## Recommendations for Improvement\n**Immediate Actions (Next 2 hours):**\n1. Run `python -m pytest tests/test_perplexity_client.py -v` to see specific error\n2. Check for Python syntax errors in the test file\n3. Verify all imports (especially PerplexityClient) are available\n4. Examine test configuration and fixtures\n\n**Short-term (Next day):**\n1. Fix the crashing test file first\n2. Add basic smoke tests to verify test infrastructure\n3. Implement minimum 70% coverage threshold\n4. Set up pre-commit hooks to prevent broken tests\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No confidence in code changes\n- High probability of undetected bugs in production\n- Deployment would be extremely risky\n- Entire test suite is compromised\n\n**Priority:** Fix test execution failure before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 321,
+      "total_tokens": 448,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

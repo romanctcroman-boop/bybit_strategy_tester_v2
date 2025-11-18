@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762641007,
+  "changed_files": [
+    "backend\\security\\secure_storage.py",
+    "backend\\services\\code_executor.py",
+    "backend\\services\\saga_metrics.py",
+    "backend\\services\\k8s_automl_manager.py",
+    "backend\\services\\ab_testing_service.py",
+    "backend\\security\\ast_validator.py",
+    "backend\\services\\anomaly_detection_service.py",
+    "backend\\services\\saga_orchestrator_v2.py",
+    "backend\\services\\saga_orchestrator.py",
+    "backend\\services\\ml_hpa_monitor.py",
+    "backend\\services\\task_queue.py",
+    "backend\\security\\key_rotation.py",
+    "backend\\services\\automl_service.py",
+    "backend\\services\\task_worker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762640993.8608797,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test infrastructure/setup issues\n- Fatal errors preventing test execution\n- Missing test dependencies or configuration\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - No files show coverage data, suggesting:\n- Tests never executed due to fatal errors\n- Coverage reporting completely broken\n- Possible import/initialization failures in test suite\n\n## Potential Issues with Recent Changes\nThe modified files span **security** and **core services** - high-risk areas:\n- `secure_storage.py` & `key_rotation.py` changes could break security initialization\n- Multiple service orchestrators modified (`saga_orchestrator*`)\n- ML/AutoML services (`automl_service.py`, `ml_hpa_monitor.py`) - complex dependencies\n- **Most likely**: Security module changes preventing service initialization\n\n## Immediate Recommendations\n1. **Debug Test Execution**\n   - Check test runner logs for fatal errors\n   - Verify all dependencies are installed\n   - Test security module imports in isolation\n\n2. **Isolate Breaking Changes**\n   - Temporarily revert security module changes to identify culprit\n   - Test services individually before integration\n   - Check for circular imports between security and services\n\n3. **Fix Infrastructure**\n   - Ensure coverage configuration is valid\n   - Verify test database/network connections\n   - Check environment variables and secrets\n\n## Risk Assessment\n**HIGH RISK** - Multiple critical paths affected:\n- 🔴 **Security**: Storage, validation, key management\n- 🔴 **Core Services**: Task processing, orchestration, ML services\n- 🔴 **Zero test coverage** means undetected regressions likely deployed\n\n**Priority**: Fix test execution immediately before any deployment. Security changes without test validation pose significant operational risk.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 276,
+      "completion_tokens": 393,
+      "total_tokens": 669,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 212
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

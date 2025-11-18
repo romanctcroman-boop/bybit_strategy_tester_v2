@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762546252,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762546238.9595525,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful quality assessment possible as tests didn't run to completion. This indicates fundamental issues with the test infrastructure or environment.\n\n## Coverage Analysis\n**0.00% COVERAGE** - No code coverage data collected. This is a red flag suggesting:\n- Tests crashed before coverage collection\n- Coverage configuration is broken\n- Test environment setup failed\n\n## Potential Issues with Recent Changes\n1. **health_check.py likely contains breaking changes** that prevent test execution\n2. Possible issues:\n   - Syntax errors in new code\n   - Missing imports or dependencies\n   - Infinite loops or blocking operations\n   - Environment configuration conflicts\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test failure first** - Check test logs for specific error messages\n2. **Isolate health_check.py** - Test this file independently to identify breaking changes\n3. **Verify test environment** - Ensure all dependencies are properly installed\n4. **Add basic smoke test** - Create a minimal test that verifies the test framework works\n\n**FOLLOW-UP:**\n5. Fix the root cause in health_check.py\n6. Re-establish coverage reporting\n7. Add pre-commit hooks to catch syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Deployment Risk:** Code cannot be safely deployed without passing tests\n- **Regression Risk:** No validation that changes work correctly\n- **Quality Risk:** Complete lack of test feedback loop\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 340,
+      "total_tokens": 462,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

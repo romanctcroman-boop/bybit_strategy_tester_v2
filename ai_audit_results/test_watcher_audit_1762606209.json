@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762606209,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psutil\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762606193.6336098,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely crash)\n- Zero test execution suggests fundamental environment/configuration issues\n- No meaningful quality assessment possible without working tests\n\n## Coverage Analysis\n**COVERAGE: 0%** - Complete failure:\n- No files were tested\n- Coverage data is empty\n- Either tests didn't run or crashed immediately\n\n## Potential Issues with Recent Changes\n**Primary Suspect**: Virtual environment corruption\n- `.venv\\Lib\\site-packages\\psutil\\__init__.py` modification suggests:\n  - Broken virtual environment\n  - Manual file edits in site-packages (should never happen)\n  - Possible version conflicts or corrupted installation\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Rebuild virtual environment completely**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n2. **Verify test runner configuration**\n3. **Run basic smoke test** (`python -c \"import psutil; print('OK')\"`)\n\n**FOLLOW-UP:**\n4. Check for system-level psutil conflicts\n5. Validate test discovery configuration\n6. Add basic health check test\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be dangerous:\n- No test validation of any functionality\n- Environment instability indicates potential runtime failures\n- Unknown impact of psutil modification on system monitoring capabilities\n\n**Priority**: Fix environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 136,
+      "completion_tokens": 334,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 72
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

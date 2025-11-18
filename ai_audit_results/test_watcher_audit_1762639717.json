@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762639717,
+  "changed_files": [
+    "test_ide_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762639704.1195316,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1), indicating fundamental issues with the test environment or test code structure. No meaningful quality assessment possible since tests didn't run.\n\n## Coverage Analysis\n**0% COVERAGE** - Complete coverage failure suggests:\n- Test framework not properly configured\n- Test discovery/execution broken\n- Environment setup issues\n- Possible import/circular dependency problems\n\n## Potential Issues with Recent Changes\n**test_ide_integration.py** modifications likely introduced:\n- Syntax errors preventing test discovery\n- Missing dependencies or imports\n- Configuration conflicts with test runner\n- Environment variable requirements not met\n\n## Recommendations\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution** - Check test runner logs for specific error messages\n2. **Verify test file syntax** - Ensure no Python syntax errors in test_ide_integration.py\n3. **Check imports** - Validate all module imports and dependencies\n4. **Test isolation** - Run `test_ide_integration.py` independently to isolate the failure\n\n**FOLLOW-UP:**\n5. Add basic smoke test to verify test framework functionality\n6. Implement CI pipeline validation for test execution\n7. Add test environment setup verification\n\n## Risk Assessment\n**HIGH RISK** - Complete test failure means:\n- No confidence in code changes\n- Potential undetected regressions\n- Deployment blocking issue\n- Urgent attention required before any further development\n\n**Priority: Fix immediately** - This blocks all meaningful testing and quality assurance.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 325,
+      "total_tokens": 451,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

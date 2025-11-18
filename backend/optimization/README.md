@@ -1,0 +1,255 @@
+# Optimization Module
+
+Модули оптимизации параметров торговых стратегий (ТЗ раздел 3.5).
+
+---
+
+## 📦 Модули
+
+### ✅ GridOptimizer (ТЗ 3.5.1 - Базовый уровень)
+**Статус:** Реализован и протестирован
+
+**Функционал:**
+- Grid search оптимизация параметров (TP, SL, Trailing Stop)
+- Генерация всех комбинаций параметров (декартово произведение)
+- Запуск BacktestEngine для каждой комбинации
+- Ранжирование результатов по score function:
+  - Sharpe Ratio (по умолчанию)
+  - Profit Factor
+  - Custom formula: `(Return / DD) * Sharpe * sqrt(WinRate)`
+- Валидация результатов (min_trades, max_drawdown)
+- Экспорт топ-N результатов в CSV
+
+**Пример использования:**
+
+```python
+from backend.optimization import GridOptimizer, ParameterRange, OptimizationConfig
+from backend.core.backtest_engine import BacktestEngine
+import pandas as pd
+
+# Конфигурация параметров
+config = OptimizationConfig(
+    parameters=[
+        ParameterRange("tp_percent", start=2.0, stop=5.0, step=0.5),
+        ParameterRange("sl_percent", start=1.0, stop=2.0, step=0.25),
+        ParameterRange("trail_activation", start=1.5, stop=3.0, step=0.5),
+        ParameterRange("trail_distance", start=0.5, stop=1.5, step=0.25),
+    ],
+    base_strategy={
+        'name': 'EMA Crossover',
+        'entry': {
+            'type': 'ema_cross',
+            'fast_period': 12,
+            'slow_period': 26
+        },
+    },
+    score_function='sharpe',  # 'sharpe', 'profit_factor', 'custom'
+    min_trades=30,
+    max_drawdown_limit=0.20,  # 20% max
+    max_workers=4,
+    top_n_results=20
+)
+
+# Загрузка данных
+data = pd.read_csv('market_data.csv')
+
+# Engine
+engine = BacktestEngine(
+    initial_capital=10000.0,
+    commission=0.0006,
+    slippage_pct=0.05
+)
+
+# Оптимизация
+optimizer = GridOptimizer(engine, data, config)
+results = optimizer.optimize(parallel=True)
+
+# Экспорт результатов
+optimizer.export_results(results, 'optimization_results.csv', top_n=20)
+
+# Статистика
+summary = optimizer.get_summary(results)
+print(f"Best Sharpe: {summary['best_score']:.2f}")
+print(f"Best params: {summary['best_parameters']}")
+```
+
+**Тесты:** `tests/test_grid_optimizer.py`
+- ✅ 6/6 тестов пройдено
+- Покрытие: генерация grid, валидация, CSV export, summary stats
+
+---
+
+### ✅ WalkForwardOptimizer (ТЗ 3.5.2 - Продвинутый уровень)
+**Статус:** Реализован и протестирован
+
+**Функционал:**
+- Защита от overfitting через IS/OOS splitting
+- Два режима: Rolling Window и Anchored Window
+- Расширенные метрики:
+  - **Efficiency**: OOS/IS performance ratio
+  - **Degradation**: IS - OOS Sharpe (overfitting measure)
+  - **Robustness Score**: Weighted composite (0-100)
+  - **Consistency Score**: % profitable OOS periods
+  - **Parameter Stability**: Variance analysis across periods
+- Автоматические рекомендации на основе robustness score
+
+**Пример использования:**
+
+```python
+from backend.optimization import WalkForwardOptimizer, WFOConfig, WFOMode, ParameterRange
+
+# Конфигурация
+config = WFOConfig(
+    in_sample_size=252,      # 252 bars для IS
+    out_sample_size=63,      # 63 bars для OOS
+    step_size=63,            # Сдвиг на 63 bars
+    mode=WFOMode.ROLLING,    # или WFOMode.ANCHORED
+    min_trades=30,
+    max_drawdown=0.50,
+)
+
+# Параметры
+param_ranges = {
+    'tp_pct': ParameterRange(1.0, 3.0, 0.5),
+    'sl_pct': ParameterRange(0.5, 2.0, 0.5),
+}
+
+# Оптимизация
+wfo = WalkForwardOptimizer(config=config)
+results = wfo.optimize(
+    data=candles,
+    param_ranges=param_ranges,
+    strategy_config={'strategy_type': 'breakout'},
+    metric='sharpe_ratio',
+)
+
+# Результаты
+print(f"Robustness Score: {results['summary']['robustness_score']:.2f}")
+print(f"Efficiency: {results['aggregated_metrics']['avg_efficiency']:.3f}")
+print(f"Degradation: {results['aggregated_metrics']['avg_degradation']:.3f}")
+```
+
+**Документация:** `backend/optimization/README_WALK_FORWARD.md`  
+**Тесты:** `tests/test_walk_forward_optimizer.py`
+- ✅ 12/12 тестов пройдено
+- Покрытие: Rolling/Anchored modes, efficiency, degradation, robustness score, parameter stability
+
+---
+
+### ✅ MonteCarloSimulator (ТЗ 3.5.3 - Продвинутый уровень)
+**Статус:** Реализован и протестирован
+
+**Функционал:**
+- Bootstrap permutation (случайная перестановка сделок с возвратом)
+- Расчёт доверительных интервалов для доходности (95%, 90%, etc.)
+- Оценка вероятности прибыли (Probability of Profit)
+- Оценка риска разорения (Probability of Ruin)
+- Распределение Sharpe Ratio и Maximum Drawdown
+- Процентильный ранжинг оригинальной стратегии
+
+**Пример использования:**
+
+```python
+from backend.optimization import MonteCarloSimulator
+
+# Конфигурация
+mc = MonteCarloSimulator(
+    n_simulations=1000,      # Количество симуляций
+    ruin_threshold=20.0,     # Порог разорения 20% DD
+    random_seed=42,          # Для воспроизводимости
+)
+
+# Запуск симуляции
+result = mc.run(
+    trades=backtest_trades,  # Список сделок с 'pnl', 'pnl_pct'
+    initial_capital=10000,
+)
+
+# Анализ результатов
+print(f"Вероятность прибыли: {result.prob_profit:.1%}")
+print(f"Вероятность разорения: {result.prob_ruin:.1%}")
+print(f"95% CI: [{result.percentile_5:.2f}%, {result.percentile_95:.2f}%]")
+print(f"Средняя доходность: {result.mean_return:.2f}% ± {result.std_return:.2f}%")
+
+# Доверительный интервал
+ci_lower, ci_upper = mc.get_confidence_interval(result, confidence=0.95)
+print(f"95% доверительный интервал: [{ci_lower:.2f}%, {ci_upper:.2f}%]")
+
+# Риск просадки
+risk_30 = mc.get_risk_of_ruin(result, ruin_level=30.0)
+print(f"Риск просадки >= 30%: {risk_30:.1%}")
+
+# Генерация сводки
+summary = mc.generate_summary(result)
+print(summary['recommendation'])
+```
+
+**Тесты:** `tests/test_monte_carlo.py`
+- ✅ 19/19 тестов пройдено
+- Покрытие: инициализация, симуляция, метрики, вероятности, доверительные интервалы, edge cases
+
+---
+
+## 🔌 API Integration
+
+Модули оптимизации интегрированы через:
+- **FastAPI endpoints:** `backend/api/routers/optimizations.py`
+- **Celery tasks:** `backend/tasks/optimize_tasks.py`
+
+**API Endpoints:**
+
+```
+POST   /api/optimizations/{id}/run/grid          # Запуск grid search
+POST   /api/optimizations/{id}/run/walk-forward  # Запуск WFO
+POST   /api/optimizations/{id}/run/bayesian      # Запуск Bayesian optimization
+GET    /api/optimizations/{id}/results           # Получение результатов
+GET    /api/optimizations/{id}/best              # Лучший результат
+```
+
+---
+
+## 📊 Структура результатов
+
+### OptimizationResult
+
+```python
+{
+    "parameters": {"tp_percent": 3.5, "sl_percent": 1.5},
+    "metrics": {
+        "total_trades": 142,
+        "win_rate": 62.5,
+        "sharpe_ratio": 1.85,
+        "profit_factor": 2.15,
+        "max_drawdown": 0.12,
+        "total_return": 0.45
+    },
+    "score": 1.85,
+    "rank": 1,
+    "valid": true,
+    "validation_errors": []
+}
+```
+
+### CSV Export Format
+
+```csv
+tp_percent,sl_percent,metric_total_trades,metric_win_rate,metric_sharpe_ratio,rank,score
+3.5,1.5,142,62.5,1.85,1,1.8500
+3.0,1.5,138,60.1,1.72,2,1.7200
+...
+```
+
+---
+
+## 🎯 Следующие шаги
+
+1. ✅ **GridOptimizer** - DONE
+2. ✅ **WalkForwardOptimizer** - DONE
+3. ✅ **MonteCarloSimulator** - DONE
+4. ✅ **Frontend UI** - DONE (OptimizationsPage.tsx с heatmap)
+5. ✅ **Heatmap visualization** - DONE (Plotly интеграция)
+
+---
+
+**Документация обновлена:** 2025-01-26
+**Статус реализации ТЗ 3.5:** 100% (3/3 модулей) ✅

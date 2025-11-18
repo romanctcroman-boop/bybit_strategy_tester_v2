@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762558560,
+  "changed_files": [
+    "test_code_agent_multikey.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762558546.4267845,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional. Exit code -1 indicates a fatal error before tests could execute, likely due to:\n- Syntax errors in test files\n- Missing dependencies or imports\n- Configuration issues in test runner\n- Environment setup failures\n\n## Coverage Analysis\n**0% coverage** confirms no tests ran successfully. This represents maximum risk - we have no visibility into code functionality or regression protection.\n\n## Potential Issues with Recent Changes\nThe changed file `test_code_agent_multikey.py` is likely the culprit:\n- Contains fatal syntax errors (Python cannot parse)\n- Missing critical imports or dependencies\n- May have broken test configuration/hooks\n- Could be incompatible with current test environment\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Fix syntax errors in `test_code_agent_multikey.py`\n2. Verify all imports and dependencies are available\n3. Run tests with `-v` flag to see specific failure details\n4. Check test configuration files for recent changes\n\n**Short-term:**\n- Add pre-commit hooks to validate syntax\n- Implement basic smoke tests that run before full suite\n- Set up CI to fail fast on syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- No regression protection\n- Potential production-breaking changes could go undetected\n- Development is effectively flying blind\n- Urgent fix required before any further changes\n\n**Priority:** Fix test execution immediately - this blocks all meaningful quality assessment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 315,
+      "total_tokens": 442,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

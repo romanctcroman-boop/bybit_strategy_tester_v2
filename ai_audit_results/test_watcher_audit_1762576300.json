@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762576300,
+  "changed_files": [
+    "tests\\test_integration_full.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762576284.8815532,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). This indicates a fundamental environment or infrastructure problem rather than test logic issues. The test suite is non-functional.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed. This isn't a coverage gap but a complete execution failure. All production code remains untested.\n\n## Potential Issues with Recent Changes\n- **Integration test crash**: `tests\\test_integration_full.py` likely contains fatal errors\n- **Environment misconfiguration**: Missing dependencies, incorrect paths, or environment variables\n- **Syntax/runtime errors**: The test file itself may have fatal Python errors\n- **Resource issues**: Memory, file permissions, or database connectivity problems\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug the crash**: Run `python -m pytest tests/test_integration_full.py -v` to see the actual error\n2. **Check test isolation**: Verify the test doesn't have destructive operations or missing setup\n3. **Validate dependencies**: Ensure all required packages and services are available\n\n**STRUCTURAL FIXES:**\n4. **Add unit test layer**: Create fast, isolated unit tests to catch basic failures before integration\n5. **Implement test logging**: Add detailed logging to identify where the crash occurs\n6. **Set up CI validation**: Ensure tests pass before deployment\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functional tests exposes the system to:\n- Undetected production failures\n- Regression bugs\n- Integration issues with external systems\n- Complete system outages\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 352,
+      "total_tokens": 479,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

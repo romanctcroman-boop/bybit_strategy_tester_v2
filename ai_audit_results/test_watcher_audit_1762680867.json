@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762680867,
+  "changed_files": [
+    "run_full_project_audit.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762680851.640263,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run. This indicates either a fatal configuration error or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0.00% coverage** - Complete coverage failure. No code was executed during testing, suggesting:\n- Test runner configuration issues\n- Fatal import/initialization errors\n- Missing test dependencies\n- Broken test discovery\n\n## Potential Issues with Recent Changes\nThe single changed file `run_full_project_audit.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Runtime errors during module loading\n- Configuration that breaks test environment\n\n## Immediate Recommendations\n1. **Debug test execution failure:**\n   - Check for syntax errors in `run_full_project_audit.py`\n   - Verify all imports and dependencies are available\n   - Run tests with `-v` flag to see where execution fails\n\n2. **Fix basic test infrastructure:**\n   - Ensure test discovery works: `python -m pytest --collect-only`\n   - Verify Python path and module structure\n   - Check for circular imports or initialization issues\n\n3. **Validate the audit script independently:**\n   - Run `run_full_project_audit.py` directly to identify runtime errors\n   - Test imports: `python -c \"import run_full_project_audit\"`\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing capability\n- Potential deployment of broken code\n- Undetected regressions in production\n- Complete lack of quality assurance\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 355,
+      "total_tokens": 481,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

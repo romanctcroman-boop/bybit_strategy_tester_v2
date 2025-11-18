@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762615487,
+  "changed_files": [
+    "test_enhanced_cross_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762615471.5867028,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data generated implies tests never ran\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete testing blackout:\n- No files were executed or measured\n- All code paths untested\n- Impossible to assess actual coverage without test execution\n\n## Potential Issues with Recent Changes\n1. **test_enhanced_cross_agent.py modifications** likely introduced:\n   - Syntax errors preventing test discovery/import\n   - Import/dependency failures\n   - Configuration-breaking changes\n   - Infinite loops or resource exhaustion\n\n2. **Infrastructure breakdown**:\n   - Test runner configuration corrupted\n   - Path/resource resolution failures\n   - Environment compatibility issues\n\n## Immediate Recommendations\n1. **Debug test execution**:\n   ```bash\n   python -m pytest test_enhanced_cross_agent.py -v\n   ```\n2. **Check for syntax errors**:\n   ```bash\n   python -m py_compile test_enhanced_cross_agent.py\n   ```\n3. **Verify imports**:\n   ```bash\n   python -c \"import test_enhanced_cross_agent\"\n   ```\n4. **Rollback recent changes** to test_enhanced_cross_agent.py and verify baseline functionality\n\n## Risk Assessment\n**HIGH RISK** - Production readiness compromised:\n- No safety net for code changes\n- Undetected regressions certain\n- Deployment would be blind\n- Requires immediate resolution before any further development\n\n**Priority: CRITICAL** - Fix test execution before addressing coverage or test quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 370,
+      "total_tokens": 498,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

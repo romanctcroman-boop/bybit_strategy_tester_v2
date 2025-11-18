@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762685261,
+  "changed_files": [
+    "run_full_project_audit.py",
+    "tests\\test_backtest_task_errors.py",
+    "tests\\test_stale_idempotency.py",
+    "tests\\test_backtest_task.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762685245.0550542,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues in the test environment or codebase. Zero test coverage suggests tests aren't running at all.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code is being executed during testing\n- **No coverage data available** - Likely due to test execution failure before coverage collection\n- **Critical gap**: Entire codebase is untested in this run\n\n## Potential Issues with Recent Changes\n1. **run_full_project_audit.py** - May contain fatal errors preventing test execution\n2. **Test files modified** - Changes in test_backtest_task_errors.py, test_stale_idempotency.py, or test_backtest_task.py could be causing:\n   - Import errors\n   - Configuration issues\n   - Syntax errors\n   - Environment dependencies\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests individually to identify which specific test file is failing\n2. Check for syntax errors in modified test files\n3. Verify imports and dependencies in run_full_project_audit.py\n4. Run with `--tb=short` to get concise error traceback\n\n**FOLLOW-UP:**\n5. Fix the failing test before addressing coverage\n6. Add basic smoke tests to prevent complete test suite failure\n7. Implement CI pipeline that fails fast on critical errors\n\n## Risk Assessment\n**HIGH RISK** - No test validation means:\n- Production code changes are completely unverified\n- Potential for undetected regressions\n- Deployment carries significant business risk\n- Code quality cannot be measured or guaranteed\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 158,
+      "completion_tokens": 366,
+      "total_tokens": 524,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 94
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

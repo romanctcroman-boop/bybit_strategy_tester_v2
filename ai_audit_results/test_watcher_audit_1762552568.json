@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762552568,
+  "changed_files": [
+    "backend\\api\\parallel_deepseek_client_v2.py",
+    "test_improved_parallel_client.py",
+    "backend\\api\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762552546.9565837,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage confirms no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files show any coverage data\n- Either tests never ran or crashed immediately\n- All new code (parallel client, circuit breaker) completely untested\n\n## Potential Issues with Recent Changes\n1. **Import/Circular Dependency Issues** - New files may have broken imports\n2. **Initialization Failures** - Client or circuit breaker crashing on instantiation\n3. **Configuration Problems** - Missing environment variables or configs\n4. **Syntax Errors** - Python cannot parse the new code\n\n## Immediate Recommendations\n**Priority 1 - Fix Test Execution:**\n```bash\n# Run with verbose output to see crash details\npython -m pytest -v --tb=short\n# Check for syntax errors\npython -m py_compile backend/api/parallel_deepseek_client_v2.py\n```\n\n**Priority 2 - Add Basic Smoke Tests:**\n- Create minimal test that imports and instantiates each new class\n- Add try/catch blocks in test setup to capture initialization errors\n\n**Priority 3 - Isolate New Components:**\n- Test parallel client and circuit breaker independently\n- Mock external dependencies to isolate failures\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production deployment would likely fail\n- No validation of new parallel processing logic\n- Circuit breaker pattern completely untested\n- Potential for silent failures in production\n\n**Immediate Action Required:** Fix test infrastructure before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 151,
+      "completion_tokens": 363,
+      "total_tokens": 514,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 87
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

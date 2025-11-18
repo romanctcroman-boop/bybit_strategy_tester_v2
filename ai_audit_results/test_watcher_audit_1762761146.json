@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762761146,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\unit\\test_batch_writer.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\backend\\conftest.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\test_mtf_engine.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762761123.2204754,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- 0% coverage suggests tests aren't even executing properly\n- Multiple test files modified simultaneously increases risk surface\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- No coverage data available - tests aren't running to completion\n- Likely failing during test discovery or setup phase\n- Critical gap: Entire codebase is effectively untested\n\n## Potential Issues with Recent Changes\n**HIGH-RISK CHANGES IDENTIFIED:**\n1. **MTF Engine modifications** (`mtf_engine.py`) - Core trading component\n2. **Database query optimization tests** - Data integrity risks\n3. **Integration tests** (`test_sandbox_integration.py`) - Environment dependencies\n4. **Multiple test configuration changes** (`conftest.py`) - Setup/teardown broken\n\n## Immediate Action Recommendations\n1. **ISOLATE FAILURE:**\n   - Run tests individually: `pytest tests/test_sandbox_integration.py -v`\n   - Check test discovery: `pytest --collect-only`\n   - Verify dependencies and test environment\n\n2. **PRIORITY FIXES:**\n   - Roll back `tests/backend/conftest.py` changes first\n   - Validate MTF engine API compatibility\n   - Check database connection strings in test config\n\n3. **VALIDATION STEPS:**\n   - Run core unit tests before integration tests\n   - Verify all fixtures are properly scoped\n   - Check for circular imports in test modules\n\n## Risk Assessment\n**SEVERITY: HIGH**\n- **Business Risk**: Trading engine potentially unstable\n- **QA Risk**: No reliable test feedback loop\n- **Deployment Risk**: Cannot safely release changes\n\n**IMMEDIATE ACTION**: Block all deployments until test suite is restored and shows >80% coverage. Focus on fixing test infrastructure before addressing feature changes.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 428,
+      "total_tokens": 634,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 142
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

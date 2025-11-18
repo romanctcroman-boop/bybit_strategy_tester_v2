@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762543752,
+  "changed_files": [
+    "backend\\health_checks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543731.1059027,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality assessment possible as tests didn't run to completion. This indicates either severe test infrastructure issues or catastrophic code errors.\n\n## Coverage Analysis\n**0.00% COVERAGE** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `backend\\health_checks.py`. Likely issues:\n- **Syntax errors** preventing import/execution\n- **Import circular dependencies** causing import failures\n- **Missing dependencies** or broken imports\n- **Runtime errors** during module initialization\n- **Test configuration issues** related to the changed file\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution** - Run tests with verbose output to identify the root cause\n2. **Check syntax** - Validate `health_checks.py` for Python syntax errors\n3. **Verify imports** - Ensure all imports in the changed file are valid and available\n4. **Run isolated test** - Test the health_checks module independently\n\n**FOLLOW-UP:**\n5. Add basic smoke tests to prevent complete test suite collapse\n6. Implement pre-commit hooks for syntax validation\n\n## Risk Assessment\n**HIGH RISK** - The codebase is currently untested and potentially broken. Deployment would be extremely risky. The health checks component is often critical for monitoring system availability, making this particularly concerning for production reliability.\n\n**Priority: Fix immediately before any further development or deployment.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 335,
+      "total_tokens": 460,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

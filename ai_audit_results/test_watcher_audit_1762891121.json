@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762891121,
+  "changed_files": [
+    "mcp-server\\test_modular_architecture.py",
+    "mcp-server\\test_functional.py",
+    "mcp-server\\test_deepseek_perfect_10.py",
+    "mcp-server\\test_deepseek_code_review.py",
+    "mcp-server\\test_observability.py",
+    "mcp-server\\test_deepseek_quick_win5.py",
+    "mcp-server\\test_deepseek_verify_fixes.py",
+    "mcp-server\\test_deepseek_api.py",
+    "mcp-server\\test_enhanced_router.py",
+    "mcp-server\\test_perplexity.py",
+    "mcp-server\\test_config.py",
+    "mcp-server\\test_multi_agent.py",
+    "mcp-server\\test_protocol.py",
+    "mcp-server\\test_providers.py",
+    "mcp-server\\test_guide.py",
+    "mcp-server\\test_deepseek_final_score.py",
+    "mcp-server\\test_main_integration.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762891101.6277957,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - All tests are failing (Exit Code -1) with 0% coverage indicates severe system-wide issues. This suggests either:\n\n- **Test infrastructure failure** (imports, dependencies, environment)\n- **Fundamental architectural break** (core modules not loading)\n- **Configuration/initialization errors** preventing test execution\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files means:\n- No code is being executed during tests\n- No meaningful quality metrics can be collected\n- All production code is effectively untested\n\n## Potential Issues with Recent Changes\nBased on the test file names, likely issues:\n1. **DeepSeek integration changes** broke core functionality\n2. **Multi-agent system** modifications causing initialization failures\n3. **Protocol/providers** changes affecting base classes\n4. **Configuration system** updates preventing proper setup\n\n## Recommendations for Improvement\n\n### IMMEDIATE ACTIONS (Next 2 hours):\n1. **Run tests individually** to identify the first failure point\n2. **Check test infrastructure**: \n   - `pytest.ini`/`conftest.py` configuration\n   - Import statements in test files\n   - Dependency versions and compatibility\n\n3. **Validate core modules**:\n   - Ensure `mcp-server` package structure is intact\n   - Verify all required modules can be imported\n   - Check for circular imports\n\n### SHORT-TERM (Next day):\n1. **Fix basic test execution** before addressing coverage\n2. **Add smoke tests** that validate basic system functionality\n3. **Implement test isolation** to prevent cascade failures\n\n### MEDIUM-TERM (Next week):\n1. **Add integration test monitoring** to catch breaks earlier\n2. **Improve test diagnostics** with better error reporting\n3. **Establish coverage baseline** once tests are running\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Production instability likely** - if tests can't run, production may be broken\n- **Undetected regressions** - no safety net for changes\n- **Development blocked** - cannot validate any modifications\n\n**Priority**: Fix test execution immediately before any further development. The 0% coverage suggests fundamental system issues that could affect production deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 325,
+      "completion_tokens": 486,
+      "total_tokens": 811,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 261
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762616330,
+  "changed_files": [
+    "test_enhanced_cross_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762616315.8780887,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero validation of code behavior. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% coverage** indicates:\n- No tests executed successfully\n- Potentially missing test configuration or dependencies\n- Possible syntax errors preventing test discovery\n- Test runner configuration issues\n\n## Potential Issues with Recent Changes\nThe single changed file `test_enhanced_cross_agent.py` likely contains:\n- Syntax errors preventing import/execution\n- Missing dependencies or imports\n- Configuration errors in test setup/teardown\n- Infinite loops or fatal exceptions\n- Incompatible test runner configuration\n\n## Recommendations for Improvement\n**Immediate Actions (Next 2 hours):**\n1. Run `python -m pytest test_enhanced_cross_agent.py -v` to get detailed error output\n2. Check for syntax errors: `python -m py_compile test_enhanced_cross_agent.py`\n3. Verify test dependencies and imports\n4. Examine test configuration and fixtures\n\n**Short-term (Next day):**\n1. Implement basic smoke test to validate test infrastructure\n2. Add test discovery verification to CI pipeline\n3. Create minimal working test case to establish baseline\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- **Deployment Risk**: Critical - No code validation\n- **Regression Risk**: Critical - Undetected breaks likely\n- **Quality Risk**: Critical - Zero confidence in changes\n\n**Priority**: Resolve test execution failure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 343,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

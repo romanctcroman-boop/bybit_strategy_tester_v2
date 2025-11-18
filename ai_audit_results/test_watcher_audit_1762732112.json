@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762732112,
+  "changed_files": [
+    "test_configurable_jitter.py",
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762732087.322904,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental setup/import issues\n- No coverage data collected\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- 0% coverage across all files\n- No tests executed successfully\n- Unable to assess actual code coverage gaps\n\n## Potential Issues with Recent Changes\n1. **Import/Dependency Issues** - Changes in `reliability\\deepseek_client.py` likely broke imports in `test_configurable_jitter.py`\n2. **Configuration/Setup Failure** - Test runner cannot initialize\n3. **Syntax Errors** - Recent changes may contain Python syntax errors\n4. **Missing Dependencies** - New imports without corresponding requirements\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run tests with `-v` flag to see specific failure details\n2. Check Python syntax: `python -m py_compile reliability/deepseek_client.py`\n3. Verify imports work in isolation\n4. Add try/except blocks around test setup to capture errors\n\n**STRUCTURAL FIXES:**\n1. Implement basic smoke test to verify test infrastructure\n2. Add import validation at module level\n3. Consider breaking changes into smaller, testable commits\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Production code may be broken\n- No safety net for regression\n- Potential deployment blockers\n- Urgent attention required before any further changes\n\n**Priority:** Fix test execution immediately before addressing coverage or adding features.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 133,
+      "completion_tokens": 346,
+      "total_tokens": 479,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 69
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

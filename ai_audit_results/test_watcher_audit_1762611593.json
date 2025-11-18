@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762611593,
+  "changed_files": [
+    "test_perplexity_exponential_backoff.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762611576.8008902,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in test infrastructure or codebase.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Test runner failed before collecting any metrics\n- **Critical gap**: Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **test_perplexity_exponential_backoff.py** likely contains syntax errors, import failures, or runtime exceptions\n2. Possible issues:\n   - Missing dependencies or imports\n   - Syntax errors in test code\n   - Configuration issues in test runner\n   - Fixture/setup failures preventing test execution\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest test_perplexity_exponential_backoff.py -v` to see specific error details\n2. Check for syntax errors: `python -m py_compile test_perplexity_exponential_backoff.py`\n3. Verify imports and dependencies are available\n\n**Follow-up:**\n4. Add basic smoke test to validate test environment\n5. Implement CI pipeline with linting and syntax checking\n6. Ensure test isolation and proper error handling\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback\n- Potential for undetected regressions\n- Development blocked until resolved\n- Critical need to restore basic test functionality before any feature work\n\n**Priority**: Fix test execution immediately before proceeding with any other development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 335,
+      "total_tokens": 463,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

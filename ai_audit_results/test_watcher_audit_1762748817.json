@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762748817,
+  "changed_files": [
+    "tests\\test_perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762748803.5788875,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with zero coverage. This indicates fundamental issues preventing any meaningful test execution.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during testing\n- **Missing Coverage: 100%** - All code paths remain untested\n- **Root Cause**: Likely fatal error during test setup/import preventing any test execution\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `test_perplexity_client.py` or dependencies\n2. **Missing Dependencies** - Required packages not installed\n3. **Configuration Issues** - Test runner setup problems\n4. **Environment Issues** - Python version conflicts or path problems\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest tests/test_perplexity_client.py -v` to see specific error details\n2. Check for syntax errors in the test file\n3. Verify all imports (`from perplexity_client import ...`) are correct\n4. Ensure test dependencies are installed\n\n**Follow-up:**\n5. Fix the fatal error first, then assess actual test coverage\n6. Add basic smoke tests to prevent complete test suite failure\n7. Implement CI pipeline that fails fast on import/syntax errors\n\n## Risk Assessment\n**HIGH RISK** - No test validation is occurring. Any bugs in production code would go undetected. Code changes are essentially untested, posing significant deployment risks.\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 330,
+      "total_tokens": 457,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

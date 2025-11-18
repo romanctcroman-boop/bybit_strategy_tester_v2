@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762541959,
+  "changed_files": [
+    "automation\\metrics\\__init__.py",
+    "automation\\metrics\\prometheus_exporter.py",
+    "automation\\metrics\\custom_metrics.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762541943.123149,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental setup/configuration issues\n- No coverage data means tests didn't even start running\n\n## Coverage Analysis & Gaps\n**NO COVERAGE** - All metrics show 0%:\n- No files were executed during test run\n- Either test discovery failed or execution crashed immediately\n- Missing baseline coverage for core metrics automation code\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` modified - virtual environment likely compromised\n2. **Missing Dependencies**: `temp_pg_test.py` suggests ad-hoc PostgreSQL testing without proper test infrastructure\n3. **Import/Initialization Failures**: `__init__.py` changes may have broken module loading\n4. **Configuration Issues**: Prometheus exporter may require external dependencies not available in test environment\n\n## Immediate Recommendations\n1. **Restore Clean Environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Fix Test Discovery**:\n   - Verify `pytest.ini`/`setup.cfg` configuration\n   - Check test file naming conventions (`test_*.py`)\n   - Run `pytest --collect-only` to debug discovery\n\n3. **Isolate Database Dependencies**:\n   - Mock PostgreSQL connections in `temp_pg_test.py`\n   - Use test containers or in-memory databases for isolation\n\n4. **Add Basic Smoke Test**:\n   ```python\n   def test_imports():\n       from automation.metrics import prometheus_exporter, custom_metrics\n       assert True\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- ❌ No confidence in metrics functionality\n- ❌ Potential production crashes from untested changes\n- ❌ Broken monitoring infrastructure risk\n- ❌ Database dependency failures in production\n\n**Priority**: Fix test environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 177,
+      "completion_tokens": 455,
+      "total_tokens": 632,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 113
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

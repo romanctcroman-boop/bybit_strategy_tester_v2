@@ -1,0 +1,61 @@
+{
+  "timestamp": 1762543805,
+  "changed_files": [
+    "backend\\core\\redis_streams_queue.py",
+    "backend\\api\\routers\\reasoning.py",
+    "backend\\security\\secure_logger.py",
+    "backend\\models\\__init__.py",
+    "backend\\scaling\\health_checks.py",
+    "backend\\scaling\\load_balancer.py",
+    "backend\\scaling\\redis_consumer_groups.py",
+    "backend\\services\\slack_service.py",
+    "backend\\services\\sandbox_executor.py",
+    "backend\\services\\tournament_storage.py",
+    "backend\\sandbox\\docker_sandbox.py",
+    "backend\\services\\reasoning_storage.py",
+    "backend\\app.py",
+    "backend\\services\\pagerduty_service.py",
+    "backend\\api\\routers\\live.py",
+    "backend\\security\\audit_logger.py",
+    "backend\\scaling\\dynamic_worker_scaling.py",
+    "backend\\database\\models\\tournament.py",
+    "backend\\tasks\\backfill_tasks.py",
+    "backend\\settings.py",
+    "backend\\api\\routers\\health.py",
+    "backend\\core\\logging_config.py",
+    "tests\\integration\\test_sandbox_executor.py",
+    "backend\\api\\routers\\admin.py",
+    "backend\\security\\jwt_manager.py",
+    "backend\\services\\data_service.py",
+    "backend\\database\\models\\reasoning_trace.py",
+    "backend\\database\\__init__.py",
+    "backend\\security\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543785.3628755,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/import)\n- 0% coverage confirms no tests executed successfully\n- This represents a complete testing breakdown\n\n## Coverage Analysis & Gaps\n**Total System Failure** - No coverage data available:\n- Coverage reporting system failed to collect any metrics\n- All 30+ modified files show 0% coverage\n- This suggests either test runner crashed before execution or severe import/dependency issues\n\n## Potential Issues with Recent Changes\n**High-Impact Problems Detected:**\n\n1. **Critical Import/Dependency Issue**\n   - Likely circular imports or missing dependencies in `backend/__init__.py` structure\n   - Security modules (`jwt_manager`, `secure_logger`) may have breaking changes\n\n2. **Infrastructure Configuration Failure**\n   - Redis-related changes (`redis_streams_queue.py`, `redis_consumer_groups.py`) may have broken test environment\n   - Database model changes (`tournament.py`, `reasoning_trace.py`) could cause ORM initialization failures\n\n3. **Service Integration Breakdown**\n   - Multiple service files modified simultaneously suggests widespread API changes\n   - Sandbox execution system (`docker_sandbox.py`, `sandbox_executor.py`) likely causing test environment crashes\n\n## Immediate Action Recommendations\n\n**TODAY:**\n1. **Fix Test Runner Crash**\n   ```bash\n   # Isolate the failure point\n   python -m pytest tests/ --tb=short -v\n   python -c \"import backend.app\"  # Check basic imports\n   ```\n\n2. **Check Critical Dependencies**\n   - Verify Redis connection in test environment\n   - Confirm database migrations are applied\n   - Validate Docker sandbox availability\n\n3. **Rollback Strategy**\n   - Revert security and core infrastructure changes first\n   - Test in isolation: `backend/security/` then `backend/scaling/`\n\n**THIS WEEK:**\n1. Add test environment health checks\n2. Implement staged deployment with smoke tests\n3. Add integration test for service initialization\n\n## Risk Assessment\n**SEVERE RISK** - Deployment would be catastrophic:\n- **Availability Risk**: High - Core services may not start\n- **Security Risk**: Medium - Authentication/audit changes untested  \n- **Data Integrity Risk**: High - Database model changes unvalidated\n\n**Priority**: Fix test execution immediately before any deployment consideration. Current state represents complete testing failure.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 429,
+      "completion_tokens": 523,
+      "total_tokens": 952,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 365
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

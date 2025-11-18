@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762721013,
+  "changed_files": [
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762720988.4421868,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution means no reliability data\n- Complete testing black hole - cannot assess any functional behavior\n\n## Potential Issues with Recent Changes\nThe `deepseek_client.py` modification likely introduced:\n- **Fatal runtime error** preventing test framework initialization\n- **Import/circular dependency** breaking test discovery\n- **Environment configuration** issues (missing dependencies, path problems)\n- **Syntax errors** or incompatible Python version requirements\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution** - Run tests manually to identify the crash source\n2. **Check imports** in `deepseek_client.py` for circular dependencies\n3. **Validate environment** - Ensure all dependencies are installed and compatible\n4. **Add basic smoke test** to verify module can be imported without crashing\n\n**Short-term:**\n5. Implement exception handling around module imports in test setup\n6. Add logging to capture initialization failures\n7. Create minimal test that imports `deepseek_client` to validate basic functionality\n\n## Risk Assessment\n**HIGH RISK** - Deploying untested code poses severe reliability threats:\n- Production failures likely\n- No regression protection\n- Client functionality completely unverified\n- Potential data loss or service disruption\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 327,
+      "total_tokens": 452,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

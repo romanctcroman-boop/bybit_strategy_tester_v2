@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762639646,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "mcp-server\\server.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762639633.7359464,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Test environment setup failure\n- Critical runtime error preventing test execution\n- Missing test dependencies or configuration\n\n## Coverage Analysis\n**NO COVERAGE DATA** - 0% across all files suggests tests never executed successfully. This is a severe quality gap requiring immediate attention.\n\n## Potential Issues with Recent Changes\n1. **Psycopg2 dependency** - `.venv` modification suggests PostgreSQL database connectivity changes\n2. **Server modifications** - `mcp-server/server.py` changes may have introduced breaking changes\n3. **New test file** - `temp_pg_test.py` appears to be a new test, possibly with configuration issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Check database connectivity and PostgreSQL service status\n2. Verify psycopg2 installation and connection strings in `temp_pg_test.py`\n3. Run tests with `-v` flag to see specific failure points\n4. Ensure test database is properly seeded/migrated\n\n**STRUCTURAL FIXES:**\n1. Add proper error handling in test setup/teardown\n2. Implement database connection validation before test execution\n3. Create isolated test database to avoid production interference\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No test validation of recent changes\n- Potential database connectivity issues\n- Risk of undetected regressions in production\n- Critical path failures in application startup\n\n**Priority:** Fix test execution immediately before any further deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 154,
+      "completion_tokens": 339,
+      "total_tokens": 493,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 26
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

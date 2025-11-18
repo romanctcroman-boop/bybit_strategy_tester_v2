@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762631352,
+  "changed_files": [
+    "mcp-server\\di_container.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762631340.6618068,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis & Gaps\n**0% coverage** - All files show 0% coverage because no tests executed. This represents maximum coverage gap - we have no visibility into code quality or functionality.\n\n## Potential Issues with Recent Changes\nThe failure likely stems from `di_container.py` changes:\n- **Dependency injection container broken** - Likely causing import/circular dependency issues\n- **Service initialization failures** - Container unable to instantiate required services\n- **Configuration/registration errors** - Missing or misconfigured service bindings\n\n## Recommendations for Improvement\n1. **Immediate Priority**: Fix DI container to enable test execution\n   - Check for circular imports in `di_container.py`\n   - Verify all service registrations are valid\n   - Ensure no missing dependencies\n\n2. **Test Infrastructure**:\n   - Add basic smoke test to verify DI container builds successfully\n   - Implement container validation in test setup\n\n3. **Progressive Recovery**:\n   - Fix container → Run unit tests → Measure actual coverage → Address gaps\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail completely. Without working tests, we cannot validate:\n- Basic functionality\n- Integration points\n- Error handling\n- Any recent feature changes\n\n**Priority**: Fix DI container immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 311,
+      "total_tokens": 437,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

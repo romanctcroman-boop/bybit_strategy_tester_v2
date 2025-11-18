@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762687857,
+  "changed_files": [
+    "backend\\core\\engine_adapter.py",
+    "backend\\tasks\\backtest_tasks.py",
+    "backend\\services\\data_service.py",
+    "backend\\tasks\\optimize_tasks.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762687841.7720778,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "Based on the test results, here are the key insights:\n\n## 1. Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests, suggesting fundamental infrastructure or configuration issues.\n\n## 2. Coverage Analysis\n**0% coverage across all files** - No tests executed successfully. This represents maximum risk for the changed files.\n\n## 3. Potential Issues with Recent Changes\n- **Configuration break**: Recent changes likely broke test configuration or dependencies\n- **Import/circular dependency issues**: Common cause of test runner crashes\n- **Missing test dependencies**: New imports in changed files may lack required packages\n- **Environment setup failure**: Virtual environment or path configuration issues\n\n## 4. Immediate Recommendations\n1. **Fix test runner first**:\n   - Check pytest/unitest configuration files\n   - Verify all dependencies are installed (`pip list`)\n   - Run with `-v` flag to see specific crash reason\n\n2. **Validate imports**:\n   - Check for circular imports in changed files\n   - Verify all imported modules exist and are accessible\n\n3. **Test incrementally**:\n   - Run tests on individual changed files to isolate the breaking change\n   - Start with basic syntax checks (`python -m py_compile file.py`)\n\n## 5. Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- No validation of core engine, data service, or task functionality\n- Potential for runtime errors in production\n- Could break existing features without detection\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 158,
+      "completion_tokens": 340,
+      "total_tokens": 498,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 94
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762643840,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\server.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "mcp-server\\server.py",
+    "temp_pg_test.py",
+    "test_backtest_engine_real.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762643822.0641747,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental runtime issues\n\n## Coverage Analysis & Gaps\n**Total system failure** - No meaningful coverage data exists:\n- Zero files show any coverage metrics\n- Either test framework crashed immediately or tests are completely misconfigured\n- No baseline for comparison or gap identification\n\n## Potential Issues with Recent Changes\n**High-risk modifications detected:**\n1. **Modified virtual environment packages** (.venv files) - Never modify installed packages directly\n2. **Database driver changes** (psycopg2) - Could cause segmentation faults\n3. **Server code modifications** - FastMCP server changes may introduce fatal errors\n4. **Test file changes** - `temp_pg_test.py` suggests temporary/testing database code\n\n## Immediate Action Recommendations\n1. **ROLLBACK** all .venv modifications immediately - reinstall clean dependencies\n2. **Isolate the crash**:\n   ```bash\n   python -c \"import psycopg2\"  # Test database driver\n   python -c \"from mcp_server import server\"  # Test server imports\n   ```\n3. **Run tests individually** to identify crashing component:\n   ```bash\n   python -m pytest test_backtest_engine_real.py -v --tb=short\n   ```\n4. **Restore clean environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n## Risk Assessment\n**HIGH RISK** - Production readiness compromised:\n- **Critical**: System crashes indicate memory corruption or fatal dependency issues\n- **High**: Modified core dependencies (.venv) creates unreproducible environment\n- **Medium**: No test coverage means undetected regressions likely exist\n\n**Priority**: Fix environment and crash issues before any feature development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 183,
+      "completion_tokens": 430,
+      "total_tokens": 613,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 119
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

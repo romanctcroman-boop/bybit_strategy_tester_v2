@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762755211,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "reliability\\retry_policy.py",
+    "test_configurable_jitter.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762755191.3900998,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated implies fundamental runtime issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- Zero coverage across all files indicates tests didn't run\n- No execution data available for analysis\n- Critical gap: entire test suite is non-operational\n\n## Potential Issues with Recent Changes\n1. **Virtual environment corruption** - `.venv` modifications suggest dependency issues\n2. **Database connectivity failure** - `psycopg2` and `temp_pg_test.py` changes indicate PostgreSQL connection problems\n3. **Retry policy breaking changes** - `retry_policy.py` modifications may have introduced fatal errors\n4. **Test configuration errors** - `test_configurable_jitter.py` likely has setup/teardown issues\n\n## Immediate Action Recommendations\n1. **Debug test execution:**\n   - Run tests with `-v` flag to see which test fails first\n   - Check for uncaught exceptions in test setup\n   - Verify database connectivity and credentials\n\n2. **Isolate the failure:**\n   - Run tests individually to identify the breaking test\n   - Test database connection separately\n   - Check retry policy logic in isolation\n\n3. **Fix dependencies:**\n   - Recreate virtual environment\n   - Verify psycopg2 installation and compatibility\n   - Ensure all test dependencies are properly installed\n\n## Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- ❌ No test validation of recent changes\n- ❌ Database integration completely untested\n- ❌ Retry logic modifications unverified\n- ❌ Zero confidence in system reliability\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 163,
+      "completion_tokens": 395,
+      "total_tokens": 558,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 99
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

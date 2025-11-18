@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762675312,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762675299.191345,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1). No tests ran successfully, indicating fundamental issues with the test infrastructure or environment setup.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed during testing. This represents a complete testing failure, not just low coverage.\n\n## Potential Issues with Recent Changes\n- **conftest.py modifications likely broke test infrastructure** - Changes to this pytest configuration file appear to have introduced fatal errors\n- **Possible issues**: Syntax errors, import failures, fixture conflicts, or environment dependencies\n- **Test discovery failure** - Pytest cannot locate or execute any tests\n\n## Recommendations for Improvement\n1. **Immediate**: Revert `tests\\backend\\conftest.py` changes and verify tests run\n2. **Debug**: Run `pytest -v tests/backend/ --tb=short` to identify specific failure points\n3. **Validate**: Check Python environment, dependencies, and pytest version compatibility\n4. **Isolate**: Test conftest changes in isolation before full test suite execution\n\n## Risk Assessment\n**HIGH RISK** - \n- No test validation of code changes\n- Potential for undetected regressions in production\n- Broken CI/CD pipeline\n- All code changes are effectively untested\n\n**Priority**: Fix immediately before any further deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 283,
+      "total_tokens": 410,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762721849,
+  "changed_files": [
+    "tests\\test_distributed_cache.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762721836.2398913,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax errors in test code\n- Import/dependency failures\n- Test framework configuration issues\n- Environment setup problems\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - 0% coverage across all files suggests:\n- No tests actually executed\n- Tests may be crashing before any coverage collection\n- Potential circular imports or module loading issues\n\n## Potential Issues with Recent Changes\nThe changed file `tests\\test_distributed_cache.py` likely contains:\n- Syntax errors (missing imports, typos)\n- Broken test fixtures or setup\n- Incompatible assertions or mocking\n- Environment-dependent code failing\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest tests/test_distributed_cache.py -v` to see specific error details\n2. Check for Python syntax: `python -m py_compile tests/test_distributed_cache.py`\n3. Verify imports and dependencies are available\n4. Examine test setup/teardown methods for errors\n\n**Follow-up:**\n- Add pre-commit hooks to catch syntax errors\n- Implement basic smoke tests that run before full test suite\n- Ensure test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback for recent changes\n- Potential production issues undetected\n- Broken CI/CD pipeline\n- Development blocking until resolved\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 332,
+      "total_tokens": 458,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

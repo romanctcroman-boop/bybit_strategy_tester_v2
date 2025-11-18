@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762582730,
+  "changed_files": [
+    "scripts\\test_tournament_fixed.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762582714.1000824,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No tests ran successfully, indicating either:\n- Syntax errors in test code\n- Import failures or module dependencies\n- Test framework configuration issues\n- Fatal errors during test setup\n\n## Coverage Analysis\n**0% COVERAGE** - No code coverage was collected because:\n- Tests never executed successfully\n- Coverage tool wasn't properly configured\n- Test runner crashed before coverage collection\n\n## Potential Issues with Recent Changes\nThe single changed file `scripts\\test_tournament_fixed.py` likely contains:\n- **Syntax errors** (missing imports, invalid Python)\n- **Configuration issues** with test runner (pytest/unittest)\n- **Dependency problems** (missing modules, version conflicts)\n- **Infinite loops** or **fatal exceptions** during test discovery\n\n## Immediate Recommendations\n\n1. **Debug Test Execution**\n   ```bash\n   python -m py_compile scripts/test_tournament_fixed.py  # Check syntax\n   python scripts/test_tournament_fixed.py  # Run directly to see errors\n   ```\n\n2. **Check Test Framework**\n   - Verify pytest/unittest installation\n   - Ensure proper test discovery patterns\n   - Check for missing `__init__.py` files in test directories\n\n3. **Validate Imports**\n   - Confirm all imported modules exist\n   - Check relative vs absolute imports in test file\n   - Verify PYTHONPATH includes necessary directories\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Production code changes are completely untested\n- Regression detection is impossible\n- Deployment carries significant failure risk\n- Code quality cannot be measured\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 369,
+      "total_tokens": 497,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "timestamp": 1762540325,
+  "changed_files": [
+    "test_2.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": 2,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762540311.612514,
+    "success": false
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code 2 indicates test execution failed before any tests could run\n- Zero test coverage suggests no code was executed\n- Likely configuration, import, or syntax errors preventing test execution\n\n## Coverage Analysis\n**NO COVERAGE** - 0.00% across all files:\n- Test framework unable to execute any code\n- No meaningful coverage data available\n- Critical failure in test infrastructure\n\n## Potential Issues with Recent Changes\n**test_2.py modifications likely caused failure:**\n- Syntax errors in test file\n- Missing imports or dependencies\n- Configuration changes breaking test discovery\n- Test framework compatibility issues\n\n## Immediate Recommendations\n1. **Fix test execution first:**\n   - Check `test_2.py` for syntax errors\n   - Verify imports and dependencies\n   - Run with `python -m pytest -v` for detailed error output\n\n2. **Debug test discovery:**\n   - Ensure test file follows naming conventions (`test_*.py`)\n   - Check pytest configuration files\n   - Verify Python path and module structure\n\n3. **Restore basic functionality:**\n   - Revert `test_2.py` changes if recently modified\n   - Add minimal passing test to verify framework works\n   - Run isolated: `python -m pytest test_2.py -v`\n\n## Risk Assessment\n**HIGH RISK** - Production deployment dangerous:\n- No test validation of code changes\n- Undetected regressions likely\n- Critical bugs could reach production\n- **Do not deploy** until test suite is functional\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 123,
+      "completion_tokens": 348,
+      "total_tokens": 471,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 59
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "C:\\Users\\roman\\AppData\\Local\\Temp\\tmptvl_okeo",
+    "debounce_seconds": 0.5
+  }
+}

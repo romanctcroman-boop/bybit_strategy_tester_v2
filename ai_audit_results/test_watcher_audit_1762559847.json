@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762559847,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\dotenv\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\main.py",
+    "ask_deepseek_chat_directly.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762559830.290406,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage confirms no tests executed successfully\n- Test framework likely crashed before any meaningful execution\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files were measured for coverage\n- All code paths untested\n- Unable to assess any functional coverage\n\n## Potential Issues with Recent Changes\n**HIGH RISK CHANGES DETECTED:**\n1. **Modified virtual environment packages** (.venv/dotenv files) - This is highly unusual and suggests:\n   - Manual editing of installed packages (should use requirements.txt instead)\n   - Potential environment corruption\n   - Version conflicts\n\n2. **ask_deepseek_chat_directly.py** - New/modified application code without corresponding tests\n\n## Immediate Recommendations\n\n**CRITICAL (Do First):**\n1. **Restore clean virtual environment:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Debug test crash:**\n   - Run tests with `python -m pytest -v` to see specific error\n   - Check for infinite loops, memory issues, or import conflicts\n\n**HIGH PRIORITY:**\n3. Create basic smoke test for `ask_deepseek_chat_directly.py`\n4. Never manually edit files in `.venv/` - use dependency management\n\n## Risk Assessment\n**SEVERE RISK** - Current state indicates:\n- **Environment instability** (corrupted venv)\n- **Zero test reliability** (cannot validate any functionality)\n- **High deployment risk** (untested code changes)\n\n**Immediate action required** - Fix environment and test infrastructure before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 165,
+      "completion_tokens": 401,
+      "total_tokens": 566,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 101
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

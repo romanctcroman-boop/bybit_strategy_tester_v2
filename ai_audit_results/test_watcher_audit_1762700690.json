@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762700690,
+  "changed_files": [
+    "backend\\core\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762700674.982795,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run to completion. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This represents a complete testing failure, not just poor coverage.\n\n## Potential Issues with Recent Changes\n1. **Circuit breaker implementation likely contains fatal errors** preventing test execution\n2. **Syntax errors** in `circuit_breaker.py` causing import failures\n3. **Missing dependencies** or **import cycles** introduced by the changes\n4. **Test infrastructure broken** by the circuit breaker implementation\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution first** - Run tests with `-v` flag to identify failure point\n2. **Check syntax** of `circuit_breaker.py` - validate Python syntax and imports\n3. **Verify imports** - ensure all dependencies are available in test environment\n4. **Test isolation** - run circuit breaker tests in isolation to identify specific failures\n\n**FOLLOW-UP:**\n5. Add basic unit tests for circuit breaker before complex integration tests\n6. Implement CI pipeline that fails fast on syntax/import issues\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- **Zero test validation** of critical circuit breaker functionality\n- **Unknown runtime behavior** - could cause production outages\n- **No regression protection** for existing functionality\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 343,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

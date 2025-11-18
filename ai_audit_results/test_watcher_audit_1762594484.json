@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762594484,
+  "changed_files": [
+    "automation\\deepseek_robot\\robot.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762594467.6877701,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either catastrophic test infrastructure issues or severe code defects preventing any tests from running.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Test runner failed before collecting any metrics\n- **Critical gap**: Unable to assess actual code coverage due to test execution failure\n\n## Potential Issues with Recent Changes\n1. **Syntax errors** in `robot.py` preventing import/execution\n2. **Missing dependencies** or import failures\n3. **Runtime errors** during test setup/initialization\n4. **Configuration issues** in test runner or environment\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution first** - Run tests locally to identify the root cause\n2. **Check `robot.py` for syntax errors** - Validate Python syntax and imports\n3. **Verify test dependencies** - Ensure all required packages are installed\n4. **Examine test configuration** - Review pytest/unittest configuration files\n\n**Follow-up:**\n5. Once tests execute, establish baseline coverage metrics\n6. Add unit tests for core functionality in `robot.py`\n7. Implement CI pipeline with proper error reporting\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Deployment risk**: Code changes cannot be validated\n- **Regression risk**: No safety net for future changes\n- **Quality risk**: Unknown if core functionality works\n- **Urgency**: Requires immediate attention before further development\n\n**Priority**: Fix test execution as blocking issue before any additional feature work.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 358,
+      "total_tokens": 486,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

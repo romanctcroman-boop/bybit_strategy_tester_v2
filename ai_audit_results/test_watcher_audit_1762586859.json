@@ -1,0 +1,49 @@
+{
+  "timestamp": 1762586859,
+  "changed_files": [
+    "tests\\unit\\test_drift_detector.py",
+    "tests\\unit\\test_lru_ttl_cache.py",
+    "backend\\ml\\optuna_optimizer.py",
+    "backend\\ml\\retrain_scheduler.py",
+    "mcp-server\\mcp_cache.py",
+    "backend\\ml\\market_regime_detector.py",
+    "tests\\unit\\test_retrain_scheduler.py",
+    "backend\\ml\\optimizer.py",
+    "tests\\unit\\test_structured_logger.py",
+    "backend\\security\\ast_validator.py",
+    "tests\\test_walk_forward.py",
+    "tests\\unit\\test_ast_validator.py",
+    "tests\\unit\\test_batch_writer.py",
+    ".venv\\Lib\\site-packages\\_pytest\\terminal.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "backend\\ml\\drift_detector.py",
+    "backend\\ml\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762586837.0834122,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception)\n- 0% coverage suggests tests aren't even executing\n- This represents a complete testing breakdown\n\n## Coverage Analysis & Gaps\n**ZERO COVERAGE** across all files indicates:\n- Test infrastructure failure\n- Possible environment/configuration issues\n- No code is being executed during test runs\n\n## Potential Issues with Recent Changes\n1. **Environment/Dependency Issues**:\n   - `.venv\\Lib\\site-packages\\_pytest\\terminal.py` modification suggests pytest installation corruption\n   - Virtual environment may be corrupted\n\n2. **Critical Code Changes**:\n   - Multiple ML components modified (`drift_detector.py`, `optimizer.py`, `retrain_scheduler.py`)\n   - Security component (`ast_validator.py`) changes could introduce runtime failures\n\n3. **Test Infrastructure**:\n   - Modified test files aren't executing\n   - Possible circular imports or initialization failures\n\n## Immediate Action Recommendations\n\n**URGENT (Next 30 minutes):**\n1. Check pytest installation: `pytest --version`\n2. Run single simple test: `pytest tests/unit/test_structured_logger.py -v`\n3. Verify Python path and imports\n\n**HIGH PRIORITY (Today):**\n1. Restore clean virtual environment\n2. Check for syntax errors in recently modified files\n3. Add `try/except` blocks around test initialization\n4. Run tests with `-x` flag to see where they fail\n\n**MEDIUM PRIORITY (This week):**\n1. Implement test logging to capture initialization failures\n2. Add basic smoke tests for core components\n3. Set up test environment validation script\n\n## Risk Assessment\n**SEVERE RISK** - Current state indicates:\n- No confidence in code changes\n- Potential production-breaking changes\n- Security risks from untested AST validator modifications\n- ML pipeline reliability completely unknown\n\n**Immediate mitigation**: Roll back recent changes until tests are functional, then reintroduce changes incrementally with proper testing.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 320,
+      "completion_tokens": 443,
+      "total_tokens": 763,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 256
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

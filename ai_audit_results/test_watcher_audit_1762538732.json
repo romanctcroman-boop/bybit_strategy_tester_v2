@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762538732,
+  "changed_files": [
+    "health_check.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538720.251265,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or system error). No tests executed successfully.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This represents complete test suite failure rather than coverage gaps.\n\n## Potential Issues with Recent Changes\n1. **health_check.py changes likely broke test infrastructure**\n2. Possible syntax errors preventing test discovery/execution\n3. Missing dependencies or imports in test configuration\n4. Test runner configuration issues\n\n## Immediate Recommendations\n1. **Fix test execution first** - Run tests with verbose output to identify root cause\n2. Check for syntax errors in health_check.py: `python -m py_compile health_check.py`\n3. Verify test runner configuration and dependencies\n4. Run minimal smoke test: `python -m pytest -v`\n5. Ensure test discovery is working: `python -m pytest --collect-only`\n\n## Risk Assessment\n**HIGH RISK** - No test feedback means:\n- Undetected regressions likely\n- Production deployment extremely risky\n- Code quality cannot be verified\n- All changes since last successful test run are unvalidated\n\n**ACTION:** Stop all development until test infrastructure is restored. Fix test execution before addressing coverage or test quality.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 122,
+      "completion_tokens": 276,
+      "total_tokens": 398,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 58
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

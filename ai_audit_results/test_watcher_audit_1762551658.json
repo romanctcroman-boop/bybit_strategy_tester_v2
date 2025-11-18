@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762551658,
+  "changed_files": [
+    "analyze_parallel_with_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762551641.4388368,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests aren't even starting execution\n- No files show any coverage data\n\n## Coverage Analysis & Gaps\n**Total system failure** - No coverage data exists because:\n- Tests crash before any code execution\n- Zero files processed for coverage analysis\n- Entire codebase is effectively untested\n\n## Potential Issues with Recent Changes\nThe file `analyze_parallel_with_deepseek.py` likely contains:\n- **Fatal syntax errors** preventing import/execution\n- **Circular imports** causing import-time crashes\n- **Memory-intensive operations** causing segmentation faults\n- **Missing dependencies** causing import failures\n- **Infinite recursion** or **stack overflows**\n\n## Recommendations for Improvement\n\n**IMMEDIATE ACTIONS:**\n1. **Run tests with verbose output** to see the actual error: `python -m pytest -v`\n2. **Check for syntax errors**: `python -m py_compile analyze_parallel_with_deepseek.py`\n3. **Test imports separately**: `python -c \"import analyze_parallel_with_deepseek\"`\n4. **Run with debugger** to catch fatal errors\n\n**STRUCTURAL FIXES:**\n1. **Add basic smoke test** that imports the module without executing complex logic\n2. **Isolate parallel processing** - test serial version first\n3. **Add error handling** around external API calls (DeepSeek)\n4. **Implement gradual test strategy** - unit → integration → system\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Production instability** - code may crash in runtime\n- **Zero test reliability** - cannot validate any functionality\n- **Critical path failure** - parallel analysis is likely a core feature\n- **Regression risk** - any changes could introduce new crashes\n\n**Priority:** Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 429,
+      "total_tokens": 556,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

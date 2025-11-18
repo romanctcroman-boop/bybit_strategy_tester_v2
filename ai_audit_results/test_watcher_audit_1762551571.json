@@ -1,0 +1,47 @@
+{
+  "timestamp": 1762551571,
+  "changed_files": [
+    "deepseek_perplexity_full_tz_audit.py",
+    "deepseek_security_audit_request.py",
+    "deepseek_weaknesses_analysis.py",
+    "deepseek_verify_fixes.py",
+    "ask_deepseek_api_keys_security.py",
+    "mcp-server\\deepseek_direct_call.py",
+    "deepseek_real_analysis.py",
+    "deepseek_final_assessment.py",
+    "deepseek_comprehensive_analysis.py",
+    "deepseek_self_diagnostic.py",
+    "deepseek_verify_complete.py",
+    "mcp-server\\auto_install_deepseek_results.py",
+    "tests\\monitoring\\test_health_endpoints.py",
+    "backend\\agents\\deepseek.py",
+    "mcp-server\\deepseek_code_agent.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762551543.757933,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test execution failure\n- 0% coverage suggests tests aren't running at all\n- No coverage data available for any file\n\n## Coverage Analysis & Gaps\n**Total Coverage: 0%** - All files show zero coverage, indicating:\n- Test infrastructure may be broken\n- Import/configuration issues preventing test execution\n- Possible circular dependencies in new DeepSeek modules\n\n## Potential Issues with Recent Changes\n1. **Multiple new DeepSeek modules** (12+ files) likely introduced:\n   - Circular imports between analysis/audit/verification modules\n   - Missing dependencies or environment configuration\n   - Breaking changes to test runner configuration\n\n2. **MCP server integration** files may have:\n   - Path resolution issues (`mcp-server\\` vs package structure)\n   - Missing MCP dependencies not installed in test environment\n\n## Immediate Recommendations\n1. **Fix Test Infrastructure First:**\n   ```bash\n   # Check test runner configuration\n   python -m pytest --collect-only\n   # Verify imports work\n   python -c \"import tests.monitoring.test_health_endpoints\"\n   ```\n\n2. **Isolate Breaking Changes:**\n   - Temporarily remove new DeepSeek modules from test scope\n   - Test core functionality first, then add modules incrementally\n\n3. **Add Basic Health Checks:**\n   - Create simple smoke tests for critical endpoints\n   - Verify module imports work independently\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely dangerous:\n- No validation of any functionality\n- Multiple new complex modules completely untested\n- Potential security issues in audit/analysis code unverified\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 277,
+      "completion_tokens": 376,
+      "total_tokens": 653,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 213
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

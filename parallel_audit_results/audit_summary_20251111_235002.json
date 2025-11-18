@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-11-11T23:50:02.349532",
+  "audit_summary": {
+    "total_files": 1234,
+    "background_analysis": 34,
+    "test_watcher": 1193,
+    "deepseek_audits": 3
+  },
+  "project_stats": {
+    "total_python": 22239,
+    "backend": 235,
+    "tests": 163
+  },
+  "tz_generated": true,
+  "tz_path": "D:\\bybit_strategy_tester_v2\\parallel_audit_results\\COMPREHENSIVE_TZ_20251111_235002.md"
+}

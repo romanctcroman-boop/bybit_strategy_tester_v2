@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762594999,
+  "changed_files": [
+    "automation\\deepseek_robot\\production_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762594982.1476457,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests aren't executing at all\n- No coverage data generated for any files\n\n## Coverage Analysis & Gaps\n**Total system failure** - No code is being tested:\n- Zero coverage across all files\n- Test execution is halting before any meaningful testing occurs\n- Missing: All functional testing, edge cases, and basic validation\n\n## Potential Issues with Recent Changes\nThe modified file `automation\\deepseek_robot\\production_test.py` likely contains:\n- Syntax errors preventing test discovery/execution\n- Import failures or missing dependencies\n- Infinite loops or fatal exceptions in test setup\n- Configuration errors in test runner\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test execution**: Run tests with `-v` flag to see where they fail\n2. **Check syntax**: Validate `production_test.py` for basic Python syntax\n3. **Verify imports**: Ensure all required modules are available\n4. **Add try-catch blocks**: Wrap test setup to prevent complete failure\n\n**Short-term:**\n- Implement basic smoke test to verify test infrastructure\n- Add test logging to capture failure points\n- Set up pre-commit hooks to catch syntax errors\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing pipeline\n- Potential for undetected production bugs\n- Development blocked until tests are functional\n- All code changes are effectively untested\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 343,
+      "total_tokens": 472,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762708408,
+  "changed_files": [
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762708381.720997,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0%** - No code is being tested\n- **No coverage data available** - Tests aren't even reaching the execution phase\n- **Complete testing gap** - Entire codebase is untested\n\n## Potential Issues with Recent Changes\nThe failure likely stems from `tests\\backend\\conftest.py` changes:\n- **Fixture/config errors** - Broken pytest configuration or fixtures\n- **Import/dependency issues** - Missing imports or circular dependencies\n- **Syntax errors** - Invalid Python syntax in conftest\n- **Environment setup failures** - Database connections, API clients, or test data setup failing\n\n## Recommendations for Improvement\n1. **Immediate: Debug conftest.py**\n   - Check for syntax errors: `python -m py_compile tests/backend/conftest.py`\n   - Run with verbose output: `pytest -v tests/backend/conftest.py`\n   - Isolate fixture issues by temporarily commenting out fixtures\n\n2. **Short-term: Restore basic functionality**\n   - Revert conftest.py changes if recently modified\n   - Add minimal working conftest configuration\n   - Verify pytest can discover and run at least one simple test\n\n3. **Medium-term: Prevent regression**\n   - Add conftest.py to pre-commit hooks for syntax validation\n   - Implement basic smoke test for test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- **No test feedback** - Code changes cannot be validated\n- **Deployment risk** - High probability of shipping broken code\n- **Development blocked** - Team cannot rely on CI/CD for quality checks\n\n**Priority:** Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 127,
+      "completion_tokens": 401,
+      "total_tokens": 528,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 63
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

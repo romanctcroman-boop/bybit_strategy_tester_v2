@@ -1,0 +1,34 @@
+{
+  "timestamp": 1762640939,
+  "changed_files": [
+    "backend\\migrations\\versions\\20251108_merge_triple_heads.py",
+    "backend\\migrations\\versions\\20251107_merge_all_heads.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762640926.0188584,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- Zero test execution suggests fundamental infrastructure issues\n- No coverage data collected indicates tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete testing blackout:\n- No files were executed during test run\n- All code paths untested\n- Impossible to assess actual code coverage\n\n## Potential Issues with Recent Changes\n**Migration files likely caused environment failure:**\n- Triple head merge (`20251108_merge_triple_heads.py`) suggests complex database schema conflicts\n- Multiple head merges indicate branching migration history\n- Possible database version mismatches or migration dependency issues\n\n## Immediate Recommendations\n1. **Fix Test Infrastructure First:**\n   - Check database connectivity and migration state\n   - Verify test environment setup scripts\n   - Run migrations manually to identify conflicts\n\n2. **Investigate Migration Chain:**\n   ```bash\n   flask db heads\n   flask db merge\n   flask db upgrade\n   ```\n\n3. **Add Pre-test Validation:**\n   - Implement migration state checks before test execution\n   - Add database connection health checks\n   - Create isolated test database for CI/CD\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- Zero test validation of recent database changes\n- Potential data integrity issues from migration conflicts\n- Complete unknown of system stability\n- **Recommendation: Block all deployments until tests pass**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 155,
+      "completion_tokens": 323,
+      "total_tokens": 478,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 91
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

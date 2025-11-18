@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762593976,
+  "changed_files": [
+    "automation\\deepseek_robot\\api_clients.py",
+    "automation\\deepseek_robot\\test_real_api.py",
+    "automation\\deepseek_robot\\advanced_architecture.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762593956.8599734,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or system error)\n- Zero test execution suggests fundamental infrastructure or import issues\n- No coverage data implies tests never reached execution phase\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- 0% coverage across all files indicates tests aren't running at all\n- No meaningful coverage data to analyze\n- Critical gap: Entire codebase is untested in this execution\n\n## Potential Issues with Recent Changes\nBased on changed files, likely culprits:\n1. **Import/Dependency Issues** - `api_clients.py` changes may have broken imports\n2. **Architecture Breakage** - `advanced_architecture.py` modifications could have disrupted test setup\n3. **Test Configuration** - `test_real_api.py` may contain fatal errors preventing test discovery/execution\n4. **Environment/Dependencies** - Missing packages or configuration in test environment\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug Test Execution:**\n   - Check Python path and import statements\n   - Verify all dependencies are installed\n   - Run with `-v` flag to see where execution fails\n\n2. **Fix Import Chain:**\n   - Test imports in isolation: `python -c \"from automation.deepseek_robot import api_clients\"`\n   - Ensure `__init__.py` files exist in package directories\n\n3. **Validate Test Configuration:**\n   - Check pytest/unittest configuration\n   - Verify test discovery patterns\n   - Ensure test files follow naming conventions (`test_*.py`)\n\n**FOLLOW-UP:**\n4. Add basic smoke test that runs before full test suite\n5. Implement CI pipeline that fails fast on import/configuration issues\n\n## Risk Assessment\n**HIGH RISK** - Deployment should be blocked:\n- **Critical**: No functional tests = unknown code quality\n- **High**: Recent architectural changes untested\n- **Medium**: API client modifications could break production integration\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 449,
+      "total_tokens": 605,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

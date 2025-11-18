@@ -1,0 +1,42 @@
+{
+  "timestamp": 1762638247,
+  "changed_files": [
+    "tests\\test_circuit_breaker.py",
+    "mcp-server\\rate_limiter.py",
+    "tests\\test_di_container.py",
+    "mcp-server\\interfaces.py",
+    "tests\\conftest.py",
+    "tests\\test_rate_limiter.py",
+    "automation\\task1_test_watcher\\test_watcher.py",
+    "automation\\metrics\\collectors\\test_watcher_collector.py",
+    "backend\\app.py",
+    "mcp-server\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762638231.3868952,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- 0% coverage suggests tests aren't executing properly\n- Recent changes to core components (circuit breaker, rate limiter, DI container) likely introduced breaking changes\n\n## Coverage Analysis & Gaps\n**NO MEANINGFUL DATA** - Coverage is 0.00% across all files, indicating:\n- Tests aren't reaching execution phase\n- Possible configuration issues in test setup\n- Critical failures in test infrastructure or dependencies\n\n## Potential Issues with Recent Changes\n1. **Circuit Breaker/Rate Limiter Changes** - Modified core infrastructure components that may have broken test dependencies\n2. **DI Container Changes** - Dependency injection issues preventing proper test initialization\n3. **Test Configuration** - `conftest.py` modifications may have broken test discovery/setup\n4. **Integration Conflicts** - Changes across multiple files creating circular dependencies or import errors\n\n## Immediate Action Recommendations\n1. **Debug Test Failure Root Cause**:\n   - Run tests with `-v` flag to see which test fails first\n   - Check for import errors in modified files\n   - Verify DI container can initialize all dependencies\n\n2. **Fix Core Infrastructure**:\n   - Test circuit breaker and rate limiter changes in isolation\n   - Ensure DI container resolves all dependencies correctly\n   - Verify test fixtures in `conftest.py` are functional\n\n3. **Restore Test Execution**:\n   - Fix the initial breaking test that prevents suite execution\n   - Validate test discovery and setup processes\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable test feedback for recent changes\n- Potential production issues if deployed\n- Broken development workflow\n- Multiple modified core components increase debugging complexity\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 224,
+      "completion_tokens": 398,
+      "total_tokens": 622,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 160
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

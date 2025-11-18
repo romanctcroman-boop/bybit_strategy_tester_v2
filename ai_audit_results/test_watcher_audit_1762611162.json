@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762611162,
+  "changed_files": [
+    "test_perplexity_multi_key.py",
+    "test_perplexity_multi_key_unit.py",
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762611137.3164573,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage suggests tests never executed properly\n- No coverage data available indicates fundamental infrastructure issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN:**\n- Zero coverage across all files\n- Test execution pipeline appears broken before any code runs\n- No meaningful coverage data to analyze\n\n## Potential Issues with Recent Changes\n1. **Infrastructure Failure**: Recent changes to test files or perplexity provider likely broke the test runner\n2. **Dependency Issues**: Missing imports, broken dependencies, or environment configuration\n3. **Critical Exceptions**: Unhandled errors in test setup or provider code preventing execution\n4. **Path/Import Problems**: `mcp-server\\api\\providers\\perplexity.py` path suggests potential module resolution issues\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug Test Runner**: Run tests with `-v` flag to see where they fail\n2. **Check Imports**: Verify all imports in changed files resolve correctly\n3. **Validate Environment**: Ensure test dependencies and Python path are configured properly\n4. **Isolate Failure**: Run each test file individually to identify the breaking change\n\n**FOLLOW-UP:**\n5. Add basic smoke tests to prevent complete test suite collapse\n6. Implement CI pipeline that fails fast on infrastructure issues\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback\n- Potential production issues undetectable\n- Development blocked until resolved\n- Recent changes may have introduced critical bugs\n\n**Priority: CRITICAL** - Fix test infrastructure immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 153,
+      "completion_tokens": 376,
+      "total_tokens": 529,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 25
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

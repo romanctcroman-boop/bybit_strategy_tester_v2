@@ -1,0 +1,43 @@
+{
+  "timestamp": 1762779694,
+  "changed_files": [
+    "reliability\\perplexity_client.py",
+    "tests\\test_edge_cases_stress.py",
+    "tests\\test_perplexity_client.py",
+    "reliability\\deepseek_client.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_deepseek_client.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_integration_retry_circuit_breaker.py",
+    "tests\\test_sandbox_integration.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762779679.24847,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Exit code -1 indicates catastrophic test failure (likely segmentation fault, memory issues, or environment crash). Test infrastructure is non-functional.\n\n## Coverage Analysis\n**COMPLETE COVERAGE BREAKDOWN** - 0.00% coverage suggests:\n- Tests cannot execute at all\n- Environment/dependency issues preventing test execution\n- Possible circular imports or initialization failures\n\n## Potential Issues with Recent Changes\n1. **Critical Dependencies**: Changes in `mtf_engine.py` or client files may have broken core imports\n2. **Initialization Failures**: New client implementations (`perplexity_client.py`, `deepseek_client.py`) may have initialization code crashing the test runner\n3. **Resource Conflicts**: Stress tests (`test_edge_cases_stress.py`) could be causing environment instability\n\n## Immediate Recommendations\n1. **ISOLATE THE CRASH**: Run tests individually to identify which module causes the crash:\n   ```bash\n   python -m pytest tests/test_perplexity_client.py -v\n   ```\n2. **CHECK IMPORTS**: Verify no circular imports between client modules and test files\n3. **VALIDATE ENVIRONMENT**: Ensure all dependencies are properly installed and compatible\n4. **ADD BASIC SANITY TESTS**: Create minimal tests that don't depend on external services\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- No reliable testing feedback\n- Potential production-breaking changes undetected\n- Complete loss of quality assurance\n- High probability of deployment failures\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 238,
+      "completion_tokens": 334,
+      "total_tokens": 572,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 174
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

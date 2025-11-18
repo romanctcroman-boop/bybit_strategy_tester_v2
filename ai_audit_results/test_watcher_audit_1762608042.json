@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762608042,
+  "changed_files": [
+    "backend\\api\\perplexity_client.py",
+    "mcp-server\\api\\providers\\base.py",
+    "mcp-server\\api\\providers\\perplexity.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762608025.2545555,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code was executed during testing\n- **Missing**: All test execution infrastructure failed\n- **Critical Gap**: Unable to assess actual code coverage due to test harness failure\n\n## Potential Issues with Recent Changes\nThe changed files suggest integration with Perplexity API. Likely culprits:\n1. **Missing dependencies** - New perplexity_client.py may require uninstalled packages\n2. **Configuration issues** - API keys, endpoints, or environment variables not set\n3. **Import/circular dependency** - Changes in provider base classes breaking imports\n4. **Syntax/runtime errors** - Fatal errors preventing test execution\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see specific failure point\n2. Check test logs for stack traces and error messages\n3. Verify all dependencies are installed: `pip install -r requirements.txt`\n4. Validate environment variables and API configurations\n\n**Structural Fixes:**\n1. Add try-catch blocks in test setup to capture initialization errors\n2. Implement health checks for external API dependencies\n3. Create isolated unit tests before integration tests\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be blind:\n- No validation of Perplexity API integration\n- Unknown if recent changes broke existing functionality\n- Zero confidence in system stability\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 348,
+      "total_tokens": 504,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762602184,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\coverage\\debug.py",
+    ".venv\\Lib\\site-packages\\_pytest\\warnings.py",
+    ".venv\\Lib\\site-packages\\_pytest\\capture.py",
+    ".venv\\Lib\\site-packages\\coverage\\collector.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_callers.py",
+    ".venv\\Lib\\site-packages\\_pytest\\logging.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_hooks.py",
+    ".venv\\Lib\\site-packages\\fastapi\\applications.py",
+    ".venv\\Lib\\site-packages\\coverage\\control.py",
+    ".venv\\Lib\\site-packages\\_pytest\\runner.py",
+    ".venv\\Lib\\site-packages\\_pytest\\config\\__init__.py",
+    ".venv\\Lib\\site-packages\\pluggy\\_manager.py",
+    "automation\\deepseek_robot\\dual_analytics_engine.py",
+    ".venv\\Lib\\site-packages\\_pytest\\main.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762602165.6379037,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely broken:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data collected for any files\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files show any coverage data\n- Test execution halted before coverage collection began\n- This indicates a fundamental infrastructure or environment issue\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption** - Modified files in `.venv\\Lib\\site-packages\\` suggest virtual environment issues\n2. **Plugin Conflicts** - Changes in `pluggy`, `pytest`, and `coverage` files indicate potential dependency conflicts\n3. **Critical File Changes** - `automation\\deepseek_robot\\dual_analytics_engine.py` modified alongside test infrastructure files\n4. **Possible circular imports or initialization failures** in the analytics engine\n\n## Immediate Recommendations\n1. **RECREATE VIRTUAL ENVIRONMENT:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **ISOLATE THE FAILURE:**\n   - Run tests without coverage first: `pytest -v`\n   - Test the analytics engine in isolation\n   - Check for import errors in `dual_analytics_engine.py`\n\n3. **VALIDATE DEPENDENCIES:**\n   - Ensure pytest, coverage, and pluggy versions are compatible\n   - Check for version conflicts in requirements\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Unreliable test results\n- Potential environment corruption\n- Risk of undetected regressions\n- Development workflow completely blocked\n\n**Priority:** Fix immediately - this blocks all meaningful testing and deployment.\n\n**Next Steps:** Start with environment recreation, then run minimal test to verify basic functionality before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 363,
+      "completion_tokens": 422,
+      "total_tokens": 785,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 299
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

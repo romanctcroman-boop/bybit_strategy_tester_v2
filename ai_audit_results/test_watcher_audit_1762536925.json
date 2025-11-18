@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762536925,
+  "changed_files": [
+    "tests\\test_safe_async_bridge_final.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762536910.4663024,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero validation of code behavior. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code is being tested. All test scenarios are failing to execute, making coverage metrics meaningless until basic test execution is restored.\n\n## Potential Issues with Recent Changes\n- **tests\\test_safe_async_bridge_final.py** appears to be the culprit\n- Likely causes:\n  - Syntax errors in test file\n  - Missing dependencies/imports\n  - Test configuration issues\n  - Fixture/setup failures preventing test discovery\n  - Environment compatibility problems\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test execution failure** - Run tests with verbose output (`pytest -v`) to identify the root cause\n2. **Check test file syntax** - Validate Python syntax in the modified test file\n3. **Verify imports and dependencies** - Ensure all required modules are available\n4. **Test isolation** - Run the problematic test file in isolation to confirm it's the source\n\n**FOLLOW-UP:**\n- Implement test failure alerts for early detection\n- Add pre-commit test validation\n- Consider adding a basic smoke test that always passes to catch infrastructure issues\n\n## Risk Assessment\n**HIGH RISK** - Shipping untested code poses significant business risk:\n- Production failures likely\n- Regression detection impossible\n- Code quality cannot be measured\n- Deployment confidence: ZERO\n\n**Priority: CRITICAL** - Fix test execution before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 354,
+      "total_tokens": 485,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

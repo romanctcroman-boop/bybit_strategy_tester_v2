@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762692652,
+  "changed_files": [
+    "tests\\test_edge_cases_stress.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762692636.658245,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution crashed completely (Exit Code -1). This indicates severe infrastructure, dependency, or code issues rather than test failures. The test suite is non-functional.\n\n## Coverage Analysis & Gaps\n**0% coverage** - No code was executed. This isn't a coverage gap but a complete execution failure. All production code remains untested.\n\n## Potential Issues with Recent Changes\n- **File `tests/test_edge_cases_stress.py`** likely contains code causing catastrophic failure:\n  - Infinite loops or recursion\n  - Memory exhaustion from stress testing\n  - Missing dependencies/imports\n  - Syntax errors or runtime exceptions\n  - Resource exhaustion (file handles, network connections)\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Isolate the failing test** - Run `test_edge_cases_stress.py` separately to identify the crash\n2. **Add debug output** - Insert print statements or use `pdb` to trace execution\n3. **Check resource limits** - Verify memory, timeout, and file descriptor constraints\n4. **Validate test dependencies** - Ensure all required packages are installed\n\n**STRUCTURAL FIXES:**\n1. Implement test isolation - run stress tests separately from main suite\n2. Add timeout decorators for stress tests\n3. Set up continuous integration with resource monitoring\n\n## Risk Assessment\n**HIGH RISK** - The entire test pipeline is broken:\n- No regression detection\n- All code changes are effectively untested\n- Deployment risks are extremely high\n- Team cannot trust test results\n\n**Priority:** Fix immediately before any further development or deployments.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 345,
+      "total_tokens": 473,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762543543,
+  "changed_files": [
+    "monitoring\\test_alerts.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762543528.7743385,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero quality assurance. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage was collected, indicating:\n- Tests failed before any meaningful execution\n- Potential configuration issues with coverage tools\n- No production code was exercised during test run\n\n## Potential Issues with Recent Changes\nThe failure likely stems from changes in `monitoring\\test_alerts.py`:\n- **Syntax errors** in test file preventing import/execution\n- **Missing dependencies** or imports causing import failures\n- **Configuration issues** with test runner or environment\n- **Broken test fixtures** or setup code\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution** - Run tests with verbose output to identify the specific failure point\n2. **Check syntax** - Validate `monitoring\\test_alerts.py` for Python syntax compliance\n3. **Verify imports** - Ensure all required modules and dependencies are available\n4. **Test isolation** - Run the failing test file in isolation to pinpoint the issue\n\n**FOLLOW-UP:**\n5. Add pre-commit hooks to catch syntax errors before commit\n6. Implement CI pipeline that fails fast on syntax issues\n7. Ensure test environment matches development environment\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **No safety net** for code changes\n- **Undetected regressions** likely in production\n- **Broken deployment pipeline** if tests are part of CI/CD\n- **Technical debt accumulation** without test feedback\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 372,
+      "total_tokens": 497,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

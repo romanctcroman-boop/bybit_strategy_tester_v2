@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762629302,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\server.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\main.py",
+    "mcp-server\\server.py",
+    ".venv\\Lib\\site-packages\\fastmcp\\server\\__init__.py",
+    ".venv\\Lib\\site-packages\\dotenv\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762629287.027206,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage means no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE:**\n- No files show any coverage data\n- Either tests aren't running or environment is corrupted\n- All code paths are untested\n\n## Potential Issues with Recent Changes\n**ENVIRONMENT CORRUPTION DETECTED:**\n- Modified files in `.venv\\Lib\\site-packages\\` suggest virtual environment corruption\n- Changes to package files (`fastmcp`, `dotenv`) indicate dependency issues\n- Manual edits to installed packages will break reproducibility\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Rebuild virtual environment:**\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify test runner configuration:**\n   - Check pytest/unitest configuration\n   - Ensure test discovery is working\n   - Run basic smoke test: `python -m pytest --version`\n\n3. **Isolate test dependencies:**\n   - Never modify installed packages\n   - Use dependency injection for testing\n   - Mock external dependencies\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- Unreliable development environment\n- No test validation of code changes\n- High probability of undetected regressions\n- Deployment would be extremely risky\n\n**Priority:** Fix environment immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 223,
+      "completion_tokens": 350,
+      "total_tokens": 573,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 159
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762723210,
+  "changed_files": [
+    "tests\\test_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762723198.6221893,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1). The test suite is non-functional and provides zero quality assurance.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code coverage was collected, indicating:\n- Tests crashed before any meaningful execution\n- No production code was exercised\n- Complete absence of test feedback\n\n## Potential Issues with Recent Changes\nThe modified `tests/test_circuit_breaker.py` likely contains:\n- Syntax errors preventing test discovery/execution\n- Import failures or missing dependencies\n- Infinite loops or fatal exceptions\n- Configuration issues in test setup/teardown\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test failure**: Run `pytest tests/test_circuit_breaker.py -v` to identify specific error\n2. **Check imports**: Verify all imports in the test file resolve correctly\n3. **Validate test structure**: Ensure proper test class/method definitions\n4. **Fix setup/teardown**: Review fixture configurations and dependencies\n\n**FOLLOW-UP:**\n- Add test for test (meta-test) to catch basic failures\n- Implement CI step to validate test suite integrity\n- Consider adding a simple smoke test that runs first\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- No test protection for circuit breaker functionality\n- Potential production defects undetectable\n- Deployment carries significant business risk\n- Critical functionality (circuit breaker) completely untested\n\n**Priority: Fix immediately before any further development or deployment.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 328,
+      "total_tokens": 456,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

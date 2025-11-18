@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762706469,
+  "changed_files": [
+    "tests\\test_retry_policy.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762706446.3773532,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **No coverage data collected** - execution halted before any meaningful testing\n- **Critical gap**: Unable to assess actual code coverage due to test infrastructure failure\n\n## Potential Issues with Recent Changes\n1. **test_retry_policy.py modifications** likely introduced:\n   - Syntax errors or import failures\n   - Infinite loops or resource exhaustion\n   - Environment dependency failures\n   - Configuration breaking changes\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test_retry_policy.py** - Run isolated to identify specific failure point\n2. **Check test dependencies** - Verify all imports and mocked objects\n3. **Review recent commits** - Focus on changes to test infrastructure and retry logic\n\n**Short-term:**\n4. Add pre-commit test validation\n5. Implement test isolation to prevent cascade failures\n\n## Risk Assessment\n**HIGH RISK** - Current state:\n- No reliable test feedback\n- Potential undetected regressions\n- Deployment blocking until resolved\n- Urgent fix required before further development\n\n**Priority:** Fix test execution failure immediately, then address coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 288,
+      "total_tokens": 416,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

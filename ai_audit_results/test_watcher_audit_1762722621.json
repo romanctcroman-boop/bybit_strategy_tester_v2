@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762722621,
+  "changed_files": [
+    "tests\\test_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762722598.239887,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (exit code -1). The test suite is non-functional and provides zero quality assurance. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code is being tested. The testing pipeline is either:\n- Failing before any tests execute\n- Tests are not properly configured/imported\n- Test discovery is broken\n\n## Potential Issues with Recent Changes\nThe modified file `tests/test_circuit_breaker.py` likely contains:\n- Syntax errors preventing test execution\n- Import errors breaking the test module\n- Configuration issues in test setup/teardown\n- Missing dependencies for the circuit breaker implementation\n\n## Immediate Recommendations\n1. **Fix Test Execution First** - Address the exit code -1 before anything else\n2. **Check test_circuit_breaker.py** for:\n   - Python syntax validity\n   - Correct imports and dependencies\n   - Proper test class/method structure\n3. **Verify test discovery** - Ensure pytest/unittest can find and run tests\n4. **Run with verbose output** to see exact failure point\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functional tests exposes the system to:\n- Undetected runtime errors in circuit breaker logic\n- Potential service outages from broken fault tolerance\n- Regression risks across the entire codebase\n- Complete loss of CI/CD quality gates\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 317,
+      "total_tokens": 445,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

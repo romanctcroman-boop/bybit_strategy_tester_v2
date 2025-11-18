@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762607473,
+  "changed_files": [
+    "backend\\api\\perplexity_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762607456.5229776,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or code syntax.\n\n## Coverage Analysis & Gaps\n- **0.00% coverage** - No tests executed successfully\n- **Complete gap** - No code paths were tested\n- **File-specific gap** - `perplexity_client.py` changes completely untested\n\n## Potential Issues with Recent Changes\n1. **Syntax/Import Errors** in `perplexity_client.py` likely preventing test execution\n2. **Missing Dependencies** - API client may require uninstalled packages\n3. **Configuration Issues** - Environment variables or API keys not set\n4. **Breaking Changes** - Recent modifications may have introduced fatal errors\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Fix test execution failure first - check error logs for specific failure cause\n2. Validate `perplexity_client.py` syntax and imports\n3. Ensure all dependencies are installed (requests, API SDKs, etc.)\n4. Verify environment configuration and API credentials\n\n**Next Steps:**\n1. Add unit tests for `perplexity_client.py` focusing on:\n   - API connection handling\n   - Error scenarios (timeouts, invalid responses)\n   - Response parsing logic\n2. Target 80%+ coverage for the modified file\n3. Add integration tests with mocked API responses\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely risky because:\n- Core functionality changes are completely untested\n- No validation of API integration behavior\n- Potential for runtime failures in production\n- Could break dependent features\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 128,
+      "completion_tokens": 360,
+      "total_tokens": 488,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 64
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

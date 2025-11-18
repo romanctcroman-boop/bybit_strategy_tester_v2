@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762538631,
+  "changed_files": [
+    "tests\\test_security_enhancements.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762538615.1501234,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). The test suite is non-functional and provides zero validation of code behavior. This represents a complete breakdown in testing infrastructure.\n\n## Coverage Analysis & Gaps\n**TOTAL COVERAGE: 0%** - No code coverage data was collected, indicating:\n- Tests failed before any meaningful execution\n- Potential configuration issues with coverage tools\n- No validation of security enhancements implementation\n\n## Potential Issues with Recent Changes\nThe failure coincides with changes to `tests/test_security_enhancements.py`:\n- Syntax errors in test file\n- Missing dependencies or imports\n- Test setup/teardown failures\n- Configuration conflicts with security enhancements\n- Infinite loops or resource exhaustion in tests\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Debug test failure**: Run `python -m pytest tests/test_security_enhancements.py -v` to identify specific failure point\n2. **Check syntax**: Validate Python syntax in the modified test file\n3. **Verify imports**: Ensure all required modules and dependencies are available\n4. **Isolate security tests**: Run security tests separately to identify compatibility issues\n\n**FOLLOW-UP:**\n5. Add test failure logging to capture error details\n6. Implement CI pipeline that fails fast on syntax/import issues\n7. Create smoke tests to validate basic test infrastructure\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functional tests exposes multiple risks:\n- **Security vulnerabilities** may be introduced undetected\n- **Regression risks** across entire codebase\n- **Zero quality assurance** for security enhancements\n- **Production failures** likely due to untested changes\n\n**Priority**: Resolve test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 375,
+      "total_tokens": 504,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 65
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

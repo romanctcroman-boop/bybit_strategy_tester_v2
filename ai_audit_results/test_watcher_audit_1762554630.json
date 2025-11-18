@@ -1,0 +1,35 @@
+{
+  "timestamp": 1762554630,
+  "changed_files": [
+    "test_circuit_breaker_load.py",
+    ".venv\\Lib\\site-packages\\psycopg2\\__init__.py",
+    "temp_pg_test.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762554616.325226,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- Zero test execution suggests fundamental environment or import issues\n- No coverage data collected\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - Complete testing blackout:\n- No tests executed means all code paths untested\n- Critical gap: Entire application lacks validation\n- Regression detection capability: **NONE**\n\n## Potential Issues with Recent Changes\n1. **Environment Corruption**: Modified `.venv\\Lib\\site-packages\\psycopg2\\__init__.py` suggests manual package tampering\n2. **Database Dependency**: `temp_pg_test.py` and psycopg2 changes indicate broken database connectivity\n3. **Import Chain Failure**: Likely missing dependencies or broken imports preventing test discovery\n\n## Immediate Action Plan\n1. **Restore Clean Environment**:\n   ```bash\n   rm -rf .venv\n   python -m venv .venv\n   pip install -r requirements.txt\n   ```\n\n2. **Verify Database Connectivity**:\n   - Check PostgreSQL service status\n   - Validate connection strings in temp_pg_test.py\n   - Ensure test database exists\n\n3. **Isolate Test Failure**:\n   ```bash\n   python -m pytest test_circuit_breaker_load.py -v --tb=short\n   ```\n\n## Risk Assessment\n**SEVERE RISK** - Deployment would be blind:\n- 🚨 No safety net for production changes\n- 🚨 Circuit breaker logic completely unvalidated\n- 🚨 Database integration untested\n- 🚨 High probability of runtime failures\n\n**Priority**: Fix test environment immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 156,
+      "completion_tokens": 374,
+      "total_tokens": 530,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 92
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

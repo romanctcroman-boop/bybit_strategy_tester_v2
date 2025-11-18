@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762526872,
+  "changed_files": [
+    "mcp-server\\tools\\analysis\\analysis_tools.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762526854.5554886,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or test code structure. Zero coverage suggests tests aren't even running.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0.00%** - No code is being executed during testing\n- **No file-specific coverage data** - Tests are failing before coverage collection begins\n- **Critical gap**: Entire test suite is non-functional\n\n## Potential Issues with Recent Changes\n1. **Broken imports** in `analysis_tools.py` or its dependencies\n2. **Missing dependencies** or environment configuration issues\n3. **Syntax errors** in the modified file preventing module loading\n4. **Test framework configuration** problems (pytest/unittest setup)\n5. **Circular imports** or module initialization failures\n\n## Immediate Recommendations\n1. **Fix test execution first**:\n   - Run tests with `-v` flag to see specific failure details\n   - Check Python path and import statements in `analysis_tools.py`\n   - Verify all dependencies are installed (`pip list`)\n\n2. **Debug the exit code -1**:\n   - Check for unhandled exceptions in test setup\n   - Review recent changes to `analysis_tools.py` for syntax issues\n   - Validate test configuration files (pytest.ini, conftest.py)\n\n3. **Restore basic functionality**:\n   - Create a simple smoke test to verify module can be imported\n   - Add basic unit tests for core functions before addressing coverage\n\n## Risk Assessment\n**HIGH RISK** - Production readiness is compromised because:\n- No code validation is occurring\n- Recent changes cannot be verified\n- Potential for undetected regressions\n- Deployment would be based on untested code\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 131,
+      "completion_tokens": 389,
+      "total_tokens": 520,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 3
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

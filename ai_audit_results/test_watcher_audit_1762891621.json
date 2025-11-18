@@ -1,0 +1,38 @@
+{
+  "timestamp": 1762891621,
+  "changed_files": [
+    "backend\\security\\secure_logger.py",
+    "backend\\strategies\\bollinger_mean_reversion.py",
+    "backend\\core\\backtest_engine.py",
+    "backend\\security\\rate_limiter.py",
+    "backend\\security\\jwt_manager.py",
+    "backend\\api\\schemas.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762891604.927637,
+    "success": false,
+    "error": "redirected stdin is pseudofile, has no fileno()"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage confirms no tests executed successfully\n- Likely broken test infrastructure or environment setup\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN** - No coverage data available:\n- All 6 modified files show 0% coverage\n- No baseline comparison possible\n- Test execution halted before any coverage collection\n\n## Potential Issues with Recent Changes\n**HIGH-RISK AREAS IDENTIFIED:**\n1. **Security modules** (secure_logger.py, rate_limiter.py, jwt_manager.py) - Critical components with no validation\n2. **Trading strategy** (bollinger_mean_reversion.py) - Financial logic untested\n3. **Core engine** (backtest_engine.py) - Core business logic unverified\n4. **API schemas** - Input validation completely untested\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Fix test execution** - Investigate exit code -1 root cause\n2. **Prioritize security testing** - Start with jwt_manager and rate_limiter\n3. **Add basic smoke tests** - Ensure core components load without errors\n4. **Check dependencies** - Verify all required packages installed\n\n**SHORT-TERM:**\n1. Implement 70%+ coverage target for security modules\n2. Add integration tests for API schemas\n3. Validate backtest engine with simple scenarios\n\n## Risk Assessment\n**SEVERITY: CRITICAL** 🚨\n- **Security Risk**: HIGH - Authentication/rate limiting untested\n- **Financial Risk**: HIGH - Trading strategy unvalidated\n- **Operational Risk**: HIGH - Core engine potentially broken\n- **Regression Risk**: HIGH - Multiple interconnected components modified\n\n**URGENT**: Fix test infrastructure immediately before any deployment. Security and financial components require priority validation.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 182,
+      "completion_tokens": 421,
+      "total_tokens": 603,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 118
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

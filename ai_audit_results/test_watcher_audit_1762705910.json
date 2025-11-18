@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762705910,
+  "changed_files": [
+    ".venv\\Lib\\site-packages\\pytest_cov\\engine.py",
+    "tests\\test_circuit_breaker.py",
+    ".venv\\Lib\\site-packages\\pytest\\__main__.py",
+    ".venv\\Lib\\site-packages\\pytest_cov\\plugin.py",
+    "reliability\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762705893.5542934,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test environment or codebase.\n\n## Coverage Analysis & Gaps\n- **Total failure**: 0% coverage across all files\n- **Critical gap**: No tests executed successfully\n- **Missing**: Basic test execution framework validation\n\n## Potential Issues with Recent Changes\n1. **Environment corruption**: Modified `.venv` files suggest virtual environment issues\n2. **pytest-cov plugin conflict**: Changes to `pytest_cov` files indicate plugin misconfiguration\n3. **Import/circular dependency**: Test file `test_circuit_breaker.py` may have import errors\n4. **Module loading failure**: `circuit_breaker.py` might have syntax errors or missing dependencies\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest tests/ --tb=short` to identify specific failure point\n2. Verify virtual environment: `python -c \"import pytest, pytest_cov\"`\n3. Check for syntax errors: `python -m py_compile reliability/circuit_breaker.py`\n\n**Systematic Fixes:**\n4. Recreate virtual environment: Remove `.venv` and reinstall dependencies\n5. Validate pytest configuration in `pytest.ini`/`pyproject.toml`\n6. Run tests without coverage first to isolate the issue\n\n## Risk Assessment\n**HIGH RISK** - Complete test suite failure indicates:\n- Production code may be broken\n- No safety net for changes\n- Potential deployment of faulty code\n- Urgent attention required before any further development\n\n**Priority**: Fix test execution immediately before addressing coverage gaps.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 193,
+      "completion_tokens": 361,
+      "total_tokens": 554,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 129
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

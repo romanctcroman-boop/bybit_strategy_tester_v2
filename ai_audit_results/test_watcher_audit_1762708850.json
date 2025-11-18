@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762708850,
+  "changed_files": [
+    "reliability\\__init__.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762708836.9605672,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful testing occurred. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**0% COVERAGE** - No code was executed during testing. This represents a complete testing blackout, making all recent changes untested and high-risk.\n\n## Potential Issues with Recent Changes\n- The `reliability\\__init__.py` modification likely contains syntax errors, import issues, or runtime exceptions\n- Possible circular imports or module initialization failures\n- Environment/dependency compatibility issues\n- Test runner configuration problems\n\n## Immediate Action Recommendations\n1. **Debug Test Failure**\n   - Check test runner logs for specific error messages\n   - Verify `reliability\\__init__.py` for syntax errors\n   - Test module import in isolation: `python -c \"import reliability\"`\n\n2. **Restore Basic Testing**\n   - Fix the immediate crash preventing test execution\n   - Add minimal smoke tests for module initialization\n   - Ensure tests can run to completion\n\n3. **Infrastructure Check**\n   - Verify test environment dependencies\n   - Confirm pytest/unittest configuration\n   - Check for missing test files or incorrect paths\n\n## Risk Assessment\n**HIGH RISK** - All changes are completely untested. The codebase is effectively flying blind with:\n- No validation of recent changes\n- Unknown regression impact\n- Potential production-breaking defects\n- Compromised deployment safety\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 326,
+      "total_tokens": 451,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "timestamp": 1762528810,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\test_phase1_security.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\test_protocol.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "backend\\ml\\lstm_queue_predictor.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762528780.1208396,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution is completely broken:\n- Exit code -1 indicates abnormal termination (likely unhandled exception)\n- Zero test execution suggests fundamental infrastructure or import issues\n- No coverage data generated implies tests never ran successfully\n\n## Coverage Analysis & Gaps\n**COVERAGE: 0%** - All gaps identified:\n- No tests executed means zero coverage across all modules\n- Critical backend components (MTF engine, LSTM predictors, API routers) completely untested\n- Market data ingestion and database optimization tests non-functional\n\n## Potential Issues with Recent Changes\n**HIGH PROBABILITY ROOT CAUSES:**\n1. **Import/dependency failures** - Likely broken imports in test modules or application code\n2. **Configuration/environment issues** - Missing environment variables, database connections, or test fixtures\n3. **Critical code errors** - Syntax errors or runtime exceptions preventing test discovery/execution\n4. **Test infrastructure broken** - pytest configuration, conftest.py, or test runner issues\n\n## Immediate Action Recommendations\n**PRIORITY 1 - RESTORE TEST EXECUTION:**\n1. Run `pytest -v` to identify first failing test and error details\n2. Check test discovery: `pytest --collect-only` \n3. Verify imports in recently changed test files, especially `test_sandbox_integration.py`\n4. Validate environment setup and required services (database, message queues)\n\n**PRIORITY 2 - INFRASTRUCTURE FIXES:**\n1. Add error handling to test setup/teardown\n2. Implement health checks for test dependencies\n3. Create smoke tests to validate test environment\n\n## Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- **Code Quality Risk**: Unable to validate any functionality\n- **Regression Risk**: No protection against breaking changes\n- **Release Risk**: Cannot proceed with deployments until resolved\n- **Technical Debt**: Every minute this persists increases remediation cost\n\n**URGENT**: Focus entirely on restoring basic test execution before addressing coverage or test quality improvements.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 281,
+      "completion_tokens": 437,
+      "total_tokens": 718,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      },
+      "prompt_cache_hit_tokens": 256,
+      "prompt_cache_miss_tokens": 25
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

@@ -1,0 +1,157 @@
+/**
+ * Global Theme Variables
+ * Based on Perplexity AI recommendations and user mockup
+ */
+
+:root {
+  /* Zone Colors from Mockup */
+  --color-header-bg: #2d5016; /* Green header */
+  --color-header-text: #ffffff;
+
+  --color-left-bg: #000033; /* Dark blue left panel */
+  --color-left-text: #ffffff;
+
+  --color-right-bg: #085858; /* Teal right panel */
+  --color-right-text: #ffffff;
+
+  --color-footer-bg: #4a0e4e; /* Purple footer */
+  --color-footer-text: #ffffff;
+
+  /* Accent Colors */
+  --color-accent: #fbbf24;
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+
+  /* Chart Colors */
+  --color-chart-bg: rgba(0, 0, 51, 0.5);
+  --color-chart-line: #4dabf7;
+  --color-chart-grid: rgba(255, 255, 255, 0.1);
+
+  /* UI Elements */
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-card-bg: rgba(255, 255, 255, 0.05);
+  --color-input-bg: rgba(255, 255, 255, 0.1);
+  --color-input-border: rgba(255, 255, 255, 0.2);
+
+  /* Typography */
+  --font-family-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --font-family-mono: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Layout */
+  --header-height: 56px;
+  --footer-height: 32px;
+  --sidebar-width: 30%;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+  --transition-slow: 500ms ease;
+
+  /* Z-index layers */
+  --z-header: 100;
+  --z-footer: 100;
+  --z-modal: 1000;
+  --z-tooltip: 2000;
+}
+
+/* Dark Theme (default) */
+[data-theme='dark'] {
+  --color-header-bg: #2d5016;
+  --color-left-bg: #000033;
+  --color-right-bg: #085858;
+  --color-footer-bg: #4a0e4e;
+}
+
+/* Light Theme (optional) */
+[data-theme='light'] {
+  --color-header-bg: #4ade80;
+  --color-header-text: #1a2341;
+
+  --color-left-bg: #e0e7ef;
+  --color-left-text: #1a2341;
+
+  --color-right-bg: #a7f3d0;
+  --color-right-text: #1a2341;
+
+  --color-footer-bg: #c4b5fd;
+  --color-footer-text: #1a2341;
+
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-card-bg: rgba(0, 0, 0, 0.03);
+  --color-chart-bg: rgba(255, 255, 255, 0.9);
+}
+
+/* Global Resets */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+code {
+  font-family: var(--font-family-mono);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Utility Classes */
+.text-success {
+  color: var(--color-success);
+}
+.text-danger {
+  color: var(--color-danger);
+}
+.text-warning {
+  color: var(--color-warning);
+}
+.text-info {
+  color: var(--color-info);
+}
+
+.bg-success {
+  background-color: var(--color-success);
+}
+.bg-danger {
+  background-color: var(--color-danger);
+}
+.bg-warning {
+  background-color: var(--color-warning);
+}
+.bg-info {
+  background-color: var(--color-info);
+}

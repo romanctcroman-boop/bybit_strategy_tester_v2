@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762728343,
+  "changed_files": [
+    "parallel_audit_submission.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762728331.4109106,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely uncaught exception during test setup/execution).\n\n## Coverage Analysis\n**0% coverage** - No code is being executed during tests. This represents complete test infrastructure failure.\n\n## Potential Issues with Recent Changes\n- `parallel_audit_submission.py` changes likely introduced breaking changes\n- Possible syntax errors, import failures, or runtime exceptions\n- Test environment/dependencies may be incompatible with new code\n- Test runner configuration may be broken\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution** - Run tests with verbose output to identify the root cause\n2. **Check syntax** - Validate `parallel_audit_submission.py` for basic Python syntax\n3. **Verify imports** - Ensure all dependencies are available and compatible\n4. **Test isolation** - Run minimal test to confirm basic functionality\n\n**Follow-up:**\n5. Add basic smoke test to prevent complete test suite collapse\n6. Implement CI pipeline that fails fast on syntax/import issues\n\n## Risk Assessment\n**HIGH RISK** - Code is completely untested and potentially non-functional. Deployment would be extremely risky.\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 273,
+      "total_tokens": 399,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

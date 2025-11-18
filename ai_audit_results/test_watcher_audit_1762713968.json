@@ -1,0 +1,36 @@
+{
+  "timestamp": 1762713968,
+  "changed_files": [
+    "fix_tests_final.py",
+    "add_mocks_to_all_tests.py",
+    "tests\\test_deepseek_client.py",
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713939.958375,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception)\n- 0% coverage means no tests executed successfully\n- Test infrastructure appears broken\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- No files have any coverage (0% across all files)\n- Test execution isn't reaching any application code\n- Either tests are failing before execution or infrastructure is misconfigured\n\n## Potential Issues with Recent Changes\n**HIGH-RISK CHANGES DETECTED**:\n1. `fix_tests_final.py` & `add_mocks_to_all_tests.py` - These bulk modification scripts likely introduced breaking changes\n2. Mock over-aggression - May be mocking essential components needed for test execution\n3. Import/dependency issues - Tests might be failing during import/setup phase\n4. Configuration corruption - Test runner or pytest configuration may be broken\n\n## Immediate Recommendations\n**PRIORITY 1 - RESTORE TEST EXECUTION**:\n1. **Rollback** the test modification scripts and verify basic test functionality\n2. **Check test imports** - Ensure all modules can be imported without errors\n3. **Run tests individually** - Start with simplest test to identify root cause\n4. **Verify pytest configuration** - Check `pytest.ini`/`conftest.py` for issues\n\n**PRIORITY 2 - VALIDATE MOCK STRATEGY**:\n- Review mock implementations in `add_mocks_to_all_tests.py`\n- Ensure mocks aren't blocking essential test infrastructure\n- Test with reduced mocking scope\n\n## Risk Assessment\n**HIGH RISK** - Current state prevents:\n- Regression detection\n- Code quality validation\n- Safe deployments\n- Continuous integration\n\n**Immediate action required** - Development is effectively flying blind without test feedback. Address test execution before any further feature development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 153,
+      "completion_tokens": 410,
+      "total_tokens": 563,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 89
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

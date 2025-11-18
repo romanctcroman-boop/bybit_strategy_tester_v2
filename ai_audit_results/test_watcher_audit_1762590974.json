@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762590974,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762590955.3170025,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates the test runner crashed before executing any tests, suggesting fundamental configuration or environment issues.\n\n## Coverage Analysis & Gaps\n- **0% coverage** - No code was executed during testing\n- No coverage data available for any files\n- Test infrastructure appears completely broken\n\n## Potential Issues with Recent Changes\n1. **Test runner crash** - Likely caused by:\n   - Missing dependencies or imports in test configuration\n   - Syntax errors in test files or conftest.py\n   - Environment misconfiguration\n   - Circular imports in the new/changed file\n\n2. **File-specific concerns**: `full_ai_audit_deepseek_perplexity_deepseek.py` may contain:\n   - Import errors or missing dependencies\n   - Syntax errors preventing test discovery\n   - Configuration that conflicts with test environment\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run `python -m pytest --collect-only` to diagnose test discovery issues\n2. Check for syntax errors: `python -m py_compile full_ai_audit_deepseek_perplexity_deepseek.py`\n3. Verify all imports and dependencies are available in test environment\n4. Examine pytest configuration and conftest.py files\n\n**Follow-up:**\n- Add basic smoke test to verify test infrastructure works\n- Implement CI pipeline that fails fast on configuration issues\n- Ensure test environment matches development environment exactly\n\n## Risk Assessment\n**HIGH RISK** - The complete test failure means:\n- No validation of recent changes to `full_ai_audit_deepseek_perplexity_deepseek.py`\n- Potential production-breaking issues undetected\n- All existing functionality is untested in current state\n- **Immediate attention required** before any deployment\n\n**Priority:** Fix test infrastructure immediately before proceeding with any development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 396,
+      "total_tokens": 531,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

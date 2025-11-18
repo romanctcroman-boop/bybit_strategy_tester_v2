@@ -1,0 +1,744 @@
+"""
+Optimization Tasks
+
+Celery задачи для оптимизации стратегий (grid search, walk-forward, Bayesian).
+"""
+
+from datetime import UTC, datetime
+from itertools import product
+from typing import Any
+
+from celery import Task
+from loguru import logger
+
+from backend.celery_app import celery_app
+from backend.core.engine_adapter import get_engine
+from backend.database import Optimization, SessionLocal
+from backend.services.data_service import DataService
+
+
+class OptimizationTask(Task):
+    """Базовый класс для задач оптимизации"""
+
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        """Обработчик ошибок"""
+        logger.error(f"❌ Optimization task {task_id} failed: {exc}")
+
+        optimization_id = kwargs.get("optimization_id") or (args[0] if args else None)
+        if optimization_id:
+            try:
+                db = SessionLocal()
+                opt = db.query(Optimization).filter(Optimization.id == optimization_id).first()
+                if opt:
+                    opt.status = "failed"
+                    opt.error_message = str(exc)
+                    opt.updated_at = datetime.now(UTC)
+                    db.commit()
+                db.close()
+            except Exception as e:
+                logger.error(f"Failed to update optimization status: {e}")
+
+    def on_success(self, retval, task_id, args, kwargs):
+        """Обработчик успешного выполнения"""
+        logger.info(f"✅ Optimization task {task_id} completed")
+
+
+def _parse_dt(value: Any) -> datetime:
+    """Parse ISO-like datetime strings to datetime; pass through if already datetime.
+
+    Falls back to naive fromisoformat when possible.
+    """
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            # Support 'YYYY-MM-DD' or full ISO strings
+            if len(value) == 10:
+                return datetime.fromisoformat(value)
+            return datetime.fromisoformat(value)
+        except Exception:
+            # Last resort: try common format
+            try:
+                return datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S")
+            except Exception:
+                pass
+    raise ValueError(f"Invalid datetime value: {value!r}")
+
+
+@celery_app.task(
+    bind=True, base=OptimizationTask, name="backend.tasks.optimize_tasks.grid_search", max_retries=2
+)
+def grid_search_task(
+    self,
+    optimization_id: int,
+    strategy_config: dict[str, Any],
+    param_space: dict[str, list],
+    symbol: str,
+    interval: str,
+    start_date: str,
+    end_date: str,
+    metric: str = "sharpe_ratio",
+) -> dict[str, Any]:
+    """
+    Grid Search оптимизация
+
+    Args:
+        optimization_id: ID записи оптимизации
+        strategy_config: Базовая конфигурация стратегии
+        param_space: Пространство параметров {param_name: [value1, value2, ...]}
+        symbol: Торговая пара
+        interval: Таймфрейм
+        start_date: Дата начала
+        end_date: Дата окончания
+        metric: Метрика для оптимизации (sharpe_ratio, total_return, profit_factor)
+
+    Returns:
+        Лучшие параметры и результаты
+    """
+    logger.info(f"🔍 Starting grid search: optimization {optimization_id}")
+    logger.info(f"   Param space: {param_space}")
+
+    db = SessionLocal()
+    data_service = DataService(db)
+
+    try:
+        # Обновить статус через DataService
+        opt = data_service.get_optimization(optimization_id)
+        if not opt:
+            raise ValueError(f"Optimization {optimization_id} not found")
+
+        data_service.update_optimization(
+            optimization_id, status="running", started_at=datetime.now(UTC)
+        )
+
+        # Загрузить данные
+        logger.info("📥 Loading market data...")
+        data_service = DataService(db)
+        start_dt = _parse_dt(start_date)
+        end_dt = _parse_dt(end_date)
+        candles = data_service.get_market_data(
+            symbol=symbol,
+            timeframe=interval,
+            start_time=start_dt,
+            end_time=end_dt,
+        )
+        if not candles or len(candles) == 0:
+            raise ValueError(f"No data for {symbol} {interval}")
+
+        logger.info(f"📊 Loaded {len(candles)} candles")
+
+        # Normalize ORM objects to a list[dict] the engine can consume
+        try:
+
+            def _to_row(x):
+                if isinstance(x, dict):
+                    return x
+                # hasattr path for ORM model attributes
+                row = {}
+                for key in ("timestamp", "open", "high", "low", "close", "volume", "quote_volume"):
+                    if hasattr(x, key):
+                        row[key] = getattr(x, key)
+                return row
+
+            norm_candles = [_to_row(c) for c in candles]
+        except Exception:
+            norm_candles = candles  # fallback
+
+        # Генерация всех комбинаций параметров
+        param_names = list(param_space.keys())
+        param_values = list(param_space.values())
+        combinations = list(product(*param_values))
+
+        total_combinations = len(combinations)
+        logger.info(f"🔢 Testing {total_combinations} parameter combinations")
+
+        # Прогресс
+        self.update_state(state="PROGRESS", meta={"current": 0, "total": total_combinations})
+
+        # Запуск бэктестов для каждой комбинации
+        results = []
+        best_score = float("-inf")
+        best_params = None
+        best_result = None
+
+        engine = get_engine(
+            None, initial_capital=10000.0, commission=0.0006, data_service=data_service
+        )
+
+        for idx, params in enumerate(combinations, 1):
+            # Обновить конфигурацию стратегии
+            test_config = strategy_config.copy()
+            for param_name, param_value in zip(param_names, params, strict=True):
+                test_config[param_name] = param_value
+
+            # Запустить бэктест
+            try:
+                result = engine.run(data=norm_candles, strategy_config=test_config)
+                score = result.get(metric, 0)
+
+                results.append(
+                    {
+                        "params": dict(zip(param_names, params, strict=True)),
+                        "score": score,
+                        "metrics": {
+                            "total_return": result.get("total_return"),
+                            "sharpe_ratio": result.get("sharpe_ratio"),
+                            "max_drawdown": result.get("max_drawdown"),
+                            "win_rate": result.get("win_rate"),
+                            "total_trades": result.get("total_trades"),
+                        },
+                    }
+                )
+
+                # Обновить лучший результат
+                if score > best_score:
+                    best_score = score
+                    best_params = dict(zip(param_names, params, strict=True))
+                    best_result = result
+
+                # Обновить прогресс
+                if idx % 10 == 0 or idx == total_combinations:
+                    logger.info(
+                        f"Progress: {idx}/{total_combinations} ({idx / total_combinations * 100:.1f}%)"
+                    )
+                    self.update_state(
+                        state="PROGRESS",
+                        meta={
+                            "current": idx,
+                            "total": total_combinations,
+                            "best_score": best_score,
+                            "best_params": best_params,
+                        },
+                    )
+
+            except Exception as e:
+                logger.warning(f"Backtest failed for params {params}: {e}")
+                continue
+
+        # Сортировать результаты по метрике
+        results.sort(key=lambda x: x["score"], reverse=True)
+
+        # Сохранить результаты
+        logger.info("💾 Saving optimization results...")
+        # Сохранить результаты через DataService
+        data_service.update_optimization(
+            optimization_id,
+            status="completed",
+            completed_at=datetime.now(UTC),
+            best_params=best_params,
+            best_score=best_score,
+            results={
+                "method": "grid_search",
+                "metric": metric,
+                "symbol": symbol,
+                "interval": interval,
+                "period": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
+                "total_combinations": total_combinations,
+                "best_params": best_params,
+                "best_score": best_score,
+                "best_metrics": best_result,
+                "top_10": results[:10],
+            },
+        )
+
+        logger.info("✅ Grid search completed")
+        logger.info(f"   Best {metric}: {best_score:.4f}")
+        logger.info(f"   Best params: {best_params}")
+
+        return {
+            "optimization_id": optimization_id,
+            "status": "completed",
+            "best_params": best_params,
+            "best_score": best_score,
+            "total_combinations": total_combinations,
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Grid search failed: {e}")
+
+        try:
+            data_service.update_optimization(
+                optimization_id,
+                status="failed",
+                error_message=str(e),
+                completed_at=datetime.now(UTC),
+            )
+        except Exception as db_error:
+            logger.error(f"Failed to update optimization status: {db_error}")
+
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+
+        raise
+
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True, base=OptimizationTask, name="backend.tasks.optimize_tasks.walk_forward")
+def walk_forward_task(
+    self,
+    optimization_id: int,
+    strategy_config: dict[str, Any],
+    param_space: dict[str, list],
+    symbol: str,
+    interval: str,
+    start_date: str,
+    end_date: str,
+    train_size: int = 252,  # Training bars (IS window)
+    test_size: int = 63,  # Testing bars (OOS window)
+    step_size: int = 63,  # Step size for rolling window
+    mode: str = "rolling",  # 'rolling' or 'anchored'
+    metric: str = "sharpe_ratio",  # Optimization metric
+    min_trades: int = 30,  # Минимум сделок для валидности
+    max_drawdown: float = 0.50,  # Максимальная просадка
+) -> dict[str, Any]:
+    """
+    Walk-Forward оптимизация (ТЗ 3.5.2)
+
+    Использует новый WalkForwardOptimizer с поддержкой Rolling и Anchored режимов.
+    Рассчитывает efficiency, degradation, robustness_score.
+
+    Args:
+        optimization_id: ID оптимизации
+        strategy_config: Базовая конфигурация
+        param_space: Пространство параметров
+        symbol: Торговая пара
+        interval: Таймфрейм
+        start_date: Дата начала
+        end_date: Дата окончания
+        train_size: Размер окна обучения (в барах, IS window)
+        test_size: Размер окна тестирования (в барах, OOS window)
+        step_size: Шаг сдвига окна (в барах)
+        mode: 'rolling' (фиксированное окно) или 'anchored' (расширяющееся)
+        metric: Метрика для оптимизации
+        min_trades: Минимум сделок для валидности
+        max_drawdown: Максимальная просадка
+
+    Returns:
+        Результаты walk-forward с degradation и robustness_score
+    """
+    from datetime import datetime
+
+    from backend.optimization.walk_forward import (
+        WalkForwardOptimizer,
+        WFOConfig,
+        WFOMode,
+        ParameterRange,
+    )
+    from backend.services.data_service import DataService
+
+    logger.info(f"🚶 Starting walk-forward optimization: {optimization_id}")
+    logger.info(f"   Symbol: {symbol}, Interval: {interval}")
+    logger.info(f"   Mode: {mode}, Train: {train_size}, Test: {test_size}, Step: {step_size}")
+    logger.info(f"   Metric: {metric}")
+
+    db = SessionLocal()
+    data_service = DataService(db)
+
+    try:
+        # 1. Обновить статус
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "optimization_id": optimization_id,
+                "status": "loading_data",
+                "progress": 0,
+            },
+        )
+
+        data_service.update_optimization(
+            optimization_id, status="running", started_at=datetime.now(UTC)
+        )
+
+        # 2. Загружаем данные
+        logger.info("📥 Loading market data...")
+        start_dt = _parse_dt(start_date)
+        end_dt = _parse_dt(end_date)
+        candles = data_service.get_market_data(
+            symbol=symbol,
+            timeframe=interval,
+            start_time=start_dt,
+            end_time=end_dt,
+        )
+        if not candles or len(candles) == 0:
+            raise ValueError(f"No data for {symbol} {interval}")
+
+        logger.info(f"📊 Loaded {len(candles)} candles")
+
+        # Normalize ORM objects to list[dict]
+        def _to_row(x):
+            if isinstance(x, dict):
+                return x
+            row = {}
+            for key in ("timestamp", "open", "high", "low", "close", "volume", "quote_volume"):
+                if hasattr(x, key):
+                    row[key] = getattr(x, key)
+            return row
+
+        norm_candles = [_to_row(c) for c in candles]
+
+        # 3. Конвертируем param_space в ParameterRange
+        param_ranges = {}
+        for param_name, values in param_space.items():
+            if isinstance(values, list) and len(values) > 0:
+                # Если уже список, оставляем как есть
+                param_ranges[param_name] = values
+            elif isinstance(values, dict) and 'start' in values:
+                # Если это range объект
+                param_ranges[param_name] = ParameterRange(
+                    start=values['start'],
+                    stop=values['stop'],
+                    step=values.get('step', (values['stop'] - values['start']) / 10)
+                )
+            else:
+                param_ranges[param_name] = values
+
+        # 4. Создаём WFO конфигурацию
+        wfo_mode = WFOMode.ROLLING if mode.lower() == "rolling" else WFOMode.ANCHORED
+        config = WFOConfig(
+            in_sample_size=train_size,
+            out_sample_size=test_size,
+            step_size=step_size,
+            mode=wfo_mode,
+            min_trades=min_trades,
+            max_drawdown=max_drawdown,
+        )
+
+        logger.info(f"🔧 WFO Config: {config}")
+
+        # 5. Создаём оптимизатор
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "optimization_id": optimization_id,
+                "status": "initializing",
+                "progress": 10,
+            },
+        )
+
+        wfo = WalkForwardOptimizer(config=config)
+
+        # 6. Запускаем оптимизацию
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "optimization_id": optimization_id,
+                "status": "optimizing",
+                "progress": 20,
+            },
+        )
+
+        engine = get_engine(
+            None, initial_capital=10000.0, commission=0.0006, data_service=data_service
+        )
+
+        results = wfo.optimize(
+            data=norm_candles,
+            param_ranges=param_ranges,
+            strategy_config=strategy_config,
+            metric=metric,
+            backtest_engine=engine,
+        )
+
+        logger.info("✅ Walk-Forward optimization completed")
+        logger.info(f"   Robustness Score: {results['summary']['robustness_score']:.2f}")
+        logger.info(f"   Avg Efficiency: {results['aggregated_metrics']['avg_efficiency']:.3f}")
+        logger.info(f"   Avg Degradation: {results['aggregated_metrics']['avg_degradation']:.3f}")
+
+        # 7. Сохраняем результаты
+        logger.info("💾 Saving optimization results...")
+        data_service.update_optimization(
+            optimization_id,
+            status="completed",
+            completed_at=datetime.now(UTC),
+            best_params=results['summary'].get('recommended_params', {}),
+            best_score=results['summary']['robustness_score'],
+            results={
+                "method": "walk_forward",
+                "metric": metric,
+                "symbol": symbol,
+                "interval": interval,
+                "period": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
+                "config": {
+                    "mode": mode,
+                    "train_size": train_size,
+                    "test_size": test_size,
+                    "step_size": step_size,
+                    "min_trades": min_trades,
+                    "max_drawdown": max_drawdown,
+                },
+                "walk_results": results['walk_results'],
+                "aggregated_metrics": results['aggregated_metrics'],
+                "parameter_stability": results['parameter_stability'],
+                "summary": results['summary'],
+            },
+        )
+
+        # 8. Обновляем прогресс
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "optimization_id": optimization_id,
+                "status": "completed",
+                "progress": 100,
+                "robustness_score": results['summary']['robustness_score'],
+            },
+        )
+
+        return {
+            "optimization_id": optimization_id,
+            "method": "walk_forward",
+            "symbol": symbol,
+            "interval": interval,
+            "start_date": start_date,
+            "end_date": end_date,
+            "config": {
+                "mode": mode,
+                "train_size": train_size,
+                "test_size": test_size,
+                "step_size": step_size,
+                "metric": metric,
+            },
+            "results": results,
+            "status": "completed",
+            "completed_at": datetime.now(UTC).isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Walk-forward failed: {optimization_id}, error: {e}")
+        
+        try:
+            data_service.update_optimization(
+                optimization_id,
+                status="failed",
+                error_message=str(e),
+                completed_at=datetime.now(UTC),
+            )
+        except Exception as db_error:
+            logger.error(f"Failed to update optimization status: {db_error}")
+
+        self.update_state(
+            state="FAILURE",
+            meta={
+                "optimization_id": optimization_id,
+                "error": str(e),
+            },
+        )
+
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e)
+            
+        raise
+    
+    finally:
+        db.close()
+
+
+@celery_app.task(
+    bind=True, base=OptimizationTask, name="backend.tasks.optimize_tasks.bayesian_optimization"
+)
+def bayesian_optimization_task(
+    self,
+    optimization_id: int,
+    strategy_config: dict[str, Any],
+    param_space: dict[str, dict[str, Any]],  # {param: {type, low, high}}
+    symbol: str,
+    interval: str,
+    start_date: str,
+    end_date: str,
+    n_trials: int = 100,
+    metric: str = "sharpe_ratio",
+    direction: str = "maximize",
+    n_jobs: int = 1,
+    random_state: int | None = None,
+) -> dict[str, Any]:
+    """
+    Bayesian Optimization используя Optuna
+
+    Использует Tree-structured Parzen Estimator (TPE) для умного поиска
+    оптимальных параметров. Значительно быстрее Grid Search.
+
+    Args:
+        optimization_id: ID оптимизации
+        strategy_config: Базовая конфигурация
+        param_space: Пространство параметров
+            Формат: {param_name: {type: 'int'|'float'|'categorical', low: X, high: Y}}
+            Пример: {'period': {'type': 'int', 'low': 10, 'high': 100}}
+        symbol: Торговая пара
+        interval: Таймфрейм
+        start_date: Дата начала
+        end_date: Дата окончания
+        n_trials: Количество попыток оптимизации
+        metric: Метрика для оптимизации
+        direction: 'maximize' или 'minimize'
+        n_jobs: Количество параллельных процессов
+        random_state: Seed для воспроизводимости
+
+    Returns:
+        Результаты Bayesian optimization
+    """
+    import asyncio
+    from datetime import datetime
+
+    from backend.core.bayesian import BayesianOptimizer
+    from backend.services.data_service import DataService
+
+    logger.info(f"🧠 Starting Bayesian optimization: {optimization_id}")
+    logger.info(f"   Symbol: {symbol}, Interval: {interval}")
+    logger.info(f"   Trials: {n_trials}, Metric: {metric}, Direction: {direction}")
+
+    try:
+        # 1. Загружаем данные
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "optimization_id": optimization_id,
+                "status": "loading_data",
+                "progress": 0,
+            },
+        )
+
+        ds = DataService()
+        start_dt = _parse_dt(start_date)
+        end_dt = _parse_dt(end_date)
+        data = ds.get_market_data(
+            symbol=symbol,
+            timeframe=interval,
+            start_time=start_dt,
+            end_time=end_dt,
+        )
+        if data is None or len(data) == 0:
+            raise ValueError(f"No data available for {symbol} {interval}")
+        logger.info(f"📊 Loaded {len(data)} candles")
+
+        # 2. Создаём Bayesian Optimizer
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "optimization_id": optimization_id,
+                "status": "initializing",
+                "progress": 10,
+            },
+        )
+
+        optimizer = BayesianOptimizer(
+            data=data,
+            initial_capital=strategy_config.get("initial_capital", 10000.0),
+            commission=strategy_config.get("commission", 0.001),
+            n_trials=n_trials,
+            n_jobs=n_jobs,
+            random_state=random_state,
+        )
+
+        logger.info(f"🎯 Initialized Bayesian Optimizer with {n_trials} trials")
+
+        # 3. Запускаем Bayesian optimization
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "optimization_id": optimization_id,
+                "status": "optimizing",
+                "progress": 20,
+                "n_trials": n_trials,
+            },
+        )
+
+        # Запускаем асинхронную версию в event loop (py3.10+ and 3.14-safe)
+        def _get_loop():
+            try:
+                return asyncio.get_running_loop()
+            except RuntimeError:
+                try:
+                    loop_existing = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop_existing = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop_existing)
+                if loop_existing.is_closed():
+                    loop_existing = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop_existing)
+                return loop_existing
+
+        loop = _get_loop()
+
+        results = loop.run_until_complete(
+            optimizer.optimize_async(
+                strategy_config=strategy_config,
+                param_space=param_space,
+                metric=metric,
+                direction=direction,
+                show_progress=False,  # Не показываем progress bar в Celery
+            )
+        )
+
+        # 4. Вычисляем важность параметров
+        try:
+            param_importance = optimizer.get_importance()
+            results["param_importance"] = param_importance
+        except Exception as e:
+            logger.warning(f"Could not compute param importance: {e}")
+            results["param_importance"] = {}
+
+        # 5. Формируем результат
+        self.update_state(
+            state="PROGRESS",
+            meta={
+                "optimization_id": optimization_id,
+                "status": "completed",
+                "progress": 100,
+            },
+        )
+
+        logger.success(
+            f"✅ Bayesian optimization completed: {optimization_id}, "
+            f"best {metric}={results['best_value']:.4f}, "
+            f"completed trials={results['statistics']['completed_trials']}/{n_trials}"
+        )
+
+        payload = {
+            "optimization_id": optimization_id,
+            "method": "bayesian",
+            "symbol": symbol,
+            "interval": interval,
+            "start_date": start_date,
+            "end_date": end_date,
+            "config": {
+                "n_trials": n_trials,
+                "metric": metric,
+                "direction": direction,
+                "n_jobs": n_jobs,
+            },
+            "results": results,
+            "status": "completed",
+            "completed_at": datetime.now(UTC).isoformat(),
+        }
+
+        # Persist via DataService
+        with DataService() as _ds:
+            _ds.update_optimization(
+                optimization_id,
+                status="completed",
+                completed_at=datetime.now(UTC),
+                results={
+                    "method": "bayesian",
+                    "metric": metric,
+                    "symbol": symbol,
+                    "interval": interval,
+                    "period": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
+                    "config": payload["config"],
+                    "results": results,
+                },
+            )
+
+        return payload
+
+    except Exception as e:
+        logger.error(f"❌ Bayesian optimization failed: {optimization_id}, error: {e}")
+        self.update_state(
+            state="FAILURE",
+            meta={
+                "optimization_id": optimization_id,
+                "error": str(e),
+            },
+        )
+        raise

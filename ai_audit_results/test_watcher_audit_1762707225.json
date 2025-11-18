@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762707225,
+  "changed_files": [
+    "reliability\\circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762707197.828079,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception in test framework or environment).\n\n## Coverage Analysis\n**0% COVERAGE** - No tests executed successfully. All code changes are completely untested.\n\n## Potential Issues with Recent Changes\n1. **Circuit breaker implementation likely broken** - Changes in `reliability/circuit_breaker.py` may have introduced syntax errors, import issues, or runtime exceptions\n2. **Test infrastructure failure** - Possible issues with test configuration, dependencies, or environment setup\n3. **Breaking API changes** - Modified interfaces without updating tests\n\n## Immediate Actions Required\n1. **Fix test execution first** - Run tests with verbose output to identify the root cause of exit code -1\n2. **Check for syntax errors** in circuit_breaker.py\n3. **Verify imports and dependencies** - Ensure all required packages are installed\n4. **Run isolated test** on circuit_breaker.py to confirm basic functionality\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- Zero test validation of reliability-critical circuit breaker logic\n- Potential production outages if circuit breaker fails\n- No safety net for future changes\n\n## Priority Recommendations\n1. **Immediate**: Fix test execution environment - this is blocking all quality checks\n2. **High**: Add basic unit tests for circuit breaker states (closed, open, half-open)\n3. **Medium**: Achieve 80%+ coverage on circuit breaker before deployment\n4. **Continuous**: Implement pre-commit hooks to prevent 0% coverage commits\n\n**Start by diagnosing why tests won't run at all - this is the most urgent issue.**",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 363,
+      "total_tokens": 488,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

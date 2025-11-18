@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762612689,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "tests\\unit\\test_batch_writer.py",
+    "test_perplexity_streaming.py",
+    "mcp-server\\api\\providers\\perplexity.py",
+    "tests\\test_mtf_engine.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_protocol.py",
+    "tests\\test_database\\test_query_optimization.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762612670.2602868,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash)\n- 0% coverage suggests tests aren't even executing properly\n- No coverage data available indicates fundamental infrastructure issues\n\n## Coverage Analysis & Gaps\n**ALL COVERAGE MISSING** - Critical gaps:\n- No code being exercised at all\n- Integration tests (`test_sandbox_integration.py`, `test_mtf_engine.py`) likely failing first\n- Database and protocol tests completely non-functional\n- Provider layer (`perplexity.py`) untested\n\n## Potential Issues with Recent Changes\n1. **Integration Breakage**: Changes in `mtf_engine.py` or `perplexity.py` likely broke dependent tests\n2. **Environment/Dependency Issues**: Exit code -1 suggests environment corruption or missing dependencies\n3. **Configuration Problems**: Test runner configuration may be broken\n4. **Circular Dependencies**: Integration tests might have dependency conflicts\n\n## Immediate Action Recommendations\n1. **Fix Test Infrastructure First**:\n   - Check test environment setup and dependencies\n   - Run tests with `-v` flag to see which test fails first\n   - Verify Python path and import statements\n\n2. **Isolate the Failure**:\n   ```bash\n   python -m pytest tests/unit/ -v  # Start with unit tests\n   python -m pytest tests/test_protocol.py -v  # Isolate protocol tests\n   ```\n\n3. **Priority Fix Order**:\n   - Fix unit tests first (`test_batch_writer.py`)\n   - Then integration tests (`test_sandbox_integration.py`)\n   - Finally complex integrations (`test_mtf_engine.py`)\n\n## Risk Assessment\n**HIGH RISK** - Production deployment should be blocked:\n- No confidence in any code changes\n- Critical integration points completely untested\n- Database and API layers potentially broken\n- **Recommendation**: Revert recent changes until tests are functional and show >80% coverage\n\n**Immediate Next Step**: Run `pytest --tb=long -x` to identify the first failing test and get detailed traceback.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 209,
+      "completion_tokens": 457,
+      "total_tokens": 666,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 145
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

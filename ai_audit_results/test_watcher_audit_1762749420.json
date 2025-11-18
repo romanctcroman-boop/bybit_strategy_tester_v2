@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762749420,
+  "changed_files": [
+    "tests\\test_protocol.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762749404.3128786,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). This indicates fundamental issues with the test suite itself rather than code failures. The test framework cannot even initialize or run.\n\n## Coverage Analysis & Gaps\n**0% COVERAGE** - No code was executed during testing. This is not a coverage gap but a complete test execution failure. All production code remains untested.\n\n## Potential Issues with Recent Changes\n1. **Broken Test Infrastructure** - The test runner cannot execute any tests\n2. **Syntax/Import Errors** in `tests/test_protocol.py` - Likely contains fatal Python errors\n3. **Missing Dependencies** - Required test dependencies may be unavailable\n4. **Configuration Issues** - Test configuration files may be corrupted or missing\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m pytest tests/test_protocol.py -v` to see specific error details\n2. Check for Python syntax errors in the test file\n3. Verify all imports in the test file are valid and available\n4. Ensure test dependencies are installed (`pytest`, `coverage`, etc.)\n\n**FOLLOW-UP:**\n- Fix the fatal error in test_protocol.py\n- Add basic smoke tests to prevent regression\n- Implement CI pipeline to catch test failures early\n\n## Risk Assessment\n**HIGH RISK** - The entire test suite is non-functional, meaning:\n- No regression detection\n- Undetected breaking changes likely\n- Production code quality cannot be verified\n- Deployment carries significant risk of undetected failures\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 352,
+      "total_tokens": 478,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

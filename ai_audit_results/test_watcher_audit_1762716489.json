@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762716489,
+  "changed_files": [
+    "tests\\test_mcp_manager.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762716475.695112,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage, indicating fundamental issues in the test suite or codebase.\n\n## Coverage Analysis & Gaps\n- **Total coverage: 0.00%** - No code was executed during testing\n- **No coverage data available** - Tests failed before coverage could be measured\n- **Critical gap**: Entire codebase remains untested\n\n## Potential Issues with Recent Changes\n1. **Test file `test_mcp_manager.py` likely contains syntax errors or import failures**\n2. **Dependencies may be missing or incompatible**\n3. **Test fixtures/setup could be broken**\n4. **Environment configuration issues**\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Fix test execution** - Run tests with verbose output to identify the specific failure point\n2. **Check imports** in `test_mcp_manager.py` for missing modules or circular dependencies\n3. **Verify test dependencies** are installed and compatible\n4. **Run individual test methods** to isolate the failing component\n\n**Short-term:**\n5. **Add basic smoke tests** to ensure test infrastructure works\n6. **Implement test logging** to capture execution details\n7. **Set up continuous integration** to catch failures early\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **Zero test reliability** - No confidence in code changes\n- **Potential production issues** undetectable\n- **Development blocked** until basic tests pass\n- **Critical business risk** if this code is deployed\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 344,
+      "total_tokens": 470,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

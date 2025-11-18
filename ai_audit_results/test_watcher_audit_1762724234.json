@@ -1,0 +1,37 @@
+{
+  "timestamp": 1762724234,
+  "changed_files": [
+    "collect_phase_data.py",
+    "reliability\\service_monitor.py",
+    "reliability\\retry_policy.py",
+    "mcp-server\\server.py",
+    "reliability\\key_rotation.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762724220.2312484,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1), indicating fundamental issues with the test environment, dependencies, or code structure. Zero coverage suggests tests aren't even running.\n\n## Coverage Analysis & Gaps\n- **Total Coverage: 0%** - No code is being executed during tests\n- **No file-specific coverage data** - Tests are failing before coverage measurement\n- **Critical gap**: Reliability modules and MCP server changes aren't being validated\n\n## Potential Issues with Recent Changes\n1. **Import/dependency failures** in reliability modules or MCP server\n2. **Syntax errors** in modified files preventing test execution\n3. **Missing dependencies** or environment configuration issues\n4. **Circular imports** between reliability modules\n5. **Configuration changes** breaking test setup\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. Run tests with `-v` flag to see which specific test fails first\n2. Check Python syntax: `python -m py_compile [changed_files]`\n3. Verify imports: `python -c \"import reliability.service_monitor\"` (repeat for each module)\n4. Examine test logs for specific error messages and stack traces\n\n**Structural Fixes:**\n1. Add basic smoke tests for each reliability module\n2. Implement error handling in test setup/teardown\n3. Ensure test dependencies are properly installed\n4. Create isolated unit tests before integration tests\n\n## Risk Assessment\n**HIGH RISK** - Changes to reliability and MCP server components are completely untested:\n- Production failures likely in retry policies and service monitoring\n- Key rotation changes could cause security/service disruptions\n- No validation of MCP server functionality\n- Zero confidence in recent code changes\n\n**Priority**: Fix test execution immediately before any deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 157,
+      "completion_tokens": 377,
+      "total_tokens": 534,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 93
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

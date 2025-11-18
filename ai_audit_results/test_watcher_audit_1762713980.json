@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762713980,
+  "changed_files": [
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762713968.24784,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution means no reliability data\n- Complete blind spot for `deepseek_client.py` changes\n\n## Potential Issues with Recent Changes\nThe `deepseek_client.py` modification likely introduced:\n- **Fatal runtime error** preventing test execution\n- **Import/circular dependency** issues\n- **Missing dependencies** or broken imports\n- **Syntax errors** or initialization failures\n\n## Recommendations for Improvement\n**Immediate Actions:**\n1. **Debug test runner** - Check for unhandled exceptions in test setup\n2. **Isolate `deepseek_client.py`** - Test this file in isolation to identify breaking changes\n3. **Add basic smoke test** - Ensure module can be imported without crashing\n\n**Short-term:**\n4. **Fix fatal error** before addressing coverage\n5. **Add exception handling** around test initialization\n6. **Verify dependencies** and imports\n\n## Risk Assessment\n**HIGH RISK** - Deploying these changes would be extremely dangerous:\n- Zero test validation means unknown runtime behavior\n- Production crashes highly probable\n- No regression protection for client functionality\n- **Recommend blocking deployment** until basic tests pass\n\n**Priority:** Fix test execution failure before any other quality improvements.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 311,
+      "total_tokens": 436,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

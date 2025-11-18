@@ -1,0 +1,40 @@
+{
+  "timestamp": 1762785174,
+  "changed_files": [
+    "backend\\ml\\drift_detector.py",
+    "backend\\ml\\market_regime_detector.py",
+    "backend\\ml\\__init__.py",
+    "backend\\core\\walk_forward_optimizer.py",
+    "backend\\security\\ast_validator.py",
+    "backend\\ml\\retrain_scheduler.py",
+    "backend\\ml\\optuna_optimizer.py",
+    "backend\\ml\\optimizer.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762785157.767152,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic test framework failure\n- 0% coverage suggests tests aren't even executing\n- No coverage data available for analysis\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- Zero coverage across all 8 modified files\n- No test execution means no meaningful coverage metrics\n- Critical ML and security components completely untested\n\n## Potential Issues with Recent Changes\n1. **Test Infrastructure Failure**: Likely broken test configuration, dependencies, or environment\n2. **Import/Module Issues**: Recent ML module changes may have broken imports\n3. **Security Validator Impact**: `ast_validator.py` changes might be blocking execution\n4. **Dependency Conflicts**: New ML components may have incompatible dependencies\n\n## Immediate Action Recommendations\n1. **Diagnose Test Failure**:\n   ```bash\n   python -m pytest --collect-only -v  # Check test discovery\n   python -m pytest -x --tb=short     # Run with early failure\n   ```\n2. **Check Dependencies**: Verify all ML libraries (optuna, etc.) are properly installed\n3. **Validate AST Security**: Temporarily disable `ast_validator` to isolate the issue\n4. **Fix Import Structure**: Ensure all ML modules properly export their public API\n\n## Risk Assessment\n**HIGH RISK** - Deployment blockers:\n- 🚨 ML pipeline components completely untested\n- 🚨 Security validation potentially broken\n- 🚨 No confidence in recent algorithmic changes\n- 🚨 Regression risk for trading systems\n\n**Priority**: Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 207,
+      "completion_tokens": 356,
+      "total_tokens": 563,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 143
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

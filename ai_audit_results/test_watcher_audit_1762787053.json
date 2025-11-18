@@ -1,0 +1,39 @@
+{
+  "timestamp": 1762787053,
+  "changed_files": [
+    "deepseek_self_diagnostic.py",
+    "tests\\test_edge_cases_stress.py",
+    "reliability\\deepseek_client.py",
+    "reliability\\perplexity_client.py",
+    "tests\\test_deepseek_client.py",
+    "tests\\test_perplexity_client.py",
+    "tests\\test_integration_retry_circuit_breaker.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762787034.182449,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1) with 0% coverage. This indicates either:\n- Syntax errors preventing test execution\n- Import/circular dependency issues\n- Test framework configuration problems\n- Critical runtime exceptions during test setup\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - No files were executed successfully. All test files show 0% coverage, meaning:\n- No API client tests ran (`test_deepseek_client.py`, `test_perplexity_client.py`)\n- No integration/retry logic validated (`test_integration_retry_circuit_breaker.py`)\n- No edge case/stress testing occurred (`test_edge_cases_stress.py`)\n\n## Potential Issues with Recent Changes\n1. **Import/Dependency Issues** - Likely circular imports between main modules and test files\n2. **Syntax Errors** - Recent changes to `deepseek_self_diagnostic.py` or client modules may contain Python syntax errors\n3. **Configuration Breakage** - Test runner configuration (pytest, unittest) may be broken\n4. **Module Structure Changes** - File reorganization may have broken import paths\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. Run `python -m py_compile deepseek_self_diagnostic.py` to check for syntax errors\n2. Execute tests individually to identify the failing test file: `python -m pytest tests/test_deepseek_client.py -v`\n3. Check import statements in all changed files for circular dependencies\n4. Verify `__init__.py` files exist in test directories\n\n**FOLLOW-UP:**\n5. Add basic smoke test that validates test infrastructure before full suite\n6. Implement CI step to validate syntax and imports before test execution\n\n## Risk Assessment\n**HIGH RISK** - Deployment would be extremely risky because:\n- No functionality has been validated\n- Client reliability changes are completely untested\n- Circuit breaker and retry logic modifications are unverified\n- All recent changes effectively have zero test coverage\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 192,
+      "completion_tokens": 450,
+      "total_tokens": 642,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 128
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

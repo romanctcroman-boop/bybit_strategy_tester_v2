@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762694363,
+  "changed_files": [
+    "backend\\api\\routers\\backtests.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762694350.1125858,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test suite failed to execute (Exit Code -1). No meaningful quality assessment possible as tests didn't run. This indicates severe infrastructure or configuration issues.\n\n## Coverage Analysis\n**0.00% coverage** - No code was executed during testing. This is not a coverage gap but a complete test execution failure.\n\n## Potential Issues with Recent Changes\n1. **Syntax errors** in `backend\\api\\routers\\backtests.py` likely preventing test execution\n2. **Missing dependencies** or imports in the changed file\n3. **Configuration issues** in test runner or environment setup\n4. **Circular imports** or module loading failures\n\n## Immediate Recommendations\n1. **Fix syntax errors first** - Run `python -m py_compile backend\\api\\routers\\backtests.py` to identify syntax issues\n2. **Check imports** - Verify all imports in the changed file resolve correctly\n3. **Run tests locally** with `python -m pytest -xvs` to get detailed failure information\n4. **Validate test configuration** - Check pytest.ini, conftest.py, and environment variables\n\n## Risk Assessment\n**HIGH RISK** - Deploying without functioning tests poses extreme risk. The application may have:\n- Runtime errors preventing startup\n- Broken API endpoints\n- Data integrity issues\n- Security vulnerabilities\n\n**Priority:** Fix test execution immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 129,
+      "completion_tokens": 302,
+      "total_tokens": 431,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 1
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

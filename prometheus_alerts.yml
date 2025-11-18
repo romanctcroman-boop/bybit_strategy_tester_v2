@@ -1,0 +1,433 @@
+# Prometheus Alerting Rules - P0-6
+# MCP Orchestrator Production Monitoring
+
+# ============================================================================
+# ALERT GROUPS
+# ============================================================================
+
+groups:
+  # ==========================================================================
+  # GROUP 1: ACK Reliability Alerts
+  # ==========================================================================
+  - name: mcp_ack_reliability
+    interval: 30s
+    rules:
+      # Alert 1: High ACK Failure Rate
+      - alert: HighACKFailureRate
+        expr: |
+          (
+            rate(mcp_ack_failures_total[5m]) 
+            / 
+            rate(mcp_tasks_completed_total[5m])
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          component: ack_handler
+          team: platform
+        annotations:
+          summary: "High ACK failure rate detected"
+          description: |
+            ACK failure rate is {{ $value | humanizePercentage }} over the last 5 minutes (threshold: 1%).
+            This indicates problems with Redis acknowledgment or message processing.
+            
+            Current rate: {{ $value | humanize }}
+            Threshold: 0.01 (1%)
+            
+            Possible causes:
+            - Redis connection issues
+            - Network partition
+            - Consumer group conflicts
+            - High load causing timeouts
+          
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/Runbook-HighACKFailureRate"
+          dashboard_url: "http://grafana/d/mcp-orchestrator/ack-metrics"
+          
+          # Recommended actions
+          action_1: "Check Redis connectivity: redis-cli PING"
+          action_2: "Review RobustRedisACKHandler logs for retry failures"
+          action_3: "Check XPENDING counts: redis-cli XPENDING mcp:queue:reasoning:express mcp_express_reasoning"
+          action_4: "Verify no duplicate consumer IDs in group"
+          action_5: "Consider scaling up Redis resources if under heavy load"
+
+      # Alert 2: ACK Success Rate Degradation
+      - alert: ACKSuccessRateDegradation
+        expr: mcp_ack_success_rate < 0.99
+        for: 10m
+        labels:
+          severity: warning
+          component: ack_handler
+          team: platform
+        annotations:
+          summary: "ACK success rate below 99%"
+          description: |
+            ACK success rate is {{ $value | humanizePercentage }} (threshold: 99%).
+            Tasks are being acknowledged successfully but at a lower rate than expected.
+            
+            Current rate: {{ $value | humanize }}
+            Expected: >= 0.99
+            
+            Impact:
+            - Increased task reprocessing
+            - Higher resource utilization
+            - Potential message duplicates
+          
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/Runbook-ACKSuccessRateDegradation"
+          
+          action_1: "Monitor for 15 minutes to see if self-recovering"
+          action_2: "Check for transient Redis issues in logs"
+          action_3: "Review orphan recovery loop effectiveness"
+
+  # ==========================================================================
+  # GROUP 2: Queue Health Alerts
+  # ==========================================================================
+  - name: mcp_queue_health
+    interval: 30s
+    rules:
+      # Alert 3: High Consumer Lag
+      - alert: HighConsumerLag
+        expr: mcp_consumer_group_lag > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: queue
+          team: platform
+        annotations:
+          summary: "High consumer lag detected"
+          description: |
+            Consumer group lag is {{ $value }} pending messages (threshold: 100).
+            Workers are not keeping up with the incoming task rate.
+            
+            Current lag: {{ $value | humanize }} messages
+            Threshold: 100 messages
+            Duration: 10 minutes
+            
+            Possible causes:
+            - Worker pool undersized for load
+            - Slow task processing (network issues, API timeouts)
+            - Worker crashes/restarts
+            - Express routing not working (tasks going to wrong queue)
+          
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/Runbook-HighConsumerLag"
+          dashboard_url: "http://grafana/d/mcp-orchestrator/queue-metrics"
+          
+          action_1: "Check worker pool size: Are all 6 express workers running?"
+          action_2: "Review task processing latency: Are tasks taking longer than usual?"
+          action_3: "Check for worker crashes: grep 'Worker.*crashed' logs"
+          action_4: "Consider temporarily increasing workers_per_type"
+          action_5: "Verify express routing: priority >= 12 tasks should go to express queue"
+
+      # Alert 4: Queue Depth Spike
+      - alert: QueueDepthSpike
+        expr: mcp_queue_depth > 500
+        for: 5m
+        labels:
+          severity: critical
+          component: queue
+          team: platform
+        annotations:
+          summary: "Queue depth spike detected"
+          description: |
+            Queue depth is {{ $value }} messages (threshold: 500).
+            This indicates either a sudden load spike or worker processing issues.
+            
+            Current depth: {{ $value | humanize }} messages
+            Threshold: 500 messages
+            Duration: 5 minutes
+            
+            Immediate risks:
+            - Memory pressure on Redis
+            - Increased task latency
+            - Potential message loss if Redis OOM
+            - SLA violations for express tasks
+          
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/Runbook-QueueDepthSpike"
+          dashboard_url: "http://grafana/d/mcp-orchestrator/queue-metrics"
+          
+          action_1: "URGENT: Check Redis memory usage: redis-cli INFO memory"
+          action_2: "Review incoming task rate: Is there a load spike?"
+          action_3: "Check worker health: Are workers processing tasks?"
+          action_4: "Consider emergency worker scaling: increase workers_per_type to 4"
+          action_5: "Enable express routing bypass if needed: route to regular queues"
+          action_6: "Contact on-call if Redis memory > 80%"
+
+      # Alert 5: Queue Depth Critical (empty for too long)
+      - alert: QueueDepthStagnant
+        expr: |
+          mcp_queue_depth == 0 
+          AND 
+          rate(mcp_tasks_enqueued_total[10m]) > 0
+        for: 15m
+        labels:
+          severity: warning
+          component: queue
+          team: platform
+        annotations:
+          summary: "Queue empty but tasks still being enqueued"
+          description: |
+            Queue depth is 0 but tasks are being enqueued ({{ $value }} tasks/sec).
+            This might indicate workers consuming faster than enqueue rate (good)
+            OR tasks being routed incorrectly/lost (bad).
+          
+          action_1: "Verify tasks are completing: check mcp_tasks_completed_total rate"
+          action_2: "Check for routing issues: are tasks going to DLQ?"
+          action_3: "Review worker logs for processing confirmations"
+
+  # ==========================================================================
+  # GROUP 3: Performance & Latency Alerts
+  # ==========================================================================
+  - name: mcp_performance
+    interval: 30s
+    rules:
+      # Alert 6: Express Latency High (p95)
+      - alert: ExpressLatencyHigh
+        expr: |
+          histogram_quantile(0.95, 
+            rate(mcp_task_latency_seconds_reasoning_bucket[5m])
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: express_workers
+          team: platform
+          task_type: reasoning
+        annotations:
+          summary: "Express task p95 latency above target"
+          description: |
+            Express task latency (p95) is {{ $value }}s (threshold: 100ms).
+            Express workers are not meeting the <100ms SLA target.
+            
+            Current p95: {{ $value | humanizeDuration }}
+            Target: 100ms
+            Task type: reasoning
+            
+            Impact:
+            - SLA violations for high-priority tasks
+            - User-facing latency increase
+            - Express routing benefit diminished
+          
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/Runbook-ExpressLatencyHigh"
+          dashboard_url: "http://grafana/d/mcp-orchestrator/latency-metrics"
+          
+          action_1: "Check system load: Are workers CPU/memory constrained?"
+          action_2: "Review Perplexity API latency: External API slowdown?"
+          action_3: "Check Redis latency: redis-cli --latency"
+          action_4: "Verify no network issues: ping Perplexity API"
+          action_5: "Consider increasing worker pool temporarily"
+
+      # Alert 7: Express Latency Critical (p95 > 500ms)
+      - alert: ExpressLatencyCritical
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(mcp_task_latency_seconds_reasoning_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          component: express_workers
+          team: platform
+        annotations:
+          summary: "Express task p95 latency CRITICAL (>500ms)"
+          description: |
+            Express task latency (p95) is {{ $value }}s (threshold: 500ms).
+            This is 5x above target and indicates severe performance degradation.
+            
+            Current p95: {{ $value | humanizeDuration }}
+            Target: 100ms
+            Critical threshold: 500ms
+          
+          action_1: "URGENT: Check if external APIs are down"
+          action_2: "Review Redis performance: redis-cli --latency-history"
+          action_3: "Check for resource exhaustion: top, free -h"
+          action_4: "Consider emergency load shedding: reject new tasks"
+          action_5: "Page on-call engineer immediately"
+
+  # ==========================================================================
+  # GROUP 4: Worker Health Alerts
+  # ==========================================================================
+  - name: mcp_worker_health
+    interval: 30s
+    rules:
+      # Alert 8: Worker Crash Rate High
+      - alert: WorkerCrashRateHigh
+        expr: rate(mcp_worker_restarts_total[10m]) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+          component: worker_pool
+          team: platform
+        annotations:
+          summary: "High worker crash/restart rate"
+          description: |
+            Worker restart rate is {{ $value }} restarts/sec (threshold: 0.5/sec).
+            Workers are crashing frequently, indicating instability.
+            
+            Current rate: {{ $value | humanize }} restarts/sec
+            Threshold: 0.5 restarts/sec (5 in 10 minutes)
+            
+            Possible causes:
+            - Memory leaks (check worker memory growth)
+            - Unhandled exceptions in task processing
+            - Redis connection failures
+            - Resource exhaustion (OOM killer)
+          
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/Runbook-WorkerCrashRateHigh"
+          
+          action_1: "Check worker logs for crash reasons: grep 'ERROR\\|CRITICAL' logs"
+          action_2: "Review memory usage: Check for leaks with /metrics"
+          action_3: "Check OOM killer: dmesg | grep -i 'killed process'"
+          action_4: "Verify Redis connectivity: redis-cli PING"
+          action_5: "Consider rolling restart with increased resources"
+
+      # Alert 9: No Active Workers
+      - alert: NoActiveWorkers
+        expr: mcp_active_workers == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: worker_pool
+          team: platform
+          page: "true"  # Page on-call immediately
+        annotations:
+          summary: "NO ACTIVE WORKERS - SERVICE DOWN"
+          description: |
+            CRITICAL: No active workers detected!
+            The MCP orchestrator is not processing any tasks.
+            
+            Current active workers: {{ $value }}
+            Expected: >= 6 (2 per task type)
+            
+            This is a full service outage!
+          
+          runbook_url: "https://github.com/RomanCTC/bybit_strategy_tester_v2/wiki/Runbook-NoActiveWorkers"
+          
+          action_1: "URGENT: Restart worker pool immediately"
+          action_2: "Check if process is running: ps aux | grep express_pool"
+          action_3: "Review startup logs for failures"
+          action_4: "Check Redis connectivity"
+          action_5: "Page on-call IMMEDIATELY if not resolved in 5 minutes"
+
+      # Alert 10: Worker Count Low
+      - alert: WorkerCountLow
+        expr: mcp_active_workers < 6
+        for: 5m
+        labels:
+          severity: warning
+          component: worker_pool
+          team: platform
+        annotations:
+          summary: "Worker count below expected (< 6)"
+          description: |
+            Active worker count is {{ $value }} (expected: 6).
+            Some workers failed to start or crashed.
+            
+            Current: {{ $value }} workers
+            Expected: 6 workers (2 reasoning + 2 codegen + 2 ml)
+            
+            Impact:
+            - Reduced throughput capacity
+            - Higher per-worker load
+            - Potential latency increase
+          
+          action_1: "Check which workers are missing: Review worker pool logs"
+          action_2: "Attempt to restart missing workers"
+          action_3: "Check for resource constraints preventing startup"
+
+  # ==========================================================================
+  # GROUP 5: Task Processing Alerts
+  # ==========================================================================
+  - name: mcp_task_processing
+    interval: 30s
+    rules:
+      # Alert 11: Task Failure Rate High
+      - alert: TaskFailureRateHigh
+        expr: |
+          rate(mcp_tasks_failed_total[10m]) 
+          / 
+          (rate(mcp_tasks_completed_total[10m]) + rate(mcp_tasks_failed_total[10m]))
+          > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: task_execution
+          team: platform
+        annotations:
+          summary: "High task failure rate"
+          description: |
+            Task failure rate is {{ $value | humanizePercentage }} (threshold: 5%).
+            A significant portion of tasks are failing.
+            
+            Current failure rate: {{ $value | humanize }}
+            Threshold: 0.05 (5%)
+            
+            Common causes:
+            - External API failures (Perplexity API down)
+            - Invalid task payloads
+            - Timeout issues
+            - Network problems
+          
+          action_1: "Check task error logs for failure patterns"
+          action_2: "Verify external API health (Perplexity, Bybit)"
+          action_3: "Review DLQ for failed task details"
+          action_4: "Check network connectivity"
+
+      # Alert 12: No Tasks Processed
+      - alert: NoTasksProcessed
+        expr: rate(mcp_tasks_completed_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: critical
+          component: task_execution
+          team: platform
+        annotations:
+          summary: "No tasks being processed"
+          description: |
+            No tasks have been completed in the last 10 minutes.
+            Either no tasks are being enqueued OR workers are stuck.
+            
+            This could indicate:
+            - Workers stuck in processing loop
+            - Redis connection issues
+            - No incoming tasks (might be expected)
+          
+          action_1: "Check if tasks are being enqueued: mcp_tasks_enqueued_total"
+          action_2: "Review worker logs for stuck processing"
+          action_3: "Check queue depth: If >0, workers are stuck"
+          action_4: "Restart workers if confirmed stuck"
+
+# ============================================================================
+# ALERTING BEST PRACTICES
+# ============================================================================
+
+# Severity Levels:
+# - critical: Immediate action required, service impacting
+# - warning: Non-critical but requires investigation
+# - info: Informational, no action required
+
+# Alert Timing:
+# - for: 2m = Fast response (crashes, outages)
+# - for: 5m = Standard response (performance, errors)
+# - for: 10m = Slow response (trends, capacity)
+
+# Alert Routing (configure in Alertmanager):
+# - severity: critical + page: true → PagerDuty
+# - severity: critical → Slack #alerts-critical
+# - severity: warning → Slack #alerts-warning
+# - team: platform → Slack #team-platform
+
+# ============================================================================
+# TESTING ALERTS
+# ============================================================================
+
+# Test alert firing manually:
+# 1. Simulate high ACK failures:
+#    for i in {1..100}; do redis-cli XACK mcp:queue:reasoning:express mcp_express_reasoning fake-msg-$i; done
+#
+# 2. Simulate queue depth spike:
+#    for i in {1..600}; do redis-cli XADD mcp:queue:reasoning:express * task_id test_$i payload '{"test":1}'; done
+#
+# 3. Simulate worker crashes:
+#    pkill -9 -f express_pool  # Kill all workers
+#
+# 4. Test alert notification:
+#    curl -X POST http://prometheus:9090/api/v1/alerts

@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762643869,
+  "changed_files": [
+    "test_backtest_engine_real.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762643852.087762,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - The test suite is completely non-functional:\n- Exit code -1 indicates abnormal termination (segmentation fault, memory error, or fatal Python error)\n- 0% coverage suggests tests never executed properly\n- No coverage data generated for any files\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE FAILURE** - No code was executed:\n- Zero coverage across all files\n- Test infrastructure itself may be broken\n- Critical gap: Unable to assess actual code coverage\n\n## Potential Issues with Recent Changes\nThe file `test_backtest_engine_real.py` likely contains:\n- **Fatal syntax errors** preventing import/execution\n- **Infinite loops** or **memory explosions** crashing Python\n- **Missing dependencies** causing import failures\n- **System-level operations** causing segfaults (C extensions, memory issues)\n\n## Recommendations for Improvement\n**IMMEDIATE ACTIONS:**\n1. **Run tests in isolation**: `python -m pytest test_backtest_engine_real.py -v`\n2. **Check for syntax errors**: `python -m py_compile test_backtest_engine_real.py`\n3. **Add debug output**: Insert `print(\"Reached line X\")` to identify crash location\n4. **Review recent changes** to `test_backtest_engine_real.py` for obvious errors\n\n**FOLLOW-UP:**\n5. Implement test isolation - run new tests separately first\n6. Add CI step to validate test syntax before execution\n7. Consider memory profiling for resource-intensive tests\n\n## Risk Assessment\n**HIGH RISK** - Current state indicates:\n- **No reliable testing** - production code changes are untested\n- **Potential system instability** - tests causing crashes may indicate deeper issues\n- **Development blocked** - cannot validate any code changes\n- **Urgent priority** - must resolve before further development\n\n**Next step**: Immediately investigate and fix `test_backtest_engine_real.py` as it's preventing all test execution.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 126,
+      "completion_tokens": 423,
+      "total_tokens": 549,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 62
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

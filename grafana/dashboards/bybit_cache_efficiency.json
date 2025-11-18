@@ -1,0 +1,173 @@
+{
+  "dashboard": {
+    "title": "Bybit Strategy Tester - Cache Efficiency",
+    "tags": ["bybit", "cache", "redis"],
+    "timezone": "browser",
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Cache Hit/Miss Rate",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "bybit_cache_operations_total{operation=\"get\",result=\"hit\"}",
+            "legendFormat": "Hits",
+            "refId": "A"
+          },
+          {
+            "expr": "bybit_cache_operations_total{operation=\"get\",result=\"miss\"}",
+            "legendFormat": "Misses",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Cache Hit Rate Over Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 16, "x": 8, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(bybit_cache_operations_total{result=\"hit\"}[5m]) / (rate(bybit_cache_operations_total{result=\"hit\"}[5m]) + rate(bybit_cache_operations_total{result=\"miss\"}[5m])) * 100",
+            "legendFormat": "Hit Rate %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percent",
+            "label": "Hit Rate",
+            "max": 100,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Cache Operations Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(bybit_cache_operations_total{operation=\"get\"}[5m])",
+            "legendFormat": "GET - {{result}}",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(bybit_cache_operations_total{operation=\"set\"}[5m])",
+            "legendFormat": "SET",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "ops", "label": "Operations/sec"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Cache Size Trend",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "bybit_cache_size_bytes{cache_type=\"redis\"}",
+            "legendFormat": "Size",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "bytes", "label": "Size"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Cache Items Count",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "bybit_cache_items_total{cache_type=\"redis\"}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 6,
+        "title": "API Requests Saved (via cache)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 16},
+        "targets": [
+          {
+            "expr": "increase(bybit_cache_operations_total{result=\"hit\"}[1h])",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "red"},
+              {"value": 100, "color": "yellow"},
+              {"value": 1000, "color": "green"}
+            ]
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Data Source Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "bybit_candles_fetched_total{source=\"api\"}",
+            "legendFormat": "API",
+            "refId": "A"
+          },
+          {
+            "expr": "bybit_candles_fetched_total{source=\"cache\"}",
+            "legendFormat": "Cache",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Cache Efficiency Score",
+        "type": "gauge",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(bybit_cache_operations_total{result=\"hit\"}[5m]) / (rate(bybit_cache_operations_total{result=\"hit\"}[5m]) + rate(bybit_cache_operations_total{result=\"miss\"}[5m])) * 100",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true,
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "red"},
+              {"value": 50, "color": "yellow"},
+              {"value": 80, "color": "green"}
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

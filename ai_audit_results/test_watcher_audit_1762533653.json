@@ -1,0 +1,46 @@
+{
+  "timestamp": 1762533653,
+  "changed_files": [
+    "tests\\test_sandbox_integration.py",
+    "tests\\backend\\test_marketdata_ingest.py",
+    "tests\\backend\\test_marketdata_uploads_list_delete.py",
+    "tests\\test_phase1_security.py",
+    "tests\\backend\\test_active_deals_api_mock.py",
+    "backend\\ml\\lstm_queue_predictor.py",
+    "tests\\backend\\test_marketdata_upload.py",
+    "tests\\backend\\test_bots_api_mock.py",
+    "backend\\core\\mtf_engine.py",
+    "tests\\test_mtf_engine.py",
+    "tests\\test_protocol.py",
+    "backend\\api\\routers\\lstm_predictions.py",
+    "tests\\test_database\\test_query_optimization.py",
+    "tests\\backend\\conftest.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762533632.5729618,
+    "success": false,
+    "error": "I/O operation on closed file."
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional:\n- Exit code -1 indicates catastrophic failure (likely uncaught exception or environment crash)\n- 0% coverage suggests tests aren't even executing properly\n- No coverage data generated implies fundamental infrastructure issues\n\n## Coverage Analysis & Gaps\n**COMPLETE COVERAGE BREAKDOWN**:\n- Zero coverage across all files indicates tests aren't running at all\n- Critical backend components (MTF engine, LSTM predictor, market data) completely untested\n- No API endpoints, database queries, or core engine logic validated\n\n## Potential Issues with Recent Changes\n1. **Environment/Infrastructure Failure**:\n   - Test runner crashing before execution begins\n   - Missing dependencies or broken virtual environment\n   - Database connections failing in test setup\n\n2. **Recent File Changes Impact**:\n   - `conftest.py` modifications likely broke test fixtures/setup\n   - New ML components (`lstm_queue_predictor.py`) may have incompatible dependencies\n   - MTF engine changes could have broken core test infrastructure\n\n3. **Integration Test Issues**:\n   - Sandbox integration tests failing catastrophically\n   - Mock APIs (`test_active_deals_api_mock`, `test_bots_api_mock`) potentially misconfigured\n\n## Immediate Recommendations\n1. **Triage Infrastructure**:\n   ```bash\n   # Check test runner directly\n   python -m pytest tests/ --tb=short -v\n   # Validate dependencies\n   pip list | grep pytest\n   # Test individual simple test cases\n   python -m pytest tests/test_phase1_security.py -v\n   ```\n\n2. **Fix Test Setup**:\n   - Review `tests/backend/conftest.py` for fixture errors\n   - Check database connections and environment variables\n   - Verify all required services are running\n\n3. **Isolate Failure**:\n   - Run tests file by file to identify the breaking point\n   - Check for unhandled exceptions in test setup/teardown\n   - Validate recent changes to core engine files\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- Core trading engine (MTF) completely untested\n- Market data ingestion and processing unvalidated\n- ML prediction API endpoints not verified\n- Database optimization changes unproven\n\n**Priority**: Fix test infrastructure immediately before any further development or deployment.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 291,
+      "completion_tokens": 507,
+      "total_tokens": 798,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 227
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

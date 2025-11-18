@@ -1,0 +1,264 @@
+# Prometheus Alerting Rules for Circuit Breaker Monitoring
+# 
+# Installation:
+#   1. Copy this file to Prometheus server: /etc/prometheus/alerting_rules.yml
+#   2. Add to prometheus.yml:
+#      rule_files:
+#        - "alerting_rules.yml"
+#   3. Reload Prometheus: sudo systemctl reload prometheus
+#
+# Alert Manager Integration:
+#   Configure alertmanager.yml with email/Slack/PagerDuty receivers
+#
+# Version: 2.0 (Circuit Breaker V2 with Prometheus metrics)
+
+groups:
+  - name: circuit_breaker_critical
+    interval: 30s
+    rules:
+      # CRITICAL: All API keys have open circuit breaker
+      - alert: AllKeysCircuitBreakerOpen
+        expr: |
+          sum(circuit_breaker_state{provider="deepseek"} == 2) 
+          == 
+          count(circuit_breaker_state{provider="deepseek"})
+        for: 2m
+        labels:
+          severity: critical
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "🚨 ALL API keys circuit breakers are OPEN"
+          description: |
+            All {{ $value }} DeepSeek API keys have open circuit breakers.
+            System is unable to make any API requests.
+            
+            **Immediate Action Required:**
+            1. Check DeepSeek API status: https://platform.deepseek.com/status
+            2. Review recent error logs for root cause
+            3. Manually reset circuit breakers if API is healthy:
+               POST /api/v1/circuit-breaker/reset
+            4. Consider rotating to backup API keys if available
+            
+            **Dashboard:** http://grafana:3000/d/circuit-breaker
+          runbook_url: "https://docs.yourcompany.com/runbooks/circuit-breaker-all-open"
+
+      # CRITICAL: High percentage of keys open
+      - alert: MajorityKeysCircuitBreakerOpen
+        expr: |
+          (sum(circuit_breaker_state{provider="deepseek"} == 2) 
+          / 
+          count(circuit_breaker_state{provider="deepseek"})) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "⚠️ Majority of API keys have OPEN circuit breaker"
+          description: |
+            {{ $value | humanizePercentage }} of DeepSeek API keys have open circuit breakers.
+            System capacity is severely degraded.
+            
+            **Action Required:**
+            1. Investigate cause of widespread failures
+            2. Check rate limit status across all keys
+            3. Review error patterns in logs
+            4. Consider temporarily increasing failure_threshold if transient issue
+          runbook_url: "https://docs.yourcompany.com/runbooks/circuit-breaker-majority-open"
+
+      # WARNING: Circuit breaker flapping
+      - alert: CircuitBreakerFlapping
+        expr: |
+          rate(circuit_breaker_transitions_total{provider="deepseek"}[10m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "🔄 Circuit breaker flapping detected for {{ $labels.key_id }}"
+          description: |
+            Circuit breaker for key {{ $labels.key_id }} is rapidly transitioning states.
+            Rate: {{ $value | humanize }} transitions per second over 10 minutes.
+            
+            **Possible Causes:**
+            - Threshold too sensitive (failure_threshold=5 may be too low)
+            - Intermittent network issues
+            - API endpoint instability
+            - Timeout too short (current: 60s)
+            
+            **Action:**
+            1. Review transition pattern in Grafana
+            2. Consider increasing failure_threshold to 7-10
+            3. Increase timeout to 90-120s if transient failures
+            4. Check network latency to DeepSeek API
+          runbook_url: "https://docs.yourcompany.com/runbooks/circuit-breaker-flapping"
+
+  - name: circuit_breaker_errors
+    interval: 1m
+    rules:
+      # WARNING: High failure count approaching threshold
+      - alert: CircuitBreakerHighFailureCount
+        expr: |
+          circuit_breaker_failure_count{provider="deepseek"} >= 4
+        for: 1m
+        labels:
+          severity: warning
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "⚠️ High failure count for key {{ $labels.key_id }}"
+          description: |
+            API key {{ $labels.key_id }} has {{ $value }} failures (threshold: 5).
+            Circuit breaker will open on next failure.
+            
+            **Proactive Action:**
+            1. Review recent errors for this key
+            2. Check if rate limit is approaching
+            3. Monitor for imminent circuit breaker trip
+          runbook_url: "https://docs.yourcompany.com/runbooks/circuit-breaker-high-failures"
+
+      # INFO: Circuit breaker opened
+      - alert: CircuitBreakerOpened
+        expr: |
+          circuit_breaker_state{provider="deepseek"} == 2
+        for: 1m
+        labels:
+          severity: info
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "ℹ️ Circuit breaker OPEN for key {{ $labels.key_id }}"
+          description: |
+            Circuit breaker for API key {{ $labels.key_id }} is OPEN.
+            Requests are failing fast for 60 seconds before retry attempt.
+            
+            **Status:** Will automatically attempt recovery via HALF_OPEN state.
+            **Expected Recovery Time:** ~60 seconds
+            
+            **Manual Override (if needed):**
+            POST /api/v1/circuit-breaker/{{ $labels.key_id }}/reset
+          runbook_url: "https://docs.yourcompany.com/runbooks/circuit-breaker-opened"
+
+      # WARNING: Circuit breaker stuck in HALF_OPEN
+      - alert: CircuitBreakerStuckHalfOpen
+        expr: |
+          circuit_breaker_state{provider="deepseek"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "⏳ Circuit breaker stuck in HALF_OPEN for {{ $labels.key_id }}"
+          description: |
+            Circuit breaker for key {{ $labels.key_id }} has been in HALF_OPEN state for 5+ minutes.
+            This indicates recovery attempts are repeatedly failing.
+            
+            **Investigation:**
+            1. Check if API endpoint is partially degraded
+            2. Review success_count metric (needs 2 successes to close)
+            3. Check if half_open_max_calls is too restrictive (current: 3)
+            
+            **Resolution:**
+            - If API is healthy: Manually reset circuit breaker
+            - If API is degraded: Wait for automatic recovery or disable key
+          runbook_url: "https://docs.yourcompany.com/runbooks/circuit-breaker-stuck-halfopen"
+
+  - name: circuit_breaker_performance
+    interval: 1m
+    rules:
+      # WARNING: Excessive time in OPEN state
+      - alert: CircuitBreakerExcessiveDowntime
+        expr: |
+          sum(rate(circuit_breaker_state_duration_seconds{provider="deepseek",state="open"}[10m])) > 300
+        for: 5m
+        labels:
+          severity: warning
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "⏱️ Circuit breakers spending excessive time OPEN"
+          description: |
+            Circuit breakers have been OPEN for cumulative {{ $value | humanizeDuration }} over 10 minutes.
+            This indicates persistent API availability issues.
+            
+            **Impact:** Reduced system capacity, failed requests
+            **Action:** Escalate to API provider or infrastructure team
+          runbook_url: "https://docs.yourcompany.com/runbooks/circuit-breaker-downtime"
+
+      # INFO: High trip rate
+      - alert: CircuitBreakerHighTripRate
+        expr: |
+          rate(circuit_breaker_trips_total{provider="deepseek"}[1h]) > 0.05
+        for: 10m
+        labels:
+          severity: info
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "📊 High circuit breaker trip rate"
+          description: |
+            Circuit breakers are tripping at {{ $value | humanize }} trips/second over 1 hour.
+            
+            **Analysis:**
+            - May indicate systemic API issues
+            - Could suggest threshold misconfiguration
+            - Review error patterns for common causes
+            
+            **Recommendation:**
+            If sustained, consider:
+            1. Load testing to validate thresholds
+            2. Adjusting failure_threshold (current: 5)
+            3. Investigating root cause of failures
+          runbook_url: "https://docs.yourcompany.com/runbooks/circuit-breaker-trip-rate"
+
+  - name: circuit_breaker_health
+    interval: 5m
+    rules:
+      # INFO: Circuit breaker metrics missing
+      - alert: CircuitBreakerMetricsMissing
+        expr: |
+          absent(circuit_breaker_state{provider="deepseek"})
+        for: 5m
+        labels:
+          severity: warning
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "❌ Circuit breaker metrics not available"
+          description: |
+            No circuit breaker metrics from DeepSeek provider for 5+ minutes.
+            
+            **Possible Causes:**
+            1. ParallelDeepSeekClientV2 not running
+            2. Prometheus scraping failing
+            3. prometheus_client not installed
+            4. Circuit breakers not initialized
+            
+            **Action:**
+            1. Check backend service status
+            2. Verify Prometheus scrape target health
+            3. Review backend logs for errors
+          runbook_url: "https://docs.yourcompany.com/runbooks/circuit-breaker-metrics-missing"
+
+      # SUCCESS: All circuit breakers healthy
+      - alert: CircuitBreakerAllHealthy
+        expr: |
+          sum(circuit_breaker_state{provider="deepseek"} == 0) 
+          == 
+          count(circuit_breaker_state{provider="deepseek"})
+        for: 10m
+        labels:
+          severity: info
+          component: circuit_breaker
+          provider: deepseek
+        annotations:
+          summary: "✅ All circuit breakers CLOSED (healthy)"
+          description: |
+            All {{ $value }} DeepSeek API keys have CLOSED circuit breakers.
+            System is operating at full capacity.
+            
+            **Status:** Normal operation
+            **Performance:** Optimal

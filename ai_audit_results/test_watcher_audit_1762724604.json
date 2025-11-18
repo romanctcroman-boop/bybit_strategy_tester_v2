@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762724604,
+  "changed_files": [
+    "reliability\\deepseek_client.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762724591.5112379,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Tests are completely non-functional. Exit code -1 indicates catastrophic failure (likely unhandled exception or environment crash). Zero coverage confirms no tests executed successfully.\n\n## Coverage Analysis & Gaps\n- **0% coverage** across all files\n- No test execution means no reliability data\n- Complete testing black hole - cannot assess any code paths\n\n## Potential Issues with Recent Changes\nThe `deepseek_client.py` modification likely introduced:\n- **Fatal import/circular dependency** preventing test discovery\n- **Syntax errors** or **missing dependencies** crashing test runner\n- **Environment configuration** issues (missing API keys, auth tokens)\n- **Breaking interface changes** without test updates\n\n## Immediate Recommendations\n1. **Debug Test Runner**:\n   ```bash\n   python -m pytest -v --tb=short  # Identify crashing test\n   python -c \"import reliability.deepseek_client\"  # Check import works\n   ```\n\n2. **Fix Critical Path**:\n   - Add try/except blocks around client initialization\n   - Mock external dependencies in tests\n   - Add validation for required environment variables\n\n3. **Restore Baseline**:\n   - Revert `deepseek_client.py` changes if recently modified\n   - Add minimal smoke test before complex test suite\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would be extremely dangerous:\n- No validation of client functionality\n- Potential silent failures in API integration\n- Complete loss of reliability monitoring\n\n**Priority**: Fix test execution immediately before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 125,
+      "completion_tokens": 324,
+      "total_tokens": 449,
+      "prompt_tokens_details": {
+        "cached_tokens": 64
+      },
+      "prompt_cache_hit_tokens": 64,
+      "prompt_cache_miss_tokens": 61
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}

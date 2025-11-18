@@ -1,0 +1,33 @@
+{
+  "timestamp": 1762693214,
+  "changed_files": [
+    "full_ai_audit_deepseek_perplexity_deepseek.py"
+  ],
+  "test_results": {
+    "pytest_exit_code": -1,
+    "coverage_total": 0,
+    "coverage_by_file": {},
+    "timestamp": 1762693194.3485794,
+    "success": false,
+    "error": "'CoverageData' object has no attribute 'covered_lines'"
+  },
+  "analysis_results": {
+    "analysis": "## Test Quality Assessment\n**CRITICAL FAILURE** - Test execution failed completely (Exit Code -1). No meaningful test quality can be assessed since tests didn't run successfully. This indicates either catastrophic test infrastructure issues or severe code defects preventing test execution.\n\n## Coverage Analysis\n**ZERO COVERAGE** - 0.00% coverage confirms no tests executed. The empty coverage report suggests:\n- Test runner cannot import/execute the changed file\n- Fatal errors during test discovery or setup\n- Missing dependencies or configuration\n\n## Potential Issues with Recent Changes\nThe single changed file `full_ai_audit_deepseek_perplexity_deepseek.py` likely contains:\n- **Syntax errors** preventing import\n- **Missing imports** or dependencies\n- **Runtime errors** in module-level code\n- **Circular imports** or namespace conflicts\n- **Environment-specific code** failing in test environment\n\n## Immediate Recommendations\n\n1. **Debug Test Failure First**\n   ```bash\n   python -m pytest --tb=short -x  # Isolate first failing test\n   python -c \"import full_ai_audit_deepseek_perplexity_deepseek\"  # Check import\n   ```\n\n2. **Check Module-Level Code**\n   - Move any executable code from global scope into functions\n   - Add `if __name__ == \"__main__\":` guards\n   - Verify all imports are available in test environment\n\n3. **Validate Test Configuration**\n   - Ensure pytest can discover and import the module\n   - Check for missing test dependencies\n   - Verify PYTHONPATH includes module location\n\n## Risk Assessment\n**HIGH RISK** - Production deployment would likely fail with same errors. Zero test coverage means:\n- No validation of recent changes\n- High probability of runtime errors\n- Potential data loss or system instability\n- **Do not deploy** until basic tests pass and coverage >70%\n\n## Priority Action\nFix the import/execution error in the changed file first, then establish minimal test coverage before any further development.",
+    "model": "deepseek-chat",
+    "usage": {
+      "prompt_tokens": 135,
+      "completion_tokens": 423,
+      "total_tokens": 558,
+      "prompt_tokens_details": {
+        "cached_tokens": 128
+      },
+      "prompt_cache_hit_tokens": 128,
+      "prompt_cache_miss_tokens": 7
+    },
+    "success": true
+  },
+  "metadata": {
+    "watch_path": "D:\\bybit_strategy_tester_v2",
+    "debounce_seconds": 20
+  }
+}
