@@ -1,0 +1,15 @@
+﻿{
+    "timestamp":  "2025-11-18_23-25-38",
+    "backend":  "http://127.0.0.1:8000",
+    "prometheus":  "http://localhost:9090",
+    "health":  {
+                   "status":  "unknown"
+               },
+    "metrics":  {
+                    "autonomy_score":  null,
+                    "circuit_breaker_state":  null,
+                    "circuit_breaker_open_24h":  null,
+                    "latency_p95_5m":  null,
+                    "recovery_ratio_1h":  null
+                }
+}
