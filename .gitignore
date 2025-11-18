@@ -299,6 +299,9 @@ FINAL_*.md
 INDEX_*.md
 P0_*.md
 
+# Large patch files
+*.patch
+
 # Analysis and utility scripts (temporary)
 analyze_*.py
 check_*.py
