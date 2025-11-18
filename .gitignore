@@ -259,7 +259,9 @@ DEEPSEEK_*.md
 # Environment files
 .env.development
 .env.production
-.env.backup
+.env.backup*
+.env.*.backup.*
+ai_audit_results/API.txt
 
 # Test results
 *_RESULTS.json
