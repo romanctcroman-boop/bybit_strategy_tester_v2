@@ -1,4 +1,18 @@
 testcontainers
 redis
 psycopg2-binary
+<<<<<<< Updated upstream
 pytest
+=======
+pytest
+pytest-asyncio
+pandas
+celery
+loguru
+httpx
+pyyaml>=6.0.1
+black
+ruff
+pre-commit
+river>=0.21.0,<0.22.0
+>>>>>>> Stashed changes

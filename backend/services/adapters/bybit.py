@@ -6,6 +6,7 @@ Behavior:
 
 This module focuses on a small subset used by the strategy tester: fetching klines (candles) and recent trades.
 """
+<<<<<<< Updated upstream
 from typing import List, Dict, Optional, Any
 import logging
 import time
@@ -15,6 +16,45 @@ import json
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
+=======
+
+import json
+import os
+from datetime import UTC, datetime
+from typing import Any
+
+# Import новых модулей
+from backend.core.config import get_config
+from backend.core.logging_config import get_logger
+from backend.core.retry import retry_with_backoff
+from backend.core.exceptions import (
+    BybitAPIError,
+    BybitRateLimitError,
+    BybitSymbolNotFoundError,
+    BybitInvalidIntervalError,
+    BybitConnectionError,
+    BybitTimeoutError,
+    handle_bybit_error
+)
+from backend.core.metrics import (
+    record_cache_hit,
+    record_cache_miss,
+    record_cache_set,
+    record_api_fetch,
+    record_db_store,
+    record_rate_limit_hit,
+    record_retry_attempt,
+    record_historical_fetch,
+    init_adapter_info,
+    track_api_request
+)
+from backend.core.cache import get_cache, make_cache_key
+from backend.reliability.http_retry import requests_retry
+
+# Получить конфигурацию и логгер
+config = get_config()
+logger = get_logger(__name__)
+>>>>>>> Stashed changes
 
 try:
     # pybit v2+ (the unofficial/official clients vary by name); attempt common import
@@ -46,7 +86,28 @@ class BybitAdapter:
         # cache TTL in seconds
         self._instruments_cache_ttl = 60 * 5
 
+<<<<<<< Updated upstream
     def get_klines(self, symbol: str, interval: str = "1", limit: int = 200) -> List[Dict]:
+=======
+    def _requests_get(
+        self,
+        operation_name: str,
+        url: str,
+        *,
+        params: dict | None = None,
+        timeout: float = 2.0,
+    ):
+        """Perform a GET request with the shared retry strategy."""
+
+        def _call():
+            response = self.session.get(url, params=params, timeout=timeout)
+            response.raise_for_status()
+            return response
+
+        return requests_retry(operation_name, _call)
+
+    def get_klines(self, symbol: str, interval: str = "1", limit: int = 200) -> list[dict]:
+>>>>>>> Stashed changes
         """Fetch kline/candle data. interval is minutes as string in Bybit public API mapping.
 
         Returns list of dicts with keys: open_time, open, high, low, close, volume
@@ -70,7 +131,10 @@ class BybitAdapter:
 
         if self._client:
             try:
-                res = self._client.kline(symbol=symbol, interval=interval, limit=limit)
+                res = requests_retry(
+                    "bybit.get_klines",
+                    lambda: self._client.kline(symbol=symbol, interval=interval, limit=limit),
+                )
                 # pybit may return nested structure; attempt to normalize
                 data = res.get('result') if isinstance(res, dict) and 'result' in res else res
                 if isinstance(data, dict) and 'list' in data:
@@ -158,6 +222,7 @@ class BybitAdapter:
             self.last_chosen_symbol = chosen
             # validate chosen symbol against instruments cache (auto-refresh if needed)
             try:
+<<<<<<< Updated upstream
                 valid = self.validate_symbol(chosen)
                 if valid != chosen:
                     # use normalized/validated symbol
@@ -170,6 +235,20 @@ class BybitAdapter:
             try:
                 r = requests.get(v5_kline_url, params=params, timeout=self.timeout)
                 r.raise_for_status()
+=======
+                params = {
+                    "category": "linear",
+                    "symbol": chosen_symbol,
+                    "interval": interval_norm,
+                    "limit": limit,
+                }
+                r = self._requests_get(
+                    "bybit.get_klines",
+                    v5_kline_url,
+                    params=params,
+                    timeout=2,
+                )
+>>>>>>> Stashed changes
                 payload = r.json()
                 # Persist raw payload for audit (append JSONL)
                 try:
@@ -207,8 +286,17 @@ class BybitAdapter:
         try:
             url_spot = "https://api.bybit.com/spot/quote/v1/kline"
             params = {"symbol": symbol, "interval": interval_norm, "limit": limit}
+<<<<<<< Updated upstream
             r = requests.get(url_spot, params=params, timeout=self.timeout)
             r.raise_for_status()
+=======
+            r = self._requests_get(
+                "bybit.get_spot_kline",
+                url_spot,
+                params=params,
+                timeout=2,
+            )
+>>>>>>> Stashed changes
             payload = r.json()
             data = payload.get('result') or payload.get('data') or payload.get('list') or []
             if isinstance(data, dict) and 'list' in data:
@@ -226,9 +314,19 @@ class BybitAdapter:
         # Legacy / older linear kline endpoint fallback
         try:
             url = "https://api.bybit.com/public/linear/kline"
+<<<<<<< Updated upstream
             params = {"symbol": symbol, "interval": interval_norm.replace('m',''), "limit": limit}
             r = requests.get(url, params=params, timeout=self.timeout)
             r.raise_for_status()
+=======
+            params = {"symbol": symbol, "interval": interval_norm.replace("m", ""), "limit": limit}
+            r = self._requests_get(
+                "bybit.get_legacy_kline",
+                url,
+                params=params,
+                timeout=2,
+            )
+>>>>>>> Stashed changes
             payload = r.json()
             data = payload.get('result') or payload.get('data') or []
             if isinstance(data, dict) and 'list' in data:
@@ -238,7 +336,196 @@ class BybitAdapter:
             logger.exception("All Bybit probes failed")
             raise
 
+<<<<<<< Updated upstream
     def _normalize_kline_row(self, row: Dict) -> Dict:
+=======
+    def get_klines_historical(
+        self, 
+        symbol: str, 
+        interval: str = "1", 
+        total_candles: int = 2000,
+        end_time: int | None = None
+    ) -> list[dict]:
+        """
+        Загрузить исторические свечи с обходом лимита API в 1000 свечей.
+        Делает множественные запросы, двигаясь назад во времени.
+        
+        Args:
+            symbol: Торговая пара (например, 'BTCUSDT')
+            interval: Интервал свечей ('1', '5', '15', '60', 'D' и т.д.)
+            total_candles: Общее количество свечей для загрузки
+            end_time: Конечная временная метка (мс). Если None - текущее время
+            
+        Returns:
+            Список свечей, отсортированный по времени (от старых к новым)
+        """
+        import time
+        
+        # Вычислить интервал в миллисекундах
+        def get_interval_ms(interval_str: str) -> int:
+            interval_str = str(interval_str)
+            if interval_str == 'D':
+                return 86400000  # 24 часа в мс
+            elif interval_str == 'W':
+                return 604800000  # 7 дней в мс
+            elif interval_str.endswith('m') or interval_str.endswith('M'):
+                minutes = int(interval_str[:-1])
+                return minutes * 60000
+            elif interval_str.endswith('h') or interval_str.endswith('H'):
+                hours = int(interval_str[:-1])
+                return hours * 3600000
+            else:
+                # Предполагаем что это минуты
+                return int(interval_str) * 60000
+        
+        interval_ms = get_interval_ms(interval)
+        current_end = end_time or int(time.time() * 1000)
+        
+        all_candles = []
+        batch_size = 1000  # Максимум за один запрос
+        requests_made = 0
+        max_requests = (total_candles // batch_size) + 2  # +2 для запаса
+        
+        logger.info(
+            f"🔄 Starting historical fetch: {symbol} {interval}, "
+            f"target={total_candles} candles, end={current_end}"
+        )
+        
+        while len(all_candles) < total_candles and requests_made < max_requests:
+            # Рассчитать startTime для текущего батча
+            # Двигаемся назад: end - (batch_size * interval)
+            start_time = current_end - (batch_size * interval_ms)
+            
+            logger.info(
+                f"📊 Batch {requests_made + 1}: fetching {batch_size} candles, "
+                f"from {start_time} to {current_end}"
+            )
+            
+            # Запрос к API с startTime и endTime
+            batch = self._fetch_klines_with_time_range(
+                symbol=symbol,
+                interval=interval,
+                limit=batch_size,
+                start_time=start_time,
+                end_time=current_end
+            )
+            
+            if not batch:
+                logger.warning(f"⚠️ No data returned for batch {requests_made + 1}, stopping")
+                break
+            
+            logger.info(f"✅ Received {len(batch)} candles in batch {requests_made + 1}")
+            
+            # Добавить в начало списка (т.к. идем назад во времени)
+            all_candles = batch + all_candles
+            
+            # Обновить end_time для следующей итерации
+            if batch:
+                # Взять время самой старой свечи из батча
+                oldest_candle_time = min(c.get('open_time', 0) for c in batch)
+                current_end = oldest_candle_time - interval_ms  # Сдвиг назад
+            else:
+                break
+            
+            requests_made += 1
+            
+            # Пауза между запросами для соблюдения rate limits
+            if requests_made < max_requests and len(all_candles) < total_candles:
+                time.sleep(0.2)  # 200ms между запросами
+        
+        # Дедупликация и сортировка
+        seen_times = set()
+        unique_candles = []
+        for candle in sorted(all_candles, key=lambda c: c.get('open_time', 0)):
+            candle_time = candle.get('open_time')
+            if candle_time and candle_time not in seen_times:
+                seen_times.add(candle_time)
+                unique_candles.append(candle)
+        
+        # Обрезать до нужного количества (берем последние)
+        result = unique_candles[-total_candles:] if len(unique_candles) > total_candles else unique_candles
+        
+        logger.info(
+            f"✅ Historical fetch complete: {len(result)} unique candles "
+            f"({requests_made} API requests)"
+        )
+        
+        return result
+    
+    def _fetch_klines_with_time_range(
+        self,
+        symbol: str,
+        interval: str,
+        limit: int,
+        start_time: int,
+        end_time: int
+    ) -> list[dict]:
+        """
+        Внутренний метод для запроса свечей с временным диапазоном.
+        Использует параметры start и end API Bybit.
+        """
+        def _to_v5_interval(itv: str) -> str:
+            itv = str(itv)
+            if itv.endswith("m") or itv.endswith("M"):
+                return itv[:-1]
+            if itv.endswith("h") or itv.endswith("H"):
+                try:
+                    return str(int(itv[:-1]) * 60)
+                except Exception:
+                    return itv[:-1]
+            if itv.endswith("d") or itv.endswith("D"):
+                return "D"
+            return itv
+        
+        interval_norm = _to_v5_interval(interval)
+        v5_kline_url = "https://api.bybit.com/v5/market/kline"
+        
+        candidates = [symbol, symbol.upper()]
+        if not symbol.upper().endswith("USDT"):
+            candidates.append(symbol.upper() + "USDT")
+        
+        for chosen_symbol in candidates:
+            try:
+                params = {
+                    "category": "linear",
+                    "symbol": chosen_symbol,
+                    "interval": interval_norm,
+                    "limit": limit,
+                    "start": start_time,
+                    "end": end_time
+                }
+                
+                r = self._requests_get(
+                    "bybit.get_klines_historical",
+                    v5_kline_url,
+                    params=params,
+                    timeout=5,
+                )
+                payload = r.json()
+                
+                result = payload.get("result") or payload.get("data") or payload
+                if isinstance(result, dict) and "list" in result:
+                    data = result["list"]
+                elif isinstance(result, list):
+                    data = result
+                else:
+                    data = []
+                
+                if data:
+                    normalized = [self._normalize_kline_row(d) for d in data]
+                    return normalized
+                    
+            except Exception as ex:
+                logger.debug(
+                    f"Fetch with time range failed for {chosen_symbol}: {ex}",
+                    exc_info=False
+                )
+                continue
+        
+        return []
+
+    def _normalize_kline_row(self, row: dict) -> dict:
+>>>>>>> Stashed changes
         # Accept both list-style and dict-style rows
         # Always preserve the original data under 'raw' to avoid any data loss
         if isinstance(row, list):
@@ -569,14 +856,77 @@ class BybitAdapter:
             return
         v5_url_info = "https://api.bybit.com/v5/market/instruments-info"
         try:
-            r = requests.get(v5_url_info, params={"category": "linear"}, timeout=self.timeout)
-            r.raise_for_status()
+            r = self._requests_get(
+                "bybit.instrument_discovery",
+                v5_url_info,
+                params={"category": "linear"},
+                timeout=self.timeout,
+            )
             info = r.json()
             instruments = info.get('result', {}).get('list', []) if isinstance(info.get('result'), dict) else info.get('result') or []
             self._instruments_cache = {itm.get('symbol'): itm for itm in instruments if isinstance(itm, dict) and itm.get('symbol')}
             self._instruments_cache_at = now
         except Exception:
+<<<<<<< Updated upstream
             logger.exception('Failed to refresh instruments cache')
+=======
+            logger.exception("Failed to refresh instruments cache")
+
+    def get_recent_trades(self, symbol: str, limit: int = 250) -> list[dict]:
+        """Fetch recent trades/ticks for a symbol.
+
+        Returns list of dicts with keys: time, price, qty, side
+        This provides real-time data that updates every tick (not every minute like candles).
+        """
+        # Try v5 public trades endpoint
+        v5_trades_url = "https://api.bybit.com/v5/market/recent-trade"
+        candidates = [symbol, symbol.upper()]
+        if not symbol.upper().endswith("USDT"):
+            candidates.append(symbol.upper() + "USDT")
+
+        for chosen_symbol in candidates:
+            try:
+                params = {"category": "linear", "symbol": chosen_symbol, "limit": limit}
+                r = self._requests_get(
+                    "bybit.get_trades",
+                    v5_trades_url,
+                    params=params,
+                    timeout=2,
+                )
+                payload = r.json()
+                result = payload.get("result") or payload.get("data") or payload
+                if isinstance(result, dict) and "list" in result:
+                    data = result["list"]
+                elif isinstance(result, list):
+                    data = result
+                else:
+                    data = []
+
+                if data:
+                    logger.info(
+                        f"Successfully fetched {len(data)} trades from Bybit for {chosen_symbol}"
+                    )
+                    # Normalize trades
+                    normalized = []
+                    for trade in data:
+                        if isinstance(trade, dict):
+                            normalized.append(
+                                {
+                                    "time": int(trade.get("execTime", trade.get("time", 0))),
+                                    "price": float(trade.get("price", 0)),
+                                    "qty": float(trade.get("size", trade.get("qty", 0))),
+                                    "side": trade.get("side", "Unknown").lower(),  # 'Buy' or 'Sell'
+                                }
+                            )
+                    return normalized
+            except Exception:
+                logger.debug(f"Bybit v5 trades fetch failed for {chosen_symbol}", exc_info=False)
+                continue
+
+        # Fallback: return empty list if all failed
+        logger.warning(f"Could not fetch recent trades for {symbol}")
+        return []
+>>>>>>> Stashed changes
 
     def validate_symbol(self, symbol: str) -> str:
         """Validate and normalize a symbol. Returns the canonical symbol if valid, else raises ValueError.

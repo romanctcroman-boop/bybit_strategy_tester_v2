@@ -15,6 +15,11 @@ from sqlalchemy.orm import Session
 from backend.celery_app import celery_app
 from backend.database import SessionLocal, Optimization
 from backend.core.engine_adapter import get_engine
+<<<<<<< Updated upstream
+=======
+from backend.database import SessionLocal
+from backend.models import Optimization
+>>>>>>> Stashed changes
 from backend.services.data_service import DataService
 
 

@@ -205,3 +205,139 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+<<<<<<< Updated upstream
+=======
+
+# --- Node / Vite / Frontend artifacts ---
+# Do not track node_modules or build outputs
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+# --- Local runtime artifacts ---
+# PID files and local logs should not be tracked
+*.pid
+.uvicorn.pid
+logs/
+**/logs/
+*.log
+
+# --- Local SQLite databases ---
+*.sqlite3
+
+# Temporary test files
+.pytest-tmp/
+.pytest_tmp/
+_deep_snapshot/
+deep_project_analyzer.ps1
+demo.db
+
+# Test cache files (Parquet)
+data/test_cache/*.parquet
+
+# DeepSeek temporary files
+*.backup_*.py
+*_backup_*.py
+deepseek_*.log
+deepseek_*_state.json
+DEEPSEEK_*.json
+DEEPSEEK_*.md
+
+# Environment files
+.env.development
+.env.production
+.env.backup*
+.env.*.backup.*
+ai_audit_results/API.txt
+
+# Test results
+*_RESULTS.json
+*_results.json
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+
+# AI reports and analysis files (keep only key docs in docs/)
+AGENT_*.md
+ALL_*.md
+CONCRETE_*.md
+CRITICAL_*.md
+BACKEND_*.md
+*ANALYSIS*.md
+*AUDIT*.md
+*DEEPSEEK*.md
+*PERPLEXITY*.md
+*REPORT*.md
+*SUMMARY*.md
+# PHASE*.md - REMOVED: Need to track monitoring documentation
+QUICK_WIN*.md
+PROJECT_ANALYSIS.md
+
+# Phase 1 monitoring documentation (must track)
+!PHASE1_MONITORING_SETUP_COMPLETE.md
+!PHASE1_STAGING_FIXES_COMPLETION.md
+!monitoring/daily_phase1_summary.md
+MCP_*.md
+E2E_*.md
+FULL_*.md
+FINAL_*.md
+INDEX_*.md
+P0_*.md
+
+# Large patch files
+*.patch
+
+# Analysis and utility scripts (temporary)
+analyze_*.py
+check_*.py
+benchmark_*.py
+apply_*.py
+create_*.py
+conduct_*.py
+send_*.py
+adapt_*.py
+complete_*.py
+collaborative_*.py
+deep_*.py
+
+# Temporary JSON files
+analysis_*.json
+COLLABORATIVE_*.json
+*_COMPLETION_*.json
+*_VERIFICATION_*.json
+COMPREHENSIVE_*.json
+
+# Celery schedule
+celerybeat-schedule
+
+# Encrypted secrets (root copy is symlink/temp)
+/encrypted_secrets.json
+
+# Temporary data files
+data.sqlite3
+
+# Legacy files with example API keys
+CRITICAL_FIXES_FINAL_REPORT.md
+NEXT_STEPS.md
+query_perplexity.py
+
+# Migration scripts with plaintext keys (run once and delete)
+migrate_api_keys.py
+
+# Grafana credentials (local only)
+monitoring/.grafana_credentials
+>>>>>>> Stashed changes
