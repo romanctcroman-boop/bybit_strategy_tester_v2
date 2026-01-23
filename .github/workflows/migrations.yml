@@ -1,0 +1,111 @@
+# ==============================================================================
+# Database Migration Workflow
+# ==============================================================================
+# Runs database migrations when changes are detected in alembic/
+#
+# Required secrets (configure in GitHub Settings → Secrets):
+#   - STAGING_DATABASE_URL: PostgreSQL connection string for staging
+#   - PRODUCTION_DATABASE_URL: PostgreSQL connection string for production
+#   - AWS_ACCESS_KEY_ID: AWS credentials for database backups
+#   - AWS_SECRET_ACCESS_KEY: AWS credentials for database backups
+# ==============================================================================
+
+name: Database Migrations
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - "alembic/**"
+            - "backend/models/**"
+    workflow_dispatch:
+        inputs:
+            environment:
+                description: "Environment to migrate"
+                required: true
+                default: "staging"
+                type: choice
+                options:
+                    - staging
+                    - production
+
+env:
+    PYTHON_VERSION: "3.11"
+
+jobs:
+    migrate-staging:
+        name: Migrate Staging Database
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+        # Uncomment after creating 'staging' environment in GitHub Settings → Environments
+        # environment:
+        #     name: staging
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install alembic psycopg2-binary sqlalchemy
+
+            - name: Run migrations
+              env:
+                  DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+              run: |
+                  echo "Running migrations on staging..."
+                  alembic upgrade head
+                  echo "Migrations completed successfully!"
+
+    migrate-production:
+        name: Migrate Production Database
+        runs-on: ubuntu-latest
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+        # Uncomment after creating 'production' environment in GitHub Settings → Environments
+        # environment:
+        #     name: production
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install alembic psycopg2-binary sqlalchemy
+
+            - name: Create migration backup
+              env:
+                  DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+                  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+              run: |
+                  echo "Creating database backup before migration..."
+                  # Add your backup command here (pg_dump, etc.)
+
+            - name: Run migrations
+              env:
+                  DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+              run: |
+                  echo "Running migrations on production..."
+                  alembic upgrade head
+                  echo "Migrations completed successfully!"
+
+            - name: Verify migration
+              env:
+                  DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+              run: |
+                  echo "Verifying migration..."
+                  alembic current

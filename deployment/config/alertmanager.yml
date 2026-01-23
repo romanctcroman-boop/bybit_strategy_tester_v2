@@ -1,0 +1,126 @@
+# Alertmanager Configuration for Bybit Strategy Tester
+
+global:
+  resolve_timeout: 5m
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+route:
+  # Default receiver
+  receiver: 'default'
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+
+  # Subroutes
+  routes:
+    # Critical alerts - Page on-call team
+    - match:
+        severity: critical
+      receiver: 'critical'
+      group_wait: 0s
+      group_interval: 5m
+      repeat_interval: 1h
+
+    # Warning alerts - Slack notifications
+    - match:
+        severity: warning
+      receiver: 'warnings'
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 24h
+
+    # Info alerts - Log only
+    - match:
+        severity: info
+      receiver: 'info'
+      group_wait: 1m
+      group_interval: 1h
+      repeat_interval: 48h
+
+receivers:
+  # ============================================
+  # Default Receiver
+  # ============================================
+  - name: 'default'
+    slack_configs:
+      - channel: '#alerts'
+        title: 'Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+
+  # ============================================
+  # Critical Alerts (PagerDuty + Slack)
+  # ============================================
+  - name: 'critical'
+    slack_configs:
+      - channel: '#critical-alerts'
+        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        color: 'danger'
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: 'http://grafana.production.internal:3000'
+          - type: button
+            text: 'View in Prometheus'
+            url: 'http://prometheus.production.internal:9090'
+
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        description: '{{ .GroupLabels.alertname }}'
+        details:
+          firing: '{{ template "pagerduty.default.instances" .Alerts.Firing }}'
+
+  # ============================================
+  # Warning Alerts (Slack only)
+  # ============================================
+  - name: 'warnings'
+    slack_configs:
+      - channel: '#alerts'
+        title: '⚠️  WARNING: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        color: 'warning'
+
+  # ============================================
+  # Info Alerts (Email + Slack)
+  # ============================================
+  - name: 'info'
+    slack_configs:
+      - channel: '#logs'
+        title: 'ℹ️  INFO: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: false
+        color: 'good'
+
+    email_configs:
+      - to: 'alerts@company.com'
+        from: 'alertmanager@production.internal'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: '${SMTP_USERNAME}'
+        auth_password: '${SMTP_PASSWORD}'
+        headers:
+          Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+
+inhibit_rules:
+  # Inhibit info and warning alerts if the system is down
+  - source_match:
+      severity: 'critical'
+    target_match_re:
+      severity: 'warning|info'
+    equal: ['alertname', 'service']
+
+  # Inhibit warning alerts if critical alert exists
+  - source_match:
+      severity: 'warning'
+    target_match_re:
+      severity: 'info'
+    equal: ['alertname', 'service']
+

@@ -1,0 +1,15 @@
+{
+  "id": "ai_6e36036b37b0",
+  "prompt": "Write a simple moving average function",
+  "response_a": "def sma(data, period): return sum(data[-period:]) / period",
+  "response_b": "SMA = average of last N prices",
+  "preference": 0,
+  "preference_type": "ai",
+  "confidence": 0.5,
+  "reasoning": "Responses are similar in quality",
+  "created_at": "2026-01-18T08:08:50.671175+00:00",
+  "metadata": {
+    "response_a_index": 0,
+    "response_b_index": 1
+  }
+}

@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <title>ML Models Dashboard - Bybit Strategy Tester v2</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4"
+        crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- External CSS (Phase 1) -->
+    <link rel="stylesheet" href="/frontend/css/variables.css">
+    <link rel="stylesheet" href="/frontend/css/components.css">
+    <link rel="stylesheet" href="/frontend/css/ml_models.css">
+
+
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-blue: #58a6ff;
+            --accent-yellow: #d29922;
+            --accent-purple: #a371f7;
+            --border-color: #30363d;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+        }
+
+        .navbar-brand {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 18px;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .nav-link.active {
+            color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4c94e6;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .stat-card-title {
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .stat-card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .stat-card-icon.blue {
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .stat-card-icon.green {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .stat-card-icon.purple {
+            background: rgba(163, 113, 247, 0.15);
+            color: var(--accent-purple);
+        }
+
+        .stat-card-icon.yellow {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+        }
+
+        .stat-card-value {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .stat-card-change {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-card-change.positive {
+            color: var(--accent-green);
+        }
+
+        .stat-card-change.negative {
+            color: var(--accent-red);
+        }
+
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .card-body.no-padding {
+            padding: 0;
+        }
+
+        /* Accessibility helper */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .model-type-filter {
+            width: 150px;
+        }
+
+        .model-search-input {
+            width: 200px;
+        }
+
+        /* Models Table */
+        .models-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .models-table th,
+        .models-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .models-table th {
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .models-table td {
+            font-size: 14px;
+        }
+
+        .models-table tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .model-name {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .model-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .model-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .model-title {
+            font-weight: 500;
+        }
+
+        .model-type {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.active {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .status-badge.training {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+        }
+
+        .status-badge.inactive {
+            background: rgba(139, 148, 158, 0.15);
+            color: var(--text-secondary);
+        }
+
+        .accuracy-bar {
+            width: 100px;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .accuracy-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .accuracy-fill.high {
+            background: var(--accent-green);
+        }
+
+        .accuracy-fill.medium {
+            background: var(--accent-yellow);
+        }
+
+        .accuracy-fill.low {
+            background: var(--accent-red);
+        }
+
+        /* Model Details Panel */
+        .model-details {
+            margin-bottom: 20px;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-label {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .detail-value {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Feature Importance Chart */
+        .chart-container {
+            height: 250px;
+            position: relative;
+        }
+
+        /* Training History */
+        .training-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .training-item:last-child {
+            border-bottom: none;
+        }
+
+        .training-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .training-icon.success {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .training-icon.warning {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--accent-yellow);
+        }
+
+        .training-icon.error {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+        }
+
+        .training-info {
+            flex: 1;
+        }
+
+        .training-title {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .training-time {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        /* Predictions Panel */
+        .prediction-card {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .prediction-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .prediction-symbol {
+            font-weight: 600;
+        }
+
+        .prediction-direction {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+        }
+
+        .prediction-direction.long {
+            color: var(--accent-green);
+        }
+
+        .prediction-direction.short {
+            color: var(--accent-red);
+        }
+
+        .prediction-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .prediction-metric {
+            text-align: center;
+        }
+
+        .prediction-metric-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .prediction-metric-label {
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 600px;
+            max-height: 80vh;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 60vh;
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--accent-blue);
+            border-bottom-color: var(--accent-blue);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="d-flex align-items-center gap-4">
+            <a href="dashboard.html" class="navbar-brand">
+                <i class="bi bi-graph-up-arrow"></i> Bybit Strategy Tester
+            </a>
+            <div class="nav-links">
+                <a href="dashboard.html" class="nav-link">Dashboard</a>
+                <a href="strategies.html" class="nav-link">Strategies</a>
+                <a href="backtest-results.html" class="nav-link">Backtests</a>
+                <a href="market-chart.html" class="nav-link">Charts</a>
+                <a href="ml-models.html" class="nav-link active">ML Models</a>
+                <a href="strategy-builder.html" class="nav-link">Builder</a>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="text-secondary" id="serverStatus">
+                <i class="bi bi-circle-fill text-success"></i> Connected
+            </span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">
+                <i class="bi bi-cpu"></i> ML Models Dashboard
+            </h1>
+            <div class="d-flex gap-2">
+                <button class="btn btn-secondary" onclick="refreshModels()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button class="btn btn-primary" onclick="openNewModelModal()">
+                    <i class="bi bi-plus-lg"></i> New Model
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">Total Models</span>
+                    <div class="stat-card-icon blue">
+                        <i class="bi bi-boxes"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="totalModels">12</div>
+                <div class="stat-card-change positive">
+                    <i class="bi bi-arrow-up"></i> 2 new this week
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">Active Models</span>
+                    <div class="stat-card-icon green">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="activeModels">8</div>
+                <div class="stat-card-change positive">
+                    <i class="bi bi-arrow-up"></i> 1 activated today
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">Avg Accuracy</span>
+                    <div class="stat-card-icon purple">
+                        <i class="bi bi-bullseye"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="avgAccuracy">87.3%</div>
+                <div class="stat-card-change positive">
+                    <i class="bi bi-arrow-up"></i> +2.1% from last week
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">Total Predictions</span>
+                    <div class="stat-card-icon yellow">
+                        <i class="bi bi-lightning"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="totalPredictions">45.2K</div>
+                <div class="stat-card-change positive">
+                    <i class="bi bi-arrow-up"></i> +12.5% today
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="main-grid">
+            <!-- Left Column - Models Table -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Registered Models</span>
+                    <div class="d-flex gap-2">
+                        <label for="modelTypeFilter" class="visually-hidden">Filter by model type</label>
+                        <select class="form-select model-type-filter" title="Filter by model type" id="modelTypeFilter">
+                            <option value="">All Types</option>
+                            <option value="classification">Classification</option>
+                            <option value="regression">Regression</option>
+                            <option value="ensemble">Ensemble</option>
+                        </select>
+                        <label for="modelSearch" class="visually-hidden">Search models</label>
+                        <input type="text" class="form-control model-search-input" placeholder="Search models..." title="Search models" id="modelSearch">
+                    </div>
+                </div>
+                <div class="card-body no-padding">
+                    <table class="models-table">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Status</th>
+                                <th>Accuracy</th>
+                                <th>Predictions</th>
+                                <th>Last Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modelsTableBody">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="d-flex flex-column gap-4">
+                <!-- Model Details -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Selected Model Details</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="modelDetailsContent">
+                            <p class="text-secondary text-center">Select a model to view details</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Predictions -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Recent Predictions</span>
+                    </div>
+                    <div class="card-body" id="recentPredictions">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Training History -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Training History</span>
+                    </div>
+                    <div class="card-body" id="trainingHistory">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Model Modal -->
+    <div class="modal-overlay" id="newModelModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Create New Model</h3>
+                <button class="modal-close" onclick="closeNewModelModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tabs">
+                    <button class="tab active" data-tab="basic">Basic Info</button>
+                    <button class="tab" data-tab="features">Features</button>
+                    <button class="tab" data-tab="hyperparams">Hyperparameters</button>
+                </div>
+
+                <div id="tabBasic">
+                    <div class="form-group">
+                        <label class="form-label">Model Name</label>
+                        <input type="text" class="form-control" id="modelName" placeholder="e.g., BTC_Price_Predictor">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Model Type</label>
+                        <select class="form-select" id="modelType">
+                            <option value="random_forest">Random Forest</option>
+                            <option value="xgboost">XGBoost</option>
+                            <option value="lightgbm">LightGBM</option>
+                            <option value="neural_network">Neural Network</option>
+                            <option value="lstm">LSTM</option>
+                            <option value="ensemble">Ensemble</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Task Type</label>
+                        <select class="form-select" id="taskType">
+                            <option value="classification">Classification</option>
+                            <option value="regression">Regression</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Target Symbol</label>
+                        <select class="form-select" id="targetSymbol">
+                            <option value="BTCUSDT">BTCUSDT</option>
+                            <option value="ETHUSDT">ETHUSDT</option>
+                            <option value="SOLUSDT">SOLUSDT</option>
+                            <option value="all">All Symbols</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="modelDescription" rows="3" placeholder="Model description..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeNewModelModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="createModel()">
+                    <i class="bi bi-plus-lg"></i> Create Model
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data
+        const models = [
+            {
+                id: 'mdl_001',
+                name: 'BTC_Trend_Classifier',
+                type: 'XGBoost',
+                taskType: 'classification',
+                status: 'active',
+                accuracy: 0.892,
+                predictions: 15234,
+                lastUpdated: '2025-12-13T10:30:00Z',
+                features: ['rsi', 'macd', 'volume', 'price_change'],
+                version: '2.1.0'
+            },
+            {
+                id: 'mdl_002',
+                name: 'ETH_Price_Regressor',
+                type: 'LightGBM',
+                taskType: 'regression',
+                status: 'active',
+                accuracy: 0.856,
+                predictions: 12456,
+                lastUpdated: '2025-12-13T09:15:00Z',
+                features: ['rsi', 'bollinger', 'volume'],
+                version: '1.5.0'
+            },
+            {
+                id: 'mdl_003',
+                name: 'Multi_Asset_Ensemble',
+                type: 'Ensemble',
+                taskType: 'classification',
+                status: 'training',
+                accuracy: 0.823,
+                predictions: 8934,
+                lastUpdated: '2025-12-13T08:00:00Z',
+                features: ['rsi', 'macd', 'atr', 'obv'],
+                version: '3.0.0'
+            },
+            {
+                id: 'mdl_004',
+                name: 'SOL_LSTM_Predictor',
+                type: 'LSTM',
+                taskType: 'regression',
+                status: 'active',
+                accuracy: 0.871,
+                predictions: 5678,
+                lastUpdated: '2025-12-12T22:45:00Z',
+                features: ['price_sequence', 'volume_sequence'],
+                version: '1.0.0'
+            },
+            {
+                id: 'mdl_005',
+                name: 'Volatility_Detector',
+                type: 'Random Forest',
+                taskType: 'classification',
+                status: 'inactive',
+                accuracy: 0.765,
+                predictions: 3421,
+                lastUpdated: '2025-12-10T14:20:00Z',
+                features: ['atr', 'bollinger_width', 'volume_std'],
+                version: '1.2.0'
+            }
+        ];
+
+        const trainingHistory = [
+            { id: 1, model: 'BTC_Trend_Classifier', status: 'success', time: '10 minutes ago', message: 'Training completed - accuracy improved to 89.2%' },
+            { id: 2, model: 'Multi_Asset_Ensemble', status: 'warning', time: '2 hours ago', message: 'Training in progress - 67% complete' },
+            { id: 3, model: 'ETH_Price_Regressor', status: 'success', time: '5 hours ago', message: 'Model retrained with new data' },
+            { id: 4, model: 'Volatility_Detector', status: 'error', time: '1 day ago', message: 'Training failed - insufficient data' }
+        ];
+
+        const recentPredictions = [
+            { symbol: 'BTCUSDT', direction: 'long', confidence: 0.87, target: 105000, model: 'BTC_Trend_Classifier' },
+            { symbol: 'ETHUSDT', direction: 'short', confidence: 0.72, target: 3800, model: 'ETH_Price_Regressor' },
+            { symbol: 'SOLUSDT', direction: 'long', confidence: 0.81, target: 250, model: 'SOL_LSTM_Predictor' }
+        ];
+
+        let selectedModel = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            renderModelsTable();
+            renderTrainingHistory();
+            renderRecentPredictions();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('modelSearch').addEventListener('input', filterModels);
+            document.getElementById('modelTypeFilter').addEventListener('change', filterModels);
+        }
+
+        function renderModelsTable() {
+            const tbody = document.getElementById('modelsTableBody');
+            tbody.innerHTML = models.map(model => `
+                <tr onclick="selectModel('${model.id}')" style="cursor: pointer">
+                    <td>
+                        <div class="model-name">
+                            <div class="model-icon">
+                                <i class="bi bi-${getModelIcon(model.type)}"></i>
+                            </div>
+                            <div class="model-info">
+                                <span class="model-title">${model.name}</span>
+                                <span class="model-type">${model.type}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="status-badge ${model.status}">${capitalize(model.status)}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="accuracy-bar">
+                                <div class="accuracy-fill ${getAccuracyClass(model.accuracy)}" style="width: ${model.accuracy * 100}%"></div>
+                            </div>
+                            <span>${(model.accuracy * 100).toFixed(1)}%</span>
+                        </div>
+                    </td>
+                    <td>${formatNumber(model.predictions)}</td>
+                    <td>${formatRelativeTime(model.lastUpdated)}</td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); trainModel('${model.id}')" title="Train">
+                                <i class="bi bi-play-fill"></i>
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); viewMetrics('${model.id}')" title="Metrics">
+                                <i class="bi bi-graph-up"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function selectModel(modelId) {
+            selectedModel = models.find(m => m.id === modelId);
+            renderModelDetails();
+        }
+
+        function renderModelDetails() {
+            if (!selectedModel) return;
+
+            const content = document.getElementById('modelDetailsContent');
+            content.innerHTML = `
+                <div class="model-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Name</span>
+                        <span class="detail-value">${selectedModel.name}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Type</span>
+                        <span class="detail-value">${selectedModel.type}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Task</span>
+                        <span class="detail-value">${capitalize(selectedModel.taskType)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Version</span>
+                        <span class="detail-value">${selectedModel.version}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Accuracy</span>
+                        <span class="detail-value">${(selectedModel.accuracy * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Features</span>
+                        <span class="detail-value">${selectedModel.features.length} features</span>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary flex-grow-1" onclick="trainModel('${selectedModel.id}')">
+                        <i class="bi bi-play-fill"></i> Train
+                    </button>
+                    <button class="btn btn-secondary flex-grow-1" onclick="deployModel('${selectedModel.id}')">
+                        <i class="bi bi-cloud-upload"></i> Deploy
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderTrainingHistory() {
+            const container = document.getElementById('trainingHistory');
+            container.innerHTML = trainingHistory.map(item => `
+                <div class="training-item">
+                    <div class="training-icon ${item.status}">
+                        <i class="bi bi-${getStatusIcon(item.status)}"></i>
+                    </div>
+                    <div class="training-info">
+                        <div class="training-title">${item.model}</div>
+                        <div class="training-time">${item.time} - ${item.message}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderRecentPredictions() {
+            const container = document.getElementById('recentPredictions');
+            container.innerHTML = recentPredictions.map(pred => `
+                <div class="prediction-card">
+                    <div class="prediction-header">
+                        <span class="prediction-symbol">${pred.symbol}</span>
+                        <span class="prediction-direction ${pred.direction}">
+                            <i class="bi bi-arrow-${pred.direction === 'long' ? 'up' : 'down'}-circle-fill"></i>
+                            ${pred.direction.toUpperCase()}
+                        </span>
+                    </div>
+                    <div class="prediction-metrics">
+                        <div class="prediction-metric">
+                            <div class="prediction-metric-value">${(pred.confidence * 100).toFixed(0)}%</div>
+                            <div class="prediction-metric-label">Confidence</div>
+                        </div>
+                        <div class="prediction-metric">
+                            <div class="prediction-metric-value">$${formatNumber(pred.target)}</div>
+                            <div class="prediction-metric-label">Target</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterModels() {
+            const search = document.getElementById('modelSearch').value.toLowerCase();
+            const typeFilter = document.getElementById('modelTypeFilter').value;
+            
+            const filtered = models.filter(model => {
+                const matchesSearch = model.name.toLowerCase().includes(search) || 
+                                     model.type.toLowerCase().includes(search);
+                const matchesType = !typeFilter || model.taskType === typeFilter;
+                return matchesSearch && matchesType;
+            });
+
+            renderFilteredModels(filtered);
+        }
+
+        function renderFilteredModels(filteredModels) {
+            const tbody = document.getElementById('modelsTableBody');
+            if (filteredModels.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-secondary p-4">No models found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = filteredModels.map(model => `
+                <tr onclick="selectModel('${model.id}')" style="cursor: pointer">
+                    <td>
+                        <div class="model-name">
+                            <div class="model-icon">
+                                <i class="bi bi-${getModelIcon(model.type)}"></i>
+                            </div>
+                            <div class="model-info">
+                                <span class="model-title">${model.name}</span>
+                                <span class="model-type">${model.type}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="status-badge ${model.status}">${capitalize(model.status)}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="accuracy-bar">
+                                <div class="accuracy-fill ${getAccuracyClass(model.accuracy)}" style="width: ${model.accuracy * 100}%"></div>
+                            </div>
+                            <span>${(model.accuracy * 100).toFixed(1)}%</span>
+                        </div>
+                    </td>
+                    <td>${formatNumber(model.predictions)}</td>
+                    <td>${formatRelativeTime(model.lastUpdated)}</td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); trainModel('${model.id}')" title="Train">
+                                <i class="bi bi-play-fill"></i>
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); viewMetrics('${model.id}')" title="Metrics">
+                                <i class="bi bi-graph-up"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Modal functions
+        function openNewModelModal() {
+            document.getElementById('newModelModal').classList.add('active');
+        }
+
+        function closeNewModelModal() {
+            document.getElementById('newModelModal').classList.remove('active');
+        }
+
+        async function createModel() {
+            const name = document.getElementById('modelName').value;
+            const type = document.getElementById('modelType').value;
+            const taskType = document.getElementById('taskType').value;
+            const symbol = document.getElementById('targetSymbol').value;
+            const description = document.getElementById('modelDescription').value;
+
+            if (!name) {
+                alert('Please enter a model name');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/enhanced-ml/registry/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name,
+                        model_type: type,
+                        task_type: taskType,
+                        symbol,
+                        description
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Model created successfully!');
+                    closeNewModelModal();
+                    refreshModels();
+                } else {
+                    const error = await response.json();
+                    alert(`Error: ${error.detail || 'Failed to create model'}`);
+                }
+            } catch (err) {
+                console.error('Error creating model:', err);
+                alert('Model created (demo mode)');
+                closeNewModelModal();
+            }
+        }
+
+        async function trainModel(modelId) {
+            const model = models.find(m => m.id === modelId);
+            alert(`Starting training for ${model.name}...`);
+        }
+
+        async function deployModel(modelId) {
+            const model = models.find(m => m.id === modelId);
+            alert(`Deploying ${model.name} to production...`);
+        }
+
+        function viewMetrics(modelId) {
+            const model = models.find(m => m.id === modelId);
+            selectModel(modelId);
+        }
+
+        function refreshModels() {
+            renderModelsTable();
+            renderTrainingHistory();
+            renderRecentPredictions();
+        }
+
+        // Helper functions
+        function getModelIcon(type) {
+            const icons = {
+                'XGBoost': 'diagram-3',
+                'LightGBM': 'lightning',
+                'Random Forest': 'tree',
+                'LSTM': 'layers',
+                'Neural Network': 'cpu',
+                'Ensemble': 'collection'
+            };
+            return icons[type] || 'box';
+        }
+
+        function getAccuracyClass(accuracy) {
+            if (accuracy >= 0.85) return 'high';
+            if (accuracy >= 0.70) return 'medium';
+            return 'low';
+        }
+
+        function getStatusIcon(status) {
+            const icons = {
+                'success': 'check-circle-fill',
+                'warning': 'clock-fill',
+                'error': 'x-circle-fill'
+            };
+            return icons[status] || 'circle';
+        }
+
+        function capitalize(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        function formatRelativeTime(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            return `${days}d ago`;
+        }
+    </script>
+</body>
+</html>

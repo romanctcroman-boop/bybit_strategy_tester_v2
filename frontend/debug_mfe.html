@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug MFE/MAE</title>
+</head>
+<body>
+<script>
+// Quick test of trade excursion calculation
+async function test() {
+    const resp = await fetch('http://localhost:8000/api/v1/backtests/fd69829a-4ba9-4b11-acdc-e351d8d42ad2');
+    const data = await resp.json();
+    
+    const timestamps = data.equity_curve.timestamps;
+    const trades = data.trades;
+    
+    console.log('Total timestamps:', timestamps.length);
+    console.log('Total trades:', trades.length);
+    
+    // Check a few trades
+    trades.slice(0, 5).forEach((trade, idx) => {
+        const entryTime = new Date(trade.entry_time).getTime();
+        const exitTime = trade.exit_time ? new Date(trade.exit_time).getTime() : entryTime;
+        
+        let entryIdx = -1;
+        let exitIdx = -1;
+        
+        for (let i = 0; i < timestamps.length; i++) {
+            const ts = new Date(timestamps[i]).getTime();
+            if (entryIdx === -1 && ts >= entryTime) entryIdx = i;
+            if (ts >= exitTime) {
+                exitIdx = i;
+                break;
+            }
+        }
+        
+        const width = exitIdx - entryIdx + 1;
+        console.log(`Trade ${idx + 1}: entryIdx=${entryIdx}, exitIdx=${exitIdx}, width=${width} points, MFE=${trade.mfe}, MAE=${trade.mae}`);
+    });
+}
+test();
+</script>
+<p>Open browser console (F12) to see debug output</p>
+</body>
+</html>

@@ -1,0 +1,129 @@
+{
+  "started_at": "2025-12-19T18:48:26.322038+00:00",
+  "host": "ROMAX-MSI-01",
+  "pages": {
+    "charts": {
+      "url": "http://127.0.0.1:8000/frontend/market-chart.html",
+      "started_at": "2025-12-19T18:48:27.541394+00:00",
+      "clicks": [
+        {
+          "index": 0,
+          "selector": "(auto)",
+          "text": "1m",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 1,
+          "selector": "(auto)",
+          "text": "5m",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 2,
+          "selector": "(auto)",
+          "text": "15m",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 3,
+          "selector": "(auto)",
+          "text": "30m",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 4,
+          "selector": "(auto)",
+          "text": "1H",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 5,
+          "selector": "(auto)",
+          "text": "4H",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 6,
+          "selector": "(auto)",
+          "text": "1D",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 7,
+          "selector": "(auto)",
+          "text": "1W",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 8,
+          "selector": "(auto)",
+          "text": "Compare",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 9,
+          "selector": "(auto)",
+          "text": "",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 10,
+          "selector": "(auto)",
+          "text": "Add Symbol",
+          "ok": true,
+          "error": null
+        },
+        {
+          "index": 11,
+          "selector": "(auto)",
+          "text": "Tick",
+          "ok": true,
+          "error": null
+        }
+      ],
+      "loaded_screenshot": "ui_smoke_artifacts\\charts_loaded.png",
+      "found_clickables": 50,
+      "after_screenshot": "ui_smoke_artifacts\\charts_after_clicks.png",
+      "console": [
+        {
+          "ts": "2025-12-19T18:48:53.172211+00:00",
+          "type": "error",
+          "text": "[Chart] Fetch error: TypeError: Failed to fetch\n    at loadCandleData (http://127.0.0.1:8000/frontend/market-chart.html:3179:40)\n    at selectTimeframe (http://127.0.0.1:8000/frontend/market-chart.html:7634:13)\n    at HTMLButtonElement.<anonymous> (http://127.0.0.1:8000/frontend/market-chart.html:8170:29)"
+        },
+        {
+          "ts": "2025-12-19T18:48:53.173050+00:00",
+          "type": "error",
+          "text": "[Compare] BTCUSDT: Error - TypeError: Failed to fetch\n    at loadCompareData (http://127.0.0.1:8000/frontend/market-chart.html:4979:40)\n    at addToCompare (http://127.0.0.1:8000/frontend/market-chart.html:4911:13)\n    at toggleCompareMode (http://127.0.0.1:8000/frontend/market-chart.html:4817:17)\n    at HTMLButtonElement.onclick (http://127.0.0.1:8000/frontend/market-chart.html:1651:135)"
+        },
+        {
+          "ts": "2025-12-19T18:48:53.173331+00:00",
+          "type": "error",
+          "text": "[Compare] BTCUSDT: Failed to load data"
+        },
+        {
+          "ts": "2025-12-19T18:48:54.681359+00:00",
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+        }
+      ],
+      "page_errors": [
+        "2025-12-19T18:48:47.219814+00:00 | Value is null",
+        "2025-12-19T18:48:47.788767+00:00 | Value is null"
+      ],
+      "http_failures": [],
+      "page_closed_reason": null,
+      "finished_at": "2025-12-19T18:48:54.727026+00:00"
+    }
+  },
+  "finished_at": "2025-12-19T18:48:54.727039+00:00"
+}

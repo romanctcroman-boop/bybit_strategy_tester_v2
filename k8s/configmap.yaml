@@ -1,0 +1,52 @@
+# ==============================================================================
+# Bybit Strategy Tester - ConfigMap
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bybit-config
+  namespace: bybit-strategy-tester
+  labels:
+    app.kubernetes.io/name: bybit-strategy-tester
+data:
+  # Application Settings
+  APP_ENV: "production"
+  APP_DEBUG: "false"
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  
+  # Database Settings (non-sensitive)
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "bybit_prod"
+  DB_POOL_SIZE: "20"
+  DB_MAX_OVERFLOW: "30"
+  
+  # Redis Settings (non-sensitive)
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  
+  # Bybit API Settings
+  BYBIT_API_BASE_URL: "https://api.bybit.com"
+  BYBIT_API_TIMEOUT: "10"
+  BYBIT_RATE_LIMIT_DELAY: "0.2"
+  BYBIT_CACHE_ENABLED: "true"
+  BYBIT_WS_ENABLED: "1"
+  BYBIT_WS_SYMBOLS: "BTCUSDT,ETHUSDT,SOLUSDT"
+  BYBIT_WS_INTERVALS: "1,5,15"
+  
+  # Security Settings
+  CORS_ALLOW_ALL: "false"
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_DEFAULT_CALLS: "100"
+  RATE_LIMIT_DEFAULT_PERIOD: "60"
+  
+  # Agent Settings
+  FORCE_DIRECT_AGENT_API: "1"
+  MCP_DISABLED: "1"
+  
+  # Feature Flags
+  FEATURE_ML_ANOMALY_DETECTION: "true"
+  FEATURE_RL_TRADING_AGENT: "false"
+  FEATURE_NLP_SENTIMENT: "false"

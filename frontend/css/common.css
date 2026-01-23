@@ -1,0 +1,583 @@
+/**
+ * 🌐 Common Styles - Bybit Strategy Tester v2
+ * 
+ * Shared styles used across all pages.
+ * Extracted during Phase 1 Week 2: CSS Extraction
+ * 
+ * This file contains:
+ * - CSS Reset / Base styles
+ * - Common layout patterns
+ * - Shared animations
+ * - Utility classes
+ * 
+ * @version 1.0.0
+ * @date 2025-12-21
+ */
+
+/* Import design tokens */
+@import 'variables.css';
+
+/* ============================================
+   CSS RESET / BASE STYLES
+   ============================================ */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-base);
+    background: var(--bg-color);
+    color: var(--text-color);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ============================================
+   COMMON LAYOUT
+   ============================================ */
+
+.container {
+    max-width: 1880px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+}
+
+.container-fluid {
+    max-width: 100%;
+    padding: 0 var(--spacing-md);
+}
+
+/* Flex Utilities */
+.flex { display: flex; }
+.flex-column { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.gap-xs { gap: var(--spacing-xs); }
+.gap-sm { gap: var(--spacing-sm); }
+.gap-md { gap: var(--spacing-md); }
+.gap-lg { gap: var(--spacing-lg); }
+
+/* Grid Utilities */
+.grid { display: grid; }
+.grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-cols-6 { grid-template-columns: repeat(6, 1fr); }
+
+@media (max-width: 1400px) {
+    .lg\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 1200px) {
+    .md\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .md\:grid-cols-1 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .sm\:grid-cols-1 { grid-template-columns: 1fr; }
+}
+
+/* ============================================
+   COMMON HEADER
+   ============================================ */
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.page-header h1 {
+    color: var(--accent-color);
+    font-size: var(--font-size-2xl);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.page-header h1 .logo {
+    font-size: 2rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* ============================================
+   NAVIGATION LINKS
+   ============================================ */
+
+.nav-links {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.nav-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-md);
+    transition: var(--transition-fast);
+    font-size: var(--font-size-sm);
+}
+
+.nav-links a:hover {
+    color: var(--text-color);
+    background: var(--card-bg-light);
+}
+
+.nav-links a.active {
+    color: var(--accent-color);
+    background: var(--card-bg);
+}
+
+/* ============================================
+   COMMON PANEL
+   ============================================ */
+
+.panel {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--card-bg-light);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h2,
+.panel-header h3 {
+    font-size: var(--font-size-lg);
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.panel-header .badge {
+    background: var(--accent-color);
+    color: #000;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+}
+
+.panel-body {
+    padding: var(--spacing-lg);
+}
+
+/* ============================================
+   TABS
+   ============================================ */
+
+.tabs {
+    display: flex;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm);
+    background: var(--card-bg-light);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.tab {
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    border: none;
+    background: transparent;
+    font-size: var(--font-size-sm);
+}
+
+.tab:hover {
+    color: var(--text-color);
+}
+
+.tab.active {
+    background: var(--accent-color);
+    color: #000;
+}
+
+/* ============================================
+   CHART CONTAINERS
+   ============================================ */
+
+.chart-container {
+    height: 300px;
+    position: relative;
+    background: var(--card-bg-light);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+}
+
+.chart-container canvas {
+    max-height: 100%;
+    width: 100%;
+}
+
+.chart-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.chart-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.chart-card-header h3 {
+    font-size: var(--font-size-lg);
+    color: var(--text-color);
+}
+
+/* ============================================
+   STATUS INDICATORS
+   ============================================ */
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.status-dot.healthy,
+.status-dot.connected { 
+    background: var(--success-color); 
+}
+
+.status-dot.warning { 
+    background: var(--warning-color); 
+}
+
+.status-dot.unhealthy,
+.status-dot.error,
+.status-dot.disconnected { 
+    background: var(--error-color); 
+}
+
+.ws-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+}
+
+.ws-status .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+
+.ws-status.connected .dot {
+    background: var(--success-color);
+    animation: pulse 2s infinite;
+}
+
+.ws-status.disconnected .dot {
+    background: var(--error-color);
+}
+
+/* ============================================
+   LOADING & ERROR STATES
+   ============================================ */
+
+.loading-skeleton {
+    background: linear-gradient(90deg, 
+        var(--card-bg-light) 25%, 
+        var(--card-bg) 50%, 
+        var(--card-bg-light) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--radius-sm);
+}
+
+.error-message {
+    background: rgba(255, 107, 107, 0.1);
+    border: 1px solid var(--error-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    color: var(--error-color);
+    text-align: center;
+}
+
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-2xl);
+    color: var(--text-muted);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+}
+
+/* ============================================
+   REFRESH INDICATOR
+   ============================================ */
+
+.refresh-indicator {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.refresh-indicator .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: none;
+}
+
+.refresh-indicator.loading .spinner {
+    display: block;
+}
+
+/* ============================================
+   PERIOD SELECTOR
+   ============================================ */
+
+.period-selector {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.period-btn {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: var(--transition-fast);
+}
+
+.period-btn:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.period-btn.active {
+    background: var(--accent-color);
+    color: #000;
+    border-color: var(--accent-color);
+}
+
+/* ============================================
+   DATE RANGE PICKER
+   ============================================ */
+
+.date-range-picker {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    background: var(--card-bg);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.date-range-picker input[type="date"] {
+    background: var(--card-bg-light);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+}
+
+.date-range-picker input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+}
+
+.date-range-picker .apply-btn {
+    background: var(--accent-color);
+    color: #000;
+    border: none;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+}
+
+.date-range-picker .apply-btn:hover {
+    background: var(--accent-hover);
+}
+
+/* ============================================
+   COMMON ANIMATIONS
+   ============================================ */
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+@keyframes scaleIn {
+    from { 
+        opacity: 0; 
+        transform: scale(0.9); 
+    }
+    to { 
+        opacity: 1; 
+        transform: scale(1); 
+    }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Text */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-muted { color: var(--text-muted); }
+.text-success { color: var(--success-color); }
+.text-error { color: var(--error-color); }
+.text-warning { color: var(--warning-color); }
+.text-info { color: var(--info-color); }
+.text-accent { color: var(--accent-color); }
+
+.font-bold { font-weight: 600; }
+.font-medium { font-weight: 500; }
+
+.text-xs { font-size: var(--font-size-xs); }
+.text-sm { font-size: var(--font-size-sm); }
+.text-lg { font-size: var(--font-size-lg); }
+.text-xl { font-size: var(--font-size-xl); }
+.text-2xl { font-size: var(--font-size-2xl); }
+
+/* Spacing */
+.m-0 { margin: 0; }
+.mb-xs { margin-bottom: var(--spacing-xs); }
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+.mb-xl { margin-bottom: var(--spacing-xl); }
+
+.p-0 { padding: 0; }
+.p-xs { padding: var(--spacing-xs); }
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+
+/* Display */
+.hidden { display: none; }
+.block { display: block; }
+.inline { display: inline; }
+.inline-block { display: inline-block; }
+
+/* Visibility */
+.invisible { visibility: hidden; }
+.opacity-0 { opacity: 0; }
+.opacity-50 { opacity: 0.5; }
+.opacity-100 { opacity: 1; }
+
+/* Overflow */
+.overflow-hidden { overflow: hidden; }
+.overflow-auto { overflow: auto; }
+.overflow-x-auto { overflow-x: auto; }
+.overflow-y-auto { overflow-y: auto; }
+
+/* Cursor */
+.cursor-pointer { cursor: pointer; }
+.cursor-not-allowed { cursor: not-allowed; }
+
+/* Width */
+.w-full { width: 100%; }
+.w-auto { width: auto; }
+
+/* Height */
+.h-full { height: 100%; }
+.min-h-screen { min-height: 100vh; }
+
+/* Position */
+.relative { position: relative; }
+.absolute { position: absolute; }
+.fixed { position: fixed; }
+.sticky { position: sticky; }
+
+/* Border */
+.rounded { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-full { border-radius: var(--radius-full); }
+.border { border: 1px solid var(--border-color); }
+.border-0 { border: none; }
+
+/* Shadow */
+.shadow { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+
+/* Transition */
+.transition { transition: var(--transition-base); }
+.transition-fast { transition: var(--transition-fast); }

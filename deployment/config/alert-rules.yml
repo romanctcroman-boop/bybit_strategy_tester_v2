@@ -1,0 +1,177 @@
+# Prometheus Alert Rules for Bybit Strategy Tester
+
+groups:
+  - name: system_alerts
+    interval: 15s
+    rules:
+      # ============================================
+      # CPU Alerts
+      # ============================================
+      - alert: HighCPUUsage
+        expr: node_cpu_seconds_total > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU Usage Detected"
+          description: "CPU usage is above 80% on {{ $labels.instance }} (Current: {{ $value }}%)"
+
+      - alert: CriticalCPUUsage
+        expr: node_cpu_seconds_total > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU Usage"
+          description: "CPU usage is above 95% on {{ $labels.instance }} (Current: {{ $value }}%)"
+
+      # ============================================
+      # Memory Alerts
+      # ============================================
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Memory Usage Detected"
+          description: "Memory usage is above 80% on {{ $labels.instance }}"
+
+      - alert: CriticalMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical Memory Usage"
+          description: "Memory usage is above 95% on {{ $labels.instance }}"
+
+      # ============================================
+      # Disk Alerts
+      # ============================================
+      - alert: HighDiskUsage
+        expr: (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Disk Usage on {{ $labels.mountpoint }}"
+          description: "Disk usage is above 80% on {{ $labels.instance }}"
+
+      - alert: CriticalDiskUsage
+        expr: (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical Disk Usage on {{ $labels.mountpoint }}"
+          description: "Disk usage is above 95% on {{ $labels.instance }}"
+
+  # ============================================
+  # Application Alerts
+  # ============================================
+  - name: application_alerts
+    interval: 10s
+    rules:
+      - alert: APIServerDown
+        expr: up{job="bybit-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API Server is Down"
+          description: "The Bybit API server at {{ $labels.instance }} is not responding"
+
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, http_request_duration_seconds_bucket) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Request Latency Detected"
+          description: "95th percentile request latency is above 1s"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Error Rate Detected"
+          description: "Error rate is above 5% on {{ $labels.instance }}"
+
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit Breaker Open"
+          description: "Circuit breaker for {{ $labels.service }} is OPEN"
+
+  # ============================================
+  # Redis Alerts
+  # ============================================
+  - name: redis_alerts
+    interval: 15s
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis Server is Down"
+          description: "Redis server at {{ $labels.instance }} is not responding"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis High Memory Usage"
+          description: "Redis memory usage is above 90% on {{ $labels.instance }}"
+
+      - alert: RedisHighEvictionRate
+        expr: rate(redis_evicted_keys_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Redis Eviction Rate"
+          description: "Redis is evicting more than 100 keys/sec on {{ $labels.instance }}"
+
+  # ============================================
+  # Elasticsearch Alerts
+  # ============================================
+  - name: elasticsearch_alerts
+    interval: 15s
+    rules:
+      - alert: ElasticsearchDown
+        expr: up{job="elasticsearch"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Elasticsearch is Down"
+          description: "Elasticsearch cluster at {{ $labels.instance }} is not responding"
+
+      - alert: ElasticsearchHighMemoryUsage
+        expr: elasticsearch_jvm_memory_used_bytes / elasticsearch_jvm_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elasticsearch High JVM Memory"
+          description: "Elasticsearch JVM memory usage is above 90%"
+
+      - alert: ElasticsearchUnassignedShards
+        expr: elasticsearch_unassigned_shards > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elasticsearch Unassigned Shards"
+          description: "{{ $value }} shards are unassigned in Elasticsearch"
+

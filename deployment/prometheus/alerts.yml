@@ -1,0 +1,298 @@
+groups:
+  - name: ai_strategy_tester_alerts
+    interval: 30s
+    rules:
+      - alert: LowCacheHitRate
+        expr: (cache_hits_total / (cache_hits_total + cache_misses_total)) < 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Cache hit rate is low (< 20%)"
+          description: "Cache hit rate has dropped below 20%. Current rate: {{ $value | humanizePercentage }}"
+          dashboard: "cache-dashboard"
+
+      - alert: HighAIRequestLatency
+        expr: ai_request_duration_ms > 30000
+        for: 5m
+        labels:
+          severity: critical
+          component: ai
+        annotations:
+          summary: "AI request latency is critical"
+          description: "AI request duration exceeds 30 seconds. Current: {{ $value | humanize }}ms"
+          dashboard: "ai-latency-dashboard"
+          runbook: "https://wiki.example.com/ai-latency-troubleshooting"
+
+      - alert: BacktestStuckLonger
+        expr: active_backtest_jobs > 0 and increase(backtest_total[2h]) == 0
+        for: 10m
+        labels:
+          severity: critical
+          component: backtest
+        annotations:
+          summary: "Backtest appears to be stuck"
+          description: "Active backtest jobs: {{ $value }} with no completion in last 2 hours"
+          dashboard: "system-health-dashboard"
+
+      - alert: HighAPIErrorRate
+        expr: (increase(api_requests_total{status=~"5.."}[5m]) / increase(api_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "API error rate is elevated"
+          description: "API 5xx error rate: {{ $value | humanizePercentage }}"
+          dashboard: "api-performance-dashboard"
+
+      - alert: ComponentUnhealthy
+        expr: component_health_status == 0
+        for: 3m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "System component is unhealthy"
+          description: "Component health check failed"
+          dashboard: "system-health-dashboard"
+
+      - alert: RedisUnavailable
+        expr: redis_status == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis cache is unavailable"
+          description: "Cannot connect to Redis cache server"
+          dashboard: "system-health-dashboard"
+
+      - alert: DatabaseUnavailable
+        expr: database_status == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database is unavailable"
+          description: "Cannot connect to database server"
+          dashboard: "system-health-dashboard"
+
+      - alert: LowBacktestWinRate
+        expr: backtest_win_rate_percent < 40
+        for: 10m
+        labels:
+          severity: warning
+          component: backtest
+        annotations:
+          summary: "Strategy win rate is below acceptable threshold"
+          description: "Win rate: {{ $value | humanizePercentage }}"
+          dashboard: "backtest-results-dashboard"
+
+      - alert: HighMaxDrawdown
+        expr: abs(backtest_max_drawdown_percent) > 30
+        for: 10m
+        labels:
+          severity: warning
+          component: backtest
+        annotations:
+          summary: "Maximum drawdown exceeds threshold"
+          description: "Max drawdown: {{ $value | humanizePercentage }}"
+          dashboard: "backtest-results-dashboard"
+
+      - alert: LowProfitFactor
+        expr: backtest_profit_factor < 1.0
+        for: 10m
+        labels:
+          severity: warning
+          component: backtest
+        annotations:
+          summary: "Profit factor is below 1.0 (unprofitable)"
+          description: "Profit factor: {{ $value }}"
+          dashboard: "backtest-results-dashboard"
+
+      - alert: LowSharpeRatio
+        expr: backtest_sharpe_ratio < 1.0
+        for: 10m
+        labels:
+          severity: warning
+          component: backtest
+        annotations:
+          summary: "Sharpe ratio is below acceptable threshold"
+          description: "Sharpe ratio: {{ $value }}"
+          dashboard: "backtest-results-dashboard"
+
+      - alert: HighAPILatency
+        expr: api_request_duration_ms > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API endpoint latency is high"
+          description: "Endpoint {{ $labels.endpoint }} latency: {{ $value | humanize }}ms"
+          dashboard: "api-performance-dashboard"
+
+      - alert: LowRequestThroughput
+        expr: rate(api_requests_total[5m]) < 0.1
+        for: 15m
+        labels:
+          severity: info
+          component: api
+        annotations:
+          summary: "API request throughput is unusually low"
+          description: "Current throughput: {{ $value | humanize }} req/sec"
+          dashboard: "api-performance-dashboard"
+
+  # ==============================================================================
+  # Circuit Breaker Alerts
+  # ==============================================================================
+  - name: circuit_breaker_alerts
+    interval: 15s
+    rules:
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          component: circuit_breaker
+        annotations:
+          summary: "Circuit breaker is OPEN for {{ $labels.service }}"
+          description: "Service {{ $labels.service }} circuit breaker has tripped to OPEN state. Requests are being rejected."
+          dashboard: "system-health-dashboard"
+          runbook: "https://wiki.example.com/circuit-breaker-troubleshooting"
+
+      - alert: CircuitBreakerHalfOpen
+        expr: circuit_breaker_state{state="half_open"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          component: circuit_breaker
+        annotations:
+          summary: "Circuit breaker is HALF_OPEN for {{ $labels.service }}"
+          description: "Service {{ $labels.service }} circuit breaker is in recovery state. Some test requests are being allowed."
+          dashboard: "system-health-dashboard"
+
+      - alert: HighCircuitBreakerFailureRate
+        expr: (circuit_breaker_failures_total / circuit_breaker_calls_total) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          component: circuit_breaker
+        annotations:
+          summary: "High failure rate for {{ $labels.service }}"
+          description: "Service {{ $labels.service }} has failure rate > 30%. Current: {{ $value | humanizePercentage }}"
+          dashboard: "system-health-dashboard"
+
+      - alert: CircuitBreakerTrippedRecently
+        expr: increase(circuit_breaker_trips_total[15m]) > 2
+        for: 1m
+        labels:
+          severity: warning
+          component: circuit_breaker
+        annotations:
+          summary: "Circuit breaker tripped multiple times for {{ $labels.service }}"
+          description: "Service {{ $labels.service }} has tripped {{ $value }} times in last 15 minutes"
+          dashboard: "system-health-dashboard"
+
+  # ==============================================================================
+  # Fallback Service Alerts  
+  # ==============================================================================
+  - name: fallback_service_alerts
+    interval: 15s
+    rules:
+      - alert: HighFallbackUsage
+        expr: (fallback_responses_total / (fallback_responses_total + successful_responses_total)) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: fallback
+        annotations:
+          summary: "High fallback usage for {{ $labels.service }}"
+          description: "Service {{ $labels.service }} is using fallbacks > 20% of requests. Current: {{ $value | humanizePercentage }}"
+          dashboard: "system-health-dashboard"
+
+      - alert: CacheFallbackStale
+        expr: (time() - fallback_cache_last_update_timestamp) > 3600
+        for: 5m
+        labels:
+          severity: warning
+          component: fallback
+        annotations:
+          summary: "Fallback cache is stale for {{ $labels.service }}"
+          description: "Fallback cache for {{ $labels.service }} hasn't been updated in over 1 hour"
+          dashboard: "system-health-dashboard"
+
+      - alert: DegradedModeActive
+        expr: degraded_mode_active == 1
+        for: 1m
+        labels:
+          severity: warning
+          component: fallback
+        annotations:
+          summary: "System is operating in degraded mode"
+          description: "Degraded mode is active for {{ $labels.service }}. Some features may be unavailable."
+          dashboard: "system-health-dashboard"
+
+      - alert: AllServicesInFallback
+        expr: count(fallback_mode_active == 1) > 2
+        for: 3m
+        labels:
+          severity: critical
+          component: fallback
+        annotations:
+          summary: "Multiple services operating in fallback mode"
+          description: "{{ $value }} services are currently in fallback mode. System reliability degraded."
+          dashboard: "system-health-dashboard"
+
+  # ==============================================================================
+  # AI Agent Specific Alerts
+  # ==============================================================================
+  - name: ai_agent_alerts
+    interval: 15s
+    rules:
+      - alert: DeepSeekServiceDegraded
+        expr: circuit_breaker_state{service="deepseek"} != 0 or fallback_mode_active{service="deepseek"} == 1
+        for: 2m
+        labels:
+          severity: warning
+          component: ai_agent
+        annotations:
+          summary: "DeepSeek AI service is degraded"
+          description: "DeepSeek service is either circuit-broken or in fallback mode"
+          dashboard: "ai-latency-dashboard"
+
+      - alert: PerplexityServiceDegraded
+        expr: circuit_breaker_state{service="perplexity"} != 0 or fallback_mode_active{service="perplexity"} == 1
+        for: 2m
+        labels:
+          severity: warning
+          component: ai_agent
+        annotations:
+          summary: "Perplexity AI service is degraded"
+          description: "Perplexity service is either circuit-broken or in fallback mode"
+          dashboard: "ai-latency-dashboard"
+
+      - alert: MCPServerDegraded
+        expr: circuit_breaker_state{service="mcp"} != 0 or fallback_mode_active{service="mcp"} == 1
+        for: 2m
+        labels:
+          severity: warning
+          component: ai_agent
+        annotations:
+          summary: "MCP Server is degraded"
+          description: "MCP Server is either circuit-broken or in fallback mode"
+          dashboard: "system-health-dashboard"
+
+      - alert: AgentBackgroundServiceDown
+        expr: up{job="agent_background_service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: ai_agent
+        annotations:
+          summary: "Agent background service is down"
+          description: "The AI agent background service is not responding to health checks"
+          dashboard: "system-health-dashboard"

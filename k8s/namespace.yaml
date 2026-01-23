@@ -1,0 +1,10 @@
+# ==============================================================================
+# Bybit Strategy Tester - Kubernetes Namespace
+# ==============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bybit-strategy-tester
+  labels:
+    app.kubernetes.io/name: bybit-strategy-tester
+    app.kubernetes.io/part-of: trading-platform

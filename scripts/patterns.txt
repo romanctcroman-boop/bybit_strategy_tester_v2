@@ -1,0 +1,71 @@
+# 'РљР°РїРёС‚Р°Р» СЃС‚СЂР°С‚РµРіРёРё'...
+('\u0420\u0459\u0420\u00b0\u0420\u0457\u0420\u0451\u0421\u201a\u0420\u00b0\u0420\u00bb \u0421\u0403\u0421\u201a\u0421\u0402\u0420\u00b0\u0421\u201a\u0420\u00b5\u0420\u0456\u0420\u0451\u0420\u0451', 'REPLACE_ME'),
+
+# ') {\n                                    return `${color} Р...
+(') {
+                                    return `${color} \u0420\u040e\u0420\u0455\u0420\u0406\u0420\u0455\u0420\u0454\u0421\u0453\u0420\u0457\u0420\u0405\u0421\u2039\u0420\u00b5 \u0420\u045f\u0420\u00a0/\u0420\u0408\u0420\u2018  ${sign}${value.toLocaleString(', 'REPLACE_ME'),
+
+# ');\n                                    if (buyHoldCheckbox...
+(');
+                                    if (buyHoldCheckbox && !buyHoldCheckbox.checked) return null;
+                                    return `   B&H \u0420\u045f\u0420\u00a0/\u0420\u0408\u0420\u2018  ${sign}${value.toLocaleString(', 'REPLACE_ME'),
+
+# ', () => {\n            if (equityChart) {\n                ...
+(', () => {
+            if (equityChart) {
+                // Dataset 1 is "\u0420\u045f\u0420\u0455\u0420\u0454\u0421\u0453\u0420\u0457\u0420\u0454\u0420\u00b0 \u0420\u0451 \u0421\u0453\u0420\u0491\u0420\u00b5\u0421\u0402\u0420\u00b6\u0420\u00b0\u0420\u0405\u0420\u0451\u0420\u00b5"
+                equityChart.data.datasets[1].hidden = !legendBuyHold.checked;
+                equityChart.update(', 'REPLACE_ME'),
+
+# ') {\n            el.textContent = `${value} РґРЅСЏ`;\n     ...
+(') {
+            el.textContent = `${value} \u0420\u0491\u0420\u0405\u0421\u040f`;
+            el.className = ', 'REPLACE_ME'),
+
+# 'РќРµРґРѕСЃС‚СѓРїРЅРѕ (С‚СЂРµР±СѓСЋС‚СЃСЏ С‚РёРєРѕРІС‹Рµ РґР...
+('\u0420\u045c\u0420\u00b5\u0420\u0491\u0420\u0455\u0421\u0403\u0421\u201a\u0421\u0453\u0420\u0457\u0420\u0405\u0420\u0455 (\u0421\u201a\u0421\u0402\u0420\u00b5\u0420\u00b1\u0421\u0453\u0421\u040b\u0421\u201a\u0421\u0403\u0421\u040f \u0421\u201a\u0420\u0451\u0420\u0454\u0420\u0455\u0420\u0406\u0421\u2039\u0420\u00b5 \u0420\u0491\u0420\u00b0\u0420\u0405\u0420\u0405\u0421\u2039\u0420\u00b5)', 'REPLACE_ME'),
+
+# '<tr><td colspan="10" style="text-align:center;color:#8b949e...
+('<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:2rem;">\u0420\u045c\u0420\u00b5\u0421\u201a \u0421\u0403\u0420\u0491\u0420\u00b5\u0420\u00bb\u0420\u0455\u0420\u0454 \u0420\u0491\u0420\u00bb\u0421\u040f \u0420\u0455\u0421\u201a\u0420\u0455\u0420\u00b1\u0421\u0402\u0420\u00b0\u0420\u00b6\u0420\u00b5\u0420\u0405\u0420\u0451\u0421\u040f</td></tr>', 'REPLACE_ME'),
+
+# ');\n\n    if (strategyName && backtest?.config) {\n        ...
+(');
+
+    if (strategyName && backtest?.config) {
+        strategyName.textContent = `\u0420\u040e\u0421\u201a\u0421\u0402\u0420\u00b0\u0421\u201a\u0420\u00b5\u0420\u0456\u0420\u0451\u0421\u040f ${backtest.config.strategy_type || ', 'REPLACE_ME'),
+
+# '} РћС‚С‡С‘С‚`;\n    }\n\n    if (dateRange && backtest?.con...
+('} \u0420\u045b\u0421\u201a\u0421\u2021\u0421\u2018\u0421\u201a`;
+    }
+
+    if (dateRange && backtest?.config) {
+        const start = backtest.config.start_date ? new Date(backtest.config.start_date).toLocaleDateString(', 'REPLACE_ME'),
+
+# ', err);\n                });\n            }, 5000);\n      ...
+(', err);
+                });
+            }, 5000);
+        } else {
+            const error = await response.json();
+            showToast(`\u0420\u045b\u0421\u20ac\u0420\u0451\u0420\u00b1\u0420\u0454\u0420\u00b0: ${error.detail}`, ', 'REPLACE_ME'),
+
+# ')"\n                                title="РЈРґР°Р»РёС‚СЊ">...
+(')"
+                                title="\u0420\u0408\u0420\u0491\u0420\u00b0\u0420\u00bb\u0420\u0451\u0421\u201a\u0421\u040a">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                `;
+    }).join(', 'REPLACE_ME'),
+
+# ' },\n                { text: `РЎСЂРµРґРЅРёР№ СѓР±С‹С‚РѕРє  ...
+(' },
+                { text: `\u0420\u040e\u0421\u0402\u0420\u00b5\u0420\u0491\u0420\u0405\u0420\u0451\u0420\u2116 \u0421\u0453\u0420\u00b1\u0421\u2039\u0421\u201a\u0420\u0455\u0420\u0454  ${avgLoss.toFixed(2)}%`, fillStyle: ', 'REPLACE_ME'),
+
+# ' },\n                { text: `РЎСЂРµРґРЅСЏСЏ РїСЂРёР±С‹Р»СЊ...
+(' },
+                { text: `\u0420\u040e\u0421\u0402\u0420\u00b5\u0420\u0491\u0420\u0405\u0421\u040f\u0421\u040f \u0420\u0457\u0421\u0402\u0420\u0451\u0420\u00b1\u0421\u2039\u0420\u00bb\u0421\u040a  ${avgProfit.toFixed(2)}%`, fillStyle: ', 'REPLACE_ME'),
+
+# 'РћС‚РєСЂС‹С‚С‹Рµ РџР\xa0/РЈР‘'...
+('\u0420\u045b\u0421\u201a\u0420\u0454\u0421\u0402\u0421\u2039\u0421\u201a\u0421\u2039\u0420\u00b5 \u0420\u045f\u0420\u00a0/\u0420\u0408\u0420\u2018', 'REPLACE_ME'),
+

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Runner - Bybit Strategy Tester v2</title>
+    <link href="libs/bootstrap.min.css" rel="stylesheet">
+    <link href="libs/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --test-pass: #198754;
+            --test-fail: #dc3545;
+            --test-skip: #ffc107;
+            --test-pending: #6c757d;
+        }
+
+        body {
+            background: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 2rem;
+        }
+
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .test-controls {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .test-summary {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: #161b22;
+            border-radius: 8px;
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .summary-label {
+            font-size: 0.875rem;
+            color: #8b949e;
+        }
+
+        .summary-item.passed .summary-value { color: var(--test-pass); }
+        .summary-item.failed .summary-value { color: var(--test-fail); }
+        .summary-item.skipped .summary-value { color: var(--test-skip); }
+
+        .hidden { display: none; }
+
+        .test-suite {
+            background: #161b22;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .suite-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: #21262d;
+            cursor: pointer;
+        }
+
+        .suite-header:hover {
+            background: #30363d;
+        }
+
+        .suite-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .suite-stats {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .test-list {
+            padding: 0.5rem;
+        }
+
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            margin: 0.25rem 0;
+        }
+
+        .test-item:hover {
+            background: #21262d;
+        }
+
+        .test-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .status-icon.pass { background: var(--test-pass); }
+        .status-icon.fail { background: var(--test-fail); }
+        .status-icon.skip { background: var(--test-skip); color: #000; }
+        .status-icon.pending { background: var(--test-pending); }
+
+        .test-duration {
+            color: #8b949e;
+            font-size: 0.875rem;
+        }
+
+        .test-error {
+            background: rgba(220, 53, 69, 0.1);
+            border-left: 3px solid var(--test-fail);
+            padding: 0.75rem;
+            margin: 0.5rem 1rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+
+        .error-message { color: var(--test-fail); }
+        .error-expected { color: var(--test-pass); }
+        .error-actual { color: var(--test-fail); }
+
+        .progress-bar-container {
+            height: 4px;
+            background: #30363d;
+            border-radius: 2px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--test-pass);
+            transition: width 0.3s ease;
+        }
+
+        .progress-bar-fill.has-failures {
+            background: linear-gradient(90deg, var(--test-pass) var(--pass-percent), var(--test-fail) var(--pass-percent));
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .loading .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+
+        .console-output {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 2rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .console-line {
+            padding: 0.25rem 0;
+            white-space: pre-wrap;
+        }
+
+        .console-line.error { color: var(--test-fail); }
+        .console-line.warn { color: var(--test-skip); }
+        .console-line.info { color: #58a6ff; }
+
+        .home-link {
+            display: inline-block;
+            color: #58a6ff;
+            text-decoration: none;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        .home-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <a href="dashboard.html" class="home-link">🏠 Dashboard</a>
+        <div class="test-header">
+            <h1><i class="bi bi-bug"></i> Test Runner</h1>
+            <div class="test-controls">
+                <button id="runAllBtn" class="btn btn-success">
+                    <i class="bi bi-play-fill"></i> Run All Tests
+                </button>
+                <button id="runCoreBtn" class="btn btn-outline-primary">
+                    <i class="bi bi-cpu"></i> Core Only
+                </button>
+                <button id="runComponentBtn" class="btn btn-outline-primary">
+                    <i class="bi bi-puzzle"></i> Components Only
+                </button>
+            </div>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Running tests...</span>
+            </div>
+            <p class="mt-3">Running tests...</p>
+        </div>
+
+        <div id="results" class="hidden">
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar-fill" data-width="0"></div>
+            </div>
+
+            <div id="summary" class="test-summary">
+                <div class="summary-item passed">
+                    <div class="summary-value" id="passedCount">0</div>
+                    <div class="summary-label">Passed</div>
+                </div>
+                <div class="summary-item failed">
+                    <div class="summary-value" id="failedCount">0</div>
+                    <div class="summary-label">Failed</div>
+                </div>
+                <div class="summary-item skipped">
+                    <div class="summary-value" id="skippedCount">0</div>
+                    <div class="summary-label">Skipped</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="duration">0</div>
+                    <div class="summary-label">Duration (ms)</div>
+                </div>
+            </div>
+
+            <div id="suites"></div>
+        </div>
+
+        <div class="console-output" id="console"></div>
+    </div>
+
+    <script type="module">
+        // Import test runner
+        import { runAllTests, runCoreTests, runComponentTests } from './js/testing/TestRunner.js';
+
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const suites = document.getElementById('suites');
+        const consoleEl = document.getElementById('console');
+
+        // Override console for capturing output
+        const originalConsole = { ...console };
+        const logs = [];
+
+        function captureConsole() {
+            ['log', 'error', 'warn', 'info', 'group', 'groupEnd'].forEach(method => {
+                console[method] = (...args) => {
+                    if (method !== 'group' && method !== 'groupEnd') {
+                        logs.push({ type: method, args });
+                        addToConsole(method, args.map(a =>
+                            typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)
+                        ).join(' '));
+                    }
+                    originalConsole[method](...args);
+                };
+            });
+        }
+
+        function addToConsole(type, message) {
+            const line = document.createElement('div');
+            line.className = `console-line ${type}`;
+            line.textContent = message;
+            consoleEl.appendChild(line);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function showLoading() {
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            consoleEl.innerHTML = '';
+            logs.length = 0;
+        }
+
+        function showResults(testResults) {
+            loading.style.display = 'none';
+            results.style.display = 'block';
+
+            const { total, results: suiteResults } = testResults;
+
+            // Update summary
+            document.getElementById('passedCount').textContent = total.passed;
+            document.getElementById('failedCount').textContent = total.failed;
+            document.getElementById('skippedCount').textContent = total.skipped;
+            document.getElementById('duration').textContent = total.duration.toFixed(0);
+
+            // Update progress bar
+            const totalTests = total.passed + total.failed + total.skipped;
+            const passPercent = (total.passed / totalTests * 100).toFixed(1);
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = '100%';
+
+            if (total.failed > 0) {
+                progressBar.classList.add('has-failures');
+                progressBar.style.setProperty('--pass-percent', `${passPercent}%`);
+            } else {
+                progressBar.classList.remove('has-failures');
+            }
+
+            // Render suites
+            suites.innerHTML = suiteResults.map(suite => `
+                <div class="test-suite">
+                    <div class="suite-header" onclick="this.parentElement.classList.toggle('collapsed')">
+                        <span class="suite-name">${suite.suite}</span>
+                        <div class="suite-stats">
+                            <span style="color: var(--test-pass)">✓ ${suite.passed}</span>
+                            <span style="color: var(--test-fail)">✗ ${suite.failed}</span>
+                            <span style="color: var(--test-skip)">○ ${suite.skipped}</span>
+                            <span style="color: #8b949e">${suite.duration.toFixed(0)}ms</span>
+                        </div>
+                    </div>
+                    <div class="test-list">
+                        ${suite.tests.map(test => `
+                            <div class="test-item">
+                                <div class="test-status">
+                                    <div class="status-icon ${test.status}">
+                                        ${test.status === 'pass' ? '✓' : test.status === 'fail' ? '✗' : '○'}
+                                    </div>
+                                    <span>${test.name}</span>
+                                </div>
+                                <span class="test-duration">${test.duration.toFixed(2)}ms</span>
+                            </div>
+                            ${test.error ? `
+                                <div class="test-error">
+                                    <div class="error-message">${test.error.message}</div>
+                                    ${test.error.expected !== undefined ? `
+                                        <div class="error-expected">Expected: ${JSON.stringify(test.error.expected)}</div>
+                                        <div class="error-actual">Actual: ${JSON.stringify(test.error.actual)}</div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Button handlers
+        document.getElementById('runAllBtn').onclick = async () => {
+            showLoading();
+            captureConsole();
+            const results = await runAllTests({ verbose: true });
+            showResults(results);
+        };
+
+        document.getElementById('runCoreBtn').onclick = async () => {
+            showLoading();
+            captureConsole();
+            const results = await runCoreTests({ verbose: true });
+            showResults(results);
+        };
+
+        document.getElementById('runComponentBtn').onclick = async () => {
+            showLoading();
+            captureConsole();
+            const results = await runComponentTests({ verbose: true });
+            showResults(results);
+        };
+
+        // Auto-run if ?autorun=true
+        const params = new URLSearchParams(location.search);
+        if (params.get('autorun') === 'true') {
+            document.getElementById('runAllBtn').click();
+        }
+    </script>
+</body>
+</html>

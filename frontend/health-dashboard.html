@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Health Dashboard - Bybit Strategy Tester</title>
+    <!-- Auto-refresh is handled by JavaScript (setInterval) -->
+    <style>
+      :root {
+        --bg-primary: #0f0f1a;
+        --bg-card: #1a1a2e;
+        --bg-card-hover: #252540;
+        --text-primary: #e4e4e7;
+        --text-secondary: #a1a1aa;
+        --accent-green: #22c55e;
+        --accent-red: #ef4444;
+        --accent-yellow: #eab308;
+        --accent-blue: #3b82f6;
+        --border-color: #27272a;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 2rem;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      h1 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .status-healthy {
+        background: rgba(34, 197, 94, 0.2);
+        color: var(--accent-green);
+      }
+      .status-degraded {
+        background: rgba(234, 179, 8, 0.2);
+        color: var(--accent-yellow);
+      }
+      .status-unhealthy {
+        background: rgba(239, 68, 68, 0.2);
+        color: var(--accent-red);
+      }
+
+      .last-update {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .card {
+        background: var(--bg-card);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+      }
+
+      .card:hover {
+        background: var(--bg-card-hover);
+        transform: translateY(-2px);
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+
+      .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .card-icon {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+
+      .metric-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .metric-row:last-child {
+        border-bottom: none;
+      }
+
+      .metric-label {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+      }
+      .metric-value {
+        font-weight: 600;
+        font-size: 0.875rem;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+      }
+
+      .dot-green {
+        background: var(--accent-green);
+        box-shadow: 0 0 8px var(--accent-green);
+      }
+      .dot-red {
+        background: var(--accent-red);
+        box-shadow: 0 0 8px var(--accent-red);
+      }
+      .dot-yellow {
+        background: var(--accent-yellow);
+        box-shadow: 0 0 8px var(--accent-yellow);
+      }
+
+      .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100px;
+        color: var(--text-secondary);
+      }
+
+      .error-message {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid var(--accent-red);
+        border-radius: 8px;
+        padding: 1rem;
+        color: var(--accent-red);
+        text-align: center;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .pulse {
+        animation: pulse 2s infinite;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>
+          <span>🏥</span>
+          Health Dashboard
+          <span id="overall-status" class="status-badge status-healthy"
+            >Loading...</span
+          >
+        </h1>
+        <div class="last-update">
+          Last updated: <span id="last-update">--</span>
+        </div>
+      </header>
+
+      <div class="grid" id="services-grid">
+        <div class="loading pulse">Loading services...</div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "";
+
+      async function fetchHealth() {
+        try {
+          const response = await fetch(`${API_BASE}/api/v1/health`);
+          const data = await response.json();
+          return data;
+        } catch (error) {
+          console.error("Failed to fetch health:", error);
+          return null;
+        }
+      }
+
+      async function fetchMcpHealth() {
+        try {
+          const response = await fetch(`${API_BASE}/mcp/health`);
+          const data = await response.json();
+          return data;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function getStatusClass(status) {
+        if (status === "healthy" || status === "ok" || status === true)
+          return "healthy";
+        if (status === "degraded" || status === "warning") return "degraded";
+        return "unhealthy";
+      }
+
+      function createServiceCard(name, icon, status, metrics) {
+        const statusClass = getStatusClass(status);
+        const dotClass =
+          statusClass === "healthy"
+            ? "dot-green"
+            : statusClass === "degraded"
+              ? "dot-yellow"
+              : "dot-red";
+
+        let metricsHtml = "";
+        if (metrics && typeof metrics === "object") {
+          for (const [key, value] of Object.entries(metrics)) {
+            if (key !== "status" && key !== "error") {
+              const displayValue =
+                typeof value === "object" ? JSON.stringify(value) : value;
+              metricsHtml += `
+                            <div class="metric-row">
+                                <span class="metric-label">${key}</span>
+                                <span class="metric-value">${displayValue}</span>
+                            </div>
+                        `;
+            }
+          }
+        }
+
+        return `
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-icon">${icon}</div>
+                            ${name}
+                        </div>
+                        <span class="status-badge status-${statusClass}">
+                            <span class="status-dot ${dotClass}"></span>
+                            ${statusClass}
+                        </span>
+                    </div>
+                    ${metricsHtml || '<div class="metric-row"><span class="metric-label">No metrics</span></div>'}
+                </div>
+            `;
+      }
+
+      async function updateDashboard() {
+        const grid = document.getElementById("services-grid");
+        const overallStatus = document.getElementById("overall-status");
+        const lastUpdate = document.getElementById("last-update");
+
+        const health = await fetchHealth();
+        const mcpHealth = await fetchMcpHealth();
+
+        if (!health) {
+          grid.innerHTML =
+            '<div class="error-message">Failed to fetch health data. Is the server running?</div>';
+          overallStatus.className = "status-badge status-unhealthy";
+          overallStatus.textContent = "Offline";
+          return;
+        }
+
+        // Update overall status
+        const overallClass = getStatusClass(health.status);
+        overallStatus.className = `status-badge status-${overallClass}`;
+        overallStatus.textContent = health.status || "Unknown";
+
+        // Build cards
+        let cards = "";
+
+        // Main service
+        cards += createServiceCard("API Server", "🖥️", health.status, {
+          Uptime: health.uptime || "N/A",
+          Version: health.version || "2.0.0",
+          Environment: health.environment || "development",
+        });
+
+        // Database
+        if (health.database) {
+          cards += createServiceCard(
+            "Database",
+            "🗄️",
+            health.database.status,
+            health.database,
+          );
+        }
+
+        // Redis
+        if (health.redis) {
+          cards += createServiceCard(
+            "Redis",
+            "📦",
+            health.redis.status,
+            health.redis,
+          );
+        }
+
+        // Bybit API
+        if (health.bybit_api) {
+          cards += createServiceCard(
+            "Bybit API",
+            "📈",
+            health.bybit_api.status,
+            health.bybit_api,
+          );
+        }
+
+        // MCP Server
+        if (mcpHealth) {
+          cards += createServiceCard(
+            "MCP Server",
+            "🤖",
+            mcpHealth.status,
+            mcpHealth,
+          );
+        }
+
+        // Circuit Breakers
+        if (health.circuit_breakers) {
+          cards += createServiceCard(
+            "Circuit Breakers",
+            "⚡",
+            Object.values(health.circuit_breakers).every(
+              (cb) => cb.state === "closed",
+            )
+              ? "healthy"
+              : "degraded",
+            health.circuit_breakers,
+          );
+        }
+
+        grid.innerHTML = cards;
+        lastUpdate.textContent = new Date().toLocaleTimeString();
+      }
+
+      // Initial load
+      updateDashboard();
+
+      // Auto-refresh every 30 seconds
+      setInterval(updateDashboard, 30000);
+    </script>
+  </body>
+</html>

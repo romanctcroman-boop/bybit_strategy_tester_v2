@@ -1,0 +1,21 @@
+{
+  "id": "eval_a6dee205800f",
+  "agent_type": "test",
+  "task_type": "general",
+  "metrics": {
+    "accuracy": 0.6,
+    "helpfulness": 0.6,
+    "safety": 1.0,
+    "efficiency": 0.0,
+    "latency_ms": 0.5289999999999999,
+    "error_rate": 0.0,
+    "consensus_rate": 0.0,
+    "user_satisfaction": 0.0,
+    "task_completion_rate": 1.0,
+    "overall_score": 64.0
+  },
+  "timestamp": "2026-01-18T08:51:12.557479+00:00",
+  "metadata": {
+    "tokens_used": 0
+  }
+}

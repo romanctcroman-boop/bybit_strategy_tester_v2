@@ -1,0 +1,304 @@
+# ==============================================================================
+# Week 3: Docker Compose - Production Deployment
+# Orchestrates: Redis, Trade Publisher, Aggregators, Backend API, Nginx
+# Updated: 2026-01-23 - Added resource limits for all services
+# ==============================================================================
+
+version: "3.8"
+
+services:
+  # ==========================================================================
+  # REDIS - Message Broker
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: tick_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tick_network
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 768M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  # ==========================================================================
+  # TRADE PUBLISHER - Bybit WebSocket -> Redis
+  # ==========================================================================
+  trade-publisher:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.trade-publisher
+    container_name: tick_trade_publisher
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - SYMBOLS=BTCUSDT,ETHUSDT
+      - LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - tick_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  # ==========================================================================
+  # TICK AGGREGATORS - Trade -> Candles
+  # ==========================================================================
+
+  # BTC 100-tick candles
+  aggregator-btc-100:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.tick-aggregator
+    container_name: tick_aggregator_btc_100
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - SYMBOL=BTCUSDT
+      - TICKS=100
+      - LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+      trade-publisher:
+        condition: service_started
+    networks:
+      - tick_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  # BTC 500-tick candles
+  aggregator-btc-500:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.tick-aggregator
+    container_name: tick_aggregator_btc_500
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - SYMBOL=BTCUSDT
+      - TICKS=500
+      - LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+      trade-publisher:
+        condition: service_started
+    networks:
+      - tick_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  # ETH 100-tick candles
+  aggregator-eth-100:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.tick-aggregator
+    container_name: tick_aggregator_eth_100
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - SYMBOL=ETHUSDT
+      - TICKS=100
+      - LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+      trade-publisher:
+        condition: service_started
+    networks:
+      - tick_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+  # ==========================================================================
+  # BACKEND API - FastAPI + Uvicorn (2 instances for load balancing)
+  # ==========================================================================
+
+  backend-1:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.backend
+    container_name: tick_backend_1
+    restart: unless-stopped
+    environment:
+      - USE_REDIS_PUBSUB=true
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+      - PORT=8000
+      - WORKERS=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      trade-publisher:
+        condition: service_started
+    expose:
+      - "8000"
+    networks:
+      - tick_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  backend-2:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.backend
+    container_name: tick_backend_2
+    restart: unless-stopped
+    environment:
+      - USE_REDIS_PUBSUB=true
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+      - PORT=8000
+      - WORKERS=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      trade-publisher:
+        condition: service_started
+    expose:
+      - "8000"
+    networks:
+      - tick_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # ==========================================================================
+  # NGINX - Load Balancer + WebSocket Proxy
+  # ==========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: tick_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend-1
+      - backend-2
+    networks:
+      - tick_network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  tick_network:
+    driver: bridge
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  redis_data:
+    driver: local

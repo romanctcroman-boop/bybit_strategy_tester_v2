@@ -1,0 +1,43 @@
+# Week 3: Trade Publisher Docker Image
+# Connects to Bybit WebSocket, publishes trades to Redis
+
+FROM python:3.13-slim
+
+LABEL maintainer="bybit_strategy_tester"
+LABEL service="trade-publisher"
+LABEL version="week3"
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first (for caching)
+COPY backend/requirements.txt /app/requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY backend/ /app/backend/
+COPY redis_tick_manager.py /app/
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV REDIS_URL=redis://redis:6379
+ENV LOG_LEVEL=INFO
+
+# Default symbols to subscribe (can override with docker run -e)
+ENV SYMBOLS=BTCUSDT,ETHUSDT
+
+# Health check - check if publisher is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import redis; r = redis.from_url('${REDIS_URL}'); r.ping()" || exit 1
+
+# Run trade publisher
+# Usage: docker run -e SYMBOLS=BTCUSDT,ETHUSDT trade-publisher
+ENTRYPOINT ["python", "redis_tick_manager.py", "start-publisher"]
+CMD ["--symbols", "BTCUSDT", "ETHUSDT"]

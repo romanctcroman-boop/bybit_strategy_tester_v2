@@ -1,0 +1,21 @@
+{
+  "id": "eval_227e7c1ad205",
+  "agent_type": "deepseek",
+  "task_type": "explanation",
+  "metrics": {
+    "accuracy": 0.82,
+    "helpfulness": 0.5,
+    "safety": 1.0,
+    "efficiency": 5.155555555555556,
+    "latency_ms": 1500,
+    "error_rate": 0.0,
+    "consensus_rate": 0.0,
+    "user_satisfaction": 0.0,
+    "task_completion_rate": 1.0,
+    "overall_score": 117.95555555555556
+  },
+  "timestamp": "2026-01-18T08:10:15.688011+00:00",
+  "metadata": {
+    "tokens_used": 150
+  }
+}

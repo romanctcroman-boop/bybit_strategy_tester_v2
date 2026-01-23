@@ -1,0 +1,83 @@
+{
+  "editor.formatOnSave": true,
+  "prettier.requireConfig": true,
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+  "python.sortImports.path": ["isort"],
+  "python.sortImports.args": [
+    "--settings-path",
+    "${workspaceFolder}\\.isort.cfg"
+  ],
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  // YAML Schema associations to prevent false schema validation errors
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/grafana/grafana/main/devenv/docker/provisioning/datasources/datasources.json": [
+      "deployment/grafana/provisioning/datasources/*.yaml"
+    ],
+    "https://raw.githubusercontent.com/prometheus/prometheus/main/config/testdata/conf.good.yml": [
+      "deployment/prometheus/*.yml",
+      "deployment/prometheus/*.yaml"
+    ]
+  },
+  // Hide nested Git repo (mcp-server) from the parent workspace Git view
+  "git.ignoredRepositories": ["${workspaceFolder}/mcp-server"],
+  // Exclude nested repo from file watching and search to reduce noise
+  "files.watcherExclude": {
+    "mcp-server/**": true
+  },
+  "search.exclude": {
+    "mcp-server/**": true
+  },
+  // Auto-run tasks on folder open
+  "task.allowAutomaticTasks": "on",
+  // Python testing configuration
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["tests"]
+}

@@ -1,0 +1,23 @@
+# ==============================================================================
+# ConfigMap
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-config
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+data:
+  LOG_LEVEL: {{ .Values.config.LOG_LEVEL | quote }}
+  ENVIRONMENT: {{ .Values.config.ENVIRONMENT | quote }}
+  DEBUG: {{ .Values.config.DEBUG | quote }}
+  DB_HOST: {{ .Values.config.DB_HOST | quote }}
+  DB_PORT: {{ .Values.config.DB_PORT | quote }}
+  DB_NAME: {{ .Values.config.DB_NAME | quote }}
+  REDIS_HOST: {{ .Values.config.REDIS_HOST | quote }}
+  REDIS_PORT: {{ .Values.config.REDIS_PORT | quote }}
+  CACHE_TTL: {{ .Values.config.CACHE_TTL | quote }}
+  API_RATE_LIMIT: {{ .Values.config.API_RATE_LIMIT | quote }}
+  MAX_CONNECTIONS: {{ .Values.config.MAX_CONNECTIONS | quote }}
+  CIRCUIT_BREAKER_THRESHOLD: {{ .Values.config.CIRCUIT_BREAKER_THRESHOLD | quote }}
+  CIRCUIT_BREAKER_RECOVERY: {{ .Values.config.CIRCUIT_BREAKER_RECOVERY | quote }}

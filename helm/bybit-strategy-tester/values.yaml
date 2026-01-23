@@ -1,0 +1,258 @@
+# ==============================================================================
+# Bybit Strategy Tester Helm Values
+# ==============================================================================
+
+# Global settings
+global:
+  imageRegistry: ghcr.io
+  imagePullSecrets: []
+  storageClass: ""
+
+# Application settings
+replicaCount: 3
+
+image:
+  repository: ghcr.io/your-org/bybit-strategy-tester
+  tag: "latest"
+  pullPolicy: Always
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "bybit-strategy-tester"
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "bybit-service-account"
+
+# Pod Security Context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# Container Security Context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# Backend Service
+service:
+  type: ClusterIP
+  port: 8000
+  annotations: {}
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: api.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: bybit-tls-secret
+      hosts:
+        - api.yourdomain.com
+
+# Resource Limits
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "250m"
+  limits:
+    memory: "2Gi"
+    cpu: "2000m"
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+    scaleUp:
+      stabilizationWindowSeconds: 60
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Health Probes
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Node Selection
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: bybit-backend
+          topologyKey: kubernetes.io/hostname
+
+# Topology Spread Constraints
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: bybit-backend
+
+# Environment Configuration
+config:
+  # Application settings
+  LOG_LEVEL: "INFO"
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  
+  # Database (connection string from secrets)
+  DB_HOST: "postgresql"
+  DB_PORT: "5432"
+  DB_NAME: "bybit_prod"
+  
+  # Redis settings
+  REDIS_HOST: "redis-master"
+  REDIS_PORT: "6379"
+  CACHE_TTL: "3600"
+  
+  # API settings
+  API_RATE_LIMIT: "100"
+  MAX_CONNECTIONS: "100"
+  
+  # Circuit Breaker settings
+  CIRCUIT_BREAKER_THRESHOLD: "5"
+  CIRCUIT_BREAKER_RECOVERY: "30"
+
+# Secrets (use external secret manager in production)
+secrets:
+  create: true
+  # Values will be base64 encoded automatically
+  DB_USER: "bybit_user"
+  DB_PASS: "CHANGE_ME_IN_PRODUCTION"
+  SECRET_KEY: "CHANGE_ME_IN_PRODUCTION"
+  JWT_SECRET_KEY: "CHANGE_ME_IN_PRODUCTION"
+  REDIS_PASSWORD: "CHANGE_ME_IN_PRODUCTION"
+  BYBIT_API_KEY: ""
+  BYBIT_API_SECRET: ""
+  PERPLEXITY_API_KEY: ""
+  DEEPSEEK_API_KEY: ""
+
+# Celery Worker Configuration
+celery:
+  enabled: true
+  worker:
+    replicaCount: 2
+    concurrency: 4
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+  beat:
+    enabled: true
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+# PostgreSQL Subchart Configuration
+postgresql:
+  enabled: true
+  auth:
+    username: bybit_user
+    password: CHANGE_ME_IN_PRODUCTION
+    database: bybit_prod
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 1000m
+
+# Redis Subchart Configuration
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    password: CHANGE_ME_IN_PRODUCTION
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 500m
+
+# Prometheus Configuration (monitoring)
+prometheus:
+  enabled: false  # Use existing prometheus stack
+  
+# Grafana Configuration
+grafana:
+  enabled: false  # Use existing grafana
+
+# Metrics & Monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    labels:
+      release: prometheus
+    interval: 15s
+    scrapeTimeout: 10s

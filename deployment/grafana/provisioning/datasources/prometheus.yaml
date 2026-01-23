@@ -1,0 +1,13 @@
+﻿# yaml-language-server: $schema=https://raw.githubusercontent.com/grafana/grafana/main/devenv/docker/provisioning/datasources/datasources.json
+# Grafana datasource provisioning configuration for Prometheus
+# This file configures Prometheus as a data source for Grafana
+# https://grafana.com/docs/grafana/latest/datasources/prometheus/
+apiVersion: 1
+datasources:
+  - name: AI Strategy Tester Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    version: 1

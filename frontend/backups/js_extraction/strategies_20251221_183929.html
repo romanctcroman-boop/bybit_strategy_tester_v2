@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <title>Trading Strategies - Bybit Strategy Tester v2</title>
+    <link rel="stylesheet" href="/frontend/css/strategies.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Trading Strategies</h1>
+            <nav class="nav-links">
+                <a href="streaming-chat.html">AI Chat</a>
+                <a href="strategies.html" class="active">Strategies</a>
+            </nav>
+        </header>
+
+        <div class="toolbar">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Search strategies...">
+                <select id="statusFilter" title="Filter by status">
+                    <option value="">All Statuses</option>
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="archived">Archived</option>
+                </select>
+                <select id="typeFilter" title="Filter by strategy type">
+                    <option value="">All Types</option>
+                    <option value="sma_crossover">SMA Crossover</option>
+                    <option value="rsi">RSI</option>
+                    <option value="macd">MACD</option>
+                    <option value="bollinger_bands">Bollinger Bands</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="openCreateModal()">+ New Strategy</button>
+        </div>
+
+        <div id="strategiesContainer" class="strategies-grid">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading strategies...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div class="modal-overlay" id="strategyModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Create Strategy</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="strategyForm">
+                    <input type="hidden" id="strategyId">
+                    
+                    <div class="form-group">
+                        <label for="strategyName">Strategy Name *</label>
+                        <input type="text" id="strategyName" required placeholder="My SMA Strategy">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="strategyDescription">Description</label>
+                        <textarea id="strategyDescription" placeholder="Describe your strategy..."></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="strategyType">Strategy Type *</label>
+                            <select id="strategyType" required>
+                                <option value="sma_crossover">SMA Crossover</option>
+                                <option value="rsi">RSI</option>
+                                <option value="macd">MACD</option>
+                                <option value="bollinger_bands">Bollinger Bands</option>
+                                <option value="bollinger_rsi">Bollinger + RSI</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="strategyStatus">Status</label>
+                            <select id="strategyStatus">
+                                <option value="draft">Draft</option>
+                                <option value="active">Active</option>
+                                <option value="paused">Paused</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="strategySymbol">Symbol</label>
+                            <input type="text" id="strategySymbol" placeholder="BTCUSDT" value="BTCUSDT">
+                        </div>
+                        <div class="form-group">
+                            <label for="strategyTimeframe">Timeframe</label>
+                            <select id="strategyTimeframe">
+                                <option value="15m">15 minutes</option>
+                                <option value="1h" selected>1 hour</option>
+                                <option value="4h">4 hours</option>
+                                <option value="1d">1 day</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="strategyCapital">Initial Capital ($)</label>
+                            <input type="number" id="strategyCapital" min="100" step="100" value="10000">
+                        </div>
+                        <div class="form-group">
+                            <label for="strategyPositionSize">Position Size (%)</label>
+                            <input type="number" id="strategyPositionSize" min="1" max="100" step="1" value="100">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="strategyStopLoss">Stop Loss (%)</label>
+                            <input type="number" id="strategyStopLoss" min="0" max="50" step="0.1" placeholder="2.0">
+                        </div>
+                        <div class="form-group">
+                            <label for="strategyTakeProfit">Take Profit (%)</label>
+                            <input type="number" id="strategyTakeProfit" min="0" max="100" step="0.1" placeholder="5.0">
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="parametersGroup">
+                        <label>Strategy Parameters</label>
+                        <div id="parametersContainer"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveStrategy()">Save Strategy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backtest Modal -->
+    <div class="modal-overlay" id="backtestModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Run Backtest</h2>
+                <button class="modal-close" onclick="closeBacktestModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="backtestForm">
+                    <input type="hidden" id="backtestStrategyId">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="backtestStartDate">Start Date</label>
+                            <input type="date" id="backtestStartDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="backtestEndDate">End Date</label>
+                            <input type="date" id="backtestEndDate" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="backtestSymbol">Symbol (override)</label>
+                            <input type="text" id="backtestSymbol" placeholder="Leave empty to use strategy default">
+                        </div>
+                        <div class="form-group">
+                            <label for="backtestCapital">Capital (override)</label>
+                            <input type="number" id="backtestCapital" placeholder="Leave empty to use strategy default">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="backtestSaveResult" checked>
+                            Save result and update strategy metrics
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeBacktestModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="runBacktest()">Run Backtest</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        const API_BASE = '/api/v1';
+        let strategies = [];
+        let strategyTypes = [];
+        let editingStrategyId = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStrategies();
+            loadStrategyTypes();
+            setupFilters();
+            setDefaultDates();
+        });
+
+        function setDefaultDates() {
+            const today = new Date();
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+            
+            document.getElementById('backtestStartDate').value = sixMonthsAgo.toISOString().split('T')[0];
+            document.getElementById('backtestEndDate').value = today.toISOString().split('T')[0];
+        }
+
+        async function loadStrategies() {
+            try {
+                const params = new URLSearchParams();
+                const search = document.getElementById('searchInput').value;
+                const status = document.getElementById('statusFilter').value;
+                const type = document.getElementById('typeFilter').value;
+                
+                if (search) params.append('search', search);
+                if (status) params.append('status', status);
+                if (type) params.append('strategy_type', type);
+                
+                const response = await fetch(`${API_BASE}/strategies/?${params}`);
+                const data = await response.json();
+                strategies = data.items || [];
+                renderStrategies();
+            } catch (error) {
+                showToast('Failed to load strategies: ' + error.message, 'error');
+                document.getElementById('strategiesContainer').innerHTML = `
+                    <div class="empty-state">
+                        <h3>Error loading strategies</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadStrategyTypes() {
+            try {
+                const response = await fetch(`${API_BASE}/strategies/types`);
+                strategyTypes = await response.json();
+            } catch (error) {
+                console.error('Failed to load strategy types:', error);
+            }
+        }
+
+        function setupFilters() {
+            document.getElementById('searchInput').addEventListener('input', debounce(loadStrategies, 300));
+            document.getElementById('statusFilter').addEventListener('change', loadStrategies);
+            document.getElementById('typeFilter').addEventListener('change', loadStrategies);
+        }
+
+        function renderStrategies() {
+            const container = document.getElementById('strategiesContainer');
+            
+            if (strategies.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>No strategies found</h3>
+                        <p>Create your first trading strategy to get started.</p>
+                        <button class="btn btn-primary" onclick="openCreateModal()" style="margin-top: 15px;">
+                            + Create Strategy
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = strategies.map(strategy => `
+                <div class="strategy-card">
+                    <div class="strategy-header">
+                        <div>
+                            <div class="strategy-title">${escapeHtml(strategy.name)}</div>
+                            <span class="strategy-type">${strategy.strategy_type}</span>
+                        </div>
+                        <span class="strategy-status status-${strategy.status}">${strategy.status}</span>
+                    </div>
+                    
+                    <div class="strategy-meta">
+                        <span>📈 ${strategy.symbol || 'BTCUSDT'}</span>
+                        <span>⏱ ${strategy.timeframe || '1h'}</span>
+                        <span>💰 $${(strategy.initial_capital || 10000).toLocaleString()}</span>
+                    </div>
+                    
+                    <div class="strategy-metrics">
+                        <div class="metric">
+                            <div class="metric-value ${getReturnClass(strategy.total_return)}">
+                                ${formatPercent(strategy.total_return)}
+                            </div>
+                            <div class="metric-label">Return</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">
+                                ${strategy.sharpe_ratio?.toFixed(2) || '-'}
+                            </div>
+                            <div class="metric-label">Sharpe</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">
+                                ${formatPercent(strategy.win_rate, true)}
+                            </div>
+                            <div class="metric-label">Win Rate</div>
+                        </div>
+                    </div>
+                    
+                    <div class="strategy-actions">
+                        <button class="btn btn-sm btn-primary" onclick="openBacktestModal('${strategy.id}')">
+                            ▶ Backtest
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="editStrategy('${strategy.id}')">
+                            ✏️ Edit
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="duplicateStrategy('${strategy.id}')">
+                            📋 Copy
+                        </button>
+                        ${strategy.status === 'active' 
+                            ? `<button class="btn btn-sm btn-secondary" onclick="pauseStrategy('${strategy.id}')">⏸ Pause</button>`
+                            : `<button class="btn btn-sm btn-secondary" onclick="activateStrategy('${strategy.id}')">▶ Activate</button>`
+                        }
+                        <button class="btn btn-sm btn-danger" onclick="deleteStrategy('${strategy.id}')">
+                            🗑
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Modal functions
+        function openCreateModal() {
+            editingStrategyId = null;
+            document.getElementById('modalTitle').textContent = 'Create Strategy';
+            document.getElementById('strategyForm').reset();
+            document.getElementById('strategyId').value = '';
+            updateParametersUI();
+            document.getElementById('strategyModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('strategyModal').classList.remove('active');
+        }
+
+        async function editStrategy(id) {
+            try {
+                const response = await fetch(`${API_BASE}/strategies/${id}`);
+                const strategy = await response.json();
+                
+                editingStrategyId = id;
+                document.getElementById('modalTitle').textContent = 'Edit Strategy';
+                document.getElementById('strategyId').value = id;
+                document.getElementById('strategyName').value = strategy.name;
+                document.getElementById('strategyDescription').value = strategy.description || '';
+                document.getElementById('strategyType').value = strategy.strategy_type;
+                document.getElementById('strategyStatus').value = strategy.status;
+                document.getElementById('strategySymbol').value = strategy.symbol || 'BTCUSDT';
+                document.getElementById('strategyTimeframe').value = strategy.timeframe || '1h';
+                document.getElementById('strategyCapital').value = strategy.initial_capital || 10000;
+                document.getElementById('strategyPositionSize').value = (strategy.position_size || 1) * 100;
+                document.getElementById('strategyStopLoss').value = strategy.stop_loss_pct || '';
+                document.getElementById('strategyTakeProfit').value = strategy.take_profit_pct || '';
+                
+                updateParametersUI(strategy.parameters);
+                document.getElementById('strategyModal').classList.add('active');
+            } catch (error) {
+                showToast('Failed to load strategy: ' + error.message, 'error');
+            }
+        }
+
+        async function saveStrategy() {
+            const id = document.getElementById('strategyId').value;
+            const data = {
+                name: document.getElementById('strategyName').value,
+                description: document.getElementById('strategyDescription').value,
+                strategy_type: document.getElementById('strategyType').value,
+                status: document.getElementById('strategyStatus').value,
+                symbol: document.getElementById('strategySymbol').value,
+                timeframe: document.getElementById('strategyTimeframe').value,
+                initial_capital: parseFloat(document.getElementById('strategyCapital').value),
+                position_size: parseFloat(document.getElementById('strategyPositionSize').value) / 100,
+                stop_loss_pct: parseFloat(document.getElementById('strategyStopLoss').value) || null,
+                take_profit_pct: parseFloat(document.getElementById('strategyTakeProfit').value) || null,
+                parameters: getParametersFromUI()
+            };
+
+            try {
+                const url = id ? `${API_BASE}/strategies/${id}` : `${API_BASE}/strategies/`;
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save strategy');
+                }
+
+                closeModal();
+                loadStrategies();
+                showToast(id ? 'Strategy updated!' : 'Strategy created!', 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function deleteStrategy(id) {
+            if (!confirm('Are you sure you want to delete this strategy?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/strategies/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to delete');
+                
+                loadStrategies();
+                showToast('Strategy deleted', 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function duplicateStrategy(id) {
+            try {
+                const response = await fetch(`${API_BASE}/strategies/${id}/duplicate`, { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to duplicate');
+                
+                loadStrategies();
+                showToast('Strategy duplicated!', 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function activateStrategy(id) {
+            try {
+                const response = await fetch(`${API_BASE}/strategies/${id}/activate`, { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to activate');
+                
+                loadStrategies();
+                showToast('Strategy activated!', 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function pauseStrategy(id) {
+            try {
+                const response = await fetch(`${API_BASE}/strategies/${id}/pause`, { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to pause');
+                
+                loadStrategies();
+                showToast('Strategy paused', 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // Backtest Modal
+        function openBacktestModal(strategyId) {
+            document.getElementById('backtestStrategyId').value = strategyId;
+            document.getElementById('backtestModal').classList.add('active');
+        }
+
+        function closeBacktestModal() {
+            document.getElementById('backtestModal').classList.remove('active');
+        }
+
+        async function runBacktest() {
+            const strategyId = document.getElementById('backtestStrategyId').value;
+            const data = {
+                start_date: document.getElementById('backtestStartDate').value + 'T00:00:00Z',
+                end_date: document.getElementById('backtestEndDate').value + 'T23:59:59Z',
+                save_result: document.getElementById('backtestSaveResult').checked
+            };
+
+            const symbol = document.getElementById('backtestSymbol').value;
+            const capital = document.getElementById('backtestCapital').value;
+            if (symbol) data.symbol = symbol;
+            if (capital) data.initial_capital = parseFloat(capital);
+
+            try {
+                showToast('Running backtest...', 'info');
+                
+                const response = await fetch(`${API_BASE}/backtests/from-strategy/${strategyId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'failed') {
+                    throw new Error(result.error_message || 'Backtest failed');
+                }
+
+                closeBacktestModal();
+                loadStrategies();
+                
+                const metrics = result.metrics;
+                showToast(
+                    `Backtest complete! Return: ${formatPercent(metrics?.total_return)}, ` +
+                    `Sharpe: ${metrics?.sharpe_ratio?.toFixed(2) || 'N/A'}`,
+                    'success'
+                );
+            } catch (error) {
+                showToast('Backtest failed: ' + error.message, 'error');
+            }
+        }
+
+        // Parameters UI
+        function updateParametersUI(existingParams = {}) {
+            const type = document.getElementById('strategyType').value;
+            const typeInfo = strategyTypes.find(t => t.strategy_type === type);
+            const defaultParams = typeInfo?.parameters || {};
+            const container = document.getElementById('parametersContainer');
+            
+            container.innerHTML = Object.entries(defaultParams).map(([key, value]) => `
+                <div class="form-row" style="margin-bottom: 10px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>${key.replace(/_/g, ' ')}</label>
+                        <input type="number" 
+                               class="param-input" 
+                               data-param="${key}" 
+                               value="${existingParams[key] ?? value}"
+                               step="any">
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getParametersFromUI() {
+            const params = {};
+            document.querySelectorAll('.param-input').forEach(input => {
+                const value = parseFloat(input.value);
+                if (!isNaN(value)) {
+                    params[input.dataset.param] = value;
+                }
+            });
+            return params;
+        }
+
+        document.getElementById('strategyType').addEventListener('change', () => updateParametersUI());
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatPercent(value, isRatio = false) {
+            if (value === null || value === undefined) return '-';
+            const pct = isRatio ? value * 100 : value;
+            const sign = pct >= 0 ? '+' : '';
+            return `${sign}${pct.toFixed(2)}%`;
+        }
+
+        function getReturnClass(value) {
+            if (value === null || value === undefined) return '';
+            return value >= 0 ? 'positive' : 'negative';
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 5000);
+        }
+    </script>
+    <script type="module" src="/frontend/js/pages/strategies.js"></script>
+</body>
+</html>

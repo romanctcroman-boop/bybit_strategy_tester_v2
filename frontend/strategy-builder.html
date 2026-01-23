@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <title>Strategy Builder - Bybit Strategy Tester v2</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- External CSS (Phase 1) -->
+    <link rel="stylesheet" href="./css/variables.css">
+    <link rel="stylesheet" href="./css/components.css">
+    <link rel="stylesheet" href="./css/common.css">
+    <link rel="stylesheet" href="./css/strategy_builder.css">
+
+    </head>
+<body>
+    <div class="app-layout">
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="navbar-left">
+                <a href="dashboard.html" class="navbar-brand" title="Back to Dashboard" aria-label="Back to Dashboard">
+                    <i class="bi bi-arrow-left"></i>
+                </a>
+                <div class="strategy-name">
+                    <i class="bi bi-diagram-3"></i>
+                    <label for="strategyName" class="visually-hidden">Strategy name</label>
+                    <input type="text" id="strategyName" value="New Strategy" placeholder="Strategy name..." title="Strategy name">
+                </div>
+                <span class="text-secondary text-sm">
+                    <i class="bi bi-clock"></i> Last saved: Never
+                </span>
+            </div>
+            <div class="navbar-actions">
+                <button class="btn btn-secondary" onclick="openTemplatesModal()">
+                    <i class="bi bi-collection"></i> Templates
+                </button>
+                <button class="btn btn-secondary" onclick="validateStrategy()">
+                    <i class="bi bi-check-circle"></i> Validate
+                </button>
+                <button class="btn btn-secondary" onclick="generateCode()">
+                    <i class="bi bi-code-slash"></i> Generate Code
+                </button>
+                <button class="btn btn-primary" onclick="saveStrategy()">
+                    <i class="bi bi-save"></i> Save
+                </button>
+                <button class="btn btn-success" onclick="runBacktest()">
+                    <i class="bi bi-play-fill"></i> Backtest
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Sidebar - Block Library -->
+            <div class="sidebar-left">
+                <div class="sidebar-header">
+                    <span class="sidebar-title">Block Library</span>
+                    <button class="btn btn-icon btn-secondary btn-sm" title="Collapse sidebar" aria-label="Collapse sidebar">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                </div>
+                <div class="sidebar-search">
+                    <label for="blockSearch" class="visually-hidden">Search blocks</label>
+                    <input type="text" class="search-input" id="blockSearch" placeholder="Search blocks..." title="Search blocks">
+                </div>
+                <div class="block-categories" id="blockCategories">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Canvas Area -->
+            <div class="canvas-area">
+                <div class="canvas-toolbar">
+                    <div class="toolbar-group">
+                        <button class="btn btn-icon btn-secondary" onclick="undo()" title="Undo">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                        <button class="btn btn-icon btn-secondary" onclick="redo()" title="Redo">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                    <div class="toolbar-group">
+                        <button class="btn btn-icon btn-secondary" onclick="deleteSelected()" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        <button class="btn btn-icon btn-secondary" onclick="duplicateSelected()" title="Duplicate">
+                            <i class="bi bi-copy"></i>
+                        </button>
+                    </div>
+                    <div class="toolbar-group">
+                        <button class="btn btn-icon btn-secondary" onclick="alignBlocks('left')" title="Align Left">
+                            <i class="bi bi-align-start"></i>
+                        </button>
+                        <button class="btn btn-icon btn-secondary" onclick="alignBlocks('center')" title="Align Center">
+                            <i class="bi bi-align-center"></i>
+                        </button>
+                        <button class="btn btn-icon btn-secondary" onclick="alignBlocks('right')" title="Align Right">
+                            <i class="bi bi-align-end"></i>
+                        </button>
+                    </div>
+                    <div class="toolbar-group">
+                        <button class="btn btn-icon btn-secondary" onclick="autoLayout()" title="Auto Layout">
+                            <i class="bi bi-grid-3x3"></i>
+                        </button>
+                        <button class="btn btn-icon btn-secondary" onclick="fitToScreen()" title="Fit to Screen">
+                            <i class="bi bi-fullscreen"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="canvas-container" id="canvasContainer">
+                    <svg class="canvas" id="connectionsCanvas">
+                        <!-- Connection lines rendered here -->
+                    </svg>
+                    <div id="blocksContainer">
+                        <!-- Strategy blocks rendered here -->
+                    </div>
+
+                    <!-- Zoom Controls -->
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomOut()" title="Zoom out" aria-label="Zoom out">
+                            <i class="bi bi-dash"></i>
+                        </button>
+                        <span class="zoom-level" id="zoomLevel">100%</span>
+                        <button class="zoom-btn" onclick="zoomIn()" title="Zoom in" aria-label="Zoom in">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                        <button class="zoom-btn" onclick="resetZoom()" title="Reset zoom" aria-label="Reset zoom">
+                            <i class="bi bi-arrows-angle-expand"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar - Properties -->
+            <div class="sidebar-right">
+                <div class="sidebar-header">
+                    <span class="sidebar-title">Properties</span>
+                </div>
+                <div class="properties-panel" id="propertiesPanel">
+                    <div class="properties-section">
+                        <div class="properties-section-header">
+                            <span class="properties-section-title">Block Properties</span>
+                            <i class="bi bi-chevron-down"></i>
+                        </div>
+                        <div class="properties-section-content" id="blockProperties">
+                            <p class="text-secondary text-center py-3">
+                                Select a block to view its properties
+                            </p>
+                        </div>
+                    </div>
+                    <div class="properties-section">
+                        <div class="properties-section-header">
+                            <span class="properties-section-title">Strategy Settings</span>
+                            <i class="bi bi-chevron-down"></i>
+                        </div>
+                        <div class="properties-section-content">
+                            <div class="property-row">
+                                <span class="property-label">Timeframe</span>
+                                <select class="property-select" id="strategyTimeframe" title="Strategy Timeframe">
+                                    <option value="1m">1 minute</option>
+                                    <option value="5m">5 minutes</option>
+                                    <option value="15m" selected>15 minutes</option>
+                                    <option value="1h">1 hour</option>
+                                    <option value="4h">4 hours</option>
+                                    <option value="1d">1 day</option>
+                                </select>
+                            </div>
+                            <div class="property-row">
+                                <span class="property-label">Symbol</span>
+                                <select class="property-select" id="strategySymbol" title="Strategy Symbol">
+                                    <option value="BTCUSDT">BTCUSDT</option>
+                                    <option value="ETHUSDT">ETHUSDT</option>
+                                    <option value="SOLUSDT">SOLUSDT</option>
+                                </select>
+                            </div>
+                            <div class="property-row">
+                                <span class="property-label">Market Type</span>
+                                <select class="property-select" id="strategyMarketType" title="Market Type - SPOT matches TradingView signals, Futures for perpetual trading">
+                                    <option value="spot" title="Use SPOT data - matches TradingView exactly">📊 SPOT (TradingView Parity)</option>
+                                    <option value="linear" selected title="Use perpetual futures data">📈 Futures (LINEAR/Perpetual)</option>
+                                </select>
+                                <small class="text-secondary d-block mt-1" style="font-size: 0.75rem;">
+                                    <i class="bi bi-info-circle"></i> SPOT matches TV signals, Futures for live perpetual trading
+                                </small>
+                            </div>
+                            <div class="property-row">
+                                <label for="initialCapital" class="property-label">Initial Capital</label>
+                                <input type="number" class="property-input" id="initialCapital" value="10000" title="Initial capital for backtesting">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Validation Panel -->
+                <div class="validation-panel">
+                    <div class="validation-header">
+                        <span class="validation-title">Validation</span>
+                        <span class="validation-status valid" id="validationStatus">
+                            <i class="bi bi-check-circle-fill"></i> Valid
+                        </span>
+                    </div>
+                    <div class="validation-list" id="validationList">
+                        <div class="validation-item info">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Add blocks to start building your strategy</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates Modal -->
+    <div class="modal-overlay" id="templatesModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Strategy Templates</h3>
+                <button class="modal-close" onclick="closeTemplatesModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="templates-grid" id="templatesGrid">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTemplatesModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="loadSelectedTemplate()">
+                    <i class="bi bi-check-lg"></i> Use Template
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./js/pages/strategy_builder.js"></script>
+</body>
+</html>

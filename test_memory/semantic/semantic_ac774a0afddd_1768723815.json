@@ -1,0 +1,23 @@
+{
+  "id": "semantic_ac774a0afddd_1768723815",
+  "content": "[strategy] User asked about moving average crossover strategy",
+  "memory_type": "semantic",
+  "created_at": "2026-01-18T08:10:15.576421+00:00",
+  "accessed_at": "2026-01-18T08:10:15.576426+00:00",
+  "access_count": 0,
+  "importance": 0.6,
+  "metadata": {
+    "source_count": 3,
+    "source_ids": [
+      "episodic_a5a7ad3fca08_1768723635",
+      "episodic_a5a7ad3fca08_1768723730",
+      "episodic_a5a7ad3fca08_1768723815"
+    ]
+  },
+  "tags": [
+    "strategy",
+    "extracted_pattern"
+  ],
+  "source": null,
+  "related_ids": []
+}

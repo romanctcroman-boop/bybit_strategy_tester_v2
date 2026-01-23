@@ -1,0 +1,42 @@
+{
+  "name": "bybit-strategy-tester-frontend",
+  "version": "2.0.0",
+  "description": "Frontend for Bybit Strategy Tester v2",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview",
+    "lint": "eslint js/**/*.js",
+    "lint:fix": "eslint js/**/*.js --fix",
+    "sri": "python generate_sri_hashes.py",
+    "clean": "rimraf dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui"
+  },
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "@testing-library/dom": "^9.3.4",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@vitest/coverage-v8": "^1.2.2",
+    "@vitest/ui": "^1.2.2",
+    "eslint": "^8.57.0",
+    "happy-dom": "^13.3.1",
+    "rimraf": "^5.0.5",
+    "rollup-plugin-sri": "^1.0.5",
+    "vite": "^5.4.0",
+    "vitest": "^1.2.2"
+  },
+  "dependencies": {},
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

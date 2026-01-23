@@ -1,0 +1,25 @@
+{
+  "id": "semantic_ef2fcd868b6b_1768725286",
+  "content": "[consolidated_from_working] Current optimization running with parameters: SL=1.5%, TP=3%",
+  "memory_type": "semantic",
+  "created_at": "2026-01-18T08:34:46.431354+00:00",
+  "accessed_at": "2026-01-18T08:34:46.431356+00:00",
+  "access_count": 0,
+  "importance": 0.9120000000000001,
+  "metadata": {
+    "source_count": 5,
+    "source_ids": [
+      "episodic_f8a1cb3b8848_1768723635",
+      "episodic_f8a1cb3b8848_1768723730",
+      "episodic_f8a1cb3b8848_1768723815",
+      "episodic_f8a1cb3b8848_1768724868",
+      "episodic_f8a1cb3b8848_1768725286"
+    ]
+  },
+  "tags": [
+    "consolidated_from_working",
+    "extracted_pattern"
+  ],
+  "source": null,
+  "related_ids": []
+}

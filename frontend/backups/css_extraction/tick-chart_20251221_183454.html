@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <title>Tick Chart - Bybit Strategy Tester</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"
+        integrity="sha384-rcCMiCptH4kTlEbg0euOTUKWe72TESbrjElatnG+9BfbmUIV268UK/Pro5biJdGm"
+        crossorigin="anonymous"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e17;
+            color: #d1d4dc;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #131722;
+            border-bottom: 1px solid #2a2e39;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header h1 .badge {
+            background: #00c853;
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .control-group label {
+            color: #787b86;
+            font-size: 13px;
+        }
+        
+        select, input[type="number"] {
+            background: #2a2e39;
+            border: 1px solid #363a45;
+            color: #d1d4dc;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #2962ff;
+        }
+        
+        button {
+            background: #2962ff;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #1e4bd8;
+        }
+        
+        button.stop {
+            background: #ff1744;
+        }
+        
+        button.stop:hover {
+            background: #d50000;
+        }
+        
+        .main-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+        
+        .chart-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #tickChart {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: #131722;
+            border-left: 1px solid #2a2e39;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-header {
+            padding: 12px 15px;
+            border-bottom: 1px solid #2a2e39;
+            font-weight: 600;
+            color: #fff;
+            font-size: 14px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+            background: #2a2e39;
+            margin: 10px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .stat-item {
+            background: #1e222d;
+            padding: 10px;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #787b86;
+            margin-bottom: 4px;
+        }
+        
+        .stat-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #d1d4dc;
+        }
+        
+        .stat-value.green { color: #00c853; }
+        .stat-value.red { color: #ff1744; }
+        
+        .trades-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .trade-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        
+        .trade-item.buy {
+            background: rgba(0, 200, 83, 0.1);
+            border-left: 2px solid #00c853;
+        }
+        
+        .trade-item.sell {
+            background: rgba(255, 23, 68, 0.1);
+            border-left: 2px solid #ff1744;
+        }
+        
+        .trade-price {
+            font-weight: 600;
+        }
+        
+        .trade-qty {
+            color: #787b86;
+        }
+        
+        .progress-bar {
+            height: 4px;
+            background: #2a2e39;
+            margin: 10px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #2962ff;
+            width: 100%;
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.1s ease-out;
+            will-change: transform;  /* GPU acceleration hint */
+        }
+        
+        .current-candle-info {
+            padding: 10px 15px;
+            background: #1e222d;
+            margin: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .current-candle-info .title {
+            color: #787b86;
+            margin-bottom: 8px;
+        }
+        
+        .candle-ohlc {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+        
+        .candle-ohlc span {
+            font-family: monospace;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            background: #1e222d;
+            margin: 10px;
+            border-radius: 4px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #787b86;
+        }
+        
+        .status-dot.connected {
+            background: #00c853;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .status-text {
+            font-size: 12px;
+            color: #787b86;
+        }
+        
+        .info-tooltip {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(19, 23, 34, 0.9);
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 100;
+            border: 1px solid #2a2e39;
+        }
+        
+        .info-tooltip .label {
+            color: #787b86;
+        }
+        
+        .info-tooltip .value {
+            color: #fff;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+        
+        /* Scroll to Now button */
+        .scroll-to-now {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: #2962ff;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 100;
+            opacity: 0.9;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        
+        .scroll-to-now:hover {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+        
+        /* ETA and rate indicators */
+        .eta-text {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 11px;
+            color: #2962ff;
+            font-weight: 500;
+        }
+        
+        .stat-item.full-width {
+            grid-column: span 2;
+            text-align: center;
+        }
+        
+        /* Utility classes */
+        .hidden {
+            display: none;
+        }
+        
+        .centered-text {
+            text-align: center;
+            margin-top: 5px;
+        }
+        
+        .stat-card {
+            background: #1e222d;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px;
+            text-align: center;
+        }
+        
+        .stat-card .stat-label {
+            font-size: 12px;
+            color: #787b86;
+            margin-bottom: 4px;
+        }
+        
+        .stat-card .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #d1d4dc;
+        }
+        
+        .stat-card .stat-sub {
+            font-size: 12px;
+            color: #a1a4ad;
+        }
+    </style>
+    <link rel="stylesheet" href="/frontend/css/tick_chart.css">
+</head>
+<body>
+    <div class="header">
+        <h1>
+            📊 Tick Chart
+            <span class="badge">LIVE</span>
+        </h1>
+        <div class="controls">
+            <div class="control-group">
+                <label for="symbolSelect">Symbol:</label>
+                <select id="symbolSelect" title="Select trading symbol">
+                    <option value="BTCUSDT" selected>BTC/USDT</option>
+                    <option value="ETHUSDT">ETH/USDT</option>
+                    <option value="SOLUSDT">SOL/USDT</option>
+                    <option value="BNBUSDT">BNB/USDT</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="ticksSelect">Ticks per bar:</label>
+                <select id="ticksSelect" title="Select number of ticks per candle">
+                    <option value="10">10 ticks</option>
+                    <option value="25">25 ticks</option>
+                    <option value="50">50 ticks</option>
+                    <option value="100" selected>100 ticks</option>
+                    <option value="250">250 ticks</option>
+                    <option value="500">500 ticks</option>
+                    <option value="1000">1000 ticks</option>
+                </select>
+            </div>
+            <button id="startBtn" onclick="startTickService()">▶ Start</button>
+            <button id="stopBtn" class="stop hidden" onclick="stopTickService()">⏹ Stop</button>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="chart-container">
+            <div id="tickChart"></div>
+            <div class="info-tooltip hidden" id="chartTooltip">
+                <span class="label">Time:</span><span class="value" id="tooltipTime">-</span><br>
+                <span class="label">O:</span><span class="value" id="tooltipOpen">-</span>
+                <span class="label">H:</span><span class="value" id="tooltipHigh">-</span>
+                <span class="label">L:</span><span class="value" id="tooltipLow">-</span>
+                <span class="label">C:</span><span class="value" id="tooltipClose">-</span>
+            </div>
+            <button class="scroll-to-now hidden" id="scrollToNowBtn" onclick="scrollToNow()" title="Scroll to latest candles">
+                ▶▶ Now
+            </button>
+        </div>
+        
+        <div class="sidebar">
+            <div class="sidebar-header">📈 Live Stats</div>
+            
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span class="status-text" id="statusText">Disconnected</span>
+            </div>
+            
+            <div class="current-candle-info">
+                <div class="title">Current Candle Progress</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="centered-text">
+                    <span id="tickProgress">0</span> / <span id="tickTotal">100</span> ticks
+                </div>
+                <div class="eta-text" id="etaText">ETA: calculating...</div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Current Ticks</div>
+                    <div class="stat-value" id="tickProgress">0</div>
+                    <div class="stat-sub" id="tickTotal">100</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Candle Rate</div>
+                    <div class="stat-value" id="candleRate">0 candles/min</div>
+                    <div class="stat-sub" id="etaText">ETA: calculating...</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Volume</div>
+                    <div class="stat-value green" id="buyVolume">0.0000</div>
+                    <div class="stat-value red" id="sellVolume">0.0000</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Last Price</div>
+                    <div class="stat-value" id="lastPrice">0.00</div>
+                    <div class="stat-sub"><span id="totalTrades">0</span> trades</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Diagnostics</div>
+                    <div class="stat-value" id="latencyStat">0 ms</div>
+                    <div class="stat-sub" id="fpsStat">60 FPS</div>
+                </div>
+            </div>
+            
+            <div class="sidebar-header">🔄 Recent Trades</div>
+            <div class="trades-list" id="tradesList"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1/marketdata/ticks';
+        
+        let chart = null;
+        let candleSeries = null;
+        let volumeSeries = null;
+        let ws = null;
+        let isConnected = false;
+        let currentSymbol = 'BTCUSDT';
+        let currentTicks = 100;
+        let tradeCount = 0;
+        let lastTradeTime = Date.now();
+        
+        // Performance optimization: throttling and batching
+        let pendingCandleUpdate = null;
+        let pendingCurrentUpdate = null;
+        let pendingTradeUpdates = [];
+        let renderFrameRequested = false;
+        const CANDLE_THROTTLE_MS = 50;  // Max 20 candle updates/sec
+        const TRADE_BATCH_SIZE = 10;     // Batch trades for DOM updates
+        let lastCandleRender = 0;
+        
+        // Auto-scroll settings
+        let autoScrollEnabled = true;
+        let userScrolledAway = false;
+        
+        // Tick chart uses index-based time (not real timestamps) because multiple candles
+        // can be created per second. LightweightCharts requires unique ascending times.
+        let candleIndex = 0;
+        let indexToTimeMap = new Map(); // Map index -> real timestamp for tooltip
+        const MAX_INDEX_MAP_SIZE = 10000;  // Prevent memory leak
+        const CLEANUP_BATCH_SIZE = 1000;   // Remove this many old entries when limit reached
+        
+        // Helper function to add to indexToTimeMap with automatic cleanup
+        function addToIndexMap(index, timestamp) {
+            indexToTimeMap.set(index, timestamp);
+            
+            // Memory leak prevention: cleanup old entries
+            if (indexToTimeMap.size > MAX_INDEX_MAP_SIZE) {
+                console.log(`[Memory] Cleaning up indexToTimeMap: ${indexToTimeMap.size} entries`);
+                
+                const toDelete = Array.from(indexToTimeMap.keys())
+                    .sort((a, b) => a - b)  // Oldest indices first
+                    .slice(0, CLEANUP_BATCH_SIZE);
+                
+                toDelete.forEach(k => indexToTimeMap.delete(k));
+                
+                console.log(`[Memory] After cleanup: ${indexToTimeMap.size} entries (removed ${CLEANUP_BATCH_SIZE})`);
+            }
+        }
+        
+        // ETA calculation
+        let recentTradesPerSecond = [];  // Rolling window of trades/sec
+        const ETA_WINDOW_SIZE = 10;      // Average over 10 seconds
+        let candlesCreatedInLastMinute = 0;
+        let lastCandleCountCheck = 0;
+        let lastMinuteCheckTime = Date.now();
+        let lastTickCount = 0;  // For calculating trades/sec from current updates
+        let ticksThisSecond = 0;  // Accumulated ticks in current second
+        
+        // Initialize chart
+        function initChart() {
+            const container = document.getElementById('tickChart');
+            
+            chart = LightweightCharts.createChart(container, {
+                layout: {
+                    background: { type: 'solid', color: '#0a0e17' },
+                    textColor: '#d1d4dc',
+                },
+                grid: {
+                    vertLines: { color: '#1e222d' },
+                    horzLines: { color: '#1e222d' },
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                },
+                rightPriceScale: {
+                    borderColor: '#2a2e39',
+                },
+                timeScale: {
+                    borderColor: '#2a2e39',
+                    timeVisible: false,  // Hide default time labels (we use index)
+                    secondsVisible: false,
+                    rightOffset: 5,  // Space for new candles
+                    shiftVisibleRangeOnNewBar: true,  // Auto-scroll on new bars
+                    tickMarkFormatter: (time) => `#${time}`,  // Show bar number
+                },
+                localization: {
+                    timeFormatter: (time) => `Bar #${time}`,  // Tooltip format
+                },
+            });
+            
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#00c853',
+                downColor: '#ff1744',
+                borderDownColor: '#ff1744',
+                borderUpColor: '#00c853',
+                wickDownColor: '#ff1744',
+                wickUpColor: '#00c853',
+            });
+            
+            volumeSeries = chart.addHistogramSeries({
+                color: '#2962ff',
+                priceFormat: { type: 'volume' },
+                priceScaleId: '',
+                scaleMargins: {
+                    top: 0.8,
+                    bottom: 0,
+                },
+            });
+            
+            // Track user scroll to disable auto-scroll when user navigates
+            chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+                // If user scrolled away from latest candle
+                const visibleRange = chart.timeScale().getVisibleRange();
+                if (visibleRange && candleIndex > 0) {
+                    // If right edge is more than 10 candles from current, user scrolled away
+                    userScrolledAway = (candleIndex - visibleRange.to) > 10;
+                    
+                    // Show/hide "Scroll to Now" button
+                    const scrollBtn = document.getElementById('scrollToNowBtn');
+                    if (userScrolledAway) {
+                        scrollBtn.classList.remove('hidden');
+                    } else {
+                        scrollBtn.classList.add('hidden');
+                    }
+                }
+            });
+            
+            // Resize handler
+            new ResizeObserver(() => {
+                chart.applyOptions({ 
+                    width: container.clientWidth,
+                    height: container.clientHeight 
+                });
+            }).observe(container);
+            
+            // Crosshair tooltip
+            chart.subscribeCrosshairMove(param => {
+                const tooltip = document.getElementById('chartTooltip');
+                if (!param.point || param.time === undefined) {
+                    tooltip.classList.add('hidden');
+                    return;
+                }
+                
+                const data = param.seriesData.get(candleSeries);
+                if (data) {
+                    tooltip.classList.remove('hidden');
+                    // param.time is index, get real timestamp from map
+                    const realTime = indexToTimeMap.get(param.time);
+                    if (realTime) {
+                        document.getElementById('tooltipTime').textContent = new Date(realTime * 1000).toLocaleTimeString();
+                    } else {
+                        document.getElementById('tooltipTime').textContent = `Bar #${param.time}`;
+                    }
+                    document.getElementById('tooltipOpen').textContent = data.open.toFixed(2);
+                    document.getElementById('tooltipHigh').textContent = data.high.toFixed(2);
+                    document.getElementById('tooltipLow').textContent = data.low.toFixed(2);
+                    document.getElementById('tooltipClose').textContent = data.close.toFixed(2);
+                }
+            });
+        }
+        
+        // Start tick service
+        async function startTickService() {
+            currentSymbol = document.getElementById('symbolSelect').value;
+            currentTicks = parseInt(document.getElementById('ticksSelect').value);
+            
+            document.getElementById('tickTotal').textContent = currentTicks;
+            
+            try {
+                // Reset reconnection state
+                shouldReconnect = true;
+                wsReconnectAttempts = 0;
+                
+                // Start backend service with selected ticks parameter
+                await fetch(`${API_BASE}/start?symbols=${currentSymbol}&ticks=${currentTicks}`, { method: 'POST' });
+                
+                // Connect WebSocket
+                connectWebSocket();
+                
+                document.getElementById('startBtn').classList.add('hidden');
+                document.getElementById('stopBtn').classList.remove('hidden');
+            } catch (e) {
+                console.error('Failed to start tick service:', e);
+            }
+        }
+        
+        // Stop tick service
+        async function stopTickService() {
+            shouldReconnect = false;  // Disable auto-reconnect
+            
+            // Clear any pending reconnect timeout
+            if (wsReconnectTimeout) {
+                clearTimeout(wsReconnectTimeout);
+                wsReconnectTimeout = null;
+            }
+            
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            try {
+                await fetch(`${API_BASE}/stop`, { method: 'POST' });
+            } catch (e) {
+                console.error('Failed to stop tick service:', e);
+            }
+            
+            updateConnectionStatus(false);
+            document.getElementById('startBtn').classList.remove('hidden');
+            document.getElementById('stopBtn').classList.add('hidden');
+        }
+        
+        // WebSocket reconnection logic
+        let wsReconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 10;
+        const RECONNECT_DELAY_MS = 2000;
+        let wsReconnectTimeout = null;
+        let shouldReconnect = true;
+
+        // WebSocket connection
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                console.log('WebSocket already connected');
+                return;
+            }
+
+            const wsUrl = `ws://${window.location.host}${API_BASE}/ws/${currentSymbol}?ticks=${currentTicks}`;
+            console.log('Connecting to:', wsUrl);
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                updateConnectionStatus(true);
+                wsReconnectAttempts = 0;  // Reset counter on success
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                updateConnectionStatus(false);
+                
+                // Auto-reconnect if enabled and not manually stopped
+                if (shouldReconnect && wsReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    wsReconnectAttempts++;
+                    console.log(`Reconnecting in ${RECONNECT_DELAY_MS}ms (attempt ${wsReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                    
+                    wsReconnectTimeout = setTimeout(() => {
+                        connectWebSocket();
+                    }, RECONNECT_DELAY_MS);
+                } else if (wsReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                    console.error('Max reconnection attempts reached. Please restart manually.');
+                    document.getElementById('statusText').textContent = 'Disconnected - Click Start to reconnect';
+                }
+            };
+            
+            ws.onerror = (e) => {
+                console.error('WebSocket error:', e);
+            };
+            
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleMessage(msg);
+            };
+        }
+        
+        // Schedule render frame for batched updates
+        function scheduleRenderFrame() {
+            if (!renderFrameRequested) {
+                renderFrameRequested = true;
+                requestAnimationFrame(processUpdates);
+            }
+        }
+        
+        let lastFrameTime = Date.now();
+        let frameCount = 0;
+        let lastFpsUpdate = Date.now();
+
+        // Process all pending updates in single frame (GPU-optimized)
+        function processUpdates() {
+            renderFrameRequested = false;
+            const now = Date.now();
+            
+            // FPS / Freeze detection
+            frameCount++;
+            if (now - lastFpsUpdate >= 1000) {
+                const fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+                document.getElementById('fpsStat').textContent = `${fps} FPS`;
+                if (fps < 10) {
+                    document.getElementById('fpsStat').style.color = 'red';
+                } else {
+                    document.getElementById('fpsStat').style.color = '#888';
+                }
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
+            
+            // Detect main thread freeze
+            const frameDelta = now - lastFrameTime;
+            if (frameDelta > 200) {
+                console.warn(`Main thread freeze detected: ${frameDelta}ms`);
+            }
+            lastFrameTime = now;
+
+            // Process pending candle update (completed candle)
+            if (pendingCandleUpdate && (now - lastCandleRender >= CANDLE_THROTTLE_MS)) {
+                const { candle, volume, isNew } = pendingCandleUpdate;
+                candleSeries.update(candle);
+                volumeSeries.update(volume);
+                
+                if (isNew) {
+                    const countEl = document.getElementById('candleCount');
+                    countEl.textContent = parseInt(countEl.textContent) + 1;
+                }
+                
+                // Auto-scroll only on new completed candle
+                if (autoScrollEnabled && !userScrolledAway) {
+                    chart.timeScale().scrollToRealTime();
+                }
+                
+                pendingCandleUpdate = null;
+                lastCandleRender = now;
+            }
+            
+            // Process pending current candle update (throttled DOM updates)
+            if (pendingCurrentUpdate) {
+                const data = pendingCurrentUpdate;
+                
+                // Update progress bar using CSS transform (GPU-accelerated)
+                const progress = data.progress_pct || 0;
+                document.getElementById('progressFill').style.transform = `scaleX(${progress / 100})`;
+                document.getElementById('tickProgress').textContent = data.current_ticks || 0;
+                
+                // Update buy/sell volume (less frequent - only if changed significantly)
+                document.getElementById('buyVolume').textContent = (data.buy_volume || 0).toFixed(4);
+                document.getElementById('sellVolume').textContent = (data.sell_volume || 0).toFixed(4);
+                
+                // Update current (incomplete) candle on chart
+                if (data.open) {
+                    candleSeries.update({
+                        time: candleIndex,
+                        open: data.open,
+                        high: data.high,
+                        low: data.low,
+                        close: data.close,
+                    });
+                    // NO scrollToRealTime here - too expensive, only on completed candle
+                }
+                
+                pendingCurrentUpdate = null;
+            }
+            
+            // Process batched trade updates
+            if (pendingTradeUpdates.length > 0) {
+                const trades = pendingTradeUpdates.splice(0, TRADE_BATCH_SIZE);
+                const tradesList = document.getElementById('tradesList');
+                
+                // Use DocumentFragment for batch DOM insertion (much faster)
+                const fragment = document.createDocumentFragment();
+                
+                trades.forEach(trade => {
+                    tradeCount++;
+                    
+                    const tradeEl = document.createElement('div');
+                    tradeEl.className = 'trade-item ' + trade.side.toLowerCase();
+                    tradeEl.innerHTML = `
+                        <span class="trade-price">${trade.price.toFixed(2)}</span>
+                        <span class="trade-qty">${trade.qty.toFixed(4)}</span>
+                    `;
+                    fragment.insertBefore(tradeEl, fragment.firstChild);
+                });
+                
+                tradesList.insertBefore(fragment, tradesList.firstChild);
+                
+                // Keep only last 50 trades
+                while (tradesList.children.length > 50) {
+                    tradesList.removeChild(tradesList.lastChild);
+                }
+                
+                // Update last trade display
+                const lastTrade = trades[trades.length - 1];
+                if (lastTrade) {
+                    document.getElementById('totalTrades').textContent = tradeCount;
+                    document.getElementById('lastPrice').textContent = lastTrade.price.toFixed(2);
+                    document.getElementById('lastPrice').className = 'stat-value ' + (lastTrade.side === 'Buy' ? 'green' : 'red');
+                }
+                
+                // If more trades pending, schedule another frame
+                if (pendingTradeUpdates.length > 0) {
+                    scheduleRenderFrame();
+                }
+            }
+        }
+        
+        // Handle WebSocket messages
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'history':
+                    // Load historical candles with index-based time
+                    candleIndex = 0;
+                    indexToTimeMap.clear();
+                    
+                    const candles = msg.data.map((c, i) => {
+                        addToIndexMap(i, c.time);  // Use helper function
+                        return {
+                            time: i,  // Use index, not timestamp
+                            open: c.open,
+                            high: c.high,
+                            low: c.low,
+                            close: c.close,
+                        };
+                    });
+                    const volumes = msg.data.map((c, i) => ({
+                        time: i,  // Use index
+                        value: c.volume,
+                        color: c.close >= c.open ? 'rgba(0,200,83,0.5)' : 'rgba(255,23,68,0.5)',
+                    }));
+                    
+                    candleIndex = msg.data.length;
+                    candleSeries.setData(candles);
+                    volumeSeries.setData(volumes);
+                    document.getElementById('candleCount').textContent = candles.length;
+                    
+                    // Scroll to latest after loading history
+                    chart.timeScale().scrollToRealTime();
+                    break;
+                    
+                case 'candle':
+                    // Queue new completed candle for next render frame
+                    // Use current candleIndex (this is the index where "current" candle was being shown)
+                    const completedIndex = candleIndex;
+                    addToIndexMap(completedIndex, msg.data.time);  // Use helper function
+                    
+                    const candle = {
+                        time: completedIndex,  // Use current index (replaces the "current" preview)
+                        open: msg.data.open,
+                        high: msg.data.high,
+                        low: msg.data.low,
+                        close: msg.data.close,
+                    };
+                    pendingCandleUpdate = {
+                        candle,
+                        volume: {
+                            time: completedIndex,  // Use same index
+                            value: msg.data.volume,
+                            color: candle.close >= candle.open ? 'rgba(0,200,83,0.5)' : 'rgba(255,23,68,0.5)',
+                        },
+                        isNew: true
+                    };
+                    
+                    // NOW increment for next candle
+                    candleIndex++;
+                    
+                    scheduleRenderFrame();
+                    break;
+                    
+                case 'current':
+                    // Queue current candle update
+                    pendingCurrentUpdate = msg.data;
+                    
+                    // Update latency if server time is available
+                    if (msg.data.server_time) {
+                        // Note: This assumes clocks are roughly synced, or at least consistent.
+                        // We care about *changes* in this value (jitter).
+                        // A better metric is "time since last message" but this helps see transport delay.
+                        const latency = Date.now() - msg.data.server_time;
+                        // Simple moving average
+                        const latEl = document.getElementById('latencyStat');
+                        latEl.textContent = `${latency} ms (diff)`;
+                        if (latency > 1000) latEl.style.color = 'red';
+                        else latEl.style.color = '#00ff88';
+                    }
+
+                    // Count ticks from current updates for accurate ETA
+                    const currentTicks = msg.data.current_ticks || 0;
+                    if (lastTickCount > 0 && currentTicks >= lastTickCount) {
+                        // Normal increment
+                        ticksThisSecond += (currentTicks - lastTickCount);
+                    } else if (lastTickCount > 0 && currentTicks < lastTickCount) {
+                        // New candle started (ticks reset from high value to low)
+                        ticksThisSecond += currentTicks;
+                    }
+                    lastTickCount = currentTicks;
+                    
+                    scheduleRenderFrame();
+                    break;
+                    
+                case 'trade':
+                    // Queue trade for batched processing
+                    pendingTradeUpdates.push(msg.data);
+                    scheduleRenderFrame();
+                    break;
+
+                case 'trades':
+                    // Backend sends a micro-batch to reduce message overhead.
+                    if (Array.isArray(msg.data) && msg.data.length > 0) {
+                        pendingTradeUpdates.push(...msg.data);
+                        scheduleRenderFrame();
+                    }
+                    break;
+                    
+                case 'ping':
+                    // Keep-alive, ignore
+                    break;
+            }
+        }
+        
+        // Reset auto-scroll when user clicks "Scroll to Now" button or double-clicks chart
+        function scrollToNow() {
+            userScrolledAway = false;
+            chart.timeScale().scrollToRealTime();
+        }
+        
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            isConnected = connected;
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            
+            if (connected) {
+                dot.classList.add('connected');
+                text.textContent = 'Connected - Live';
+            } else {
+                dot.classList.remove('connected');
+                text.textContent = 'Disconnected';
+            }
+        }
+        
+        // Calculate ETA to next candle
+        function updateETA() {
+            // Store ticks/sec history for averaging (from actual tick count, not trade messages)
+            recentTradesPerSecond.push(ticksThisSecond);
+            if (recentTradesPerSecond.length > ETA_WINDOW_SIZE) {
+                recentTradesPerSecond.shift();
+            }
+            
+            // Calculate average trades per second
+            const avgTradesPerSec = recentTradesPerSecond.reduce((a, b) => a + b, 0) / recentTradesPerSecond.length;
+            
+            // Get current progress
+            const currentProgress = parseInt(document.getElementById('tickProgress').textContent) || 0;
+            const ticksNeeded = currentTicks - currentProgress;
+            
+            // Calculate ETA
+            const etaEl = document.getElementById('etaText');
+            if (avgTradesPerSec > 0 && ticksNeeded > 0) {
+                const etaSeconds = ticksNeeded / avgTradesPerSec;
+                if (etaSeconds < 60) {
+                    etaEl.textContent = `ETA: ~${Math.round(etaSeconds)}s`;
+                } else {
+                    const mins = Math.floor(etaSeconds / 60);
+                    const secs = Math.round(etaSeconds % 60);
+                    etaEl.textContent = `ETA: ~${mins}m ${secs}s`;
+                }
+            } else if (currentProgress === 0) {
+                etaEl.textContent = 'ETA: waiting for trades...';
+            } else {
+                etaEl.textContent = 'ETA: calculating...';
+            }
+            
+            // Update trades/sec display (show actual ticks this second)
+            document.getElementById('tradesPerSec').textContent = ticksThisSecond;
+            ticksThisSecond = 0;  // Reset for next second
+        }
+        
+        // Calculate candle rate (candles per minute)
+        function updateCandleRate() {
+            const now = Date.now();
+            const elapsedMs = now - lastMinuteCheckTime;
+            
+            if (elapsedMs >= 60000) {
+                // One minute passed - calculate rate
+                const currentCandleCount = parseInt(document.getElementById('candleCount').textContent) || 0;
+                const candlesInLastMinute = currentCandleCount - lastCandleCountCheck;
+                
+                document.getElementById('candleRate').textContent = `${candlesInLastMinute} candles/min`;
+                
+                lastCandleCountCheck = currentCandleCount;
+                lastMinuteCheckTime = now;
+            }
+        }
+        
+        // Update stats every second
+        setInterval(() => {
+            updateETA();
+            updateCandleRate();
+        }, 1000);
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+        });
+    </script>
+</body>
+</html>

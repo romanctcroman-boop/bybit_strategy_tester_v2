@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: 'ai_strategy_tester'
+    environment: 'production'
+
+scrape_configs:
+  - job_name: 'ai_strategy_tester'
+    static_configs:
+      - targets: ['host.docker.internal:8000']
+    metrics_path: '/monitoring/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['localhost:9093']
+      timeout: 10s
+
+rule_files:
+  - '/etc/prometheus/rules/*.yml'

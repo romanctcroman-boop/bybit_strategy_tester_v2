@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <title>Dashboard - Bybit Strategy Tester v2</title>
+    <link rel="icon" href="/frontend/favicon.ico" type="image/x-icon">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"
+        integrity="sha384-cVMg8E3QFwTvGCDuK+ET4PD341jF3W8nO1auiXfuZNQkzbUUiBGLsIQUE+b1mxws"
+        crossorigin="anonymous"></script>
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      integrity="sha384-4LISF5TTJX/fLmGSxO53rV4miRxdg84mZsxmO8Rx5jGtp/LbrixFETvWa5a6sESd"
+      crossorigin="anonymous">
+    <!-- External CSS (Phase 1) -->
+    <link rel="stylesheet" href="./css/variables.css">
+    <link rel="stylesheet" href="./css/components.css">
+    <link rel="stylesheet" href="./css/common.css">
+    <link rel="stylesheet" href="./css/dashboard.css">
+    <!-- AI Assistant CSS -->
+    <link rel="stylesheet" href="./css/ai-assistant.css">
+
+    </head>
+<body>
+    <!-- Keyboard Shortcuts Modal -->
+    <div class="shortcuts-modal" id="shortcutsModal">
+        <div class="shortcuts-content">
+            <h3><i class="bi bi-keyboard"></i> Keyboard Shortcuts</h3>
+            <div class="shortcut-group">
+                <h4>Navigation</h4>
+                <div class="shortcut-item">
+                    <span>Go to Dashboard</span>
+                    <span class="shortcut-key">D</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Go to Strategies</span>
+                    <span class="shortcut-key">S</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Go to Trading</span>
+                    <span class="shortcut-key">T</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Go to Charts</span>
+                    <span class="shortcut-key">C</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Go to Analytics</span>
+                    <span class="shortcut-key">A</span>
+                </div>
+            </div>
+            <div class="shortcut-group">
+                <h4>Actions</h4>
+                <div class="shortcut-item">
+                    <span>Refresh Dashboard</span>
+                    <span class="shortcut-key">R</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>New Strategy</span>
+                    <span class="shortcut-key">N</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Toggle Theme</span>
+                    <span class="shortcut-key">L</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Show Notifications</span>
+                    <span class="shortcut-key">I</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Open Settings</span>
+                    <span class="shortcut-key">O</span>
+                </div>
+            </div>
+            <div class="shortcut-group">
+                <h4>General</h4>
+                <div class="shortcut-item">
+                    <span>Show Shortcuts</span>
+                    <span class="shortcut-key">?</span>
+                </div>
+                <div class="shortcut-item">
+                    <span>Close Modal</span>
+                    <span class="shortcut-key">Esc</span>
+                </div>
+            </div>
+            <button onclick="hideShortcuts()" class="close-modal-btn">Close</button>
+        </div>
+    </div>
+
+    <!-- Live Price Ticker -->
+    <div class="live-ticker" id="liveTicker">
+        <div class="ticker-track" id="tickerTrack">
+            <!-- Filled by JavaScript -->
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>
+                <span class="logo">📊</span>
+                Bybit Strategy Tester
+            </h1>
+            <nav class="nav-links">
+                <a href="dashboard.html" class="active">Dashboard</a>
+                
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-btn">Trading <i class="bi bi-chevron-down"></i></button>
+                    <div class="nav-dropdown-menu">
+                        <a href="trading.html"><i class="bi bi-graph-up-arrow"></i> Live Trading</a>
+                        <a href="market-chart.html"><i class="bi bi-bar-chart"></i> Charts</a>
+                        <a href="tick-chart.html"><i class="bi bi-activity"></i> Tick Chart</a>
+                        <a href="portfolio.html"><i class="bi bi-wallet2"></i> Portfolio</a>
+                    </div>
+                </div>
+                
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-btn">Strategies <i class="bi bi-chevron-down"></i></button>
+                    <div class="nav-dropdown-menu">
+                        <a href="strategies.html"><i class="bi bi-list"></i> My Strategies</a>
+                        <a href="strategy-builder.html"><i class="bi bi-puzzle"></i> Strategy Builder</a>
+                        <a href="backtest-results.html"><i class="bi bi-clock-history"></i> Backtests</a>
+                        <a href="optimizations.html"><i class="bi bi-sliders"></i> Optimizations</a>
+                    </div>
+                </div>
+                
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-btn">Analytics <i class="bi bi-chevron-down"></i></button>
+                    <div class="nav-dropdown-menu">
+                        <a href="analytics.html"><i class="bi bi-pie-chart"></i> Analytics</a>
+                        <a href="ml-models.html"><i class="bi bi-robot"></i> ML Models</a>
+                        <a href="risk-management.html"><i class="bi bi-shield-check"></i> Risk Management</a>
+                    </div>
+                </div>
+                
+                <a href="notifications.html" title="Notifications"><i class="bi bi-bell"></i></a>
+                <a href="settings.html" title="Settings"><i class="bi bi-gear"></i></a>
+                
+                <div class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme (L)">
+                    <span class="toggle-icon active" id="darkModeIcon"><i class="bi bi-moon-fill"></i></span>
+                    <span class="toggle-icon" id="lightModeIcon"><i class="bi bi-sun-fill"></i></span>
+                </div>
+            </nav>
+        </header>
+
+        <!-- Market Overview -->
+        <div class="market-overview" id="marketOverview">
+            <!-- Filled by JavaScript -->
+        </div>
+
+        <!-- Period Selector & Refresh -->
+        <div class="dashboard-toolbar">
+            <div class="toolbar-left">
+                <div class="period-selector">
+                    <button class="period-btn" data-period="1h">1H</button>
+                    <button class="period-btn active" data-period="24h">24H</button>
+                    <button class="period-btn" data-period="7d">7D</button>
+                    <button class="period-btn" data-period="30d">30D</button>
+                    <button class="period-btn" data-period="all">All</button>
+                </div>
+                
+                <!-- Custom Date Range -->
+                <div class="date-range-picker" id="customDateRange">
+                    <span class="date-icon">📅</span>
+                    <input type="date" id="dateFrom" title="Start date">
+                    <span class="date-separator">→</span>
+                    <input type="date" id="dateTo" title="End date">
+                    <button class="apply-btn" onclick="applyCustomDateRange()">Apply</button>
+                </div>
+            </div>
+            
+            <div class="toolbar-left">
+                <!-- WebSocket Status -->
+                <div class="ws-status" id="wsStatus">
+                    <div class="dot"></div>
+                    <span>Connecting...</span>
+                </div>
+                
+                <div class="refresh-indicator" id="refreshIndicator">
+                    <div class="spinner"></div>
+                    <span id="lastUpdate">Last updated: --</span>
+                    <button class="refresh-btn" onclick="refreshDashboard()" title="Refresh">🔄</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card blue">
+                <div class="icon">📈</div>
+                <div class="title">Total Backtests</div>
+                <div class="value" id="totalBacktests">--</div>
+                <div class="subtext">
+                    <span id="runningBacktests">0</span> running • <span id="completedBacktests">0</span> completed
+                </div>
+            </div>
+
+            <div class="stat-card green">
+                <div class="icon">🎯</div>
+                <div class="title">Success Rate</div>
+                <div class="value" id="successRate">--%</div>
+                <div class="subtext" id="failedBacktests">0 failed</div>
+            </div>
+
+            <div class="stat-card purple">
+                <div class="icon">📋</div>
+                <div class="title">Active Strategies</div>
+                <div class="value" id="activeStrategies">--</div>
+                <div class="subtext"><span id="totalStrategies">0</span> total strategies</div>
+            </div>
+
+            <div class="stat-card yellow">
+                <div class="icon">⚙️</div>
+                <div class="title">Optimizations</div>
+                <div class="value" id="totalOptimizations">--</div>
+                <div class="subtext"><span id="runningOptimizations">0</span> running</div>
+            </div>
+
+            <div class="stat-card green">
+                <div class="icon">💹</div>
+                <div class="title">Trades Analyzed</div>
+                <div class="value" id="totalTrades">--</div>
+                <div class="subtext">In selected period</div>
+            </div>
+
+            <div class="stat-card blue">
+                <div class="icon">⏱️</div>
+                <div class="title">Avg Backtest Time</div>
+                <div class="value" id="avgDuration">--s</div>
+                <div class="subtext">Per completed backtest</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-grid">
+            <!-- Performance Over Time -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>📈 Performance Over Time</h3>
+                    <label for="chartMetricSelect" class="visually-hidden">Select chart metric</label>
+                    <select id="chartMetricSelect" title="Select chart metric" class="metric-select">
+                        <option value="returns">Returns</option>
+                        <option value="sharpe">Sharpe Ratio</option>
+                        <option value="trades">Trade Count</option>
+                    </select>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Returns Distribution -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>📊 Returns Distribution</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="distributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Win Rate by Strategy Type -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>🎯 Win Rate by Strategy</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="winRateChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backtests Timeline -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>⏳ Backtests Activity</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Left Column: Top Performers -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>🏆 Top Performers</h3>
+                    <label for="performerMetric" class="visually-hidden">Sort by metric</label>
+                    <select id="performerMetric" title="Sort performers by metric" class="metric-select">
+                        <option value="sharpe_ratio">Sharpe Ratio</option>
+                        <option value="total_return">Total Return</option>
+                        <option value="win_rate">Win Rate</option>
+                    </select>
+                </div>
+                <div class="panel-body">
+                    <table class="performers-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Strategy</th>
+                                <th>Symbol</th>
+                                <th>Sharpe</th>
+                                <th>Return</th>
+                                <th>Win Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="performersBody">
+                            <tr>
+                                <td colspan="6" class="table-loading">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Right Column: System Health & Quick Actions -->
+            <div class="charts-column">
+                <!-- System Health -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>🏥 System Health</h3>
+                        <span class="badge" id="systemStatus">--</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="health-grid" id="healthGrid">
+                            <div class="health-item">
+                                <div class="label">
+                                    <span>🗄️</span>
+                                    <span>Database</span>
+                                </div>
+                                <div class="status">
+                                    <span id="dbResponseTime">--ms</span>
+                                    <div class="status-dot" id="dbStatus"></div>
+                                </div>
+                            </div>
+                            <div class="health-item">
+                                <div class="label">
+                                    <span>📦</span>
+                                    <span>Task Queue</span>
+                                </div>
+                                <div class="status">
+                                    <span id="pendingTasks">--</span>
+                                    <div class="status-dot" id="queueStatus"></div>
+                                </div>
+                            </div>
+                            <div class="health-item">
+                                <div class="label">
+                                    <span>💾</span>
+                                    <span>Database Size</span>
+                                </div>
+                                <div class="status">
+                                    <span id="dbSize">--</span>
+                                </div>
+                            </div>
+                            <div class="health-item">
+                                <div class="label">
+                                    <span>🤖</span>
+                                    <span>AI Agents</span>
+                                </div>
+                                <div class="status">
+                                    <span id="agentsStatus">--</span>
+                                    <div class="status-dot" id="agentsDot"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>⚡ Quick Actions</h3>
+                    </div>
+                    <div class="panel-body">
+                        <div class="quick-actions">
+                            <a href="strategies.html?action=new" class="action-btn">
+                                <span class="icon">➕</span>
+                                New Strategy
+                            </a>
+                            <a href="backtest-results.html?action=run" class="action-btn">
+                                <span class="icon">▶️</span>
+                                Run Backtest
+                            </a>
+                            <a href="optimizations.html?action=new" class="action-btn">
+                                <span class="icon">🔧</span>
+                                Optimization
+                            </a>
+                            <a href="trading.html" class="action-btn">
+                                <span class="icon">💹</span>
+                                Trading
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Watchlist Widget -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>⭐ Watchlist</h3>
+                        <button class="refresh-btn" onclick="addToWatchlist()" title="Add Symbol">➕</button>
+                    </div>
+                    <div class="panel-body">
+                        <div class="watchlist-widget" id="watchlistWidget">
+                            <div class="watchlist-item">
+                                <div class="watchlist-left">
+                                    <span class="watchlist-star">★</span>
+                                    <div>
+                                        <div class="market-symbol">BTC/USDT</div>
+                                        <div class="market-name">Bitcoin</div>
+                                    </div>
+                                </div>
+                                <div class="watchlist-right">
+                                    <div class="market-price">$67,250.50</div>
+                                    <div class="market-change up">+2.35%</div>
+                                </div>
+                            </div>
+                            <div class="watchlist-item">
+                                <div class="watchlist-left">
+                                    <span class="watchlist-star">★</span>
+                                    <div>
+                                        <div class="market-symbol">ETH/USDT</div>
+                                        <div class="market-name">Ethereum</div>
+                                    </div>
+                                </div>
+                                <div class="watchlist-right">
+                                    <div class="market-price">$3,520.80</div>
+                                    <div class="market-change up">+1.82%</div>
+                                </div>
+                            </div>
+                            <div class="watchlist-item">
+                                <div class="watchlist-left">
+                                    <span class="watchlist-star">★</span>
+                                    <div>
+                                        <div class="market-symbol">SOL/USDT</div>
+                                        <div class="market-name">Solana</div>
+                                    </div>
+                                </div>
+                                <div class="watchlist-right">
+                                    <div class="market-price">$142.35</div>
+                                    <div class="market-change down">-0.95%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: Watchlist & Risk Heatmap Row -->
+        <div class="dashboard-grid spaced">
+            <!-- Risk Heatmap -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>🔥 Risk Heatmap</h3>
+                    <span class="badge warning">Portfolio Risk</span>
+                </div>
+                <div class="panel-body">
+                    <div class="risk-heatmap" id="riskHeatmap">
+                        <div class="heatmap-cell risk-low">
+                            <div class="symbol">BTC</div>
+                            <div class="value">Low Risk (15%)</div>
+                        </div>
+                        <div class="heatmap-cell risk-low">
+                            <div class="symbol">ETH</div>
+                            <div class="value">Low Risk (22%)</div>
+                        </div>
+                        <div class="heatmap-cell risk-medium">
+                            <div class="symbol">SOL</div>
+                            <div class="value">Medium (45%)</div>
+                        </div>
+                        <div class="heatmap-cell risk-medium">
+                            <div class="symbol">BNB</div>
+                            <div class="value">Medium (38%)</div>
+                        </div>
+                        <div class="heatmap-cell risk-high">
+                            <div class="symbol">DOGE</div>
+                            <div class="value">High Risk (65%)</div>
+                        </div>
+                        <div class="heatmap-cell risk-extreme">
+                            <div class="symbol">SHIB</div>
+                            <div class="value">Extreme (85%)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini Calendar -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>� Calendar</h3>
+                    <div class="calendar-nav">
+                        <button onclick="changeMonth(-1)" title="Previous Month">◀</button>
+                        <span id="calendarMonth">January 2025</span>
+                        <button onclick="changeMonth(1)" title="Next Month">▶</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="mini-calendar">
+                        <div class="calendar-grid">
+                            <div class="calendar-day-header">Su</div>
+                            <div class="calendar-day-header">Mo</div>
+                            <div class="calendar-day-header">Tu</div>
+                            <div class="calendar-day-header">We</div>
+                            <div class="calendar-day-header">Th</div>
+                            <div class="calendar-day-header">Fr</div>
+                            <div class="calendar-day-header">Sa</div>
+                            <!-- Days filled by JS -->
+                            <div class="calendar-day other-month">29</div>
+                            <div class="calendar-day other-month">30</div>
+                            <div class="calendar-day other-month">31</div>
+                            <div class="calendar-day">1</div>
+                            <div class="calendar-day">2</div>
+                            <div class="calendar-day">3</div>
+                            <div class="calendar-day">4</div>
+                            <div class="calendar-day">5</div>
+                            <div class="calendar-day">6</div>
+                            <div class="calendar-day today">7</div>
+                            <div class="calendar-day">8</div>
+                            <div class="calendar-day">9</div>
+                            <div class="calendar-day has-event">10</div>
+                            <div class="calendar-day">11</div>
+                            <div class="calendar-day">12</div>
+                            <div class="calendar-day">13</div>
+                            <div class="calendar-day">14</div>
+                            <div class="calendar-day has-event">15</div>
+                            <div class="calendar-day">16</div>
+                            <div class="calendar-day">17</div>
+                            <div class="calendar-day">18</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Second Row: Recent Activity -->
+        <div class="panel panel-spaced">
+            <div class="panel-header">
+                <h3>📋 Recent Activity</h3>
+                <span class="badge" id="activityCount">0</span>
+            </div>
+            <div class="panel-body">
+                <ul class="activity-list" id="activityList">
+                    <li class="activity-loading">
+                        Loading recent activity...
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- NEW: Portfolio History & AI Recommendations Row -->
+        <div class="dashboard-grid spaced">
+            <!-- Portfolio History Chart -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>📊 Portfolio History</h3>
+                    <div class="period-selector" id="portfolioPeriodSelector">
+                        <button class="period-btn active" data-days="7">7D</button>
+                        <button class="period-btn" data-days="30">30D</button>
+                        <button class="period-btn" data-days="90">90D</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="portfolioHistoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Recommendations -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>🤖 AI Recommendations</h3>
+                    <button class="refresh-btn" onclick="loadAIRecommendations()" title="Refresh AI Insights">🔄</button>
+                </div>
+                <div class="panel-body">
+                    <div id="aiRecommendations" class="ai-recommendations-container">
+                        <div class="ai-loading">
+                            <div class="spinner"></div>
+                            <span>Analyzing portfolio...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: Real-time P&L and Strategy Leaderboard Row -->
+        <div class="dashboard-grid spaced">
+            <!-- Real-time P&L Widget -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>💰 Real-time P&L</h3>
+                    <span class="badge pnl-live" id="pnlLiveStatus">● LIVE</span>
+                </div>
+                <div class="panel-body">
+                    <div class="pnl-display">
+                        <div class="pnl-main">
+                            <span class="pnl-label">Current P&L</span>
+                            <span class="pnl-value" id="currentPnL">$0.00</span>
+                        </div>
+                        <div class="pnl-stats">
+                            <div class="pnl-stat">
+                                <span class="label">Today</span>
+                                <span class="value" id="pnlToday">$0.00</span>
+                            </div>
+                            <div class="pnl-stat">
+                                <span class="label">This Week</span>
+                                <span class="value" id="pnlWeek">$0.00</span>
+                            </div>
+                            <div class="pnl-stat">
+                                <span class="label">This Month</span>
+                                <span class="value" id="pnlMonth">$0.00</span>
+                            </div>
+                            <div class="pnl-stat">
+                                <span class="label">Open Positions</span>
+                                <span class="value" id="openPositions">0</span>
+                            </div>
+                        </div>
+                        <div class="pnl-chart-mini">
+                            <canvas id="pnlMiniChart" height="80"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strategy Leaderboard -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>🏆 Strategy Leaderboard</h3>
+                    <select id="leaderboardPeriod" class="metric-select" title="Leaderboard period">
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                        <option value="all">All Time</option>
+                    </select>
+                </div>
+                <div class="panel-body">
+                    <table class="performers-table leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Strategy</th>
+                                <th>P&L</th>
+                                <th>Win Rate</th>
+                                <th>Trades</th>
+                                <th>Trend</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardBody">
+                            <tr>
+                                <td colspan="6" class="table-loading">Loading leaderboard...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>Bybit Strategy Tester v2.0 • &copy; 2025 • 
+                <a href="docs/index.html" class="footer-link">Documentation</a> • 
+                <a href="/api/v1/docs" class="footer-link">API</a>
+            </p>
+        </footer>
+    </div>
+
+    <script type="module" src="./js/pages/dashboard.js"></script>
+    <!-- AI Assistant -->
+    <script src="./js/ai-assistant.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "id": "human_6590f679a037",
+  "prompt": "Explain what RSI indicates",
+  "response_a": "RSI measures momentum by comparing recent gains vs losses.",
+  "response_b": "RSI is a number between 0 and 100.",
+  "preference": -1,
+  "preference_type": "human",
+  "confidence": 1.0,
+  "reasoning": "Response A is more complete",
+  "created_at": "2026-01-18T08:07:15.998940+00:00",
+  "metadata": {
+    "source": "user_interface"
+  }
+}

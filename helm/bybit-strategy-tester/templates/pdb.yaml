@@ -1,0 +1,17 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+# ==============================================================================
+# Pod Disruption Budget
+# ==============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-backend-pdb
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "bybit-strategy-tester.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+{{- end }}

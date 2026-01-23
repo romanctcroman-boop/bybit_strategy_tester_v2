@@ -1,0 +1,49 @@
+{
+  "categories": [
+    {
+      "title": "## 🚀 Features",
+      "labels": ["feature", "enhancement"]
+    },
+    {
+      "title": "## 🐛 Bug Fixes",
+      "labels": ["bug", "fix"]
+    },
+    {
+      "title": "## 🔒 Security",
+      "labels": ["security"]
+    },
+    {
+      "title": "## 📚 Documentation",
+      "labels": ["documentation", "docs"]
+    },
+    {
+      "title": "## 🧪 Tests",
+      "labels": ["test", "testing"]
+    },
+    {
+      "title": "## ⚡ Performance",
+      "labels": ["performance"]
+    },
+    {
+      "title": "## 🔧 Maintenance",
+      "labels": ["chore", "maintenance", "refactor"]
+    }
+  ],
+  "sort": "ASC",
+  "template": "#{{CHANGELOG}}\n\n## Contributors\n#{{CONTRIBUTORS}}",
+  "pr_template": "- #{{TITLE}} (#{{NUMBER}}) by @#{{AUTHOR}}",
+  "empty_template": "- No changes",
+  "transformers": [
+    {
+      "pattern": "[\\-\\*] (\\[.*\\])+:?\\s?",
+      "target": "- "
+    }
+  ],
+  "max_tags_to_fetch": 200,
+  "max_pull_requests": 200,
+  "max_back_track_time_days": 365,
+  "exclude_merge_branches": ["develop"],
+  "tag_resolver": {
+    "method": "semver"
+  }
+}

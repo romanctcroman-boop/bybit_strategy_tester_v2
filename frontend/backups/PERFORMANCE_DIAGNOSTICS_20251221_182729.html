@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Diagnostics - market-chart.html</title>
+    <style>
+        body { font-family: monospace; background: #1a1a2e; color: #eee; padding: 20px; }
+        h1 { color: #00c853; }
+        .section { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .issue { color: #ff1744; }
+        .fix { color: #00c853; }
+        pre { background: #0f0f23; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        code { color: #58a6ff; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Анализ причин зависания market-chart.html</h1>
+    
+    <div class="section">
+        <h2>📌 Диагноз: Вероятные причины зависания на 150+ секунд</h2>
+        <ol>
+            <li class="issue"><strong>Memory Leak в массивах currentCandles/currentVolumes</strong>
+                <p>При долгой работе массивы могут накапливать данные, вызывая GC паузы</p>
+            </li>
+            <li class="issue"><strong>WebSocket reconnect loop</strong>
+                <p>Если WS отключается, attemptReconnect может блокировать</p>
+            </li>
+            <li class="issue"><strong>candleSeries.update() при большом количестве данных</strong>
+                <p>TradingView может тормозить при >2000 свечей</p>
+            </li>
+            <li class="issue"><strong>Infinity scroll loading (loadMoreHistory)</strong>
+                <p>Может загружать огромные объёмы данных</p>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="section">
+        <h2>✅ Рекомендации по исправлению</h2>
+        
+        <h3>1. Добавить профилирование в handleBybitKline</h3>
+        <pre><code>function handleBybitKline(data) {
+    const start = performance.now();
+    
+    // ... existing code ...
+    
+    const elapsed = performance.now() - start;
+    if (elapsed > 16) {  // More than 1 frame
+        console.warn('[Perf] handleBybitKline took', elapsed.toFixed(1), 'ms');
+    }
+}</code></pre>
+
+        <h3>2. Ограничить размер currentCandles (уже есть MAX_CANDLES = 2000)</h3>
+        <p class="fix">✓ Это уже реализовано в handleBybitKline</p>
+
+        <h3>3. Добавить дебаунс на candleSeries.update()</h3>
+        <pre><code>let pendingCandleUpdate = null;
+let candleUpdateScheduled = false;
+
+function handleBybitKline(data) {
+    // ... parse kline ...
+    
+    // Batch updates using requestAnimationFrame
+    pendingCandleUpdate = candle;
+    if (!candleUpdateScheduled) {
+        candleUpdateScheduled = true;
+        requestAnimationFrame(() => {
+            if (pendingCandleUpdate) {
+                candleSeries.update(pendingCandleUpdate);
+                // ... update arrays ...
+            }
+            candleUpdateScheduled = false;
+        });
+    }
+}</code></pre>
+
+        <h3>4. Проверить infinite scroll</h3>
+        <pre><code>// В loadMoreHistory добавить защиту от гонки
+if (isLoadingHistory) {
+    console.log('[History] Already loading, skipping');
+    return;
+}
+
+// Добавить таймаут
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), 10000);
+try {
+    const response = await fetch(url, { signal: controller.signal });
+    // ...
+} finally {
+    clearTimeout(timeoutId);
+    isLoadingHistory = false;
+}</code></pre>
+
+        <h3>5. Добавить мониторинг памяти</h3>
+        <pre><code>// В initStallDiagnostics добавить:
+setInterval(() => {
+    if (performance.memory) {
+        const used = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
+        const total = Math.round(performance.memory.totalJSHeapSize / 1024 / 1024);
+        console.log('[Memory]', used, 'MB /', total, 'MB');
+        if (used > 500) {
+            console.warn('[Memory] High memory usage!');
+        }
+    }
+}, 10000);</code></pre>
+
+        <h3>6. Добавить детальный лог WebSocket</h3>
+        <pre><code>let wsMessageCount = 0;
+let wsLastSecondCount = 0;
+
+// В onmessage:
+wsMessageCount++;
+
+// Логировать каждую секунду:
+setInterval(() => {
+    if (wsMessageCount !== wsLastSecondCount) {
+        console.log('[WS] Messages/sec:', wsMessageCount - wsLastSecondCount);
+        wsLastSecondCount = wsMessageCount;
+    }
+}, 1000);</code></pre>
+    </div>
+    
+    <div class="section">
+        <h2>🛠️ Как профилировать в Chrome DevTools</h2>
+        <ol>
+            <li>Открыть DevTools (F12)</li>
+            <li>Вкладка <strong>Performance</strong></li>
+            <li>Нажать <strong>Record</strong> (●)</li>
+            <li>Дождаться зависания</li>
+            <li>Нажать <strong>Stop</strong></li>
+            <li>Искать длинные жёлтые блоки (JavaScript) или фиолетовые (Layout/Paint)</li>
+        </ol>
+        <p>Также полезно:</p>
+        <ul>
+            <li><strong>Memory</strong> вкладка → Take heap snapshot → Искать утечки</li>
+            <li><strong>Console</strong> → Фильтр по "[Perf]" или "[Diag]"</li>
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>🎯 Быстрое решение: Отключить trades и orderbook</h2>
+        <p>Для теста можно закомментировать подписки в connectWebSocket:</p>
+        <pre><code>// Временно отключить для диагностики:
+// bybitWs.send(JSON.stringify({ op: 'subscribe', args: [`orderbook.50.${currentSymbol}`] }));
+// bybitWs.send(JSON.stringify({ op: 'subscribe', args: [`publicTrade.${currentSymbol}`] }));</code></pre>
+        <p>Если после этого зависания пропадут - проблема в обработке orderbook/trades</p>
+    </div>
+</body>
+</html>
+</code></pre>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <title>Notifications & Alerts - Bybit Strategy Tester v2</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- External CSS (Phase 1) -->
+    <link rel="stylesheet" href="./css/variables.css">
+    <link rel="stylesheet" href="./css/components.css">
+    <link rel="stylesheet" href="./css/common.css">
+    <link rel="stylesheet" href="./css/notifications.css">
+
+    </head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="logo">
+            <i class="bi bi-graph-up-arrow"></i>
+            <span>Strategy Tester</span>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <a href="dashboard.html" class="nav-item"><i class="bi bi-speedometer2"></i> Dashboard</a>
+            <a href="market-chart.html" class="nav-item"><i class="bi bi-graph-up"></i> Charts</a>
+            <a href="trading.html" class="nav-item"><i class="bi bi-currency-exchange"></i> Trading</a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">Strategy</div>
+            <a href="strategies.html" class="nav-item"><i class="bi bi-lightbulb"></i> Strategies</a>
+            <a href="strategy-builder.html" class="nav-item"><i class="bi bi-puzzle"></i> Builder</a>
+            <a href="backtest-results.html" class="nav-item"><i class="bi bi-clock-history"></i> Backtests</a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">Analytics</div>
+            <a href="analytics.html" class="nav-item"><i class="bi bi-bar-chart"></i> Analytics</a>
+            <a href="portfolio.html" class="nav-item"><i class="bi bi-pie-chart"></i> Portfolio</a>
+            <a href="ml-models.html" class="nav-item"><i class="bi bi-cpu"></i> ML Models</a>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">System</div>
+            <a href="notifications.html" class="nav-item active"><i class="bi bi-bell"></i> Notifications</a>
+            <a href="risk-management.html" class="nav-item"><i class="bi bi-shield-check"></i> Risk</a>
+            <a href="settings.html" class="nav-item"><i class="bi bi-gear"></i> Settings</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="page-header">
+            <h1 class="page-title">Notifications & Alerts</h1>
+            <div class="header-actions">
+                <button class="btn-secondary" onclick="markAllAsRead()">
+                    <i class="bi bi-check-all"></i> Mark All Read
+                </button>
+                <button class="btn-primary" onclick="showCreateAlert()">
+                    <i class="bi bi-plus-lg"></i> Create Alert
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">Total Notifications</span>
+                    <div class="stat-card-icon blue">
+                        <i class="bi bi-bell"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="totalNotifications">24</div>
+                <div class="stat-card-change positive">+5 today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">Unread</span>
+                    <div class="stat-card-icon red">
+                        <i class="bi bi-envelope"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="unreadCount">7</div>
+                <div class="stat-card-change negative">3 urgent</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">Active Alerts</span>
+                    <div class="stat-card-icon green">
+                        <i class="bi bi-lightning"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="activeAlerts">12</div>
+                <div class="stat-card-change positive">All healthy</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">Triggered Today</span>
+                    <div class="stat-card-icon yellow">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                </div>
+                <div class="stat-card-value" id="triggeredToday">3</div>
+                <div class="stat-card-change">2 price, 1 system</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="notifications">
+                <i class="bi bi-bell"></i> Notifications
+                <span class="tab-badge">7</span>
+            </button>
+            <button class="tab-btn" data-tab="alerts">
+                <i class="bi bi-lightning"></i> Active Alerts
+            </button>
+            <button class="tab-btn" data-tab="settings">
+                <i class="bi bi-gear"></i> Settings
+            </button>
+            <button class="tab-btn" data-tab="history">
+                <i class="bi bi-clock-history"></i> History
+            </button>
+        </div>
+
+        <!-- Notifications Tab -->
+        <div class="tab-content active" id="notifications-tab">
+            <div class="notification-list" id="notificationList">
+                <!-- Notifications will be populated here -->
+            </div>
+        </div>
+
+        <!-- Active Alerts Tab -->
+        <div class="tab-content" id="alerts-tab">
+            <div class="settings-card">
+                <table class="alerts-table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Condition</th>
+                            <th>Target Price</th>
+                            <th>Current Price</th>
+                            <th>Status</th>
+                            <th>Channels</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alertsTableBody">
+                        <!-- Alerts will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div class="tab-content" id="settings-tab">
+            <div class="alert-config-grid">
+                <div class="alert-config-card">
+                    <div class="alert-config-header">
+                        <div class="alert-config-title">
+                            <i class="bi bi-bell icon-blue"></i>
+                            Push Notifications
+                        </div>
+                        <div class="toggle active" onclick="toggleSetting(this)"></div>
+                    </div>
+                    <div class="alert-config-body">
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">Price Alerts</div>
+                                <div class="config-desc">Get notified when price targets are hit</div>
+                            </div>
+                            <div class="toggle active" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">Trade Executions</div>
+                                <div class="config-desc">Notifications for order fills</div>
+                            </div>
+                            <div class="toggle active" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">System Alerts</div>
+                                <div class="config-desc">Important system notifications</div>
+                            </div>
+                            <div class="toggle active" onclick="toggleSetting(this)"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert-config-card">
+                    <div class="alert-config-header">
+                        <div class="alert-config-title">
+                            <i class="bi bi-envelope icon-purple"></i>
+                            Email Notifications
+                        </div>
+                        <div class="toggle" onclick="toggleSetting(this)"></div>
+                    </div>
+                    <div class="alert-config-body">
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">Daily Summary</div>
+                                <div class="config-desc">Daily portfolio and trade summary</div>
+                            </div>
+                            <div class="toggle active" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">Weekly Report</div>
+                                <div class="config-desc">Weekly performance report</div>
+                            </div>
+                            <div class="toggle active" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">Critical Alerts Only</div>
+                                <div class="config-desc">Only send emails for critical events</div>
+                            </div>
+                            <div class="toggle" onclick="toggleSetting(this)"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert-config-card">
+                    <div class="alert-config-header">
+                        <div class="alert-config-title">
+                            <i class="bi bi-telegram icon-blue"></i>
+                            Telegram Bot
+                        </div>
+                        <div class="toggle" onclick="toggleSetting(this)"></div>
+                    </div>
+                    <div class="alert-config-body">
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">Bot Status</div>
+                                <div class="config-desc">Not connected</div>
+                            </div>
+                            <button class="notification-btn primary" onclick="connectTelegram()">Connect</button>
+                        </div>
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">All Alerts</div>
+                                <div class="config-desc">Send all alerts to Telegram</div>
+                            </div>
+                            <div class="toggle" onclick="toggleSetting(this)"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert-config-card">
+                    <div class="alert-config-header">
+                        <div class="alert-config-title">
+                            <i class="bi bi-discord icon-discord"></i>
+                            Discord Webhook
+                        </div>
+                        <div class="toggle" onclick="toggleSetting(this)"></div>
+                    </div>
+                    <div class="alert-config-body">
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">Webhook Status</div>
+                                <div class="config-desc">Not configured</div>
+                            </div>
+                            <button class="notification-btn primary" onclick="configureDiscord()">Configure</button>
+                        </div>
+                        <div class="config-row">
+                            <div>
+                                <div class="config-label">Trade Signals</div>
+                                <div class="config-desc">Post trade signals to channel</div>
+                            </div>
+                            <div class="toggle" onclick="toggleSetting(this)"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div class="tab-content" id="history-tab">
+            <div class="empty-state">
+                <i class="bi bi-clock-history"></i>
+                <h3>Notification History</h3>
+                <p>Your past notifications will appear here</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous"></script>
+    <script type="module" src="./js/pages/notifications.js"></script>
+</body>
+</html>

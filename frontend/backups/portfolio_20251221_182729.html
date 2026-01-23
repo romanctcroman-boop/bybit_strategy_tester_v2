@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Manager - Bybit Strategy Tester v2</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-blue: #58a6ff;
+            --accent-yellow: #d29922;
+            --accent-purple: #a371f7;
+            --border-color: #30363d;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+        }
+
+        .navbar-brand {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 18px;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .nav-link.active {
+            color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4c94e6;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Portfolio Overview */
+        .portfolio-overview {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .overview-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .overview-label {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .overview-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .overview-value.positive {
+            color: var(--accent-green);
+        }
+
+        .overview-value.negative {
+            color: var(--accent-red);
+        }
+
+        .overview-change {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+
+        .overview-change.positive {
+            color: var(--accent-green);
+        }
+
+        .overview-change.negative {
+            color: var(--accent-red);
+        }
+
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+
+        /* Holdings Table */
+        .holdings-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .holdings-table th,
+        .holdings-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .holdings-table th {
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .holdings-table tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .asset-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .asset-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .asset-icon.btc {
+            background: linear-gradient(135deg, #f7931a 0%, #ffb23e 100%);
+            color: white;
+        }
+
+        .asset-icon.eth {
+            background: linear-gradient(135deg, #627eea 0%, #8fa8ff 100%);
+            color: white;
+        }
+
+        .asset-icon.sol {
+            background: linear-gradient(135deg, #9945ff 0%, #14f195 100%);
+            color: white;
+        }
+
+        .asset-icon.usdt {
+            background: linear-gradient(135deg, #26a17b 0%, #50e3a4 100%);
+            color: white;
+        }
+
+        .asset-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .asset-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .asset-symbol {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .value-cell {
+            text-align: right;
+        }
+
+        .value-main {
+            font-weight: 600;
+        }
+
+        .value-sub {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .change-positive {
+            color: var(--accent-green);
+        }
+
+        .change-negative {
+            color: var(--accent-red);
+        }
+
+        /* Allocation Chart */
+        .allocation-chart {
+            height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .allocation-legend {
+            margin-top: 16px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .legend-item:last-child {
+            border-bottom: none;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-right: 10px;
+        }
+
+        .legend-label {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .legend-value {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        /* Recent Trades */
+        .trade-item {
+            display: flex;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .trade-item:last-child {
+            border-bottom: none;
+        }
+
+        .trade-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 16px;
+        }
+
+        .trade-icon.buy {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+        }
+
+        .trade-icon.sell {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--accent-red);
+        }
+
+        .trade-info {
+            flex: 1;
+        }
+
+        .trade-title {
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .trade-time {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .trade-amount {
+            text-align: right;
+        }
+
+        .trade-value {
+            font-weight: 600;
+        }
+
+        .trade-pnl {
+            font-size: 12px;
+        }
+
+        /* Risk Metrics */
+        .risk-metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .risk-metric:last-child {
+            border-bottom: none;
+        }
+
+        .risk-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .risk-value {
+            font-weight: 600;
+        }
+
+        .risk-value.good {
+            color: var(--accent-green);
+        }
+
+        .risk-value.warning {
+            color: var(--accent-yellow);
+        }
+
+        .risk-value.danger {
+            color: var(--accent-red);
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100px;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        .progress-fill.green {
+            background: var(--accent-green);
+        }
+
+        .progress-fill.yellow {
+            background: var(--accent-yellow);
+        }
+
+        .progress-fill.red {
+            background: var(--accent-red);
+        }
+
+        /* Card body with no padding */
+        .card-body.no-padding {
+            padding: 0;
+        }
+
+        /* View all link */
+        .view-all-link {
+            font-size: 13px;
+            text-decoration: none;
+            color: var(--text-secondary);
+        }
+
+        .view-all-link:hover {
+            color: var(--accent-blue);
+        }
+
+        /* Progress width utilities */
+        .w-45 { width: 45%; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .portfolio-overview {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="d-flex align-items-center gap-4">
+            <a href="dashboard.html" class="navbar-brand">
+                <i class="bi bi-graph-up-arrow"></i> Bybit Strategy Tester
+            </a>
+            <div class="nav-links">
+                <a href="dashboard.html" class="nav-link">Dashboard</a>
+                <a href="strategies.html" class="nav-link">Strategies</a>
+                <a href="backtest-results.html" class="nav-link">Backtests</a>
+                <a href="market-chart.html" class="nav-link">Charts</a>
+                <a href="portfolio.html" class="nav-link active">Portfolio</a>
+                <a href="ml-models.html" class="nav-link">ML Models</a>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="text-secondary" id="lastUpdate">
+                <i class="bi bi-clock"></i> Updated: Just now
+            </span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">
+                <i class="bi bi-wallet2"></i> Portfolio Manager
+            </h1>
+            <div class="d-flex gap-2">
+                <button class="btn btn-secondary" onclick="refreshPortfolio()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button class="btn btn-secondary" onclick="exportPortfolio()">
+                    <i class="bi bi-download"></i> Export
+                </button>
+                <button class="btn btn-primary" onclick="openTradeModal()">
+                    <i class="bi bi-plus-lg"></i> New Trade
+                </button>
+            </div>
+        </div>
+
+        <!-- Portfolio Overview -->
+        <div class="portfolio-overview">
+            <div class="overview-card">
+                <div class="overview-label">Total Portfolio Value</div>
+                <div class="overview-value" id="totalValue">$125,432.50</div>
+                <div class="overview-change positive">
+                    <i class="bi bi-arrow-up"></i>
+                    <span>+$3,245.20 (2.66%) today</span>
+                </div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-label">Total P&L</div>
+                <div class="overview-value positive" id="totalPnl">+$25,432.50</div>
+                <div class="overview-change positive">
+                    <i class="bi bi-arrow-up"></i>
+                    <span>+25.43% all time</span>
+                </div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-label">Open Positions</div>
+                <div class="overview-value" id="openPositions">8</div>
+                <div class="overview-change">
+                    <span class="text-secondary">5 Long, 3 Short</span>
+                </div>
+            </div>
+            <div class="overview-card">
+                <div class="overview-label">Available Balance</div>
+                <div class="overview-value" id="availableBalance">$42,150.00</div>
+                <div class="overview-change">
+                    <span class="text-secondary">33.6% of portfolio</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="main-grid">
+            <!-- Left Column -->
+            <div class="d-flex flex-column gap-4">
+                <!-- Performance Chart -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Portfolio Performance</span>
+                        <div class="tabs">
+                            <button class="tab-btn active" onclick="setTimeRange('1D')">1D</button>
+                            <button class="tab-btn" onclick="setTimeRange('1W')">1W</button>
+                            <button class="tab-btn" onclick="setTimeRange('1M')">1M</button>
+                            <button class="tab-btn" onclick="setTimeRange('3M')">3M</button>
+                            <button class="tab-btn" onclick="setTimeRange('1Y')">1Y</button>
+                            <button class="tab-btn" onclick="setTimeRange('ALL')">All</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Holdings Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Current Holdings</span>
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control" placeholder="Search assets..." id="assetSearch" aria-label="Search assets">
+                        </div>
+                    </div>
+                    <div class="card-body no-padding">
+                        <table class="holdings-table">
+                            <thead>
+                                <tr>
+                                    <th>Asset</th>
+                                    <th>Amount</th>
+                                    <th>Avg Price</th>
+                                    <th>Current Price</th>
+                                    <th>Value</th>
+                                    <th>P&L</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="holdingsTableBody">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="d-flex flex-column gap-4">
+                <!-- Asset Allocation -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Asset Allocation</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="allocation-chart">
+                            <canvas id="allocationChart"></canvas>
+                        </div>
+                        <div class="allocation-legend" id="allocationLegend">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Risk Metrics -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Risk Metrics</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="risk-metric">
+                            <span class="risk-label">
+                                <i class="bi bi-shield-check"></i>
+                                Sharpe Ratio
+                            </span>
+                            <span class="risk-value good">1.85</span>
+                        </div>
+                        <div class="risk-metric">
+                            <span class="risk-label">
+                                <i class="bi bi-graph-down"></i>
+                                Max Drawdown
+                            </span>
+                            <span class="risk-value warning">-12.5%</span>
+                        </div>
+                        <div class="risk-metric">
+                            <span class="risk-label">
+                                <i class="bi bi-activity"></i>
+                                Volatility (30D)
+                            </span>
+                            <span class="risk-value warning">24.3%</span>
+                        </div>
+                        <div class="risk-metric">
+                            <span class="risk-label">
+                                <i class="bi bi-percent"></i>
+                                Win Rate
+                            </span>
+                            <span class="risk-value good">67.5%</span>
+                        </div>
+                        <div class="risk-metric">
+                            <span class="risk-label">
+                                <i class="bi bi-bar-chart"></i>
+                                Profit Factor
+                            </span>
+                            <span class="risk-value good">2.34</span>
+                        </div>
+                        <div class="risk-metric">
+                            <span class="risk-label">
+                                <i class="bi bi-speedometer2"></i>
+                                Leverage Used
+                            </span>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="progress-bar">
+                                    <div class="progress-fill yellow w-45"></div>
+                                </div>
+                                <span class="risk-value">2.3x</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Trades -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Recent Trades</span>
+                        <a href="backtest-results.html" class="view-all-link">View All</a>
+                    </div>
+                    <div class="card-body" id="recentTrades">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Portfolio Data
+        const holdings = [
+            {
+                symbol: 'BTCUSDT',
+                name: 'Bitcoin',
+                icon: 'btc',
+                amount: 1.2345,
+                avgPrice: 42500,
+                currentPrice: 44250,
+                value: 54640.625,
+                pnl: 2160.625,
+                pnlPercent: 4.12
+            },
+            {
+                symbol: 'ETHUSDT',
+                name: 'Ethereum',
+                icon: 'eth',
+                amount: 15.5,
+                avgPrice: 2250,
+                currentPrice: 2480,
+                value: 38440,
+                pnl: 3565,
+                pnlPercent: 10.22
+            },
+            {
+                symbol: 'SOLUSDT',
+                name: 'Solana',
+                icon: 'sol',
+                amount: 125,
+                avgPrice: 95,
+                currentPrice: 108.5,
+                value: 13562.5,
+                pnl: 1687.5,
+                pnlPercent: 14.21
+            },
+            {
+                symbol: 'USDT',
+                name: 'Tether',
+                icon: 'usdt',
+                amount: 18789.375,
+                avgPrice: 1,
+                currentPrice: 1,
+                value: 18789.375,
+                pnl: 0,
+                pnlPercent: 0
+            }
+        ];
+
+        const recentTrades = [
+            { type: 'buy', symbol: 'BTCUSDT', amount: 0.25, price: 44150, time: '10 minutes ago', pnl: null },
+            { type: 'sell', symbol: 'ETHUSDT', amount: 2.5, price: 2485, time: '45 minutes ago', pnl: 245.50 },
+            { type: 'buy', symbol: 'SOLUSDT', amount: 25, price: 107.20, time: '2 hours ago', pnl: null },
+            { type: 'sell', symbol: 'BTCUSDT', amount: 0.15, price: 43980, time: '5 hours ago', pnl: 156.30 }
+        ];
+
+        const allocationColors = ['#f7931a', '#627eea', '#9945ff', '#26a17b', '#58a6ff'];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            renderHoldingsTable();
+            renderRecentTrades();
+            initPerformanceChart();
+            initAllocationChart();
+        });
+
+        function renderHoldingsTable() {
+            const tbody = document.getElementById('holdingsTableBody');
+            tbody.innerHTML = holdings.map(h => `
+                <tr>
+                    <td>
+                        <div class="asset-info">
+                            <div class="asset-icon ${h.icon}">${h.symbol.slice(0, 1)}</div>
+                            <div class="asset-details">
+                                <span class="asset-name">${h.name}</span>
+                                <span class="asset-symbol">${h.symbol}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>${h.amount.toLocaleString()}</td>
+                    <td>$${h.avgPrice.toLocaleString()}</td>
+                    <td>$${h.currentPrice.toLocaleString()}</td>
+                    <td class="value-cell">
+                        <div class="value-main">$${h.value.toLocaleString()}</div>
+                    </td>
+                    <td class="value-cell">
+                        <div class="value-main ${h.pnl >= 0 ? 'change-positive' : 'change-negative'}">
+                            ${h.pnl >= 0 ? '+' : ''}$${h.pnl.toLocaleString()}
+                        </div>
+                        <div class="value-sub ${h.pnlPercent >= 0 ? 'change-positive' : 'change-negative'}">
+                            ${h.pnlPercent >= 0 ? '+' : ''}${h.pnlPercent.toFixed(2)}%
+                        </div>
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-secondary btn-sm" onclick="trade('${h.symbol}', 'buy')" title="Buy">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="trade('${h.symbol}', 'sell')" title="Sell">
+                                <i class="bi bi-dash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderRecentTrades() {
+            const container = document.getElementById('recentTrades');
+            container.innerHTML = recentTrades.map(t => `
+                <div class="trade-item">
+                    <div class="trade-icon ${t.type}">
+                        <i class="bi bi-arrow-${t.type === 'buy' ? 'down' : 'up'}-circle"></i>
+                    </div>
+                    <div class="trade-info">
+                        <div class="trade-title">${t.type === 'buy' ? 'Bought' : 'Sold'} ${t.amount} ${t.symbol}</div>
+                        <div class="trade-time">@ $${t.price.toLocaleString()} • ${t.time}</div>
+                    </div>
+                    <div class="trade-amount">
+                        <div class="trade-value">$${(t.amount * t.price).toLocaleString()}</div>
+                        ${t.pnl !== null ? `
+                            <div class="trade-pnl ${t.pnl >= 0 ? 'change-positive' : 'change-negative'}">
+                                ${t.pnl >= 0 ? '+' : ''}$${t.pnl.toLocaleString()}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function initPerformanceChart() {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            // Generate sample data
+            const labels = [];
+            const data = [];
+            let value = 100000;
+            
+            for (let i = 30; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                
+                value += (Math.random() - 0.4) * 2000;
+                data.push(value);
+            }
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Portfolio Value',
+                        data,
+                        borderColor: '#58a6ff',
+                        backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: '#161b22',
+                            borderColor: '#30363d',
+                            borderWidth: 1,
+                            titleColor: '#f0f6fc',
+                            bodyColor: '#8b949e',
+                            callbacks: {
+                                label: function(context) {
+                                    return '$' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(48, 54, 61, 0.5)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#8b949e'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(48, 54, 61, 0.5)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#8b949e',
+                                callback: function(value) {
+                                    return '$' + (value / 1000).toFixed(0) + 'K';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initAllocationChart() {
+            const ctx = document.getElementById('allocationChart').getContext('2d');
+            const total = holdings.reduce((sum, h) => sum + h.value, 0);
+            
+            const data = holdings.map(h => ({
+                label: h.symbol,
+                value: h.value,
+                percent: (h.value / total * 100).toFixed(1)
+            }));
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.label),
+                    datasets: [{
+                        data: data.map(d => d.value),
+                        backgroundColor: allocationColors,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Render legend
+            const legend = document.getElementById('allocationLegend');
+            legend.innerHTML = data.map((d, i) => `
+                <div class="legend-item">
+                    <span class="legend-label">
+                        <span class="legend-color" style="background: ${allocationColors[i]}"></span>
+                        ${d.label}
+                    </span>
+                    <span class="legend-value">${d.percent}%</span>
+                </div>
+            `).join('');
+        }
+
+        function setTimeRange(range) {
+            // Update active tab
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === range);
+            });
+            
+            // Would reload chart data here
+            console.log('Set time range:', range);
+        }
+
+        function refreshPortfolio() {
+            document.getElementById('lastUpdate').innerHTML = '<i class="bi bi-clock"></i> Updated: Just now';
+            renderHoldingsTable();
+            renderRecentTrades();
+        }
+
+        function exportPortfolio() {
+            alert('Exporting portfolio data...');
+        }
+
+        function openTradeModal() {
+            alert('Opening trade modal...');
+        }
+
+        function trade(symbol, type) {
+            alert(`${type === 'buy' ? 'Buy' : 'Sell'} ${symbol}`);
+        }
+    </script>
+</body>
+</html>

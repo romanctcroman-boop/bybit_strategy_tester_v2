@@ -1,0 +1,44 @@
+# Ruff configuration
+# https://docs.astral.sh/ruff/configuration/
+
+[lint]
+# Rules to enable
+select = ["E", "F", "W"]
+
+# Rules to ignore globally
+ignore = [
+    "E501",  # Line too long - we handle this elsewhere
+    "E402",  # Module import not at top - often intentional for path setup
+]
+
+[lint.per-file-ignores]
+# Test files often need imports after sys.path manipulation
+"test_*.py" = ["E402", "E722", "F841"]
+"tests/**/*.py" = ["E402", "E722", "F841"]
+"**/tests/**/*.py" = ["E402", "E722", "F841"]
+# Scripts that need path setup before imports
+"analyze_*.py" = ["E402"]
+"check_*.py" = ["E402"]
+"verify_*.py" = ["E402"]
+"tv_*.py" = ["E402"]
+"backtest_*.py" = ["E402"]
+"compare_*.py" = ["E402"]
+"conftest.py" = ["E402"]
+"debug_*.py" = ["E402"]
+"direct_*.py" = ["E402"]
+"export_*.py" = ["E402"]
+"final_*.py" = ["E402"]
+"find_*.py" = ["E402"]
+"full_*.py" = ["E402"]
+"quick_*.py" = ["E402"]
+"run_*.py" = ["E402"]
+"scripts/*.py" = ["E402"]
+"specs/*.py" = ["E402"]
+"temp_*.py" = ["E402"]
+# These files intentionally import for availability check
+"test_security_system.py" = ["F401"]
+"tests/backend/test_archival_service.py" = ["F401"]
+# Agent test files with intentional bare excepts for resilience testing
+"agent_*.py" = ["E722"]
+"parallel_audit_submission.py" = ["E722"]
+"simple_audit_test.py" = ["E722"]

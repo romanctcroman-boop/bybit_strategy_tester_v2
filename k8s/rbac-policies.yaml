@@ -1,0 +1,103 @@
+# ==============================================================================
+# Bybit Strategy Tester - Service Account & RBAC
+# ==============================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bybit-service-account
+  namespace: bybit-strategy-tester
+  labels:
+    app.kubernetes.io/name: bybit-strategy-tester
+
+---
+# ==============================================================================
+# Network Policy - Restrict Traffic
+# ==============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bybit-network-policy
+  namespace: bybit-strategy-tester
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+    # Allow internal communication
+    - from:
+        - podSelector: {}
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow internal communication
+    - to:
+        - podSelector: {}
+    # Allow external HTTPS (Bybit API)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# ==============================================================================
+# Resource Quota
+# ==============================================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: bybit-resource-quota
+  namespace: bybit-strategy-tester
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: "16Gi"
+    limits.cpu: "16"
+    limits.memory: "32Gi"
+    pods: "50"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+    persistentvolumeclaims: "10"
+
+---
+# ==============================================================================
+# Limit Range
+# ==============================================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: bybit-limit-range
+  namespace: bybit-strategy-tester
+spec:
+  limits:
+    - default:
+        cpu: "500m"
+        memory: "512Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      max:
+        cpu: "4"
+        memory: "4Gi"
+      min:
+        cpu: "50m"
+        memory: "64Mi"
+      type: Container

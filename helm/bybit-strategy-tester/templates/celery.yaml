@@ -1,0 +1,154 @@
+{{- if .Values.celery.enabled }}
+# ==============================================================================
+# Celery Worker Deployment
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-celery-worker
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-worker
+spec:
+  replicas: {{ .Values.celery.worker.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "bybit-strategy-tester.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: celery-worker
+  template:
+    metadata:
+      labels:
+        {{- include "bybit-strategy-tester.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: celery-worker
+    spec:
+      serviceAccountName: {{ include "bybit-strategy-tester.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      
+      initContainers:
+        - name: wait-for-redis
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z {{ .Values.config.REDIS_HOST }} {{ .Values.config.REDIS_PORT }}; do echo waiting for redis; sleep 2; done']
+      
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "backend.tasks.celery_app", "worker", "--loglevel=info", "--concurrency={{ .Values.celery.worker.concurrency }}"]
+          
+          envFrom:
+            - configMapRef:
+                name: {{ include "bybit-strategy-tester.fullname" . }}-config
+          
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bybit-strategy-tester.fullname" . }}-secrets
+                  key: DB_USER
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bybit-strategy-tester.fullname" . }}-secrets
+                  key: DB_PASS
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bybit-strategy-tester.fullname" . }}-secrets
+                  key: REDIS_PASSWORD
+            - name: DATABASE_URL
+              value: {{ include "bybit-strategy-tester.databaseUrl" . }}
+            - name: CELERY_BROKER_URL
+              value: {{ include "bybit-strategy-tester.celeryBrokerUrl" . }}
+            - name: CELERY_RESULT_BACKEND
+              value: {{ include "bybit-strategy-tester.celeryResultUrl" . }}
+          
+          resources:
+            {{- toYaml .Values.celery.worker.resources | nindent 12 }}
+          
+          livenessProbe:
+            exec:
+              command:
+                - celery
+                - -A
+                - backend.tasks.celery_app
+                - inspect
+                - ping
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            timeoutSeconds: 30
+          
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+      
+      volumes:
+        - name: logs
+          emptyDir: {}
+
+---
+{{- if .Values.celery.beat.enabled }}
+# ==============================================================================
+# Celery Beat Deployment
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bybit-strategy-tester.fullname" . }}-celery-beat
+  labels:
+    {{- include "bybit-strategy-tester.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-beat
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "bybit-strategy-tester.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: celery-beat
+  template:
+    metadata:
+      labels:
+        {{- include "bybit-strategy-tester.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: celery-beat
+    spec:
+      serviceAccountName: {{ include "bybit-strategy-tester.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      
+      containers:
+        - name: beat
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["celery", "-A", "backend.tasks.celery_app", "beat", "--loglevel=info"]
+          
+          envFrom:
+            - configMapRef:
+                name: {{ include "bybit-strategy-tester.fullname" . }}-config
+          
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bybit-strategy-tester.fullname" . }}-secrets
+                  key: REDIS_PASSWORD
+            - name: CELERY_BROKER_URL
+              value: {{ include "bybit-strategy-tester.celeryBrokerUrl" . }}
+          
+          resources:
+            {{- toYaml .Values.celery.beat.resources | nindent 12 }}
+          
+          volumeMounts:
+            - name: schedule
+              mountPath: /app/celerybeat-schedule
+      
+      volumes:
+        - name: schedule
+          emptyDir: {}
+{{- end }}
+{{- end }}

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <title>Tick Chart - Bybit Strategy Tester</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"
+        integrity="sha384-rcCMiCptH4kTlEbg0euOTUKWe72TESbrjElatnG+9BfbmUIV268UK/Pro5biJdGm"
+        crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="./css/tick_chart.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-nav">
+            <a href="dashboard.html" class="home-link">🏠 Dashboard</a>
+        </div>
+        <h1>
+            📊 Tick Chart
+            <span class="badge">LIVE</span>
+        </h1>
+        <div class="controls">
+            <div class="control-group">
+                <label for="symbolSelect">Symbol:</label>
+                <select id="symbolSelect" title="Select trading symbol">
+                    <option value="BTCUSDT" selected>BTC/USDT</option>
+                    <option value="ETHUSDT">ETH/USDT</option>
+                    <option value="SOLUSDT">SOL/USDT</option>
+                    <option value="BNBUSDT">BNB/USDT</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="ticksSelect">Ticks per bar:</label>
+                <select id="ticksSelect" title="Select number of ticks per candle">
+                    <option value="10">10 ticks</option>
+                    <option value="25">25 ticks</option>
+                    <option value="50">50 ticks</option>
+                    <option value="100" selected>100 ticks</option>
+                    <option value="250">250 ticks</option>
+                    <option value="500">500 ticks</option>
+                    <option value="1000">1000 ticks</option>
+                </select>
+            </div>
+            <button id="startBtn" onclick="startTickService()">▶ Start</button>
+            <button id="stopBtn" class="stop hidden" onclick="stopTickService()">⏹ Stop</button>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="chart-container">
+            <div id="tickChart"></div>
+            <div class="info-tooltip hidden" id="chartTooltip">
+                <span class="label">Time:</span><span class="value" id="tooltipTime">-</span><br>
+                <span class="label">O:</span><span class="value" id="tooltipOpen">-</span>
+                <span class="label">H:</span><span class="value" id="tooltipHigh">-</span>
+                <span class="label">L:</span><span class="value" id="tooltipLow">-</span>
+                <span class="label">C:</span><span class="value" id="tooltipClose">-</span>
+            </div>
+            <button class="scroll-to-now hidden" id="scrollToNowBtn" onclick="scrollToNow()" title="Scroll to latest candles">
+                ▶▶ Now
+            </button>
+        </div>
+        
+        <div class="sidebar">
+            <div class="sidebar-header">📈 Live Stats</div>
+            
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span class="status-text" id="statusText">Disconnected</span>
+            </div>
+            
+            <div class="current-candle-info">
+                <div class="title">Current Candle Progress</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="centered-text">
+                    <span id="tickProgress">0</span> / <span id="tickTotal">100</span> ticks
+                </div>
+                <div class="eta-text" id="etaText">ETA: calculating...</div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Current Ticks</div>
+                    <div class="stat-value" id="tickProgress">0</div>
+                    <div class="stat-sub" id="tickTotal">100</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Candle Rate</div>
+                    <div class="stat-value" id="candleRate">0 candles/min</div>
+                    <div class="stat-sub" id="etaText">ETA: calculating...</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Volume</div>
+                    <div class="stat-value green" id="buyVolume">0.0000</div>
+                    <div class="stat-value red" id="sellVolume">0.0000</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Last Price</div>
+                    <div class="stat-value" id="lastPrice">0.00</div>
+                    <div class="stat-sub"><span id="totalTrades">0</span> trades</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Diagnostics</div>
+                    <div class="stat-value" id="latencyStat">0 ms</div>
+                    <div class="stat-sub" id="fpsStat">60 FPS</div>
+                </div>
+            </div>
+            
+            <div class="sidebar-header">🔄 Recent Trades</div>
+            <div class="trades-list" id="tradesList"></div>
+        </div>
+    </div>
+
+    <script type="module" src="./js/pages/tick_chart.js"></script>
+</body>
+</html>

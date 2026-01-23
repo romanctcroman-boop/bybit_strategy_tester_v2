@@ -1,0 +1,373 @@
+/**
+ * 🎨 Component Styles - Bybit Strategy Tester v2
+ * 
+ * Styles for reusable UI components
+ * Part of Phase 2: Architecture Modernization
+ * 
+ * @version 1.0.0
+ * @date 2025-12-21
+ */
+
+/* ============================================
+   MODAL COMPONENT
+   ============================================ */
+
+.modal-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1050;
+    pointer-events: none;
+}
+
+.modal-container .modal.show {
+    pointer-events: auto;
+}
+
+.modal-container .modal-backdrop.show {
+    pointer-events: auto;
+}
+
+.modal-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 10;
+}
+
+/* Modal animations */
+.modal.fade .modal-dialog {
+    transform: translateY(-20px);
+    opacity: 0;
+    transition: transform 0.15s ease-out, opacity 0.15s ease-out;
+}
+
+.modal.fade.show .modal-dialog {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* ============================================
+   TOAST COMPONENT
+   ============================================ */
+
+.toast-container {
+    max-height: 100vh;
+    overflow: hidden;
+}
+
+.toast {
+    transition: all 0.3s ease;
+}
+
+.toast:not(.show) {
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    transition: width 100ms linear;
+}
+
+/* ============================================
+   DATA TABLE COMPONENT
+   ============================================ */
+
+.data-table-wrapper {
+    position: relative;
+}
+
+.data-table-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.data-table-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 10;
+}
+
+.data-table-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+/* Sortable headers */
+th.sortable {
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+th.sortable:hover {
+    background-color: rgba(0, 0, 0, 0.075);
+}
+
+/* Selection */
+.table tbody tr.table-active {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+}
+
+/* ============================================
+   FORM COMPONENT
+   ============================================ */
+
+.form-component {
+    position: relative;
+}
+
+.form-component.form-disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.form-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.7);
+    z-index: 10;
+}
+
+/* Required field indicator */
+.form-label.required::after {
+    content: ' *';
+    color: var(--bs-danger);
+}
+
+/* Form actions */
+.form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+/* ============================================
+   CARD COMPONENT
+   ============================================ */
+
+.card-clickable {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card-clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.card-header-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.card-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 10;
+    border-radius: inherit;
+}
+
+/* Collapsible card animation */
+.card .card-body,
+.card .card-footer {
+    transition: opacity 0.15s ease;
+}
+
+/* ============================================
+   LOADER COMPONENT
+   ============================================ */
+
+.loader-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+}
+
+.loader-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.8);
+    z-index: 10;
+}
+
+.loader-inline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.loader-text {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+/* Loader animations */
+@keyframes loader-dots {
+    0%, 80%, 100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
+}
+
+@keyframes loader-bars {
+    0%, 40%, 100% {
+        transform: scaleY(0.4);
+    }
+    20% {
+        transform: scaleY(1);
+    }
+}
+
+@keyframes loader-pulse {
+    0%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    50% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes skeleton-pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.4;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* Skeleton loader */
+.skeleton-loader {
+    width: 100%;
+}
+
+.skeleton-line {
+    height: 1rem;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+    animation: skeleton-pulse 1.5s infinite;
+}
+
+.skeleton-line:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.skeleton-line:nth-child(3) {
+    animation-delay: 0.2s;
+}
+
+/* ============================================
+   DARK MODE SUPPORT
+   ============================================ */
+
+[data-theme="dark"] .modal-loading,
+[data-theme="dark"] .form-loading,
+[data-theme="dark"] .data-table-loading,
+[data-theme="dark"] .card-loading,
+[data-theme="dark"] .loader-overlay {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="dark"] .skeleton-line {
+    background-color: #3a3a3a;
+}
+
+[data-theme="dark"] .loader-text {
+    color: #adb5bd;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 576px) {
+    .data-table-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .data-table-toolbar .input-group {
+        max-width: none !important;
+    }
+
+    .data-table-pagination {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+    }
+}

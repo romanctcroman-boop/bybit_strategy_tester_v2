@@ -1,0 +1,43 @@
+# Week 3: Tick Aggregator Docker Image
+# Subscribes to Redis trades, publishes tick candles
+
+FROM python:3.13-slim
+
+LABEL maintainer="bybit_strategy_tester"
+LABEL service="tick-aggregator"
+LABEL version="week3"
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first (for caching)
+COPY backend/requirements.txt /app/requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY backend/ /app/backend/
+COPY redis_tick_manager.py /app/
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV REDIS_URL=redis://redis:6379
+ENV LOG_LEVEL=INFO
+
+# Aggregator configuration (override with docker run -e)
+ENV SYMBOL=BTCUSDT
+ENV TICKS=100
+
+# Health check - check Redis connection and aggregator is publishing
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import redis; r = redis.from_url('${REDIS_URL}'); r.ping()" || exit 1
+
+# Run tick aggregator
+# Usage: docker run -e SYMBOL=BTCUSDT -e TICKS=100 tick-aggregator
+ENTRYPOINT ["sh", "-c", "python redis_tick_manager.py start-aggregator --symbol $SYMBOL --ticks $TICKS --redis-url $REDIS_URL"]

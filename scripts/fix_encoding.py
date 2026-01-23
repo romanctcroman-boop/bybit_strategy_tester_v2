@@ -1,0 +1,35 @@
+# Fix mojibake in JS file
+# Read as bytes, decode properly, fix patterns, save
+
+import re
+
+filepath = 'frontend/js/pages/backtest_results.js'
+
+# Read file as raw bytes
+with open(filepath, 'rb') as f:
+    raw_bytes = f.read()
+
+# Decode as UTF-8
+content = raw_bytes.decode('utf-8')
+
+# These are the UTF-8 byte sequences that represent the mojibake patterns
+# (UTF-8 bytes of Russian text interpreted as Windows-1251 then encoded as UTF-8 again)
+replacements = [
+    # Each tuple: (mojibake pattern as it appears in file, correct Russian)
+    (b'\xd0\xa0\xc2\xbb\xd0\xa0\xc2\xb0\xd0\xa0\xc2\xbf\xd0\xa0\xc2\xb8\xd0\xa1\xe2\x80\x9a\xd0\xa0\xc2\xb0\xd0\xa0\xc2\xbb \xd0\xa1\xc6\x92\xd0\xa1\xe2\x80\x9a\xd0\xa1\xe2\x82\xac\xd0\xa0\xc2\xb0\xd0\xa1\xe2\x80\x9a\xd0\xa0\xc2\xb5\xd0\xa0\xc2\xb3\xd0\xa0\xc2\xb8\xd0\xa0\xc2\xb8'.decode('utf-8'), 'Капитал стратегии'),
+]
+
+# Simpler approach: direct string replacement with exact strings from file
+# Since we already know what strings look like in the view_file output
+
+content = content.replace("labels: ['\xd0\xa0\xd1\x9f\xd0\xa0\xd1\x95\xd0\xa0\xc2\xb1\xd0\xa0\xc2\xb5\xd0\xa0\xc2\xb4\xd0\xa1\xe2\x80\xb9', '\xd0\xa0\xc2\xa3\xd0\xa0\xc2\xb1\xd0\xa1\xe2\x80\xb9\xd0\xa1\xe2\x80\x9a\xd0\xa0\xc2\xba\xd0\xa0\xc2\xb8', '\xd0\xa0\xd0\x86\xd0\xa0\xc2\xb5\xd0\xa0\xc2\xb7\xd0\xa1\xc6\x92\xd0\xa0\xc2\xb1\xd0\xa1\xe2\x80\xb9\xd0\xa1\xe2\x80\x9a\xd0\xa0\xc2\xbe\xd0\xa1\xe2\x80\xa1\xd0\xa0\xc2\xbd\xd0\xa0\xc2\xbe\xd0\xa1\xc3\x91\xd0\xa1\xe2\x80\x9a\xd0\xa1\xc5\x92']", 
+                          "labels: ['Победы', 'Убытки', 'Безубыточность']")
+
+print("Attempting fix...")
+print(f"File size: {len(content)} chars")
+
+# Save
+with open(filepath, 'w', encoding='utf-8', newline='') as f:
+    f.write(content)
+
+print("Done!")

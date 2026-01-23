@@ -1,0 +1,26 @@
+{
+  "id": "semantic_0686a0496543_1768725491",
+  "content": "[trading] User asked about moving average crossover strategy",
+  "memory_type": "semantic",
+  "created_at": "2026-01-18T08:38:11.775582+00:00",
+  "accessed_at": "2026-01-18T08:38:11.775583+00:00",
+  "access_count": 0,
+  "importance": 0.6,
+  "metadata": {
+    "source_count": 6,
+    "source_ids": [
+      "episodic_a5a7ad3fca08_1768723635",
+      "episodic_a5a7ad3fca08_1768723730",
+      "episodic_a5a7ad3fca08_1768723815",
+      "episodic_a5a7ad3fca08_1768724868",
+      "episodic_a5a7ad3fca08_1768725286",
+      "episodic_a5a7ad3fca08_1768725491"
+    ]
+  },
+  "tags": [
+    "trading",
+    "extracted_pattern"
+  ],
+  "source": null,
+  "related_ids": []
+}

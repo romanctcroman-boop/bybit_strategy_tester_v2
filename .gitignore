@@ -1,0 +1,416 @@
+﻿# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# SQLite WAL/SHM files (can be large)
+*.sqlite3-wal
+*.sqlite3-shm
+data.sqlite3-wal
+data.sqlite3-shm
+
+# Redis dump
+dump.rdb
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+#   For a library or package, you might want to ignore these files since the code is
+#   intended to run in multiple environments; otherwise, check them in:
+# .python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# UV
+#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#uv.lock
+
+# poetry
+#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+#   This is especially recommended for binary packages to ensure reproducibility, and is more
+#   commonly ignored for libraries.
+#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+#poetry.lock
+#poetry.toml
+
+# pdm
+#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
+#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
+#pdm.lock
+#pdm.toml
+.pdm-python
+.pdm-build/
+
+# pixi
+#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
+#pixi.lock
+#   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
+#   in the .venv directory. It is recommended not to include this directory in version control.
+.pixi
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#  and can be added to the global gitignore or merged into this file.  For a more nuclear
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+#.idea/
+
+# Abstra
+# Abstra is an AI-powered process automation framework.
+# Ignore directories containing user credentials, local state, and settings.
+# Learn more at https://abstra.io/docs
+.abstra/
+
+# Visual Studio Code
+#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
+#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
+#  you could uncomment the following to ignore the entire vscode folder
+# .vscode/
+
+# Ruff stuff:
+.ruff_cache/
+
+# PyPI configuration file
+.pypirc
+
+# Cursor
+#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
+#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
+#  refer to https://docs.cursor.com/context/ignore-files
+.cursorignore
+.cursorindexingignore
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+ 
+# --- Node / Vite / Frontend artifacts ---
+# Do not track node_modules or build outputs
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+
+# --- Local runtime artifacts ---
+# PID files and local logs should not be tracked
+*.pid
+.uvicorn.pid
+logs/
+**/logs/
+*.log
+
+# --- Local SQLite databases ---
+*.sqlite3
+
+# Temporary test files
+.pytest-tmp/
+.pytest_tmp/
+_deep_snapshot/
+deep_project_analyzer.ps1
+demo.db
+
+# Test cache files (Parquet)
+data/test_cache/*.parquet
+
+# DeepSeek temporary files
+*.backup_*.py
+*_backup_*.py
+deepseek_*.log
+deepseek_*_state.json
+DEEPSEEK_*.json
+DEEPSEEK_*.md
+
+# Environment files
+.env.development
+.env.production
+.env.backup*
+.env.*.backup.*
+ai_audit_results/API.txt
+
+# Test results
+*_RESULTS.json
+*_results.json
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+
+# AI reports and analysis files (keep only key docs in docs/)
+AGENT_*.md
+ALL_*.md
+CONCRETE_*.md
+CRITICAL_*.md
+BACKEND_*.md
+*ANALYSIS*.md
+*AUDIT*.md
+*DEEPSEEK*.md
+*PERPLEXITY*.md
+*REPORT*.md
+*SUMMARY*.md
+# PHASE*.md - REMOVED: Need to track monitoring documentation
+QUICK_WIN*.md
+PROJECT_ANALYSIS.md
+
+# Phase 1 monitoring documentation (must track)
+!PHASE1_MONITORING_SETUP_COMPLETE.md
+!PHASE1_STAGING_FIXES_COMPLETION.md
+!monitoring/daily_phase1_summary.md
+MCP_*.md
+E2E_*.md
+FULL_*.md
+FINAL_*.md
+INDEX_*.md
+P0_*.md
+
+# Large patch files
+*.patch
+
+# Analysis and utility scripts (temporary)
+analyze_*.py
+check_*.py
+benchmark_*.py
+apply_*.py
+create_*.py
+conduct_*.py
+send_*.py
+adapt_*.py
+complete_*.py
+collaborative_*.py
+deep_*.py
+
+# Temporary JSON files
+analysis_*.json
+COLLABORATIVE_*.json
+*_COMPLETION_*.json
+*_VERIFICATION_*.json
+COMPREHENSIVE_*.json
+
+# Celery schedule
+celerybeat-schedule
+
+# Encrypted secrets (root copy is symlink/temp)
+/encrypted_secrets.json
+
+# Temporary data files
+data.sqlite3
+
+# Legacy files with example API keys
+CRITICAL_FIXES_FINAL_REPORT.md
+NEXT_STEPS.md
+query_perplexity.py
+
+# Migration scripts with plaintext keys (run once and delete)
+migrate_api_keys.py
+
+# Grafana credentials (local only)
+monitoring/.grafana_credentials
+
+# Large files and embedded repos to exclude from tracking
+mcp-server/
+node_modules
+
+# --- Test Results and Reports (temporary) ---
+# These are generated during testing and should not be committed
+*_result.txt
+*_results.txt
+*_RESULT.txt
+*_RESULTS.txt
+unified_test_results*.json
+ai_deep_audit_*.json
+quick_audit_report_*.json
+security_audit_*.json
+TEST_*.txt
+UNIFIED_TEST_*.txt
+*_TEST_SUMMARY.txt
+*_FINAL_REPORT.txt
+*_FINAL_VERIFICATION.txt
+TEST_EXECUTION_SUMMARY.txt
+START_AI_AGENT_TEST.txt
+AI_AGENT_TEST_SUMMARY.txt
+AGENT_ANALYSIS_SUMMARY.txt
+performance_baseline.txt
+test_output.txt
+
+# --- Agent Memory (runtime state) ---
+agent_memory/
+
+# --- Root-level certificates (use deployment/certs instead) ---
+server.crt
+server.key
+
+# --- Quick Start Scripts (auto-generated) ---
+AI_AGENT_TEST_QUICK_START.py
+
+# Runtime artifacts
+data.sqlite3-shm
+data.sqlite3-wal
+dump.rdb
+
+# Screenshots and debug artifacts
+debug_screenshot.png
+screenshots/
+ui_smoke_artifacts/
+
+# ==============================================================================
+# Archive directories (2026-01-23 cleanup)
+# ==============================================================================
+# These contain archived/temporary files that should not be tracked
+
+# Archived Python scripts
+scripts/archive/
+
+# Archived documentation
+docs/archive/
+
+# Archived data/test files
+data/archive/
+
+# Old openapi files
+openapi*.json
+!openapi.yaml
+
+# Agent skills (embedded repo)
+.agent/skills/

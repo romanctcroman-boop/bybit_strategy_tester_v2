@@ -1,0 +1,192 @@
+/**
+ * 🎨 Design Tokens - Bybit Strategy Tester v2
+ * 
+ * Unified CSS variables for consistent theming across all pages.
+ * Created as part of Phase 1: Critical Security & Performance
+ * 
+ * @version 1.0.0
+ * @date 2025-12-21
+ */
+
+/* ============================================
+   THEME: Dark (Default)
+   ============================================ */
+:root,
+[data-theme="dark"] {
+    /* ---- Background Colors ---- */
+    --color-bg-primary: #0d1117;
+    --color-bg-secondary: #161b22;
+    --color-bg-tertiary: #21262d;
+    --color-bg-card: #16213e;
+    --color-bg-card-hover: #1e2a47;
+    --color-bg-input: #0d1117;
+    --color-bg-overlay: rgba(0, 0, 0, 0.7);
+    
+    /* ---- Text Colors ---- */
+    --color-text-primary: #f0f6fc;
+    --color-text-secondary: #8b949e;
+    --color-text-muted: #6e7681;
+    --color-text-inverse: #0d1117;
+    
+    /* ---- Accent Colors ---- */
+    --color-accent: #58a6ff;
+    --color-accent-hover: #79b8ff;
+    --color-success: #3fb950;
+    --color-success-hover: #56d364;
+    --color-danger: #f85149;
+    --color-danger-hover: #ff7b72;
+    --color-warning: #d29922;
+    --color-warning-hover: #e3b341;
+    --color-info: #58a6ff;
+    --color-info-hover: #79b8ff;
+    
+    /* ---- Trading Colors ---- */
+    --color-long: #3fb950;
+    --color-long-bg: rgba(63, 185, 80, 0.1);
+    --color-short: #f85149;
+    --color-short-bg: rgba(248, 81, 73, 0.1);
+    --color-neutral: #8b949e;
+    
+    /* ---- Border Colors ---- */
+    --color-border: #30363d;
+    --color-border-hover: #484f58;
+    --color-border-focus: #58a6ff;
+    
+    /* ---- Shadow ---- */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.5);
+    --shadow-focus: 0 0 0 3px rgba(88, 166, 255, 0.3);
+}
+
+/* ============================================
+   THEME: Light
+   ============================================ */
+[data-theme="light"] {
+    /* ---- Background Colors ---- */
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f6f8fa;
+    --color-bg-tertiary: #eaeef2;
+    --color-bg-card: #ffffff;
+    --color-bg-card-hover: #f6f8fa;
+    --color-bg-input: #ffffff;
+    --color-bg-overlay: rgba(0, 0, 0, 0.5);
+    
+    /* ---- Text Colors ---- */
+    --color-text-primary: #1f2328;
+    --color-text-secondary: #57606a;
+    --color-text-muted: #8c959f;
+    --color-text-inverse: #ffffff;
+    
+    /* ---- Accent Colors ---- */
+    --color-accent: #0969da;
+    --color-accent-hover: #0550ae;
+    --color-success: #1a7f37;
+    --color-success-hover: #116329;
+    --color-danger: #cf222e;
+    --color-danger-hover: #a40e26;
+    --color-warning: #9a6700;
+    --color-warning-hover: #7d4e00;
+    --color-info: #0969da;
+    --color-info-hover: #0550ae;
+    
+    /* ---- Border Colors ---- */
+    --color-border: #d1d9e0;
+    --color-border-hover: #b1bac4;
+    --color-border-focus: #0969da;
+    
+    /* ---- Shadow ---- */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.2);
+    --shadow-focus: 0 0 0 3px rgba(9, 105, 218, 0.3);
+}
+
+/* ============================================
+   SPACING SYSTEM
+   ============================================ */
+:root {
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
+    --spacing-3xl: 64px;
+}
+
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
+:root {
+    /* Font Families */
+    --font-family-base: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    
+    /* Font Sizes */
+    --font-size-xs: 0.75rem;    /* 12px */
+    --font-size-sm: 0.875rem;   /* 14px */
+    --font-size-base: 1rem;     /* 16px */
+    --font-size-lg: 1.125rem;   /* 18px */
+    --font-size-xl: 1.25rem;    /* 20px */
+    --font-size-2xl: 1.5rem;    /* 24px */
+    --font-size-3xl: 1.875rem;  /* 30px */
+    --font-size-4xl: 2.25rem;   /* 36px */
+    
+    /* Font Weights */
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    
+    /* Line Heights */
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.75;
+}
+
+/* ============================================
+   BORDER RADIUS
+   ============================================ */
+:root {
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-2xl: 16px;
+    --radius-full: 9999px;
+}
+
+/* ============================================
+   Z-INDEX SCALE
+   ============================================ */
+:root {
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-fixed: 300;
+    --z-modal-backdrop: 400;
+    --z-modal: 500;
+    --z-popover: 600;
+    --z-tooltip: 700;
+    --z-toast: 800;
+}
+
+/* ============================================
+   TRANSITIONS
+   ============================================ */
+:root {
+    --transition-fast: 150ms ease-out;
+    --transition-normal: 250ms ease-out;
+    --transition-slow: 350ms ease-out;
+}
+
+/* ============================================
+   BREAKPOINTS (for reference in JS)
+   ============================================ */
+:root {
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+}

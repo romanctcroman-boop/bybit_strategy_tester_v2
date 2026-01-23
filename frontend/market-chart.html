@@ -1,0 +1,897 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <title>Advanced Market Chart - Bybit Strategy Tester v2</title>
+    <link rel="icon" href="/frontend/favicon.ico" type="image/x-icon">
+    <!-- TradingView Lightweight Charts (local) -->
+    <script src="libs/lightweight-charts.js"></script>
+    <!-- Bootstrap 5.3.2 (local) -->
+    <link href="libs/bootstrap.min.css" rel="stylesheet">
+    <link href="libs/bootstrap-icons.css" rel="stylesheet">
+    <!-- External CSS (Phase 1) -->
+    <link rel="stylesheet" href="./css/variables.css">
+    <link rel="stylesheet" href="./css/components.css">
+    <link rel="stylesheet" href="./css/common.css">
+    <link rel="stylesheet" href="./css/market_chart.css">
+
+    </head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <a href="dashboard.html"><i class="bi bi-graph-up-arrow"></i> Charts</a>
+                </div>
+                
+                <div class="symbol-selector">
+                    <div class="symbol-dropdown" id="symbolDropdown" onclick="openSymbolSearch(false)">
+                        <span id="currentSymbol">BTCUSDT</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                    
+                    <div class="price-info">
+                        <span class="current-price up" id="currentPrice">$97,234.50</span>
+                        <span class="price-change positive" id="priceChange">
+                            <span>+2.34%</span>
+                            <span>+$2,234.50</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="timeframe-selector">
+                    <button class="tf-btn" data-tf="1">1m</button>
+                    <button class="tf-btn" data-tf="5">5m</button>
+                    <button class="tf-btn" data-tf="15">15m</button>
+                    <button class="tf-btn" data-tf="30">30m</button>
+                    <button class="tf-btn" data-tf="60">1H</button>
+                    <button class="tf-btn" data-tf="240">4H</button>
+                    <button class="tf-btn" data-tf="D">1D</button>
+                    <button class="tf-btn" data-tf="W">1W</button>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <div class="compare-wrapper">
+                    <button class="header-btn" id="compareBtn" onclick="toggleCompareDropdown()" title="Compare symbols (C)">
+                        <i class="bi bi-layers"></i> Compare
+                    </button>
+                    <!-- Compare Dropdown Panel -->
+                    <div class="compare-panel" id="comparePanel">
+                        <div class="compare-header">
+                            <span class="compare-header-title">Compare Symbols</span>
+                            <button class="btn-icon" onclick="toggleCompareMode()" id="compareModeToggle" title="Toggle compare mode">
+                                <i class="bi bi-toggle-off" id="compareModeIcon"></i>
+                            </button>
+                        </div>
+                        <div class="compare-chips" id="compareChips">
+                            <!-- Dynamically populated -->
+                        </div>
+                        <button class="compare-add-btn" onclick="openSymbolSearch(true)">
+                            <i class="bi bi-plus"></i> Add Symbol
+                        </button>
+                        <div class="compare-hint">
+                            Add symbols to compare their performance
+                        </div>
+                    </div>
+                </div>
+                <button class="header-btn" onclick="location.href='tick-chart.html'" title="Tick Chart (T)">
+                    <i class="bi bi-activity"></i> Tick
+                </button>
+                <button class="header-btn" onclick="openIndicatorsModal()" title="Indicators (I)">
+                    <i class="bi bi-graph-up"></i> Indicators
+                </button>
+                <button class="header-btn" onclick="openAlertsModal()" title="Price Alerts (A)">
+                    <i class="bi bi-bell"></i> Alerts
+                    <span class="alert-badge hidden" id="alertBadge">0</span>
+                </button>
+                <button class="header-btn" id="settingsBtn" title="Chart Settings (,)">
+                    <i class="bi bi-gear"></i> Settings
+                </button>
+                <button class="header-btn" onclick="exportChart()" title="Export (E)">
+                    <i class="bi bi-download"></i> Export
+                </button>
+                <button class="header-btn" onclick="openShortcutsModal()" title="Keyboard Shortcuts (?)">
+                    <i class="bi bi-keyboard"></i>
+                </button>
+                <button class="header-btn" onclick="toggleFullscreen()" title="Toggle Fullscreen (F)" aria-label="Toggle fullscreen mode">
+                    <i class="bi bi-fullscreen"></i>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Compare Legend (shows current values) -->
+        <div class="compare-legend hidden" id="compareLegend">
+            <!-- Dynamically populated with current % values -->
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Toolbar -->
+            <div class="sidebar">
+                <button class="tool-btn active" data-tool="cursor" title="Cursor"><i class="bi bi-cursor"></i></button>
+                <button class="tool-btn" data-tool="crosshair" title="Crosshair"><i class="bi bi-plus-lg"></i></button>
+                <div class="tool-separator"></div>
+                <button class="tool-btn" data-tool="trendline" title="Trend Line"><i class="bi bi-slash-lg"></i></button>
+                <button class="tool-btn" data-tool="hline" title="Horizontal Line"><i class="bi bi-dash-lg"></i></button>
+                <button class="tool-btn" data-tool="rectangle" title="Rectangle"><i class="bi bi-square"></i></button>
+                <button class="tool-btn" data-tool="fibonacci" title="Fibonacci"><i class="bi bi-rulers"></i></button>
+                <div class="tool-separator"></div>
+                <button class="tool-btn" data-tool="text" title="Text"><i class="bi bi-fonts"></i></button>
+                <button class="tool-btn" data-tool="arrow" title="Arrow"><i class="bi bi-arrow-right"></i></button>
+                <div class="tool-separator"></div>
+                <button class="tool-btn" data-tool="measure" title="Measure"><i class="bi bi-rulers"></i></button>
+                <button class="tool-btn" data-tool="zoom" title="Zoom"><i class="bi bi-zoom-in"></i></button>
+                <div class="tool-separator"></div>
+                <button class="tool-btn" onclick="clearDrawings()" title="Clear All"><i class="bi bi-trash"></i></button>
+            </div>
+
+            <!-- Chart Area -->
+            <div class="chart-area">
+                <div class="chart-container" id="chartContainer">
+                    <div id="chart"></div>
+                    <!-- Countdown Timer -->
+                    <div id="candleCountdown" class="candle-countdown">00:00</div>
+                    <!-- Pulse Animation Container -->
+                    <div id="pricePulse" class="pulse-container">
+                        <div class="pulse-ring"></div>
+                        <div class="pulse-dot"></div>
+                    </div>
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+                <!-- Resizable divider -->
+                <div class="chart-resizer" id="chartResizer"></div>
+                <div class="indicators-panel" id="indicatorsPanel">
+                    <div class="volume-label">РћР±СЉС‘Рј SMA <span id="volumeSmaValue">9</span></div>
+                    <div id="volumeChart"></div>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="right-panel">
+                <div class="panel-tabs">
+                    <button class="panel-tab active" data-panel="orderbook">Order Book</button>
+                    <button class="panel-tab" data-panel="trades">Trades</button>
+                    <button class="panel-tab" data-panel="stats">Stats</button>
+                </div>
+                <div class="panel-content">
+                    <!-- Order Book (default) -->
+                    <div id="orderbookPanel" class="orderbook">
+                        <div class="orderbook-header">
+                            <span>Price</span>
+                            <span class="text-right">Size</span>
+                            <span class="text-right">Total</span>
+                        </div>
+                        <div id="asks"></div>
+                        <!-- Depth Scale Bar - РІРёР·СѓР°Р»СЊРЅС‹Р№ СЂР°Р·РґРµР»РёС‚РµР»СЊ -->
+                        <div class="depth-scale">
+                            <div class="depth-scale-bar">
+                                <div class="depth-scale-sell" id="depthSellBar"></div>
+                                <div class="depth-scale-buy" id="depthBuyBar"></div>
+                            </div>
+                        </div>
+                        <div class="depth-scale-labels">
+                            <span class="depth-scale-label-sell" id="depthSellLabel">50%</span>
+                            <span class="spread-row">Spread: <span id="spread">$12.50 (0.01%)</span></span>
+                            <span class="depth-scale-label-buy" id="depthBuyLabel">50%</span>
+                        </div>
+                        <div id="bids"></div>
+                        <!-- Buy/Sell Pressure Indicator - single price with dynamic color -->
+                        <div class="pressure-indicator">
+                            <span class="pressure-arrow" id="pressureArrow">в†‘</span>
+                            <span class="pressure-price" id="pressurePrice">86,426.90</span>
+                        </div>
+                    </div>
+                    <!-- Trades Panel (hidden) -->
+                    <div id="tradesPanel" class="trades-list hidden-panel">
+                        <div class="trades-header">
+                            <span>Price</span>
+                            <span class="text-right">Size</span>
+                            <span class="text-right">Time</span>
+                        </div>
+                        <div id="tradesList"></div>
+                    </div>
+                    <!-- Stats Panel (hidden) -->
+                    <div id="statsPanel" class="stats-grid hidden-panel">
+                        <div class="stat-item">
+                            <div class="stat-label">24h High</div>
+                            <div class="stat-value" id="stat24hHigh">$98,500.00</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">24h Low</div>
+                            <div class="stat-value" id="stat24hLow">$94,200.00</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">24h Volume</div>
+                            <div class="stat-value" id="stat24hVolume">$2.4B</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">24h Trades</div>
+                            <div class="stat-value" id="stat24hTrades">1.2M</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Open Interest</div>
+                            <div class="stat-value" id="statOI">$12.5B</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Funding Rate</div>
+                            <div class="stat-value" id="statFunding">0.01%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <div class="status-item">
+                <span class="status-dot" id="connectionDot"></span>
+                <span id="connectionStatus">Connecting...</span>
+            </div>
+            <div class="status-item">
+                <span>Last Update: <span id="lastUpdate">--:--:--</span></span>
+            </div>
+            <div class="status-item">
+                <span>O: <span id="ohlcOpen">--</span></span>
+                <span>H: <span id="ohlcHigh">--</span></span>
+                <span>L: <span id="ohlcLow">--</span></span>
+                <span>C: <span id="ohlcClose">--</span></span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Symbol Search Modal -->
+    <div class="symbol-search-modal" id="symbolSearchModal">
+        <div class="symbol-search-container">
+            <div class="symbol-search-header">
+                <input type="text" class="symbol-search-input" id="symbolSearchInput" 
+                       placeholder="Search symbols... (e.g., BTC, ETH, SOL)" 
+                       autocomplete="off">
+            </div>
+            <div class="symbol-categories" id="symbolCategories">
+                <button class="symbol-category active" data-category="all">All</button>
+                <button class="symbol-category" data-category="popular">Popular</button>
+                <button class="symbol-category" data-category="btc">BTC Pairs</button>
+                <button class="symbol-category" data-category="eth">ETH Pairs</button>
+                <button class="symbol-category" data-category="defi">DeFi</button>
+                <button class="symbol-category" data-category="meme">Meme</button>
+                <button class="symbol-category" data-category="layer1">Layer 1</button>
+            </div>
+            <div class="symbol-list" id="symbolList">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Indicators Modal -->
+    <div class="modal-overlay hidden" id="indicatorsModal">
+        <div class="modal" id="indicatorsModalContent">
+            <div class="modal-header">
+                <h3><i class="bi bi-graph-up"></i> Technical Indicators</h3>
+                <button class="modal-close" onclick="closeIndicatorsModal()">Г—</button>
+            </div>
+            <div class="modal-body">
+                <div class="indicator-item" onclick="toggleIndicator('sma')">
+                    <div class="indicator-info">
+                        <h4>SMA (Simple Moving Average)</h4>
+                        <p>20, 50, 200 periods</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-sma"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('ema')">
+                    <div class="indicator-info">
+                        <h4>EMA (Exponential Moving Average)</h4>
+                        <p>12, 26 periods</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-ema"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('bb')">
+                    <div class="indicator-info">
+                        <h4>Bollinger Bands</h4>
+                        <p>20 period, 2 std dev</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-bb"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('rsi')">
+                    <div class="indicator-info">
+                        <h4>RSI (Relative Strength Index)</h4>
+                        <p>14 period</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-rsi"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('macd')">
+                    <div class="indicator-info">
+                        <h4>MACD</h4>
+                        <p>12, 26, 9 periods</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-macd"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('vwap')">
+                    <div class="indicator-info">
+                        <h4>VWAP</h4>
+                        <p>Volume Weighted Average Price</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-vwap"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('stoch')">
+                    <div class="indicator-info">
+                        <h4>Stochastic Oscillator</h4>
+                        <p>14, 3, 3 periods (K, D, Smooth)</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-stoch"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('atr')">
+                    <div class="indicator-info">
+                        <h4>ATR (Average True Range)</h4>
+                        <p>14 period volatility indicator</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-atr"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('ichimoku')">
+                    <div class="indicator-info">
+                        <h4>Ichimoku Cloud</h4>
+                        <p>9, 26, 52 periods</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-ichimoku"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('pivots')">
+                    <div class="indicator-info">
+                        <h4>Pivot Points</h4>
+                        <p>Support/Resistance levels (S1-S3, R1-R3)</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-pivots"></div>
+                </div>
+                <div class="indicator-item" onclick="toggleIndicator('supertrend')">
+                    <div class="indicator-info">
+                        <h4>SuperTrend</h4>
+                        <p>ATR-based trend following (10, 3)</p>
+                    </div>
+                    <div class="indicator-toggle" id="toggle-supertrend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Price Alerts Modal -->
+    <div class="modal-overlay hidden" id="alertsModal">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h3><i class="bi bi-bell"></i> Price Alerts</h3>
+                <button class="modal-close" onclick="closeAlertsModal()">Г—</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert-form">
+                    <div class="alert-form-row">
+                        <select id="alertCondition" aria-label="Alert Condition" class="form-select">
+                            <option value="above">Price Above</option>
+                            <option value="below">Price Below</option>
+                            <option value="cross_up">Crosses Up</option>
+                            <option value="cross_down">Crosses Down</option>
+                        </select>
+                        <input type="number" id="alertPrice" placeholder="Price" class="form-input">
+                    </div>
+                    <div class="alert-form-row">
+                        <input type="text" id="alertMessage" placeholder="Alert message (optional)" class="form-input">
+                        <button onclick="createAlert()" class="btn-primary">
+                            <i class="bi bi-plus-lg"></i> Add
+                        </button>
+                    </div>
+                </div>
+                <div id="alertsList" class="alerts-list">
+                    <!-- Alerts will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div class="modal-overlay hidden" id="shortcutsModal">
+        <div class="modal modal-medium">
+            <div class="modal-header">
+                <h3><i class="bi bi-keyboard"></i> Keyboard Shortcuts</h3>
+                <button class="modal-close" onclick="closeShortcutsModal()">Г—</button>
+            </div>
+            <div class="modal-body">
+                <div class="shortcuts-grid">
+                    <div class="shortcut-item">
+                        <span>Toggle Indicators</span>
+                        <kbd>I</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Search Symbol</span>
+                        <kbd>S</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Price Alerts</span>
+                        <kbd>A</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Toggle Fullscreen</span>
+                        <kbd>F</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Zoom In</span>
+                        <kbd>+</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Zoom Out</span>
+                        <kbd>-</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Reset Zoom</span>
+                        <kbd>R</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Toggle Compare Mode</span>
+                        <kbd>C</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Export Chart</span>
+                        <kbd>E</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Chart Settings</span>
+                        <kbd>,</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Timeframes (1m-1W)</span>
+                        <kbd>1-7</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Show Shortcuts</span>
+                        <kbd>?</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span>Close Modal</span>
+                        <kbd>Esc</kbd>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay settings-modal hidden" id="settingsModal">
+        <div class="modal modal-wide">
+            <div class="modal-header">
+                <h3><i class="bi bi-gear"></i> Chart Settings</h3>
+                <button class="modal-close" onclick="closeSettingsModal()">Г—</button>
+            </div>
+            <div class="modal-body">
+                <!-- Settings Tabs -->
+                <div class="settings-tabs">
+                    <button class="settings-tab active" data-tab="display" onclick="switchSettingsTab('display')">
+                        <i class="bi bi-display"></i> Display
+                    </button>
+                    <button class="settings-tab" data-tab="volume" onclick="switchSettingsTab('volume')">
+                        <i class="bi bi-bar-chart-fill"></i> Volume
+                    </button>
+                    <button class="settings-tab" data-tab="trading" onclick="switchSettingsTab('trading')">
+                        <i class="bi bi-graph-up-arrow"></i> Trading
+                    </button>
+                    <button class="settings-tab" data-tab="patterns" onclick="switchSettingsTab('patterns')">
+                        <i class="bi bi-diagram-3"></i> Patterns
+                    </button>
+                    <button class="settings-tab" data-tab="advanced" onclick="switchSettingsTab('advanced')">
+                        <i class="bi bi-sliders"></i> Advanced
+                    </button>
+                </div>
+                
+                <!-- Display Settings -->
+                <div class="settings-panel active" id="settings-display">
+                    <div class="settings-section">
+                        <h4>Chart Appearance</h4>
+                        <div class="settings-grid">
+                            <!-- Visual Enhancements -->
+
+                             <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Comp. Scrollbar</span>
+                                    <span class="setting-desc">Sleek dark mode scrollbars</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-customScrollbar" aria-label="Custom Scrollbar" onchange="updateSetting('customScrollbar', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Price Pulse</span>
+                                    <span class="setting-desc">Animating pulse at current price</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-pulse" aria-label="Price Pulse" onchange="updateSetting('pulse', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Candle Countdown</span>
+                                    <span class="setting-desc">Show time remaining</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-countdown" aria-label="Countdown Timer" onchange="updateSetting('countdown', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                             <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Trade Markers</span>
+                                    <span class="setting-desc">Show mock executions</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-tradeMarkers" aria-label="Trade Markers" onchange="updateSetting('tradeMarkers', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            
+                            <hr class="settings-separator">
+                            
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Grid Lines</span>
+                                    <span class="setting-desc">Display horizontal and vertical grid</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-gridLines" aria-label="Grid Lines" checked onchange="updateSetting('gridLines', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Volume Chart</span>
+                                    <span class="setting-desc">Display volume histogram below candles</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-volumeChart" aria-label="Volume Chart" checked onchange="updateSetting('volumeChart', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Watermark</span>
+                                    <span class="setting-desc">Display symbol name as watermark</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-watermark" aria-label="Watermark" onchange="updateSetting('watermark', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Last Price Line</span>
+                                    <span class="setting-desc">Horizontal line at current price</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-lastPriceLine" aria-label="Last Price Line" checked onchange="updateSetting('lastPriceLine', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Crosshair</span>
+                                    <span class="setting-desc">Display crosshair on mouse hover</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-crosshair" aria-label="Crosshair" checked onchange="updateSetting('crosshair', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Volume Settings -->
+                <div class="settings-panel" id="settings-volume">
+                    <div class="settings-section">
+                        <h4>Volume Indicators</h4>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Volume SMA</span>
+                                    <span class="setting-desc">Simple Moving Average of Volume</span>
+                                </div>
+                                <div class="setting-controls">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="setting-volumeSma" aria-label="Volume SMA" checked onchange="updateVolumeSetting('sma', this.checked)">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <input type="number" id="setting-volumeSmaPeriod" aria-label="Volume SMA Period" value="9" min="2" max="50" 
+                                           class="setting-input-small" onchange="updateVolumeSetting('smaPeriod', this.value)">
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Volume EMA</span>
+                                    <span class="setting-desc">Exponential Moving Average of Volume</span>
+                                </div>
+                                <div class="setting-controls">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="setting-volumeEma" aria-label="Volume EMA" onchange="updateVolumeSetting('ema', this.checked)">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <input type="number" id="setting-volumeEmaPeriod" aria-label="Volume EMA Period" value="21" min="2" max="50" 
+                                           class="setting-input-small" onchange="updateVolumeSetting('emaPeriod', this.value)">
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">VWAP</span>
+                                    <span class="setting-desc">Volume Weighted Average Price (on main chart)</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-vwap" aria-label="VWAP" onchange="updateVolumeSetting('vwap', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Volume Bollinger Bands</span>
+                                    <span class="setting-desc">Detect abnormal volume spikes</span>
+                                </div>
+                                <div class="setting-controls">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="setting-volumeBB" aria-label="Volume Bollinger Bands" onchange="updateVolumeSetting('bb', this.checked)">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <input type="number" id="setting-volumeBBPeriod" aria-label="Volume BB Period" value="20" min="5" max="50" 
+                                           class="setting-input-small" onchange="updateVolumeSetting('bbPeriod', this.value)">
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">OBV (On-Balance Volume)</span>
+                                    <span class="setting-desc">Cumulative volume indicator</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-obv" aria-label="On-Balance Volume" onchange="updateVolumeSetting('obv', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Volume Delta</span>
+                                    <span class="setting-desc">Buy vs Sell volume difference</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-volumeDelta" aria-label="Volume Delta" onchange="updateVolumeSetting('delta', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Highlight High Volume</span>
+                                    <span class="setting-desc">Highlight bars with above-average volume</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-highlightVolume" aria-label="Highlight Volume" checked onchange="updateVolumeSetting('highlight', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>Volume Chart Style</h4>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Bar Opacity</span>
+                                    <span class="setting-desc">Volume bar transparency</span>
+                                </div>
+                                <input type="range" id="setting-volumeOpacity" aria-label="Volume Opacity" min="20" max="100" value="80" 
+                                       class="setting-range" onchange="updateVolumeSetting('opacity', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Trading Settings -->
+                <div class="settings-panel" id="settings-trading">
+                    <div class="settings-section">
+                        <h4>Price Levels</h4>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Support/Resistance</span>
+                                    <span class="setting-desc">Auto-detect and display S/R levels</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-supportResistance" aria-label="Support Resistance" onchange="updateSetting('supportResistance', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show 24h High/Low</span>
+                                    <span class="setting-desc">Display 24h price range lines</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-highLowLines" aria-label="High Low Lines" onchange="updateSetting('highLowLines', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Open Price</span>
+                                    <span class="setting-desc">Display daily open price line</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-openPriceLine" aria-label="Open Price Line" onchange="updateSetting('openPriceLine', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>Trade Signals</h4>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Buy/Sell Markers</span>
+                                    <span class="setting-desc">Display strategy signals on chart</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-buySellMarkers" aria-label="Buy Sell Markers" onchange="updateSetting('buySellMarkers', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Liquidations</span>
+                                    <span class="setting-desc">Display large liquidation events</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-liquidations" aria-label="Liquidations" onchange="updateSetting('liquidations', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Pattern Detection Settings -->
+                <div class="settings-panel" id="settings-patterns">
+                    <div class="settings-section">
+                        <h4>Candlestick Patterns</h4>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Detect Doji</span>
+                                    <span class="setting-desc">Indecision candles</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-pattern-doji" aria-label="Doji Pattern" onchange="updateSetting('patternDoji', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Detect Hammer/Hanging Man</span>
+                                    <span class="setting-desc">Reversal patterns</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-pattern-hammer" aria-label="Hammer Pattern" onchange="updateSetting('patternHammer', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Detect Engulfing</span>
+                                    <span class="setting-desc">Bullish/Bearish engulfing</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-pattern-engulfing" aria-label="Engulfing Pattern" onchange="updateSetting('patternEngulfing', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Detect Morning/Evening Star</span>
+                                    <span class="setting-desc">3-candle reversal patterns</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-pattern-star" aria-label="Star Pattern" onchange="updateSetting('patternStar', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Detect Three Soldiers/Crows</span>
+                                    <span class="setting-desc">Strong trend continuation</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-pattern-soldiers" aria-label="Three Soldiers Pattern" onchange="updateSetting('patternSoldiers', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Advanced Settings -->
+                <div class="settings-panel" id="settings-advanced">
+                    <div class="settings-section">
+                        <h4>Data & Performance</h4>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Auto-Load History</span>
+                                    <span class="setting-desc">Load more data when scrolling left</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-infiniteHistory" aria-label="Infinite History" checked onchange="updateSetting('infiniteHistory', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Auto-Scroll to New Candles</span>
+                                    <span class="setting-desc">Keep latest candle visible</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-autoScroll" aria-label="Auto Scroll" checked onchange="updateSetting('autoScroll', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Connection Status</span>
+                                    <span class="setting-desc">Display WebSocket status indicator</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-connectionStatus" aria-label="Connection Status" checked onchange="updateSetting('connectionStatus', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>Right Panel</h4>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Order Book</span>
+                                    <span class="setting-desc">Display real-time order book</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-orderBook" aria-label="Order Book" checked onchange="updateSetting('orderBook', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <span class="setting-label">Show Recent Trades</span>
+                                    <span class="setting-desc">Display trade feed</span>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="setting-recentTrades" aria-label="Recent Trades" checked onchange="updateSetting('recentTrades', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button class="btn-secondary" onclick="resetSettings()">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reset to Defaults
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS (local) -->
+    <script src="libs/bootstrap.bundle.min.js"></script>
+    <script type="module" src="./js/pages/market_chart.js"></script>
+</body>
+</html>

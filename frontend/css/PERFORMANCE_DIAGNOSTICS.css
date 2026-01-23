@@ -1,0 +1,27 @@
+/**
+ * 📄 Performance Diagnostics Page Styles
+ * 
+ * Page-specific styles for PERFORMANCE_DIAGNOSTICS.html
+ * Extracted during Phase 1 Week 2: CSS Extraction
+ * 
+ * @version 1.0.0
+ * @date 2025-12-21
+ */
+
+/* Import shared variables and components */
+@import 'variables.css';
+@import 'components.css';
+
+/* ============================================
+   PAGE-SPECIFIC STYLES
+   ============================================ */
+
+body { font-family: monospace; background: #1a1a2e; color: #eee; padding: 20px; }
+        h1 { color: #00c853; }
+        .section { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .issue { color: #ff1744; }
+        .fix { color: #00c853; }
+        pre { background: #0f0f23; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        code { color: #58a6ff; }
+        .nav-link { margin-bottom: 1rem; }
+        .dashboard-link { color: #58a6ff; text-decoration: none; }

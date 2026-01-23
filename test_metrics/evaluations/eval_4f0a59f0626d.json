@@ -1,0 +1,21 @@
+{
+  "id": "eval_4f0a59f0626d",
+  "agent_type": "deepseek",
+  "task_type": "code_generation",
+  "metrics": {
+    "accuracy": 0.7,
+    "helpfulness": 0.7,
+    "safety": 1.0,
+    "efficiency": 9.999999999999998,
+    "latency_ms": 2000,
+    "error_rate": 0.0,
+    "consensus_rate": 0.0,
+    "user_satisfaction": 0.0,
+    "task_completion_rate": 1.0,
+    "overall_score": 167.99999999999997
+  },
+  "timestamp": "2026-01-18T08:34:59.635606+00:00",
+  "metadata": {
+    "tokens_used": 80
+  }
+}

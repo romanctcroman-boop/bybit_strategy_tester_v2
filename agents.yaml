@@ -1,0 +1,100 @@
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Agent System Configuration
+# ═══════════════════════════════════════════════════════════════════════════════════
+# This file is watched for changes - hot-reload supported!
+# Edit and save to update configuration without restarting the server.
+
+meta:
+  version: 1
+  name: "Bybit Strategy Tester Agent System"
+  description: "AI Agent configuration for trading strategy analysis"
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Prompt Configuration
+# ═══════════════════════════════════════════════════════════════════════════════════
+prompt:
+  # Maximum length of prompts sent to AI models
+  max_length: 16000
+  
+  # Notice appended when prompt is truncated
+  truncate_notice: "[TRUNCATED]"
+  
+  # Default system prompt template
+  system_prompt_template: |
+    You are an expert trading strategy analyst AI assistant.
+    You help users analyze trading strategies, backtesting results,
+    and market data for the Bybit cryptocurrency exchange.
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Circuit Breaker Configuration
+# ═══════════════════════════════════════════════════════════════════════════════════
+circuit_breaker:
+  # Number of failures before opening circuit
+  failure_threshold: 5
+  
+  # Time in seconds before attempting recovery
+  recovery_timeout: 60
+  
+  # Number of test requests in half-open state
+  half_open_requests: 3
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Rate Limiting Configuration
+# ═══════════════════════════════════════════════════════════════════════════════════
+rate_limit:
+  # Maximum requests per minute per client
+  requests_per_minute: 60
+  
+  # Burst size for token bucket
+  burst_size: 10
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Agent-Specific Settings
+# ═══════════════════════════════════════════════════════════════════════════════════
+agents:
+  deepseek:
+    enabled: true
+    model: "deepseek-chat"
+    temperature: 0.7
+    max_tokens: 4096
+    timeout_seconds: 120
+    
+  perplexity:
+    enabled: true
+    model: "llama-3.1-sonar-small-128k-online"
+    temperature: 0.2
+    max_tokens: 4096
+    timeout_seconds: 60
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Memory & Context Settings
+# ═══════════════════════════════════════════════════════════════════════════════════
+memory:
+  # Backend type: "file" or "redis"
+  backend: "file"
+  
+  # Directory for file-based memory
+  directory: "agent_memory"
+  
+  # Maximum conversation history to retain
+  max_history_items: 50
+  
+  # Auto-summarize after N messages
+  summarize_after: 20
+
+# ═══════════════════════════════════════════════════════════════════════════════════
+# Tool Configuration
+# ═══════════════════════════════════════════════════════════════════════════════════
+tools:
+  # Maximum tool calls per request
+  budget: 10
+  
+  # Timeout for individual tool execution (seconds)
+  timeout: 30
+  
+  # Enabled tool categories
+  enabled_categories:
+    - file_operations
+    - database_queries
+    - market_analysis
+    - strategy_evaluation

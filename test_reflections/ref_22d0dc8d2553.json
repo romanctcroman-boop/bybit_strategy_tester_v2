@@ -1,0 +1,27 @@
+{
+  "id": "ref_22d0dc8d2553",
+  "task": "Generate a simple RSI calculation function in Python",
+  "solution": "\ndef calculate_rsi(prices, period=14):\n    gains = []\n    losses = []\n    for i in range(1, len(prices)):\n        change = prices[i] - prices[i-1]\n        if change > 0:\n            gains.append(change)\n            losses.append(0)\n        else:\n            gains.append(0)\n            losses.append(abs(change))\n    \n    avg_gain = sum(gains[-period:]) / period\n    avg_loss = sum(losses[-period:]) / period\n    \n    if avg_loss == 0:\n        return 100\n    rs = avg_gain / avg_loss\n    return 100 -...",
+  "outcome": {
+    "success": true,
+    "tests_passed": 5,
+    "execution_time_ms": 50
+  },
+  "reflections": {
+    "task_analysis": "The main challenge was understanding the requirements and implementing correctly.",
+    "solution_quality": "Quality: 8/10. The solution addresses the task requirements clearly.",
+    "what_worked": "Systematic approach and breaking down the problem worked well.",
+    "what_didnt_work": "No major issues identified.",
+    "improvement": "Reflection in progress.",
+    "knowledge_gap": "Could benefit from deeper domain knowledge.",
+    "transferable_lessons": "Always validate solutions and consider edge cases."
+  },
+  "quality_score": 8.0,
+  "lessons_learned": [
+    "Systematic approach and breaking down the problem worked well.",
+    "Always validate solutions and consider edge cases."
+  ],
+  "improvement_actions": [],
+  "knowledge_gaps": [],
+  "created_at": "2026-01-18T08:38:21.769482+00:00"
+}
