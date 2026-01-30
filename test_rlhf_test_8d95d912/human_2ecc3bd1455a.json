@@ -1,0 +1,14 @@
+{
+  "id": "human_2ecc3bd1455a",
+  "prompt": "Question 3",
+  "response_a": "Detailed answer 3",
+  "response_b": "Short 3",
+  "preference": -1,
+  "preference_type": "human",
+  "confidence": 1.0,
+  "reasoning": null,
+  "created_at": "2026-01-27T23:28:49.936935+00:00",
+  "metadata": {
+    "source": "user_interface"
+  }
+}

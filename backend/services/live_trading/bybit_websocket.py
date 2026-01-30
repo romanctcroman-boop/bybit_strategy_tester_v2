@@ -22,6 +22,7 @@ from asyncio import Queue
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Optional
+from uuid import uuid4
 
 import websockets
 from websockets import ClientConnection
@@ -108,8 +109,12 @@ class BybitWebSocketClient:
         reconnect_delay: float = 1.0,
         ping_interval: float = 20.0,
     ):
-        self.api_key = api_key
-        self.api_secret = api_secret
+        # Store encrypted credentials (XOR with session key for basic obfuscation)
+        # NOTE: For production, use proper secrets management (Vault, AWS Secrets, etc.)
+        self._session_key = uuid4().bytes[:16]  # 16-byte random key
+        self._api_key_encrypted = self._xor_encrypt(api_key.encode(), self._session_key) if api_key else b""
+        self._api_secret_encrypted = self._xor_encrypt(api_secret.encode(), self._session_key) if api_secret else b""
+
         self.testnet = testnet
         self.category = category
         self.max_reconnect_attempts = max_reconnect_attempts
@@ -138,9 +143,26 @@ class BybitWebSocketClient:
         # Background tasks
         self._tasks: list[asyncio.Task] = []
 
-        logger.info(
-            f"BybitWebSocketClient initialized (testnet={testnet}, category={category})"
-        )
+        logger.info(f"BybitWebSocketClient initialized (testnet={testnet}, category={category})")
+
+    @staticmethod
+    def _xor_encrypt(data: bytes, key: bytes) -> bytes:
+        """Simple XOR encryption for in-memory credential obfuscation."""
+        return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+
+    @property
+    def api_key(self) -> str | None:
+        """Decrypt and return API key."""
+        if not self._api_key_encrypted:
+            return None
+        return self._xor_encrypt(self._api_key_encrypted, self._session_key).decode()
+
+    @property
+    def api_secret(self) -> str | None:
+        """Decrypt and return API secret."""
+        if not self._api_secret_encrypted:
+            return None
+        return self._xor_encrypt(self._api_secret_encrypted, self._session_key).decode()
 
     @property
     def public_url(self) -> str:
@@ -187,9 +209,7 @@ class BybitWebSocketClient:
             # Start background tasks
             self._tasks.append(asyncio.create_task(self._receive_public_messages()))
             if self._private_ws:
-                self._tasks.append(
-                    asyncio.create_task(self._receive_private_messages())
-                )
+                self._tasks.append(asyncio.create_task(self._receive_private_messages()))
 
             self._reconnect_count = 0
             return True
@@ -243,16 +263,12 @@ class BybitWebSocketClient:
             logger.info("✅ WebSocket authenticated successfully")
         else:
             logger.error(f"❌ WebSocket authentication failed: {data}")
-            raise Exception(
-                f"Authentication failed: {data.get('ret_msg', 'Unknown error')}"
-            )
+            raise Exception(f"Authentication failed: {data.get('ret_msg', 'Unknown error')}")
 
     def _generate_signature(self, expires: int) -> str:
         """Generate HMAC signature for authentication."""
         param_str = f"GET/realtime{expires}"
-        return hmac.new(
-            self.api_secret.encode("utf-8"), param_str.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
+        return hmac.new(self.api_secret.encode("utf-8"), param_str.encode("utf-8"), hashlib.sha256).hexdigest()
 
     async def _handle_reconnect(self) -> bool:
         """Handle reconnection with exponential backoff."""
@@ -262,17 +278,13 @@ class BybitWebSocketClient:
         self._reconnect_count += 1
 
         if self._reconnect_count > self.max_reconnect_attempts:
-            logger.error(
-                f"Max reconnect attempts ({self.max_reconnect_attempts}) reached. Giving up."
-            )
+            logger.error(f"Max reconnect attempts ({self.max_reconnect_attempts}) reached. Giving up.")
             return False
 
         delay = self.reconnect_delay * (2 ** (self._reconnect_count - 1))
         delay = min(delay, 60.0)  # Max 60 seconds
 
-        logger.info(
-            f"Reconnecting in {delay:.1f}s (attempt {self._reconnect_count}/{self.max_reconnect_attempts})"
-        )
+        logger.info(f"Reconnecting in {delay:.1f}s (attempt {self._reconnect_count}/{self.max_reconnect_attempts})")
         await asyncio.sleep(delay)
 
         return await self.connect()
@@ -447,9 +459,7 @@ class BybitWebSocketClient:
             if not topic:
                 return
 
-            message = WebSocketMessage(
-                topic=topic, data=msg_data, timestamp=ts, type=msg_type, raw=data
-            )
+            message = WebSocketMessage(topic=topic, data=msg_data, timestamp=ts, type=msg_type, raw=data)
 
             # Put in queue for consumers
             await self._message_queue.put(message)
@@ -507,9 +517,7 @@ class BybitWebSocketClient:
     def unregister_callback(self, topic: str, callback: Callable):
         """Unregister a callback."""
         if topic in self._callbacks:
-            self._callbacks[topic] = [
-                cb for cb in self._callbacks[topic] if cb != callback
-            ]
+            self._callbacks[topic] = [cb for cb in self._callbacks[topic] if cb != callback]
 
     async def messages(self):
         """
@@ -523,9 +531,7 @@ class BybitWebSocketClient:
             message = await self._message_queue.get()
             yield message
 
-    async def get_message(
-        self, timeout: Optional[float] = None
-    ) -> Optional[WebSocketMessage]:
+    async def get_message(self, timeout: Optional[float] = None) -> Optional[WebSocketMessage]:
         """
         Get next message with optional timeout.
 
@@ -533,9 +539,7 @@ class BybitWebSocketClient:
         """
         try:
             if timeout:
-                return await asyncio.wait_for(
-                    self._message_queue.get(), timeout=timeout
-                )
+                return await asyncio.wait_for(self._message_queue.get(), timeout=timeout)
             return await self._message_queue.get()
         except asyncio.TimeoutError:
             return None
@@ -647,23 +651,13 @@ def parse_position_message(message: WebSocketMessage) -> list[dict]:
                 "unrealized_pnl": float(item.get("unrealisedPnl", 0) or 0),
                 "cum_realized_pnl": float(item.get("cumRealisedPnl", 0) or 0),
                 "leverage": float(item.get("leverage", 1) or 1),
-                "liq_price": float(item.get("liqPrice", 0) or 0)
-                if item.get("liqPrice")
-                else None,
-                "bust_price": float(item.get("bustPrice", 0) or 0)
-                if item.get("bustPrice")
-                else None,
+                "liq_price": float(item.get("liqPrice", 0) or 0) if item.get("liqPrice") else None,
+                "bust_price": float(item.get("bustPrice", 0) or 0) if item.get("bustPrice") else None,
                 "position_im": float(item.get("positionIM", 0) or 0),
                 "position_mm": float(item.get("positionMM", 0) or 0),
-                "take_profit": float(item.get("takeProfit", 0) or 0)
-                if item.get("takeProfit")
-                else None,
-                "stop_loss": float(item.get("stopLoss", 0) or 0)
-                if item.get("stopLoss")
-                else None,
-                "trailing_stop": float(item.get("trailingStop", 0) or 0)
-                if item.get("trailingStop")
-                else None,
+                "take_profit": float(item.get("takeProfit", 0) or 0) if item.get("takeProfit") else None,
+                "stop_loss": float(item.get("stopLoss", 0) or 0) if item.get("stopLoss") else None,
+                "trailing_stop": float(item.get("trailingStop", 0) or 0) if item.get("trailingStop") else None,
                 "created_time": int(item.get("createdTime", 0) or 0),
                 "updated_time": int(item.get("updatedTime", 0) or 0),
             }
@@ -694,12 +688,8 @@ def parse_order_message(message: WebSocketMessage) -> list[dict]:
                 "time_in_force": item.get("timeInForce", ""),
                 "reduce_only": item.get("reduceOnly", False),
                 "close_on_trigger": item.get("closeOnTrigger", False),
-                "stop_loss": float(item.get("stopLoss", 0) or 0)
-                if item.get("stopLoss")
-                else None,
-                "take_profit": float(item.get("takeProfit", 0) or 0)
-                if item.get("takeProfit")
-                else None,
+                "stop_loss": float(item.get("stopLoss", 0) or 0) if item.get("stopLoss") else None,
+                "take_profit": float(item.get("takeProfit", 0) or 0) if item.get("takeProfit") else None,
                 "created_time": int(item.get("createdTime", 0)),
                 "updated_time": int(item.get("updatedTime", 0)),
             }

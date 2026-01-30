@@ -133,9 +133,7 @@ class L1MemoryCache:
             entry.touch()
             return entry
 
-    async def set(
-        self, key: str, value: Any, ttl_seconds: Optional[int] = None
-    ) -> None:
+    async def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
         """Set value in cache."""
         async with self._lock:
             # Evict if at capacity
@@ -225,9 +223,7 @@ class L2RedisCache:
             logger.error(f"Redis get error: {e}")
             return None
 
-    async def set(
-        self, key: str, value: Any, ttl_seconds: Optional[int] = None
-    ) -> None:
+    async def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
         """Set value in Redis."""
         redis = await self._get_redis()
         if redis is None:
@@ -389,9 +385,7 @@ class MultiLevelCache:
 
         # Update average
         if self._hit_latencies:
-            self.stats.avg_hit_latency_ms = sum(self._hit_latencies[-100:]) / len(
-                self._hit_latencies[-100:]
-            )
+            self.stats.avg_hit_latency_ms = sum(self._hit_latencies[-100:]) / len(self._hit_latencies[-100:])
 
     def _record_miss(self, start_time: float) -> None:
         """Record cache miss."""
@@ -400,9 +394,7 @@ class MultiLevelCache:
         self._miss_latencies.append(latency_ms)
 
         if self._miss_latencies:
-            self.stats.avg_miss_latency_ms = sum(self._miss_latencies[-100:]) / len(
-                self._miss_latencies[-100:]
-            )
+            self.stats.avg_miss_latency_ms = sum(self._miss_latencies[-100:]) / len(self._miss_latencies[-100:])
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
@@ -416,11 +408,11 @@ class MultiLevelCache:
 
 
 def cache_key(*args, **kwargs) -> str:
-    """Generate a cache key from arguments."""
+    """Generate a cache key from arguments using SHA256."""
     key_parts = [str(arg) for arg in args]
     key_parts.extend(f"{k}={v}" for k, v in sorted(kwargs.items()))
     key_str = ":".join(key_parts)
-    return hashlib.md5(key_str.encode()).hexdigest()
+    return hashlib.sha256(key_str.encode()).hexdigest()
 
 
 def cached(

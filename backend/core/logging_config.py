@@ -1,19 +1,45 @@
 """
 Logging Configuration
 Centralized logging configuration for the backend
+
+Supports both loguru (preferred) and standard logging for backward compatibility.
+New code should use: from loguru import logger
+Legacy code can use: from backend.core.logging_config import get_logger
 """
 
 import logging
 import logging.handlers
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from loguru import Logger
+
+# Type alias for loguru logger
+LoguruLogger = Optional["Logger"]
+
+try:
+    from loguru import logger as loguru_logger
+
+    LOGURU_AVAILABLE = True
+except ImportError:
+    LOGURU_AVAILABLE = False
+    loguru_logger: LoguruLogger = None  # type: ignore[no-redef]
 
 # Default log format
 DEFAULT_FORMAT = (
     "%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d - %(message)s"
 )
 SIMPLE_FORMAT = "%(levelname)s: %(message)s"
+
+# Loguru format (cleaner)
+LOGURU_FORMAT = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+    "<level>{level: <8}</level> | "
+    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+    "<level>{message}</level>"
+)
 
 
 def setup_logging(
@@ -94,6 +120,97 @@ def set_log_level(level: str) -> None:
     for handler in root_logger.handlers:
         handler.setLevel(numeric_level)
 
+    # Also update loguru if available
+    if LOGURU_AVAILABLE:
+        loguru_logger.remove()
+        loguru_logger.add(sys.stderr, level=level.upper(), format=LOGURU_FORMAT)
+
+
+def setup_loguru(
+    level: str = "INFO",
+    log_file: Optional[Path] = None,
+    rotation: str = "10 MB",
+    retention: str = "7 days",
+) -> None:
+    """
+    Configure loguru for the application (preferred over standard logging)
+
+    Args:
+        level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        log_file: Optional file path for file logging
+        rotation: When to rotate the log file
+        retention: How long to keep old log files
+    """
+    if not LOGURU_AVAILABLE:
+        # Fall back to standard logging
+        setup_logging(level=level, log_file=log_file)
+        return
+
+    # Remove default handler
+    loguru_logger.remove()
+
+    # Add console handler
+    loguru_logger.add(
+        sys.stderr,
+        level=level.upper(),
+        format=LOGURU_FORMAT,
+        colorize=True,
+    )
+
+    # Add file handler if specified
+    if log_file:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        loguru_logger.add(
+            log_file,
+            level=level.upper(),
+            format=LOGURU_FORMAT.replace("<green>", "")
+            .replace("</green>", "")
+            .replace("<level>", "")
+            .replace("</level>", "")
+            .replace("<cyan>", "")
+            .replace("</cyan>", ""),
+            rotation=rotation,
+            retention=retention,
+            encoding="utf-8",
+        )
+
+
+# Intercept standard logging and redirect to loguru
+class InterceptHandler(logging.Handler):
+    """Handler to intercept standard logging calls and redirect to loguru."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if not LOGURU_AVAILABLE or loguru_logger is None:
+            return
+
+        # Get corresponding Loguru level if it exists
+        try:
+            level: str | int = loguru_logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Find caller from where originated the logged message
+        frame = sys._getframe(6)
+        depth = 6
+        while frame.f_back is not None and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        loguru_logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
+
+
+def enable_loguru_intercept() -> None:
+    """
+    Enable interception of standard logging calls to redirect to loguru.
+    Call this to unify all logging output through loguru.
+    """
+    if not LOGURU_AVAILABLE:
+        return
+
+    logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+
 
 # Configure default logging on module import
 setup_logging(
@@ -101,11 +218,19 @@ setup_logging(
     enable_console=True,
 )
 
+# Setup loguru if available
+if LOGURU_AVAILABLE:
+    setup_loguru(level="INFO")
+
 
 __all__ = [
     "setup_logging",
+    "setup_loguru",
     "get_logger",
     "set_log_level",
+    "enable_loguru_intercept",
     "DEFAULT_FORMAT",
     "SIMPLE_FORMAT",
+    "LOGURU_FORMAT",
+    "LOGURU_AVAILABLE",
 ]

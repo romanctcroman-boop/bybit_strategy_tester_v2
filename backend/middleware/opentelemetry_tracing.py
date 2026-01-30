@@ -13,10 +13,11 @@ Features:
 import logging
 import os
 import time
+from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any, Optional
 from uuid import uuid4
 
 from fastapi import Request, Response
@@ -36,15 +37,15 @@ class SpanContext:
 
     span_id: str
     trace_id: str
-    parent_span_id: Optional[str]
+    parent_span_id: str | None
     operation_name: str
     service_name: str
     start_time: float
-    end_time: Optional[float] = None
+    end_time: float | None = None
     status: str = "OK"
-    attributes: Dict[str, Any] = field(default_factory=dict)
-    events: List[Dict[str, Any]] = field(default_factory=list)
-    links: List[str] = field(default_factory=list)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    events: list[dict[str, Any]] = field(default_factory=list)
+    links: list[str] = field(default_factory=list)
 
     @property
     def duration_ms(self) -> float:
@@ -53,12 +54,12 @@ class SpanContext:
             return (self.end_time - self.start_time) * 1000
         return (time.time() - self.start_time) * 1000
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None):
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None):
         """Add an event to the span."""
         self.events.append(
             {
                 "name": name,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "attributes": attributes or {},
             }
         )
@@ -77,7 +78,7 @@ class SpanContext:
         """End the span."""
         self.end_time = time.time()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert span to dictionary for export."""
         return {
             "span_id": self.span_id,
@@ -103,15 +104,15 @@ class TraceContext:
 
     trace_id: str
     service_name: str
-    spans: List[SpanContext] = field(default_factory=list)
-    current_span_id: Optional[str] = None
-    baggage: Dict[str, str] = field(default_factory=dict)
+    spans: list[SpanContext] = field(default_factory=list)
+    current_span_id: str | None = None
+    baggage: dict[str, str] = field(default_factory=dict)
 
     def create_span(
         self,
         operation_name: str,
-        parent_span_id: Optional[str] = None,
-        attributes: Optional[Dict[str, Any]] = None,
+        parent_span_id: str | None = None,
+        attributes: dict[str, Any] | None = None,
     ) -> SpanContext:
         """Create a new span in this trace."""
         span = SpanContext(
@@ -127,7 +128,7 @@ class TraceContext:
         self.current_span_id = span.span_id
         return span
 
-    def get_current_span(self) -> Optional[SpanContext]:
+    def get_current_span(self) -> SpanContext | None:
         """Get the currently active span."""
         if not self.current_span_id:
             return None
@@ -140,7 +141,7 @@ class TraceContext:
 class SpanExporter:
     """Base class for span exporters."""
 
-    async def export(self, spans: List[SpanContext]):
+    async def export(self, spans: list[SpanContext]):
         """Export spans to backend."""
         raise NotImplementedError
 
@@ -148,7 +149,7 @@ class SpanExporter:
 class ConsoleSpanExporter(SpanExporter):
     """Export spans to console (for development)."""
 
-    async def export(self, spans: List[SpanContext]):
+    async def export(self, spans: list[SpanContext]):
         """Export spans to console."""
         for span in spans:
             logger.info(
@@ -164,23 +165,23 @@ class InMemorySpanExporter(SpanExporter):
     """Export spans to in-memory storage for analysis."""
 
     def __init__(self, max_spans: int = 10000):
-        self.spans: List[Dict[str, Any]] = []
+        self.spans: list[dict[str, Any]] = []
         self.max_spans = max_spans
 
-    async def export(self, spans: List[SpanContext]):
+    async def export(self, spans: list[SpanContext]):
         """Export spans to memory."""
         for span in spans:
             self.spans.append(span.to_dict())
             if len(self.spans) > self.max_spans:
                 self.spans.pop(0)
 
-    def get_spans(self, trace_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_spans(self, trace_id: str | None = None) -> list[dict[str, Any]]:
         """Get stored spans, optionally filtered by trace_id."""
         if trace_id:
             return [s for s in self.spans if s["trace_id"] == trace_id]
         return self.spans
 
-    def get_trace_summary(self) -> Dict[str, Any]:
+    def get_trace_summary(self) -> dict[str, Any]:
         """Get summary of stored traces."""
         traces = {}
         for span in self.spans:
@@ -202,7 +203,7 @@ class TracingManager:
     def __init__(
         self,
         service_name: str = "bybit-strategy-tester",
-        exporters: Optional[List[SpanExporter]] = None,
+        exporters: list[SpanExporter] | None = None,
         sampling_rate: float = 1.0,
         enabled: bool = True,
     ):
@@ -210,7 +211,7 @@ class TracingManager:
         self.exporters = exporters or [InMemorySpanExporter()]
         self.sampling_rate = sampling_rate
         self.enabled = enabled
-        self._traces: Dict[str, TraceContext] = {}
+        self._traces: dict[str, TraceContext] = {}
 
         # Metrics
         self.total_traces = 0
@@ -224,7 +225,7 @@ class TracingManager:
         return random.random() < self.sampling_rate
 
     def create_trace(
-        self, trace_id: Optional[str] = None, baggage: Optional[Dict[str, str]] = None
+        self, trace_id: str | None = None, baggage: dict[str, str] | None = None
     ) -> TraceContext:
         """Create a new trace context."""
         trace = TraceContext(
@@ -237,13 +238,13 @@ class TracingManager:
         _current_trace.set(trace)
         return trace
 
-    def get_current_trace(self) -> Optional[TraceContext]:
+    def get_current_trace(self) -> TraceContext | None:
         """Get the current trace from context."""
         return _current_trace.get()
 
     def start_span(
-        self, operation_name: str, attributes: Optional[Dict[str, Any]] = None
-    ) -> Optional[SpanContext]:
+        self, operation_name: str, attributes: dict[str, Any] | None = None
+    ) -> SpanContext | None:
         """Start a new span in the current trace."""
         trace = self.get_current_trace()
         if not trace:
@@ -282,7 +283,7 @@ class TracingManager:
         del self._traces[trace_id]
         _current_trace.set(None)
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get tracing metrics."""
         return {
             "total_traces": self.total_traces,
@@ -296,7 +297,7 @@ class TracingManager:
 
 
 # Global tracing manager instance
-_tracing_manager: Optional[TracingManager] = None
+_tracing_manager: TracingManager | None = None
 
 
 def get_tracing_manager() -> TracingManager:
@@ -311,7 +312,7 @@ def get_tracing_manager() -> TracingManager:
     return _tracing_manager
 
 
-def trace_span(operation_name: Optional[str] = None):
+def trace_span(operation_name: str | None = None):
     """
     Decorator to add tracing to a function.
 
@@ -397,7 +398,7 @@ class OpenTelemetryMiddleware(BaseHTTPMiddleware):
         self,
         app,
         service_name: str = "bybit-strategy-tester",
-        excluded_paths: Optional[List[str]] = None,
+        excluded_paths: list[str] | None = None,
     ):
         super().__init__(app)
         self.service_name = service_name
@@ -489,7 +490,7 @@ def add_span_attribute(key: str, value: Any):
             span.set_attribute(key, value)
 
 
-def add_span_event(name: str, attributes: Optional[Dict[str, Any]] = None):
+def add_span_event(name: str, attributes: dict[str, Any] | None = None):
     """Add an event to the current span."""
     manager = get_tracing_manager()
     trace = manager.get_current_trace()

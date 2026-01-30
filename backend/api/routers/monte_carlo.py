@@ -5,6 +5,7 @@ Provides endpoints for:
 - Running Monte Carlo analysis on backtests
 - Getting probability distributions
 - Risk metric calculations
+- Kelly Criterion calculations
 """
 
 import logging
@@ -13,6 +14,11 @@ from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from backend.backtesting.position_sizing import (
+    KellyCalculator,
+    MonteCarloAnalyzer,
+    TradeResult,
+)
 from backend.services.monte_carlo import MonteCarloSimulator, run_monte_carlo
 
 logger = logging.getLogger(__name__)
@@ -287,4 +293,325 @@ async def quick_analysis(
 
     except Exception as e:
         logger.exception("Quick analysis failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Kelly Criterion Endpoints
+# ============================================================================
+
+
+class KellyRequest(BaseModel):
+    """Request model for Kelly Criterion calculation."""
+
+    trades: list[dict[str, Any]] = Field(
+        ...,
+        description="List of trades with pnl, entry_price, exit_price, size",
+    )
+    taker_fee: float = Field(
+        default=0.0007,
+        ge=0,
+        le=0.01,
+        description="Taker fee rate (default 0.07% for Bybit)",
+    )
+    min_trades: int = Field(
+        default=50,
+        ge=10,
+        description="Minimum trades for Kelly calculation",
+    )
+    lookback_trades: int = Field(
+        default=100,
+        ge=20,
+        description="Number of recent trades to consider",
+    )
+    use_exponential_weights: bool = Field(
+        default=True,
+        description="Weight recent trades more heavily",
+    )
+    decay_factor: float = Field(
+        default=0.95,
+        ge=0.8,
+        le=0.99,
+        description="Decay factor for exponential weights",
+    )
+    kelly_fraction: float = Field(
+        default=0.5,
+        ge=0.1,
+        le=1.0,
+        description="Fraction of Kelly to use (0.5 = Half-Kelly)",
+    )
+
+
+class KellyResponse(BaseModel):
+    """Response model for Kelly calculation."""
+
+    kelly_fraction: Optional[float] = Field(
+        None, description="Recommended position size as fraction of capital"
+    )
+    full_kelly: Optional[float] = Field(
+        None, description="Full Kelly value (use with caution)"
+    )
+    half_kelly: Optional[float] = Field(
+        None, description="Half-Kelly value (recommended)"
+    )
+    win_rate: Optional[float] = Field(None, description="Win rate of analyzed trades")
+    win_loss_ratio: Optional[float] = Field(
+        None, description="Average win / average loss ratio"
+    )
+    avg_win: Optional[float] = Field(None, description="Average winning trade PnL")
+    avg_loss: Optional[float] = Field(None, description="Average losing trade PnL")
+    trades_analyzed: int = Field(..., description="Number of trades analyzed")
+    sufficient_data: bool = Field(..., description="Whether enough data for Kelly")
+    recommendation: str = Field(..., description="Position sizing recommendation")
+
+
+@router.post("/kelly", response_model=KellyResponse)
+async def calculate_kelly(request: KellyRequest) -> KellyResponse:
+    """
+    Calculate optimal position size using enhanced Kelly Criterion.
+
+    Features:
+    - Fee-adjusted PnL calculation
+    - Exponential weighting (recent trades matter more)
+    - Half-Kelly for safety
+    - Detailed statistics
+    """
+    try:
+        # Convert trades to TradeResult objects
+        trade_results = []
+        for t in request.trades:
+            trade_results.append(
+                TradeResult(
+                    pnl=t.get("pnl", 0),
+                    entry_price=t.get("entry_price", 0),
+                    exit_price=t.get("exit_price", 0),
+                    size=t.get("size", t.get("quantity", 1)),
+                    entry_fee=t.get("entry_fee", 0),
+                    exit_fee=t.get("exit_fee", 0),
+                )
+            )
+
+        calculator = KellyCalculator(
+            min_trades=request.min_trades,
+            lookback_trades=request.lookback_trades,
+            use_exponential_weights=request.use_exponential_weights,
+            decay_factor=request.decay_factor,
+            kelly_fraction=request.kelly_fraction,
+        )
+
+        stats = calculator.get_kelly_stats(trade_results, request.taker_fee)
+
+        # Generate recommendation
+        if not stats["sufficient_data"]:
+            recommendation = (
+                f"Insufficient data: {stats['trades_analyzed']} trades, "
+                f"need at least {request.min_trades}. Use fixed 5-10% position size."
+            )
+        elif stats["kelly_fraction"] and stats["kelly_fraction"] < 0.05:
+            recommendation = (
+                "Low Kelly suggests poor edge. Consider smaller positions (2-5%) "
+                "or review strategy parameters."
+            )
+        elif stats["kelly_fraction"] and stats["kelly_fraction"] > 0.20:
+            recommendation = (
+                f"High Kelly ({stats['kelly_fraction']:.1%}). Strong edge detected. "
+                f"Use Half-Kelly ({stats['half_kelly']:.1%}) for safety."
+            )
+        else:
+            recommendation = (
+                f"Moderate Kelly ({stats['kelly_fraction']:.1%}). "
+                f"Recommended position size: {stats['kelly_fraction']:.1%} of capital."
+            )
+
+        return KellyResponse(
+            kelly_fraction=stats["kelly_fraction"],
+            full_kelly=stats.get("full_kelly"),
+            half_kelly=stats.get("half_kelly"),
+            win_rate=stats.get("win_rate"),
+            win_loss_ratio=stats.get("win_loss_ratio"),
+            avg_win=stats.get("avg_win"),
+            avg_loss=stats.get("avg_loss"),
+            trades_analyzed=stats["trades_analyzed"],
+            sufficient_data=stats["sufficient_data"],
+            recommendation=recommendation,
+        )
+
+    except Exception as e:
+        logger.exception("Kelly calculation failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Enhanced Monte Carlo (from position_sizing module)
+# ============================================================================
+
+
+class EnhancedMCRequest(BaseModel):
+    """Request for enhanced Monte Carlo simulation."""
+
+    trades: list[dict[str, Any]] = Field(
+        ...,
+        description="List of trades with pnl field",
+    )
+    initial_capital: float = Field(
+        default=10000.0,
+        gt=0,
+        description="Initial capital for simulation",
+    )
+    n_simulations: int = Field(
+        default=1000,
+        ge=100,
+        le=10000,
+        description="Number of simulations",
+    )
+    target_return: float = Field(
+        default=0.5,
+        description="Target return for probability calculation (0.5 = 50%)",
+    )
+    max_drawdown_limit: float = Field(
+        default=0.3,
+        ge=0.1,
+        le=0.9,
+        description="Max drawdown limit for risk of ruin (0.3 = 30%)",
+    )
+    confidence_level: float = Field(
+        default=0.95,
+        ge=0.8,
+        le=0.99,
+        description="Confidence level for intervals",
+    )
+
+
+class EnhancedMCResponse(BaseModel):
+    """Response for enhanced Monte Carlo simulation."""
+
+    n_simulations: int
+    trades_count: int
+    initial_capital: float
+    confidence_level: float
+    # Return statistics
+    return_mean: float
+    return_median: float
+    return_std: float
+    return_ci_lower: float
+    return_ci_upper: float
+    return_5th_percentile: float
+    return_95th_percentile: float
+    # Drawdown statistics
+    max_drawdown_mean: float
+    max_drawdown_median: float
+    max_drawdown_ci_lower: float
+    max_drawdown_ci_upper: float
+    max_drawdown_worst: float
+    # Sharpe statistics
+    sharpe_mean: float
+    sharpe_median: float
+    sharpe_ci_lower: float
+    sharpe_ci_upper: float
+    # Win rate statistics
+    win_rate_mean: float
+    win_rate_ci_lower: float
+    win_rate_ci_upper: float
+    # Probability metrics
+    probability_of_profit: float
+    probability_of_target: float
+    risk_of_ruin: float
+    # Risk metrics
+    var_95: float
+    cvar_95: float
+
+
+@router.post("/enhanced-analysis", response_model=EnhancedMCResponse)
+async def enhanced_monte_carlo(request: EnhancedMCRequest) -> EnhancedMCResponse:
+    """
+    Run enhanced Monte Carlo simulation with detailed statistics.
+
+    This endpoint uses bootstrap resampling to estimate:
+    - Confidence intervals for returns, drawdown, Sharpe ratio
+    - Probability of achieving target returns
+    - Risk of ruin probability
+    - VaR and CVaR metrics
+    """
+    try:
+        # Convert trades to TradeResult objects
+        trade_results = []
+        for t in request.trades:
+            trade_results.append(
+                TradeResult(
+                    pnl=t.get("pnl", 0),
+                    entry_price=t.get("entry_price", 1),
+                    exit_price=t.get("exit_price", 1),
+                    size=t.get("size", t.get("quantity", 1)),
+                )
+            )
+
+        analyzer = MonteCarloAnalyzer(
+            n_simulations=request.n_simulations,
+            confidence_level=request.confidence_level,
+        )
+
+        result = analyzer.run_simulation(
+            trades=trade_results,
+            initial_capital=request.initial_capital,
+            target_return=request.target_return,
+            max_drawdown_limit=request.max_drawdown_limit,
+        )
+
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+
+        return EnhancedMCResponse(**result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Enhanced Monte Carlo simulation failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/quick-kelly")
+async def quick_kelly_from_stats(
+    win_rate: float = Query(..., ge=0, le=1, description="Win rate as decimal (0-1)"),
+    avg_win: float = Query(..., gt=0, description="Average winning trade amount"),
+    avg_loss: float = Query(
+        ..., gt=0, description="Average losing trade amount (positive)"
+    ),
+    kelly_fraction: float = Query(
+        default=0.5, ge=0.1, le=1.0, description="Kelly fraction"
+    ),
+) -> dict:
+    """
+    Quick Kelly calculation from summary statistics.
+
+    Use this when you have win rate and average win/loss
+    but not individual trade data.
+    """
+    try:
+        # Kelly Formula: K = W - (1-W)/R
+        # W = win rate, R = avg_win/avg_loss
+        win_loss_ratio = avg_win / avg_loss
+        full_kelly = win_rate - (1 - win_rate) / win_loss_ratio
+        adjusted_kelly = full_kelly * kelly_fraction
+
+        # Clamp values
+        full_kelly = max(0, min(full_kelly, 1.0))
+        adjusted_kelly = max(0, min(adjusted_kelly, 0.5))
+
+        return {
+            "full_kelly": round(full_kelly, 4),
+            "half_kelly": round(full_kelly * 0.5, 4),
+            "adjusted_kelly": round(adjusted_kelly, 4),
+            "kelly_fraction_used": kelly_fraction,
+            "win_rate": win_rate,
+            "win_loss_ratio": round(win_loss_ratio, 4),
+            "edge": round((win_rate * win_loss_ratio) - (1 - win_rate), 4),
+            "recommendation": (
+                "Negative edge - avoid trading"
+                if full_kelly <= 0
+                else f"Recommended position: {adjusted_kelly:.1%} of capital"
+            ),
+        }
+
+    except Exception as e:
+        logger.exception("Quick Kelly calculation failed")
         raise HTTPException(status_code=500, detail=str(e))

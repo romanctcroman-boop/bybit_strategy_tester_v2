@@ -9,15 +9,23 @@ Detects anomalies in strategy performance:
 - Correlation breakdowns
 
 Uses statistical methods (Z-score, IQR) and ML (Isolation Forest) for detection.
+
+Features:
+- Multiple severity levels (INFO, WARNING, CRITICAL)
+- Callback-based alerting system
+- Webhook integration support
+- Prometheus metrics integration
 """
 
+import json
 import logging
 import statistics
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
+from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
@@ -76,10 +84,7 @@ class MetricWindow:
         """Initialize deques with proper maxlen."""
         if not hasattr(self.values, "maxlen") or self.values.maxlen != self.window_size:
             self.values = deque(self.values, maxlen=self.window_size)
-        if (
-            not hasattr(self.timestamps, "maxlen")
-            or self.timestamps.maxlen != self.window_size
-        ):
+        if not hasattr(self.timestamps, "maxlen") or self.timestamps.maxlen != self.window_size:
             self.timestamps = deque(self.timestamps, maxlen=self.window_size)
 
     def add(self, value: float, timestamp: Optional[datetime] = None) -> None:
@@ -148,6 +153,148 @@ class AnomalyThresholds:
     slippage_critical_pct: float = 1.0
 
 
+class AlertNotifier(Protocol):
+    """Protocol for alert notification handlers."""
+
+    def send_alert(self, anomaly: Anomaly) -> bool:
+        """Send alert notification. Returns True if successful."""
+        ...
+
+
+class WebhookAlertNotifier:
+    """
+    Webhook-based alert notifier for anomaly alerts.
+
+    Sends alerts to a configured webhook URL (Slack, Discord, custom endpoint).
+    """
+
+    def __init__(
+        self,
+        webhook_url: str,
+        timeout: float = 10.0,
+        include_details: bool = True,
+    ):
+        """
+        Args:
+            webhook_url: URL to send alert POST requests to
+            timeout: Request timeout in seconds
+            include_details: Include detailed anomaly info in payload
+        """
+        self.webhook_url = webhook_url
+        self.timeout = timeout
+        self.include_details = include_details
+
+    def send_alert(self, anomaly: Anomaly) -> bool:
+        """Send alert via webhook."""
+        try:
+            payload = self._format_payload(anomaly)
+            data = json.dumps(payload).encode("utf-8")
+
+            request = Request(
+                self.webhook_url,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+
+            with urlopen(request, timeout=self.timeout) as response:
+                return response.status == 200
+
+        except Exception as e:
+            logger.error(f"Failed to send webhook alert: {e}")
+            return False
+
+    def _format_payload(self, anomaly: Anomaly) -> dict:
+        """Format anomaly as webhook payload (Slack-compatible)."""
+        severity_emoji = {
+            AnomalySeverity.INFO: "ℹ️",
+            AnomalySeverity.WARNING: "⚠️",
+            AnomalySeverity.CRITICAL: "🚨",
+        }
+
+        emoji = severity_emoji.get(anomaly.severity, "❓")
+
+        payload = {
+            "text": f"{emoji} {anomaly.severity.value.upper()}: {anomaly.description}",
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"{emoji} Anomaly Detected",
+                    },
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {"type": "mrkdwn", "text": f"*Severity:*\n{anomaly.severity.value}"},
+                        {"type": "mrkdwn", "text": f"*Type:*\n{anomaly.anomaly_type.value}"},
+                        {"type": "mrkdwn", "text": f"*Strategy:*\n{anomaly.strategy_id}"},
+                        {"type": "mrkdwn", "text": f"*Metric:*\n{anomaly.metric_name}"},
+                    ],
+                },
+            ],
+        }
+
+        if self.include_details:
+            payload["blocks"].append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": (
+                            f"*Value:* {anomaly.current_value:.4f}\n"
+                            f"*Expected Range:* {anomaly.expected_range[0]:.4f} - {anomaly.expected_range[1]:.4f}\n"
+                            f"*Deviation Score:* {anomaly.deviation_score:.2f}\n"
+                            f"*Time:* {anomaly.timestamp.isoformat()}"
+                        ),
+                    },
+                }
+            )
+
+        return payload
+
+
+class LogAlertNotifier:
+    """Simple alert notifier that logs to the standard logger."""
+
+    def send_alert(self, anomaly: Anomaly) -> bool:
+        """Log alert."""
+        log_method = {
+            AnomalySeverity.INFO: logger.info,
+            AnomalySeverity.WARNING: logger.warning,
+            AnomalySeverity.CRITICAL: logger.critical,
+        }.get(anomaly.severity, logger.info)
+
+        log_method(
+            f"[ALERT] {anomaly.anomaly_type.value}: {anomaly.description} "
+            f"(strategy={anomaly.strategy_id}, value={anomaly.current_value:.4f})"
+        )
+        return True
+
+
+class CompositeAlertNotifier:
+    """Combines multiple alert notifiers."""
+
+    def __init__(self, notifiers: List[AlertNotifier] = None):
+        self.notifiers: List[AlertNotifier] = notifiers or []
+
+    def add_notifier(self, notifier: AlertNotifier) -> None:
+        """Add a notifier to the composite."""
+        self.notifiers.append(notifier)
+
+    def send_alert(self, anomaly: Anomaly) -> bool:
+        """Send alert to all notifiers. Returns True if any succeeded."""
+        results = []
+        for notifier in self.notifiers:
+            try:
+                results.append(notifier.send_alert(anomaly))
+            except Exception as e:
+                logger.error(f"Notifier failed: {e}")
+                results.append(False)
+        return any(results) if results else False
+
+
 class AnomalyDetector:
     """
     Detects anomalies in trading strategy metrics.
@@ -162,6 +309,10 @@ class AnomalyDetector:
 
         # Check for anomalies
         anomalies = detector.detect_anomalies("my_strategy")
+
+        # With webhook alerts:
+        notifier = WebhookAlertNotifier("https://hooks.slack.com/...")
+        detector = AnomalyDetector(alert_notifier=notifier)
     """
 
     def __init__(
@@ -169,10 +320,14 @@ class AnomalyDetector:
         thresholds: Optional[AnomalyThresholds] = None,
         window_size: int = 100,
         on_anomaly: Optional[Callable[[Anomaly], None]] = None,
+        alert_notifier: Optional[AlertNotifier] = None,
     ):
         self.thresholds = thresholds or AnomalyThresholds()
         self.window_size = window_size
         self.on_anomaly = on_anomaly
+
+        # Alert notifier for sending alerts
+        self.alert_notifier = alert_notifier or LogAlertNotifier()
 
         # Per-strategy metric windows
         self._strategy_metrics: Dict[str, Dict[str, MetricWindow]] = {}
@@ -232,22 +387,27 @@ class AnomalyDetector:
 
         if anomaly:
             self._anomalies[strategy_id].append(anomaly)
+
+            # Call legacy callback if set
             if self.on_anomaly:
                 try:
                     self.on_anomaly(anomaly)
                 except Exception as e:
                     logger.error(f"Error in anomaly callback: {e}")
 
+            # Send alert via notifier
+            if self.alert_notifier:
+                try:
+                    self.alert_notifier.send_alert(anomaly)
+                except Exception as e:
+                    logger.error(f"Error sending alert: {e}")
+
             # Record to prometheus metrics
             try:
                 from backend.core.metrics import metrics as prom_metrics
 
-                prom_metrics.record_anomaly(
-                    anomaly.anomaly_type.value, anomaly.severity.value
-                )
-                prom_metrics.fire_alert(
-                    f"{strategy_id}_{metric_name}", anomaly.severity.value
-                )
+                prom_metrics.record_anomaly(anomaly.anomaly_type.value, anomaly.severity.value)
+                prom_metrics.fire_alert(f"{strategy_id}_{metric_name}", anomaly.severity.value)
             except ImportError:
                 pass
 
@@ -278,9 +438,7 @@ class AnomalyDetector:
                 metric_name="consecutive_losses",
                 current_value=float(losses),
                 expected_range=(0, self.thresholds.consecutive_losses_warning),
-                deviation_score=float(
-                    losses - self.thresholds.consecutive_losses_warning
-                ),
+                deviation_score=float(losses - self.thresholds.consecutive_losses_warning),
                 description=f"Critical: {losses} consecutive losing trades",
             )
         elif losses >= self.thresholds.consecutive_losses_warning:
@@ -326,9 +484,7 @@ class AnomalyDetector:
 
         if severity is None:
             # Check metric-specific thresholds
-            severity = self._check_metric_specific_thresholds(
-                metric_name, value, window
-            )
+            severity = self._check_metric_specific_thresholds(metric_name, value, window)
 
         if severity is None:
             return None
@@ -386,9 +542,7 @@ class AnomalyDetector:
 
         return None
 
-    def _get_anomaly_type(
-        self, metric_name: str, value: float, window: MetricWindow
-    ) -> AnomalyType:
+    def _get_anomaly_type(self, metric_name: str, value: float, window: MetricWindow) -> AnomalyType:
         """Determine anomaly type based on metric."""
 
         metric_to_type = {
@@ -460,9 +614,7 @@ class AnomalyDetector:
 
         return sorted(anomalies, key=lambda a: a.timestamp, reverse=True)
 
-    def acknowledge_anomaly(
-        self, anomaly_id: str, acknowledged_by: str = "system"
-    ) -> bool:
+    def acknowledge_anomaly(self, anomaly_id: str, acknowledged_by: str = "system") -> bool:
         """Acknowledge an anomaly."""
         for anomalies in self._anomalies.values():
             for anomaly in anomalies:
@@ -474,9 +626,7 @@ class AnomalyDetector:
                     try:
                         from backend.core.metrics import metrics as prom_metrics
 
-                        prom_metrics.acknowledge_alert(
-                            f"{anomaly.strategy_id}_{anomaly.metric_name}"
-                        )
+                        prom_metrics.acknowledge_alert(f"{anomaly.strategy_id}_{anomaly.metric_name}")
                     except ImportError:
                         pass
 
@@ -491,12 +641,8 @@ class AnomalyDetector:
         anomalies = self.get_anomalies(strategy_id, unacknowledged_only=True)
 
         # Calculate health score
-        critical_count = sum(
-            1 for a in anomalies if a.severity == AnomalySeverity.CRITICAL
-        )
-        warning_count = sum(
-            1 for a in anomalies if a.severity == AnomalySeverity.WARNING
-        )
+        critical_count = sum(1 for a in anomalies if a.severity == AnomalySeverity.CRITICAL)
+        warning_count = sum(1 for a in anomalies if a.severity == AnomalySeverity.WARNING)
 
         if critical_count > 0:
             status = "critical"
@@ -538,9 +684,7 @@ class AnomalyDetector:
         for strategy_id in self._anomalies:
             original_count = len(self._anomalies[strategy_id])
             self._anomalies[strategy_id] = [
-                a
-                for a in self._anomalies[strategy_id]
-                if not a.acknowledged or a.timestamp >= cutoff
+                a for a in self._anomalies[strategy_id] if not a.acknowledged or a.timestamp >= cutoff
             ]
             removed += original_count - len(self._anomalies[strategy_id])
 

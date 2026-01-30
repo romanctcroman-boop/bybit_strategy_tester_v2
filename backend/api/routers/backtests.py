@@ -7,7 +7,7 @@ Integrates with Strategies CRUD for running backtests from saved strategies.
 """
 
 from datetime import datetime, timezone
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
@@ -16,6 +16,7 @@ from pydantic_core import ValidationError as PydanticCoreValidationError
 from sqlalchemy.orm import Session
 
 from backend.backtesting.engine import get_engine
+from backend.backtesting.interfaces import TradeDirection
 from backend.backtesting.models import (
     BacktestConfig,
     BacktestCreateRequest,
@@ -24,6 +25,7 @@ from backend.backtesting.models import (
     BacktestStatus,
     EquityCurve,
     PerformanceMetrics,
+    StrategyType,
     TradeRecord,
 )
 from backend.backtesting.service import get_backtest_service
@@ -34,6 +36,42 @@ from backend.database.models import BacktestStatus as DBBacktestStatus
 from backend.database.models import Strategy
 
 router = APIRouter(tags=["Backtests"])
+
+
+def _get_side_value(side: Any) -> str:
+    """Safely extract side value from enum or return string representation."""
+    if side is None:
+        return "unknown"
+    if hasattr(side, "value"):
+        return str(side.value)
+    return str(side)
+
+
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    """Safely convert SQLAlchemy Column or other value to float."""
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(val: Any, default: int = 0) -> int:
+    """Safely convert SQLAlchemy Column or other value to int."""
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_str(val: Any, default: str = "") -> str:
+    """Safely convert SQLAlchemy Column or other value to str."""
+    if val is None:
+        return default
+    return str(val)
 
 
 def downsample_list(data: List, max_points: int = 500) -> List:
@@ -50,8 +88,8 @@ def downsample_list(data: List, max_points: int = 500) -> List:
 
 
 def build_equity_curve_response(
-    equity_curve: EquityCurve, trades: List = None, max_points: int = 800
-) -> dict:
+    equity_curve: EquityCurve, trades: Optional[List] = None, max_points: int = 800
+) -> Optional[Dict[str, Any]]:
     """Build equity curve response with one point per trade exit.
 
     Returns equity value at the moment each trade closes.
@@ -386,7 +424,7 @@ async def create_backtest(request: BacktestCreateRequest):
             )
 
             # Normalize trades into dicts suitable for DB storage
-            trades_list = []
+            trades_list: List[Dict[str, Any]] = []
             for t in (trades_source or [])[:500]:
                 if hasattr(t, "__dict__") and not isinstance(t, dict):
                     # object-like trade
@@ -399,7 +437,7 @@ async def create_backtest(request: BacktestCreateRequest):
                             if entry_time
                             else None,
                             "exit_time": exit_time.isoformat() if exit_time else None,
-                            "side": side.value if hasattr(side, "value") else str(side),
+                            "side": _get_side_value(side),
                             "entry_price": float(getattr(t, "entry_price", 0) or 0),
                             "exit_price": float(getattr(t, "exit_price", 0) or 0),
                             "size": float(getattr(t, "size", 1.0) or 1.0),
@@ -457,7 +495,7 @@ async def create_backtest(request: BacktestCreateRequest):
                             if entry_time
                             else None,
                             "exit_time": exit_time.isoformat() if exit_time else None,
-                            "side": side.value if hasattr(side, "value") else str(side),
+                            "side": _get_side_value(side),
                             "entry_price": float(getattr(t, "entry_price", 0) or 0),
                             "exit_price": float(getattr(t, "exit_price", 0) or 0),
                             "size": float(getattr(t, "size", 1.0) or 1.0),
@@ -616,8 +654,8 @@ async def list_backtests(
         # Convert DB model to BacktestResult
         try:
             # Parse dates - they may be strings or datetime objects
-            start_dt = bt.start_date
-            end_dt = bt.end_date
+            start_dt: Optional[datetime] = cast(Optional[datetime], bt.start_date)
+            end_dt: Optional[datetime] = cast(Optional[datetime], bt.end_date)
             if isinstance(start_dt, str):
                 start_dt = datetime.fromisoformat(start_dt.replace("Z", "+00:00"))
             if isinstance(end_dt, str):
@@ -628,19 +666,17 @@ async def list_backtests(
                 end_dt = end_dt.replace(tzinfo=timezone.utc)
 
             config = BacktestConfig(
-                symbol=bt.symbol or "BTCUSDT",
-                interval=bt.timeframe or "30",
+                symbol=str(bt.symbol or "BTCUSDT"),
+                interval=str(bt.timeframe or "30"),
                 start_date=start_dt or datetime.now(timezone.utc),
                 end_date=end_dt or datetime.now(timezone.utc),
-                initial_capital=bt.initial_capital or 10000.0,
-                strategy_type=bt.strategy_type or "rsi",
+                initial_capital=float(bt.initial_capital or 10000.0),
+                strategy_type=StrategyType(str(bt.strategy_type or "rsi")),
                 strategy_params=bt.parameters.get("strategy_params", {})
                 if bt.parameters
                 else {},
-                stop_loss_pct=bt.parameters.get("stop_loss_pct")
-                if bt.parameters
-                else None,
-                take_profit_pct=bt.parameters.get("take_profit_pct")
+                stop_loss=bt.parameters.get("stop_loss_pct") if bt.parameters else None,
+                take_profit=bt.parameters.get("take_profit_pct")
                 if bt.parameters
                 else None,
                 leverage=bt.parameters.get("leverage", 10) if bt.parameters else 10,
@@ -659,7 +695,7 @@ async def list_backtests(
 
             # Get stored metrics - prioritize metrics_json (full data), fallback to parameters.optimization_metrics
             # metrics_json is the Single Source of Truth (SSoT) for all detailed metrics
-            opt_metrics = {}
+            opt_metrics: Dict[str, Any] = {}
 
             # First, try metrics_json (contains complete metrics snapshot)
             if bt.metrics_json and isinstance(bt.metrics_json, dict):
@@ -706,147 +742,239 @@ async def list_backtests(
                 losing_trades_count = total_trades_count - winning_trades_count
 
             metrics = PerformanceMetrics(
-                net_profit=opt_metrics.get("net_profit", net_profit),
-                net_profit_pct=opt_metrics.get("net_profit_pct", bt.total_return or 0),
-                total_return=bt.total_return or 0,
-                annual_return=bt.annual_return or opt_metrics.get("annual_return", 0),
-                sharpe_ratio=bt.sharpe_ratio or 0,
-                sortino_ratio=bt.sortino_ratio or 0,
-                calmar_ratio=bt.calmar_ratio or opt_metrics.get("calmar_ratio", 0),
-                max_drawdown=bt.max_drawdown or 0,
-                max_drawdown_value=max_dd_value,
-                avg_drawdown=opt_metrics.get("avg_drawdown", 0),
-                avg_drawdown_value=opt_metrics.get("avg_drawdown_value", 0),
-                max_drawdown_duration_days=opt_metrics.get(
-                    "max_drawdown_duration_days", 0
+                net_profit=_safe_float(opt_metrics.get("net_profit", net_profit)),
+                net_profit_pct=_safe_float(
+                    opt_metrics.get("net_profit_pct", bt.total_return or 0)
                 ),
-                total_trades=total_trades_count,
-                winning_trades=winning_trades_count,
-                losing_trades=losing_trades_count,
-                win_rate=bt.win_rate or 0,
-                profit_factor=bt.profit_factor or 0,
-                avg_win=opt_metrics.get("avg_win", 0),
-                avg_loss=opt_metrics.get("avg_loss", 0),
+                total_return=_safe_float(bt.total_return or 0),
+                annual_return=_safe_float(
+                    bt.annual_return or opt_metrics.get("annual_return", 0)
+                ),
+                sharpe_ratio=_safe_float(bt.sharpe_ratio or 0),
+                sortino_ratio=_safe_float(bt.sortino_ratio or 0),
+                calmar_ratio=_safe_float(
+                    bt.calmar_ratio or opt_metrics.get("calmar_ratio", 0)
+                ),
+                max_drawdown=_safe_float(bt.max_drawdown or 0),
+                max_drawdown_value=_safe_float(max_dd_value),
+                avg_drawdown=_safe_float(opt_metrics.get("avg_drawdown", 0)),
+                avg_drawdown_value=_safe_float(
+                    opt_metrics.get("avg_drawdown_value", 0)
+                ),
+                max_drawdown_duration_days=_safe_float(
+                    opt_metrics.get("max_drawdown_duration_days", 0)
+                ),
+                total_trades=_safe_int(total_trades_count),
+                winning_trades=_safe_int(winning_trades_count),
+                losing_trades=_safe_int(losing_trades_count),
+                win_rate=_safe_float(bt.win_rate or 0),
+                profit_factor=_safe_float(bt.profit_factor or 0),
+                avg_win=_safe_float(opt_metrics.get("avg_win", 0)),
+                avg_loss=_safe_float(opt_metrics.get("avg_loss", 0)),
                 # avg_win/avg_loss are already in USD, copy to _value fields
-                avg_win_value=opt_metrics.get("avg_win", 0),
-                avg_loss_value=opt_metrics.get("avg_loss", 0),
-                exposure_time=bt.exposure_time
-                if bt.exposure_time is not None
-                else opt_metrics.get("exposure_time", 0),
-                avg_trade_duration_hours=opt_metrics.get("avg_trade_duration_hours", 0),
+                avg_win_value=_safe_float(opt_metrics.get("avg_win", 0)),
+                avg_loss_value=_safe_float(opt_metrics.get("avg_loss", 0)),
+                exposure_time=_safe_float(
+                    bt.exposure_time
+                    if bt.exposure_time is not None
+                    else opt_metrics.get("exposure_time", 0)
+                ),
+                avg_trade_duration_hours=_safe_float(
+                    opt_metrics.get("avg_trade_duration_hours", 0)
+                ),
                 # Extended metrics - DB columns first, then opt_metrics fallback
-                gross_profit=bt.gross_profit
-                if bt.gross_profit is not None
-                else opt_metrics.get("gross_profit", 0),
-                gross_loss=bt.gross_loss
-                if bt.gross_loss is not None
-                else opt_metrics.get("gross_loss", 0),
-                expectancy=bt.expectancy
-                if bt.expectancy is not None
-                else opt_metrics.get("expectancy", 0),
-                max_consecutive_wins=bt.max_consecutive_wins
-                if bt.max_consecutive_wins is not None
-                else opt_metrics.get("max_consecutive_wins", 0),
-                max_consecutive_losses=bt.max_consecutive_losses
-                if bt.max_consecutive_losses is not None
-                else opt_metrics.get("max_consecutive_losses", 0),
-                recovery_factor=bt.recovery_factor
-                if bt.recovery_factor is not None
-                else opt_metrics.get("recovery_factor", 0),
-                largest_win=opt_metrics.get("best_trade", 0),
-                largest_loss=opt_metrics.get("worst_trade", 0),
-                largest_win_value=opt_metrics.get("best_trade", 0),
-                largest_loss_value=opt_metrics.get("worst_trade", 0),
+                gross_profit=_safe_float(
+                    bt.gross_profit
+                    if bt.gross_profit is not None
+                    else opt_metrics.get("gross_profit", 0)
+                ),
+                gross_loss=_safe_float(
+                    bt.gross_loss
+                    if bt.gross_loss is not None
+                    else opt_metrics.get("gross_loss", 0)
+                ),
+                expectancy=_safe_float(
+                    bt.expectancy
+                    if bt.expectancy is not None
+                    else opt_metrics.get("expectancy", 0)
+                ),
+                max_consecutive_wins=_safe_int(
+                    bt.max_consecutive_wins
+                    if bt.max_consecutive_wins is not None
+                    else opt_metrics.get("max_consecutive_wins", 0)
+                ),
+                max_consecutive_losses=_safe_int(
+                    bt.max_consecutive_losses
+                    if bt.max_consecutive_losses is not None
+                    else opt_metrics.get("max_consecutive_losses", 0)
+                ),
+                recovery_factor=_safe_float(
+                    bt.recovery_factor
+                    if bt.recovery_factor is not None
+                    else opt_metrics.get("recovery_factor", 0)
+                ),
+                largest_win=_safe_float(opt_metrics.get("best_trade", 0)),
+                largest_loss=_safe_float(opt_metrics.get("worst_trade", 0)),
+                largest_win_value=_safe_float(opt_metrics.get("best_trade", 0)),
+                largest_loss_value=_safe_float(opt_metrics.get("worst_trade", 0)),
                 # Long/Short statistics - DB columns first, then opt_metrics fallback
-                long_trades=bt.long_trades
-                if bt.long_trades is not None
-                else opt_metrics.get("long_trades", 0),
-                long_winning_trades=opt_metrics.get("long_winning_trades", 0),
-                long_losing_trades=opt_metrics.get("long_losing_trades", 0),
-                long_win_rate=bt.long_win_rate
-                if bt.long_win_rate is not None
-                else opt_metrics.get("long_win_rate", 0),
-                long_gross_profit=opt_metrics.get("long_gross_profit", 0),
-                long_gross_profit_pct=opt_metrics.get("long_gross_profit_pct", 0),
-                long_gross_loss=opt_metrics.get("long_gross_loss", 0),
-                long_gross_loss_pct=opt_metrics.get("long_gross_loss_pct", 0),
-                long_net_profit=bt.long_pnl
-                if bt.long_pnl is not None
-                else opt_metrics.get("long_net_profit", 0),
-                long_profit_factor=opt_metrics.get("long_profit_factor", 0),
-                long_avg_win=opt_metrics.get("long_avg_win", 0),
-                long_avg_loss=opt_metrics.get("long_avg_loss", 0),
-                short_trades=bt.short_trades
-                if bt.short_trades is not None
-                else opt_metrics.get("short_trades", 0),
-                short_winning_trades=opt_metrics.get("short_winning_trades", 0),
-                short_losing_trades=opt_metrics.get("short_losing_trades", 0),
-                short_win_rate=bt.short_win_rate
-                if bt.short_win_rate is not None
-                else opt_metrics.get("short_win_rate", 0),
-                short_gross_profit=opt_metrics.get("short_gross_profit", 0),
-                short_gross_profit_pct=opt_metrics.get("short_gross_profit_pct", 0),
-                short_gross_loss=opt_metrics.get("short_gross_loss", 0),
-                short_gross_loss_pct=opt_metrics.get("short_gross_loss_pct", 0),
-                short_net_profit=bt.short_pnl
-                if bt.short_pnl is not None
-                else opt_metrics.get("short_net_profit", 0),
-                short_profit_factor=opt_metrics.get("short_profit_factor", 0),
-                short_avg_win=opt_metrics.get("short_avg_win", 0),
-                short_avg_loss=opt_metrics.get("short_avg_loss", 0),
+                long_trades=_safe_int(
+                    bt.long_trades
+                    if bt.long_trades is not None
+                    else opt_metrics.get("long_trades", 0)
+                ),
+                long_winning_trades=_safe_int(
+                    opt_metrics.get("long_winning_trades", 0)
+                ),
+                long_losing_trades=_safe_int(opt_metrics.get("long_losing_trades", 0)),
+                long_win_rate=_safe_float(
+                    bt.long_win_rate
+                    if bt.long_win_rate is not None
+                    else opt_metrics.get("long_win_rate", 0)
+                ),
+                long_gross_profit=_safe_float(opt_metrics.get("long_gross_profit", 0)),
+                long_gross_profit_pct=_safe_float(
+                    opt_metrics.get("long_gross_profit_pct", 0)
+                ),
+                long_gross_loss=_safe_float(opt_metrics.get("long_gross_loss", 0)),
+                long_gross_loss_pct=_safe_float(
+                    opt_metrics.get("long_gross_loss_pct", 0)
+                ),
+                long_net_profit=_safe_float(
+                    bt.long_pnl
+                    if bt.long_pnl is not None
+                    else opt_metrics.get("long_net_profit", 0)
+                ),
+                long_profit_factor=_safe_float(
+                    opt_metrics.get("long_profit_factor", 0)
+                ),
+                long_avg_win=_safe_float(opt_metrics.get("long_avg_win", 0)),
+                long_avg_loss=_safe_float(opt_metrics.get("long_avg_loss", 0)),
+                short_trades=_safe_int(
+                    bt.short_trades
+                    if bt.short_trades is not None
+                    else opt_metrics.get("short_trades", 0)
+                ),
+                short_winning_trades=_safe_int(
+                    opt_metrics.get("short_winning_trades", 0)
+                ),
+                short_losing_trades=_safe_int(
+                    opt_metrics.get("short_losing_trades", 0)
+                ),
+                short_win_rate=_safe_float(
+                    bt.short_win_rate
+                    if bt.short_win_rate is not None
+                    else opt_metrics.get("short_win_rate", 0)
+                ),
+                short_gross_profit=_safe_float(
+                    opt_metrics.get("short_gross_profit", 0)
+                ),
+                short_gross_profit_pct=_safe_float(
+                    opt_metrics.get("short_gross_profit_pct", 0)
+                ),
+                short_gross_loss=_safe_float(opt_metrics.get("short_gross_loss", 0)),
+                short_gross_loss_pct=_safe_float(
+                    opt_metrics.get("short_gross_loss_pct", 0)
+                ),
+                short_net_profit=_safe_float(
+                    bt.short_pnl
+                    if bt.short_pnl is not None
+                    else opt_metrics.get("short_net_profit", 0)
+                ),
+                short_profit_factor=_safe_float(
+                    opt_metrics.get("short_profit_factor", 0)
+                ),
+                short_avg_win=_safe_float(opt_metrics.get("short_avg_win", 0)),
+                short_avg_loss=_safe_float(opt_metrics.get("short_avg_loss", 0)),
                 # Additional metrics
-                avg_bars_in_trade=opt_metrics.get("avg_bars_in_trade", 0),
-                avg_bars_in_winning=opt_metrics.get("avg_bars_in_winning", 0),
-                avg_bars_in_losing=opt_metrics.get("avg_bars_in_losing", 0),
-                avg_bars_in_long=opt_metrics.get("avg_bars_in_long", 0),
-                avg_bars_in_short=opt_metrics.get("avg_bars_in_short", 0),
-                avg_bars_in_winning_long=opt_metrics.get("avg_bars_in_winning_long", 0),
-                avg_bars_in_losing_long=opt_metrics.get("avg_bars_in_losing_long", 0),
-                avg_bars_in_winning_short=opt_metrics.get(
-                    "avg_bars_in_winning_short", 0
+                avg_bars_in_trade=_safe_float(opt_metrics.get("avg_bars_in_trade", 0)),
+                avg_bars_in_winning=_safe_float(
+                    opt_metrics.get("avg_bars_in_winning", 0)
                 ),
-                avg_bars_in_losing_short=opt_metrics.get("avg_bars_in_losing_short", 0),
-                recovery_long=opt_metrics.get("recovery_long", 0),
-                recovery_short=opt_metrics.get("recovery_short", 0),
+                avg_bars_in_losing=_safe_float(
+                    opt_metrics.get("avg_bars_in_losing", 0)
+                ),
+                avg_bars_in_long=_safe_float(opt_metrics.get("avg_bars_in_long", 0)),
+                avg_bars_in_short=_safe_float(opt_metrics.get("avg_bars_in_short", 0)),
+                avg_bars_in_winning_long=_safe_float(
+                    opt_metrics.get("avg_bars_in_winning_long", 0)
+                ),
+                avg_bars_in_losing_long=_safe_float(
+                    opt_metrics.get("avg_bars_in_losing_long", 0)
+                ),
+                avg_bars_in_winning_short=_safe_float(
+                    opt_metrics.get("avg_bars_in_winning_short", 0)
+                ),
+                avg_bars_in_losing_short=_safe_float(
+                    opt_metrics.get("avg_bars_in_losing_short", 0)
+                ),
+                recovery_long=_safe_float(opt_metrics.get("recovery_long", 0)),
+                recovery_short=_safe_float(opt_metrics.get("recovery_short", 0)),
                 # Long/Short consecutive and payoff metrics (TradingView)
-                long_max_consec_wins=opt_metrics.get("long_max_consec_wins", 0),
-                long_max_consec_losses=opt_metrics.get("long_max_consec_losses", 0),
-                short_max_consec_wins=opt_metrics.get("short_max_consec_wins", 0),
-                short_max_consec_losses=opt_metrics.get("short_max_consec_losses", 0),
-                long_payoff_ratio=opt_metrics.get("long_payoff_ratio", 0),
-                short_payoff_ratio=opt_metrics.get("short_payoff_ratio", 0),
-                long_expectancy=opt_metrics.get("long_expectancy", 0),
-                short_expectancy=opt_metrics.get("short_expectancy", 0),
-                # Use DB columns first, fallback to opt_metrics
-                total_commission=bt.total_commission
-                if bt.total_commission is not None
-                else opt_metrics.get("total_commission", 0),
-                buy_hold_return=bt.buy_hold_return
-                if bt.buy_hold_return is not None
-                else opt_metrics.get("buy_hold_return", 0),
-                buy_hold_return_pct=bt.buy_hold_return_pct
-                if bt.buy_hold_return_pct is not None
-                else opt_metrics.get("buy_hold_return_pct", 0),
-                strategy_outperformance=opt_metrics.get("strategy_outperformance", 0),
-                cagr=bt.cagr if bt.cagr is not None else opt_metrics.get("cagr", 0),
-                cagr_long=bt.cagr_long
-                if bt.cagr_long is not None
-                else opt_metrics.get("cagr_long", 0),
-                cagr_short=bt.cagr_short
-                if bt.cagr_short is not None
-                else opt_metrics.get("cagr_short", 0),
-                max_runup=opt_metrics.get("max_runup", 0),
-                max_runup_value=opt_metrics.get("max_runup_value", 0),
-                avg_runup_duration_bars=opt_metrics.get("avg_runup_duration_bars", 0),
-                avg_drawdown_duration_bars=opt_metrics.get(
-                    "avg_drawdown_duration_bars", 0
+                long_max_consec_wins=_safe_int(
+                    opt_metrics.get("long_max_consec_wins", 0)
                 ),
-                best_trade=opt_metrics.get("best_trade", 0),
-                worst_trade=opt_metrics.get("worst_trade", 0),
+                long_max_consec_losses=_safe_int(
+                    opt_metrics.get("long_max_consec_losses", 0)
+                ),
+                short_max_consec_wins=_safe_int(
+                    opt_metrics.get("short_max_consec_wins", 0)
+                ),
+                short_max_consec_losses=_safe_int(
+                    opt_metrics.get("short_max_consec_losses", 0)
+                ),
+                long_payoff_ratio=_safe_float(opt_metrics.get("long_payoff_ratio", 0)),
+                short_payoff_ratio=_safe_float(
+                    opt_metrics.get("short_payoff_ratio", 0)
+                ),
+                long_expectancy=_safe_float(opt_metrics.get("long_expectancy", 0)),
+                short_expectancy=_safe_float(opt_metrics.get("short_expectancy", 0)),
+                # Use DB columns first, fallback to opt_metrics
+                total_commission=_safe_float(
+                    bt.total_commission
+                    if bt.total_commission is not None
+                    else opt_metrics.get("total_commission", 0)
+                ),
+                buy_hold_return=_safe_float(
+                    bt.buy_hold_return
+                    if bt.buy_hold_return is not None
+                    else opt_metrics.get("buy_hold_return", 0)
+                ),
+                buy_hold_return_pct=_safe_float(
+                    bt.buy_hold_return_pct
+                    if bt.buy_hold_return_pct is not None
+                    else opt_metrics.get("buy_hold_return_pct", 0)
+                ),
+                strategy_outperformance=_safe_float(
+                    opt_metrics.get("strategy_outperformance", 0)
+                ),
+                cagr=_safe_float(
+                    bt.cagr if bt.cagr is not None else opt_metrics.get("cagr", 0)
+                ),
+                cagr_long=_safe_float(
+                    bt.cagr_long
+                    if bt.cagr_long is not None
+                    else opt_metrics.get("cagr_long", 0)
+                ),
+                cagr_short=_safe_float(
+                    bt.cagr_short
+                    if bt.cagr_short is not None
+                    else opt_metrics.get("cagr_short", 0)
+                ),
+                max_runup=_safe_float(opt_metrics.get("max_runup", 0)),
+                max_runup_value=_safe_float(opt_metrics.get("max_runup_value", 0)),
+                avg_runup_duration_bars=_safe_float(
+                    opt_metrics.get("avg_runup_duration_bars", 0)
+                ),
+                avg_drawdown_duration_bars=_safe_float(
+                    opt_metrics.get("avg_drawdown_duration_bars", 0)
+                ),
+                best_trade=_safe_float(opt_metrics.get("best_trade", 0)),
+                worst_trade=_safe_float(opt_metrics.get("worst_trade", 0)),
             )
 
             # Get trades and equity curve from DB if available
-            trades_data = bt.trades if bt.trades else []
+            trades_data: List[Any] = list(bt.trades) if bt.trades else []  # type: ignore[arg-type]
 
             # Convert equity_curve from list format to EquityCurve model
             equity_curve_data = None
@@ -880,18 +1008,22 @@ async def list_backtests(
                     )
 
             result = BacktestResult(
-                id=bt.id,
+                id=str(bt.id) if bt.id else "",
                 status=BacktestStatus.COMPLETED
                 if bt.status == DBBacktestStatus.COMPLETED
                 else BacktestStatus.FAILED,
-                created_at=bt.created_at or datetime.now(timezone.utc),
+                created_at=cast(datetime, bt.created_at)
+                if bt.created_at
+                else datetime.now(timezone.utc),
                 config=config,
                 metrics=metrics,
-                trades=trades_data,
+                trades=cast(List[TradeRecord], list(trades_data))
+                if trades_data
+                else [],
                 equity_curve=equity_curve_data,
-                final_equity=bt.final_capital,
-                final_pnl=net_profit,
-                final_pnl_pct=bt.total_return or 0,
+                final_equity=float(bt.final_capital) if bt.final_capital else None,
+                final_pnl=float(net_profit) if net_profit else None,
+                final_pnl_pct=float(bt.total_return) if bt.total_return else 0.0,
             )
             db_results.append(result)
         except Exception as e:
@@ -963,8 +1095,8 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
     # Convert DB model to BacktestResult
     try:
         # Parse dates - they may be strings or datetime objects
-        start_dt = bt.start_date
-        end_dt = bt.end_date
+        start_dt: Optional[datetime] = cast(Optional[datetime], bt.start_date)
+        end_dt: Optional[datetime] = cast(Optional[datetime], bt.end_date)
         if isinstance(start_dt, str):
             start_dt = datetime.fromisoformat(start_dt.replace("Z", "+00:00"))
         if isinstance(end_dt, str):
@@ -975,19 +1107,19 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
             end_dt = end_dt.replace(tzinfo=timezone.utc)
 
         config = BacktestConfig(
-            symbol=bt.symbol or "BTCUSDT",
-            interval=bt.timeframe or "30",
-            start_date=start_dt or datetime.now(timezone.utc),
-            end_date=end_dt or datetime.now(timezone.utc),
-            initial_capital=bt.initial_capital or 10000.0,
-            strategy_type=bt.strategy_type or "rsi",
+            symbol=str(bt.symbol or "BTCUSDT"),
+            interval=str(bt.timeframe or "30"),
+            start_date=cast(datetime, start_dt)
+            if start_dt
+            else datetime.now(timezone.utc),
+            end_date=cast(datetime, end_dt) if end_dt else datetime.now(timezone.utc),
+            initial_capital=float(bt.initial_capital or 10000.0),
+            strategy_type=StrategyType(str(bt.strategy_type or "rsi")),
             strategy_params=bt.parameters.get("strategy_params", {})
             if bt.parameters
             else {},
-            stop_loss_pct=bt.parameters.get("stop_loss_pct") if bt.parameters else None,
-            take_profit_pct=bt.parameters.get("take_profit_pct")
-            if bt.parameters
-            else None,
+            stop_loss=bt.parameters.get("stop_loss_pct") if bt.parameters else None,
+            take_profit=bt.parameters.get("take_profit_pct") if bt.parameters else None,
             leverage=bt.parameters.get("leverage", 10) if bt.parameters else 10,
         )
 
@@ -1000,7 +1132,7 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
 
         # Get stored metrics - prioritize metrics_json (full data), fallback to parameters.optimization_metrics
         # metrics_json is the Single Source of Truth (SSoT) for all detailed metrics
-        opt_metrics = {}
+        opt_metrics: Dict[str, Any] = {}
 
         # First, try metrics_json (contains complete metrics snapshot)
         if bt.metrics_json and isinstance(bt.metrics_json, dict):
@@ -1046,158 +1178,228 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
             losing_trades_count = total_trades_count - winning_trades_count
 
         metrics = PerformanceMetrics(
-            net_profit=opt_metrics.get("net_profit", net_profit),
-            net_profit_pct=opt_metrics.get("net_profit_pct", bt.total_return or 0),
-            total_return=bt.total_return or 0,
-            annual_return=bt.annual_return or opt_metrics.get("annual_return", 0),
-            sharpe_ratio=bt.sharpe_ratio or 0,
-            sortino_ratio=bt.sortino_ratio or 0,
-            calmar_ratio=bt.calmar_ratio or opt_metrics.get("calmar_ratio", 0),
-            max_drawdown=bt.max_drawdown or 0,
-            max_drawdown_value=max_dd_value,
-            avg_drawdown=opt_metrics.get("avg_drawdown", 0),
-            avg_drawdown_value=opt_metrics.get("avg_drawdown_value", 0),
-            max_drawdown_duration_days=opt_metrics.get("max_drawdown_duration_days", 0),
-            total_trades=total_trades_count,
-            winning_trades=winning_trades_count,
-            losing_trades=losing_trades_count,
-            win_rate=bt.win_rate or 0,
-            profit_factor=bt.profit_factor or 0,
-            avg_win=opt_metrics.get("avg_win", 0),
-            avg_loss=opt_metrics.get("avg_loss", 0),
-            avg_trade=opt_metrics.get("avg_trade", 0),
-            # avg_win/avg_loss are already in USD, copy to _value fields
-            avg_win_value=opt_metrics.get(
-                "avg_win_value", opt_metrics.get("avg_win", 0)
+            net_profit=_safe_float(opt_metrics.get("net_profit", net_profit)),
+            net_profit_pct=_safe_float(
+                opt_metrics.get("net_profit_pct", bt.total_return or 0)
             ),
-            avg_loss_value=opt_metrics.get(
-                "avg_loss_value", opt_metrics.get("avg_loss", 0)
+            total_return=_safe_float(bt.total_return or 0),
+            annual_return=_safe_float(
+                bt.annual_return or opt_metrics.get("annual_return", 0)
             ),
-            avg_trade_value=opt_metrics.get("avg_trade_value", 0),
-            exposure_time=bt.exposure_time
-            if bt.exposure_time is not None
-            else opt_metrics.get("exposure_time", 0),
-            avg_trade_duration_hours=opt_metrics.get("avg_trade_duration_hours", 0),
-            # Extended metrics - DB columns first, then opt_metrics fallback
-            gross_profit=bt.gross_profit
-            if bt.gross_profit is not None
-            else opt_metrics.get("gross_profit", 0),
-            gross_loss=bt.gross_loss
-            if bt.gross_loss is not None
-            else opt_metrics.get("gross_loss", 0),
-            expectancy=bt.expectancy
-            if bt.expectancy is not None
-            else opt_metrics.get("expectancy", 0),
-            max_consecutive_wins=bt.max_consecutive_wins
-            if bt.max_consecutive_wins is not None
-            else opt_metrics.get("max_consecutive_wins", 0),
-            max_consecutive_losses=bt.max_consecutive_losses
-            if bt.max_consecutive_losses is not None
-            else opt_metrics.get("max_consecutive_losses", 0),
-            recovery_factor=bt.recovery_factor
-            if bt.recovery_factor is not None
-            else opt_metrics.get("recovery_factor", 0),
-            largest_win=opt_metrics.get("largest_win", 0),
-            largest_loss=opt_metrics.get("largest_loss", 0),
-            largest_win_value=opt_metrics.get("largest_win_value", 0),
-            largest_loss_value=opt_metrics.get("largest_loss_value", 0),
-            # Long/Short statistics - DB columns first, then opt_metrics fallback
-            long_trades=bt.long_trades
-            if bt.long_trades is not None
-            else opt_metrics.get("long_trades", 0),
-            long_winning_trades=opt_metrics.get("long_winning_trades", 0),
-            long_losing_trades=opt_metrics.get("long_losing_trades", 0),
-            long_win_rate=bt.long_win_rate
-            if bt.long_win_rate is not None
-            else opt_metrics.get("long_win_rate", 0),
-            long_gross_profit=opt_metrics.get("long_gross_profit", 0),
-            long_gross_profit_pct=opt_metrics.get("long_gross_profit_pct", 0),
-            long_gross_loss=opt_metrics.get("long_gross_loss", 0),
-            long_gross_loss_pct=opt_metrics.get("long_gross_loss_pct", 0),
-            long_net_profit=bt.long_pnl
-            if bt.long_pnl is not None
-            else opt_metrics.get("long_net_profit", 0),
-            long_profit_factor=opt_metrics.get("long_profit_factor", 0),
-            long_avg_win=opt_metrics.get("long_avg_win_pct", 0),
-            long_avg_loss=opt_metrics.get("long_avg_loss_pct", 0),
-            short_trades=bt.short_trades
-            if bt.short_trades is not None
-            else opt_metrics.get("short_trades", 0),
-            short_winning_trades=opt_metrics.get("short_winning_trades", 0),
-            short_losing_trades=opt_metrics.get("short_losing_trades", 0),
-            short_win_rate=bt.short_win_rate
-            if bt.short_win_rate is not None
-            else opt_metrics.get("short_win_rate", 0),
-            short_gross_profit=opt_metrics.get("short_gross_profit", 0),
-            short_gross_profit_pct=opt_metrics.get("short_gross_profit_pct", 0),
-            short_gross_loss=opt_metrics.get("short_gross_loss", 0),
-            short_gross_loss_pct=opt_metrics.get("short_gross_loss_pct", 0),
-            short_net_profit=bt.short_pnl
-            if bt.short_pnl is not None
-            else opt_metrics.get("short_net_profit", 0),
-            short_profit_factor=opt_metrics.get("short_profit_factor", 0),
-            short_avg_win=opt_metrics.get("short_avg_win_pct", 0),
-            short_avg_loss=opt_metrics.get("short_avg_loss_pct", 0),
-            recovery_long=opt_metrics.get("recovery_long", 0),
-            recovery_short=opt_metrics.get("recovery_short", 0),
-            # Value fields (USD)
-            long_avg_win_value=opt_metrics.get("long_avg_win", 0),
-            long_avg_loss_value=opt_metrics.get("long_avg_loss", 0),
-            short_avg_win_value=opt_metrics.get("short_avg_win", 0),
-            short_avg_loss_value=opt_metrics.get("short_avg_loss", 0),
-            long_largest_win_value=opt_metrics.get("long_largest_win", 0),
-            long_largest_loss_value=opt_metrics.get("long_largest_loss", 0),
-            short_largest_win_value=opt_metrics.get("short_largest_win", 0),
-            short_largest_loss_value=opt_metrics.get("short_largest_loss", 0),
-            # Long/Short consecutive and payoff metrics (TradingView)
-            long_max_consec_wins=opt_metrics.get("long_max_consec_wins", 0),
-            long_max_consec_losses=opt_metrics.get("long_max_consec_losses", 0),
-            short_max_consec_wins=opt_metrics.get("short_max_consec_wins", 0),
-            short_max_consec_losses=opt_metrics.get("short_max_consec_losses", 0),
-            long_payoff_ratio=opt_metrics.get("long_payoff_ratio", 0),
-            short_payoff_ratio=opt_metrics.get("short_payoff_ratio", 0),
-            long_expectancy=opt_metrics.get("long_expectancy", 0),
-            short_expectancy=opt_metrics.get("short_expectancy", 0),
-            # Use DB columns first, fallback to opt_metrics
-            total_commission=bt.total_commission
-            if bt.total_commission is not None
-            else opt_metrics.get("total_commission", 0),
-            buy_hold_return=bt.buy_hold_return
-            if bt.buy_hold_return is not None
-            else opt_metrics.get("buy_hold_return", 0),
-            buy_hold_return_pct=bt.buy_hold_return_pct
-            if bt.buy_hold_return_pct is not None
-            else opt_metrics.get("buy_hold_return_pct", 0),
-            strategy_outperformance=opt_metrics.get("strategy_outperformance", 0),
-            cagr=bt.cagr if bt.cagr is not None else opt_metrics.get("cagr", 0),
-            cagr_long=bt.cagr_long
-            if bt.cagr_long is not None
-            else opt_metrics.get("cagr_long", 0),
-            cagr_short=bt.cagr_short
-            if bt.cagr_short is not None
-            else opt_metrics.get("cagr_short", 0),
-            max_runup=opt_metrics.get("max_runup", 0),
-            max_runup_value=opt_metrics.get("max_runup_value", 0),
-            avg_runup_duration_bars=opt_metrics.get("avg_runup_duration_bars", 0),
-            avg_drawdown_duration_bars=opt_metrics.get("avg_drawdown_duration_bars", 0),
-            # Average bars in trade metrics
-            avg_bars_in_trade=bt.avg_bars_in_trade
-            if bt.avg_bars_in_trade is not None
-            else opt_metrics.get("avg_bars_in_trade", 0),
-            avg_bars_in_winning=opt_metrics.get("avg_bars_in_winning", 0),
-            avg_bars_in_losing=opt_metrics.get("avg_bars_in_losing", 0),
-            avg_bars_in_long=opt_metrics.get("avg_bars_in_long", 0),
-            avg_bars_in_short=opt_metrics.get("avg_bars_in_short", 0),
-            avg_bars_in_winning_long=opt_metrics.get("avg_bars_in_winning_long", 0),
-            avg_bars_in_winning_short=opt_metrics.get("avg_bars_in_winning_short", 0),
-            avg_bars_in_losing_long=opt_metrics.get("avg_bars_in_losing_long", 0),
-            avg_bars_in_losing_short=opt_metrics.get("avg_bars_in_losing_short", 0),
+            sharpe_ratio=_safe_float(bt.sharpe_ratio or 0),
+            sortino_ratio=_safe_float(bt.sortino_ratio or 0),
+            calmar_ratio=_safe_float(
+                bt.calmar_ratio or opt_metrics.get("calmar_ratio", 0)
+            ),
+            max_drawdown=_safe_float(bt.max_drawdown or 0),
+            max_drawdown_value=_safe_float(max_dd_value),
+            avg_drawdown=_safe_float(opt_metrics.get("avg_drawdown", 0)),
+            avg_drawdown_value=_safe_float(opt_metrics.get("avg_drawdown_value", 0)),
+            max_drawdown_duration_days=_safe_float(
+                opt_metrics.get("max_drawdown_duration_days", 0)
+            ),
+            total_trades=_safe_int(total_trades_count),
+            winning_trades=_safe_int(winning_trades_count),
+            losing_trades=_safe_int(losing_trades_count),
+            win_rate=_safe_float(bt.win_rate or 0),
+            profit_factor=_safe_float(bt.profit_factor or 0),
+            avg_win=_safe_float(opt_metrics.get("avg_win", 0)),
+            avg_loss=_safe_float(opt_metrics.get("avg_loss", 0)),
+            avg_trade=_safe_float(opt_metrics.get("avg_trade", 0)),
+            avg_win_value=_safe_float(
+                opt_metrics.get("avg_win_value", opt_metrics.get("avg_win", 0))
+            ),
+            avg_loss_value=_safe_float(
+                opt_metrics.get("avg_loss_value", opt_metrics.get("avg_loss", 0))
+            ),
+            avg_trade_value=_safe_float(opt_metrics.get("avg_trade_value", 0)),
+            exposure_time=_safe_float(
+                bt.exposure_time
+                if bt.exposure_time is not None
+                else opt_metrics.get("exposure_time", 0)
+            ),
+            avg_trade_duration_hours=_safe_float(
+                opt_metrics.get("avg_trade_duration_hours", 0)
+            ),
+            gross_profit=_safe_float(
+                bt.gross_profit
+                if bt.gross_profit is not None
+                else opt_metrics.get("gross_profit", 0)
+            ),
+            gross_loss=_safe_float(
+                bt.gross_loss
+                if bt.gross_loss is not None
+                else opt_metrics.get("gross_loss", 0)
+            ),
+            expectancy=_safe_float(
+                bt.expectancy
+                if bt.expectancy is not None
+                else opt_metrics.get("expectancy", 0)
+            ),
+            max_consecutive_wins=_safe_int(
+                bt.max_consecutive_wins
+                if bt.max_consecutive_wins is not None
+                else opt_metrics.get("max_consecutive_wins", 0)
+            ),
+            max_consecutive_losses=_safe_int(
+                bt.max_consecutive_losses
+                if bt.max_consecutive_losses is not None
+                else opt_metrics.get("max_consecutive_losses", 0)
+            ),
+            recovery_factor=_safe_float(
+                bt.recovery_factor
+                if bt.recovery_factor is not None
+                else opt_metrics.get("recovery_factor", 0)
+            ),
+            largest_win=_safe_float(opt_metrics.get("largest_win", 0)),
+            largest_loss=_safe_float(opt_metrics.get("largest_loss", 0)),
+            largest_win_value=_safe_float(opt_metrics.get("largest_win_value", 0)),
+            largest_loss_value=_safe_float(opt_metrics.get("largest_loss_value", 0)),
+            long_trades=_safe_int(
+                bt.long_trades
+                if bt.long_trades is not None
+                else opt_metrics.get("long_trades", 0)
+            ),
+            long_winning_trades=_safe_int(opt_metrics.get("long_winning_trades", 0)),
+            long_losing_trades=_safe_int(opt_metrics.get("long_losing_trades", 0)),
+            long_win_rate=_safe_float(
+                bt.long_win_rate
+                if bt.long_win_rate is not None
+                else opt_metrics.get("long_win_rate", 0)
+            ),
+            long_gross_profit=_safe_float(opt_metrics.get("long_gross_profit", 0)),
+            long_gross_profit_pct=_safe_float(
+                opt_metrics.get("long_gross_profit_pct", 0)
+            ),
+            long_gross_loss=_safe_float(opt_metrics.get("long_gross_loss", 0)),
+            long_gross_loss_pct=_safe_float(opt_metrics.get("long_gross_loss_pct", 0)),
+            long_net_profit=_safe_float(
+                bt.long_pnl
+                if bt.long_pnl is not None
+                else opt_metrics.get("long_net_profit", 0)
+            ),
+            long_profit_factor=_safe_float(opt_metrics.get("long_profit_factor", 0)),
+            long_avg_win=_safe_float(opt_metrics.get("long_avg_win_pct", 0)),
+            long_avg_loss=_safe_float(opt_metrics.get("long_avg_loss_pct", 0)),
+            short_trades=_safe_int(
+                bt.short_trades
+                if bt.short_trades is not None
+                else opt_metrics.get("short_trades", 0)
+            ),
+            short_winning_trades=_safe_int(opt_metrics.get("short_winning_trades", 0)),
+            short_losing_trades=_safe_int(opt_metrics.get("short_losing_trades", 0)),
+            short_win_rate=_safe_float(
+                bt.short_win_rate
+                if bt.short_win_rate is not None
+                else opt_metrics.get("short_win_rate", 0)
+            ),
+            short_gross_profit=_safe_float(opt_metrics.get("short_gross_profit", 0)),
+            short_gross_profit_pct=_safe_float(
+                opt_metrics.get("short_gross_profit_pct", 0)
+            ),
+            short_gross_loss=_safe_float(opt_metrics.get("short_gross_loss", 0)),
+            short_gross_loss_pct=_safe_float(
+                opt_metrics.get("short_gross_loss_pct", 0)
+            ),
+            short_net_profit=_safe_float(
+                bt.short_pnl
+                if bt.short_pnl is not None
+                else opt_metrics.get("short_net_profit", 0)
+            ),
+            short_profit_factor=_safe_float(opt_metrics.get("short_profit_factor", 0)),
+            short_avg_win=_safe_float(opt_metrics.get("short_avg_win_pct", 0)),
+            short_avg_loss=_safe_float(opt_metrics.get("short_avg_loss_pct", 0)),
+            recovery_long=_safe_float(opt_metrics.get("recovery_long", 0)),
+            recovery_short=_safe_float(opt_metrics.get("recovery_short", 0)),
+            long_avg_win_value=_safe_float(opt_metrics.get("long_avg_win", 0)),
+            long_avg_loss_value=_safe_float(opt_metrics.get("long_avg_loss", 0)),
+            short_avg_win_value=_safe_float(opt_metrics.get("short_avg_win", 0)),
+            short_avg_loss_value=_safe_float(opt_metrics.get("short_avg_loss", 0)),
+            long_largest_win=_safe_float(opt_metrics.get("long_largest_win", 0)),
+            long_largest_loss=_safe_float(opt_metrics.get("long_largest_loss", 0)),
+            short_largest_win=_safe_float(opt_metrics.get("short_largest_win", 0)),
+            short_largest_loss=_safe_float(opt_metrics.get("short_largest_loss", 0)),
+            long_max_consec_wins=_safe_int(opt_metrics.get("long_max_consec_wins", 0)),
+            long_max_consec_losses=_safe_int(
+                opt_metrics.get("long_max_consec_losses", 0)
+            ),
+            short_max_consec_wins=_safe_int(
+                opt_metrics.get("short_max_consec_wins", 0)
+            ),
+            short_max_consec_losses=_safe_int(
+                opt_metrics.get("short_max_consec_losses", 0)
+            ),
+            long_payoff_ratio=_safe_float(opt_metrics.get("long_payoff_ratio", 0)),
+            short_payoff_ratio=_safe_float(opt_metrics.get("short_payoff_ratio", 0)),
+            long_expectancy=_safe_float(opt_metrics.get("long_expectancy", 0)),
+            short_expectancy=_safe_float(opt_metrics.get("short_expectancy", 0)),
+            total_commission=_safe_float(
+                bt.total_commission
+                if bt.total_commission is not None
+                else opt_metrics.get("total_commission", 0)
+            ),
+            buy_hold_return=_safe_float(
+                bt.buy_hold_return
+                if bt.buy_hold_return is not None
+                else opt_metrics.get("buy_hold_return", 0)
+            ),
+            buy_hold_return_pct=_safe_float(
+                bt.buy_hold_return_pct
+                if bt.buy_hold_return_pct is not None
+                else opt_metrics.get("buy_hold_return_pct", 0)
+            ),
+            strategy_outperformance=_safe_float(
+                opt_metrics.get("strategy_outperformance", 0)
+            ),
+            cagr=_safe_float(
+                bt.cagr if bt.cagr is not None else opt_metrics.get("cagr", 0)
+            ),
+            cagr_long=_safe_float(
+                bt.cagr_long
+                if bt.cagr_long is not None
+                else opt_metrics.get("cagr_long", 0)
+            ),
+            cagr_short=_safe_float(
+                bt.cagr_short
+                if bt.cagr_short is not None
+                else opt_metrics.get("cagr_short", 0)
+            ),
+            max_runup=_safe_float(opt_metrics.get("max_runup", 0)),
+            max_runup_value=_safe_float(opt_metrics.get("max_runup_value", 0)),
+            avg_runup_duration_bars=_safe_float(
+                opt_metrics.get("avg_runup_duration_bars", 0)
+            ),
+            avg_drawdown_duration_bars=_safe_float(
+                opt_metrics.get("avg_drawdown_duration_bars", 0)
+            ),
+            avg_bars_in_trade=_safe_float(
+                bt.avg_bars_in_trade
+                if bt.avg_bars_in_trade is not None
+                else opt_metrics.get("avg_bars_in_trade", 0)
+            ),
+            avg_bars_in_winning=_safe_float(opt_metrics.get("avg_bars_in_winning", 0)),
+            avg_bars_in_losing=_safe_float(opt_metrics.get("avg_bars_in_losing", 0)),
+            avg_bars_in_long=_safe_float(opt_metrics.get("avg_bars_in_long", 0)),
+            avg_bars_in_short=_safe_float(opt_metrics.get("avg_bars_in_short", 0)),
+            avg_bars_in_winning_long=_safe_float(
+                opt_metrics.get("avg_bars_in_winning_long", 0)
+            ),
+            avg_bars_in_winning_short=_safe_float(
+                opt_metrics.get("avg_bars_in_winning_short", 0)
+            ),
+            avg_bars_in_losing_long=_safe_float(
+                opt_metrics.get("avg_bars_in_losing_long", 0)
+            ),
+            avg_bars_in_losing_short=_safe_float(
+                opt_metrics.get("avg_bars_in_losing_short", 0)
+            ),
         )
 
         # Get trades and equity curve from DB if available
-        trades_data = []
-        if bt.trades:
-            for t in bt.trades:
+        trades_data: List[Any] = []
+        trades_list = list(bt.trades) if bt.trades else []  # type: ignore[arg-type]
+        if trades_list:
+            for t in trades_list:
                 # Convert timestamp (ms) to datetime if needed
                 entry_time = t.get("entry_time")
                 exit_time = t.get("exit_time")
@@ -1292,18 +1494,20 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 )
 
         return BacktestResult(
-            id=bt.id,
+            id=str(bt.id) if bt.id else "",
             status=BacktestStatus.COMPLETED
             if bt.status == DBBacktestStatus.COMPLETED
             else BacktestStatus.FAILED,
-            created_at=bt.created_at or datetime.now(timezone.utc),
+            created_at=cast(datetime, bt.created_at)
+            if bt.created_at
+            else datetime.now(timezone.utc),
             config=config,
             metrics=metrics,
-            trades=trades_data,
+            trades=cast(List[TradeRecord], trades_data) if trades_data else [],
             equity_curve=equity_curve_data,
-            final_equity=bt.final_capital,
-            final_pnl=net_profit,
-            final_pnl_pct=bt.total_return or 0,
+            final_equity=float(bt.final_capital) if bt.final_capital else None,
+            final_pnl=float(net_profit) if net_profit else None,
+            final_pnl_pct=float(bt.total_return) if bt.total_return else 0.0,
         )
     except Exception as e:
         logger.warning(f"Failed to convert DB backtest {bt.id}: {e}")
@@ -1461,13 +1665,15 @@ async def run_backtest_from_strategy(
         )
 
     # Build backtest config from strategy
-    symbol = request.symbol or strategy.symbol or "BTCUSDT"
-    interval = request.interval or strategy.timeframe or "1h"
-    initial_capital = request.initial_capital or strategy.initial_capital or 10000.0
+    symbol = request.symbol or str(strategy.symbol or "BTCUSDT")
+    interval = request.interval or str(strategy.timeframe or "1h")
+    initial_capital = float(
+        request.initial_capital or strategy.initial_capital or 10000.0
+    )
 
     # Extract trading parameters from strategy.parameters (stored with _ prefix)
     # Note: commission and slippage are already stored as decimals (e.g., 0.001 for 0.1%)
-    params = strategy.parameters or {}
+    params: Dict[str, Any] = dict(strategy.parameters) if strategy.parameters else {}
     leverage = float(params.get("_leverage", 1))
     direction = params.get("_direction", "both")
     pyramiding = int(params.get("_pyramiding", 1))
@@ -1482,11 +1688,12 @@ async def run_backtest_from_strategy(
     position_size_type = params.get("_position_size_type", "percent")
     order_amount = params.get("_order_amount")  # Fixed $ amount or contracts
 
+    position_size: float
     if position_size_type == "fixed_amount" and order_amount:
         # Convert fixed $ amount to fraction of capital
         # The order amount with leverage
-        effective_order = float(order_amount) * leverage
-        position_size = min(effective_order / initial_capital, 1.0)
+        effective_order = float(order_amount) * float(leverage)
+        position_size = min(effective_order / float(initial_capital), 1.0)
         logger.info(
             f"Using fixed order amount: ${order_amount} x {leverage}x leverage = "
             f"${effective_order} = {position_size * 100:.1f}% of ${initial_capital}"
@@ -1497,7 +1704,11 @@ async def run_backtest_from_strategy(
         logger.info(f"Using fixed contracts: {order_amount}")
     else:
         # Percent mode - use strategy.position_size (already as fraction)
-        position_size = request.position_size or strategy.position_size or 1.0
+        position_size = (
+            _safe_float(request.position_size)
+            or _safe_float(strategy.position_size)
+            or 1.0
+        )
 
     # Build config with validation error handling
     try:
@@ -1522,8 +1733,10 @@ async def run_backtest_from_strategy(
             taker_fee=commission,
             maker_fee=commission,
             slippage=slippage,
-            stop_loss=strategy.stop_loss_pct / 100 if strategy.stop_loss_pct else None,
-            take_profit=strategy.take_profit_pct / 100
+            stop_loss=_safe_float(strategy.stop_loss_pct) / 100
+            if strategy.stop_loss_pct
+            else None,
+            take_profit=_safe_float(strategy.take_profit_pct) / 100
             if strategy.take_profit_pct
             else None,
         )
@@ -1553,7 +1766,7 @@ async def run_backtest_from_strategy(
         return RunFromStrategyResponse(
             backtest_id=result.id or "",
             strategy_id=strategy_id,
-            strategy_name=strategy.name,
+            strategy_name=str(strategy.name or ""),
             status="failed",
             error_message=result.error_message,
             saved_to_db=False,
@@ -1658,12 +1871,12 @@ async def run_backtest_from_strategy(
 
             # Update strategy metrics with best/latest results
             if result.metrics:
-                strategy.total_return = result.metrics.total_return
-                strategy.sharpe_ratio = result.metrics.sharpe_ratio
-                strategy.win_rate = result.metrics.win_rate
-                strategy.total_trades = result.metrics.total_trades
-                strategy.backtest_count = (strategy.backtest_count or 0) + 1
-                strategy.last_backtest_at = datetime.now(timezone.utc)
+                strategy.total_return = result.metrics.total_return  # type: ignore[assignment]
+                strategy.sharpe_ratio = result.metrics.sharpe_ratio  # type: ignore[assignment]
+                strategy.win_rate = result.metrics.win_rate  # type: ignore[assignment]
+                strategy.total_trades = result.metrics.total_trades  # type: ignore[assignment]
+                strategy.backtest_count = _safe_int(strategy.backtest_count) + 1  # type: ignore[assignment]
+                strategy.last_backtest_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
             db.commit()
             saved_to_db = True
@@ -1676,7 +1889,7 @@ async def run_backtest_from_strategy(
     return RunFromStrategyResponse(
         backtest_id=result.id,
         strategy_id=strategy_id,
-        strategy_name=strategy.name,
+        strategy_name=str(strategy.name or ""),
         status="completed",
         metrics=metrics_dict,
         saved_to_db=saved_to_db,
@@ -2456,12 +2669,12 @@ async def save_optimization_result(
 
         # Update strategy metrics if linked
         if strategy:
-            strategy.total_return = total_return_pct
-            strategy.sharpe_ratio = results.get("sharpe_ratio", 0)
-            strategy.win_rate = results.get("win_rate", 0)
-            strategy.total_trades = results.get("total_trades", 0)
-            strategy.backtest_count = (strategy.backtest_count or 0) + 1
-            strategy.last_backtest_at = datetime.now(timezone.utc)
+            strategy.total_return = total_return_pct  # type: ignore[assignment]
+            strategy.sharpe_ratio = results.get("sharpe_ratio", 0)  # type: ignore[assignment]
+            strategy.win_rate = results.get("win_rate", 0)  # type: ignore[assignment]
+            strategy.total_trades = results.get("total_trades", 0)  # type: ignore[assignment]
+            strategy.backtest_count = _safe_int(strategy.backtest_count) + 1  # type: ignore[assignment]
+            strategy.last_backtest_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             logger.info(f"Updated strategy {strategy.id} metrics from optimization")
 
         db.commit()
@@ -2470,7 +2683,7 @@ async def save_optimization_result(
         logger.info(f"Saved optimization backtest with ID: {db_backtest.id}")
 
         return SaveOptimizationResultResponse(
-            id=db_backtest.id,
+            id=str(db_backtest.id),
             name=request.name,
             status="completed",
             created_at=db_backtest.created_at.isoformat(),
@@ -2479,6 +2692,354 @@ async def save_optimization_result(
     except Exception as e:
         logger.error(f"Failed to save optimization result: {e}")
         db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===========================================================================
+# MTF (Multi-Timeframe) BACKTEST ENDPOINT
+# ===========================================================================
+
+
+class MTFBacktestRequest(BaseModel):
+    """Request model for MTF backtest."""
+
+    # Standard params
+    symbol: str = Field(..., description="Trading pair (e.g., BTCUSDT)")
+    interval: str = Field(..., description="LTF interval (e.g., 15m, 5m)")
+    start_date: str = Field(..., description="Start date (YYYY-MM-DD)")
+    end_date: str = Field(..., description="End date (YYYY-MM-DD)")
+    initial_capital: float = Field(default=10000.0, ge=100)
+    leverage: int = Field(default=10, ge=1, le=125)
+    direction: str = Field(default="both", pattern="^(long|short|both)$")
+
+    # Risk management
+    stop_loss: float = Field(default=0.02, ge=0.001, le=0.5)
+    take_profit: float = Field(default=0.03, ge=0.001, le=1.0)
+
+    # Strategy params
+    strategy_type: str = Field(
+        default="rsi", description="Strategy: rsi, sma_crossover"
+    )
+    strategy_params: dict = Field(default_factory=dict)
+
+    # MTF params
+    htf_interval: str = Field(default="60", description="HTF interval (e.g., 60, 240)")
+    htf_filter_type: str = Field(default="sma", pattern="^(sma|ema)$")
+    htf_filter_period: int = Field(default=200, ge=1, le=500)
+    mtf_neutral_zone_pct: float = Field(default=0.0, ge=0.0, le=5.0)
+
+    # BTC correlation (optional)
+    use_btc_filter: bool = Field(default=False)
+    btc_sma_period: int = Field(default=50, ge=1, le=200)
+
+    # Advanced features (optional)
+    trailing_stop_enabled: bool = Field(default=False)
+    trailing_stop_activation: float = Field(default=0.01)
+    trailing_stop_distance: float = Field(default=0.005)
+    breakeven_enabled: bool = Field(default=False)
+    dca_enabled: bool = Field(default=False)
+    dca_safety_orders: int = Field(default=0, ge=0, le=10)
+
+
+class MTFBacktestResponse(BaseModel):
+    """Response model for MTF backtest."""
+
+    backtest_id: str
+    status: str
+    is_valid: bool
+
+    # Metrics
+    total_trades: int
+    filtered_trades: int  # Trades filtered by MTF
+    net_profit: float
+    total_return_pct: float
+    win_rate: float
+    max_drawdown: float
+    sharpe_ratio: float
+    profit_factor: float
+
+    # MTF stats
+    mtf_filter_type: str
+    mtf_filter_period: int
+    htf_interval: str
+    long_signals_allowed: int
+    short_signals_allowed: int
+    long_signals_filtered: int
+    short_signals_filtered: int
+
+    # Comparison (MTF vs no MTF)
+    baseline_trades: Optional[int] = None
+    baseline_pnl: Optional[float] = None
+    mtf_improvement_pct: Optional[float] = None
+
+    # Trades (limited)
+    trades: List[dict] = Field(default_factory=list)
+
+    # Equity curve
+    equity_curve: Optional[dict] = None
+
+
+@router.post("/mtf", response_model=MTFBacktestResponse)
+async def run_mtf_backtest(request: MTFBacktestRequest):
+    """
+    Run backtest with Multi-Timeframe (MTF) filtering.
+
+    MTF filtering improves strategy performance by:
+    - Only taking LONG signals when HTF trend is bullish
+    - Only taking SHORT signals when HTF trend is bearish
+
+    **Example Request:**
+    ```json
+    {
+        "symbol": "BTCUSDT",
+        "interval": "15m",
+        "start_date": "2025-07-01",
+        "end_date": "2026-01-26",
+        "strategy_type": "rsi",
+        "strategy_params": {"period": 14, "oversold": 30, "overbought": 70},
+        "htf_interval": "60",
+        "htf_filter_type": "sma",
+        "htf_filter_period": 200
+    }
+    ```
+
+    **Strategies:**
+    - `rsi`: RSI oversold/overbought crossover
+    - `sma_crossover`: Golden/Death cross
+
+    **HTF Filters:**
+    - `sma`: Simple Moving Average (default SMA200)
+    - `ema`: Exponential Moving Average
+    """
+    import sqlite3
+    import uuid
+
+    import numpy as np
+    import pandas as pd
+
+    from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
+    from backend.backtesting.interfaces import BacktestInput
+    from backend.backtesting.mtf.index_mapper import create_htf_index_map
+    from backend.backtesting.mtf.signals import (
+        generate_mtf_rsi_signals,
+        generate_mtf_signals_with_btc,
+        generate_mtf_sma_crossover_signals,
+    )
+
+    logger.info(
+        f"MTF Backtest: {request.symbol} {request.interval} → HTF {request.htf_interval} "
+        f"filter={request.htf_filter_type.upper()}{request.htf_filter_period}"
+    )
+
+    try:
+        # Load LTF data
+        conn = sqlite3.connect("data.sqlite3")
+        ltf_query = f"""
+            SELECT open_time, open_price as open, high_price as high,
+                   low_price as low, close_price as close, volume
+            FROM bybit_kline_audit
+            WHERE symbol = '{request.symbol}'
+              AND interval = '{request.interval.replace("m", "")}'
+              AND open_time >= {int(pd.Timestamp(request.start_date).timestamp() * 1000)}
+              AND open_time <= {int(pd.Timestamp(request.end_date).timestamp() * 1000)}
+            ORDER BY open_time
+        """
+        ltf_df = pd.read_sql(ltf_query, conn)
+
+        if ltf_df.empty:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No LTF data found for {request.symbol} {request.interval}",
+            )
+
+        # Convert to datetime index
+        ltf_df["open_time"] = pd.to_datetime(ltf_df["open_time"], unit="ms")
+        ltf_df.set_index("open_time", inplace=True)
+
+        # Load HTF data
+        htf_interval = request.htf_interval.replace("m", "")
+        htf_query = f"""
+            SELECT open_time, open_price as open, high_price as high,
+                   low_price as low, close_price as close, volume
+            FROM bybit_kline_audit
+            WHERE symbol = '{request.symbol}'
+              AND interval = '{htf_interval}'
+              AND open_time >= {int(pd.Timestamp(request.start_date).timestamp() * 1000)}
+              AND open_time <= {int(pd.Timestamp(request.end_date).timestamp() * 1000)}
+            ORDER BY open_time
+        """
+        htf_df = pd.read_sql(htf_query, conn)
+
+        if htf_df.empty:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No HTF data found for {request.symbol} {request.htf_interval}",
+            )
+
+        htf_df["open_time"] = pd.to_datetime(htf_df["open_time"], unit="ms")
+        htf_df.set_index("open_time", inplace=True)
+
+        # Load BTC data if needed
+        btc_df = None
+        btc_index_map = None
+        if request.use_btc_filter and request.symbol != "BTCUSDT":
+            btc_query = f"""
+                SELECT open_time, open_price as open, high_price as high,
+                       low_price as low, close_price as close, volume
+                FROM bybit_kline_audit
+                WHERE symbol = 'BTCUSDT'
+                  AND interval = '{htf_interval}'
+                  AND open_time >= {int(pd.Timestamp(request.start_date).timestamp() * 1000)}
+                  AND open_time <= {int(pd.Timestamp(request.end_date).timestamp() * 1000)}
+                ORDER BY open_time
+            """
+            btc_df = pd.read_sql(btc_query, conn)
+            if not btc_df.empty:
+                btc_df["open_time"] = pd.to_datetime(btc_df["open_time"], unit="ms")
+                btc_df.set_index("open_time", inplace=True)
+                btc_index_map = create_htf_index_map(ltf_df, btc_df)
+
+        conn.close()
+
+        # Create HTF index map
+        htf_index_map = create_htf_index_map(ltf_df, htf_df)
+
+        # Generate MTF signals
+        strategy_params = request.strategy_params.copy()
+
+        if request.use_btc_filter and btc_df is not None and btc_index_map is not None:
+            long_entries, long_exits, short_entries, short_exits = (
+                generate_mtf_signals_with_btc(
+                    ltf_candles=ltf_df,
+                    htf_candles=htf_df,
+                    htf_index_map=htf_index_map,
+                    btc_candles=btc_df,
+                    btc_index_map=btc_index_map,
+                    strategy_type=request.strategy_type,
+                    strategy_params=strategy_params,
+                    htf_filter_type=request.htf_filter_type,
+                    htf_filter_period=request.htf_filter_period,
+                    btc_filter_period=request.btc_sma_period,
+                    direction=request.direction,
+                )
+            )
+        elif request.strategy_type == "rsi":
+            long_entries, long_exits, short_entries, short_exits = (
+                generate_mtf_rsi_signals(
+                    ltf_candles=ltf_df,
+                    htf_candles=htf_df,
+                    htf_index_map=htf_index_map,
+                    htf_filter_type=request.htf_filter_type,
+                    htf_filter_period=request.htf_filter_period,
+                    neutral_zone_pct=request.mtf_neutral_zone_pct,
+                    direction=request.direction,
+                    **strategy_params,
+                )
+            )
+        elif request.strategy_type == "sma_crossover":
+            long_entries, long_exits, short_entries, short_exits = (
+                generate_mtf_sma_crossover_signals(
+                    ltf_candles=ltf_df,
+                    htf_candles=htf_df,
+                    htf_index_map=htf_index_map,
+                    htf_filter_type=request.htf_filter_type,
+                    htf_filter_period=request.htf_filter_period,
+                    neutral_zone_pct=request.mtf_neutral_zone_pct,
+                    direction=request.direction,
+                    **strategy_params,
+                )
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown strategy type: {request.strategy_type}",
+            )
+
+        # Count signals
+        n_long_entries = int(np.sum(long_entries))
+        n_short_entries = int(np.sum(short_entries))
+
+        # Build BacktestInput
+        input_data = BacktestInput(
+            symbol=request.symbol,
+            interval=request.interval,
+            initial_capital=request.initial_capital,
+            leverage=request.leverage,
+            direction=TradeDirection(request.direction),
+            stop_loss=request.stop_loss,
+            take_profit=request.take_profit,
+            taker_fee=0.0007,
+            candles=ltf_df,
+            long_entries=long_entries,
+            long_exits=long_exits,
+            short_entries=short_entries,
+            short_exits=short_exits,
+            use_bar_magnifier=False,
+            # MTF
+            mtf_enabled=True,
+            mtf_htf_candles=htf_df,
+            mtf_htf_index_map=htf_index_map,
+            mtf_filter_type=request.htf_filter_type,
+            mtf_filter_period=request.htf_filter_period,
+            # Advanced features
+            trailing_stop_enabled=request.trailing_stop_enabled,
+            trailing_stop_activation=request.trailing_stop_activation,
+            trailing_stop_distance=request.trailing_stop_distance,
+            breakeven_enabled=request.breakeven_enabled,
+            dca_enabled=request.dca_enabled,
+            dca_safety_orders=request.dca_safety_orders,
+        )
+
+        # Run backtest
+        engine = FallbackEngineV4()
+        result = engine.run(input_data)
+
+        # Build response
+        m = result.metrics
+        backtest_id = str(uuid.uuid4())[:8]
+
+        # Format trades for response
+        trades_list = []
+        for t in (result.trades or [])[:100]:
+            trades_list.append(
+                {
+                    "entry_time": str(t.entry_time) if t.entry_time else None,
+                    "exit_time": str(t.exit_time) if t.exit_time else None,
+                    "direction": t.direction,
+                    "entry_price": float(t.entry_price),
+                    "exit_price": float(t.exit_price),
+                    "pnl": float(t.pnl),
+                    "pnl_pct": float(t.pnl_pct),
+                    "exit_reason": str(t.exit_reason) if t.exit_reason else None,
+                }
+            )
+
+        return MTFBacktestResponse(
+            backtest_id=backtest_id,
+            status="completed" if result.is_valid else "failed",
+            is_valid=result.is_valid,
+            total_trades=m.total_trades,
+            filtered_trades=0,  # TODO: calculate from baseline comparison
+            net_profit=float(m.net_profit),
+            total_return_pct=float(m.total_return),
+            win_rate=float(m.win_rate),
+            max_drawdown=float(m.max_drawdown),
+            sharpe_ratio=float(m.sharpe_ratio),
+            profit_factor=float(m.profit_factor),
+            mtf_filter_type=request.htf_filter_type,
+            mtf_filter_period=request.htf_filter_period,
+            htf_interval=request.htf_interval,
+            long_signals_allowed=n_long_entries,
+            short_signals_allowed=n_short_entries,
+            long_signals_filtered=0,  # TODO
+            short_signals_filtered=0,  # TODO
+            trades=trades_list,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"MTF backtest failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

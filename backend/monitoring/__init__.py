@@ -21,6 +21,14 @@ from backend.monitoring.db_monitor import (
     HealthStatus,
     create_health_router,
 )
+from backend.monitoring.health_checks import (
+    HealthChecker,
+    HealthCheckResult,
+    SystemHealthReport,
+    get_health_checker,
+    run_health_check,
+)
+from backend.monitoring.health_checks import HealthStatus as ComprehensiveHealthStatus
 from backend.monitoring.self_learning_signal_service import (
     SelfLearningSignalPublisher,
 )
@@ -43,4 +51,11 @@ __all__ = [
     "HealthStatus",
     "AlertThreshold",
     "create_health_router",
+    # Comprehensive health checks
+    "HealthChecker",
+    "HealthCheckResult",
+    "SystemHealthReport",
+    "ComprehensiveHealthStatus",
+    "get_health_checker",
+    "run_health_check",
 ]

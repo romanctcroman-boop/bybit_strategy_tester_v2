@@ -7,6 +7,9 @@ This module provides advanced ML capabilities:
 - Auto-ML Pipeline (automated model selection and tuning)
 - Online Learning (incremental model updates)
 - Feature Store (centralized feature management)
+- Drift Alert Manager (alert integration for drift detection)
+- Persistent Feature Store (Redis-backed feature caching)
+- Validated Model Registry (model validation before deployment)
 """
 
 from .automl_pipeline import (
@@ -21,6 +24,14 @@ from .concept_drift import (
     DriftResult,
     DriftType,
     MultiVariateDriftDetector,
+)
+from .drift_alert_manager import (
+    AlertChannel,
+    AlertSeverity,
+    DriftAlertConfig,
+    DriftAlertManager,
+    EnhancedDriftAlert,
+    IntegratedDriftMonitor,
 )
 from .feature_store import (
     FeatureDefinition,
@@ -41,33 +52,52 @@ from .online_learner import (
     OnlineLearner,
     UpdateStrategy,
 )
+from .persistent_feature_store import (
+    PersistentFeatureStore,
+    create_feature_store,
+)
+from .validated_model_registry import (
+    ValidatedModelRegistry,
+    ValidationConfig,
+    ValidationReport,
+    ValidationResult,
+    create_validated_registry,
+)
 
 __all__ = [
-    # Concept Drift
-    "ConceptDriftDetector",
-    "DriftType",
-    "DriftResult",
-    "DriftAlert",
-    "MultiVariateDriftDetector",
-    # Model Registry
-    "ModelRegistry",
-    "ModelVersion",
-    "ModelMetadata",
-    "ModelStatus",
     "ABTest",
-    # Auto-ML
-    "AutoMLPipeline",
+    "AlertChannel",
+    "AlertSeverity",
     "AutoMLConfig",
-    "ModelCandidate",
-    "PipelineResult",
-    # Online Learning
-    "OnlineLearner",
-    "IncrementalModel",
-    "UpdateStrategy",
-    "LearningStats",
-    # Feature Store
-    "FeatureStore",
+    "AutoMLPipeline",
+    "ConceptDriftDetector",
+    "DriftAlert",
+    "DriftAlertConfig",
+    "DriftAlertManager",
+    "DriftResult",
+    "DriftType",
+    "EnhancedDriftAlert",
     "FeatureDefinition",
     "FeatureGroup",
+    "FeatureStore",
     "FeatureVersion",
+    "IncrementalModel",
+    "IntegratedDriftMonitor",
+    "LearningStats",
+    "ModelCandidate",
+    "ModelMetadata",
+    "ModelRegistry",
+    "ModelStatus",
+    "ModelVersion",
+    "MultiVariateDriftDetector",
+    "OnlineLearner",
+    "PersistentFeatureStore",
+    "PipelineResult",
+    "UpdateStrategy",
+    "ValidatedModelRegistry",
+    "ValidationConfig",
+    "ValidationReport",
+    "ValidationResult",
+    "create_feature_store",
+    "create_validated_registry",
 ]

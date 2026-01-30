@@ -3,7 +3,8 @@
 Используем production код, а не тестовые обёртки
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd
 import sqlite3
@@ -19,7 +20,7 @@ print(f"Время: {datetime.now()}")
 # 1. Загрузка РЕАЛЬНЫХ данных
 # ============================================================================
 print("\n📊 Загрузка данных из БД...")
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 # Проверим сколько данных есть
 info = pd.read_sql("""

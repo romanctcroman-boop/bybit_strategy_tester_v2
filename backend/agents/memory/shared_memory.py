@@ -21,7 +21,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
 from loguru import logger
 
-
 T = TypeVar("T")
 
 
@@ -64,9 +63,7 @@ class Transaction:
 
     id: str = field(default_factory=lambda: f"tx_{uuid.uuid4().hex[:12]}")
     agent_id: Optional[str] = None
-    operations: List[Tuple[str, str, Any]] = field(
-        default_factory=list
-    )  # (op, key, value)
+    operations: List[Tuple[str, str, Any]] = field(default_factory=list)  # (op, key, value)
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     committed: bool = False
 
@@ -150,7 +147,7 @@ class SharedMemory:
         lock_timeout_seconds: int = 30,
     ):
         self._data: Dict[str, SharedValue] = {}
-        self._lock = asyncio.Lock()
+        self._lock: Optional[asyncio.Lock] = None  # Lazy init for event loop compatibility
         self._thread_lock = threading.RLock()
 
         self.conflict_resolution = conflict_resolution
@@ -162,6 +159,12 @@ class SharedMemory:
         self._pending_transactions: Dict[str, Transaction] = {}
 
         logger.info("🧠 SharedMemory initialized")
+
+    def _get_lock(self) -> asyncio.Lock:
+        """Get or create asyncio lock (lazy initialization for event loop compatibility)"""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     async def set(
         self,
@@ -182,20 +185,15 @@ class SharedMemory:
         Returns:
             True if successful, False if version conflict
         """
-        async with self._lock:
+        async with self._get_lock():
             now = datetime.now(timezone.utc)
 
             if key in self._data:
                 existing = self._data[key]
 
                 # Check optimistic lock
-                if (
-                    expected_version is not None
-                    and existing.version != expected_version
-                ):
-                    logger.warning(
-                        f"Version conflict on {key}: expected {expected_version}, got {existing.version}"
-                    )
+                if expected_version is not None and existing.version != expected_version:
+                    logger.warning(f"Version conflict on {key}: expected {expected_version}, got {existing.version}")
                     return False
 
                 # Check pessimistic lock
@@ -234,14 +232,14 @@ class SharedMemory:
 
     async def get(self, key: str, default: Any = None) -> Any:
         """Get value by key"""
-        async with self._lock:
+        async with self._get_lock():
             if key in self._data:
                 return self._data[key].value
             return default
 
     async def get_with_version(self, key: str) -> Tuple[Any, int]:
         """Get value with version for optimistic locking"""
-        async with self._lock:
+        async with self._get_lock():
             if key in self._data:
                 sv = self._data[key]
                 return sv.value, sv.version
@@ -249,7 +247,7 @@ class SharedMemory:
 
     async def delete(self, agent_id: str, key: str) -> bool:
         """Delete key"""
-        async with self._lock:
+        async with self._get_lock():
             if key in self._data:
                 sv = self._data[key]
 
@@ -280,7 +278,7 @@ class SharedMemory:
         delta: float = 1.0,
     ) -> float:
         """Atomic increment operation"""
-        async with self._lock:
+        async with self._get_lock():
             current = 0.0
             if key in self._data:
                 current = float(self._data[key].value)
@@ -298,7 +296,7 @@ class SharedMemory:
         new_value: Any,
     ) -> bool:
         """Atomic compare-and-swap operation"""
-        async with self._lock:
+        async with self._get_lock():
             current = self._data.get(key)
 
             if current is None:
@@ -322,11 +320,9 @@ class SharedMemory:
         """Acquire pessimistic lock on key"""
         timeout = timeout_seconds or self.lock_timeout_seconds
 
-        async with self._lock:
+        async with self._get_lock():
             now = datetime.now(timezone.utc)
-            expires_at = datetime.fromtimestamp(
-                now.timestamp() + timeout, tz=timezone.utc
-            )
+            expires_at = datetime.fromtimestamp(now.timestamp() + timeout, tz=timezone.utc)
 
             if key not in self._data:
                 self._data[key] = SharedValue(
@@ -360,7 +356,7 @@ class SharedMemory:
 
     async def release_lock(self, agent_id: str, key: str) -> bool:
         """Release lock on key"""
-        async with self._lock:
+        async with self._get_lock():
             if key not in self._data:
                 return False
 
@@ -395,7 +391,7 @@ class SharedMemory:
 
     async def commit_transaction(self, tx: Transaction) -> bool:
         """Commit transaction"""
-        async with self._lock:
+        async with self._get_lock():
             try:
                 for op, key, value in tx.operations:
                     if op == "SET":
@@ -488,26 +484,24 @@ class SharedMemory:
 
     async def get_all(self) -> Dict[str, Any]:
         """Get all key-value pairs"""
-        async with self._lock:
+        async with self._get_lock():
             return {key: sv.value for key, sv in self._data.items()}
 
     async def keys(self) -> List[str]:
         """Get all keys"""
-        async with self._lock:
+        async with self._get_lock():
             return list(self._data.keys())
 
     async def clear(self, agent_id: str) -> None:
         """Clear all data"""
-        async with self._lock:
+        async with self._get_lock():
             self._data.clear()
             logger.info(f"SharedMemory cleared by {agent_id}")
 
     def get_stats(self) -> Dict[str, Any]:
         """Get memory statistics"""
         with self._thread_lock:
-            locked_keys = [
-                key for key, sv in self._data.items() if sv.lock_holder is not None
-            ]
+            locked_keys = [key for key, sv in self._data.items() if sv.lock_holder is not None]
 
             return {
                 "total_keys": len(self._data),
@@ -573,9 +567,7 @@ class DistributedSharedMemory(SharedMemory):
 
         if result:
             # Update vector clock
-            self._vector_clock[self.node_id] = (
-                self._vector_clock.get(self.node_id, 0) + 1
-            )
+            self._vector_clock[self.node_id] = self._vector_clock.get(self.node_id, 0) + 1
 
             # Replicate to peers (placeholder)
             # await self._replicate_to_peers(key, value)

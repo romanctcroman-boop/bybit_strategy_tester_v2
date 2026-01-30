@@ -1,10 +1,24 @@
 """
-API Rate Limiting Middleware using slowapi.
+API Rate Limiting Middleware using slowapi (DEPRECATED).
 
+.. deprecated:: 2.9.4
+    This module is NOT used in production. The active rate limiting middleware is
+    ``backend.middleware.rate_limiter.RateLimitMiddleware`` which uses Token Bucket
+    algorithm configured via environment variables.
+
+    This slowapi-based implementation is kept for potential decorator-based
+    per-endpoint rate limiting use cases.
+
+For current rate limiting configuration, see:
+- backend/middleware/rate_limiter.py - Active Token Bucket implementation
+- backend/api/middleware_setup.py - Where middleware is configured
+
+Original description:
+---------------------
 Provides configurable rate limiting to protect the API from abuse.
 Uses Redis as backend for distributed rate limiting (falls back to memory).
 
-Usage:
+Usage (if re-enabled):
     from backend.api.middleware.rate_limiter import limiter, rate_limit_exceeded_handler
 
     app.state.limiter = limiter
@@ -29,14 +43,12 @@ logger = logging.getLogger(__name__)
 try:
     from slowapi import Limiter
     from slowapi.errors import RateLimitExceeded
-    from slowapi.util import get_remote_address
+    from slowapi.util import get_remote_address  # noqa: F401
 
     SLOWAPI_AVAILABLE = True
 except ImportError:
     SLOWAPI_AVAILABLE = False
-    logger.warning(
-        "slowapi not installed. Rate limiting disabled. Install with: pip install slowapi"
-    )
+    logger.warning("slowapi not installed. Rate limiting disabled. Install with: pip install slowapi")
 
 
 def get_client_identifier(request: Request) -> str:
@@ -98,9 +110,7 @@ def create_limiter() -> "Limiter | None":
         headers_enabled=True,  # Add X-RateLimit-* headers to responses
     )
 
-    logger.info(
-        f"Rate limiter initialized: default={RATE_LIMIT_DEFAULT}, burst={RATE_LIMIT_BURST}"
-    )
+    logger.info(f"Rate limiter initialized: default={RATE_LIMIT_DEFAULT}, burst={RATE_LIMIT_BURST}")
     return limiter
 
 
@@ -108,9 +118,7 @@ def create_limiter() -> "Limiter | None":
 limiter = create_limiter()
 
 
-async def rate_limit_exceeded_handler(
-    request: Request, exc: "RateLimitExceeded"
-) -> Response:
+async def rate_limit_exceeded_handler(request: Request, exc: "RateLimitExceeded") -> Response:
     """
     Custom handler for rate limit exceeded errors.
 
@@ -121,19 +129,14 @@ async def rate_limit_exceeded_handler(
     """
     retry_after = getattr(exc, "retry_after", 60)
 
-    logger.warning(
-        f"Rate limit exceeded for {get_client_identifier(request)}: "
-        f"{request.method} {request.url.path}"
-    )
+    logger.warning(f"Rate limit exceeded for {get_client_identifier(request)}: {request.method} {request.url.path}")
 
     return JSONResponse(
         status_code=429,
         content={
             "error": "rate_limit_exceeded",
             "message": "Too many requests. Please slow down.",
-            "detail": str(exc.detail)
-            if hasattr(exc, "detail")
-            else "Rate limit exceeded",
+            "detail": str(exc.detail) if hasattr(exc, "detail") else "Rate limit exceeded",
             "retry_after": retry_after,
         },
         headers={

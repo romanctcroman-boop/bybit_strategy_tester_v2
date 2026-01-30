@@ -1,0 +1,130 @@
+# =============================================================================
+# HashiCorp Vault Production Setup
+# =============================================================================
+# Docker Compose configuration for running Vault in production mode
+# with MLflow experiment tracking server.
+#
+# Usage:
+#   docker-compose -f docker-compose.vault.yml up -d
+#
+# Initial Setup:
+#   1. Start Vault: docker-compose up -d vault
+#   2. Initialize: docker exec vault vault operator init
+#   3. Save the unseal keys and root token securely!
+#   4. Unseal: docker exec vault vault operator unseal <key>
+#   5. Login: docker exec vault vault login <root-token>
+#   6. Run init script: ./scripts/vault_init.sh
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ===========================================================================
+  # HashiCorp Vault - Secrets Management
+  # ===========================================================================
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: bybit-vault
+    restart: unless-stopped
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_API_ADDR: "http://0.0.0.0:8200"
+      # For production, use file storage backend
+      VAULT_LOCAL_CONFIG: |
+        {
+          "backend": {
+            "file": {
+              "path": "/vault/data"
+            }
+          },
+          "listener": {
+            "tcp": {
+              "address": "0.0.0.0:8200",
+              "tls_disable": 1
+            }
+          },
+          "ui": true,
+          "disable_mlock": true
+        }
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - vault-data:/vault/data
+      - vault-logs:/vault/logs
+      - ./vault/config:/vault/config:ro
+      - ./vault/policies:/vault/policies:ro
+    command: server
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - bybit-network
+
+  # ===========================================================================
+  # MLflow Tracking Server
+  # ===========================================================================
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.0
+    container_name: bybit-mlflow
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      MLFLOW_BACKEND_STORE_URI: sqlite:///mlflow/mlflow.db
+      MLFLOW_DEFAULT_ARTIFACT_ROOT: /mlflow/artifacts
+    volumes:
+      - mlflow-data:/mlflow
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - bybit-network
+
+  # ===========================================================================
+  # PostgreSQL for MLflow (Production Alternative)
+  # ===========================================================================
+  mlflow-db:
+    image: postgres:15-alpine
+    container_name: bybit-mlflow-db
+    restart: unless-stopped
+    profiles:
+      - production
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: ${MLFLOW_DB_PASSWORD:-mlflow_secret}
+      POSTGRES_DB: mlflow
+    volumes:
+      - mlflow-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bybit-network
+
+volumes:
+  vault-data:
+    driver: local
+  vault-logs:
+    driver: local
+  mlflow-data:
+    driver: local
+  mlflow-pg-data:
+    driver: local
+
+networks:
+  bybit-network:
+    driver: bridge

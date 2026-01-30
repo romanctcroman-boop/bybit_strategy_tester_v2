@@ -10,8 +10,10 @@ Features:
 - High precision floats (0.01, 0.001, etc.)
 - Log-scale sampling option
 - Parallel optimization with n_jobs
+- Thread-safe operations with locks
 """
 
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -77,6 +79,10 @@ class BayesianOptimizer:
         self._best_params: Optional[Dict[str, Any]] = None
         self._best_value: Optional[float] = None
 
+        # Thread safety lock for concurrent access
+        self._lock = threading.RLock()
+        self._is_running = False
+
         # Suppress Optuna logs for cleaner output
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -88,9 +94,7 @@ class BayesianOptimizer:
             multivariate=True,  # Consider parameter correlations
         )
 
-    def _suggest_param(
-        self, trial: "optuna.Trial", param_name: str, param_spec: Dict[str, Any]
-    ) -> Any:
+    def _suggest_param(self, trial: "optuna.Trial", param_name: str, param_spec: Dict[str, Any]) -> Any:
         """
         Suggest a parameter value based on specification.
 
@@ -140,9 +144,7 @@ class BayesianOptimizer:
             # We'll sample uniformly and then round to the step
             if step < 0.01 or precision:
                 # Use uniform sampling and round
-                value = trial.suggest_float(
-                    param_name, float(low), float(high), log=log_scale and low > 0
-                )
+                value = trial.suggest_float(param_name, float(low), float(high), log=log_scale and low > 0)
                 # Round to step or precision
                 if precision:
                     return round(value, precision)
@@ -172,6 +174,8 @@ class BayesianOptimizer:
         """
         Run Bayesian optimization asynchronously.
 
+        Thread-safe: Only one optimization can run at a time per instance.
+
         Args:
             strategy_config: Base strategy configuration
             param_space: Parameter search space
@@ -182,138 +186,133 @@ class BayesianOptimizer:
 
         Returns:
             Optimization results with best params and statistics
+
+        Raises:
+            RuntimeError: If another optimization is already running
         """
-        from backend.core.engine_adapter import get_engine
-
-        engine = get_engine()
-
-        # Prepare backtest configuration
-        base_config = {
-            "symbol": strategy_config.get("symbol", "BTCUSDT"),
-            "interval": strategy_config.get("interval", "1h"),
-            "initial_capital": self.initial_capital,
-            "leverage": strategy_config.get("leverage", 1),
-            "commission": self.commission,
-            **strategy_config,
-        }
-
-        def objective(trial: optuna.Trial) -> float:
-            """Objective function for Optuna."""
-            # Suggest parameters
-            params = {}
-            for param_name, param_spec in param_space.items():
-                value = self._suggest_param(trial, param_name, param_spec)
-                if value is not None:
-                    params[param_name] = value
-
-            # Merge with base config
-            config = {**base_config, **params}
-
-            try:
-                # Run backtest
-                result = engine.run_backtest(
-                    df=self.data.copy(),
-                    config=config,
+        # Thread-safe check for concurrent optimization
+        with self._lock:
+            if self._is_running:
+                raise RuntimeError(
+                    "Another optimization is already running. "
+                    "Wait for it to complete or create a new BayesianOptimizer instance."
                 )
+            self._is_running = True
 
-                if result is None:
+        try:
+            from backend.core.engine_adapter import get_engine
+
+            engine = get_engine()
+
+            # Prepare backtest configuration
+            base_config = {
+                "symbol": strategy_config.get("symbol", "BTCUSDT"),
+                "interval": strategy_config.get("interval", "1h"),
+                "initial_capital": self.initial_capital,
+                "leverage": strategy_config.get("leverage", 1),
+                "commission": self.commission,
+                **strategy_config,
+            }
+
+            def objective(trial: optuna.Trial) -> float:
+                """Objective function for Optuna."""
+                # Suggest parameters
+                params = {}
+                for param_name, param_spec in param_space.items():
+                    value = self._suggest_param(trial, param_name, param_spec)
+                    if value is not None:
+                        params[param_name] = value
+
+                # Merge with base config
+                config = {**base_config, **params}
+
+                try:
+                    # Run backtest
+                    result = engine.run_backtest(
+                        df=self.data.copy(),
+                        config=config,
+                    )
+
+                    if result is None:
+                        return float("-inf") if direction == "maximize" else float("inf")
+
+                    # Extract metric
+                    metrics = result.get("metrics", result)
+                    value = metrics.get(metric, 0)
+
+                    if value is None or np.isnan(value) or np.isinf(value):
+                        return float("-inf") if direction == "maximize" else float("inf")
+
+                    return float(value)
+
+                except Exception as e:
+                    logger.warning(f"Trial failed: {e}")
                     return float("-inf") if direction == "maximize" else float("inf")
 
-                # Extract metric
-                metrics = result.get("metrics", result)
-                value = metrics.get(metric, 0)
+            # Create study
+            self.study = optuna.create_study(
+                direction=direction,
+                sampler=self._create_sampler(),
+                study_name=f"bayesian_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            )
 
-                if value is None or np.isnan(value) or np.isinf(value):
-                    return float("-inf") if direction == "maximize" else float("inf")
+            # Progress callback
+            completed_trials = [0]
 
-                return float(value)
+            def progress_callback(study: optuna.Study, trial: optuna.trial.FrozenTrial):
+                completed_trials[0] += 1
+                if show_progress and completed_trials[0] % 10 == 0:
+                    best = study.best_value if study.best_trial else None
+                    logger.info(
+                        f"🔄 Trial {completed_trials[0]}/{self.n_trials}, best {metric}={best:.4f}" if best else ""
+                    )
 
-            except Exception as e:
-                logger.warning(f"Trial failed: {e}")
-                return float("-inf") if direction == "maximize" else float("inf")
+            # Run optimization
+            self.study.optimize(
+                objective,
+                n_trials=self.n_trials,
+                n_jobs=self.n_jobs,
+                callbacks=[progress_callback] if show_progress else None,
+                show_progress_bar=False,
+            )
 
-        # Create study
-        self.study = optuna.create_study(
-            direction=direction,
-            sampler=self._create_sampler(),
-            study_name=f"bayesian_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-        )
+            # Extract results
+            with self._lock:
+                self._best_params = self.study.best_params
+                self._best_value = self.study.best_value
 
-        # Progress callback
-        completed_trials = [0]
+            # Get top trials
+            top_trials = sorted(
+                [t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE],
+                key=lambda t: t.value if direction == "maximize" else -t.value,
+                reverse=True,
+            )[:10]
 
-        def progress_callback(study: optuna.Study, trial: optuna.trial.FrozenTrial):
-            completed_trials[0] += 1
-            if show_progress and completed_trials[0] % 10 == 0:
-                best = study.best_value if study.best_trial else None
-                logger.info(
-                    f"🔄 Trial {completed_trials[0]}/{self.n_trials}, "
-                    f"best {metric}={best:.4f}"
-                    if best
-                    else ""
-                )
-
-        # Run optimization
-        self.study.optimize(
-            objective,
-            n_trials=self.n_trials,
-            n_jobs=self.n_jobs,
-            callbacks=[progress_callback] if show_progress else None,
-            show_progress_bar=False,
-        )
-
-        # Extract results
-        self._best_params = self.study.best_params
-        self._best_value = self.study.best_value
-
-        # Get top trials
-        top_trials = sorted(
-            [
-                t
-                for t in self.study.trials
-                if t.state == optuna.trial.TrialState.COMPLETE
-            ],
-            key=lambda t: t.value if direction == "maximize" else -t.value,
-            reverse=True,
-        )[:10]
-
-        return {
-            "best_params": self._best_params,
-            "best_value": self._best_value,
-            "best_trial_number": self.study.best_trial.number,
-            "top_results": [
-                {
-                    "trial": t.number,
-                    "params": t.params,
-                    "value": t.value,
-                }
-                for t in top_trials
-            ],
-            "statistics": {
-                "completed_trials": len(
-                    [
-                        t
-                        for t in self.study.trials
-                        if t.state == optuna.trial.TrialState.COMPLETE
-                    ]
-                ),
-                "failed_trials": len(
-                    [
-                        t
-                        for t in self.study.trials
-                        if t.state == optuna.trial.TrialState.FAIL
-                    ]
-                ),
-                "pruned_trials": len(
-                    [
-                        t
-                        for t in self.study.trials
-                        if t.state == optuna.trial.TrialState.PRUNED
-                    ]
-                ),
-                "total_trials": len(self.study.trials),
-            },
-        }
+            return {
+                "best_params": self._best_params,
+                "best_value": self._best_value,
+                "best_trial_number": self.study.best_trial.number,
+                "top_results": [
+                    {
+                        "trial": t.number,
+                        "params": t.params,
+                        "value": t.value,
+                    }
+                    for t in top_trials
+                ],
+                "statistics": {
+                    "completed_trials": len(
+                        [t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+                    ),
+                    "failed_trials": len([t for t in self.study.trials if t.state == optuna.trial.TrialState.FAIL]),
+                    "pruned_trials": len([t for t in self.study.trials if t.state == optuna.trial.TrialState.PRUNED]),
+                    "total_trials": len(self.study.trials),
+                },
+            }
+        finally:
+            # Always release the running flag
+            with self._lock:
+                self._is_running = False
 
     def get_importance(self) -> Dict[str, float]:
         """

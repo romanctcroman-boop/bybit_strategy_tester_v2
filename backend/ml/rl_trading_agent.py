@@ -19,6 +19,8 @@ from typing import Any, Optional
 
 import numpy as np
 
+from backend.core.indicators import calculate_rsi
+
 logger = logging.getLogger(__name__)
 
 
@@ -189,9 +191,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         super().push(state, action, reward, next_state, done)
         self.priorities.append(priority)
 
-    def sample(
-        self, batch_size: int, beta: float = 0.4
-    ) -> tuple[list[Experience], np.ndarray, list[int]]:
+    def sample(self, batch_size: int, beta: float = 0.4) -> tuple[list[Experience], np.ndarray, list[int]]:
         """Sample batch weighted by priorities."""
         if len(self.buffer) == 0:
             return [], np.array([]), []
@@ -200,9 +200,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         probs = priorities**self.alpha
         probs /= probs.sum()
 
-        indices = np.random.choice(
-            len(self.buffer), min(batch_size, len(self.buffer)), p=probs, replace=False
-        )
+        indices = np.random.choice(len(self.buffer), min(batch_size, len(self.buffer)), p=probs, replace=False)
         samples = [self.buffer[i] for i in indices]
 
         # Importance sampling weights
@@ -234,9 +232,7 @@ class SimpleNeuralNetwork:
 
         # Initialize weights using He initialization
         for i in range(len(layer_dims) - 1):
-            w = np.random.randn(layer_dims[i], layer_dims[i + 1]) * np.sqrt(
-                2.0 / layer_dims[i]
-            )
+            w = np.random.randn(layer_dims[i], layer_dims[i + 1]) * np.sqrt(2.0 / layer_dims[i])
             b = np.zeros((1, layer_dims[i + 1]))
             self.weights.append(w)
             self.biases.append(b)
@@ -293,9 +289,7 @@ class SimpleNeuralNetwork:
 
         # Backward pass (simplified)
         d_output = np.zeros_like(predictions)
-        d_output[np.arange(batch_size), action_indices] = (
-            2 * (predicted_q - targets) / batch_size
-        )
+        d_output[np.arange(batch_size), action_indices] = 2 * (predicted_q - targets) / batch_size
 
         # Backprop through layers
         d_current = d_output
@@ -400,9 +394,7 @@ class DQNAgent(BaseRLAgent):
         # Exploration
         self.epsilon = config.epsilon_start
 
-        logger.info(
-            f"DQN Agent initialized with state_dim={config.state_dim}, action_dim={config.action_dim}"
-        )
+        logger.info(f"DQN Agent initialized with state_dim={config.state_dim}, action_dim={config.action_dim}")
 
     def select_action(self, state: np.ndarray, training: bool = True) -> int:
         """Select action using epsilon-greedy policy."""
@@ -635,30 +627,20 @@ class TradingEnvironment:
             atr=np.std(returns) if len(returns) > 1 else 0.0,
             position_size=self.position,
             unrealized_pnl=self._calculate_unrealized_pnl(),
-            entry_price=self.entry_price / (current_price + 1e-8)
-            if self.entry_price > 0
-            else 0.0,
+            entry_price=self.entry_price / (current_price + 1e-8) if self.entry_price > 0 else 0.0,
         )
 
         return state.to_array()
 
     def _calculate_rsi(self, prices: np.ndarray, period: int = 14) -> float:
-        """Calculate RSI indicator."""
+        """Calculate RSI indicator using unified library."""
         if len(prices) < period + 1:
             return 50.0
 
-        deltas = np.diff(prices)
-        gains = np.where(deltas > 0, deltas, 0)
-        losses = np.where(deltas < 0, -deltas, 0)
-
-        avg_gain = np.mean(gains[-period:])
-        avg_loss = np.mean(losses[-period:])
-
-        if avg_loss == 0:
-            return 100.0
-
-        rs = avg_gain / avg_loss
-        return 100 - (100 / (1 + rs))
+        rsi_array = calculate_rsi(prices, period)
+        # Return last non-NaN value
+        valid_rsi = rsi_array[~np.isnan(rsi_array)]
+        return float(valid_rsi[-1]) if len(valid_rsi) > 0 else 50.0
 
     def _calculate_unrealized_pnl(self) -> float:
         """Calculate unrealized PnL."""
@@ -685,11 +667,7 @@ class TradingEnvironment:
         if rl_action == RLAction.BUY and self.position <= 0:
             if self.position < 0:
                 # Close short first
-                pnl = (
-                    -self.position
-                    * (current_price - self.entry_price)
-                    / self.entry_price
-                )
+                pnl = -self.position * (current_price - self.entry_price) / self.entry_price
             self.position = self.config.max_position_size
             self.entry_price = current_price
             position_changed = True
@@ -697,28 +675,16 @@ class TradingEnvironment:
         elif rl_action == RLAction.SELL and self.position >= 0:
             if self.position > 0:
                 # Close long first
-                pnl = (
-                    self.position
-                    * (current_price - self.entry_price)
-                    / self.entry_price
-                )
+                pnl = self.position * (current_price - self.entry_price) / self.entry_price
             self.position = -self.config.max_position_size
             self.entry_price = current_price
             position_changed = True
 
         elif rl_action == RLAction.CLOSE and self.position != 0:
             if self.position > 0:
-                pnl = (
-                    self.position
-                    * (current_price - self.entry_price)
-                    / self.entry_price
-                )
+                pnl = self.position * (current_price - self.entry_price) / self.entry_price
             else:
-                pnl = (
-                    -self.position
-                    * (current_price - self.entry_price)
-                    / self.entry_price
-                )
+                pnl = -self.position * (current_price - self.entry_price) / self.entry_price
             self.position = 0.0
             self.entry_price = 0.0
             position_changed = True
@@ -727,11 +693,7 @@ class TradingEnvironment:
         self.total_pnl += pnl
         if self.total_pnl > self.peak_value:
             self.peak_value = self.total_pnl
-        drawdown = (
-            (self.peak_value - self.total_pnl) / (self.peak_value + 1e-8)
-            if self.peak_value > 0
-            else 0.0
-        )
+        drawdown = (self.peak_value - self.total_pnl) / (self.peak_value + 1e-8) if self.peak_value > 0 else 0.0
         self.max_drawdown = max(self.max_drawdown, drawdown)
 
         # Calculate reward
@@ -832,10 +794,7 @@ async def train_rl_agent(
         if (episode + 1) % 10 == 0:
             avg_reward = np.mean(training_metrics["episode_rewards"][-10:])
             avg_pnl = np.mean(training_metrics["final_pnl"][-10:])
-            logger.info(
-                f"Episode {episode + 1}/{num_episodes}: "
-                f"Avg Reward: {avg_reward:.4f}, Avg PnL: {avg_pnl:.4%}"
-            )
+            logger.info(f"Episode {episode + 1}/{num_episodes}: Avg Reward: {avg_reward:.4f}, Avg PnL: {avg_pnl:.4%}")
 
         # Save best model
         if save_path and episode_reward > best_reward:

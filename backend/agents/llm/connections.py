@@ -9,11 +9,12 @@ Production-ready connections to LLM APIs:
 - Local models via Ollama
 
 Features:
-- Connection pooling
+- Connection pooling (via persistent aiohttp sessions)
 - Automatic retries with backoff
 - Rate limiting
 - Streaming support
 - Token tracking
+- Circuit Breaker integration (P1 fix 2026-01-28)
 """
 
 from __future__ import annotations
@@ -26,10 +27,25 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, TypeVar
 
 import aiohttp
 from loguru import logger
+
+# Circuit Breaker integration (optional - graceful fallback if not available)
+try:
+    from backend.agents.circuit_breaker_manager import (
+        CircuitBreakerError,
+        get_circuit_manager,
+    )
+    _CIRCUIT_BREAKER_AVAILABLE = True
+except ImportError:
+    logger.debug("Circuit breaker not available, running without protection")
+    _CIRCUIT_BREAKER_AVAILABLE = False
+    CircuitBreakerError = Exception  # type: ignore
+    get_circuit_manager = None  # type: ignore
+
+T = TypeVar("T")
 
 
 class LLMProvider(Enum):
@@ -141,7 +157,40 @@ class RateLimiter:
 
 
 class LLMClient(ABC):
-    """Abstract LLM client"""
+    """Abstract LLM client with optional circuit breaker integration"""
+
+    _circuit_manager = None
+    _breaker_name: str = "llm_default"
+
+    def _init_circuit_breaker(self, breaker_name: str) -> None:
+        """Initialize circuit breaker for this client"""
+        self._breaker_name = breaker_name
+        if _CIRCUIT_BREAKER_AVAILABLE and get_circuit_manager is not None:
+            try:
+                self._circuit_manager = get_circuit_manager()
+                if breaker_name not in self._circuit_manager.get_all_breakers():
+                    self._circuit_manager.register_breaker(
+                        name=breaker_name,
+                        fail_max=5,
+                        timeout_duration=60,
+                        expected_exception=Exception,
+                    )
+                logger.debug(f"Circuit breaker '{breaker_name}' initialized")
+            except Exception as e:
+                logger.warning(f"Could not initialize circuit breaker: {e}")
+                self._circuit_manager = None
+
+    async def _call_with_breaker(self, func: Callable[[], T]) -> T:
+        """Execute function with circuit breaker protection"""
+        if self._circuit_manager:
+            try:
+                return await self._circuit_manager.call_with_breaker(
+                    self._breaker_name, func
+                )
+            except CircuitBreakerError:
+                logger.warning(f"Circuit breaker '{self._breaker_name}' is open")
+                raise
+        return await func()
 
     @abstractmethod
     async def chat(
@@ -168,7 +217,7 @@ class LLMClient(ABC):
 
 
 class DeepSeekClient(LLMClient):
-    """DeepSeek API client"""
+    """DeepSeek API client with circuit breaker protection"""
 
     DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
     DEFAULT_MODEL = "deepseek-chat"
@@ -184,6 +233,9 @@ class DeepSeekClient(LLMClient):
         self.total_requests = 0
         self.total_tokens = 0
         self.total_cost = 0.0
+
+        # Initialize circuit breaker
+        self._init_circuit_breaker("deepseek_llm_client")
 
         logger.info(f"🔵 DeepSeek client initialized: {self.model}")
 
@@ -311,7 +363,7 @@ class DeepSeekClient(LLMClient):
 
 
 class PerplexityClient(LLMClient):
-    """Perplexity API client"""
+    """Perplexity API client with circuit breaker protection"""
 
     DEFAULT_BASE_URL = "https://api.perplexity.ai"
     DEFAULT_MODEL = "llama-3.1-sonar-small-128k-online"
@@ -325,6 +377,9 @@ class PerplexityClient(LLMClient):
 
         self.total_requests = 0
         self.total_tokens = 0
+
+        # Initialize circuit breaker
+        self._init_circuit_breaker("perplexity_llm_client")
 
         logger.info(f"🟣 Perplexity client initialized: {self.model}")
 

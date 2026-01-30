@@ -267,6 +267,60 @@ class StrategyValidator:
                 )
             )
 
+        # Check for main strategy node and entry signals
+        main_node = None
+        for block_id, block in graph.blocks.items():
+            if block.block_type == BlockType.OUTPUT_SIGNAL and (
+                block.name.lower() == "strategy" or getattr(block, "isMain", False)
+            ):
+                main_node = block_id
+                break
+
+        if main_node:
+            # Check if entry signals are connected to main node
+            # Frontend uses ports: entry_long, entry_short, exit_long, exit_short
+            # But OUTPUT_SIGNAL block definition only has "signal" input
+            # So we check for connections to main node regardless of input name
+            # OR check if main node has custom inputs (entry_long, etc.)
+            main_block = graph.blocks[main_node]
+            main_inputs = [inp.name for inp in main_block.inputs]
+            
+            # Check for connections to main node
+            main_connections = [
+                conn
+                for conn in graph.connections
+                if conn.target_block_id == main_node
+            ]
+            
+            # If main node has entry_long/entry_short inputs, require them
+            if "entry_long" in main_inputs or "entry_short" in main_inputs:
+                entry_connections = [
+                    conn
+                    for conn in main_connections
+                    if conn.target_input in ["entry_long", "entry_short"]
+                ]
+                if not entry_connections:
+                    errors.append(
+                        ValidationError(
+                            code="NO_ENTRY_SIGNALS",
+                            message="Main strategy node has no entry signals connected",
+                            severity=ValidationSeverity.ERROR,
+                            block_id=main_node,
+                            suggestion="Connect at least one condition block to entry_long or entry_short port",
+                        )
+                    )
+            # Otherwise, just check that main node has some connections
+            elif not main_connections:
+                errors.append(
+                    ValidationError(
+                        code="NO_ENTRY_SIGNALS",
+                        message="Main strategy node has no signals connected",
+                        severity=ValidationSeverity.ERROR,
+                        block_id=main_node,
+                        suggestion="Connect at least one condition block to the main strategy node",
+                    )
+                )
+
         # Check for orphan blocks (not connected to anything)
         connected_blocks = self._get_connected_blocks(graph)
         for block_id, block in graph.blocks.items():

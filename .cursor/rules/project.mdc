@@ -1,0 +1,42 @@
+---
+description: Bybit Strategy Tester v2 — архитектура, движки бэктеста, TradingView parity, ключевые модули. Использовать при любой задаче в проекте.
+alwaysApply: true
+---
+
+# Проект: Bybit Strategy Tester v2
+
+## Структура
+
+- `backend/` — FastAPI, `api/` (роутеры), `backtesting/` (движки), `core/` (metrics_calculator 166 метрик), `database/`, `services/adapters/bybit.py`
+- `frontend/` — HTML/CSS/JS, Chart.js, Tabulator
+- `scripts/` — утилиты, калибровка, сравнения
+- `tests/` — pytest
+- `.agent/docs/` — ARCHITECTURE, DECISIONS, CHANGELOG
+
+## Движки бэктеста
+
+| Движок | Скорость | Pyramiding | Multi-TP | ATR | Назначение |
+|--------|----------|:----------:|:--------:|:---:|------------|
+| FallbackV2 | 1x | — | — | — | Базовый референс |
+| FallbackV3 | 1x | ✅ | — | — | Pyramiding |
+| **FallbackV4** | 1x | ✅ | ✅ | ✅ | **Эталон**, DCA, Multi-TP |
+| NumbaV2 | 41x | — | — | — | Быстрая оптимизация |
+| GPUV2 | 10–50x | — | — | — | Массовая оптимизация (CUDA) |
+
+Выбор: Multi-TP/DCA/ATR → V4; только pyramiding → V3; оптимизация → NumbaV2 или GPUV2; иначе → V2.
+
+## TradingView parity
+
+- **Комиссия обязательно 0.07%** для сравнения с TradingView.
+- Эталон точности: **FallbackEngineV2** (и V4 для сценариев с Multi-TP/DCA).
+- Калибровка: `scripts/calibrate_166_metrics.py`, `scripts/compare_*`.
+
+## Конфиг и пути
+
+- **Не хардкодить** `d:\bybit_strategy_tester_v2` / `d:/bybit_strategy_tester_v2`.
+- Использовать: `Path(__file__).resolve().parents[N]`, `os.environ.get("DATABASE_PATH","DATABASE_URL","CACHE_DIR","PROJECT_ROOT")` с fallback от корня проекта.
+
+## Запуск и линтинг
+
+- `.\dev.ps1 run` — приложение; `.\dev.ps1 lint`, `.\dev.ps1 format` — ruff; `.\dev.ps1 test` — pytest.
+- Python: `py -3.14` или интерпретатор из `pyproject.toml`.

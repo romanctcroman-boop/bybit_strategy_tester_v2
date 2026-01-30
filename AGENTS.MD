@@ -1,0 +1,318 @@
+# 🤖 Global Agent Rules - Bybit Strategy Tester v2
+
+> **CRITICAL**: These rules apply to ALL agent interactions in this workspace.
+> Read this file at the start of every conversation.
+
+---
+
+## 🎛️ Multi-Model Support
+
+### Model-Specific Configuration Files
+
+| Model               | Config File             | Mode                         |
+| ------------------- | ----------------------- | ---------------------------- |
+| **Claude Opus 4.5** | `.agent/Claude.md`      | Planning (Extended Thinking) |
+| **Gemini 3 Pro**    | `.agent/Gemini.md`      | Auto                         |
+| **Any Model**       | `AGENTS.MD` (this file) | Universal                    |
+
+### Optimizations by Model
+
+- **Claude Opus 4.5**: Use Planning mode, extended thinking for complex tasks
+- **Gemini 3 Pro**: Use Fast mode for quick tasks, Planning for complex
+- **Both**: Maximum terminal autonomy, auto-documentation
+
+### Priority Order
+
+1. Model-specific file (`.agent/Claude.md` or `.agent/Gemini.md`)
+2. Global rules (`AGENTS.MD`)
+3. Project skills (`.agent/skills/`)
+4. Knowledge Items
+
+---
+
+## 🧠 Memory & Context Persistence
+
+### Before Starting ANY Work:
+
+1. **Read KI Summaries** - Check knowledge items before independent research
+2. **Read .agent/docs/** - Understand current architecture and decisions
+3. **Check CHANGELOG.md** - Know recent changes and context
+4. **Reference DECISIONS.md** - Understand reasoning behind key choices
+
+### After Completing Work:
+
+1. **Update CHANGELOG.md** - Document what changed and why
+2. **Update ARCHITECTURE.md** - If structural changes were made
+3. **Update DECISIONS.md** - If important decisions were made
+4. **Create/Update API.md** - If endpoints changed
+5. **Update MODELS.md** - If data models changed
+
+---
+
+## 📝 Documentation Standards
+
+### Code Documentation:
+
+- Generate inline comments for complex logic (not obvious code)
+- Use Google-style docstrings for all public functions
+- Document edge cases and gotchas
+- Reference related Knowledge Items in comments when applicable
+
+### Markdown Documentation:
+
+- Use clear headings and table of contents for long docs
+- Include code examples where helpful
+- Add timestamps to major updates
+- Link related documents together
+
+### Artifact Generation:
+
+- Create implementation_plan artifacts for complex tasks
+- Generate task artifacts for multi-step work
+- Use walkthrough artifacts for explanations
+- Save all generated images as artifacts
+
+---
+
+## 🔧 Workflow Standards
+
+### For Simple Tasks (< 15 minutes):
+
+1. Execute directly
+2. Document in CHANGELOG.md
+3. Report completion
+
+### For Complex Tasks (> 15 minutes):
+
+1. Create implementation_plan artifact
+2. Break into subtasks
+3. Execute each subtask
+4. Document continuously
+5. Generate comprehensive report
+
+### For Research Tasks:
+
+1. Check KIs first (MANDATORY!)
+2. If not found, search codebase
+3. Document findings in appropriate docs
+4. Consider creating new KI if knowledge is reusable
+
+---
+
+## 🎯 Agent Skills Usage
+
+### Always Check Skills First:
+
+- Before implementing common patterns, check `.agent/skills/`
+- Use existing skills instead of reinventing
+- Suggest new skills for reusable patterns
+
+### Skill Locations:
+
+- `.agent/skills/skills/` - Pre-built superpowers
+- `.agent/workflows/` - Step-by-step procedures
+
+---
+
+## ⚙️ Technical Standards
+
+### Code Quality:
+
+- Follow existing code style (see pyproject.toml)
+- Run ruff/black before committing
+- Write tests for new functionality
+- Maintain backward compatibility
+
+### Error Handling:
+
+- Never silently swallow errors
+- Log with context (loguru format)
+- Provide actionable error messages
+- Document known issues in DECISIONS.md
+
+### Performance:
+
+- Profile before optimizing
+- Document performance-critical paths
+- Consider memory usage for large datasets
+- Use appropriate data structures
+
+---
+
+## 🔒 Security Rules
+
+### Never:
+
+- Print or log secrets/API keys
+- Commit credentials to git
+- Execute untrusted code without review
+- Expose internal endpoints
+
+### Always:
+
+- Use environment variables for secrets
+- Validate user input
+- Use parameterized queries
+- Follow principle of least privilege
+
+---
+
+## 📊 Project-Specific Knowledge
+
+### Key Architecture Components:
+
+- `backend/` - FastAPI application
+- `frontend/` - Static HTML/JS/CSS
+- `backend/backtesting/` - Trading strategy backtesting
+- `backend/core/metrics_calculator.py` - 166-metric suite
+- `backend/services/adapters/bybit.py` - Bybit API integration
+
+### TradingView Parity:
+
+- Commission MUST be 0.07% for parity
+- Use FallbackEngineV2 as gold standard
+- Check calibration script for metric verification
+
+### Database:
+
+- SQLite with SQLAlchemy
+- Market data partitioned by symbol
+- Use repository pattern for queries
+
+---
+
+## 🚀 Autonomy Guidelines
+
+### Auto-Execute (Safe Commands):
+
+**File Operations:**
+- `ls`, `dir`, `cat`, `type`, `head`, `tail`, `find`, `grep`
+- `mkdir`, `touch` (creating directories/files)
+- `mv`, `cp` (moving/copying files within workspace)
+- Reading any file in workspace
+
+**Git Operations (Read & Local):**
+- `git status`, `git log`, `git diff`, `git branch`, `git show`
+- `git add` (staging changes)
+- `git commit` (with descriptive messages)
+- `git checkout -b` (creating new branches)
+- `git merge` (local merges, not to main/master)
+- `git pull`, `git fetch`
+
+**Development Commands:**
+- `py -3.14 <script>` for any Python scripts
+- `python -m pytest` (all test commands)
+- `npm run dev`, `npm run build`, `npm run test`
+- `ruff check .`, `ruff format .`
+- `mypy .`, `black .`, `isort .`
+- `docker-compose up`, `docker-compose down`, `docker-compose logs`
+- `docker build`, `docker run` (non-destructive)
+
+**Code Quality:**
+- Running linters and formatters
+- Fixing linting errors automatically
+- Organizing imports
+- Formatting code
+
+**Testing & Analysis:**
+- Running all tests
+- Generating test coverage reports
+- Profiling code (`cProfile`, `memory_profiler`)
+- Performance benchmarking
+
+**Documentation:**
+- Updating CHANGELOG.md
+- Adding/updating docstrings
+- Creating/updating markdown documentation
+- Generating code comments
+
+**Refactoring (Safe):**
+- Renaming variables/functions (non-public)
+- Extracting methods/classes
+- Removing dead code
+- Simplifying conditionals
+- Fixing typos and formatting
+- Applying DRY principle
+
+**Bug Fixes (Low Risk):**
+- Fixing syntax errors
+- Correcting type hints
+- Fixing import errors
+- Resolving linter warnings
+- Fixing obvious bugs (with tests)
+
+### Ask Before (Moderate Risk):
+
+- `git push` (especially to main/master)
+- `git reset --hard`, `git rebase`
+- `rm`, `del`, `rmdir` (deleting files/directories)
+- Database migrations (schema changes)
+- Installing new dependencies (`pip install`, `npm install`)
+- Modifying `.gitignore` or CI/CD configs
+- Production deployments
+- Changing environment variables
+- Modifying security-critical code
+
+### Never Auto-Execute:
+
+- `curl`/`wget` to external URLs (without explicit permission)
+- Installing global packages
+- Modifying system files
+- Commands with sudo/admin privileges
+- `DROP TABLE`, `TRUNCATE`, destructive database operations
+- Formatting disks or system-level operations
+- Registry modifications (Windows)
+- Network configuration changes
+
+---
+
+## 📋 Self-Check Before Completing
+
+Before saying "task complete":
+
+| Check          | Question                           |
+| -------------- | ---------------------------------- |
+| ✅ Goal met?   | Did I do exactly what was asked?   |
+| ✅ Documented? | Updated all relevant docs?         |
+| ✅ Tested?     | Verified the change works?         |
+| ✅ Clean?      | No lint errors or warnings?        |
+| ✅ Context?    | Left enough info for next session? |
+| ✅ Improved?   | Did I improve code quality?        |
+| ✅ Secure?    | No security issues introduced?     |
+
+## 🎯 Enhanced Autonomy
+
+### Proactive Actions You Should Take
+
+- **Fix linting errors automatically** - Run `ruff check --fix .` and fix issues
+- **Run tests after changes** - Ensure nothing broke
+- **Update documentation** - CHANGELOG.md, docstrings, comments
+- **Improve code quality** - Refactor when you see opportunities
+- **Fix obvious bugs** - If you spot issues, fix them
+- **Add missing tests** - For new functionality
+- **Optimize performance** - When bottlenecks are obvious
+- **Enhance security** - Fix low-risk security issues
+
+### Autonomous Refactoring
+
+You are ENCOURAGED to:
+- Extract repeated code
+- Rename for clarity (non-public)
+- Remove dead code
+- Simplify complex logic
+- Break down large functions
+- Apply DRY principle
+- Improve variable names
+
+### Error Recovery
+
+When errors occur:
+1. Read error message carefully
+2. Check known issues (DECISIONS.md, CHANGELOG.md)
+3. Try obvious fixes (max 3 attempts)
+4. If still failing, report with suggestions
+
+---
+
+_Last Updated: 2026-01-24_
+_Version: 1.0_

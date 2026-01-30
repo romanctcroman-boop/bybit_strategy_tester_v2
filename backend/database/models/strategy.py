@@ -109,6 +109,20 @@ class Strategy(Base):
     # Version control
     version = Column(Integer, nullable=False, default=1)
 
+    # Strategy Builder fields (for visual block-based strategies)
+    builder_graph = Column(
+        JSON, nullable=True, default=None
+    )  # Full strategy graph: blocks + connections
+    builder_blocks = Column(
+        JSON, nullable=True, default=None
+    )  # Array of block objects (for quick access)
+    builder_connections = Column(
+        JSON, nullable=True, default=None
+    )  # Array of connection objects
+    is_builder_strategy = Column(
+        Boolean, nullable=False, default=False
+    )  # True if created via Strategy Builder
+
     # Relationships
     backtests = relationship(
         "Backtest", back_populates="strategy", cascade="all, delete-orphan"
@@ -150,6 +164,10 @@ class Strategy(Base):
             else None,
             "tags": self.tags,
             "version": self.version,
+            "builder_graph": self.builder_graph,
+            "builder_blocks": self.builder_blocks,
+            "builder_connections": self.builder_connections,
+            "is_builder_strategy": self.is_builder_strategy,
         }
 
     @classmethod

@@ -203,9 +203,7 @@ class HierarchicalMemory:
         }
 
         # Memory stores
-        self.stores: Dict[MemoryType, Dict[str, MemoryItem]] = {
-            tier: {} for tier in MemoryType
-        }
+        self.stores: Dict[MemoryType, Dict[str, MemoryItem]] = {tier: {} for tier in MemoryType}
 
         # Statistics
         self.stats = {
@@ -287,10 +285,7 @@ class HierarchicalMemory:
         if self.persist_path:
             await self._persist_item(item)
 
-        logger.debug(
-            f"📝 Stored memory [{memory_type.value}]: {content[:50]}... "
-            f"(importance={importance:.2f})"
-        )
+        logger.debug(f"📝 Stored memory [{memory_type.value}]: {content[:50]}... (importance={importance:.2f})")
 
         return item
 
@@ -362,9 +357,7 @@ class HierarchicalMemory:
 
         self.stats["total_recalled"] += len(top_results)
 
-        logger.debug(
-            f"🔍 Recalled {len(top_results)} memories for query: {query[:30]}..."
-        )
+        logger.debug(f"🔍 Recalled {len(top_results)} memories for query: {query[:30]}...")
 
         return top_results
 
@@ -404,8 +397,6 @@ class HierarchicalMemory:
             "episodic_to_semantic": 0,
             "to_procedural": 0,
         }
-
-        now = datetime.now(timezone.utc)
 
         # Working → Episodic: Important short-term memories
         working_store = self.stores[MemoryType.WORKING]

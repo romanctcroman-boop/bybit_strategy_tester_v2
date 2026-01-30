@@ -35,4 +35,15 @@ catch {
 # Keep window open on exit for debugging
 Write-Host ""
 Write-Host "Agent service has stopped." -ForegroundColor Yellow
-Read-Host "Press Enter to close"
+
+# DEV MODE: Auto-close after 3 seconds (remove this block for production)
+Write-Host "Press Enter to close (auto-closing in 3 sec)..." -ForegroundColor DarkGray
+$timeout = 3
+$stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+while ($stopwatch.Elapsed.TotalSeconds -lt $timeout) {
+    if ([Console]::KeyAvailable) {
+        [Console]::ReadKey($true) | Out-Null
+        break
+    }
+    Start-Sleep -Milliseconds 100
+}

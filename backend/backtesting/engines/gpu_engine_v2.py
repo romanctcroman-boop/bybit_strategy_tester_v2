@@ -1,6 +1,30 @@
 """
 GPUEngineV2 - GPU-Accelerated Backtest Engine
 
+⚠️ DEPRECATED: This engine is deprecated in favor of NumbaEngine.
+
+Reasons for deprecation:
+1. V2-only features — doesn't support pyramiding, multi-TP, ATR, trailing
+2. Requires NVIDIA GPU + CUDA (limited hardware support)
+3. NumbaEngine provides 20-40x speedup which is sufficient for 90% of use cases
+4. Complex codebase with higher maintenance burden
+
+Migration:
+    # Old way (deprecated):
+    from backend.backtesting.engines.gpu_engine_v2 import GPUEngineV2
+    engine = GPUEngineV2()
+
+    # New way (recommended):
+    from backend.backtesting.engines import NumbaEngine
+    engine = NumbaEngine()  # Full V4 support, 20-40x faster
+
+For extreme workloads (100K+ combinations), consider:
+- Batch processing with NumbaEngine
+- Ray distributed optimizer (backend/optimization/ray_optimizer.py)
+
+---
+
+Original description:
 100% parity with FallbackEngineV2 (reference implementation).
 Uses CuPy for NVIDIA GPU acceleration.
 
@@ -13,20 +37,21 @@ Architecture:
 - CPU: Trade record construction, metrics calculation
 """
 
-from typing import List, Tuple, Optional, Dict, Any
+import time
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-import time
 from loguru import logger
 
 from backend.backtesting.interfaces import (
-    BaseBacktestEngine,
     BacktestInput,
-    BacktestOutput,
     BacktestMetrics,
-    TradeRecord,
-    TradeDirection,
+    BacktestOutput,
+    BaseBacktestEngine,
     ExitReason,
+    TradeDirection,
+    TradeRecord,
 )
 
 # =============================================================================
@@ -101,22 +126,34 @@ class GPUEngineV2(BaseBacktestEngine):
     """
     GPU-Accelerated Backtest Engine V2.
 
-    Features:
+    ⚠️ DEPRECATED: Use NumbaEngine for full V4 support.
+
+    Features (V2-only):
     - 100% parity with FallbackEngineV2 (reference)
     - CuPy GPU acceleration for large datasets
     - Automatic CPU fallback if GPU unavailable
     - Full TradeRecord support (size, fees, pnl_pct)
 
-    When to use:
-    - Large datasets (>10,000 bars)
-    - Optimization with many iterations
-    - When GPU is available
+    NOT supported (use NumbaEngine instead):
+    - Pyramiding (multiple entries)
+    - ATR-based SL/TP
+    - Multi-level TP
+    - Trailing Stop
 
-    Limitations:
-    - Bar Magnifier not yet supported (falls back to bar-level)
+    Migration:
+        from backend.backtesting.engines import NumbaEngine
+        engine = NumbaEngine()  # Full V4 support, 20-40x faster
     """
 
     def __init__(self):
+        import warnings
+        warnings.warn(
+            "GPUEngineV2 is deprecated. Use NumbaEngine for full V4 support "
+            "(pyramiding, ATR, multi-TP, trailing) with 20-40x speedup. "
+            "GPU engine is V2-only and requires NVIDIA hardware.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._gpu_available = GPU_AVAILABLE
 
     @property
@@ -153,14 +190,38 @@ class GPUEngineV2(BaseBacktestEngine):
         low_prices = candles["low"].values.astype(np.float64)
         close_prices = candles["close"].values.astype(np.float64)
 
-        long_entries = input_data.long_entries
-        long_exits = input_data.long_exits
-        short_entries = input_data.short_entries
-        short_exits = input_data.short_exits
+        n = len(close_prices)
+
+        # Handle None signals - create zero arrays if not provided
+        long_entries = (
+            input_data.long_entries
+            if input_data.long_entries is not None
+            else np.zeros(n, dtype=bool)
+        )
+        long_exits = (
+            input_data.long_exits
+            if input_data.long_exits is not None
+            else np.zeros(n, dtype=bool)
+        )
+        short_entries = (
+            input_data.short_entries
+            if input_data.short_entries is not None
+            else np.zeros(n, dtype=bool)
+        )
+        short_exits = (
+            input_data.short_exits
+            if input_data.short_exits is not None
+            else np.zeros(n, dtype=bool)
+        )
 
         # Parameters
         initial_capital = input_data.initial_capital
-        position_size = input_data.position_size
+
+        # FIXED: Handle use_fixed_amount for TradingView parity
+        use_fixed_amount = input_data.use_fixed_amount and input_data.fixed_amount > 0
+        fixed_amount = input_data.fixed_amount if use_fixed_amount else 0.0
+        position_size = input_data.position_size  # For percentage-based sizing
+
         leverage = input_data.leverage
         stop_loss = input_data.stop_loss
         take_profit = input_data.take_profit
@@ -172,8 +233,6 @@ class GPUEngineV2(BaseBacktestEngine):
         # Direction flags
         allow_long = direction in (TradeDirection.LONG, TradeDirection.BOTH)
         allow_short = direction in (TradeDirection.SHORT, TradeDirection.BOTH)
-
-        n = len(close_prices)
 
         # Bar Magnifier index
         bar_magnifier_index = (
@@ -204,6 +263,8 @@ class GPUEngineV2(BaseBacktestEngine):
         short_size = 0.0
         long_allocated = 0.0
         short_allocated = 0.0
+        long_entry_fee = 0.0  # Track entry fee for TV fee calculation
+        short_entry_fee = 0.0  # Track entry fee for TV fee calculation
 
         for i in range(1, n):
             current_time = timestamps[i]
@@ -212,11 +273,15 @@ class GPUEngineV2(BaseBacktestEngine):
             low_price = low_prices[i]
             close_price = close_prices[i]
 
+            # TV-style: Track if we exited this bar (prevents new entry on same bar)
+            exited_this_bar = False
+
             # === LONG EXIT ===
             if in_long:
                 exit_reason, exit_price = self._check_exit_conditions(
                     is_long=True,
                     entry_price=long_entry_price,
+                    open_price=open_price,  # For TV intrabar simulation
                     high=high_price,
                     low=low_price,
                     close=close_price,
@@ -237,6 +302,7 @@ class GPUEngineV2(BaseBacktestEngine):
                         exit_price=exit_price,
                         size=long_size,
                         taker_fee=taker_fee,
+                        entry_fee=long_entry_fee,  # TV: entry + exit fees
                     )
 
                     cash += long_allocated + pnl
@@ -260,12 +326,15 @@ class GPUEngineV2(BaseBacktestEngine):
                     in_long = False
                     long_size = 0.0
                     long_allocated = 0.0
+                    long_entry_fee = 0.0  # Reset
+                    exited_this_bar = True  # Prevent new entry on same bar
 
             # === SHORT EXIT ===
             if in_short:
                 exit_reason, exit_price = self._check_exit_conditions(
                     is_long=False,
                     entry_price=short_entry_price,
+                    open_price=open_price,  # For TV intrabar simulation
                     high=high_price,
                     low=low_price,
                     close=close_price,
@@ -286,6 +355,7 @@ class GPUEngineV2(BaseBacktestEngine):
                         exit_price=exit_price,
                         size=short_size,
                         taker_fee=taker_fee,
+                        entry_fee=short_entry_fee,  # TV: entry + exit fees
                     )
 
                     cash += short_allocated + pnl
@@ -309,46 +379,82 @@ class GPUEngineV2(BaseBacktestEngine):
                     in_short = False
                     short_size = 0.0
                     short_allocated = 0.0
+                    short_entry_fee = 0.0  # Reset
+                    exited_this_bar = True  # Prevent new entry on same bar
 
             # === LONG ENTRY ===
-            # Skip entry on last bar
-            if not in_long and allow_long and long_entries[i] and (i < n - 1):
-                entry_price = open_price * (1.0 + slippage)
-                allocated = cash * position_size
+            # TradingView parity: signal at bar i, entry at bar i+1 open
+            # Check not in_short to prevent simultaneous positions
+            # TV-style: No entry on same bar as exit
+            if (
+                not in_long
+                and not in_short
+                and not exited_this_bar  # TV-style: No entry on same bar as exit
+                and allow_long
+                and long_entries[i]
+                and (i < n - 2)
+                and (i > 0)
+            ):
+                # Enter at NEXT bar's open (i+1), not current bar
+                # TV parity: No slippage on entry, entry at exact open price
+                entry_price = open_prices[i + 1]
+                # FIXED: Handle fixed amount vs percentage modes (TV parity)
+                if use_fixed_amount:
+                    allocated = min(fixed_amount, cash)
+                else:
+                    allocated = cash * position_size
 
                 if allocated >= 1.0:  # Minimum $1.00 to open
                     notional = allocated * leverage
                     size = notional / entry_price
                     entry_fee = notional * taker_fee
 
+                    # FIXED: TV doesn't deduct entry_fee from cash
                     cash -= allocated
-                    cash -= entry_fee
 
                     in_long = True
                     long_entry_price = entry_price
-                    long_entry_idx = i
+                    long_entry_idx = i  # Signal bar index (TV style)
                     long_size = size
                     long_allocated = allocated
+                    long_entry_fee = entry_fee  # Track for TV fee calculation
 
             # === SHORT ENTRY ===
-            # Skip entry on last bar
-            if not in_short and allow_short and short_entries[i] and (i < n - 1):
-                entry_price = open_price * (1.0 - slippage)
-                allocated = cash * position_size
+            # TradingView parity: signal at bar i, entry at bar i+1 open
+            # Check not in_long to prevent simultaneous positions
+            # TV-style: No entry on same bar as exit
+            if (
+                not in_short
+                and not in_long
+                and not exited_this_bar  # TV-style: No entry on same bar as exit
+                and allow_short
+                and short_entries[i]
+                and (i < n - 2)
+                and (i > 0)
+            ):
+                # Enter at NEXT bar's open (i+1), not current bar
+                # TV parity: No slippage on entry, entry at exact open price
+                entry_price = open_prices[i + 1]
+                # FIXED: Handle fixed amount vs percentage modes (TV parity)
+                if use_fixed_amount:
+                    allocated = min(fixed_amount, cash)
+                else:
+                    allocated = cash * position_size
 
                 if allocated >= 1.0:  # Minimum $1.00 to open
                     notional = allocated * leverage
                     size = notional / entry_price
                     entry_fee = notional * taker_fee
 
+                    # FIXED: TV doesn't deduct entry_fee from cash
                     cash -= allocated
-                    cash -= entry_fee
 
                     in_short = True
                     short_entry_price = entry_price
-                    short_entry_idx = i
+                    short_entry_idx = i  # Signal bar index (TV style)
                     short_size = size
                     short_allocated = allocated
+                    short_entry_fee = entry_fee  # Track for TV fee calculation
 
             # === UPDATE EQUITY ===
             equity = cash
@@ -376,6 +482,7 @@ class GPUEngineV2(BaseBacktestEngine):
                 exit_price=exit_price,
                 size=long_size,
                 taker_fee=taker_fee,
+                entry_fee=long_entry_fee,  # TV: entry + exit fees
             )
 
             trades.append(
@@ -402,6 +509,7 @@ class GPUEngineV2(BaseBacktestEngine):
                 exit_price=exit_price,
                 size=short_size,
                 taker_fee=taker_fee,
+                entry_fee=short_entry_fee,  # TV: entry + exit fees
             )
 
             trades.append(
@@ -441,6 +549,7 @@ class GPUEngineV2(BaseBacktestEngine):
         self,
         is_long: bool,
         entry_price: float,
+        open_price: float,  # Added for TV intrabar simulation
         high: float,
         low: float,
         close: float,
@@ -467,7 +576,12 @@ class GPUEngineV2(BaseBacktestEngine):
             tp_price = entry_price * (1.0 - take_profit) if take_profit > 0 else 0.0
 
         # === BAR MAGNIFIER: Precise intrabar SL/TP detection ===
-        if use_bar_magnifier and bar_magnifier_index and bar_idx in bar_magnifier_index:
+        if (
+            use_bar_magnifier
+            and bar_magnifier_index
+            and candles_1m is not None
+            and bar_idx in bar_magnifier_index
+        ):
             start_idx, end_idx = bar_magnifier_index[bar_idx]
             m1_highs = candles_1m["high"].values[start_idx:end_idx]
             m1_lows = candles_1m["low"].values[start_idx:end_idx]
@@ -475,30 +589,57 @@ class GPUEngineV2(BaseBacktestEngine):
             for m1_high, m1_low in zip(m1_highs, m1_lows):
                 if is_long:
                     # Long: check SL (low) first, then TP (high)
+                    # TV parity: SL/TP exit at exact level, no slippage
                     if sl_price > 0 and m1_low <= sl_price:
-                        return ExitReason.STOP_LOSS, sl_price * (1.0 - slippage)
+                        return ExitReason.STOP_LOSS, sl_price
                     if tp_price < float("inf") and m1_high >= tp_price:
-                        return ExitReason.TAKE_PROFIT, tp_price * (1.0 - slippage)
+                        return ExitReason.TAKE_PROFIT, tp_price
                 else:
                     # Short: check SL (high) first, then TP (low)
+                    # TV parity: SL/TP exit at exact level, no slippage
                     if sl_price < float("inf") and m1_high >= sl_price:
-                        return ExitReason.STOP_LOSS, sl_price * (1.0 + slippage)
+                        return ExitReason.STOP_LOSS, sl_price
                     if tp_price > 0 and m1_low <= tp_price:
-                        return ExitReason.TAKE_PROFIT, tp_price * (1.0 + slippage)
+                        return ExitReason.TAKE_PROFIT, tp_price
 
-        # === FALLBACK: Bar-level check (always runs if 1M data didn't trigger) ===
+        # === FALLBACK: TV-style intrabar simulation based on open position ===
+        # Determine check order based on where open is relative to high/low
+        open_closer_to_high = abs(open_price - high) < abs(open_price - low)
+
         if is_long:
-            if sl_price > 0 and low <= sl_price:
-                return ExitReason.STOP_LOSS, sl_price * (1.0 - slippage)
-            if tp_price < float("inf") and high >= tp_price:
-                return ExitReason.TAKE_PROFIT, tp_price * (1.0 - slippage)
-        else:
-            if sl_price < float("inf") and high >= sl_price:
-                return ExitReason.STOP_LOSS, sl_price * (1.0 + slippage)
-            if tp_price > 0 and low <= tp_price:
-                return ExitReason.TAKE_PROFIT, tp_price * (1.0 + slippage)
+            sl_hit = sl_price > 0 and low <= sl_price
+            tp_hit = tp_price < float("inf") and high >= tp_price
 
-        # Signal exit
+            if sl_hit and tp_hit:
+                # Both hit - check order based on open position
+                if open_closer_to_high:
+                    # Order: open → high → low → close - TP triggers first
+                    return ExitReason.TAKE_PROFIT, tp_price
+                else:
+                    # Order: open → low → high → close - SL triggers first
+                    return ExitReason.STOP_LOSS, sl_price
+            elif sl_hit:
+                return ExitReason.STOP_LOSS, sl_price
+            elif tp_hit:
+                return ExitReason.TAKE_PROFIT, tp_price
+        else:
+            sl_hit = sl_price < float("inf") and high >= sl_price
+            tp_hit = tp_price > 0 and low <= tp_price
+
+            if sl_hit and tp_hit:
+                # Both hit - check order based on open position
+                if open_closer_to_high:
+                    # Order: open → high → low → close - SL triggers first for short
+                    return ExitReason.STOP_LOSS, sl_price
+                else:
+                    # Order: open → low → high → close - TP triggers first for short
+                    return ExitReason.TAKE_PROFIT, tp_price
+            elif sl_hit:
+                return ExitReason.STOP_LOSS, sl_price
+            elif tp_hit:
+                return ExitReason.TAKE_PROFIT, tp_price
+
+        # Signal exit - uses close price with slippage
         if signal_exit:
             exit_price = close * (1.0 - slippage if is_long else 1.0 + slippage)
             return ExitReason.SIGNAL, exit_price
@@ -554,21 +695,24 @@ class GPUEngineV2(BaseBacktestEngine):
         exit_price: float,
         size: float,
         taker_fee: float,
+        entry_fee: float = 0.0,  # TV: entry fee from position open
     ) -> Tuple[float, float, float]:
-        """Calculate PnL, PnL%, and fees - same logic as FallbackEngineV2."""
+        """Calculate PnL, PnL%, and fees - TV style (entry + exit fees)."""
 
         if is_long:
             pnl = (exit_price - entry_price) * size
         else:
             pnl = (entry_price - exit_price) * size
 
+        # TV: Calculate both entry and exit fees
         exit_value = exit_price * size
-        fees = exit_value * taker_fee
-        pnl -= fees
+        exit_fee = exit_value * taker_fee
+        total_fees = entry_fee + exit_fee  # TV: entry + exit
+        pnl -= total_fees
 
         pnl_pct = pnl / (entry_price * size) * 100 if entry_price * size > 0 else 0
 
-        return pnl, pnl_pct, fees
+        return pnl, pnl_pct, total_fees
 
     def _calculate_metrics(
         self,
@@ -639,10 +783,13 @@ class GPUEngineV2(BaseBacktestEngine):
         final_equity = equity_curve[-1]
         total_return = ((final_equity - initial_capital) / initial_capital) * 100
 
-        # Max Drawdown
+        # Max Drawdown - percentage for consistency with other engines
         peak = np.maximum.accumulate(equity_curve)
-        drawdown = (peak - equity_curve) / peak * 100
-        max_drawdown = np.max(drawdown)
+        drawdown_pct = (peak - equity_curve) / peak * 100
+        drawdown_usdt = peak - equity_curve  # Absolute drawdown in USDT
+        max_drawdown = np.max(drawdown_pct)  # Percentage for consistency
+        max_drawdown_pct = np.max(drawdown_pct)  # noqa: F841 - Keep percentage version
+        max_drawdown_usdt = np.max(drawdown_usdt)  # noqa: F841 - USDT version for display
 
         # Sharpe Ratio (hourly returns - same as FallbackEngineV2)
         returns = np.diff(equity_curve) / equity_curve[:-1]
@@ -673,7 +820,7 @@ class GPUEngineV2(BaseBacktestEngine):
             calmar_ratio = 0.0
 
         # Avg Drawdown
-        avg_drawdown = np.mean(drawdown)
+        avg_drawdown = np.mean(drawdown_pct)
 
         # Long/Short breakdown
         long_trades_list = [t for t in trades if t.direction == "long"]

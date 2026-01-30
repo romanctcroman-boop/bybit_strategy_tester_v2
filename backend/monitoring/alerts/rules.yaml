@@ -1,0 +1,269 @@
+# Prometheus AlertManager Rules for Bybit Strategy Tester
+# Based on MONITORING_SYSTEM_AUDIT_2026_01_28 recommendations
+#
+# Usage:
+# 1. Copy this file to your Prometheus AlertManager config directory
+# 2. Configure alert receivers in alertmanager.yml
+# 3. Reload Prometheus configuration
+
+groups:
+  # ============================================================================
+  # CRITICAL ALERTS - Require immediate attention (PagerDuty + Slack + Email)
+  # ============================================================================
+  - name: critical
+    rules:
+      # API Down
+      - alert: APIDown
+        expr: up{job="bybit-strategy-tester"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "API is down"
+          description: "Bybit Strategy Tester API has been down for more than 1 minute."
+          runbook_url: "https://docs.example.com/runbooks/api-down"
+
+      # Database Connection Failed
+      - alert: DatabaseDown
+        expr: system_health{component="database"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Database connection failed"
+          description: "Database connection has been failing for more than 30 seconds."
+          runbook_url: "https://docs.example.com/runbooks/database-down"
+
+      # High Error Rate (> 5%)
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(api_requests_total{status=~"5.."}[5m]) 
+            / 
+            rate(api_requests_total[5m])
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5% for the last 2 minutes. Current: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/high-error-rate"
+
+      # Daily Loss Limit Reached
+      - alert: DailyLossLimitReached
+        expr: trading_daily_loss_usd > 500
+        for: 0s
+        labels:
+          severity: critical
+          team: trading
+        annotations:
+          summary: "Daily loss limit reached"
+          description: "Trading has incurred a daily loss of ${{ $value }}. Trading should be halted."
+          runbook_url: "https://docs.example.com/runbooks/loss-limit"
+
+  # ============================================================================
+  # HIGH PRIORITY ALERTS - Require attention within 1 hour (Slack + Email)
+  # ============================================================================
+  - name: high_priority
+    rules:
+      # High Latency (p99 > 5 seconds)
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.99, rate(api_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "High API latency detected"
+          description: "p99 latency is above 5 seconds for the last 5 minutes. Current: {{ $value | humanizeDuration }}"
+          runbook_url: "https://docs.example.com/runbooks/high-latency"
+
+      # Redis Down
+      - alert: RedisDown
+        expr: redis_connection_status == 0
+        for: 1m
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "Redis connection failed"
+          description: "Redis connection has been down for more than 1 minute."
+          runbook_url: "https://docs.example.com/runbooks/redis-down"
+
+      # High Drawdown (> 15%)
+      - alert: HighDrawdown
+        expr: backtest_max_drawdown > 15
+        for: 0s
+        labels:
+          severity: high
+          team: trading
+        annotations:
+          summary: "High drawdown detected"
+          description: "Maximum drawdown is above 15%. Current: {{ $value }}%"
+          runbook_url: "https://docs.example.com/runbooks/high-drawdown"
+
+      # Memory Usage High
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+          ) * 100 > 90
+        for: 5m
+        labels:
+          severity: high
+          team: infra
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 90% for the last 5 minutes. Current: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/high-memory"
+
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})
+          ) * 100 > 85
+        for: 5m
+        labels:
+          severity: high
+          team: infra
+        annotations:
+          summary: "Disk space low"
+          description: "Disk usage is above 85%. Current: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/disk-space-low"
+
+      # Bybit API Degraded
+      - alert: BybitAPIDegraded
+        expr: system_health{component="bybit_api"} == 0
+        for: 2m
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "Bybit API connectivity issues"
+          description: "Bybit API has been unreachable for more than 2 minutes."
+          runbook_url: "https://docs.example.com/runbooks/bybit-api-degraded"
+
+  # ============================================================================
+  # MEDIUM PRIORITY ALERTS - Require attention within 24 hours (Email)
+  # ============================================================================
+  - name: medium_priority
+    rules:
+      # AI API Budget Exceeded
+      - alert: AIBudgetExceeded
+        expr: ai_cost_daily_usd > 10
+        for: 0s
+        labels:
+          severity: medium
+          team: backend
+        annotations:
+          summary: "Daily AI API budget exceeded"
+          description: "AI API costs have exceeded $10 today. Current: ${{ $value }}"
+          runbook_url: "https://docs.example.com/runbooks/ai-budget"
+
+      # Cache Hit Rate Low
+      - alert: LowCacheHitRate
+        expr: cache_hit_rate < 0.5
+        for: 15m
+        labels:
+          severity: medium
+          team: backend
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is below 50% for the last 15 minutes. Current: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/low-cache-hit-rate"
+
+      # Slow Backtests
+      - alert: SlowBacktests
+        expr: |
+          histogram_quantile(0.90, rate(backtest_duration_seconds_bucket[1h])) > 300
+        for: 30m
+        labels:
+          severity: medium
+          team: backend
+        annotations:
+          summary: "Backtests running slowly"
+          description: "p90 backtest duration is above 5 minutes. Current: {{ $value | humanizeDuration }}"
+          runbook_url: "https://docs.example.com/runbooks/slow-backtests"
+
+      # High AI Request Duration
+      - alert: HighAIRequestDuration
+        expr: |
+          histogram_quantile(0.95, rate(ai_request_duration_seconds_bucket[15m])) > 60
+        for: 15m
+        labels:
+          severity: medium
+          team: backend
+        annotations:
+          summary: "AI requests taking too long"
+          description: "p95 AI request duration is above 60 seconds. Current: {{ $value | humanizeDuration }}"
+          runbook_url: "https://docs.example.com/runbooks/slow-ai-requests"
+
+  # ============================================================================
+  # LOW PRIORITY ALERTS - Informational (Logged only)
+  # ============================================================================
+  - name: low_priority
+    rules:
+      # No Recent Backtests
+      - alert: NoRecentBacktests
+        expr: increase(backtests_total[24h]) == 0
+        for: 24h
+        labels:
+          severity: low
+          team: trading
+        annotations:
+          summary: "No backtests in 24 hours"
+          description: "No backtests have been executed in the last 24 hours."
+
+      # Circuit Breaker Tripped
+      - alert: CircuitBreakerTripped
+        expr: circuit_breaker_state{state="open"} == 1
+        for: 0s
+        labels:
+          severity: low
+          team: backend
+        annotations:
+          summary: "Circuit breaker tripped"
+          description: "Circuit breaker for {{ $labels.service }} is in OPEN state."
+
+  # ============================================================================
+  # SLO ALERTS - Service Level Objective monitoring
+  # ============================================================================
+  - name: slo_alerts
+    rules:
+      # API Availability SLO (99.9%)
+      - alert: APISLOViolation
+        expr: |
+          (
+            1 - (
+              rate(api_requests_total{status=~"5.."}[24h]) 
+              / 
+              rate(api_requests_total[24h])
+            )
+          ) < 0.999
+        for: 1h
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "API availability SLO violation"
+          description: "API availability is below 99.9% SLO. Current: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/slo-violation"
+
+      # Latency SLO (p95 < 2s)
+      - alert: LatencySLOViolation
+        expr: |
+          histogram_quantile(0.95, rate(api_request_duration_seconds_bucket[24h])) > 2
+        for: 1h
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "API latency SLO violation"
+          description: "p95 latency is above 2 seconds SLO. Current: {{ $value | humanizeDuration }}"
+          runbook_url: "https://docs.example.com/runbooks/slo-violation"

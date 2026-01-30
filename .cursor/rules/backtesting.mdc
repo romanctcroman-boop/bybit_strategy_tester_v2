@@ -1,0 +1,39 @@
+---
+description: Бэктест и движки — выбор FallbackV2/V3/V4, NumbaV2, GPUV2, калибровка, 0.07% комиссия, VectorBT только для оптимизации.
+globs: backend/backtesting/**/*.py,scripts/*calibrate*.py,scripts/*backtest*.py,scripts/*engine*.py,scripts/compare_*.py
+alwaysApply: false
+---
+
+# Скил: Backtesting
+
+## Выбор движка
+
+```text
+Multi-TP / DCA / ATR / Trailing  →  FallbackEngineV4  (эталон)
+Только pyramiding                →  FallbackEngineV3
+Массовая оптимизация + CUDA      →  GPUEngineV2
+Быстрая оптимизация              →  NumbaEngineV2
+Обычный бэктест, референс        →  FallbackEngineV2
+```
+
+Интерфейсы: `backend/backtesting/interfaces.py`, выбор в `engine_selector.py` или `engine.py`.
+
+## TradingView parity
+
+- **Комиссия 0.07%** — обязательно для сравнения с TradingView.
+- Эталон: FallbackV2 (и V4 для Multi-TP/DCA). VectorBT **не** использовать для финальной проверки — только для оптимизации (относительный рейтинг).
+
+## Калибровка и проверка
+
+- `scripts/calibrate_166_metrics.py` — калибровка 166 метрик.
+- `scripts/compare_bar_magnifier_metrics.py`, `scripts/compare_*` — сравнение движков/метрик.
+- `backend/core/metrics_calculator.py` — 166 метрик; при отладке не писать в хардкод-путь `d:\...\logs\` — использовать `Path(__file__).resolve().parents[2] / "logs"` или конфиг.
+
+## VectorBT
+
+- `Portfolio.from_signals` — только для оптимизации (скорость).
+- Отличия: quick reversals, фиксированный sizing, параллельная обработка — расхождения 10–60% с Fallback. Не применять для финального бэктеста.
+
+## Bar Magnifier, intrabar
+
+- `bar_magnifier.py`, intrabar SL/TP по High/Low — в Fallback-движках. Учитывать при изменении логики сделок.

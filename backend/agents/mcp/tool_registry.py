@@ -255,19 +255,15 @@ class Tool:
                 hint = type_hints.get(param_name)
 
                 if hint:
-                    if hint == int:
+                    if hint is int:
                         param_type = ParameterType.INTEGER
-                    elif hint == float:
+                    elif hint is float:
                         param_type = ParameterType.NUMBER
-                    elif hint == bool:
+                    elif hint is bool:
                         param_type = ParameterType.BOOLEAN
-                    elif hint == list or (
-                        hasattr(hint, "__origin__") and hint.__origin__ == list
-                    ):
+                    elif hint is list or (hasattr(hint, "__origin__") and hint.__origin__ is list):
                         param_type = ParameterType.ARRAY
-                    elif hint == dict or (
-                        hasattr(hint, "__origin__") and hint.__origin__ == dict
-                    ):
+                    elif hint is dict or (hasattr(hint, "__origin__") and hint.__origin__ is dict):
                         param_type = ParameterType.OBJECT
 
                 parameters.append(
@@ -275,9 +271,7 @@ class Tool:
                         name=param_name,
                         type=param_type,
                         required=param.default == inspect.Parameter.empty,
-                        default=None
-                        if param.default == inspect.Parameter.empty
-                        else param.default,
+                        default=None if param.default == inspect.Parameter.empty else param.default,
                     )
                 )
 
@@ -425,9 +419,7 @@ class ToolRegistry:
             "categories": len(self._categories),
             "total_calls": total_calls,
             "successful_calls": successful_calls,
-            "success_rate": (successful_calls / total_calls * 100)
-            if total_calls > 0
-            else 0.0,
+            "success_rate": (successful_calls / total_calls * 100) if total_calls > 0 else 0.0,
             "by_category": {cat: len(tools) for cat, tools in self._categories.items()},
         }
 

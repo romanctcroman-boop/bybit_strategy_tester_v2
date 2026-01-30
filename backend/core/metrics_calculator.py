@@ -42,6 +42,42 @@ except ImportError:
         return decorator
 
 
+# =============================================================================
+# SAFE DIVISION UTILITY
+# =============================================================================
+
+
+def safe_divide(
+    numerator: float,
+    denominator: float,
+    default: float = 0.0,
+    epsilon: float = 1e-10,
+) -> float:
+    """
+    Safe division that handles zero and near-zero denominators.
+
+    Args:
+        numerator: The dividend
+        denominator: The divisor
+        default: Value to return if denominator is zero/near-zero
+        epsilon: Threshold for considering denominator as zero
+
+    Returns:
+        Result of division or default if denominator is too small
+
+    Examples:
+        >>> safe_divide(10, 2)
+        5.0
+        >>> safe_divide(10, 0)
+        0.0
+        >>> safe_divide(10, 0, default=float('inf'))
+        inf
+    """
+    if abs(denominator) < epsilon:
+        return default
+    return numerator / denominator
+
+
 class TimeFrequency(str, Enum):
     """Data frequency for annualization"""
 
@@ -582,9 +618,7 @@ def calculate_stability_r2(equity_curve: np.ndarray) -> float:
     return float(np.clip(r2, 0.0, 1.0))
 
 
-def calculate_sqn(
-    total_trades: int, avg_trade_profit: float, std_trade_profit: float
-) -> float:
+def calculate_sqn(total_trades: int, avg_trade_profit: float, std_trade_profit: float) -> float:
     """
     Calculate System Quality Number (SQN).
 
@@ -739,15 +773,11 @@ class MetricsCalculator:
                 pnl = t.get("pnl", t.get("profit", t.get("realized_pnl", 0)))
                 pnl_pct = t.get(
                     "pnl_pct",
-                    t.get(
-                        "profit_percent", t.get("profit_pct", t.get("profitPerc", 0))
-                    ),
+                    t.get("profit_percent", t.get("profit_pct", t.get("profitPerc", 0))),
                 )
                 # fees may be stored under 'fees' or 'commission'
                 fees = t.get("fees", t.get("commission", t.get("commissions", 0)))
-                bars = t.get(
-                    "bars_in_trade", t.get("bars", t.get("bars_in_position", 0))
-                )
+                bars = t.get("bars_in_trade", t.get("bars", t.get("bars_in_position", 0)))
             else:
                 pnl = getattr(t, "pnl", getattr(t, "profit", 0))
                 pnl_pct = getattr(t, "pnl_pct", getattr(t, "profit_percent", 0))
@@ -763,9 +793,7 @@ class MetricsCalculator:
                 # Log first and last few trades for debugging
                 from loguru import logger
 
-                logger.debug(
-                    f"Process trade {i}: side={getattr(t, 'side', 'N/A')}, pnl={pnl}, fees={fees}"
-                )
+                logger.debug(f"Process trade {i}: side={getattr(t, 'side', 'N/A')}, pnl={pnl}, fees={fees}")
 
             # Gross profit/loss (P&L + fees for consistency)
             gross_pnl = pnl + fees if include_commission else pnl
@@ -796,12 +824,8 @@ class MetricsCalculator:
         metrics.net_profit = sum(pnl_list)
 
         # Derived metrics
-        metrics.win_rate = calculate_win_rate(
-            metrics.winning_trades, metrics.total_trades
-        )
-        metrics.profit_factor = calculate_profit_factor(
-            metrics.gross_profit, metrics.gross_loss
-        )
+        metrics.win_rate = calculate_win_rate(metrics.winning_trades, metrics.total_trades)
+        metrics.profit_factor = calculate_profit_factor(metrics.gross_profit, metrics.gross_loss)
 
         # Averages
         metrics.avg_win = float(np.mean(win_pnl)) if win_pnl else 0.0
@@ -822,9 +846,7 @@ class MetricsCalculator:
         metrics.avg_loss_bars = np.mean(loss_bars) if loss_bars else 0.0
 
         # Streaks
-        metrics.max_consec_wins, metrics.max_consec_losses = (
-            calculate_consecutive_streaks(pnl_list)
-        )
+        metrics.max_consec_wins, metrics.max_consec_losses = calculate_consecutive_streaks(pnl_list)
 
         return metrics
 
@@ -933,9 +955,7 @@ class MetricsCalculator:
         # Risk ratios
         metrics.sharpe_ratio = calculate_sharpe(returns, frequency)
         metrics.sortino_ratio = calculate_sortino(returns, frequency)
-        metrics.calmar_ratio = calculate_calmar(
-            total_return_pct, metrics.max_drawdown, years
-        )
+        metrics.calmar_ratio = calculate_calmar(total_return_pct, metrics.max_drawdown, years)
 
         # CAGR
         metrics.cagr = calculate_cagr(initial_capital, final_capital, years)
@@ -951,16 +971,12 @@ class MetricsCalculator:
         # Margin Efficiency
         if margin_used > 0:
             net_profit = final_capital - initial_capital
-            metrics.margin_efficiency = calculate_margin_efficiency(
-                net_profit, margin_used
-            )
+            metrics.margin_efficiency = calculate_margin_efficiency(net_profit, margin_used)
 
         # Volatility (annualized)
         if len(returns) > 1:
             periods_per_year = ANNUALIZATION_FACTORS.get(frequency, 365.25)
-            metrics.volatility = (
-                float(np.std(returns, ddof=1) * np.sqrt(periods_per_year)) * 100
-            )
+            metrics.volatility = float(np.std(returns, ddof=1) * np.sqrt(periods_per_year)) * 100
 
         return metrics
 
@@ -984,28 +1000,23 @@ class MetricsCalculator:
 
         for t in trades:
             try:
-                if (
-                    len(long_trades) == 0
-                    and len(short_trades) == 0
-                    and len(unknown_sides) == 0
-                ):
-                    # Log first trade sample only once
-                    with open(
-                        "d:\\bybit_strategy_tester_v2\\logs\\debug_metrics_explicit.log",
-                        "a",
-                        encoding="utf-8",
-                    ) as f:
+                if len(long_trades) == 0 and len(short_trades) == 0 and len(unknown_sides) == 0:
+                    # Log first trade sample only once (debug mode)
+                    # Note: In production, consider disabling or using proper logging
+                    from pathlib import Path
+
+                    log_dir = Path(__file__).resolve().parents[2] / "logs"
+                    log_dir.mkdir(parents=True, exist_ok=True)
+                    log_path = log_dir / "debug_metrics_explicit.log"
+                    with open(log_path, "a", encoding="utf-8") as f:
                         f.write(f"Trades sample (first trade): {t}\n")
-            except:
+            except Exception:
+                # Silently skip debug logging on failure (non-critical)
                 pass
             side = t.get("side", "") if isinstance(t, dict) else getattr(t, "side", "")
             # Also check 'direction' field as fallback (used by GPU optimizer)
             if not side:
-                side = (
-                    t.get("direction", "")
-                    if isinstance(t, dict)
-                    else getattr(t, "direction", "")
-                )
+                side = t.get("direction", "") if isinstance(t, dict) else getattr(t, "direction", "")
 
             # Normalize side to string
             if hasattr(side, "value"):
@@ -1061,40 +1072,14 @@ class MetricsCalculator:
         # Process Longs
         from loguru import logger
 
-        # Explicit file debug
-        try:
-            with open(
-                "d:\\bybit_strategy_tester_v2\\logs\\debug_metrics_explicit.log",
-                "a",
-                encoding="utf-8",
-            ) as f:
-                f.write(
-                    f"[metrics_calc] Processing Longs: {len(long_trades)} trades identified. Sample: {long_trades[0] if long_trades else 'None'}\n"
-                )
-        except Exception as e:
-            logger.error(f"Failed to write debug log: {e}")
-
-        logger.info(
+        logger.debug(
             f"[metrics_calc] Processing Longs: {len(long_trades)} trades identified. Sample: {long_trades[0] if long_trades else 'None'}"
         )
 
         long_res = process_side(long_trades)
         if long_res:
             long_m, long_cagr = long_res
-            try:
-                with open(
-                    "d:\\bybit_strategy_tester_v2\\logs\\debug_metrics_explicit.log",
-                    "a",
-                    encoding="utf-8",
-                ) as f:
-                    f.write(
-                        f"[metrics_calc] Long metrics raw: avg_loss={long_m.avg_loss}, avg_win={long_m.avg_win}\n"
-                    )
-            except Exception:
-                pass
-            logger.info(
-                f"[metrics_calc] Long metrics raw: avg_loss={long_m.avg_loss}, avg_win={long_m.avg_win}"
-            )
+            logger.debug(f"[metrics_calc] Long metrics raw: avg_loss={long_m.avg_loss}, avg_win={long_m.avg_win}")
 
             metrics.long_trades = long_m.total_trades
             metrics.long_winning = long_m.winning_trades
@@ -1226,16 +1211,12 @@ class MetricsCalculator:
         )
 
         # Long/Short metrics
-        ls_m = MetricsCalculator.calculate_long_short_metrics(
-            trades, initial_capital, years
-        )
+        ls_m = MetricsCalculator.calculate_long_short_metrics(trades, initial_capital, years)
 
         # Expectancy and SQN
         if trade_m.total_trades > 0:
             win_frac = trade_m.winning_trades / trade_m.total_trades
-            expectancy, expectancy_ratio = calculate_expectancy(
-                win_frac, trade_m.avg_win, trade_m.avg_loss
-            )
+            expectancy, expectancy_ratio = calculate_expectancy(win_frac, trade_m.avg_win, trade_m.avg_loss)
 
             # SQN (System Quality Number) calculation
             # Extract PnLs from trades again to compute StdDev
@@ -1247,9 +1228,7 @@ class MetricsCalculator:
 
             if len(pnl_values) > 1:
                 std_pnl = float(np.std(pnl_values, ddof=1))
-                risk_m.sqn = calculate_sqn(
-                    trade_m.total_trades, trade_m.avg_trade, std_pnl
-                )
+                risk_m.sqn = calculate_sqn(trade_m.total_trades, trade_m.avg_trade, std_pnl)
 
         else:
             expectancy, expectancy_ratio = 0.0, 0.0
@@ -1441,9 +1420,7 @@ def enrich_metrics_with_percentages(metrics: dict, initial_capital: float) -> di
         result["long_return_pct"] = (metrics["long_net_profit"] / initial_capital) * 100
 
     if "short_net_profit" in metrics and metrics["short_net_profit"] is not None:
-        result["short_return_pct"] = (
-            metrics["short_net_profit"] / initial_capital
-        ) * 100
+        result["short_return_pct"] = (metrics["short_net_profit"] / initial_capital) * 100
 
     # Strategy outperformance vs Buy & Hold
     strategy_return = result.get("net_profit_pct", result.get("total_return", 0))

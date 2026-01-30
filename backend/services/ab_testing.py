@@ -159,9 +159,7 @@ class StatisticalAnalyzer:
         if len(control_values) < 2 or len(treatment_values) < 2:
             return 0.0, 1.0
 
-        t_stat, p_value = stats.ttest_ind(
-            control_values, treatment_values, equal_var=False, alternative=alternative
-        )
+        t_stat, p_value = stats.ttest_ind(control_values, treatment_values, equal_var=False, alternative=alternative)
         return float(t_stat), float(p_value)
 
     @staticmethod
@@ -179,9 +177,7 @@ class StatisticalAnalyzer:
         if len(control_values) < 2 or len(treatment_values) < 2:
             return 0.0, 1.0
 
-        u_stat, p_value = stats.mannwhitneyu(
-            control_values, treatment_values, alternative=alternative
-        )
+        u_stat, p_value = stats.mannwhitneyu(control_values, treatment_values, alternative=alternative)
         return float(u_stat), float(p_value)
 
     @staticmethod
@@ -213,9 +209,7 @@ class StatisticalAnalyzer:
         return float(chi2), float(p_value)
 
     @staticmethod
-    def calculate_effect_size(
-        control_values: List[float], treatment_values: List[float]
-    ) -> float:
+    def calculate_effect_size(control_values: List[float], treatment_values: List[float]) -> float:
         """Calculate Cohen's d effect size."""
         if len(control_values) < 2 or len(treatment_values) < 2:
             return 0.0
@@ -382,10 +376,8 @@ class ABExperiment:
         return self.config.variants[-1]
 
     def _allocate_deterministic(self, key: str) -> Variant:
-        """Hash-based deterministic allocation."""
-        hash_value = (
-            int(hashlib.md5(f"{self.id}:{key}".encode()).hexdigest(), 16) % 1000
-        )
+        """Hash-based deterministic allocation using SHA256."""
+        hash_value = int(hashlib.sha256(f"{self.id}:{key}".encode()).hexdigest(), 16) % 1000
 
         cumulative = 0.0
         for variant in self.config.variants:
@@ -406,18 +398,14 @@ class ABExperiment:
 
     def record_metric(self, variant_name: str, metric_name: str, value: float) -> None:
         """Record a metric value for a variant."""
-        variant = next(
-            (v for v in self.config.variants if v.name == variant_name), None
-        )
+        variant = next((v for v in self.config.variants if v.name == variant_name), None)
         if variant:
             variant.add_metric(metric_name, value)
 
             # Check guardrails
             self._check_guardrails(variant, metric_name, value)
 
-    def _check_guardrails(
-        self, variant: Variant, metric_name: str, value: float
-    ) -> None:
+    def _check_guardrails(self, variant: Variant, metric_name: str, value: float) -> None:
         """Check if guardrail metrics are violated."""
         if metric_name not in self.config.guardrail_metrics:
             return
@@ -442,18 +430,14 @@ class ABExperiment:
         )
 
         if self.started_at:
-            result.duration = (
-                self.ended_at or datetime.now(timezone.utc)
-            ) - self.started_at
+            result.duration = (self.ended_at or datetime.now(timezone.utc)) - self.started_at
 
         # Get stats for all variants
         for variant in self.config.variants:
             result.variant_stats[variant.name] = {
                 "samples": variant.samples,
                 "is_control": variant.is_control,
-                "metrics": {
-                    name: variant.get_metric_stats(name) for name in variant.metrics
-                },
+                "metrics": {name: variant.get_metric_stats(name) for name in variant.metrics},
             }
 
         # Statistical analysis against control
@@ -473,9 +457,7 @@ class ABExperiment:
 
             # Perform t-test
             _, p_value = self.analyzer.t_test(control_values, treatment_values)
-            effect_size = self.analyzer.calculate_effect_size(
-                control_values, treatment_values
-            )
+            effect_size = self.analyzer.calculate_effect_size(control_values, treatment_values)
 
             if p_value < best_p_value and effect_size > 0:
                 best_treatment = treatment.name
@@ -491,12 +473,8 @@ class ABExperiment:
             result.effect_size = best_effect
 
             control_mean = np.mean(control_values) if control_values else 0
-            treatment_mean = result.variant_stats[best_treatment]["metrics"][primary][
-                "mean"
-            ]
-            uplift = self.analyzer.calculate_relative_uplift(
-                control_mean, treatment_mean
-            )
+            treatment_mean = result.variant_stats[best_treatment]["metrics"][primary]["mean"]
+            uplift = self.analyzer.calculate_relative_uplift(control_mean, treatment_mean)
 
             result.recommendation = (
                 f"Winner: {best_treatment} with {uplift:.1f}% improvement "
@@ -504,8 +482,7 @@ class ABExperiment:
             )
         else:
             result.recommendation = (
-                "No statistically significant winner detected. "
-                "Consider running longer or increasing sample size."
+                "No statistically significant winner detected. Consider running longer or increasing sample size."
             )
 
         return result
@@ -560,9 +537,7 @@ class ExperimentManager:
             for exp_id in active:
                 other = self.experiments.get(exp_id)
                 if other and other.status == ExperimentStatus.RUNNING:
-                    raise ValueError(
-                        f"Symbol {symbol} already has active experiment: {exp_id}"
-                    )
+                    raise ValueError(f"Symbol {symbol} already has active experiment: {exp_id}")
 
     def stop_experiment(self, experiment_id: str) -> ExperimentResult:
         """Stop an experiment and get results."""
@@ -577,9 +552,7 @@ class ExperimentManager:
             for symbol in exp.config.target_symbols:
                 if symbol in self._active_by_symbol:
                     self._active_by_symbol[symbol] = [
-                        eid
-                        for eid in self._active_by_symbol[symbol]
-                        if eid != experiment_id
+                        eid for eid in self._active_by_symbol[symbol] if eid != experiment_id
                     ]
 
         return exp.get_results()
@@ -623,9 +596,7 @@ class ExperimentManager:
             for name, value in metrics.items():
                 exp.record_metric(variant_name, name, value)
 
-    def list_experiments(
-        self, status: Optional[ExperimentStatus] = None
-    ) -> List[Dict[str, Any]]:
+    def list_experiments(self, status: Optional[ExperimentStatus] = None) -> List[Dict[str, Any]]:
         """List all experiments, optionally filtered by status."""
         results = []
         for exp in self.experiments.values():
@@ -640,9 +611,7 @@ class ExperimentManager:
                     "variants": [v.name for v in exp.config.variants],
                     "total_samples": sum(v.samples for v in exp.config.variants),
                     "created_at": exp.created_at.isoformat(),
-                    "started_at": exp.started_at.isoformat()
-                    if exp.started_at
-                    else None,
+                    "started_at": exp.started_at.isoformat() if exp.started_at else None,
                 }
             )
 
@@ -660,9 +629,7 @@ class ExperimentManager:
             "experiment_id": exp.id,
             "name": exp.config.name,
             "status": exp.status.value,
-            "duration_seconds": results.duration.total_seconds()
-            if results.duration
-            else 0,
+            "duration_seconds": results.duration.total_seconds() if results.duration else 0,
             "total_samples": results.total_samples,
             "variants": [
                 {

@@ -2,7 +2,8 @@
 Perplexity API consultation about VectorBT limitations (sonar-pro model)
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import httpx
 import json

@@ -385,9 +385,7 @@ class NewsNLPAnalyzer:
             # Use FinBERT for financial sentiment
             model_name = "ProsusAI/finbert"
             self._tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self._transformer_model = (
-                AutoModelForSequenceClassification.from_pretrained(model_name)
-            )
+            self._transformer_model = AutoModelForSequenceClassification.from_pretrained(model_name)
             logger.info(f"Loaded transformer model: {model_name}")
         except ImportError:
             logger.warning("transformers package not installed, using lexicon only")
@@ -434,9 +432,7 @@ class NewsNLPAnalyzer:
         key_phrases = self._extract_key_phrases(text)
 
         # Calculate impact score
-        impact_score = self._calculate_impact_score(
-            sentiment_score, confidence, symbols, category
-        )
+        impact_score = self._calculate_impact_score(sentiment_score, confidence, symbols, category)
 
         result = SentimentResult(
             article_id=article.article_id,
@@ -455,9 +451,9 @@ class NewsNLPAnalyzer:
         return result
 
     def _get_cache_key(self, article: NewsArticle) -> str:
-        """Generate cache key for article."""
+        """Generate cache key for article using SHA256."""
         content = f"{article.title}:{article.content[:500]}"
-        return hashlib.md5(content.encode()).hexdigest()
+        return hashlib.sha256(content.encode()).hexdigest()
 
     def _cache_result(self, key: str, result: SentimentResult) -> None:
         """Cache analysis result."""
@@ -610,9 +606,7 @@ class NewsNLPAnalyzer:
         sentences = re.split(r"[.!?]", text)
         key_phrases = []
 
-        all_keywords = set(self.lexicon.BULLISH_TERMS.keys()) | set(
-            self.lexicon.BEARISH_TERMS.keys()
-        )
+        all_keywords = set(self.lexicon.BULLISH_TERMS.keys()) | set(self.lexicon.BEARISH_TERMS.keys())
 
         for sentence in sentences:
             sentence = sentence.strip()
@@ -741,11 +735,7 @@ class SentimentAggregator:
         else:
             sentiment = Sentiment.NEUTRAL
 
-        dominant_category = (
-            max(category_counts.keys(), key=lambda x: category_counts[x])
-            if category_counts
-            else None
-        )
+        dominant_category = max(category_counts.keys(), key=lambda x: category_counts[x]) if category_counts else None
 
         return {
             "symbol": symbol,
@@ -762,15 +752,11 @@ class SentimentAggregator:
 
         for symbol, results in self._results.items():
             recent_results = [
-                r
-                for r in results
-                if (datetime.now(timezone.utc) - r.analyzed_at).total_seconds() < 86400
+                r for r in results if (datetime.now(timezone.utc) - r.analyzed_at).total_seconds() < 86400
             ]
 
             if recent_results:
-                avg_impact = sum(r.impact_score for r in recent_results) / len(
-                    recent_results
-                )
+                avg_impact = sum(r.impact_score for r in recent_results) / len(recent_results)
                 symbol_activity.append(
                     {
                         "symbol": symbol,
@@ -781,9 +767,7 @@ class SentimentAggregator:
                 )
 
         # Sort by news count * impact
-        symbol_activity.sort(
-            key=lambda x: x["news_count"] * x["avg_impact"], reverse=True
-        )
+        symbol_activity.sort(key=lambda x: x["news_count"] * x["avg_impact"], reverse=True)
 
         return symbol_activity[:top_n]
 

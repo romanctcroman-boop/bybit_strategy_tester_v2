@@ -76,29 +76,35 @@ class OrderExecutor:
     """
     Order Executor for Bybit V5 API.
 
-    Usage:
-        executor = OrderExecutor(
+    Usage (recommended - context manager):
+        async with OrderExecutor(
             api_key="your_key",
             api_secret="your_secret",
             testnet=False
-        )
+        ) as executor:
+            # Place market order
+            result = await executor.place_market_order(
+                symbol="BTCUSDT",
+                side=OrderSide.BUY,
+                qty=0.001
+            )
 
-        # Place market order
-        result = await executor.place_market_order(
-            symbol="BTCUSDT",
-            side=OrderSide.BUY,
-            qty=0.001
-        )
+            # Place limit order with SL/TP
+            result = await executor.place_limit_order(
+                symbol="BTCUSDT",
+                side=OrderSide.BUY,
+                qty=0.001,
+                price=40000.0,
+                stop_loss=39000.0,
+                take_profit=42000.0
+            )
 
-        # Place limit order with SL/TP
-        result = await executor.place_limit_order(
-            symbol="BTCUSDT",
-            side=OrderSide.BUY,
-            qty=0.001,
-            price=40000.0,
-            stop_loss=39000.0,
-            take_profit=42000.0
-        )
+    Alternative (manual cleanup):
+        executor = OrderExecutor(...)
+        try:
+            result = await executor.place_market_order(...)
+        finally:
+            await executor.close()
     """
 
     # Bybit V5 API endpoints
@@ -115,8 +121,12 @@ class OrderExecutor:
         max_retries: int = 3,
         retry_delay: float = 0.5,
     ):
-        self.api_key = api_key
-        self.api_secret = api_secret
+        # Store encrypted credentials (XOR with session key for basic obfuscation)
+        # NOTE: For production, use proper secrets management (Vault, AWS Secrets, etc.)
+        self._session_key = uuid4().bytes[:16]  # 16-byte random key
+        self._api_key_encrypted = self._xor_encrypt(api_key.encode(), self._session_key)
+        self._api_secret_encrypted = self._xor_encrypt(api_secret.encode(), self._session_key)
+
         self.testnet = testnet
         self.category = category
         self.recv_window = recv_window
@@ -128,16 +138,60 @@ class OrderExecutor:
         # Active orders cache
         self._active_orders: dict[str, Order] = {}
 
-        # HTTP client
-        self._client = httpx.AsyncClient(timeout=30.0)
+        # HTTP client (lazy initialization for safer resource management)
+        self._client: Optional[httpx.AsyncClient] = None
+        self._closed = False
 
-        logger.info(
-            f"OrderExecutor initialized (testnet={testnet}, category={category})"
-        )
+        logger.info(f"OrderExecutor initialized (testnet={testnet}, category={category})")
+
+    @staticmethod
+    def _xor_encrypt(data: bytes, key: bytes) -> bytes:
+        """Simple XOR encryption for in-memory credential obfuscation."""
+        return bytes(b ^ key[i % len(key)] for i, b in enumerate(data))
+
+    @property
+    def api_key(self) -> str:
+        """Decrypt and return API key."""
+        return self._xor_encrypt(self._api_key_encrypted, self._session_key).decode()
+
+    @property
+    def api_secret(self) -> str:
+        """Decrypt and return API secret."""
+        return self._xor_encrypt(self._api_secret_encrypted, self._session_key).decode()
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create HTTP client (lazy initialization)."""
+        if self._closed:
+            raise RuntimeError("OrderExecutor is closed")
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=30.0)
+        return self._client
+
+    async def __aenter__(self) -> "OrderExecutor":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit - ensures cleanup."""
+        await self.close()
 
     async def close(self):
-        """Close HTTP client."""
-        await self._client.aclose()
+        """Close HTTP client and cleanup resources."""
+        if self._closed:
+            return
+        self._closed = True
+        if self._client is not None:
+            try:
+                await self._client.aclose()
+            except Exception as e:
+                logger.warning(f"Error closing HTTP client: {e}")
+            finally:
+                self._client = None
+        # Clear sensitive data from memory
+        self._session_key = b"\x00" * 16
+        self._api_key_encrypted = b""
+        self._api_secret_encrypted = b""
+        logger.info("OrderExecutor closed and resources cleaned up")
 
     # ==========================================================================
     # Order Placement
@@ -294,9 +348,7 @@ class OrderExecutor:
             trigger_price: Take profit trigger price
         """
         # For TP, direction is opposite to SL
-        direction = (
-            TriggerDirection.RISE if side == OrderSide.SELL else TriggerDirection.FALL
-        )
+        direction = TriggerDirection.RISE if side == OrderSide.SELL else TriggerDirection.FALL
 
         request = OrderRequest(
             symbol=symbol,
@@ -370,9 +422,7 @@ class OrderExecutor:
         # Make API call with retry
         for attempt in range(self.max_retries):
             try:
-                response = await self._signed_request(
-                    "POST", "/v5/order/create", payload
-                )
+                response = await self._signed_request("POST", "/v5/order/create", payload)
 
                 latency_ms = (time.time() - start_time) * 1000
 
@@ -415,13 +465,8 @@ class OrderExecutor:
                     error_msg = response.get("retMsg", "Unknown error")
 
                     # Check for retryable errors
-                    if (
-                        self._is_retryable_error(error_code)
-                        and attempt < self.max_retries - 1
-                    ):
-                        logger.warning(
-                            f"Retryable error on order (attempt {attempt + 1}): {error_msg}"
-                        )
+                    if self._is_retryable_error(error_code) and attempt < self.max_retries - 1:
+                        logger.warning(f"Retryable error on order (attempt {attempt + 1}): {error_msg}")
                         await asyncio.sleep(self.retry_delay * (attempt + 1))
                         continue
 
@@ -459,9 +504,7 @@ class OrderExecutor:
         payload = {
             "category": self.category,
             "symbol": request.symbol,
-            "side": "Buy"
-            if request.side in (OrderSide.BUY, OrderSide.LONG)
-            else "Sell",
+            "side": "Buy" if request.side in (OrderSide.BUY, OrderSide.LONG) else "Sell",
             "orderType": self._map_order_type(request.order_type),
             "qty": str(request.qty),
             "timeInForce": request.time_in_force.value,
@@ -717,9 +760,7 @@ class OrderExecutor:
             price=float(data.get("price", 0)) if data.get("price") else None,
             status=status_map.get(data.get("orderStatus", ""), OrderStatus.PENDING),
             filled_quantity=float(data.get("cumExecQty", 0)),
-            average_price=float(data.get("avgPrice", 0))
-            if data.get("avgPrice")
-            else 0.0,
+            average_price=float(data.get("avgPrice", 0)) if data.get("avgPrice") else 0.0,
             exchange_order_id=data.get("orderId", ""),
             client_order_id=data.get("orderLinkId", ""),
         )
@@ -746,9 +787,7 @@ class OrderExecutor:
             param_str = json.dumps(params)
             sign_str = f"{timestamp}{self.api_key}{self.recv_window}{param_str}"
 
-        signature = hmac.new(
-            self.api_secret.encode("utf-8"), sign_str.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
+        signature = hmac.new(self.api_secret.encode("utf-8"), sign_str.encode("utf-8"), hashlib.sha256).hexdigest()
 
         headers = {
             "X-BAPI-API-KEY": self.api_key,
@@ -760,11 +799,12 @@ class OrderExecutor:
         }
 
         url = f"{self.base_url}{endpoint}"
+        client = await self._get_client()
 
         if method == "GET":
-            response = await self._client.get(url, params=params, headers=headers)
+            response = await client.get(url, params=params, headers=headers)
         else:
-            response = await self._client.post(url, json=params, headers=headers)
+            response = await client.post(url, json=params, headers=headers)
 
         return response.json()
 
@@ -778,9 +818,7 @@ class OrderExecutor:
 
     async def get_wallet_balance(self, account_type: str = "UNIFIED") -> dict:
         """Get wallet balance."""
-        response = await self._signed_request(
-            "GET", "/v5/account/wallet-balance", {"accountType": account_type}
-        )
+        response = await self._signed_request("GET", "/v5/account/wallet-balance", {"accountType": account_type})
 
         if response.get("retCode") == 0:
             return response.get("result", {})

@@ -8,7 +8,8 @@ Tests all newly implemented features:
 5. Regime Detection
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 import pandas as pd

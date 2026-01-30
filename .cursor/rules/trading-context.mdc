@@ -1,0 +1,41 @@
+---
+description: Критические переменные и валидация для торговой системы — бэктестер, Bybit API, стратегии, walk-forward.
+globs: backend/backtesting/**/*.py,backend/services/**/*.py,backend/core/metrics_calculator.py,backend/api/**/*.py
+alwaysApply: false
+---
+
+# Контекст торговой системы (переменные и валидация)
+
+## Бэктестер (backend/backtesting/)
+
+- **strategy_params** — не терять при рефакторинге; проверить все использования (Grep).
+- **initial_capital** — передаётся в движок; цепочка: run/execute → BacktestEngine.
+- **commission** — 0.07% для TradingView parity; не менять без обоснования (см. backtesting.mdc).
+- **Цепочка:** DataLoader → Strategy (get_signals) → Engine → Results → metrics_calculator.
+- **Валидация:** после изменений — `pytest tests/` по затронутой области; при изменении движка — калибровка/compare_*.
+
+## Bybit API (backend/services/adapters/, live_trading/)
+
+- **Исключения:** обрабатывать для всех API/WebSocket вызовов (не голый `except Exception`).
+- **Секреты:** только .env / конфиг; не хранить ключи в коде.
+- **Состояние:** отслеживать WebSocket/connection state при изменениях в live_trading.
+- **Rate limits:** учитывать лимиты Bybit при добавлении вызовов.
+
+## Параметры стратегий (RSI, ATR, lookback)
+
+- **Отслеживать:** length, period, multiplier и аналоги — определения и использования (Grep/SemanticSearch).
+- **Lookback:** при изменении индикаторов проверять lookback periods (RSI, ATR и т.д.).
+- **Валидация:** сравнение с TradingView при изменении логики индикаторов/сигналов.
+
+## Walk-forward и оптимизация
+
+- **Периоды:** train_period, test_period, window_size — синхронизация и отсутствие data leakage.
+- **Результаты по окнам:** отслеживать, где хранятся результаты каждого window (DataFrame/структуры).
+- **Валидация:** тесты на отсутствие утечки данных между train/test.
+
+## Проверки перед завершением задачи
+
+- Тесты: `pytest tests/` (или по подмножеству).
+- Линтер: `ruff check` по изменённым файлам.
+- Секреты: не коммитить ключи; проверять .env.example и .gitignore.
+- Бэктест: при изменении движка/метрик — запуск калибровки или compare_* по необходимости.

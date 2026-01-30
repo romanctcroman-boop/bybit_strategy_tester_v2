@@ -236,9 +236,7 @@ class ITradingEngine(ABC):
         pass
 
     @abstractmethod
-    async def close_position(
-        self, symbol: str, quantity: Optional[float] = None
-    ) -> TradeResult:
+    async def close_position(self, symbol: str, quantity: Optional[float] = None) -> TradeResult:
         """Close a position (fully or partially)."""
         pass
 
@@ -444,9 +442,7 @@ class LocalTradingEngine(ITradingEngine):
         """Get all open positions."""
         return [p for p in self._positions.values() if p.side != PositionSide.NONE]
 
-    async def close_position(
-        self, symbol: str, quantity: Optional[float] = None
-    ) -> TradeResult:
+    async def close_position(self, symbol: str, quantity: Optional[float] = None) -> TradeResult:
         """Close a position."""
         position = self._positions.get(symbol.upper())
         if not position:
@@ -457,9 +453,7 @@ class LocalTradingEngine(ITradingEngine):
             )
 
         # Determine close side
-        close_side = (
-            OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
-        )
+        close_side = OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
         close_qty = quantity or position.size
 
         return await self.place_order(
@@ -479,9 +473,7 @@ class LocalTradingEngine(ITradingEngine):
         return {
             "status": "healthy",
             "initialized": self._initialized,
-            "open_orders": len(
-                [o for o in self._orders.values() if o.status == OrderStatus.PENDING]
-            ),
+            "open_orders": len([o for o in self._orders.values() if o.status == OrderStatus.PENDING]),
             "positions": len(self._positions),
             "event_bus_connected": self._event_bus is not None,
         }
@@ -498,6 +490,17 @@ class RemoteTradingEngine(ITradingEngine):
 
     Communicates with trading engine microservice via HTTP/gRPC.
     Used in distributed deployment mode.
+
+    Recommended usage (context manager):
+        async with RemoteTradingEngine("http://localhost:8001") as engine:
+            result = await engine.place_order(...)
+
+    Alternative (manual cleanup):
+        engine = RemoteTradingEngine("http://localhost:8001")
+        try:
+            result = await engine.place_order(...)
+        finally:
+            await engine.close()
     """
 
     def __init__(
@@ -508,9 +511,33 @@ class RemoteTradingEngine(ITradingEngine):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._client: Optional[Any] = None
+        self._closed = False
+
+    async def __aenter__(self) -> "RemoteTradingEngine":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit - ensures cleanup."""
+        await self.close()
+
+    async def close(self) -> None:
+        """Close HTTP client and cleanup resources."""
+        if self._closed:
+            return
+        self._closed = True
+        if self._client is not None:
+            try:
+                await self._client.aclose()
+            except Exception as e:
+                logger.warning(f"Error closing HTTP client: {e}")
+            finally:
+                self._client = None
 
     async def _get_client(self) -> Any:
         """Get or create HTTP client."""
+        if self._closed:
+            raise RuntimeError("RemoteTradingEngine is closed")
         if self._client is None:
             import httpx
 
@@ -624,9 +651,7 @@ class RemoteTradingEngine(ITradingEngine):
         except Exception:
             return []
 
-    async def close_position(
-        self, symbol: str, quantity: Optional[float] = None
-    ) -> TradeResult:
+    async def close_position(self, symbol: str, quantity: Optional[float] = None) -> TradeResult:
         """Close position via remote service."""
         try:
             await self._request(

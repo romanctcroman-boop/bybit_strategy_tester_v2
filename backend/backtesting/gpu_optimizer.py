@@ -54,10 +54,20 @@ _WARM_POOL = None
 _SHARED_MEMORY_BLOCKS = []  # Track for cleanup
 
 
-# Configure CUDA PATH before importing CuPy
+# =============================================================================
+# LAZY GPU INITIALIZATION
+# CuPy is loaded only when GPU is actually needed to speed up startup
+# =============================================================================
+
+# GPU state - initialized lazily on first use
+GPU_AVAILABLE = None  # None = not checked yet, True/False after check
+cp = None
+GPU_NAME = "Not initialized"
+_gpu_init_done = False
+
+
 def _setup_cuda_path():
     """Add CUDA bin to PATH for NVRTC libraries"""
-    # CuPy 13.6 requires CUDA 12.x runtime, so prioritize v12.0
     cuda_paths = [
         r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\bin",
         r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin",
@@ -78,34 +88,55 @@ def _setup_cuda_path():
     return None
 
 
-_cuda_path = _setup_cuda_path()
+def _init_gpu():
+    """
+    Initialize GPU/CuPy on first use (lazy loading).
+    Returns True if GPU is available, False otherwise.
+    """
+    global GPU_AVAILABLE, cp, GPU_NAME, _gpu_init_done
 
-# Check GPU availability
-GPU_AVAILABLE = False
-cp = None
-GPU_NAME = "None"
+    if _gpu_init_done:
+        return GPU_AVAILABLE
 
-try:
-    import cupy as cp
+    _gpu_init_done = True
+    _setup_cuda_path()
 
-    # Test actual GPU operations (not just import)
-    _test = cp.array([1.0, 2.0, 3.0], dtype=cp.float64)
-    _result = cp.diff(_test)  # This requires NVRTC which often fails
-    cp.cuda.Stream.null.synchronize()  # Ensure operation completed
-    del _test, _result
-
-    GPU_AVAILABLE = True
     try:
-        device = cp.cuda.Device()
-        mem_info = device.mem_info
-        GPU_NAME = f"GPU {device.id} ({mem_info[1] / 1024**3:.1f}GB)"
-    except Exception:
-        GPU_NAME = "NVIDIA GPU"
-    logger.info(f"🚀 GPU acceleration enabled: {GPU_NAME}")
-except Exception as e:
-    cp = None
-    GPU_AVAILABLE = False
-    logger.info(f"GPU not available (using CPU): {e}")
+        import cupy as _cp
+
+        # Test actual GPU operations
+        _test = _cp.array([1.0, 2.0, 3.0], dtype=_cp.float64)
+        _result = _cp.diff(_test)
+        _cp.cuda.Stream.null.synchronize()
+        del _test, _result
+
+        cp = _cp
+        GPU_AVAILABLE = True
+
+        try:
+            device = _cp.cuda.Device()
+            mem_info = device.mem_info
+            GPU_NAME = f"GPU {device.id} ({mem_info[1] / 1024**3:.1f}GB)"
+        except Exception:
+            GPU_NAME = "NVIDIA GPU"
+
+        logger.info(f"🚀 GPU acceleration enabled: {GPU_NAME}")
+        return True
+
+    except Exception as e:
+        cp = None
+        GPU_AVAILABLE = False
+        GPU_NAME = "None"
+        logger.info(f"GPU not available (using CPU): {e}")
+        return False
+
+
+def is_gpu_available():
+    """Check if GPU is available, initializing if needed."""
+    if GPU_AVAILABLE is None:
+        _init_gpu()
+    return GPU_AVAILABLE
+
 
 # Fallback to Numba for CPU
 try:
@@ -333,9 +364,7 @@ if NUMBA_AVAILABLE:
         fastmath=True,
         boundscheck=False,
     )
-    def _calculate_all_rsi_vectorized(
-        close: np.ndarray, periods: np.ndarray
-    ) -> np.ndarray:
+    def _calculate_all_rsi_vectorized(close: np.ndarray, periods: np.ndarray) -> np.ndarray:
         """
         Calculate RSI for ALL periods at once.
         Returns: rsi_matrix[period_idx, time]
@@ -496,12 +525,8 @@ if NUMBA_AVAILABLE:
                                             equity *= 1 - commission
                                     else:
                                         # Check exit conditions for Long
-                                        hit_sl = sl > 0 and low[
-                                            i
-                                        ] <= long_entry_price * (1 - sl)
-                                        hit_tp = tp > 0 and high[
-                                            i
-                                        ] >= long_entry_price * (1 + tp)
+                                        hit_sl = sl > 0 and low[i] <= long_entry_price * (1 - sl)
+                                        hit_tp = tp > 0 and high[i] >= long_entry_price * (1 + tp)
 
                                         if long_exits[i] or hit_sl or hit_tp:
                                             if hit_sl:
@@ -509,9 +534,7 @@ if NUMBA_AVAILABLE:
                                             elif hit_tp:
                                                 pnl = tp
                                             else:
-                                                pnl = (
-                                                    close[i] - long_entry_price
-                                                ) / long_entry_price
+                                                pnl = (close[i] - long_entry_price) / long_entry_price
 
                                             equity *= (1 + pnl) * (1 - commission)
 
@@ -546,12 +569,8 @@ if NUMBA_AVAILABLE:
                                             equity *= 1 - commission
                                     else:
                                         # Check exit conditions for Short (reversed)
-                                        hit_sl = sl > 0 and high[
-                                            i
-                                        ] >= short_entry_price * (1 + sl)
-                                        hit_tp = tp > 0 and low[
-                                            i
-                                        ] <= short_entry_price * (1 - tp)
+                                        hit_sl = sl > 0 and high[i] >= short_entry_price * (1 + sl)
+                                        hit_tp = tp > 0 and low[i] <= short_entry_price * (1 - tp)
 
                                         if short_exits[i] or hit_sl or hit_tp:
                                             if hit_sl:
@@ -559,9 +578,7 @@ if NUMBA_AVAILABLE:
                                             elif hit_tp:
                                                 pnl = tp
                                             else:
-                                                pnl = (
-                                                    short_entry_price - close[i]
-                                                ) / short_entry_price
+                                                pnl = (short_entry_price - close[i]) / short_entry_price
 
                                             equity *= (1 + pnl) * (1 - commission)
 
@@ -589,21 +606,13 @@ if NUMBA_AVAILABLE:
 
                             # Store result
                             combo_idx = (
-                                combo_base
-                                + ob_idx * n_os * n_sl * n_tp
-                                + os_idx * n_sl * n_tp
-                                + sl_idx * n_tp
-                                + tp_idx
+                                combo_base + ob_idx * n_os * n_sl * n_tp + os_idx * n_sl * n_tp + sl_idx * n_tp + tp_idx
                             )
 
                             if trade_count > 0:
                                 total_return = (equity - capital) / capital * 100
                                 win_rate = wins / trade_count
-                                profit_factor = (
-                                    gross_profit / gross_loss
-                                    if gross_loss > 0
-                                    else 100.0
-                                )
+                                profit_factor = gross_profit / gross_loss if gross_loss > 0 else 100.0
 
                                 # Sharpe ratio
                                 if trade_count > 1:
@@ -618,11 +627,7 @@ if NUMBA_AVAILABLE:
                                         variance += (trade_pnls[j] - mean_ret) ** 2
                                     variance /= tc - 1
                                     std_ret = variance**0.5
-                                    sharpe = (
-                                        (mean_ret / std_ret * 15.87)
-                                        if std_ret > 0
-                                        else 0.0
-                                    )
+                                    sharpe = (mean_ret / std_ret * 15.87) if std_ret > 0 else 0.0
                                 else:
                                     sharpe = 0.0
 
@@ -729,11 +734,7 @@ if NUMBA_AVAILABLE:
                             tp = tp_arr[tp_idx] / 100.0
 
                             combo_idx = (
-                                combo_base
-                                + ob_idx * n_os * n_sl * n_tp
-                                + os_idx * n_sl * n_tp
-                                + sl_idx * n_tp
-                                + tp_idx
+                                combo_base + ob_idx * n_os * n_sl * n_tp + os_idx * n_sl * n_tp + sl_idx * n_tp + tp_idx
                             )
 
                             # Store parameters first
@@ -777,23 +778,13 @@ if NUMBA_AVAILABLE:
 
                                             if in_short:
                                                 if position_mode == 0:  # BLOCK
-                                                    can_open_long = (
-                                                        False  # Skip - Short is open
-                                                    )
-                                                elif (
-                                                    position_mode == 1
-                                                ):  # CLOSE-AND-OPEN
+                                                    can_open_long = False  # Skip - Short is open
+                                                elif position_mode == 1:  # CLOSE-AND-OPEN
                                                     # Close Short first
-                                                    short_pnl = (
-                                                        short_entry_price - close[i]
-                                                    ) / short_entry_price
-                                                    equity *= (1 + short_pnl) * (
-                                                        1 - commission
-                                                    )
+                                                    short_pnl = (short_entry_price - close[i]) / short_entry_price
+                                                    equity *= (1 + short_pnl) * (1 - commission)
                                                     if trade_count < 500:
-                                                        trade_pnls[trade_count] = (
-                                                            short_pnl
-                                                        )
+                                                        trade_pnls[trade_count] = short_pnl
                                                     trade_count += 1
                                                     short_trades_count += 1
                                                     if short_pnl > 0:
@@ -805,9 +796,7 @@ if NUMBA_AVAILABLE:
                                                         gross_loss += abs(short_pnl)
                                                     if equity > peak_equity:
                                                         peak_equity = equity
-                                                    dd = (
-                                                        peak_equity - equity
-                                                    ) / peak_equity
+                                                    dd = (peak_equity - equity) / peak_equity
                                                     if dd > max_dd:
                                                         max_dd = dd
                                                     in_short = False
@@ -818,12 +807,8 @@ if NUMBA_AVAILABLE:
                                                 long_entry_price = close[i]
                                                 equity *= 1 - commission
                                     else:
-                                        hit_sl = sl > 0 and low[
-                                            i
-                                        ] <= long_entry_price * (1 - sl)
-                                        hit_tp = tp > 0 and high[
-                                            i
-                                        ] >= long_entry_price * (1 + tp)
+                                        hit_sl = sl > 0 and low[i] <= long_entry_price * (1 - sl)
+                                        hit_tp = tp > 0 and high[i] >= long_entry_price * (1 + tp)
 
                                         if long_exits[i] or hit_sl or hit_tp:
                                             if hit_sl:
@@ -833,9 +818,7 @@ if NUMBA_AVAILABLE:
                                             else:
                                                 exit_p = close[i]
 
-                                            real_entry = long_entry_price * (
-                                                1 + slippage
-                                            )
+                                            real_entry = long_entry_price * (1 + slippage)
                                             real_exit = exit_p * (1 - slippage)
                                             pnl = (real_exit - real_entry) / real_entry
 
@@ -871,23 +854,13 @@ if NUMBA_AVAILABLE:
 
                                             if in_long:
                                                 if position_mode == 0:  # BLOCK
-                                                    can_open_short = (
-                                                        False  # Skip - Long is open
-                                                    )
-                                                elif (
-                                                    position_mode == 1
-                                                ):  # CLOSE-AND-OPEN
+                                                    can_open_short = False  # Skip - Long is open
+                                                elif position_mode == 1:  # CLOSE-AND-OPEN
                                                     # Close Long first
-                                                    long_pnl = (
-                                                        close[i] - long_entry_price
-                                                    ) / long_entry_price
-                                                    equity *= (1 + long_pnl) * (
-                                                        1 - commission
-                                                    )
+                                                    long_pnl = (close[i] - long_entry_price) / long_entry_price
+                                                    equity *= (1 + long_pnl) * (1 - commission)
                                                     if trade_count < 500:
-                                                        trade_pnls[trade_count] = (
-                                                            long_pnl
-                                                        )
+                                                        trade_pnls[trade_count] = long_pnl
                                                     trade_count += 1
                                                     long_trades_count += 1
                                                     if long_pnl > 0:
@@ -899,9 +872,7 @@ if NUMBA_AVAILABLE:
                                                         gross_loss += abs(long_pnl)
                                                     if equity > peak_equity:
                                                         peak_equity = equity
-                                                    dd = (
-                                                        peak_equity - equity
-                                                    ) / peak_equity
+                                                    dd = (peak_equity - equity) / peak_equity
                                                     if dd > max_dd:
                                                         max_dd = dd
                                                     in_long = False
@@ -912,12 +883,8 @@ if NUMBA_AVAILABLE:
                                                 short_entry_price = close[i]
                                                 equity *= 1 - commission
                                     else:
-                                        hit_sl = sl > 0 and high[
-                                            i
-                                        ] >= short_entry_price * (1 + sl)
-                                        hit_tp = tp > 0 and low[
-                                            i
-                                        ] <= short_entry_price * (1 - tp)
+                                        hit_sl = sl > 0 and high[i] >= short_entry_price * (1 + sl)
+                                        hit_tp = tp > 0 and low[i] <= short_entry_price * (1 - tp)
 
                                         if short_exits[i] or hit_sl or hit_tp:
                                             if hit_sl:
@@ -927,9 +894,7 @@ if NUMBA_AVAILABLE:
                                             else:
                                                 exit_p = close[i]
 
-                                            real_entry = short_entry_price * (
-                                                1 - slippage
-                                            )
+                                            real_entry = short_entry_price * (1 - slippage)
                                             real_exit = exit_p * (1 + slippage)
                                             pnl = (real_entry - real_exit) / real_entry
 
@@ -960,11 +925,7 @@ if NUMBA_AVAILABLE:
                             if trade_count > 0:
                                 total_return = (equity - capital) / capital * 100
                                 win_rate = wins / trade_count
-                                profit_factor = (
-                                    gross_profit / gross_loss
-                                    if gross_loss > 0
-                                    else 100.0
-                                )
+                                profit_factor = gross_profit / gross_loss if gross_loss > 0 else 100.0
 
                                 if trade_count > 1:
                                     mean_ret = 0.0
@@ -978,11 +939,7 @@ if NUMBA_AVAILABLE:
                                         variance += (trade_pnls[j] - mean_ret) ** 2
                                     variance /= tc - 1
                                     std_ret = variance**0.5
-                                    sharpe = (
-                                        (mean_ret / std_ret * 15.87)
-                                        if std_ret > 0
-                                        else 0.0
-                                    )
+                                    sharpe = (mean_ret / std_ret * 15.87) if std_ret > 0 else 0.0
                                 else:
                                     sharpe = 0.0
 
@@ -1123,11 +1080,7 @@ if NUMBA_AVAILABLE:
                             tp = tp_arr[tp_idx] / 100.0
 
                             combo_idx = (
-                                combo_base
-                                + ob_idx * n_os * n_sl * n_tp
-                                + os_idx * n_sl * n_tp
-                                + sl_idx * n_tp
-                                + tp_idx
+                                combo_base + ob_idx * n_os * n_sl * n_tp + os_idx * n_sl * n_tp + sl_idx * n_tp + tp_idx
                             )
 
                             # Store parameters
@@ -1161,9 +1114,7 @@ if NUMBA_AVAILABLE:
                                         equity *= 1 - commission
                                 else:
                                     hit_sl = sl > 0 and low[i] <= entry_price * (1 - sl)
-                                    hit_tp = tp > 0 and high[i] >= entry_price * (
-                                        1 + tp
-                                    )
+                                    hit_tp = tp > 0 and high[i] >= entry_price * (1 + tp)
 
                                     if exits[i] or hit_sl or hit_tp:
                                         if hit_sl:
@@ -1202,11 +1153,7 @@ if NUMBA_AVAILABLE:
                             if trade_count > 0:
                                 total_return = (equity - capital) / capital * 100
                                 win_rate = wins / trade_count
-                                profit_factor = (
-                                    gross_profit / gross_loss
-                                    if gross_loss > 0
-                                    else 100.0
-                                )
+                                profit_factor = gross_profit / gross_loss if gross_loss > 0 else 100.0
 
                                 if trade_count > 1:
                                     mean_ret = 0.0
@@ -1220,11 +1167,7 @@ if NUMBA_AVAILABLE:
                                         variance += (trade_pnls[j] - mean_ret) ** 2
                                     variance /= tc - 1
                                     std_ret = variance**0.5
-                                    sharpe = (
-                                        (mean_ret / std_ret * 15.87)
-                                        if std_ret > 0
-                                        else 0.0
-                                    )
+                                    sharpe = (mean_ret / std_ret * 15.87) if std_ret > 0 else 0.0
                                 else:
                                     sharpe = 0.0
 
@@ -1239,9 +1182,7 @@ if NUMBA_AVAILABLE:
 
 else:
     # Fallback without Numba (much slower)
-    def _fast_simulate_backtest(
-        close, high, low, entries, exits, stop_loss, take_profit, capital, commission
-    ):
+    def _fast_simulate_backtest(close, high, low, entries, exits, stop_loss, take_profit, capital, commission):
         """Non-JIT fallback (slow)"""
         return 0.0, 0.0, 0.0, 0.0, 0, 0.0
 
@@ -1400,11 +1341,7 @@ if NUMBA_AVAILABLE:
                             tp = tp_arr[tp_idx] / 100.0
 
                             combo_idx = (
-                                combo_base
-                                + ob_idx * n_os * n_sl * n_tp
-                                + os_idx * n_sl * n_tp
-                                + sl_idx * n_tp
-                                + tp_idx
+                                combo_base + ob_idx * n_os * n_sl * n_tp + os_idx * n_sl * n_tp + sl_idx * n_tp + tp_idx
                             )
 
                             # Store parameters
@@ -1434,9 +1371,7 @@ if NUMBA_AVAILABLE:
                                         equity *= 1 - commission
                                 else:
                                     hit_sl = sl > 0 and low[i] <= entry_price * (1 - sl)
-                                    hit_tp = tp > 0 and high[i] >= entry_price * (
-                                        1 + tp
-                                    )
+                                    hit_tp = tp > 0 and high[i] >= entry_price * (1 + tp)
 
                                     if exits[i] or hit_sl or hit_tp:
                                         if hit_sl:
@@ -1470,11 +1405,7 @@ if NUMBA_AVAILABLE:
                             if trade_count > 0:
                                 total_return = (equity - capital) / capital * 100
                                 win_rate = wins / trade_count
-                                profit_factor = (
-                                    gross_profit / gross_loss
-                                    if gross_loss > 0
-                                    else 100.0
-                                )
+                                profit_factor = gross_profit / gross_loss if gross_loss > 0 else 100.0
 
                                 if trade_count > 1:
                                     mean_ret = 0.0
@@ -1488,11 +1419,7 @@ if NUMBA_AVAILABLE:
                                         variance += (trade_pnls[j] - mean_ret) ** 2
                                     variance /= tc - 1
                                     std_ret = variance**0.5
-                                    sharpe = (
-                                        (mean_ret / std_ret * 15.87)
-                                        if std_ret > 0
-                                        else 0.0
-                                    )
+                                    sharpe = (mean_ret / std_ret * 15.87) if std_ret > 0 else 0.0
                                 else:
                                     sharpe = 0.0
 
@@ -1600,11 +1527,7 @@ if NUMBA_AVAILABLE:
                             tp = tp_arr[tp_idx] / 100.0
 
                             combo_idx = (
-                                combo_base
-                                + ob_idx * n_os * n_sl * n_tp
-                                + os_idx * n_sl * n_tp
-                                + sl_idx * n_tp
-                                + tp_idx
+                                combo_base + ob_idx * n_os * n_sl * n_tp + os_idx * n_sl * n_tp + sl_idx * n_tp + tp_idx
                             )
 
                             # Store parameters in TRANSPOSED layout (column access)
@@ -1634,9 +1557,7 @@ if NUMBA_AVAILABLE:
                                         equity *= 1 - commission
                                 else:
                                     hit_sl = sl > 0 and low[i] <= entry_price * (1 - sl)
-                                    hit_tp = tp > 0 and high[i] >= entry_price * (
-                                        1 + tp
-                                    )
+                                    hit_tp = tp > 0 and high[i] >= entry_price * (1 + tp)
 
                                     if exits[i] or hit_sl or hit_tp:
                                         if hit_sl:
@@ -1670,11 +1591,7 @@ if NUMBA_AVAILABLE:
                             if trade_count > 0:
                                 total_return = (equity - capital) / capital * 100
                                 win_rate = wins / trade_count
-                                profit_factor = (
-                                    gross_profit / gross_loss
-                                    if gross_loss > 0
-                                    else 100.0
-                                )
+                                profit_factor = gross_profit / gross_loss if gross_loss > 0 else 100.0
 
                                 if trade_count > 1:
                                     mean_ret = 0.0
@@ -1688,11 +1605,7 @@ if NUMBA_AVAILABLE:
                                         variance += (trade_pnls[j] - mean_ret) ** 2
                                     variance /= tc - 1
                                     std_ret = variance**0.5
-                                    sharpe = (
-                                        (mean_ret / std_ret * 15.87)
-                                        if std_ret > 0
-                                        else 0.0
-                                    )
+                                    sharpe = (mean_ret / std_ret * 15.87) if std_ret > 0 else 0.0
                                 else:
                                     sharpe = 0.0
 
@@ -1865,9 +1778,7 @@ if NUMBA_AVAILABLE:
 
                                     if equity_batch[b] > peak_equity_batch[b]:
                                         peak_equity_batch[b] = equity_batch[b]
-                                    dd = (
-                                        peak_equity_batch[b] - equity_batch[b]
-                                    ) / peak_equity_batch[b]
+                                    dd = (peak_equity_batch[b] - equity_batch[b]) / peak_equity_batch[b]
                                     if dd > max_dd_batch[b]:
                                         max_dd_batch[b] = dd
 
@@ -1878,11 +1789,7 @@ if NUMBA_AVAILABLE:
                         for tp_idx in range(n_tp):
                             b = sl_idx * n_tp + tp_idx
                             combo_idx = (
-                                combo_base
-                                + ob_idx * n_os * n_sl * n_tp
-                                + os_idx * n_sl * n_tp
-                                + sl_idx * n_tp
-                                + tp_idx
+                                combo_base + ob_idx * n_os * n_sl * n_tp + os_idx * n_sl * n_tp + sl_idx * n_tp + tp_idx
                             )
 
                             results[combo_idx, 0] = period
@@ -1893,14 +1800,10 @@ if NUMBA_AVAILABLE:
 
                             tc = trade_count_batch[b]
                             if tc > 0:
-                                total_return = (
-                                    (equity_batch[b] - capital) / capital * 100
-                                )
+                                total_return = (equity_batch[b] - capital) / capital * 100
                                 win_rate = wins_batch[b] / tc
                                 profit_factor = (
-                                    gross_profit_batch[b] / gross_loss_batch[b]
-                                    if gross_loss_batch[b] > 0
-                                    else 100.0
+                                    gross_profit_batch[b] / gross_loss_batch[b] if gross_loss_batch[b] > 0 else 100.0
                                 )
 
                                 if tc > 1:
@@ -1912,16 +1815,10 @@ if NUMBA_AVAILABLE:
 
                                     variance = 0.0
                                     for j in range(tc_lim):
-                                        variance += (
-                                            trade_pnls_batch[b, j] - mean_ret
-                                        ) ** 2
+                                        variance += (trade_pnls_batch[b, j] - mean_ret) ** 2
                                     variance /= tc_lim - 1
                                     std_ret = variance**0.5
-                                    sharpe = (
-                                        (mean_ret / std_ret * 15.87)
-                                        if std_ret > 0
-                                        else 0.0
-                                    )
+                                    sharpe = (mean_ret / std_ret * 15.87) if std_ret > 0 else 0.0
                                 else:
                                     sharpe = 0.0
 
@@ -1971,9 +1868,7 @@ def _worker_init(shm_name: str, shape: tuple, dtype: str, close_len: int):
 
         # Pre-warm Numba JIT compilation with dummy data (happens only on first call)
         if NUMBA_AVAILABLE:
-            dummy_close = np.array(
-                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0] * 5, dtype=np.float64
-            )
+            dummy_close = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0] * 5, dtype=np.float64)
             dummy_high = dummy_close * 1.01
             dummy_low = dummy_close * 0.99
             dummy_entries = np.array([False, True, False, False] * 10, dtype=np.bool_)
@@ -2053,20 +1948,18 @@ def _worker_process_period(args: tuple):
                     sl_val = sl / 100.0 if sl else 0.0
                     tp_val = tp / 100.0 if tp else 0.0
 
-                    total_return, sharpe, max_dd, win_rate, total_trades, pf = (
-                        _fast_simulate_backtest(
-                            close,
-                            high,
-                            low,
-                            entries.astype(np.bool_),
-                            exits.astype(np.bool_),
-                            sl_val,
-                            tp_val,
-                            initial_capital * leverage,
-                            commission,
-                            slippage,
-                            1.0,  # position_size - 100% in worker (leverage already applied to capital)
-                        )
+                    total_return, sharpe, max_dd, win_rate, total_trades, pf = _fast_simulate_backtest(
+                        close,
+                        high,
+                        low,
+                        entries.astype(np.bool_),
+                        exits.astype(np.bool_),
+                        sl_val,
+                        tp_val,
+                        initial_capital * leverage,
+                        commission,
+                        slippage,
+                        1.0,  # position_size - 100% in worker (leverage already applied to capital)
                     )
 
                     if total_trades > 0:
@@ -2114,17 +2007,13 @@ class WarmProcessPool:
         _SHARED_MEMORY_BLOCKS.append(self.shm)
 
         # Copy data into shared memory
-        all_data = np.ndarray(
-            (self.close_len * 3,), dtype=np.float64, buffer=self.shm.buf
-        )
+        all_data = np.ndarray((self.close_len * 3,), dtype=np.float64, buffer=self.shm.buf)
         all_data[: self.close_len] = close
         all_data[self.close_len : 2 * self.close_len] = high
         all_data[2 * self.close_len :] = low
 
         # Create pool with initializer (workers pre-warm Numba)
-        logger.info(
-            f"Starting {self.n_workers} workers with shared memory ({total_size / 1024 / 1024:.2f} MB)..."
-        )
+        logger.info(f"Starting {self.n_workers} workers with shared memory ({total_size / 1024 / 1024:.2f} MB)...")
         start_init = time.time()
 
         self.pool = Pool(
@@ -2265,19 +2154,17 @@ def _process_rsi_period(
                     sl_val = sl / 100.0 if sl else 0.0
                     tp_val = tp / 100.0 if tp else 0.0
 
-                    total_return, sharpe, max_dd, win_rate, total_trades, pf = (
-                        _fast_simulate_backtest(
-                            close,
-                            high,
-                            low,
-                            entries.astype(np.bool_),
-                            exits.astype(np.bool_),
-                            sl_val,
-                            tp_val,
-                            initial_capital * leverage,
-                            commission,
-                            1.0,  # position_size - 100% in parallel worker
-                        )
+                    total_return, sharpe, max_dd, win_rate, total_trades, pf = _fast_simulate_backtest(
+                        close,
+                        high,
+                        low,
+                        entries.astype(np.bool_),
+                        exits.astype(np.bool_),
+                        sl_val,
+                        tp_val,
+                        initial_capital * leverage,
+                        commission,
+                        1.0,  # position_size - 100% in parallel worker
                     )
 
                     if total_trades > 0:
@@ -2424,19 +2311,11 @@ if GPU_AVAILABLE and cp is not None:
 
                     # Generate signals on GPU (vectorized boolean ops)
                     if direction >= 0:
-                        entries_all[p_idx, ob_idx, os_idx, period + 1 :] = (
-                            rsi[period + 1 :] < oversold
-                        )
-                        exits_all[p_idx, ob_idx, os_idx, period + 1 :] = (
-                            rsi[period + 1 :] > overbought
-                        )
+                        entries_all[p_idx, ob_idx, os_idx, period + 1 :] = rsi[period + 1 :] < oversold
+                        exits_all[p_idx, ob_idx, os_idx, period + 1 :] = rsi[period + 1 :] > overbought
                     else:
-                        entries_all[p_idx, ob_idx, os_idx, period + 1 :] = (
-                            rsi[period + 1 :] > overbought
-                        )
-                        exits_all[p_idx, ob_idx, os_idx, period + 1 :] = (
-                            rsi[period + 1 :] < oversold
-                        )
+                        entries_all[p_idx, ob_idx, os_idx, period + 1 :] = rsi[period + 1 :] > overbought
+                        exits_all[p_idx, ob_idx, os_idx, period + 1 :] = rsi[period + 1 :] < oversold
 
         # Transfer signals back to CPU for sequential backtest
         entries_cpu = entries_all.get()
@@ -2573,12 +2452,8 @@ if GPU_AVAILABLE and cp is not None:
                                             entry_price = close[i]
                                             equity *= 1 - commission
                                     else:
-                                        hit_sl = sl > 0 and low[i] <= entry_price * (
-                                            1 - sl
-                                        )
-                                        hit_tp = tp > 0 and high[i] >= entry_price * (
-                                            1 + tp
-                                        )
+                                        hit_sl = sl > 0 and low[i] <= entry_price * (1 - sl)
+                                        hit_tp = tp > 0 and high[i] >= entry_price * (1 + tp)
 
                                         if exits[i] or hit_sl or hit_tp:
                                             if hit_sl:
@@ -2586,9 +2461,7 @@ if GPU_AVAILABLE and cp is not None:
                                             elif hit_tp:
                                                 pnl = tp
                                             else:
-                                                pnl = (
-                                                    close[i] - entry_price
-                                                ) / entry_price
+                                                pnl = (close[i] - entry_price) / entry_price
 
                                             equity *= (1 + pnl) * (1 - commission)
 
@@ -2614,11 +2487,7 @@ if GPU_AVAILABLE and cp is not None:
                                 if trade_count > 0:
                                     total_return = (equity - capital) / capital * 100
                                     win_rate = wins / trade_count
-                                    profit_factor = (
-                                        gross_profit / gross_loss
-                                        if gross_loss > 0
-                                        else 100.0
-                                    )
+                                    profit_factor = gross_profit / gross_loss if gross_loss > 0 else 100.0
 
                                     if trade_count > 1:
                                         mean_ret = 0.0
@@ -2632,11 +2501,7 @@ if GPU_AVAILABLE and cp is not None:
                                             variance += (trade_pnls[j] - mean_ret) ** 2
                                         variance /= tc - 1
                                         std_ret = variance**0.5
-                                        sharpe = (
-                                            (mean_ret / std_ret * 15.87)
-                                            if std_ret > 0
-                                            else 0.0
-                                        )
+                                        sharpe = (mean_ret / std_ret * 15.87) if std_ret > 0 else 0.0
                                     else:
                                         sharpe = 0.0
 
@@ -2760,8 +2625,7 @@ class GPUGridOptimizer:
             raise ValueError("No parameter combinations to evaluate")
         if total_combinations > MAX_COMBINATIONS:
             raise ValueError(
-                f"Too many combinations ({total_combinations:,}). "
-                f"Reduce the grid below {MAX_COMBINATIONS:,}."
+                f"Too many combinations ({total_combinations:,}). Reduce the grid below {MAX_COMBINATIONS:,}."
             )
 
         logger.info("🚀 GPU Grid Optimizer starting")
@@ -2778,11 +2642,7 @@ class GPUGridOptimizer:
         if n_candles < 2:
             raise ValueError("Not enough candles to run optimization")
 
-        if not (
-            np.isfinite(close).all()
-            and np.isfinite(high).all()
-            and np.isfinite(low).all()
-        ):
+        if not (np.isfinite(close).all() and np.isfinite(high).all() and np.isfinite(low).all()):
             raise ValueError("Candles contain NaN or infinite values")
 
         # Use parallel processing for large parameter spaces (joblib works on Windows)
@@ -2913,9 +2773,7 @@ class GPUGridOptimizer:
         results.sort(key=lambda x: x.get("score", 0), reverse=True)
 
         execution_time = time.time() - start_time
-        combinations_per_second = (
-            total_combinations / execution_time if execution_time > 0 else 0
-        )
+        combinations_per_second = total_combinations / execution_time if execution_time > 0 else 0
 
         logger.info(f"✅ Optimization completed in {execution_time:.2f}s")
         logger.info(f"   Speed: {combinations_per_second:,.0f} combinations/second")
@@ -2949,9 +2807,7 @@ class GPUGridOptimizer:
             performance_stats={
                 "combinations_per_second": round(combinations_per_second, 0),
                 "gpu_enabled": self.use_gpu,
-                "acceleration": "GPU (CuPy)"
-                if execution_mode.startswith("gpu")
-                else "CPU (Numba)",
+                "acceleration": "GPU (CuPy)" if execution_mode.startswith("gpu") else "CPU (Numba)",
                 "gpu_memory_used_mb": self._get_gpu_memory() if self.use_gpu else 0,
                 "execution_mode": execution_mode,
                 "fallback_reason": fallback_reason,
@@ -2988,9 +2844,7 @@ class GPUGridOptimizer:
         high_gpu = cp.asarray(high, dtype=cp.float64)
         low_gpu = cp.asarray(low, dtype=cp.float64)
 
-        logger.debug(
-            f"Data transferred to GPU: {close_gpu.nbytes / 1024 / 1024:.2f} MB"
-        )
+        logger.debug(f"Data transferred to GPU: {close_gpu.nbytes / 1024 / 1024:.2f} MB")
 
         # Pre-calculate RSI for all periods using NUMBA (much faster than GPU for sequential EMA)
         rsi_cache = {}
@@ -2999,22 +2853,12 @@ class GPUGridOptimizer:
                 rsi_cache[period] = _fast_calculate_rsi(close, period)
         else:
             for period in rsi_periods:
-                rsi_cache[period] = cp.asnumpy(
-                    self._calculate_rsi_gpu(close_gpu, period)
-                )
+                rsi_cache[period] = cp.asnumpy(self._calculate_rsi_gpu(close_gpu, period))
 
-        logger.debug(
-            f"RSI calculated for {len(rsi_periods)} periods (Numba: {NUMBA_AVAILABLE})"
-        )
+        logger.debug(f"RSI calculated for {len(rsi_periods)} periods (Numba: {NUMBA_AVAILABLE})")
 
         # Generate all combinations and test
-        total = (
-            len(rsi_periods)
-            * len(overbought_levels)
-            * len(oversold_levels)
-            * len(stop_losses)
-            * len(take_profits)
-        )
+        total = len(rsi_periods) * len(overbought_levels) * len(oversold_levels) * len(stop_losses) * len(take_profits)
         processed = 0
 
         for period in rsi_periods:
@@ -3069,9 +2913,7 @@ class GPUGridOptimizer:
 
                             processed += 1
                             if processed % 10000 == 0:
-                                logger.info(
-                                    f"   Progress: {processed:,}/{total:,} ({processed / total * 100:.1f}%)"
-                                )
+                                logger.info(f"   Progress: {processed:,}/{total:,} ({processed / total * 100:.1f}%)")
 
         # Free GPU memory
         del close_gpu, high_gpu, low_gpu
@@ -3191,20 +3033,18 @@ class GPUGridOptimizer:
             sl = stop_loss if stop_loss is not None else 0.0
             tp = take_profit if take_profit is not None else 0.0
 
-            total_return, sharpe, max_dd, win_rate, total_trades, pf = (
-                _fast_simulate_backtest(
-                    close,
-                    high,
-                    low,
-                    entries.astype(np.bool_),
-                    exits.astype(np.bool_),
-                    sl,
-                    tp,
-                    capital,
-                    commission,
-                    slippage,
-                    position_size,
-                )
+            total_return, sharpe, max_dd, win_rate, total_trades, pf = _fast_simulate_backtest(
+                close,
+                high,
+                low,
+                entries.astype(np.bool_),
+                exits.astype(np.bool_),
+                sl,
+                tp,
+                capital,
+                commission,
+                slippage,
+                position_size,
             )
 
             return {
@@ -3495,15 +3335,11 @@ class GPUGridOptimizer:
         ]
 
         conv_time = time.time() - conv_start
-        logger.debug(
-            f"   Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)"
-        )
+        logger.debug(f"   Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)")
 
         total_time = time.time() - start
         speed = total_combinations / total_time
-        logger.info(
-            f"   Vectorized V2: {total_time:.2f}s, {speed:,.0f} comb/sec, {n_valid:,} valid"
-        )
+        logger.info(f"   Vectorized V2: {total_time:.2f}s, {speed:,.0f} comb/sec, {n_valid:,} valid")
 
         return results
 
@@ -3553,9 +3389,7 @@ class GPUGridOptimizer:
 
         # Step 2: PRE-COMPUTE ALL SIGNALS (DeepSeek Priority 1: Hoist Signal Generation)
         sig_start = time.time()
-        entries_all, exits_all = _precompute_all_signals(
-            rsi_all, periods_arr, overbought_arr, oversold_arr, dir_int
-        )
+        entries_all, exits_all = _precompute_all_signals(rsi_all, periods_arr, overbought_arr, oversold_arr, dir_int)
         sig_time = time.time() - sig_start
         logger.debug(f"   [V3] Signal precompute: {sig_time:.3f}s")
 
@@ -3642,15 +3476,11 @@ class GPUGridOptimizer:
         ]
 
         conv_time = time.time() - conv_start
-        logger.debug(
-            f"   [V3] Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)"
-        )
+        logger.debug(f"   [V3] Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)")
 
         total_time = time.time() - start
         speed = total_combinations / total_time
-        logger.info(
-            f"   Vectorized V3: {total_time:.2f}s, {speed:,.0f} comb/sec, {n_valid:,} valid"
-        )
+        logger.info(f"   Vectorized V3: {total_time:.2f}s, {speed:,.0f} comb/sec, {n_valid:,} valid")
 
         return results
 
@@ -3788,9 +3618,7 @@ class GPUGridOptimizer:
         ]
 
         conv_time = time.time() - conv_start
-        logger.debug(
-            f"   [V4] Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)"
-        )
+        logger.debug(f"   [V4] Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)")
 
         total_time = time.time() - start
         speed = total_combinations / total_time
@@ -3931,15 +3759,11 @@ class GPUGridOptimizer:
         ]
 
         conv_time = time.time() - conv_start
-        logger.debug(
-            f"   [V5] Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)"
-        )
+        logger.debug(f"   [V5] Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)")
 
         total_time = time.time() - start
         speed = total_combinations / total_time
-        logger.info(
-            f"   Vectorized V5 (transposed): {total_time:.2f}s, {speed:,.0f} comb/sec, {n_valid:,} valid"
-        )
+        logger.info(f"   Vectorized V5 (transposed): {total_time:.2f}s, {speed:,.0f} comb/sec, {n_valid:,} valid")
 
         return results
 
@@ -4038,13 +3862,7 @@ class GPUGridOptimizer:
         valid_results = results_matrix[valid_mask]
 
         n_valid = len(valid_results)
-        total_combinations = (
-            len(periods_arr)
-            * len(overbought_arr)
-            * len(oversold_arr)
-            * len(sl_arr)
-            * len(tp_arr)
-        )
+        total_combinations = len(periods_arr) * len(overbought_arr) * len(oversold_arr) * len(sl_arr) * len(tp_arr)
 
         scores = valid_results[:, 5]
         top_n = min(top_k, len(valid_results))
@@ -4092,15 +3910,11 @@ class GPUGridOptimizer:
         ]
 
         conv_time = time.time() - conv_start
-        logger.debug(
-            f"   [GPU] Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)"
-        )
+        logger.debug(f"   [GPU] Conversion: {conv_time:.3f}s ({n_valid:,} valid -> {top_n} top)")
 
         total_time = time.time() - start
         speed = total_combinations / total_time
-        logger.info(
-            f"   GPU: {total_time:.2f}s, {speed:,.0f} comb/sec, {n_valid:,} valid"
-        )
+        logger.info(f"   GPU: {total_time:.2f}s, {speed:,.0f} comb/sec, {n_valid:,} valid")
 
         return results
 
@@ -4203,9 +4017,7 @@ class GPUGridOptimizer:
             avg_gain[i] = alpha * gains[i] + (1 - alpha) * avg_gain[i - 1]
             avg_loss[i] = alpha * losses[i] + (1 - alpha) * avg_loss[i - 1]
 
-        rs = np.divide(
-            avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0
-        )
+        rs = np.divide(avg_gain, avg_loss, out=np.zeros_like(avg_gain), where=avg_loss != 0)
         rsi = 100 - (100 / (1 + rs))
         rsi[:period] = 50
 
@@ -4226,9 +4038,7 @@ class GPUGridOptimizer:
             elif metric == "net_profit":
                 # Net profit = gross profit - gross loss (in absolute value)
                 # If not available, calculate from return and capital
-                r["score"] = r.get(
-                    "net_profit", r.get("total_return", 0) * 100
-                )  # Scale to absolute value
+                r["score"] = r.get("net_profit", r.get("total_return", 0) * 100)  # Scale to absolute value
             elif metric == "profit_factor":
                 r["score"] = r.get("profit_factor", 0)
             elif metric == "risk_adjusted_return":

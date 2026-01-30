@@ -156,13 +156,13 @@ class IntrabarEngine:
         """
         o = float(m1_bar["open"])
         h = float(m1_bar["high"])
-        l = float(m1_bar["low"])
+        low_val = float(m1_bar["low"])
         c = float(m1_bar["close"])
         v = float(m1_bar.get("volume", 0))
         ts = int(m1_bar["open_time"])
 
         # Определяем порядок обхода
-        path = self._get_ohlc_path(o, h, l, c)
+        path = self._get_ohlc_path(o, h, low_val, c)
 
         # Распределение объёма
         volumes = self._distribute_volume(v, len(path))
@@ -191,7 +191,7 @@ class IntrabarEngine:
                     yield st
 
     def _get_ohlc_path(
-        self, o: float, h: float, l: float, c: float
+        self, o: float, h: float, low_val: float, c: float
     ) -> list[tuple[float, str]]:
         """
         Определить порядок обхода OHLC.
@@ -200,25 +200,25 @@ class IntrabarEngine:
             List of (price, type) tuples
         """
         if self.config.ohlc_path == OHLCPath.O_H_L_C:
-            return [(o, "open"), (h, "high"), (l, "low"), (c, "close")]
+            return [(o, "open"), (h, "high"), (low_val, "low"), (c, "close")]
 
         elif self.config.ohlc_path == OHLCPath.O_L_H_C:
-            return [(o, "open"), (l, "low"), (h, "high"), (c, "close")]
+            return [(o, "open"), (low_val, "low"), (h, "high"), (c, "close")]
 
         elif self.config.ohlc_path == OHLCPath.CONSERVATIVE_LONG:
             # Для лонга: сначала worst (low), потом best (high)
-            return [(o, "open"), (l, "low"), (h, "high"), (c, "close")]
+            return [(o, "open"), (low_val, "low"), (h, "high"), (c, "close")]
 
         elif self.config.ohlc_path == OHLCPath.CONSERVATIVE_SHORT:
             # Для шорта: сначала worst (high), потом best (low)
-            return [(o, "open"), (h, "high"), (l, "low"), (c, "close")]
+            return [(o, "open"), (h, "high"), (low_val, "low"), (c, "close")]
 
         else:  # O_HL_HEURISTIC - TradingView style
             # Если Open ближе к High → сначала High, потом Low
-            if abs(o - h) < abs(o - l):
-                return [(o, "open"), (h, "high"), (l, "low"), (c, "close")]
+            if abs(o - h) < abs(o - low_val):
+                return [(o, "open"), (h, "high"), (low_val, "low"), (c, "close")]
             else:
-                return [(o, "open"), (l, "low"), (h, "high"), (c, "close")]
+                return [(o, "open"), (low_val, "low"), (h, "high"), (c, "close")]
 
     def _generate_subticks(
         self,

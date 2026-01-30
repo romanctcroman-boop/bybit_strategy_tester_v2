@@ -414,3 +414,42 @@ openapi*.json
 
 # Agent skills (embedded repo)
 .agent/skills/
+
+# ==============================================================================
+# Additional entries (2026-01-27 cleanup)
+# ==============================================================================
+
+# Agent memory and docs (local runtime)
+agent_memory/
+.agent/docs/
+
+# Cache directories
+cache/
+.cache/
+
+# Model registry (local ML artifacts)
+model_registry/
+
+# Feature store (local ML features)
+feature_store/
+
+# Coverage reports
+htmlcov_*/
+htmlcov/
+
+# Test directories (auto-generated)
+test_e2e_test_*/
+test_eval_test_*/
+test_memory_test_*/
+test_integration_test_*/
+test_feedback/
+test_memory/
+
+# Journal files
+journal/
+
+# DeepSeek consultations (temporary)
+deepseek_*.md
+
+# Validation reports
+validation_reports.json

@@ -12,8 +12,8 @@ TradingView Pyramiding Rules:
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 from datetime import datetime
+from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -156,6 +156,38 @@ class PyramidPosition:
         if not self.entries:
             return None
         return self.entries.pop(-1)
+
+    def close_partial(self, portion: float) -> Tuple[float, float, float]:
+        """
+        Частично закрыть позицию (для Multi-level TP).
+
+        Args:
+            portion: Доля позиции для закрытия (0.0-1.0)
+
+        Returns:
+            (closed_size, closed_allocated, avg_entry_price)
+            Размер позиции и капитал уменьшаются пропорционально.
+        """
+        if not self.entries or portion <= 0:
+            return 0.0, 0.0, 0.0
+
+        portion = min(portion, 1.0)
+        avg_price = self.avg_entry_price
+        total_size = self.total_size
+        total_allocated = self.total_allocated
+
+        closed_size = total_size * portion
+        closed_allocated = total_allocated * portion
+
+        # Уменьшить каждый вход пропорционально
+        for entry in self.entries:
+            entry.size *= 1 - portion
+            entry.allocated_capital *= 1 - portion
+
+        # Удалить входы с нулевым размером
+        self.entries = [e for e in self.entries if e.size > 0.0001]
+
+        return closed_size, closed_allocated, avg_price
 
 
 class PyramidingManager:
@@ -308,6 +340,167 @@ class PyramidingManager:
         else:
             return avg_price * (1 + stop_loss)
 
+    def get_atr_tp_price(self, direction: str, atr_value: float, multiplier: float) -> float:
+        """
+        Рассчитать TP на основе ATR.
+
+        Args:
+            direction: "long" или "short"
+            atr_value: Текущее значение ATR
+            multiplier: Множитель ATR (например, 2.0 = 2*ATR)
+
+        Returns:
+            Цена Take Profit
+        """
+        avg_price = self.get_avg_entry_price(direction)
+        if avg_price == 0 or atr_value == 0:
+            return 0.0
+
+        if direction == "long":
+            return avg_price + atr_value * multiplier
+        else:
+            return avg_price - atr_value * multiplier
+
+    def get_atr_sl_price(self, direction: str, atr_value: float, multiplier: float) -> float:
+        """
+        Рассчитать SL на основе ATR.
+
+        Args:
+            direction: "long" или "short"
+            atr_value: Текущее значение ATR
+            multiplier: Множитель ATR (например, 1.5 = 1.5*ATR)
+
+        Returns:
+            Цена Stop Loss
+        """
+        avg_price = self.get_avg_entry_price(direction)
+        if avg_price == 0 or atr_value == 0:
+            return 0.0
+
+        if direction == "long":
+            return avg_price - atr_value * multiplier
+        else:
+            return avg_price + atr_value * multiplier
+
+    def get_multi_tp_prices(self, direction: str, base_tp: float, tp_levels: Tuple[float, ...]) -> List[float]:
+        """
+        Рассчитать несколько уровней TP (TP1, TP2, TP3, TP4).
+
+        Args:
+            direction: "long" или "short"
+            base_tp: Базовый TP в процентах (0.01 = 1%)
+            tp_levels: Множители уровней (1.0, 2.0, 3.0, 4.0) = TP*1, TP*2, TP*3, TP*4
+
+        Returns:
+            Список цен TP [TP1_price, TP2_price, TP3_price, TP4_price]
+        """
+        avg_price = self.get_avg_entry_price(direction)
+        if avg_price == 0:
+            return [0.0] * len(tp_levels)
+
+        prices = []
+        for level in tp_levels:
+            tp_pct = base_tp * level
+            if direction == "long":
+                prices.append(avg_price * (1 + tp_pct))
+            else:
+                prices.append(avg_price * (1 - tp_pct))
+        return prices
+
+    def get_atr_multi_tp_prices(
+        self, direction: str, atr_value: float, tp_multipliers: Tuple[float, ...]
+    ) -> List[float]:
+        """
+        Рассчитать несколько уровней TP на основе ATR.
+
+        Args:
+            direction: "long" или "short"
+            atr_value: Текущее значение ATR
+            tp_multipliers: Множители ATR для каждого уровня (1.0, 2.0, 3.0, 4.0)
+
+        Returns:
+            Список цен TP [TP1_price, TP2_price, TP3_price, TP4_price]
+        """
+        avg_price = self.get_avg_entry_price(direction)
+        if avg_price == 0 or atr_value == 0:
+            return [0.0] * len(tp_multipliers)
+
+        prices = []
+        for mult in tp_multipliers:
+            if direction == "long":
+                prices.append(avg_price + atr_value * mult)
+            else:
+                prices.append(avg_price - atr_value * mult)
+        return prices
+
+    def close_partial(
+        self,
+        direction: str,
+        exit_price: float,
+        portion: float,
+        exit_bar_idx: int,
+        exit_time: datetime,
+        exit_reason: str,
+        taker_fee: float = 0.0,
+    ) -> Optional[dict]:
+        """
+        Частично закрыть позицию (для Multi-level TP).
+
+        Args:
+            direction: "long" или "short"
+            exit_price: Цена выхода
+            portion: Доля позиции для закрытия (0.0-1.0)
+            exit_bar_idx: Индекс бара выхода
+            exit_time: Время выхода
+            exit_reason: Причина выхода (например "tp1", "tp2")
+            taker_fee: Комиссия
+
+        Returns:
+            dict с данными о закрытой части или None
+        """
+        pos = self.get_position(direction)
+        if not pos.is_open:
+            return None
+
+        first_bar = pos.first_entry_bar
+        first_time = pos.first_entry_time
+
+        closed_size, closed_allocated, avg_price = pos.close_partial(portion)
+
+        if closed_size == 0:
+            return None
+
+        # Рассчитать P&L
+        if direction == "long":
+            pnl_pct = (exit_price - avg_price) / avg_price
+            gross_pnl = closed_size * (exit_price - avg_price)
+        else:
+            pnl_pct = (avg_price - exit_price) / avg_price
+            gross_pnl = closed_size * (avg_price - exit_price)
+
+        # Комиссии (только за закрываемую часть)
+        entry_fee = closed_size * avg_price * taker_fee
+        exit_fee = closed_size * exit_price * taker_fee
+        fees = entry_fee + exit_fee
+        net_pnl = gross_pnl - fees
+
+        return {
+            "entry_time": first_time,
+            "exit_time": exit_time,
+            "direction": direction,
+            "entry_price": avg_price,
+            "exit_price": exit_price,
+            "size": closed_size,
+            "allocated": closed_allocated,
+            "pnl": net_pnl,
+            "pnl_pct": pnl_pct,
+            "fees": fees,
+            "exit_reason": exit_reason,
+            "duration_bars": exit_bar_idx - first_bar,
+            "partial": True,
+            "portion": portion,
+        }
+
     def close_position(
         self,
         direction: str,
@@ -332,12 +525,13 @@ class PyramidingManager:
 
         trades = []
 
+        # Save entry_count before closing (entries will be cleared)
+        entry_count_before_close = pos.entry_count
+
         # TP/SL всегда закрывает ВСЕ входы
         if exit_reason in ("take_profit", "stop_loss", "end_of_data"):
             # Закрыть все сразу
-            avg_price, total_size, total_allocated, first_bar, first_time = (
-                pos.close_all()
-            )
+            avg_price, total_size, total_allocated, first_bar, first_time = pos.close_all()
 
             # Рассчитать P&L
             if direction == "long":
@@ -346,11 +540,12 @@ class PyramidingManager:
                 pnl_pct = (avg_price - exit_price) / avg_price
 
             gross_pnl = (
-                total_size * (exit_price - avg_price)
-                if direction == "long"
-                else total_size * (avg_price - exit_price)
+                total_size * (exit_price - avg_price) if direction == "long" else total_size * (avg_price - exit_price)
             )
-            fees = total_size * exit_price * taker_fee * 2  # Entry + Exit
+            # TradingView-совместимый расчёт комиссий: entry_fee + exit_fee
+            entry_fee = total_size * avg_price * taker_fee
+            exit_fee = total_size * exit_price * taker_fee
+            fees = entry_fee + exit_fee
             net_pnl = gross_pnl - fees
 
             trades.append(
@@ -367,15 +562,13 @@ class PyramidingManager:
                     "fees": fees,
                     "exit_reason": exit_reason,
                     "duration_bars": exit_bar_idx - first_bar,
-                    "entry_count": len(pos.entries) + 1,  # +1 потому что уже очищено
+                    "entry_count": entry_count_before_close,
                 }
             )
 
         elif self.close_rule == "ALL":
             # Закрыть все сразу
-            avg_price, total_size, total_allocated, first_bar, first_time = (
-                pos.close_all()
-            )
+            avg_price, total_size, total_allocated, first_bar, first_time = pos.close_all()
 
             if direction == "long":
                 pnl_pct = (exit_price - avg_price) / avg_price
@@ -383,11 +576,12 @@ class PyramidingManager:
                 pnl_pct = (avg_price - exit_price) / avg_price
 
             gross_pnl = (
-                total_size * (exit_price - avg_price)
-                if direction == "long"
-                else total_size * (avg_price - exit_price)
+                total_size * (exit_price - avg_price) if direction == "long" else total_size * (avg_price - exit_price)
             )
-            fees = total_size * exit_price * taker_fee * 2
+            # TradingView-совместимый расчёт комиссий: entry_fee + exit_fee
+            entry_fee = total_size * avg_price * taker_fee
+            exit_fee = total_size * exit_price * taker_fee
+            fees = entry_fee + exit_fee
             net_pnl = gross_pnl - fees
 
             trades.append(
@@ -421,7 +615,10 @@ class PyramidingManager:
                     if direction == "long"
                     else entry.size * (entry.entry_price - exit_price)
                 )
-                fees = entry.size * exit_price * taker_fee * 2
+                # TradingView-совместимый расчёт комиссий: entry_fee + exit_fee
+                entry_fee = entry.size * entry.entry_price * taker_fee
+                exit_fee = entry.size * exit_price * taker_fee
+                fees = entry_fee + exit_fee
                 net_pnl = gross_pnl - fees
 
                 trades.append(
@@ -455,7 +652,10 @@ class PyramidingManager:
                     if direction == "long"
                     else entry.size * (entry.entry_price - exit_price)
                 )
-                fees = entry.size * exit_price * taker_fee * 2
+                # TradingView-совместимый расчёт комиссий: entry_fee + exit_fee
+                entry_fee = entry.size * entry.entry_price * taker_fee
+                exit_fee = entry.size * exit_price * taker_fee
+                fees = entry_fee + exit_fee
                 net_pnl = gross_pnl - fees
 
                 trades.append(

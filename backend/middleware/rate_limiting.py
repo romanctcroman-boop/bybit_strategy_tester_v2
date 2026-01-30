@@ -1,6 +1,21 @@
 """
-Rate Limiting Middleware для FastAPI
-=====================================
+Rate Limiting Middleware для FastAPI (DEPRECATED)
+=================================================
+
+.. deprecated:: 2.9.4
+    This module is NOT used in production. The active rate limiting middleware is
+    ``backend.middleware.rate_limiter.RateLimitMiddleware`` which uses Token Bucket
+    algorithm with in-memory storage.
+
+    This Redis-based sliding window implementation is kept for potential future use
+    in distributed deployments where Redis-backed rate limiting is needed.
+
+For current rate limiting configuration, see:
+- backend/middleware/rate_limiter.py - Active Token Bucket implementation
+- backend/api/middleware_setup.py - Where middleware is configured
+
+Original description:
+---------------------
 Защищает API от DDoS и злоупотреблений
 Использует Redis для distributed rate limiting
 """
@@ -8,7 +23,7 @@ Rate Limiting Middleware для FastAPI
 import hashlib
 import logging
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import redis
 from fastapi import HTTPException, Request, Response
@@ -32,7 +47,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
         app: ASGIApp,
-        redis_client: Optional[redis.Redis] = None,
+        redis_client: redis.Redis | None = None,
         default_limit: int = 100,  # requests per window
         window_seconds: int = 60,  # time window
         enabled: bool = True,
@@ -56,9 +71,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def _get_client_identifier(self, request: Request) -> str:
         """Get unique client identifier (IP + API key if present)"""
         # Try to get API key from header
-        api_key = request.headers.get("X-API-Key") or request.headers.get(
-            "Authorization"
-        )
+        api_key = request.headers.get("X-API-Key") or request.headers.get("Authorization")
         if api_key:
             # Use hash of API key for privacy
             key_hash = hashlib.sha256(api_key.encode()).hexdigest()[:16]
@@ -192,7 +205,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 # Helper function to get Redis client
-def get_redis_client() -> Optional[redis.Redis]:
+def get_redis_client() -> redis.Redis | None:
     """Get Redis client for rate limiting"""
     try:
         from backend.core.config import settings

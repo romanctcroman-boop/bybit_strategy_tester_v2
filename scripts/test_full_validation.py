@@ -4,7 +4,8 @@
 FallbackEngineV2 vs NumbaEngineV2
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 import pandas as pd
@@ -264,7 +265,7 @@ print(f"\n📋 КОНФИГУРАЦИЙ ДЛЯ ТЕСТИРОВАНИЯ: {len(ST
 # ЗАГРУЗКА ДАННЫХ
 # ============================================================================
 print("\n📊 Загрузка данных...")
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df_1h = pd.read_sql("""
     SELECT open_time, open_price as open, high_price as high, 
            low_price as low, close_price as close, volume

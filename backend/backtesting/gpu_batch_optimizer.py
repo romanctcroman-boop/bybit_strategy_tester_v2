@@ -7,11 +7,15 @@ All combinations share the same candle data, only signals differ.
 Performance: ~10-50x faster than sequential single-process optimization.
 """
 
-from typing import List, Dict, Any, Tuple
-import numpy as np
 import time
-from loguru import logger
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+
+import numpy as np
+from loguru import logger
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 # GPU availability check
 GPU_AVAILABLE = False
@@ -134,8 +138,8 @@ class GPUBatchOptimizer:
         direction: str,
     ) -> List[BatchOptimizationResult]:
         """GPU-accelerated batch optimization using CuPy."""
-        n_combos = len(param_combinations)
-        n_bars = len(close)
+        n_combos = len(param_combinations)  # noqa: F841
+        n_bars = len(close)  # noqa: F841
 
         # Transfer price data to GPU (shared across all combinations)
         close_gpu = cp.asarray(close)
@@ -243,7 +247,7 @@ class GPUBatchOptimizer:
         Simplified vectorized backtest on GPU.
         Returns approximate metrics (fast but less accurate than full simulation).
         """
-        n = len(close)
+        n = len(close)  # noqa: F841
 
         # Convert signals to CPU for trade simulation
         long_entries_cpu = cp.asnumpy(long_entries)
@@ -453,7 +457,7 @@ class GPUBatchOptimizer:
             if allow_short and not in_short and not in_long and short_entries[i]:
                 in_short = True
                 entry_price = close[i]
-                entry_idx = i
+                entry_idx = i  # noqa: F841
                 position_size = cash
 
             equity_curve.append(cash)

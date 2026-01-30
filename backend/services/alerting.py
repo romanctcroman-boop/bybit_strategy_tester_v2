@@ -41,6 +41,12 @@ class AlertConfig:
     slack_username: str = "Bybit Strategy Tester"
     slack_icon_emoji: str = ":robot_face:"
 
+    # Telegram
+    telegram_enabled: bool = False
+    telegram_bot_token: str = ""
+    telegram_chat_ids: list[str] = field(default_factory=list)
+    telegram_parse_mode: str = "HTML"  # HTML or Markdown
+
     # Email
     email_enabled: bool = False
     smtp_host: str = "smtp.gmail.com"
@@ -58,12 +64,20 @@ class AlertConfig:
     def from_env(cls) -> "AlertConfig":
         """Load configuration from environment variables."""
         to_emails = os.getenv("ALERT_EMAIL_TO", "")
+        telegram_chats = os.getenv("TELEGRAM_CHAT_IDS", "")
         return cls(
             slack_enabled=os.getenv("ALERT_SLACK_ENABLED", "false").lower() == "true",
             slack_webhook_url=os.getenv("SLACK_WEBHOOK_URL", ""),
             slack_channel=os.getenv("SLACK_ALERT_CHANNEL", "#alerts"),
             slack_username=os.getenv("SLACK_USERNAME", "Bybit Strategy Tester"),
             slack_icon_emoji=os.getenv("SLACK_ICON_EMOJI", ":robot_face:"),
+            telegram_enabled=os.getenv("ALERT_TELEGRAM_ENABLED", "false").lower()
+            == "true",
+            telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+            telegram_chat_ids=[
+                c.strip() for c in telegram_chats.split(",") if c.strip()
+            ],
+            telegram_parse_mode=os.getenv("TELEGRAM_PARSE_MODE", "HTML"),
             email_enabled=os.getenv("ALERT_EMAIL_ENABLED", "false").lower() == "true",
             smtp_host=os.getenv("SMTP_HOST", "smtp.gmail.com"),
             smtp_port=int(os.getenv("SMTP_PORT", "587")),
@@ -180,6 +194,35 @@ class Alert:
         """
         return subject, html
 
+    def to_telegram_message(self) -> str:
+        """Convert to Telegram message (HTML format)."""
+        level_icon = {
+            AlertLevel.INFO: "ℹ️",
+            AlertLevel.WARNING: "⚠️",
+            AlertLevel.CRITICAL: "🚨",
+        }.get(self.level, "📢")
+
+        # Build message
+        lines = [
+            f"<b>{level_icon} {self.title}</b>",
+            "",
+            f"<b>Level:</b> {self.level.value.upper()}",
+            f"<b>Source:</b> {self.source}",
+            f"<b>Time:</b> {self.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+            "",
+            "<b>Message:</b>",
+            self.message,
+        ]
+
+        # Add metadata
+        if self.metadata:
+            lines.append("")
+            lines.append("<b>Details:</b>")
+            for k, v in list(self.metadata.items())[:10]:
+                lines.append(f"• <code>{k}</code>: {v}")
+
+        return "\n".join(lines)
+
 
 class AlertingService:
     """
@@ -271,6 +314,7 @@ class AlertingService:
         # Send via channels
         results = await asyncio.gather(
             self._send_slack(alert),
+            self._send_telegram(alert),
             self._send_email(alert),
             return_exceptions=True,
         )
@@ -299,6 +343,45 @@ class AlertingService:
                 return True
         except Exception as e:
             logger.exception("Failed to send Slack alert: %s", e)
+            return False
+
+    async def _send_telegram(self, alert: Alert) -> bool:
+        """Send alert to Telegram."""
+        if not self.config.telegram_enabled or not self.config.telegram_bot_token:
+            return False
+
+        if not self.config.telegram_chat_ids:
+            logger.warning("Telegram enabled but no chat IDs configured")
+            return False
+
+        message = alert.to_telegram_message()
+        api_url = (
+            f"https://api.telegram.org/bot{self.config.telegram_bot_token}/sendMessage"
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                for chat_id in self.config.telegram_chat_ids:
+                    response = await client.post(
+                        api_url,
+                        json={
+                            "chat_id": chat_id,
+                            "text": message,
+                            "parse_mode": self.config.telegram_parse_mode,
+                            "disable_web_page_preview": True,
+                        },
+                    )
+                    if response.status_code != 200:
+                        logger.warning(
+                            "Telegram send failed for chat %s: %s",
+                            chat_id,
+                            response.text,
+                        )
+
+                logger.info("Telegram alert sent: %s", alert.title)
+                return True
+        except Exception as e:
+            logger.exception("Failed to send Telegram alert: %s", e)
             return False
 
     async def _send_email(self, alert: Alert) -> bool:

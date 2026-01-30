@@ -259,10 +259,7 @@ class CircuitBreaker:
 
             if self.is_open:
                 # Check if timeout elapsed
-                if (
-                    self.last_failure_time
-                    and time.time() - self.last_failure_time >= self.config.timeout
-                ):
+                if self.last_failure_time and time.time() - self.last_failure_time >= self.config.timeout:
                     self._transition_to(CircuitState.HALF_OPEN)
                     self._half_open_calls = 1
                     return True
@@ -312,9 +309,7 @@ class CircuitBreaker:
 
             if PROMETHEUS_AVAILABLE:
                 circuit_success_total.labels(circuit_name=self.name).inc()
-                circuit_latency_histogram.labels(circuit_name=self.name).observe(
-                    latency_ms / 1000
-                )
+                circuit_latency_histogram.labels(circuit_name=self.name).observe(latency_ms / 1000)
 
             if self.is_half_open:
                 self.success_count += 1
@@ -333,18 +328,14 @@ class CircuitBreaker:
             self.last_failure_time = time.time()
 
             if PROMETHEUS_AVAILABLE:
-                circuit_failures_total.labels(
-                    circuit_name=self.name, error_type=type(error).__name__
-                ).inc()
+                circuit_failures_total.labels(circuit_name=self.name, error_type=type(error).__name__).inc()
 
             if self.is_half_open:
                 # Any failure in half-open goes back to open
                 self._transition_to(CircuitState.OPEN)
             elif self.is_closed:
                 # Check adaptive threshold
-                threshold = self.metrics.get_adaptive_threshold(
-                    self.config.failure_threshold
-                )
+                threshold = self.metrics.get_adaptive_threshold(self.config.failure_threshold)
                 if self.failure_count >= threshold:
                     self._transition_to(CircuitState.OPEN)
 
@@ -415,24 +406,116 @@ class CircuitBreaker:
 
 
 class CircuitBreakerRegistry:
-    """Singleton registry for all circuit breakers."""
+    """Singleton registry for all circuit breakers with optional Redis persistence."""
 
     _instance: "CircuitBreakerRegistry | None" = None
     _circuits: dict[str, CircuitBreaker]
+    _redis_client: "Any"  # redis.Redis or None
+    _redis_prefix: str
 
     def __new__(cls) -> "CircuitBreakerRegistry":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._circuits = {}
+            cls._instance._redis_client = None
+            cls._instance._redis_prefix = "circuit_breaker:"
         return cls._instance
 
-    def get_or_create(
-        self, name: str, config: CircuitBreakerConfig | None = None
-    ) -> CircuitBreaker:
-        """Get or create a circuit breaker by name."""
+    def configure_persistence(
+        self,
+        redis_url: str = "redis://localhost:6379/0",
+        prefix: str = "circuit_breaker:",
+    ) -> bool:
+        """
+        Configure Redis persistence for circuit breaker state.
+
+        Args:
+            redis_url: Redis connection URL
+            prefix: Key prefix for Redis keys
+
+        Returns:
+            True if connected successfully, False otherwise
+        """
+        try:
+            import redis
+
+            self._redis_client = redis.from_url(
+                redis_url,
+                decode_responses=True,
+                socket_timeout=2.0,
+                socket_connect_timeout=2.0,
+            )
+            self._redis_client.ping()
+            self._redis_prefix = prefix
+            logger.info(f"✅ Circuit breaker persistence enabled: {redis_url}")
+            return True
+        except ImportError:
+            logger.warning("⚠️ redis package not installed for circuit breaker persistence")
+            return False
+        except Exception as e:
+            logger.warning(f"⚠️ Redis connection failed for circuit breaker: {e}")
+            return False
+
+    def _persist_state(self, cb: CircuitBreaker) -> None:
+        """Persist circuit breaker state to Redis."""
+        if not self._redis_client:
+            return
+
+        try:
+            import json
+
+            key = f"{self._redis_prefix}{cb.name}"
+            data = {
+                "state": cb.state.value,
+                "failure_count": cb.failure_count,
+                "success_count": cb.success_count,
+                "last_failure_time": cb.last_failure_time,
+                "last_state_change": cb.last_state_change,
+            }
+            self._redis_client.setex(key, 3600, json.dumps(data))  # 1 hour TTL
+        except Exception as e:
+            logger.debug(f"Failed to persist circuit breaker state: {e}")
+
+    def _restore_state(self, cb: CircuitBreaker) -> None:
+        """Restore circuit breaker state from Redis."""
+        if not self._redis_client:
+            return
+
+        try:
+            import json
+
+            key = f"{self._redis_prefix}{cb.name}"
+            data = self._redis_client.get(key)
+            if data:
+                state_data = json.loads(data)
+                # Restore state
+                state_str = state_data.get("state", "closed")
+                cb.state = CircuitState(state_str)
+                cb.failure_count = state_data.get("failure_count", 0)
+                cb.success_count = state_data.get("success_count", 0)
+                cb.last_failure_time = state_data.get("last_failure_time")
+                cb.last_state_change = state_data.get("last_state_change", time.time())
+                logger.debug(f"Restored circuit breaker state: {cb.name} -> {cb.state.value}")
+        except Exception as e:
+            logger.debug(f"Failed to restore circuit breaker state: {e}")
+
+    def get_or_create(self, name: str, config: CircuitBreakerConfig | None = None) -> CircuitBreaker:
+        """Get or create a circuit breaker by name, restoring state from Redis if available."""
         if name not in self._circuits:
-            self._circuits[name] = CircuitBreaker(name, config)
+            cb = CircuitBreaker(name, config)
+            self._restore_state(cb)  # Restore from Redis if available
+            self._circuits[name] = cb
         return self._circuits[name]
+
+    def save_state(self, name: str) -> None:
+        """Manually save circuit breaker state to Redis."""
+        if name in self._circuits:
+            self._persist_state(self._circuits[name])
+
+    def save_all_states(self) -> None:
+        """Save all circuit breaker states to Redis."""
+        for cb in self._circuits.values():
+            self._persist_state(cb)
 
     def get(self, name: str) -> CircuitBreaker | None:
         """Get a circuit breaker by name."""
@@ -511,9 +594,7 @@ def with_retry(
             attempt = 0
             async for attempt_state in AsyncRetrying(
                 stop=stop_after_attempt(max_attempts),
-                wait=wait_exponential_jitter(
-                    initial=min_wait, max=max_wait, jitter=jitter
-                ),
+                wait=wait_exponential_jitter(initial=min_wait, max=max_wait, jitter=jitter),
                 retry=retry_if_exception_type(retry_on),
                 reraise=True,
             ):
@@ -525,9 +606,7 @@ def with_retry(
                             extra={"operation": name, "attempt": attempt},
                         )
                         if PROMETHEUS_AVAILABLE:
-                            retry_attempts_total.labels(
-                                operation_name=name, attempt=str(attempt)
-                            ).inc()
+                            retry_attempts_total.labels(operation_name=name, attempt=str(attempt)).inc()
                     return await func(*args, **kwargs)
             # This should never be reached
             raise RuntimeError("Retry loop ended unexpectedly")

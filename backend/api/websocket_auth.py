@@ -10,21 +10,43 @@ Security:
 - Tokens can be short-lived session tokens or long-lived API keys
 - Rate limiting applied per token/API key
 - Anonymous access configurable via ALLOW_ANONYMOUS_WS env var
+- Uses SHA256 for secure hashing (not MD5)
+- WS_SECRET_KEY must be set in production environments
 """
 
 import hashlib
 import hmac
+import logging
 import os
+import secrets
 import time
 from dataclasses import dataclass
 from typing import Optional
 
 from fastapi import Query, WebSocket
 
+# Logging
+logger = logging.getLogger(__name__)
+
 # Configuration
 ALLOW_ANONYMOUS_WS = os.environ.get("ALLOW_ANONYMOUS_WS", "true").lower() == "true"
-WS_SECRET_KEY = os.environ.get("WS_SECRET_KEY", "dev-secret-change-in-production")
 WS_TOKEN_TTL_SECONDS = int(os.environ.get("WS_TOKEN_TTL_SECONDS", "3600"))  # 1 hour
+
+# Security: Handle WS_SECRET_KEY properly
+_ws_secret_key_raw = os.environ.get("WS_SECRET_KEY")
+if not _ws_secret_key_raw:
+    _environment = os.environ.get("ENVIRONMENT", "development").lower()
+    if _environment in ("staging", "production", "prod"):
+        raise RuntimeError(
+            "WS_SECRET_KEY must be set in staging/production environments! "
+            'Generate a secure key with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
+        )
+    else:
+        # Development only: generate random key and warn
+        _ws_secret_key_raw = secrets.token_urlsafe(32)
+        logger.warning("WS_SECRET_KEY not set, using random key (development only). Set WS_SECRET_KEY in production!")
+
+WS_SECRET_KEY = _ws_secret_key_raw
 
 
 @dataclass
@@ -60,9 +82,7 @@ class WSAuthenticator:
         secret_key: str = None,
         token_ttl: int = None,
     ):
-        self.allow_anonymous = (
-            allow_anonymous if allow_anonymous is not None else ALLOW_ANONYMOUS_WS
-        )
+        self.allow_anonymous = allow_anonymous if allow_anonymous is not None else ALLOW_ANONYMOUS_WS
         self.secret_key = secret_key or WS_SECRET_KEY
         self.token_ttl = token_ttl or WS_TOKEN_TTL_SECONDS
 
@@ -95,9 +115,7 @@ class WSAuthenticator:
         timestamp = int(time.time())
         payload = f"{user_id}:{timestamp}"
 
-        signature = hmac.new(
-            self.secret_key.encode(), payload.encode(), hashlib.sha256
-        ).hexdigest()[:16]
+        signature = hmac.new(self.secret_key.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
 
         token_data = f"{payload}:{signature}"
         return base64.urlsafe_b64encode(token_data.encode()).decode()
@@ -126,9 +144,7 @@ class WSAuthenticator:
 
             # Verify signature
             payload = f"{user_id}:{timestamp_str}"
-            expected_sig = hmac.new(
-                self.secret_key.encode(), payload.encode(), hashlib.sha256
-            ).hexdigest()[:16]
+            expected_sig = hmac.new(self.secret_key.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
 
             if not hmac.compare_digest(signature, expected_sig):
                 return False, None, "Invalid signature"
@@ -151,9 +167,7 @@ class WSAuthenticator:
 
         return False, None, "Invalid API key"
 
-    async def authenticate(
-        self, websocket: WebSocket, token: str = None
-    ) -> WSAuthResult:
+    async def authenticate(self, websocket: WebSocket, token: str = None) -> WSAuthResult:
         """
         Authenticate WebSocket connection.
 
@@ -198,9 +212,12 @@ class WSAuthenticator:
 
         # 3. Anonymous access
         if self.allow_anonymous:
-            # Generate anonymous ID from client IP for rate limiting
+            # Generate anonymous ID from client IP using SHA256 (more secure than MD5)
+            # Include secret to prevent ID enumeration attacks
             client_ip = websocket.client.host if websocket.client else "unknown"
-            anon_id = f"anon:{hashlib.md5(client_ip.encode()).hexdigest()[:8]}"
+            # Use HMAC with secret key for secure, non-guessable IDs
+            data = f"{client_ip}:{self.secret_key}".encode()
+            anon_id = f"anon:{hashlib.sha256(data).hexdigest()[:16]}"
 
             return WSAuthResult(
                 authenticated=True,
@@ -224,9 +241,7 @@ def get_ws_authenticator() -> WSAuthenticator:
     return _authenticator
 
 
-async def ws_auth_dependency(
-    websocket: WebSocket, token: str = Query(None)
-) -> WSAuthResult:
+async def ws_auth_dependency(websocket: WebSocket, token: str = Query(None)) -> WSAuthResult:
     """
     FastAPI dependency for WebSocket authentication.
 

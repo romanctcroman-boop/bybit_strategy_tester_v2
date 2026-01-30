@@ -1,43 +1,29 @@
 """
-Database Session Management
-Provides SQLAlchemy session management for database operations.
+Database Session Management - Re-export Module
+
+This module re-exports database session utilities from the main database module.
+For new code, prefer importing directly from backend.database.
+
+Note: This file exists for backward compatibility. The actual implementation
+is in backend/database/__init__.py.
 """
 
 import logging
-from typing import Generator
 
 logger = logging.getLogger(__name__)
 
-# Placeholder for database session management
-# In a full implementation, this would use SQLAlchemy Engine and SessionLocal
+# Re-export from main database module to avoid breaking existing imports
+from backend.database import Base, SessionLocal, engine, get_db
+
+__all__ = ["get_db", "SessionLocal", "engine", "Base"]
 
 
-def get_db() -> Generator:
+# Deprecated helper - use backend.database.get_db() directly
+def get_session():
     """
-    FastAPI dependency that provides a database session.
+    DEPRECATED: Use get_db() instead.
 
-    Yields:
-        Database session (stub implementation)
-
-    Example:
-        @router.get("/users")
-        async def get_users(db: Session = Depends(get_db)):
-            return db.query(User).all()
+    This function exists for backward compatibility only.
     """
-    # Stub implementation - yields None for now
-    # In production, this would:
-    # 1. Create a SessionLocal() instance
-    # 2. Yield the session
-    # 3. Close the session in finally block
-
-    logger.debug("get_db called (stub implementation)")
-    yield None
-
-
-# Placeholder for SessionLocal
-# In production, this would be:
-# from sqlalchemy import create_engine
-# from sqlalchemy.orm import sessionmaker
-#
-# engine = create_engine(DATABASE_URL)
-# SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    logger.warning("get_session() is deprecated. Use get_db() from backend.database instead.")
+    return get_db()

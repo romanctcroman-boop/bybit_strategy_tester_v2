@@ -2,24 +2,54 @@
 Backend ML Module
 """
 
+from .enhanced.drift_alert_manager import (
+    AlertChannel,
+    AlertSeverity,
+    DriftAlertConfig,
+    DriftAlertManager,
+    EnhancedDriftAlert,
+    IntegratedDriftMonitor,
+)
+from .enhanced.persistent_feature_store import (
+    PersistentFeatureStore,
+    create_feature_store,
+)
+from .enhanced.validated_model_registry import (
+    ValidatedModelRegistry,
+    ValidationConfig,
+    ValidationReport,
+    ValidationResult,
+)
 from .regime_detection import (
+    HMM_AVAILABLE,
+    GMMRegimeDetector,
     HMMRegimeDetector,
     KMeansRegimeDetector,
-    GMMRegimeDetector,
+    MarketRegime,
     RegimeAdaptiveStrategy,
     RegimeDetectionResult,
-    MarketRegime,
     get_regime_detector,
-    HMM_AVAILABLE,
 )
 
 __all__ = [
-    "HMMRegimeDetector",
-    "KMeansRegimeDetector",
+    "AlertChannel",
+    "AlertSeverity",
+    "DriftAlertConfig",
+    "DriftAlertManager",
+    "EnhancedDriftAlert",
     "GMMRegimeDetector",
+    "HMM_AVAILABLE",
+    "HMMRegimeDetector",
+    "IntegratedDriftMonitor",
+    "KMeansRegimeDetector",
+    "MarketRegime",
+    "PersistentFeatureStore",
     "RegimeAdaptiveStrategy",
     "RegimeDetectionResult",
-    "MarketRegime",
+    "ValidatedModelRegistry",
+    "ValidationConfig",
+    "ValidationReport",
+    "ValidationResult",
+    "create_feature_store",
     "get_regime_detector",
-    "HMM_AVAILABLE",
 ]

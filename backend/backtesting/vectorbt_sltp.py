@@ -16,10 +16,10 @@ Date: January 2026
 
 import numpy as np
 import pandas as pd
-from numba import njit
 import vectorbt as vbt
-from vectorbt.portfolio.nb import order_nb, order_nothing_nb
+from numba import njit
 from vectorbt.portfolio.enums import Direction
+from vectorbt.portfolio.nb import order_nb, order_nothing_nb
 
 
 @njit
@@ -114,14 +114,14 @@ def flex_order_func_nb(
     tracked_cash = state[0]
     current_entry_price = state[1]
     current_entry_size = state[2]
-    current_is_long = state[3] > 0.5
+    current_is_long = state[3] > 0.5  # noqa: F841
     peak_equity = state[4]
     is_stopped = state[5] > 0.5  # Trading stopped due to max drawdown
 
     close_now = c.close[i, col]
     high_now = high_arr[i, 0]
     low_now = low_arr[i, 0]
-    open_now = open_arr[i, 0] if i < len(open_arr) else close_now
+    open_now = open_arr[i, 0] if i < len(open_arr) else close_now  # noqa: F841
 
     # Calculate current equity and check max drawdown
     current_equity = tracked_cash
@@ -181,9 +181,9 @@ def flex_order_func_nb(
 
     # Determine fill price based on fill_mode
     # fill_mode: 0 = bar_close, 1 = next_bar_open
-    fill_price = close_now
+    fill_price = close_now  # noqa: F841
     if fill_mode == 1 and i + 1 < len(open_arr):
-        fill_price = open_arr[i + 1, 0]  # Use next bar's open
+        fill_price = open_arr[i + 1, 0]  # noqa: F841 - Use next bar's open
 
     # Signals
     long_entry = entries[i, 0]

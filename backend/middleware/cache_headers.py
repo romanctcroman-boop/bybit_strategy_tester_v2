@@ -6,7 +6,7 @@ Adds Cache-Control, ETag, and Last-Modified headers where appropriate.
 import hashlib
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware

@@ -97,9 +97,7 @@ class Alert:
     annotations: Dict[str, str] = field(default_factory=dict)
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     resolved_at: Optional[datetime] = None
-    last_evaluated_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    last_evaluated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     firing_since: Optional[datetime] = None
     notification_sent: bool = False
 
@@ -153,9 +151,7 @@ class LogNotifier(AlertNotifier):
             AlertSeverity.CRITICAL: logger.critical,
         }.get(alert.severity, logger.info)
 
-        log_fn(
-            f"{icon} ALERT [{alert.rule_name}]: {alert.message} (value={alert.value:.2f})"
-        )
+        log_fn(f"{icon} ALERT [{alert.rule_name}]: {alert.message} (value={alert.value:.2f})")
         return True
 
 
@@ -356,9 +352,7 @@ class AlertManager:
                     if rule.duration_seconds > 0:
                         if alert.firing_since is None:
                             alert.firing_since = now
-                        elif (
-                            now - alert.firing_since
-                        ).total_seconds() >= rule.duration_seconds:
+                        elif (now - alert.firing_since).total_seconds() >= rule.duration_seconds:
                             if alert.state == AlertState.PENDING:
                                 alert.state = AlertState.FIRING
                                 new_alerts.append(alert)
@@ -371,9 +365,7 @@ class AlertManager:
                         id=alert_id,
                         rule_name=rule_name,
                         severity=rule.severity,
-                        state=AlertState.PENDING
-                        if rule.duration_seconds > 0
-                        else AlertState.FIRING,
+                        state=AlertState.PENDING if rule.duration_seconds > 0 else AlertState.FIRING,
                         message=rule.description,
                         value=value,
                         threshold=rule.threshold,
@@ -492,12 +484,16 @@ class AlertManager:
         z_score = abs(current_value - mean) / std
 
         if z_score > std_threshold:
+            msg = (
+                f"Anomaly detected: {metric_name} value {current_value:.2f} "
+                f"is {z_score:.1f} std devs from mean {mean:.2f}"
+            )
             alert = Alert(
                 id=f"anomaly_{metric_name}",
                 rule_name=f"anomaly_detection_{metric_name}",
                 severity=AlertSeverity.WARNING,
                 state=AlertState.FIRING,
-                message=f"Anomaly detected: {metric_name} value {current_value:.2f} is {z_score:.1f} std devs from mean {mean:.2f}",
+                message=msg,
                 value=current_value,
                 threshold=mean + std_threshold * std,
                 labels={"type": "anomaly", "metric": metric_name},
@@ -518,9 +514,7 @@ class AlertManager:
         max_metric_samples = 500
         for metric_name in self.metric_history:
             if len(self.metric_history[metric_name]) > max_metric_samples:
-                self.metric_history[metric_name] = self.metric_history[metric_name][
-                    -max_metric_samples:
-                ]
+                self.metric_history[metric_name] = self.metric_history[metric_name][-max_metric_samples:]
 
         return removed
 
@@ -529,9 +523,7 @@ class AlertManager:
         return {
             **self.stats,
             "rules_count": len(self.rules),
-            "active_alerts": len(
-                [a for a in self.alerts.values() if a.state == AlertState.FIRING]
-            ),
+            "active_alerts": len([a for a in self.alerts.values() if a.state == AlertState.FIRING]),
             "silenced_rules": len(self.silences),
             "history_size": len(self.alert_history),
         }

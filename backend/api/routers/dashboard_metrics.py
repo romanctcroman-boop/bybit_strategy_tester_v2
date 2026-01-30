@@ -6,6 +6,7 @@ Provides aggregated stats for backtests, strategies, and system health.
 """
 
 import asyncio
+import contextlib
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -93,26 +94,16 @@ async def get_metrics_summary(
             backtest_query = backtest_query.filter(Backtest.created_at >= time_filter)
 
         total_backtests = backtest_query.count()
-        completed_backtests = backtest_query.filter(
-            Backtest.status == BacktestStatus.COMPLETED
-        ).count()
-        running_backtests = backtest_query.filter(
-            Backtest.status == BacktestStatus.RUNNING
-        ).count()
-        failed_backtests = backtest_query.filter(
-            Backtest.status == BacktestStatus.FAILED
-        ).count()
+        completed_backtests = backtest_query.filter(Backtest.status == BacktestStatus.COMPLETED).count()
+        running_backtests = backtest_query.filter(Backtest.status == BacktestStatus.RUNNING).count()
+        failed_backtests = backtest_query.filter(Backtest.status == BacktestStatus.FAILED).count()
 
-        success_rate = (
-            completed_backtests / total_backtests if total_backtests > 0 else 0.0
-        )
+        success_rate = completed_backtests / total_backtests if total_backtests > 0 else 0.0
 
         # Strategy metrics
         strategy_query = db.query(Strategy)
         total_strategies = strategy_query.count()
-        active_strategies = strategy_query.filter(
-            Strategy.status == StrategyStatus.ACTIVE
-        ).count()
+        active_strategies = strategy_query.filter(Strategy.status == StrategyStatus.ACTIVE).count()
 
         # Performance metrics - average backtest duration
         avg_duration = (
@@ -128,23 +119,14 @@ async def get_metrics_summary(
 
         # Total trades from completed backtests (sum of total_trades column)
         total_trades = (
-            db.query(func.sum(Backtest.total_trades))
-            .filter(Backtest.status == BacktestStatus.COMPLETED)
-            .scalar()
-            or 0
+            db.query(func.sum(Backtest.total_trades)).filter(Backtest.status == BacktestStatus.COMPLETED).scalar() or 0
         )
 
         # Optimization metrics
         total_optimizations = db.query(Optimization).count()
-        running_optimizations = (
-            db.query(Optimization)
-            .filter(Optimization.status == OptimizationStatus.RUNNING)
-            .count()
-        )
+        running_optimizations = db.query(Optimization).filter(Optimization.status == OptimizationStatus.RUNNING).count()
         completed_optimizations = (
-            db.query(Optimization)
-            .filter(Optimization.status == OptimizationStatus.COMPLETED)
-            .count()
+            db.query(Optimization).filter(Optimization.status == OptimizationStatus.COMPLETED).count()
         )
 
         # Calculate duration in seconds for frontend
@@ -175,9 +157,7 @@ async def get_metrics_summary(
 
     except Exception as e:
         logger.error(f"Failed to get metrics summary: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve metrics: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve metrics: {str(e)}")
     finally:
         db.close()
 
@@ -262,9 +242,7 @@ async def get_top_performers(
                     "win_rate": round(bt.win_rate or 0, 3),
                     "max_drawdown": round(bt.max_drawdown or 0, 2),
                     "total_trades": bt.total_trades,
-                    "completed_at": bt.completed_at.isoformat()
-                    if bt.completed_at
-                    else None,
+                    "completed_at": bt.completed_at.isoformat() if bt.completed_at else None,
                 }
             )
 
@@ -279,9 +257,7 @@ async def get_top_performers(
         raise
     except Exception as e:
         logger.error(f"Failed to get top performers: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve top performers: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve top performers: {str(e)}")
     finally:
         db.close()
 
@@ -325,9 +301,7 @@ async def get_strategy_metrics(
         # Get strategy
         strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
         if not strategy:
-            raise HTTPException(
-                status_code=404, detail=f"Strategy {strategy_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Strategy {strategy_id} not found")
 
         # Calculate time window
         now = utc_now()
@@ -383,9 +357,7 @@ async def get_strategy_metrics(
                 "symbol": best_bt.symbol,
                 "sharpe_ratio": round(best_bt.sharpe_ratio or 0, 2),
                 "total_return": round(best_bt.total_return or 0, 2),
-                "completed_at": best_bt.completed_at.isoformat()
-                if best_bt.completed_at
-                else None,
+                "completed_at": best_bt.completed_at.isoformat() if best_bt.completed_at else None,
             },
             "recent_activity": [
                 {
@@ -403,9 +375,7 @@ async def get_strategy_metrics(
         raise
     except Exception as e:
         logger.error(f"Failed to get strategy metrics: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve strategy metrics: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve strategy metrics: {str(e)}")
     finally:
         db.close()
 
@@ -447,11 +417,7 @@ async def get_system_health() -> dict[str, Any]:
 
         # Count pending backtests
         pending_backtests = (
-            db.query(Backtest)
-            .filter(
-                Backtest.status.in_([BacktestStatus.PENDING, BacktestStatus.RUNNING])
-            )
-            .count()
+            db.query(Backtest).filter(Backtest.status.in_([BacktestStatus.PENDING, BacktestStatus.RUNNING])).count()
         )
 
         # Database size (approximate) - use file size for SQLite or try pg_database_size for PostgreSQL
@@ -521,16 +487,12 @@ class DashboardConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-        logger.info(
-            f"📊 Dashboard WebSocket connected. Total connections: {len(self.active_connections)}"
-        )
+        logger.info(f"📊 Dashboard WebSocket connected. Total connections: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            logger.info(
-                f"📊 Dashboard WebSocket disconnected. Remaining: {len(self.active_connections)}"
-            )
+            logger.info(f"📊 Dashboard WebSocket disconnected. Remaining: {len(self.active_connections)}")
 
     async def broadcast(self, data: dict):
         """Send data to all connected clients"""
@@ -591,9 +553,11 @@ async def dashboard_websocket(websocket: WebSocket):
                 "message": "Dashboard WebSocket connected",
                 "timestamp": utc_now().isoformat(),
             }
-            await websocket.send_json(initial_data)
+            # Check if websocket is still connected before sending
+            if websocket.client_state.name == "CONNECTED":
+                await websocket.send_json(initial_data)
         except Exception as e:
-            logger.error(f"Error sending initial data: {e}")
+            logger.warning(f"Could not send initial data (client may have disconnected): {e}")
 
         # Start background task for periodic updates
         update_task = asyncio.create_task(_send_periodic_updates(websocket))
@@ -613,12 +577,12 @@ async def dashboard_websocket(websocket: WebSocket):
             logger.info("Dashboard WebSocket client disconnected normally")
         finally:
             update_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await update_task
-            except asyncio.CancelledError:
-                pass
+    except WebSocketDisconnect:
+        logger.debug("Dashboard WebSocket disconnected during setup")
     except Exception as e:
-        logger.error(f"Dashboard WebSocket error: {e}")
+        logger.warning(f"Dashboard WebSocket error: {e}")
     finally:
         dashboard_ws_manager.disconnect(websocket)
 
@@ -648,28 +612,16 @@ async def _send_metrics_update(websocket: WebSocket):
             # Backtest metrics
             backtest_query = db.query(Backtest)
             if time_filter:
-                backtest_query = backtest_query.filter(
-                    Backtest.created_at >= time_filter
-                )
+                backtest_query = backtest_query.filter(Backtest.created_at >= time_filter)
 
             total = backtest_query.count()
-            completed = backtest_query.filter(
-                Backtest.status == BacktestStatus.COMPLETED
-            ).count()
-            running = backtest_query.filter(
-                Backtest.status == BacktestStatus.RUNNING
-            ).count()
-            failed = backtest_query.filter(
-                Backtest.status == BacktestStatus.FAILED
-            ).count()
+            completed = backtest_query.filter(Backtest.status == BacktestStatus.COMPLETED).count()
+            running = backtest_query.filter(Backtest.status == BacktestStatus.RUNNING).count()
+            failed = backtest_query.filter(Backtest.status == BacktestStatus.FAILED).count()
 
             # Strategy metrics
             total_strategies = db.query(Strategy).count()
-            active_strategies = (
-                db.query(Strategy)
-                .filter(Strategy.status == StrategyStatus.ACTIVE)
-                .count()
-            )
+            active_strategies = db.query(Strategy).filter(Strategy.status == StrategyStatus.ACTIVE).count()
 
             update_data = {
                 "type": "metrics_update",
@@ -679,9 +631,7 @@ async def _send_metrics_update(websocket: WebSocket):
                         "completed": completed,
                         "running": running,
                         "failed": failed,
-                        "success_rate": round(completed / total, 3)
-                        if total > 0
-                        else 0.0,
+                        "success_rate": round(completed / total, 3) if total > 0 else 0.0,
                     },
                     "strategies": {
                         "total": total_strategies,

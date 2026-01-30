@@ -11,16 +11,21 @@
 """
 
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "d:/bybit_strategy_tester_v2")
+# Dynamic path resolution - works on any system
+_project_root = str(Path(__file__).resolve().parents[2])
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+import json
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-from datetime import datetime
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional
 from loguru import logger
-import json
 
 
 @dataclass
@@ -202,19 +207,13 @@ class ValidationSuite:
 
         # Compare engines
         if report.vectorbt_result and report.fallback_result:
-            report.vbt_vs_fallback = self._compare_results(
-                report.vectorbt_result, report.fallback_result
-            )
+            report.vbt_vs_fallback = self._compare_results(report.vectorbt_result, report.fallback_result)
 
         if report.vectorbt_result and report.numba_result:
-            report.vbt_vs_numba = self._compare_results(
-                report.vectorbt_result, report.numba_result
-            )
+            report.vbt_vs_numba = self._compare_results(report.vectorbt_result, report.numba_result)
 
         if report.fallback_result and report.numba_result:
-            report.fallback_vs_numba = self._compare_results(
-                report.fallback_result, report.numba_result
-            )
+            report.fallback_vs_numba = self._compare_results(report.fallback_result, report.numba_result)
 
         # Check overall status
         report.all_pass = self._check_all_pass(report)
@@ -249,6 +248,7 @@ class ValidationSuite:
     ) -> EngineResult:
         """Run VectorBT engine."""
         import time
+
         import vectorbt as vbt
 
         start = time.perf_counter()
@@ -325,8 +325,9 @@ class ValidationSuite:
     ) -> EngineResult:
         """Run Fallback (Python) engine."""
         import time
-        from backend.backtesting.models import BacktestConfig
         from datetime import datetime as dt
+
+        from backend.backtesting.models import BacktestConfig
 
         start = time.perf_counter()
 
@@ -361,10 +362,7 @@ class ValidationSuite:
                 if result.metrics.win_rate > 1
                 else result.metrics.win_rate,  # Normalize to decimal
                 execution_time_ms=exec_time,
-                trades_list=[
-                    t.__dict__ if hasattr(t, "__dict__") else t
-                    for t in result.trades[:10]
-                ],
+                trades_list=[t.__dict__ if hasattr(t, "__dict__") else t for t in result.trades[:10]],
             )
         except Exception as e:
             logger.error(f"Fallback error: {e}")
@@ -470,11 +468,7 @@ class ValidationSuite:
                             risk_free_rate = 0.02  # 2% annual
                             period_rfr = risk_free_rate / periods_per_year
 
-                            sharpe = (
-                                (mean_ret - period_rfr)
-                                / std_ret
-                                * np.sqrt(periods_per_year)
-                            )
+                            sharpe = (mean_ret - period_rfr) / std_ret * np.sqrt(periods_per_year)
                             sharpe = float(np.clip(sharpe, -100, 100))
                         else:
                             sharpe = 0.0
@@ -528,9 +522,7 @@ class ValidationSuite:
         pnl_diff_pct = pnl_diff / max(abs(a.net_pnl), abs(b.net_pnl), 1)
 
         sharpe_diff = abs(a.sharpe_ratio - b.sharpe_ratio)
-        sharpe_diff_pct = sharpe_diff / max(
-            abs(a.sharpe_ratio), abs(b.sharpe_ratio), 0.001
-        )
+        sharpe_diff_pct = sharpe_diff / max(abs(a.sharpe_ratio), abs(b.sharpe_ratio), 0.001)
 
         max_dd_diff = abs(a.max_drawdown - b.max_drawdown)
 
@@ -601,9 +593,7 @@ class ValidationSuite:
             if comp:
                 status = "✅ PASS" if comp.is_acceptable else "❌ FAIL"
                 print(f"\n{name}: {status}")
-                print(
-                    f"   Trades diff: {comp.trades_diff} ({comp.trades_diff_pct:.1%})"
-                )
+                print(f"   Trades diff: {comp.trades_diff} ({comp.trades_diff_pct:.1%})")
                 print(f"   PnL diff: ${comp.pnl_diff:,.2f} ({comp.pnl_diff_pct:.1%})")
                 print(f"   Sharpe diff: {comp.sharpe_diff:.3f}")
 
@@ -678,16 +668,21 @@ class ValidationSuite:
 
 if __name__ == "__main__":
     import sqlite3
+    from pathlib import Path
 
     print("=" * 70)
     print("🔬 VALIDATION SUITE - Engine Parity Testing")
     print("=" * 70)
 
+    # Dynamic path resolution
+    project_root = Path(__file__).resolve().parents[2]
+    db_path = project_root / "data.sqlite3"
+
     # Load data
-    conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+    conn = sqlite3.connect(str(db_path))
     df = pd.read_sql(
         """
-        SELECT open_time, open_price as open, high_price as high, 
+        SELECT open_time, open_price as open, high_price as high,
                low_price as low, close_price as close, volume
         FROM bybit_kline_audit
         WHERE symbol = 'BTCUSDT' AND interval = '60'
@@ -719,4 +714,4 @@ if __name__ == "__main__":
     suite.print_report(report)
 
     # Save reports
-    suite.save_reports("d:/bybit_strategy_tester_v2/validation_reports.json")
+    suite.save_reports(str(project_root / "validation_reports.json"))

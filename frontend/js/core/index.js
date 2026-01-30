@@ -5,125 +5,189 @@
  *
  * Part of Phase 2-3: Architecture & Performance
  *
- * @version 2.0.0
- * @date 2025-12-21
+ * @version 2.1.0
+ * @date 2026-01-28
+ *
+ * Updates:
+ * - Added ApiClient (CSRF protection, centralized API)
+ * - Added WebSocketClient (auto-reconnect)
+ * - Added Sanitizer (XSS protection)
  */
 
 // State Management
 import {
-    StateManager,
-    createStore,
-    getStore,
-    StateMiddleware
-} from './StateManager.js';
+  StateManager,
+  createStore,
+  getStore,
+  StateMiddleware,
+} from "./StateManager.js";
 
 // Event System
-import {
-    EventBus,
-    getEventBus,
-    Events
-} from './EventBus.js';
+import { EventBus, getEventBus, Events } from "./EventBus.js";
 
 // Router
-import {
-    Router,
-    getRouter
-} from './Router.js';
+import { Router, getRouter } from "./Router.js";
 
 // Service Layer
 import {
-    BaseService,
-    MarketService,
-    TradingService,
-    StrategyService,
-    AnalyticsService,
-    SettingsService,
-    NotificationService,
-    getServices,
-    getService
-} from './ServiceLayer.js';
+  BaseService,
+  MarketService,
+  TradingService,
+  StrategyService,
+  AnalyticsService,
+  SettingsService,
+  NotificationService,
+  getServices,
+  getService,
+} from "./ServiceLayer.js";
+
+// API Client (NEW - CSRF protection, centralized error handling)
+import { ApiClient, ApiError, NetworkError, api } from "./ApiClient.js";
+
+// WebSocket Client (NEW - auto-reconnect, heartbeat)
+import {
+  WebSocketClient,
+  BybitWebSocketClient,
+  WS_STATE,
+  WS_EVENTS,
+} from "./WebSocketClient.js";
+
+// Sanitizer (NEW - XSS protection)
+import {
+  Sanitizer,
+  sanitize,
+  sanitizeToText,
+  escapeHtml,
+  setInnerHTML,
+  createElementFromHTML,
+} from "./Sanitizer.js";
+
+// Safe DOM Operations (NEW - XSS-safe DOM manipulation)
+import SafeDOM, {
+  safeText,
+  safeHTML,
+  createElement,
+  appendChildren,
+  html,
+  trusted,
+  TrustedHTML,
+  tableRow,
+  buildTable,
+  $,
+  $$,
+} from "./SafeDOM.js";
 
 // Lazy Loading (Phase 3)
 import {
-    LazyLoader,
-    IntersectionLoader,
-    RouteChunkLoader,
-    ImageLoader,
-    LoadState,
-    getLazyLoader,
-    getImageLoader,
-    lazy
-} from './LazyLoader.js';
+  LazyLoader,
+  IntersectionLoader,
+  RouteChunkLoader,
+  ImageLoader,
+  LoadState,
+  getLazyLoader,
+  getImageLoader,
+  lazy,
+} from "./LazyLoader.js";
 
 // Resource Hints (Phase 3)
 import {
-    ResourceHints,
-    FetchPriority,
-    HintType,
-    ResourceType,
-    getResourceHints,
-    initResourceHints
-} from './ResourceHints.js';
+  ResourceHints,
+  FetchPriority,
+  HintType,
+  ResourceType,
+  getResourceHints,
+  initResourceHints,
+} from "./ResourceHints.js";
 
 // Performance Monitoring (Phase 3)
 import {
-    PerformanceMonitor,
-    MemoryMonitor,
-    Thresholds,
-    Rating,
-    getRating,
-    getPerformanceMonitor,
-    initPerformanceMonitoring
-} from './PerformanceMonitor.js';
+  PerformanceMonitor,
+  MemoryMonitor,
+  Thresholds,
+  Rating,
+  getRating,
+  getPerformanceMonitor,
+  initPerformanceMonitoring,
+} from "./PerformanceMonitor.js";
 
 // Re-export all
 export {
-    // State Management
-    StateManager,
-    createStore,
-    getStore,
-    StateMiddleware,
-    // Event System
-    EventBus,
-    getEventBus,
-    Events,
-    // Router
-    Router,
-    getRouter,
-    // Service Layer
-    BaseService,
-    MarketService,
-    TradingService,
-    StrategyService,
-    AnalyticsService,
-    SettingsService,
-    NotificationService,
-    getServices,
-    getService,
-    // Lazy Loading (Phase 3)
-    LazyLoader,
-    IntersectionLoader,
-    RouteChunkLoader,
-    ImageLoader,
-    LoadState,
-    getLazyLoader,
-    getImageLoader,
-    lazy,
-    // Resource Hints (Phase 3)
-    ResourceHints,
-    FetchPriority,
-    HintType,
-    ResourceType,
-    getResourceHints,
-    initResourceHints,
-    // Performance Monitoring (Phase 3)
-    PerformanceMonitor,
-    MemoryMonitor,
-    Thresholds,
-    Rating,
-    getRating,
-    getPerformanceMonitor,
-    initPerformanceMonitoring
+  // State Management
+  StateManager,
+  createStore,
+  getStore,
+  StateMiddleware,
+  // Event System
+  EventBus,
+  getEventBus,
+  Events,
+  // Router
+  Router,
+  getRouter,
+  // Service Layer
+  BaseService,
+  MarketService,
+  TradingService,
+  StrategyService,
+  AnalyticsService,
+  SettingsService,
+  NotificationService,
+  getServices,
+  getService,
+  // API Client (NEW)
+  ApiClient,
+  ApiError,
+  NetworkError,
+  api,
+  // WebSocket Client (NEW)
+  WebSocketClient,
+  BybitWebSocketClient,
+  WS_STATE,
+  WS_EVENTS,
+  // Sanitizer (NEW)
+  Sanitizer,
+  sanitize,
+  sanitizeToText,
+  escapeHtml,
+  setInnerHTML,
+  createElementFromHTML,
+  // Safe DOM Operations (NEW)
+  SafeDOM,
+  safeText,
+  safeHTML,
+  createElement,
+  appendChildren,
+  html,
+  trusted,
+  TrustedHTML,
+  tableRow,
+  buildTable,
+  $,
+  $$,
+  // Lazy Loading (Phase 3)
+  LazyLoader,
+  IntersectionLoader,
+  RouteChunkLoader,
+  ImageLoader,
+  LoadState,
+  getLazyLoader,
+  getImageLoader,
+  lazy,
+  // Resource Hints (Phase 3)
+  ResourceHints,
+  FetchPriority,
+  HintType,
+  ResourceType,
+  getResourceHints,
+  initResourceHints,
+  // Performance Monitoring (Phase 3)
+  PerformanceMonitor,
+  MemoryMonitor,
+  Thresholds,
+  Rating,
+  getRating,
+  getPerformanceMonitor,
+  initPerformanceMonitoring,
 };
 
 // Convenience function to initialize all core systems
@@ -135,51 +199,53 @@ let initialized = false;
  * @returns {Object} Initialized core systems
  */
 export function initCore(options = {}) {
-    if (initialized) {
-        console.warn('Core systems already initialized');
-        return getCoreInstances();
-    }
+  if (initialized) {
+    console.warn("Core systems already initialized");
+    return getCoreInstances();
+  }
 
-    const {
-        routes = [],
-        initialState = {},
-        middleware = [],
-        debug = false
-    } = options;
+  const {
+    routes = [],
+    initialState = {},
+    middleware = [],
+    debug = false,
+  } = options;
 
-    // Create store
-    const store = createStore(initialState, {
-        devTools: debug,
-        persist: true,
-        persistKey: 'bybit-strategy-tester'
-    });
+  // Create store
+  const store = createStore(initialState, {
+    devTools: debug,
+    persist: true,
+    persistKey: "bybit-strategy-tester",
+  });
 
-    // Add middleware
-    if (debug) {
-        store.use(StateMiddleware.logger());
-    }
-    middleware.forEach(m => store.use(m));
+  // Add middleware
+  if (debug) {
+    store.use(StateMiddleware.logger());
+  }
+  middleware.forEach((m) => store.use(m));
 
-    // Initialize router
-    const router = getRouter();
-    routes.forEach(route => router.addRoute(route.path, route.component, route.options));
+  // Initialize router
+  const router = getRouter();
+  routes.forEach((route) =>
+    router.addRoute(route.path, route.component, route.options),
+  );
 
-    // Get event bus
-    const bus = getEventBus();
+  // Get event bus
+  const bus = getEventBus();
 
-    // Get services
-    const services = getServices();
+  // Get services
+  const services = getServices();
 
-    // Connect systems
-    router.onNavigate((path, route) => {
-        store.set('router.currentPath', path);
-        store.set('router.currentRoute', route?.path || null);
-        bus.emit(Events.ROUTE_CHANGED, { path, route });
-    });
+  // Connect systems
+  router.onNavigate((path, route) => {
+    store.set("router.currentPath", path);
+    store.set("router.currentRoute", route?.path || null);
+    bus.emit(Events.ROUTE_CHANGED, { path, route });
+  });
 
-    initialized = true;
+  initialized = true;
 
-    return { store, router, bus, services };
+  return { store, router, bus, services };
 }
 
 /**
@@ -187,15 +253,15 @@ export function initCore(options = {}) {
  * @returns {Object}
  */
 export function getCoreInstances() {
-    return {
-        store: getStore(),
-        bus: getEventBus(),
-        router: getRouter(),
-        services: getServices()
-    };
+  return {
+    store: getStore(),
+    bus: getEventBus(),
+    router: getRouter(),
+    services: getServices(),
+  };
 }
 
 export default {
-    initCore,
-    getCoreInstances
+  initCore,
+  getCoreInstances,
 };

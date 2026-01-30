@@ -3,7 +3,8 @@
 Параметры: SL=3.5%, TP=1.5%, RSI(14, 70, 30) - БЕЗ ОПТИМИЗАЦИИ
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd
 import sqlite3
@@ -63,7 +64,7 @@ print("=" * 100)
 print("📊 ЗАГРУЗКА ДАННЫХ")
 print("=" * 100)
 
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 start_ts = int(pd.Timestamp(BASE_CONFIG['start_date']).timestamp() * 1000)
 end_ts = int(pd.Timestamp(BASE_CONFIG['end_date']).timestamp() * 1000)
 

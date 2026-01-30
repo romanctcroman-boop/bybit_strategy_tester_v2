@@ -13,10 +13,11 @@
 import hashlib
 import json
 import pickle
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Tuple
-from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
 from loguru import logger
@@ -30,7 +31,8 @@ class OptimizationCache:
     Level 2: Disk cache for optimization results (persistent)
     """
 
-    CACHE_DIR = Path("d:/bybit_strategy_tester_v2/.cache")
+    # Dynamic path resolution - works on any system
+    CACHE_DIR = Path(__file__).resolve().parents[2] / ".cache"
     MAX_MEMORY_ITEMS = 1000
     MAX_DISK_SIZE_MB = 500
     EXPIRY_DAYS = 7
@@ -59,13 +61,13 @@ class OptimizationCache:
     # =========================================================
 
     def _make_key(self, *args, **kwargs) -> str:
-        """Create a unique hash key from arguments."""
+        """Create a unique hash key from arguments using SHA256."""
         key_data = {
             "args": [self._serialize_arg(a) for a in args],
             "kwargs": {k: self._serialize_arg(v) for k, v in sorted(kwargs.items())},
         }
         key_str = json.dumps(key_data, sort_keys=True, default=str)
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.sha256(key_str.encode()).hexdigest()
 
     def _serialize_arg(self, arg) -> Any:
         """Serialize argument for hashing."""
@@ -76,21 +78,19 @@ class OptimizationCache:
                 "shape": arg.shape,
                 "first": arg.iloc[0].to_dict() if len(arg) > 0 else None,
                 "last": arg.iloc[-1].to_dict() if len(arg) > 0 else None,
-                "hash": hashlib.md5(
-                    pd.util.hash_pandas_object(arg).values.tobytes()
-                ).hexdigest()[:8],
+                "hash": hashlib.sha256(pd.util.hash_pandas_object(arg).values.tobytes()).hexdigest()[:8],
             }
         elif isinstance(arg, pd.Series):
             return {
                 "type": "Series",
                 "len": len(arg),
-                "hash": hashlib.md5(arg.values.tobytes()).hexdigest()[:8],
+                "hash": hashlib.sha256(arg.values.tobytes()).hexdigest()[:8],
             }
         elif isinstance(arg, np.ndarray):
             return {
                 "type": "ndarray",
                 "shape": arg.shape,
-                "hash": hashlib.md5(arg.tobytes()).hexdigest()[:8],
+                "hash": hashlib.sha256(arg.tobytes()).hexdigest()[:8],
             }
         elif isinstance(arg, (dict, list, tuple, str, int, float, bool, type(None))):
             return arg
@@ -150,10 +150,7 @@ class OptimizationCache:
                     data = pickle.load(f)
 
                 # Check expiry
-                if (
-                    data.get("expires_at")
-                    and datetime.fromisoformat(data["expires_at"]) < datetime.now()
-                ):
+                if data.get("expires_at") and datetime.fromisoformat(data["expires_at"]) < datetime.now():
                     path.unlink()
                     return False, None
 
@@ -199,10 +196,7 @@ class OptimizationCache:
                 with open(path, "rb") as f:
                     data = pickle.load(f)
 
-                if (
-                    data.get("expires_at")
-                    and datetime.fromisoformat(data["expires_at"]) < datetime.now()
-                ):
+                if data.get("expires_at") and datetime.fromisoformat(data["expires_at"]) < datetime.now():
                     path.unlink()
                     removed += 1
             except Exception:

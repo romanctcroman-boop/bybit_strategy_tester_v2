@@ -4,7 +4,8 @@ Uses the project's UnifiedAgentInterface with encrypted API keys.
 """
 import asyncio
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.agents.unified_agent_interface import (
     UnifiedAgentInterface,

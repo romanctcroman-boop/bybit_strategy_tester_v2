@@ -112,9 +112,7 @@ async def health_check():
 
         session = SessionLocal()
         try:
-            session.execute(
-                text("SELECT 1")
-            )  # ✅ Fixed: explicit text() for SQLAlchemy 2.0
+            session.execute(text("SELECT 1"))  # ✅ Fixed: explicit text() for SQLAlchemy 2.0
             checks["database"] = {
                 "status": "ok",
                 "message": "Database connection successful",
@@ -170,9 +168,7 @@ async def health_check():
 
     # Return 503 if unhealthy
     if overall_status == "unhealthy":
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=response
-        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=response)
 
     return response
 
@@ -375,12 +371,8 @@ async def database_pool_status():
 
         # Return 503 if pool is critical
         if statistics["health"] == "critical":
-            logger.warning(
-                f"Database pool in critical state: {statistics['utilization']}% utilization"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=response
-            )
+            logger.warning(f"Database pool in critical state: {statistics['utilization']}% utilization")
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=response)
 
         return response
 
@@ -388,9 +380,7 @@ async def database_pool_status():
         raise
     except Exception as e:
         logger.error("Failed to get DB pool status", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get DB pool status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get DB pool status: {str(e)}")
 
 
 @router.get("/metrics")
@@ -416,9 +406,7 @@ async def metrics_endpoint():
         return Response(content=metrics_output, media_type=CONTENT_TYPE_LATEST)
     except Exception as e:
         logger.error("Failed to generate metrics", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate metrics: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to generate metrics: {str(e)}")
 
 
 @router.get("/phase2", response_model=Dict[str, Any])
@@ -481,9 +469,7 @@ async def phase2_status():
             "persistence": {
                 "enabled": circuit_mgr._persistence_enabled,
                 "redis_connected": circuit_mgr._persistence_redis is not None,
-                "autosave_interval": circuit_mgr._autosave_interval
-                if circuit_mgr._persistence_enabled
-                else None,
+                "autosave_interval": circuit_mgr._autosave_interval if circuit_mgr._persistence_enabled else None,
                 "breakers_tracked": len(circuit_mgr._configs),
             },
             "config": config_status,
@@ -505,9 +491,7 @@ async def phase2_status():
 
     except Exception as e:
         logger.error("Failed to get Phase 2 status", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get Phase 2 status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get Phase 2 status: {str(e)}")
 
 
 # =============================================================================
@@ -537,9 +521,7 @@ async def database_health():
 
     except Exception as e:
         logger.error("Database health check failed", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Database health check failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Database health check failed: {str(e)}")
 
 
 @router.get("/database/metrics", response_model=Dict[str, Any])
@@ -560,9 +542,7 @@ async def database_metrics():
 
     except Exception as e:
         logger.error("Failed to get database metrics", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get database metrics: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get database metrics: {str(e)}")
 
 
 @router.get("/database/metrics/prometheus")
@@ -582,6 +562,103 @@ async def database_metrics_prometheus():
 
     except Exception as e:
         logger.error("Failed to get Prometheus metrics", extra={"error": str(e)})
+        raise HTTPException(status_code=500, detail=f"Failed to get Prometheus metrics: {str(e)}")
+
+
+# =============================================================================
+# COMPREHENSIVE HEALTH CHECK (NEW: Based on MONITORING_SYSTEM_AUDIT_2026_01_28)
+# =============================================================================
+
+
+@router.get("/comprehensive", response_model=Dict[str, Any])
+async def comprehensive_health_check():
+    """
+    Comprehensive system health check.
+
+    Checks all critical system components:
+    - Database connectivity
+    - Redis connectivity
+    - Bybit API status
+    - Disk space
+    - Memory usage
+    - CPU usage
+
+    Returns overall system health status with details for each component.
+
+    Returns:
+        SystemHealthReport with status of all components
+
+    Status Codes:
+        200: All components healthy or degraded
+        503: One or more critical components unhealthy
+    """
+    try:
+        from backend.monitoring.health_checks import get_health_checker
+
+        checker = get_health_checker()
+        report = await checker.check_all(force=True)
+
+        result = report.to_dict()
+
+        # Return 503 if overall status is unhealthy
+        if result["overall_status"] == "unhealthy":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=result,
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Comprehensive health check failed", extra={"error": str(e)})
         raise HTTPException(
-            status_code=500, detail=f"Failed to get Prometheus metrics: {str(e)}"
+            status_code=500,
+            detail=f"Comprehensive health check failed: {str(e)}",
+        )
+
+
+@router.get("/comprehensive/{component}", response_model=Dict[str, Any])
+async def component_health_check(component: str):
+    """
+    Check health of a specific component.
+
+    Args:
+        component: Component name (database, redis, bybit_api, disk, memory, cpu)
+
+    Returns:
+        HealthCheckResult for the specified component
+    """
+    from backend.monitoring.health_checks import get_health_checker
+
+    checker = get_health_checker()
+
+    # Map component names to check methods
+    check_methods = {
+        "database": checker.check_database,
+        "redis": checker.check_redis,
+        "bybit_api": checker.check_bybit_api,
+        "disk": checker.check_disk_space,
+        "memory": checker.check_memory,
+        "cpu": checker.check_cpu,
+    }
+
+    if component not in check_methods:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown component: {component}. Available: {list(check_methods.keys())}",
+        )
+
+    try:
+        result = await check_methods[component]()
+        return result.to_dict()
+    except Exception as e:
+        logger.error(
+            f"Component health check failed: {component}",
+            extra={"error": str(e)},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Component health check failed: {str(e)}",
         )

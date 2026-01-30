@@ -13,7 +13,8 @@ Full Parameter Support:
 - Strategy type, Date range, OHLC Path Model, Subticks
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 import pandas as pd
@@ -78,7 +79,7 @@ print("\n" + "=" * 80)
 print("LOADING DATA")
 print("=" * 80)
 
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 # Load main timeframe data
 df_60m = pd.read_sql(f"""

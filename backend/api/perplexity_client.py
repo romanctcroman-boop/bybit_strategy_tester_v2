@@ -24,7 +24,7 @@ from typing import Optional
 import httpx
 
 from backend.reliability.http_retry import httpx_retry
-from reliability.retry_policy import is_http_error_retryable
+from backend.reliability.retry_policy import is_http_error_retryable
 
 try:  # Local import guard for non-backend runtimes
     from backend.agents.circuit_breaker_manager import (
@@ -196,7 +196,8 @@ class PerplexityClient:
             else:
                 response = await _ping_request()
 
-            is_healthy = response.status_code in [200, 400, 401, 403]
+                    # Only 200 is truly healthy; 401/403 indicate auth issues
+                    is_healthy = response.status_code == 200
 
             # Cache result
             self.cache.set("ping", {"success": is_healthy}, model="sonar")

@@ -24,7 +24,6 @@ from itertools import product
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -124,8 +123,7 @@ def generate_param_values(spec: "ParamRangeSpec") -> List[Any]:
             # Safety limit: max 10000 values
             if len(values) >= 10000:
                 logger.warning(
-                    f"Parameter range truncated to 10000 values "
-                    f"(low={spec.low}, high={spec.high}, step={step})"
+                    f"Parameter range truncated to 10000 values (low={spec.low}, high={spec.high}, step={step})"
                 )
                 break
 
@@ -165,9 +163,7 @@ class ParamRangeSpec(BaseModel):
         None,
         description="Decimal precision for rounding (e.g., 2 for 0.01, 4 for 0.0001)",
     )
-    values: Optional[List[Any]] = Field(
-        None, description="Explicit values (for categorical or grid)"
-    )
+    values: Optional[List[Any]] = Field(None, description="Explicit values (for categorical or grid)")
     log: bool = Field(False, description="Use log scale for sampling")
 
 
@@ -183,9 +179,7 @@ class CreateOptimizationRequest(BaseModel):
     timeframe: str = Field("1h", description="Candle timeframe")
     start_date: str = Field(..., description="Start date (YYYY-MM-DD)")
     end_date: str = Field(..., description="End date (YYYY-MM-DD)")
-    param_ranges: Dict[str, ParamRangeSpec] = Field(
-        ..., description="Parameter search space"
-    )
+    param_ranges: Dict[str, ParamRangeSpec] = Field(..., description="Parameter search space")
     metric: str = Field("sharpe_ratio", description="Metric to optimize")
     initial_capital: float = Field(10000.0, description="Starting capital")
 
@@ -267,9 +261,7 @@ def optimization_to_response(opt: Optimization) -> OptimizationResponse:
         start_date=opt.start_date.isoformat() if opt.start_date else None,
         end_date=opt.end_date.isoformat() if opt.end_date else None,
         metric=opt.metric,
-        status=opt.status.value
-        if isinstance(opt.status, OptimizationStatus)
-        else opt.status,
+        status=opt.status.value if isinstance(opt.status, OptimizationStatus) else opt.status,
         progress=opt.progress or 0.0,
         best_params=opt.best_params,
         best_score=opt.best_score,
@@ -298,9 +290,7 @@ def parse_optimization_type(type_str: str) -> OptimizationType:
     return type_map.get(type_str.lower(), OptimizationType.GRID_SEARCH)
 
 
-def calculate_total_combinations(
-    param_ranges: Dict[str, ParamRangeSpec], opt_type: OptimizationType
-) -> int:
+def calculate_total_combinations(param_ranges: Dict[str, ParamRangeSpec], opt_type: OptimizationType) -> int:
     """Calculate total parameter combinations."""
     if opt_type in (OptimizationType.BAYESIAN, OptimizationType.RANDOM_SEARCH):
         return 0
@@ -345,9 +335,7 @@ async def create_optimization(
         raise HTTPException(status_code=404, detail="Strategy not found")
 
     opt_type = parse_optimization_type(request.optimization_type)
-    total_combinations = calculate_total_combinations(
-        {k: v for k, v in request.param_ranges.items()}, opt_type
-    )
+    total_combinations = calculate_total_combinations({k: v for k, v in request.param_ranges.items()}, opt_type)
     param_ranges_dict = {k: v.model_dump() for k, v in request.param_ranges.items()}
 
     optimization = Optimization(
@@ -376,9 +364,7 @@ async def create_optimization(
     db.commit()
     db.refresh(optimization)
 
-    logger.info(
-        f"Created optimization {optimization.id}: {opt_type.value} for strategy {request.strategy_id}"
-    )
+    logger.info(f"Created optimization {optimization.id}: {opt_type.value} for strategy {request.strategy_id}")
 
     background_tasks.add_task(
         launch_optimization_task,
@@ -471,9 +457,7 @@ async def launch_optimization_task(
                     if precision is None:
                         if spec.step and spec.step < 1:
                             step_str = f"{spec.step:.10f}".rstrip("0")
-                            precision = (
-                                len(step_str.split(".")[-1]) if "." in step_str else 2
-                            )
+                            precision = len(step_str.split(".")[-1]) if "." in step_str else 2
                         else:
                             precision = 2  # Default for floats
 
@@ -491,9 +475,7 @@ async def launch_optimization_task(
                         param_space[param_name] = list(
                             set(
                                 [
-                                    round(
-                                        random.uniform(spec.low, spec.high), precision
-                                    )
+                                    round(random.uniform(spec.low, spec.high), precision)
                                     for _ in range(min(request.n_trials, 50))
                                 ]
                             )
@@ -510,9 +492,7 @@ async def launch_optimization_task(
                 metric=request.metric,
             )
 
-        logger.info(
-            f"Launched {opt_type.value} task for optimization {optimization_id}"
-        )
+        logger.info(f"Launched {opt_type.value} task for optimization {optimization_id}")
 
     except Exception as e:
         logger.error(f"Failed to launch optimization task: {e}")
@@ -520,11 +500,7 @@ async def launch_optimization_task(
 
         db = SessionLocal()
         try:
-            opt = (
-                db.query(Optimization)
-                .filter(Optimization.id == optimization_id)
-                .first()
-            )
+            opt = db.query(Optimization).filter(Optimization.id == optimization_id).first()
             if opt:
                 opt.status = OptimizationStatus.FAILED
                 opt.error_message = str(e)
@@ -566,9 +542,7 @@ async def list_optimizations(
 @router.get("/{optimization_id}", response_model=OptimizationResponse)
 async def get_optimization(optimization_id: int, db: Session = Depends(get_db)):
     """Get optimization details by ID."""
-    optimization = (
-        db.query(Optimization).filter(Optimization.id == optimization_id).first()
-    )
+    optimization = db.query(Optimization).filter(Optimization.id == optimization_id).first()
     if not optimization:
         raise HTTPException(status_code=404, detail="Optimization not found")
     return optimization_to_response(optimization)
@@ -577,18 +551,12 @@ async def get_optimization(optimization_id: int, db: Session = Depends(get_db)):
 @router.get("/{optimization_id}/status", response_model=OptimizationStatusResponse)
 async def get_optimization_status(optimization_id: int, db: Session = Depends(get_db)):
     """Get current status and progress of an optimization job."""
-    optimization = (
-        db.query(Optimization).filter(Optimization.id == optimization_id).first()
-    )
+    optimization = db.query(Optimization).filter(Optimization.id == optimization_id).first()
     if not optimization:
         raise HTTPException(status_code=404, detail="Optimization not found")
 
     eta_seconds = None
-    if (
-        optimization.status == OptimizationStatus.RUNNING
-        and optimization.started_at
-        and optimization.progress > 0
-    ):
+    if optimization.status == OptimizationStatus.RUNNING and optimization.started_at and optimization.progress > 0:
         elapsed = (datetime.now(timezone.utc) - optimization.started_at).total_seconds()
         eta_seconds = elapsed / optimization.progress * (1 - optimization.progress)
 
@@ -609,9 +577,7 @@ async def get_optimization_status(optimization_id: int, db: Session = Depends(ge
 @router.get("/{optimization_id}/results", response_model=OptimizationResultsResponse)
 async def get_optimization_results(optimization_id: int, db: Session = Depends(get_db)):
     """Get detailed results of a completed optimization."""
-    optimization = (
-        db.query(Optimization).filter(Optimization.id == optimization_id).first()
-    )
+    optimization = db.query(Optimization).filter(Optimization.id == optimization_id).first()
     if not optimization:
         raise HTTPException(status_code=404, detail="Optimization not found")
 
@@ -648,9 +614,7 @@ async def get_optimization_results(optimization_id: int, db: Session = Depends(g
 @router.delete("/{optimization_id}")
 async def cancel_optimization(optimization_id: int, db: Session = Depends(get_db)):
     """Cancel a running or queued optimization."""
-    optimization = (
-        db.query(Optimization).filter(Optimization.id == optimization_id).first()
-    )
+    optimization = db.query(Optimization).filter(Optimization.id == optimization_id).first()
     if not optimization:
         raise HTTPException(status_code=404, detail="Optimization not found")
 
@@ -702,17 +666,13 @@ async def rerun_optimization(
     db.commit()
     db.refresh(new_optimization)
 
-    logger.info(
-        f"Created rerun optimization {new_optimization.id} from {optimization_id}"
-    )
+    logger.info(f"Created rerun optimization {new_optimization.id} from {optimization_id}")
 
     strategy = db.query(Strategy).filter(Strategy.id == original.strategy_id).first()
     strategy_config = strategy.parameters if strategy else {}
 
     config = original.config or {}
-    param_ranges = {
-        k: ParamRangeSpec(**v) for k, v in (original.param_ranges or {}).items()
-    }
+    param_ranges = {k: ParamRangeSpec(**v) for k, v in (original.param_ranges or {}).items()}
 
     request = CreateOptimizationRequest(
         strategy_id=original.strategy_id,
@@ -750,25 +710,11 @@ async def get_optimization_stats(db: Session = Depends(get_db)):
 
     total = db.query(func.count(Optimization.id)).scalar()
     completed = (
-        db.query(func.count(Optimization.id))
-        .filter(Optimization.status == OptimizationStatus.COMPLETED)
-        .scalar()
+        db.query(func.count(Optimization.id)).filter(Optimization.status == OptimizationStatus.COMPLETED).scalar()
     )
-    running = (
-        db.query(func.count(Optimization.id))
-        .filter(Optimization.status == OptimizationStatus.RUNNING)
-        .scalar()
-    )
-    failed = (
-        db.query(func.count(Optimization.id))
-        .filter(Optimization.status == OptimizationStatus.FAILED)
-        .scalar()
-    )
-    queued = (
-        db.query(func.count(Optimization.id))
-        .filter(Optimization.status == OptimizationStatus.QUEUED)
-        .scalar()
-    )
+    running = db.query(func.count(Optimization.id)).filter(Optimization.status == OptimizationStatus.RUNNING).scalar()
+    failed = db.query(func.count(Optimization.id)).filter(Optimization.status == OptimizationStatus.FAILED).scalar()
+    queued = db.query(func.count(Optimization.id)).filter(Optimization.status == OptimizationStatus.QUEUED).scalar()
 
     by_type = (
         db.query(Optimization.optimization_type, func.count(Optimization.id))
@@ -784,9 +730,7 @@ async def get_optimization_stats(db: Session = Depends(get_db)):
             "failed": failed,
             "queued": queued,
         },
-        "by_type": {
-            t.value if hasattr(t, "value") else t: count for t, count in by_type
-        },
+        "by_type": {t.value if hasattr(t, "value") else t: count for t, count in by_type},
     }
 
 
@@ -813,17 +757,17 @@ def _run_batch_backtests(
     import pandas as pd
 
     from backend.backtesting.engine_selector import get_engine
-    from backend.backtesting.signal_generators import generate_rsi_signals
     from backend.backtesting.interfaces import BacktestInput, TradeDirection
+    from backend.backtesting.signal_generators import generate_rsi_signals
 
     # Восстанавливаем DataFrame из dict
     candles = pd.DataFrame(candles_dict)
     candles["timestamp"] = pd.to_datetime(candles["timestamp"])
     candles.set_index("timestamp", inplace=True)
 
-    # Парсим даты
-    start_dt = dt.fromisoformat(start_dt_str)
-    end_dt = dt.fromisoformat(end_dt_str)
+    # Парсим даты (validation - ensure valid datetime format)
+    dt.fromisoformat(start_dt_str)  # Validate start date
+    dt.fromisoformat(end_dt_str)  # Validate end date
 
     # Получаем движок на основе выбранного engine_type
     engine_type = request_params.get("engine_type", "auto")
@@ -894,9 +838,7 @@ def _run_batch_backtests(
                 "total_return": metrics.total_return if metrics else 0,
                 "sharpe_ratio": metrics.sharpe_ratio if metrics else 0,
                 "max_drawdown": metrics.max_drawdown if metrics else 0,
-                "win_rate": metrics.win_rate * 100
-                if metrics
-                else 0,  # V2 возвращает 0-1, конвертируем в %
+                "win_rate": metrics.win_rate * 100 if metrics else 0,  # V2 возвращает 0-1, конвертируем в %
                 "total_trades": metrics.total_trades if metrics else 0,
                 "profit_factor": metrics.profit_factor if metrics else 0,
                 # Additional metrics for full reporting
@@ -921,55 +863,31 @@ def _run_batch_backtests(
                 "max_drawdown_value": 0,
                 # Long/Short breakdown for TV parity
                 "long_trades": metrics.long_trades if metrics else 0,
-                "long_winning_trades": getattr(metrics, "long_winning_trades", 0)
-                if metrics
-                else 0,
-                "long_losing_trades": getattr(metrics, "long_losing_trades", 0)
-                if metrics
-                else 0,
+                "long_winning_trades": getattr(metrics, "long_winning_trades", 0) if metrics else 0,
+                "long_losing_trades": getattr(metrics, "long_losing_trades", 0) if metrics else 0,
                 "long_win_rate": metrics.long_win_rate * 100 if metrics else 0,
-                "long_gross_profit": getattr(metrics, "long_gross_profit", 0)
-                if metrics
-                else 0,
-                "long_gross_loss": getattr(metrics, "long_gross_loss", 0)
-                if metrics
-                else 0,
+                "long_gross_profit": getattr(metrics, "long_gross_profit", 0) if metrics else 0,
+                "long_gross_loss": getattr(metrics, "long_gross_loss", 0) if metrics else 0,
                 "long_net_profit": metrics.long_profit if metrics else 0,
-                "long_profit_factor": getattr(metrics, "long_profit_factor", 0)
-                if metrics
-                else 0,
+                "long_profit_factor": getattr(metrics, "long_profit_factor", 0) if metrics else 0,
                 "long_avg_win": getattr(metrics, "long_avg_win", 0) if metrics else 0,
                 "long_avg_loss": getattr(metrics, "long_avg_loss", 0) if metrics else 0,
                 "short_trades": metrics.short_trades if metrics else 0,
-                "short_winning_trades": getattr(metrics, "short_winning_trades", 0)
-                if metrics
-                else 0,
-                "short_losing_trades": getattr(metrics, "short_losing_trades", 0)
-                if metrics
-                else 0,
+                "short_winning_trades": getattr(metrics, "short_winning_trades", 0) if metrics else 0,
+                "short_losing_trades": getattr(metrics, "short_losing_trades", 0) if metrics else 0,
                 "short_win_rate": metrics.short_win_rate * 100 if metrics else 0,
-                "short_gross_profit": getattr(metrics, "short_gross_profit", 0)
-                if metrics
-                else 0,
-                "short_gross_loss": getattr(metrics, "short_gross_loss", 0)
-                if metrics
-                else 0,
+                "short_gross_profit": getattr(metrics, "short_gross_profit", 0) if metrics else 0,
+                "short_gross_loss": getattr(metrics, "short_gross_loss", 0) if metrics else 0,
                 "short_net_profit": metrics.short_profit if metrics else 0,
-                "short_profit_factor": getattr(metrics, "short_profit_factor", 0)
-                if metrics
-                else 0,
+                "short_profit_factor": getattr(metrics, "short_profit_factor", 0) if metrics else 0,
                 "short_avg_win": getattr(metrics, "short_avg_win", 0) if metrics else 0,
-                "short_avg_loss": getattr(metrics, "short_avg_loss", 0)
-                if metrics
-                else 0,
+                "short_avg_loss": getattr(metrics, "short_avg_loss", 0) if metrics else 0,
                 # Duration metrics
                 "avg_bars_in_trade": metrics.avg_trade_duration if metrics else 0,
                 "avg_bars_in_winning": metrics.avg_winning_duration if metrics else 0,
                 "avg_bars_in_losing": metrics.avg_losing_duration if metrics else 0,
                 # Commission
-                "total_commission": sum(t.fees for t in bt_output.trades)
-                if bt_output.trades
-                else 0,
+                "total_commission": sum(t.fees for t in bt_output.trades) if bt_output.trades else 0,
             }
 
             # Проверить фильтры с учётом форматов (win_rate приходит в процентах)
@@ -990,18 +908,12 @@ def _run_batch_backtests(
                     # Calculate duration if we have entry and exit times
                     duration_hours = 0
                     if t.entry_time and t.exit_time:
-                        duration_hours = (
-                            t.exit_time - t.entry_time
-                        ).total_seconds() / 3600
+                        duration_hours = (t.exit_time - t.entry_time).total_seconds() / 3600
 
                     trades_data.append(
                         {
-                            "entry_time": t.entry_time.isoformat()
-                            if t.entry_time
-                            else None,
-                            "exit_time": t.exit_time.isoformat()
-                            if t.exit_time
-                            else None,
+                            "entry_time": t.entry_time.isoformat() if t.entry_time else None,
+                            "exit_time": t.exit_time.isoformat() if t.exit_time else None,
                             # V2 uses 'direction' field instead of 'side'
                             "side": t.direction
                             if hasattr(t, "direction")
@@ -1014,25 +926,15 @@ def _run_batch_backtests(
                             "exit_price": float(t.exit_price) if t.exit_price else 0,
                             "size": float(t.size) if t.size else 0,
                             "pnl": float(t.pnl) if t.pnl else 0,
-                            "pnl_pct": float(t.pnl_pct)
-                            if hasattr(t, "pnl_pct") and t.pnl_pct
-                            else 0,
-                            "return_pct": float(t.pnl_pct)
-                            if hasattr(t, "pnl_pct") and t.pnl_pct
-                            else 0,
-                            "fees": float(t.fees)
-                            if hasattr(t, "fees") and t.fees
-                            else 0,
+                            "pnl_pct": float(t.pnl_pct) if hasattr(t, "pnl_pct") and t.pnl_pct else 0,
+                            "return_pct": float(t.pnl_pct) if hasattr(t, "pnl_pct") and t.pnl_pct else 0,
+                            "fees": float(t.fees) if hasattr(t, "fees") and t.fees else 0,
                             "duration_hours": duration_hours,
                             # MFE/MAE (TradingView style)
                             "mfe": float(t.mfe) if hasattr(t, "mfe") and t.mfe else 0,
                             "mae": float(t.mae) if hasattr(t, "mae") and t.mae else 0,
-                            "mfe_pct": float(t.mfe)
-                            if hasattr(t, "mfe") and t.mfe
-                            else 0,
-                            "mae_pct": float(t.mae)
-                            if hasattr(t, "mae") and t.mae
-                            else 0,
+                            "mfe_pct": float(t.mfe) if hasattr(t, "mfe") and t.mfe else 0,
+                            "mae_pct": float(t.mae) if hasattr(t, "mae") and t.mae else 0,
                         }
                     )
 
@@ -1041,9 +943,7 @@ def _run_batch_backtests(
             equity_data = None
             if bt_output.equity_curve is not None and len(bt_output.equity_curve) > 0:
                 equity = bt_output.equity_curve
-                timestamps = (
-                    bt_output.timestamps if bt_output.timestamps is not None else []
-                )
+                timestamps = bt_output.timestamps if bt_output.timestamps is not None else []
                 # Sample if too many points
                 step = max(1, len(equity) // 500)
                 equity_data = {
@@ -1097,8 +997,8 @@ def _run_batch_backtests(
                     "equity_curve": equity_data,
                 }
             )
-        except Exception:
-            pass  # Skip failed backtests
+        except Exception as e:
+            logger.warning("Skipped failed backtest in grid: %s", e)
 
     return results
 
@@ -1158,9 +1058,7 @@ def _run_single_backtest_for_process(args: tuple) -> dict:
             initial_capital=request_params["initial_capital"],
             leverage=request_params["leverage"],
             direction=request_params["direction"],
-            stop_loss=request_params["stop_loss_percent"] / 100.0
-            if request_params["stop_loss_percent"]
-            else None,
+            stop_loss=request_params["stop_loss_percent"] / 100.0 if request_params["stop_loss_percent"] else None,
             take_profit=request_params["take_profit_percent"] / 100.0
             if request_params["take_profit_percent"]
             else None,
@@ -1178,9 +1076,7 @@ def _run_single_backtest_for_process(args: tuple) -> dict:
             "max_drawdown": bt_result.metrics.max_drawdown if bt_result.metrics else 0,
             "win_rate": bt_result.metrics.win_rate if bt_result.metrics else 0,
             "total_trades": bt_result.metrics.total_trades if bt_result.metrics else 0,
-            "profit_factor": bt_result.metrics.profit_factor
-            if bt_result.metrics
-            else 0,
+            "profit_factor": bt_result.metrics.profit_factor if bt_result.metrics else 0,
         }
 
         # Получить значение метрики
@@ -1203,9 +1099,7 @@ def _run_single_backtest_for_process(args: tuple) -> dict:
         return None
 
 
-def _calculate_composite_score(
-    result: dict, metric: str, weights: dict = None
-) -> float:
+def _calculate_composite_score(result: dict, metric: str, weights: dict = None) -> float:
     """
     Вычисляет композитный скор для результата бэктеста.
 
@@ -1366,14 +1260,11 @@ def _generate_smart_recommendations(results: list) -> dict:
 
     if not profitable:
         # Если нет прибыльных, берём наименее убыточный
-        sorted_by_return = sorted(
-            results, key=lambda x: x.get("total_return", -999), reverse=True
-        )
+        sorted_by_return = sorted(results, key=lambda x: x.get("total_return", -999), reverse=True)
         if sorted_by_return:
             recommendations["best_balanced"] = sorted_by_return[0]
             recommendations["recommendation_text"] = (
-                "⚠️ Все комбинации убыточны. "
-                "Рекомендуем изменить параметры стратегии или период тестирования."
+                "⚠️ Все комбинации убыточны. Рекомендуем изменить параметры стратегии или период тестирования."
             )
         return recommendations
 
@@ -1382,9 +1273,7 @@ def _generate_smart_recommendations(results: list) -> dict:
         dd = abs(r.get("max_drawdown", 1)) or 1
         r["_calmar"] = r.get("total_return", 0) / dd
 
-    sorted_by_calmar = sorted(
-        profitable, key=lambda x: x.get("_calmar", 0), reverse=True
-    )
+    sorted_by_calmar = sorted(profitable, key=lambda x: x.get("_calmar", 0), reverse=True)
     recommendations["best_balanced"] = sorted_by_calmar[0] if sorted_by_calmar else None
 
     # 2. ЛУЧШИЙ КОНСЕРВАТИВНЫЙ - минимальная просадка при положительной доходности
@@ -1393,12 +1282,8 @@ def _generate_smart_recommendations(results: list) -> dict:
     recommendations["best_conservative"] = sorted_by_dd[0] if sorted_by_dd else None
 
     # 3. ЛУЧШИЙ АГРЕССИВНЫЙ - максимальная доходность
-    sorted_by_return = sorted(
-        profitable, key=lambda x: x.get("total_return", 0), reverse=True
-    )
-    recommendations["best_aggressive"] = (
-        sorted_by_return[0] if sorted_by_return else None
-    )
+    sorted_by_return = sorted(profitable, key=lambda x: x.get("total_return", 0), reverse=True)
+    recommendations["best_aggressive"] = sorted_by_return[0] if sorted_by_return else None
 
     # Генерируем текст рекомендации
     balanced = recommendations["best_balanced"]
@@ -1411,9 +1296,7 @@ def _generate_smart_recommendations(results: list) -> dict:
         """Форматирует параметры для отображения"""
         p = r.get("params", {})
         rsi_str = f"RSI({p.get('rsi_period')}, {p.get('rsi_overbought')}, {p.get('rsi_oversold')})"
-        tpsl_str = (
-            f"SL={p.get('stop_loss_pct', 10)}%, TP={p.get('take_profit_pct', 1.5)}%"
-        )
+        tpsl_str = f"SL={p.get('stop_loss_pct', 10)}%, TP={p.get('take_profit_pct', 1.5)}%"
         return f"{rsi_str}, {tpsl_str}"
 
     if balanced:
@@ -1538,9 +1421,7 @@ def _run_single_backtest(
             "max_drawdown": bt_result.metrics.max_drawdown if bt_result.metrics else 0,
             "win_rate": bt_result.metrics.win_rate if bt_result.metrics else 0,
             "total_trades": bt_result.metrics.total_trades if bt_result.metrics else 0,
-            "profit_factor": bt_result.metrics.profit_factor
-            if bt_result.metrics
-            else 0,
+            "profit_factor": bt_result.metrics.profit_factor if bt_result.metrics else 0,
         }
 
         # Проверить фильтры
@@ -1567,8 +1448,7 @@ def _run_single_backtest(
             "win_rate": result.get("win_rate", 0),
             "total_trades": result.get("total_trades", 0),
             "profit_factor": result.get("profit_factor", 0),
-            "calmar_ratio": result.get("total_return", 0)
-            / max(abs(result.get("max_drawdown", 0.01) * 100), 0.01),
+            "calmar_ratio": result.get("total_return", 0) / max(abs(result.get("max_drawdown", 0.01) * 100), 0.01),
         }
     except Exception as e:
         from loguru import logger
@@ -1792,18 +1672,12 @@ async def sync_grid_search_optimization(
 
         if max_iter < total_combinations:
             param_combinations = random.sample(param_combinations, max_iter)
-            logger.info(
-                f"🎲 Random Search: sampling {max_iter} from {total_combinations} combinations"
-            )
+            logger.info(f"🎲 Random Search: sampling {max_iter} from {total_combinations} combinations")
             total_combinations = max_iter
         else:
-            logger.info(
-                f"🎲 Random Search: using all {total_combinations} combinations (< max_iterations)"
-            )
+            logger.info(f"🎲 Random Search: using all {total_combinations} combinations (< max_iterations)")
     else:
-        logger.info(
-            f"🔢 Grid Search: testing all {total_combinations} parameter combinations"
-        )
+        logger.info(f"🔢 Grid Search: testing all {total_combinations} parameter combinations")
 
     # No limit - user is informed about time estimate in UI
 
@@ -1853,20 +1727,14 @@ async def sync_grid_search_optimization(
     logger.info(f"🔧 Engine type requested: {engine_type}")
 
     # GPU Batch Optimization - ultra fast screening + full verification
-    if (
-        engine_type == "gpu"
-        and total_combinations >= 50
-        and request.strategy_type.lower() == "rsi"
-    ):
-        logger.info(
-            f"🚀 Using GPU Batch Optimizer (hybrid mode) for {total_combinations} combinations"
-        )
+    if engine_type == "gpu" and total_combinations >= 50 and request.strategy_type.lower() == "rsi":
+        logger.info(f"🚀 Using GPU Batch Optimizer (hybrid mode) for {total_combinations} combinations")
 
         try:
-            from backend.backtesting.gpu_batch_optimizer import GPUBatchOptimizer
             from backend.backtesting.engine_selector import get_engine
-            from backend.backtesting.signal_generators import generate_rsi_signals
+            from backend.backtesting.gpu_batch_optimizer import GPUBatchOptimizer
             from backend.backtesting.interfaces import BacktestInput, TradeDirection
+            from backend.backtesting.signal_generators import generate_rsi_signals
 
             # Phase 1: Fast GPU Batch screening
             batch_optimizer = GPUBatchOptimizer()
@@ -1904,17 +1772,11 @@ async def sync_grid_search_optimization(
             batch_with_scores.sort(key=lambda x: x["score"], reverse=True)
 
             # Phase 2: Full verification of top candidates
-            top_n = min(
-                100, len(batch_with_scores)
-            )  # Verify top 100 for better accuracy
-            logger.info(
-                f"🔍 Phase 2: Verifying top {top_n} candidates with full engine"
-            )
+            top_n = min(100, len(batch_with_scores))  # Verify top 100 for better accuracy
+            logger.info(f"🔍 Phase 2: Verifying top {top_n} candidates with full engine")
 
             # Get full engine for verification
-            engine = get_engine(
-                engine_type="numba"
-            )  # Use Numba for verification (faster than fallback)
+            engine = get_engine(engine_type="numba")  # Use Numba for verification (faster than fallback)
 
             # Convert direction
             direction_str = request_params.get("direction", "both")
@@ -1935,14 +1797,12 @@ async def sync_grid_search_optimization(
 
                 try:
                     # Generate signals with full engine
-                    long_entries, long_exits, short_entries, short_exits = (
-                        generate_rsi_signals(
-                            candles=candles,
-                            period=period,
-                            overbought=overbought,
-                            oversold=oversold,
-                            direction=direction_str,
-                        )
+                    long_entries, long_exits, short_entries, short_exits = generate_rsi_signals(
+                        candles=candles,
+                        period=period,
+                        overbought=overbought,
+                        oversold=oversold,
+                        direction=direction_str,
                     )
 
                     backtest_input = BacktestInput(
@@ -1955,9 +1815,7 @@ async def sync_grid_search_optimization(
                         symbol=request_params["symbol"],
                         interval=request_params["interval"],
                         initial_capital=request_params["initial_capital"],
-                        position_size=0.1
-                        if request_params.get("use_fixed_amount")
-                        else 1.0,
+                        position_size=0.1 if request_params.get("use_fixed_amount") else 1.0,
                         use_fixed_amount=request_params.get("use_fixed_amount", False),
                         fixed_amount=request_params.get("fixed_amount", 0.0),
                         leverage=request_params["leverage"],
@@ -2005,26 +1863,20 @@ async def sync_grid_search_optimization(
                 except Exception as verify_err:
                     logger.warning(f"Verification failed for {params}: {verify_err}")
 
-            logger.info(
-                f"✅ GPU Batch Hybrid completed: {total_combinations} screened, {completed} verified"
-            )
+            logger.info(f"✅ GPU Batch Hybrid completed: {total_combinations} screened, {completed} verified")
 
         except Exception as batch_err:
-            logger.warning(
-                f"GPU Batch failed: {batch_err}, falling back to single-process"
-            )
+            logger.warning(f"GPU Batch failed: {batch_err}, falling back to single-process")
             # Fall through to single-process mode
             engine_type = "numba"  # Use Numba as fallback
 
     # Single-process mode for GPU/Numba OR small Fallback jobs (avoid multiprocessing overhead)
     if completed == 0 and (engine_type in ("gpu", "numba") or total_combinations <= 10):
-        logger.info(
-            f"⚡ Using single-process mode for {engine_type} ({total_combinations} combinations)"
-        )
+        logger.info(f"⚡ Using single-process mode for {engine_type} ({total_combinations} combinations)")
 
         from backend.backtesting.engine_selector import get_engine
-        from backend.backtesting.signal_generators import generate_rsi_signals
         from backend.backtesting.interfaces import BacktestInput, TradeDirection
+        from backend.backtesting.signal_generators import generate_rsi_signals
 
         # Get engine once (single warmup)
         engine = get_engine(engine_type=engine_type)
@@ -2044,14 +1896,12 @@ async def sync_grid_search_optimization(
             period, overbought, oversold, stop_loss, take_profit = combo
             try:
                 # Generate RSI signals
-                long_entries, long_exits, short_entries, short_exits = (
-                    generate_rsi_signals(
-                        candles=candles,
-                        period=period,
-                        overbought=overbought,
-                        oversold=oversold,
-                        direction=direction_str,
-                    )
+                long_entries, long_exits, short_entries, short_exits = generate_rsi_signals(
+                    candles=candles,
+                    period=period,
+                    overbought=overbought,
+                    oversold=oversold,
+                    direction=direction_str,
                 )
 
                 # Create BacktestInput
@@ -2065,9 +1915,7 @@ async def sync_grid_search_optimization(
                     symbol=request_params["symbol"],
                     interval=request_params["interval"],
                     initial_capital=request_params["initial_capital"],
-                    position_size=0.1
-                    if request_params.get("use_fixed_amount")
-                    else 1.0,
+                    position_size=0.1 if request_params.get("use_fixed_amount") else 1.0,
                     use_fixed_amount=request_params.get("use_fixed_amount", False),
                     fixed_amount=request_params.get("fixed_amount", 0.0),
                     leverage=request_params["leverage"],
@@ -2103,9 +1951,7 @@ async def sync_grid_search_optimization(
                     "gross_loss": metrics.gross_loss if metrics else 0,
                     "avg_win": metrics.avg_win if metrics else 0,
                     "avg_loss": metrics.avg_loss if metrics else 0,
-                    "avg_win_value": metrics.avg_win
-                    if metrics
-                    else 0,  # Same as avg_win for TV parity
+                    "avg_win_value": metrics.avg_win if metrics else 0,  # Same as avg_win for TV parity
                     "avg_loss_value": metrics.avg_loss if metrics else 0,
                     "largest_win": metrics.largest_win if metrics else 0,
                     "largest_loss": metrics.largest_loss if metrics else 0,
@@ -2117,63 +1963,31 @@ async def sync_grid_search_optimization(
                     "calmar_ratio": metrics.calmar_ratio if metrics else 0,
                     # Long/Short breakdown
                     "long_trades": metrics.long_trades if metrics else 0,
-                    "long_winning_trades": getattr(metrics, "long_winning_trades", 0)
-                    if metrics
-                    else 0,
-                    "long_losing_trades": getattr(metrics, "long_losing_trades", 0)
-                    if metrics
-                    else 0,
+                    "long_winning_trades": getattr(metrics, "long_winning_trades", 0) if metrics else 0,
+                    "long_losing_trades": getattr(metrics, "long_losing_trades", 0) if metrics else 0,
                     "long_win_rate": metrics.long_win_rate * 100 if metrics else 0,
-                    "long_gross_profit": getattr(metrics, "long_gross_profit", 0)
-                    if metrics
-                    else 0,
-                    "long_gross_loss": getattr(metrics, "long_gross_loss", 0)
-                    if metrics
-                    else 0,
+                    "long_gross_profit": getattr(metrics, "long_gross_profit", 0) if metrics else 0,
+                    "long_gross_loss": getattr(metrics, "long_gross_loss", 0) if metrics else 0,
                     "long_net_profit": metrics.long_profit if metrics else 0,
-                    "long_profit_factor": getattr(metrics, "long_profit_factor", 0)
-                    if metrics
-                    else 0,
-                    "long_avg_win": getattr(metrics, "long_avg_win", 0)
-                    if metrics
-                    else 0,
-                    "long_avg_loss": getattr(metrics, "long_avg_loss", 0)
-                    if metrics
-                    else 0,
+                    "long_profit_factor": getattr(metrics, "long_profit_factor", 0) if metrics else 0,
+                    "long_avg_win": getattr(metrics, "long_avg_win", 0) if metrics else 0,
+                    "long_avg_loss": getattr(metrics, "long_avg_loss", 0) if metrics else 0,
                     "short_trades": metrics.short_trades if metrics else 0,
-                    "short_winning_trades": getattr(metrics, "short_winning_trades", 0)
-                    if metrics
-                    else 0,
-                    "short_losing_trades": getattr(metrics, "short_losing_trades", 0)
-                    if metrics
-                    else 0,
+                    "short_winning_trades": getattr(metrics, "short_winning_trades", 0) if metrics else 0,
+                    "short_losing_trades": getattr(metrics, "short_losing_trades", 0) if metrics else 0,
                     "short_win_rate": metrics.short_win_rate * 100 if metrics else 0,
-                    "short_gross_profit": getattr(metrics, "short_gross_profit", 0)
-                    if metrics
-                    else 0,
-                    "short_gross_loss": getattr(metrics, "short_gross_loss", 0)
-                    if metrics
-                    else 0,
+                    "short_gross_profit": getattr(metrics, "short_gross_profit", 0) if metrics else 0,
+                    "short_gross_loss": getattr(metrics, "short_gross_loss", 0) if metrics else 0,
                     "short_net_profit": metrics.short_profit if metrics else 0,
-                    "short_profit_factor": getattr(metrics, "short_profit_factor", 0)
-                    if metrics
-                    else 0,
-                    "short_avg_win": getattr(metrics, "short_avg_win", 0)
-                    if metrics
-                    else 0,
-                    "short_avg_loss": getattr(metrics, "short_avg_loss", 0)
-                    if metrics
-                    else 0,
+                    "short_profit_factor": getattr(metrics, "short_profit_factor", 0) if metrics else 0,
+                    "short_avg_win": getattr(metrics, "short_avg_win", 0) if metrics else 0,
+                    "short_avg_loss": getattr(metrics, "short_avg_loss", 0) if metrics else 0,
                     # Duration metrics
                     "avg_bars_in_trade": metrics.avg_trade_duration if metrics else 0,
-                    "avg_bars_in_winning": metrics.avg_winning_duration
-                    if metrics
-                    else 0,
+                    "avg_bars_in_winning": metrics.avg_winning_duration if metrics else 0,
                     "avg_bars_in_losing": metrics.avg_losing_duration if metrics else 0,
                     # Commission
-                    "total_commission": sum(t.fees for t in bt_output.trades)
-                    if bt_output.trades
-                    else 0,
+                    "total_commission": sum(t.fees for t in bt_output.trades) if bt_output.trades else 0,
                     "params": {
                         "rsi_period": period,
                         "rsi_overbought": overbought,
@@ -2184,20 +1998,14 @@ async def sync_grid_search_optimization(
                     # Trade list for comparison with TV
                     "trades": [
                         {
-                            "entry_time": t.entry_time.isoformat()
-                            if t.entry_time
-                            else None,
-                            "exit_time": t.exit_time.isoformat()
-                            if t.exit_time
-                            else None,
+                            "entry_time": t.entry_time.isoformat() if t.entry_time else None,
+                            "exit_time": t.exit_time.isoformat() if t.exit_time else None,
                             "direction": t.direction,
                             "entry_price": round(t.entry_price, 2),
                             "exit_price": round(t.exit_price, 2),
                             "pnl": round(t.pnl, 2),
                             "pnl_pct": round(t.pnl_pct, 4) if t.pnl_pct else 0,
-                            "exit_reason": str(t.exit_reason.value)
-                            if t.exit_reason
-                            else "unknown",
+                            "exit_reason": str(t.exit_reason.value) if t.exit_reason else "unknown",
                             "duration_bars": t.duration_bars,
                         }
                         for t in (bt_output.trades or [])
@@ -2228,9 +2036,7 @@ async def sync_grid_search_optimization(
     # Multiprocessing mode for Fallback (CPU parallelism)
     if completed == 0:
         max_workers = min(os.cpu_count() or 4, 8)
-        logger.info(
-            f"📝 Using multiprocessing with {max_workers} processes for {engine_type}"
-        )
+        logger.info(f"📝 Using multiprocessing with {max_workers} processes for {engine_type}")
 
         # Prepare serializable data
         candles_dict = candles.reset_index().to_dict("records")
@@ -2240,13 +2046,8 @@ async def sync_grid_search_optimization(
 
         # Split into batches
         batch_size = max(1, len(param_combinations) // max_workers)
-        batches = [
-            param_combinations[i : i + batch_size]
-            for i in range(0, len(param_combinations), batch_size)
-        ]
-        logger.info(
-            f"📦 Split into {len(batches)} batches of ~{batch_size} combinations each"
-        )
+        batches = [param_combinations[i : i + batch_size] for i in range(0, len(param_combinations), batch_size)]
+        logger.info(f"📦 Split into {len(batches)} batches of ~{batch_size} combinations each")
 
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = {
@@ -2284,9 +2085,7 @@ async def sync_grid_search_optimization(
                     logger.warning(f"Batch failed: {e}")
 
     # Применяем мультикритериальное ранжирование если есть selection_criteria
-    selection_criteria = getattr(request, "selection_criteria", None) or [
-        request.optimize_metric
-    ]
+    selection_criteria = getattr(request, "selection_criteria", None) or [request.optimize_metric]
     if len(selection_criteria) > 1:
         # Используем мультикритериальное ранжирование
         results = _rank_by_multi_criteria(results, selection_criteria)
@@ -2343,14 +2142,10 @@ async def sync_grid_search_optimization(
             "total_return": best_result.get("total_return", 0) if best_result else 0,
             "sharpe_ratio": best_result.get("sharpe_ratio", 0) if best_result else 0,
             "max_drawdown": best_result.get("max_drawdown", 0) if best_result else 0,
-            "max_drawdown_value": best_result.get("max_drawdown_value", 0)
-            if best_result
-            else 0,
+            "max_drawdown_value": best_result.get("max_drawdown_value", 0) if best_result else 0,
             "win_rate": best_result.get("win_rate", 0) if best_result else 0,
             "total_trades": best_result.get("total_trades", 0) if best_result else 0,
-            "winning_trades": best_result.get("winning_trades", 0)
-            if best_result
-            else 0,
+            "winning_trades": best_result.get("winning_trades", 0) if best_result else 0,
             "losing_trades": best_result.get("losing_trades", 0) if best_result else 0,
             "profit_factor": best_result.get("profit_factor", 0) if best_result else 0,
             "net_profit": best_result.get("net_profit", 0) if best_result else 0,
@@ -2358,139 +2153,61 @@ async def sync_grid_search_optimization(
             "gross_loss": best_result.get("gross_loss", 0) if best_result else 0,
             "avg_win": best_result.get("avg_win", 0) if best_result else 0,
             "avg_loss": best_result.get("avg_loss", 0) if best_result else 0,
-            "avg_win_value": best_result.get(
-                "avg_win_value", best_result.get("avg_win", 0)
-            )
-            if best_result
-            else 0,
-            "avg_loss_value": best_result.get(
-                "avg_loss_value", best_result.get("avg_loss", 0)
-            )
-            if best_result
-            else 0,
+            "avg_win_value": best_result.get("avg_win_value", best_result.get("avg_win", 0)) if best_result else 0,
+            "avg_loss_value": best_result.get("avg_loss_value", best_result.get("avg_loss", 0)) if best_result else 0,
             "largest_win": best_result.get("largest_win", 0) if best_result else 0,
             "largest_loss": best_result.get("largest_loss", 0) if best_result else 0,
-            "largest_win_value": best_result.get("largest_win", 0)
-            if best_result
-            else 0,
-            "largest_loss_value": best_result.get("largest_loss", 0)
-            if best_result
-            else 0,
-            "recovery_factor": best_result.get("recovery_factor", 0)
-            if best_result
-            else 0,
+            "largest_win_value": best_result.get("largest_win", 0) if best_result else 0,
+            "largest_loss_value": best_result.get("largest_loss", 0) if best_result else 0,
+            "recovery_factor": best_result.get("recovery_factor", 0) if best_result else 0,
             "expectancy": best_result.get("expectancy", 0) if best_result else 0,
             "sortino_ratio": best_result.get("sortino_ratio", 0) if best_result else 0,
             "calmar_ratio": best_result.get("calmar_ratio", 0) if best_result else 0,
-            "max_consecutive_wins": best_result.get("max_consecutive_wins", 0)
-            if best_result
-            else 0,
-            "max_consecutive_losses": best_result.get("max_consecutive_losses", 0)
-            if best_result
-            else 0,
+            "max_consecutive_wins": best_result.get("max_consecutive_wins", 0) if best_result else 0,
+            "max_consecutive_losses": best_result.get("max_consecutive_losses", 0) if best_result else 0,
             "best_trade": best_result.get("best_trade", 0) if best_result else 0,
             "worst_trade": best_result.get("worst_trade", 0) if best_result else 0,
-            "best_trade_pct": best_result.get("best_trade_pct", 0)
-            if best_result
-            else 0,
-            "worst_trade_pct": best_result.get("worst_trade_pct", 0)
-            if best_result
-            else 0,
+            "best_trade_pct": best_result.get("best_trade_pct", 0) if best_result else 0,
+            "worst_trade_pct": best_result.get("worst_trade_pct", 0) if best_result else 0,
             # Long/Short statistics
             "long_trades": best_result.get("long_trades", 0) if best_result else 0,
-            "long_winning_trades": best_result.get("long_winning_trades", 0)
-            if best_result
-            else 0,
-            "long_losing_trades": best_result.get("long_losing_trades", 0)
-            if best_result
-            else 0,
+            "long_winning_trades": best_result.get("long_winning_trades", 0) if best_result else 0,
+            "long_losing_trades": best_result.get("long_losing_trades", 0) if best_result else 0,
             "long_win_rate": best_result.get("long_win_rate", 0) if best_result else 0,
-            "long_gross_profit": best_result.get("long_gross_profit", 0)
-            if best_result
-            else 0,
-            "long_gross_loss": best_result.get("long_gross_loss", 0)
-            if best_result
-            else 0,
-            "long_net_profit": best_result.get("long_net_profit", 0)
-            if best_result
-            else 0,
-            "long_profit_factor": best_result.get("long_profit_factor", 0)
-            if best_result
-            else 0,
+            "long_gross_profit": best_result.get("long_gross_profit", 0) if best_result else 0,
+            "long_gross_loss": best_result.get("long_gross_loss", 0) if best_result else 0,
+            "long_net_profit": best_result.get("long_net_profit", 0) if best_result else 0,
+            "long_profit_factor": best_result.get("long_profit_factor", 0) if best_result else 0,
             "long_avg_win": best_result.get("long_avg_win", 0) if best_result else 0,
             "long_avg_loss": best_result.get("long_avg_loss", 0) if best_result else 0,
             "short_trades": best_result.get("short_trades", 0) if best_result else 0,
-            "short_winning_trades": best_result.get("short_winning_trades", 0)
-            if best_result
-            else 0,
-            "short_losing_trades": best_result.get("short_losing_trades", 0)
-            if best_result
-            else 0,
-            "short_win_rate": best_result.get("short_win_rate", 0)
-            if best_result
-            else 0,
-            "short_gross_profit": best_result.get("short_gross_profit", 0)
-            if best_result
-            else 0,
-            "short_gross_loss": best_result.get("short_gross_loss", 0)
-            if best_result
-            else 0,
-            "short_net_profit": best_result.get("short_net_profit", 0)
-            if best_result
-            else 0,
-            "short_profit_factor": best_result.get("short_profit_factor", 0)
-            if best_result
-            else 0,
+            "short_winning_trades": best_result.get("short_winning_trades", 0) if best_result else 0,
+            "short_losing_trades": best_result.get("short_losing_trades", 0) if best_result else 0,
+            "short_win_rate": best_result.get("short_win_rate", 0) if best_result else 0,
+            "short_gross_profit": best_result.get("short_gross_profit", 0) if best_result else 0,
+            "short_gross_loss": best_result.get("short_gross_loss", 0) if best_result else 0,
+            "short_net_profit": best_result.get("short_net_profit", 0) if best_result else 0,
+            "short_profit_factor": best_result.get("short_profit_factor", 0) if best_result else 0,
             "short_avg_win": best_result.get("short_avg_win", 0) if best_result else 0,
-            "short_avg_loss": best_result.get("short_avg_loss", 0)
-            if best_result
-            else 0,
+            "short_avg_loss": best_result.get("short_avg_loss", 0) if best_result else 0,
             # Average bars in trade
-            "avg_bars_in_trade": best_result.get("avg_bars_in_trade", 0)
-            if best_result
-            else 0,
-            "avg_bars_in_winning": best_result.get("avg_bars_in_winning", 0)
-            if best_result
-            else 0,
-            "avg_bars_in_losing": best_result.get("avg_bars_in_losing", 0)
-            if best_result
-            else 0,
-            "avg_bars_in_long": best_result.get("avg_bars_in_long", 0)
-            if best_result
-            else 0,
-            "avg_bars_in_short": best_result.get("avg_bars_in_short", 0)
-            if best_result
-            else 0,
-            "avg_bars_in_winning_long": best_result.get("avg_bars_in_winning_long", 0)
-            if best_result
-            else 0,
-            "avg_bars_in_losing_long": best_result.get("avg_bars_in_losing_long", 0)
-            if best_result
-            else 0,
-            "avg_bars_in_winning_short": best_result.get("avg_bars_in_winning_short", 0)
-            if best_result
-            else 0,
-            "avg_bars_in_losing_short": best_result.get("avg_bars_in_losing_short", 0)
-            if best_result
-            else 0,
+            "avg_bars_in_trade": best_result.get("avg_bars_in_trade", 0) if best_result else 0,
+            "avg_bars_in_winning": best_result.get("avg_bars_in_winning", 0) if best_result else 0,
+            "avg_bars_in_losing": best_result.get("avg_bars_in_losing", 0) if best_result else 0,
+            "avg_bars_in_long": best_result.get("avg_bars_in_long", 0) if best_result else 0,
+            "avg_bars_in_short": best_result.get("avg_bars_in_short", 0) if best_result else 0,
+            "avg_bars_in_winning_long": best_result.get("avg_bars_in_winning_long", 0) if best_result else 0,
+            "avg_bars_in_losing_long": best_result.get("avg_bars_in_losing_long", 0) if best_result else 0,
+            "avg_bars_in_winning_short": best_result.get("avg_bars_in_winning_short", 0) if best_result else 0,
+            "avg_bars_in_losing_short": best_result.get("avg_bars_in_losing_short", 0) if best_result else 0,
             # Recovery factor Long/Short
             "recovery_long": best_result.get("recovery_long", 0) if best_result else 0,
-            "recovery_short": best_result.get("recovery_short", 0)
-            if best_result
-            else 0,
+            "recovery_short": best_result.get("recovery_short", 0) if best_result else 0,
             # Commission, Buy&Hold, CAGR
-            "total_commission": best_result.get("total_commission", 0)
-            if best_result
-            else 0,
-            "buy_hold_return": best_result.get("buy_hold_return", 0)
-            if best_result
-            else 0,
-            "buy_hold_return_pct": best_result.get("buy_hold_return_pct", 0)
-            if best_result
-            else 0,
-            "strategy_outperformance": best_result.get("strategy_outperformance", 0)
-            if best_result
-            else 0,
+            "total_commission": best_result.get("total_commission", 0) if best_result else 0,
+            "buy_hold_return": best_result.get("buy_hold_return", 0) if best_result else 0,
+            "buy_hold_return_pct": best_result.get("buy_hold_return_pct", 0) if best_result else 0,
+            "strategy_outperformance": best_result.get("strategy_outperformance", 0) if best_result else 0,
             "cagr": best_result.get("cagr", 0) if best_result else 0,
             "cagr_long": best_result.get("cagr_long", 0) if best_result else 0,
             "cagr_short": best_result.get("cagr_short", 0) if best_result else 0,
@@ -2607,9 +2324,7 @@ async def vectorbt_grid_search_optimization(
     backends = get_available_backends()
     recommended = get_recommended_backend()
     optimizer = UniversalOptimizer(backend="auto")
-    logger.info(
-        f"🚀 Using UniversalOptimizer (auto-backend: {recommended}, GPU: {backends.get('gpu', False)})"
-    )
+    logger.info(f"🚀 Using UniversalOptimizer (auto-backend: {recommended}, GPU: {backends.get('gpu', False)})")
 
     logger.info("🚀 Starting ultra-fast optimization")
 
@@ -2642,10 +2357,11 @@ async def vectorbt_grid_search_optimization(
     interval = _normalize_interval(request.interval)
     logger.info(f"📊 Normalized interval: {request.interval} -> {interval}")
 
-    # Get DB path from environment
-    db_path = os.environ.get(
-        "DATABASE_PATH", "d:\\bybit_strategy_tester_v2\\data.sqlite3"
-    )
+    # Get DB path from environment with dynamic fallback
+    from pathlib import Path
+
+    default_db = str(Path(__file__).resolve().parents[3] / "data.sqlite3")
+    db_path = os.environ.get("DATABASE_PATH", default_db)
 
     try:
         # Load market data via DIRECT SQL (bypass ORM for speed)
@@ -2664,9 +2380,7 @@ async def vectorbt_grid_search_optimization(
 
         load_time = _time.perf_counter() - load_start
         cache_stats = get_candle_cache().stats()
-        logger.info(
-            f"📊 Data loaded in {load_time:.3f}s (cache size: {cache_stats['size']}/{cache_stats['max_size']})"
-        )
+        logger.info(f"📊 Data loaded in {load_time:.3f}s (cache size: {cache_stats['size']}/{cache_stats['max_size']})")
 
     except Exception as data_err:
         logger.error(f"Direct SQL load failed: {data_err}, falling back to ORM")
@@ -2789,12 +2503,8 @@ async def vectorbt_grid_search_optimization(
                 leverage=request.leverage,
                 # GPU optimizer treats 'both' as 'long' (direction >= 0), so match that here
                 direction="long" if request.direction in ("long", "both") else "short",
-                stop_loss=best_params.get("stop_loss_pct", 0) / 100
-                if best_params.get("stop_loss_pct")
-                else None,
-                take_profit=best_params.get("take_profit_pct", 0) / 100
-                if best_params.get("take_profit_pct")
-                else None,
+                stop_loss=best_params.get("stop_loss_pct", 0) / 100 if best_params.get("stop_loss_pct") else None,
+                take_profit=best_params.get("take_profit_pct", 0) / 100 if best_params.get("take_profit_pct") else None,
                 taker_fee=request.commission,
                 maker_fee=request.commission,
                 slippage=request.slippage,
@@ -2817,9 +2527,7 @@ async def vectorbt_grid_search_optimization(
                 best["long_trades"] = getattr(metrics, "long_trades", 0)
                 best["short_trades"] = getattr(metrics, "short_trades", 0)
                 best["long_winning_trades"] = getattr(metrics, "long_winning_trades", 0)
-                best["short_winning_trades"] = getattr(
-                    metrics, "short_winning_trades", 0
-                )
+                best["short_winning_trades"] = getattr(metrics, "short_winning_trades", 0)
                 best["long_win_rate"] = getattr(metrics, "long_win_rate", 0)
                 best["short_win_rate"] = getattr(metrics, "short_win_rate", 0)
                 best["long_gross_profit"] = getattr(metrics, "long_gross_profit", 0)
@@ -2851,9 +2559,7 @@ async def vectorbt_grid_search_optimization(
                 full_bt_max_dd = getattr(metrics, "max_drawdown", 0)
                 if full_bt_max_dd > 0:
                     best["max_drawdown"] = full_bt_max_dd
-                    best["max_drawdown_value"] = getattr(
-                        metrics, "max_drawdown_value", 0
-                    )
+                    best["max_drawdown_value"] = getattr(metrics, "max_drawdown_value", 0)
                 # else: keep GPU optimizer's max_drawdown from top_results[0]
                 best["recovery_factor"] = getattr(metrics, "recovery_factor", 0)
                 best["expectancy"] = getattr(metrics, "expectancy", 0)
@@ -2865,27 +2571,15 @@ async def vectorbt_grid_search_optimization(
                 best["avg_bars_in_losing"] = getattr(metrics, "avg_bars_in_losing", 0)
 
                 # Convert trades to dict list
-                best["trades"] = (
-                    [t.model_dump() for t in full_result.trades]
-                    if full_result.trades
-                    else []
-                )
+                best["trades"] = [t.model_dump() for t in full_result.trades] if full_result.trades else []
 
                 # Convert equity curve (EquityCurve has timestamps and equity lists)
-                if full_result.equity_curve and hasattr(
-                    full_result.equity_curve, "timestamps"
-                ):
+                if full_result.equity_curve and hasattr(full_result.equity_curve, "timestamps"):
                     ec = full_result.equity_curve
-                    drawdowns = (
-                        ec.drawdown
-                        if hasattr(ec, "drawdown") and ec.drawdown
-                        else [0] * len(ec.equity)
-                    )
+                    drawdowns = ec.drawdown if hasattr(ec, "drawdown") and ec.drawdown else [0] * len(ec.equity)
                     best["equity_curve"] = [
                         {
-                            "timestamp": t.isoformat()
-                            if hasattr(t, "isoformat")
-                            else str(t),
+                            "timestamp": t.isoformat() if hasattr(t, "isoformat") else str(t),
                             "equity": v,
                             "drawdown": d,
                         }
@@ -2906,9 +2600,7 @@ async def vectorbt_grid_search_optimization(
                 result.best_metrics.update(
                     {
                         # Core trade stats
-                        "total_trades": best.get(
-                            "total_trades", len(best.get("trades", []))
-                        ),
+                        "total_trades": best.get("total_trades", len(best.get("trades", []))),
                         "winning_trades": best.get("winning_trades", 0),
                         "losing_trades": best.get("losing_trades", 0),
                         "win_rate": best.get("win_rate", 0),
@@ -2932,9 +2624,7 @@ async def vectorbt_grid_search_optimization(
     if result.top_results:
         first = result.top_results[0]
         logger.info(f"DEBUG top_results[0] keys: {list(first.keys())}")
-        logger.info(
-            f"DEBUG trades: {len(first.get('trades', [])) if first.get('trades') else 'None'}"
-        )
+        logger.info(f"DEBUG trades: {len(first.get('trades', [])) if first.get('trades') else 'None'}")
         logger.info(f"DEBUG equity_curve: {first.get('equity_curve') is not None}")
 
     def _to_recommendation(r: dict) -> Optional[SmartRecommendation]:
@@ -2957,11 +2647,7 @@ async def vectorbt_grid_search_optimization(
     )
 
     # Calculate speed
-    speed = (
-        int(result.tested_combinations / result.execution_time_seconds)
-        if result.execution_time_seconds > 0
-        else 0
-    )
+    speed = int(result.tested_combinations / result.execution_time_seconds) if result.execution_time_seconds > 0 else 0
     num_workers = getattr(result, "num_workers", None) or (os.cpu_count() or 4)
 
     return VectorbtOptimizationResponse(
@@ -3044,13 +2730,7 @@ async def vectorbt_grid_search_stream(
     sl_range = parse_float_list(stop_loss_range)
     tp_range = parse_float_list(take_profit_range)
 
-    total_combinations = (
-        len(period_range)
-        * len(overbought_range)
-        * len(oversold_range)
-        * len(sl_range)
-        * len(tp_range)
-    )
+    total_combinations = len(period_range) * len(overbought_range) * len(oversold_range) * len(sl_range) * len(tp_range)
 
     logger.info(f"🚀 SSE Grid Search: {total_combinations:,} combinations")
 
@@ -3097,10 +2777,11 @@ async def vectorbt_grid_search_stream(
 
             optimizer = UniversalOptimizer(backend="auto")
 
-            # Get DB path
-            db_path = os.environ.get(
-                "DATABASE_PATH", "d:\\bybit_strategy_tester_v2\\data.sqlite3"
-            )
+            # Get DB path with dynamic fallback
+            from pathlib import Path
+
+            default_db = str(Path(__file__).resolve().parents[3] / "data.sqlite3")
+            db_path = os.environ.get("DATABASE_PATH", default_db)
 
             # Normalize interval
             interval_map = {
@@ -3192,9 +2873,7 @@ async def vectorbt_grid_search_stream(
                     from backend.backtesting.models import BacktestConfig, StrategyType
 
                     best_params = best_result.get("params", {})
-                    logger.info(
-                        f"[SSE] Running full backtest for enrichment: {best_params}"
-                    )
+                    logger.info(f"[SSE] Running full backtest for enrichment: {best_params}")
 
                     backtest_config = BacktestConfig(
                         symbol=request.symbol,
@@ -3210,21 +2889,11 @@ async def vectorbt_grid_search_stream(
                         initial_capital=request.initial_capital,
                         leverage=request.leverage,
                         direction=request.direction,
-                        stop_loss=best_params.get(
-                            "stop_loss_pct", best_params.get("stop_loss", 0)
-                        )
-                        / 100
-                        if best_params.get(
-                            "stop_loss_pct", best_params.get("stop_loss")
-                        )
+                        stop_loss=best_params.get("stop_loss_pct", best_params.get("stop_loss", 0)) / 100
+                        if best_params.get("stop_loss_pct", best_params.get("stop_loss"))
                         else None,
-                        take_profit=best_params.get(
-                            "take_profit_pct", best_params.get("take_profit", 0)
-                        )
-                        / 100
-                        if best_params.get(
-                            "take_profit_pct", best_params.get("take_profit")
-                        )
+                        take_profit=best_params.get("take_profit_pct", best_params.get("take_profit", 0)) / 100
+                        if best_params.get("take_profit_pct", best_params.get("take_profit"))
                         else None,
                         taker_fee=request.commission,
                         maker_fee=request.commission,
@@ -3236,9 +2905,7 @@ async def vectorbt_grid_search_stream(
 
                     if full_result and full_result.trades:
                         trades = [t.model_dump() for t in full_result.trades]
-                        logger.info(
-                            f"[SSE] Got {len(trades)} trades from full backtest"
-                        )
+                        logger.info(f"[SSE] Got {len(trades)} trades from full backtest")
 
                         # Update best_result with full metrics
                         if full_result.metrics:
@@ -3246,96 +2913,50 @@ async def vectorbt_grid_search_stream(
                             best_result["avg_win"] = getattr(m, "avg_win", 0)
                             best_result["avg_loss"] = getattr(m, "avg_loss", 0)
                             best_result["avg_trade"] = getattr(m, "avg_trade", 0)
-                            best_result["avg_win_value"] = getattr(
-                                m, "avg_win_value", 0
-                            )
-                            best_result["avg_loss_value"] = getattr(
-                                m, "avg_loss_value", 0
-                            )
+                            best_result["avg_win_value"] = getattr(m, "avg_win_value", 0)
+                            best_result["avg_loss_value"] = getattr(m, "avg_loss_value", 0)
                             best_result["largest_win"] = getattr(m, "largest_win", 0)
                             best_result["largest_loss"] = getattr(m, "largest_loss", 0)
-                            best_result["largest_win_value"] = getattr(
-                                m, "largest_win_value", 0
-                            )
-                            best_result["largest_loss_value"] = getattr(
-                                m, "largest_loss_value", 0
-                            )
+                            best_result["largest_win_value"] = getattr(m, "largest_win_value", 0)
+                            best_result["largest_loss_value"] = getattr(m, "largest_loss_value", 0)
                             best_result["gross_profit"] = getattr(m, "gross_profit", 0)
                             best_result["gross_loss"] = getattr(m, "gross_loss", 0)
                             best_result["net_profit"] = getattr(m, "net_profit", 0)
                             best_result["long_trades"] = getattr(m, "long_trades", 0)
                             best_result["short_trades"] = getattr(m, "short_trades", 0)
-                            best_result["long_winning_trades"] = getattr(
-                                m, "long_winning_trades", 0
-                            )
-                            best_result["short_winning_trades"] = getattr(
-                                m, "short_winning_trades", 0
-                            )
-                            best_result["long_win_rate"] = getattr(
-                                m, "long_win_rate", 0
-                            )
-                            best_result["short_win_rate"] = getattr(
-                                m, "short_win_rate", 0
-                            )
-                            best_result["long_gross_profit"] = getattr(
-                                m, "long_gross_profit", 0
-                            )
-                            best_result["long_gross_loss"] = getattr(
-                                m, "long_gross_loss", 0
-                            )
-                            best_result["short_gross_profit"] = getattr(
-                                m, "short_gross_profit", 0
-                            )
-                            best_result["short_gross_loss"] = getattr(
-                                m, "short_gross_loss", 0
-                            )
-                            best_result["long_net_profit"] = getattr(
-                                m, "long_net_profit", 0
-                            )
-                            best_result["short_net_profit"] = getattr(
-                                m, "short_net_profit", 0
-                            )
-                            best_result["max_consecutive_wins"] = getattr(
-                                m, "max_consecutive_wins", 0
-                            )
-                            best_result["max_consecutive_losses"] = getattr(
-                                m, "max_consecutive_losses", 0
-                            )
+                            best_result["long_winning_trades"] = getattr(m, "long_winning_trades", 0)
+                            best_result["short_winning_trades"] = getattr(m, "short_winning_trades", 0)
+                            best_result["long_win_rate"] = getattr(m, "long_win_rate", 0)
+                            best_result["short_win_rate"] = getattr(m, "short_win_rate", 0)
+                            best_result["long_gross_profit"] = getattr(m, "long_gross_profit", 0)
+                            best_result["long_gross_loss"] = getattr(m, "long_gross_loss", 0)
+                            best_result["short_gross_profit"] = getattr(m, "short_gross_profit", 0)
+                            best_result["short_gross_loss"] = getattr(m, "short_gross_loss", 0)
+                            best_result["long_net_profit"] = getattr(m, "long_net_profit", 0)
+                            best_result["short_net_profit"] = getattr(m, "short_net_profit", 0)
+                            best_result["max_consecutive_wins"] = getattr(m, "max_consecutive_wins", 0)
+                            best_result["max_consecutive_losses"] = getattr(m, "max_consecutive_losses", 0)
                             best_result["expectancy"] = getattr(m, "expectancy", 0)
-                            best_result["total_commission"] = getattr(
-                                m, "total_commission", 0
-                            )
+                            best_result["total_commission"] = getattr(m, "total_commission", 0)
                             best_result["trades"] = trades
-                            logger.info(
-                                f"[SSE] Enriched with full metrics: avg_win={best_result['avg_win']:.2f}%"
-                            )
+                            logger.info(f"[SSE] Enriched with full metrics: avg_win={best_result['avg_win']:.2f}%")
 
                     if full_result and full_result.equity_curve:
                         ec = full_result.equity_curve
                         if hasattr(ec, "timestamps") and hasattr(ec, "equity"):
-                            drawdowns = (
-                                ec.drawdown
-                                if hasattr(ec, "drawdown") and ec.drawdown
-                                else [0] * len(ec.equity)
-                            )
+                            drawdowns = ec.drawdown if hasattr(ec, "drawdown") and ec.drawdown else [0] * len(ec.equity)
                             equity_curve = [
                                 {
-                                    "timestamp": t.isoformat()
-                                    if hasattr(t, "isoformat")
-                                    else str(t),
+                                    "timestamp": t.isoformat() if hasattr(t, "isoformat") else str(t),
                                     "equity": v,
                                     "drawdown": d,
                                 }
                                 for t, v, d in zip(ec.timestamps, ec.equity, drawdowns)
                             ]
-                            logger.info(
-                                f"[SSE] Got {len(equity_curve)} equity curve points"
-                            )
+                            logger.info(f"[SSE] Got {len(equity_curve)} equity curve points")
 
                 except Exception as enrich_err:
-                    logger.warning(
-                        f"[SSE] Failed to enrich with full backtest: {enrich_err}"
-                    )
+                    logger.warning(f"[SSE] Failed to enrich with full backtest: {enrich_err}")
 
             result_dict = {
                 "best_params": result.best_params,
@@ -3348,9 +2969,7 @@ async def vectorbt_grid_search_stream(
                 "equity_curve": equity_curve,
             }
 
-            logger.info(
-                f"[SSE] Result dict ready, trades={len(trades)}, equity={len(equity_curve)}"
-            )
+            logger.info(f"[SSE] Result dict ready, trades={len(trades)}, equity={len(equity_curve)}")
 
             result_container["result"] = result_dict
             result_container["done"] = True
@@ -3386,19 +3005,9 @@ async def vectorbt_grid_search_stream(
                 if current_time - last_heartbeat >= heartbeat_interval:
                     # Estimate progress based on expected speed (~25k combos/sec)
                     estimated_speed = 25000
-                    estimated_done = min(
-                        int(elapsed * estimated_speed), total_combinations
-                    )
-                    percent = (
-                        min(99, int(estimated_done * 100 / total_combinations))
-                        if total_combinations > 0
-                        else 0
-                    )
-                    eta = (
-                        max(0, (total_combinations - estimated_done) / estimated_speed)
-                        if estimated_speed > 0
-                        else 0
-                    )
+                    estimated_done = min(int(elapsed * estimated_speed), total_combinations)
+                    percent = min(99, int(estimated_done * 100 / total_combinations)) if total_combinations > 0 else 0
+                    eta = max(0, (total_combinations - estimated_done) / estimated_speed) if estimated_speed > 0 else 0
 
                     yield f"data: {json.dumps({'event': 'heartbeat', 'elapsed': round(elapsed, 1), 'percent': percent, 'eta_seconds': round(eta, 0)})}\n\n"
                     last_heartbeat = current_time
@@ -3450,13 +3059,9 @@ async def vectorbt_grid_search_stream(
                     "performance_stats": {},
                     "smart_recommendations": {
                         "best_balanced": _to_rec(smart_recs.get("best_balanced")),
-                        "best_conservative": _to_rec(
-                            smart_recs.get("best_conservative")
-                        ),
+                        "best_conservative": _to_rec(smart_recs.get("best_conservative")),
                         "best_aggressive": _to_rec(smart_recs.get("best_aggressive")),
-                        "recommendation_text": smart_recs.get(
-                            "recommendation_text", ""
-                        ),
+                        "recommendation_text": smart_recs.get("recommendation_text", ""),
                     },
                 }
 
@@ -3499,16 +3104,10 @@ class TwoStageOptimizationRequest(BaseModel):
 
     # Strategy parameters
     rsi_period_range: List[int] = Field([7, 14, 21], description="RSI periods")
-    rsi_overbought_range: List[int] = Field(
-        [65, 70, 75, 80], description="Overbought levels"
-    )
-    rsi_oversold_range: List[int] = Field(
-        [20, 25, 30, 35], description="Oversold levels"
-    )
+    rsi_overbought_range: List[int] = Field([65, 70, 75, 80], description="Overbought levels")
+    rsi_oversold_range: List[int] = Field([20, 25, 30, 35], description="Oversold levels")
     stop_loss_range: List[float] = Field([0.02, 0.03, 0.05], description="Stop loss %")
-    take_profit_range: List[float] = Field(
-        [0.02, 0.04, 0.06], description="Take profit %"
-    )
+    take_profit_range: List[float] = Field([0.02, 0.04, 0.06], description="Take profit %")
 
     # Trading settings
     direction: str = Field("both", description="long/short/both")
@@ -3518,15 +3117,9 @@ class TwoStageOptimizationRequest(BaseModel):
     slippage: float = Field(0.0005)
 
     # Two-stage settings
-    top_n: int = Field(
-        50, ge=10, le=200, description="Candidates to validate in Stage 2"
-    )
-    use_bar_magnifier: bool = Field(
-        True, description="Use tick-level precision (Bar Magnifier)"
-    )
-    parallel_workers: int = Field(
-        4, ge=1, le=8, description="Parallel validation workers"
-    )
+    top_n: int = Field(50, ge=10, le=200, description="Candidates to validate in Stage 2")
+    use_bar_magnifier: bool = Field(True, description="Use tick-level precision (Bar Magnifier)")
+    parallel_workers: int = Field(4, ge=1, le=8, description="Parallel validation workers")
     drift_threshold: float = Field(0.25, description="Max acceptable metric drift")
 
     # TradingView-like simulation settings
@@ -3607,10 +3200,10 @@ class TwoStageOptimizationResponse(BaseModel):
     summary="🚀 Two-Stage Optimization",
     description="""
     Two-Stage Optimization combines VBT speed with Fallback precision.
-    
+
     **Stage 1 (Screening):** Fast VBT/GPU grid search over all combinations
     **Stage 2 (Validation):** Precise Fallback validation of top-N candidates
-    
+
     Benefits:
     - 100x-600x faster than full Fallback optimization
     - Validates top candidates with tick-level precision
@@ -3659,9 +3252,10 @@ async def two_stage_optimization(
     interval = _normalize_interval(request.interval)
 
     # Load data - try DB first, then SmartKlineService
-    db_path = os.environ.get(
-        "DATABASE_PATH", "d:\\bybit_strategy_tester_v2\\data.sqlite3"
-    )
+    from pathlib import Path
+
+    default_db = str(Path(__file__).resolve().parents[3] / "data.sqlite3")
+    db_path = os.environ.get("DATABASE_PATH", default_db)
     candle_data = None
 
     try:
@@ -3676,9 +3270,7 @@ async def two_stage_optimization(
         )
         load_time = time.perf_counter() - load_start
         if candle_data is not None and len(candle_data) > 0:
-            logger.info(
-                f"📊 Data loaded from DB in {load_time:.3f}s ({len(candle_data)} candles)"
-            )
+            logger.info(f"📊 Data loaded from DB in {load_time:.3f}s ({len(candle_data)} candles)")
 
     except Exception as e:
         logger.warning(f"DB load failed: {e}, trying SmartKlineService...")
@@ -3686,13 +3278,12 @@ async def two_stage_optimization(
     # Fallback to SmartKlineService if DB has no data
     if candle_data is None or len(candle_data) == 0:
         try:
-            from backend.services.smart_kline_service import SMART_KLINE_SERVICE
             import numpy as np
 
+            from backend.services.smart_kline_service import SMART_KLINE_SERVICE
+
             logger.info("📊 Loading data via SmartKlineService...")
-            raw_candles = SMART_KLINE_SERVICE.get_candles(
-                request.symbol, interval, limit=5000
-            )
+            raw_candles = SMART_KLINE_SERVICE.get_candles(request.symbol, interval, limit=5000)
 
             if raw_candles:
                 # Convert list of dicts to numpy array
@@ -3710,9 +3301,7 @@ async def two_stage_optimization(
                     ],
                     dtype=np.float64,
                 )
-                logger.info(
-                    f"📊 Loaded {len(candle_data)} candles via SmartKlineService"
-                )
+                logger.info(f"📊 Loaded {len(candle_data)} candles via SmartKlineService")
         except Exception as e:
             logger.error(f"SmartKlineService failed: {e}")
 
@@ -3789,9 +3378,7 @@ async def two_stage_optimization(
             )
         )
 
-    logger.info(
-        f"✅ Two-stage optimization completed in {result.total_execution_time:.1f}s"
-    )
+    logger.info(f"✅ Two-stage optimization completed in {result.total_execution_time:.1f}s")
     logger.info(f"🚀 Speedup: {result.speedup_factor:.0f}x")
 
     return TwoStageOptimizationResponse(

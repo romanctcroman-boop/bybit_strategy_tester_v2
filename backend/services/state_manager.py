@@ -121,9 +121,7 @@ class Order:
             "order_type": self.order_type,
             "quantity": self.quantity,
             "price": self.price,
-            "status": self.status.value
-            if isinstance(self.status, OrderStatus)
-            else self.status,
+            "status": self.status.value if isinstance(self.status, OrderStatus) else self.status,
             "filled_quantity": self.filled_quantity,
             "average_price": self.average_price,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -171,9 +169,7 @@ class Position:
         return {
             "position_id": self.position_id,
             "symbol": self.symbol,
-            "side": self.side.value
-            if isinstance(self.side, PositionSide)
-            else self.side,
+            "side": self.side.value if isinstance(self.side, PositionSide) else self.side,
             "quantity": self.quantity,
             "entry_price": self.entry_price,
             "current_price": self.current_price,
@@ -297,9 +293,7 @@ class EventQueue:
                 self._queue.pop(0)
 
             self._queue.append(event)
-            logger.debug(
-                f"Event published: {event.event_type.value} - {event.entity_id}"
-            )
+            logger.debug(f"Event published: {event.event_type.value} - {event.entity_id}")
             return True
 
     async def consume(self, batch_size: int = 10) -> List[StateEvent]:
@@ -603,9 +597,7 @@ class UnifiedStateManager:
         self._log_audit("order_updated", order.order_id, order.to_dict())
         return order
 
-    async def get_order(
-        self, order_id: str, source: StateSource = StateSource.REDIS
-    ) -> Optional[Order]:
+    async def get_order(self, order_id: str, source: StateSource = StateSource.REDIS) -> Optional[Order]:
         """
         Get order by ID.
 
@@ -692,13 +684,9 @@ class UnifiedStateManager:
 
         # Calculate unrealized PnL
         if position.side == PositionSide.LONG:
-            position.unrealized_pnl = (
-                position.current_price - position.entry_price
-            ) * position.quantity
+            position.unrealized_pnl = (position.current_price - position.entry_price) * position.quantity
         elif position.side == PositionSide.SHORT:
-            position.unrealized_pnl = (
-                position.entry_price - position.current_price
-            ) * position.quantity
+            position.unrealized_pnl = (position.entry_price - position.current_price) * position.quantity
 
         await self.redis_store.set_position(position)
 
@@ -715,9 +703,7 @@ class UnifiedStateManager:
 
         return position
 
-    async def close_position(
-        self, position_id: str, close_price: float
-    ) -> Optional[Position]:
+    async def close_position(self, position_id: str, close_price: float) -> Optional[Position]:
         """Close position."""
         position = await self.redis_store.get_position(position_id)
         if not position:
@@ -725,13 +711,9 @@ class UnifiedStateManager:
 
         # Calculate realized PnL
         if position.side == PositionSide.LONG:
-            position.realized_pnl = (
-                close_price - position.entry_price
-            ) * position.quantity
+            position.realized_pnl = (close_price - position.entry_price) * position.quantity
         elif position.side == PositionSide.SHORT:
-            position.realized_pnl = (
-                position.entry_price - close_price
-            ) * position.quantity
+            position.realized_pnl = (position.entry_price - close_price) * position.quantity
 
         position.current_price = close_price
         position.quantity = 0
@@ -754,9 +736,7 @@ class UnifiedStateManager:
         self._log_audit("position_closed", position.position_id, position.to_dict())
         return position
 
-    async def get_position(
-        self, position_id: str, source: StateSource = StateSource.REDIS
-    ) -> Optional[Position]:
+    async def get_position(self, position_id: str, source: StateSource = StateSource.REDIS) -> Optional[Position]:
         """Get position by ID."""
         if source == StateSource.REDIS:
             return await self.redis_store.get_position(position_id)
@@ -810,9 +790,7 @@ class UnifiedStateManager:
                         results["synced_orders"] += 1
                     else:
                         # Check for conflict
-                        conflict = await self._check_order_conflict(
-                            order, postgres_order
-                        )
+                        conflict = await self._check_order_conflict(order, postgres_order)
                         if conflict:
                             results["conflicts_detected"] += 1
                             resolved = await self._resolve_conflict(conflict)
@@ -830,17 +808,13 @@ class UnifiedStateManager:
             redis_positions = await self.redis_store.list_positions()
             for position in redis_positions:
                 try:
-                    postgres_position = await self.postgres_store.get_position(
-                        position.position_id
-                    )
+                    postgres_position = await self.postgres_store.get_position(position.position_id)
 
                     if postgres_position is None:
                         await self.postgres_store.set_position(position)
                         results["synced_positions"] += 1
                     else:
-                        conflict = await self._check_position_conflict(
-                            position, postgres_position
-                        )
+                        conflict = await self._check_position_conflict(position, postgres_position)
                         if conflict:
                             results["conflicts_detected"] += 1
                             resolved = await self._resolve_conflict(conflict)
@@ -851,21 +825,15 @@ class UnifiedStateManager:
                                 await self.postgres_store.set_position(position)
                                 results["synced_positions"] += 1
                 except Exception as e:
-                    results["errors"].append(
-                        f"Position {position.position_id}: {str(e)}"
-                    )
+                    results["errors"].append(f"Position {position.position_id}: {str(e)}")
 
             # Update metrics
             self.metrics.last_sync = datetime.now(timezone.utc)
             self.metrics.sync_latency_ms = (time.time() - start) * 1000
             self.metrics.orders_in_redis = len(redis_orders)
-            self.metrics.orders_in_postgres = len(
-                await self.postgres_store.list_orders()
-            )
+            self.metrics.orders_in_postgres = len(await self.postgres_store.list_orders())
             self.metrics.positions_in_redis = len(redis_positions)
-            self.metrics.positions_in_postgres = len(
-                await self.postgres_store.list_positions()
-            )
+            self.metrics.positions_in_postgres = len(await self.postgres_store.list_positions())
             self.metrics.pending_events = self.event_queue.pending_count
             self.metrics.conflicts_detected += results["conflicts_detected"]
             self.metrics.conflicts_resolved += results["conflicts_resolved"]
@@ -876,9 +844,7 @@ class UnifiedStateManager:
 
         return results
 
-    async def _check_order_conflict(
-        self, redis_order: Order, postgres_order: Order
-    ) -> Optional[StateConflict]:
+    async def _check_order_conflict(self, redis_order: Order, postgres_order: Order) -> Optional[StateConflict]:
         """Check for order conflict."""
         # Generate state hash for comparison
         redis_hash = self._hash_order(redis_order)
@@ -904,19 +870,14 @@ class UnifiedStateManager:
                     return conflict
         return None
 
-    async def _check_position_conflict(
-        self, redis_pos: Position, postgres_pos: Position
-    ) -> Optional[StateConflict]:
+    async def _check_position_conflict(self, redis_pos: Position, postgres_pos: Position) -> Optional[StateConflict]:
         """Check for position conflict."""
         redis_hash = self._hash_position(redis_pos)
         postgres_hash = self._hash_position(postgres_pos)
 
         if redis_hash != postgres_hash:
             if self.metrics.last_sync:
-                if (
-                    redis_pos.updated_at > self.metrics.last_sync
-                    and postgres_pos.updated_at > self.metrics.last_sync
-                ):
+                if redis_pos.updated_at > self.metrics.last_sync and postgres_pos.updated_at > self.metrics.last_sync:
                     conflict = StateConflict(
                         conflict_id=str(uuid.uuid4()),
                         entity_type="position",
@@ -944,9 +905,7 @@ class UnifiedStateManager:
                 winner = conflict.postgres_state
             else:
                 # Manual resolution required
-                logger.warning(
-                    f"Manual conflict resolution required: {conflict.conflict_id}"
-                )
+                logger.warning(f"Manual conflict resolution required: {conflict.conflict_id}")
                 return False
 
             # Apply winner to both stores
@@ -979,14 +938,14 @@ class UnifiedStateManager:
             return False
 
     def _hash_order(self, order: Order) -> str:
-        """Generate hash for order comparison."""
+        """Generate hash for order comparison using SHA256."""
         key_fields = f"{order.status}:{order.filled_quantity}:{order.average_price}"
-        return hashlib.md5(key_fields.encode()).hexdigest()
+        return hashlib.sha256(key_fields.encode()).hexdigest()
 
     def _hash_position(self, position: Position) -> str:
-        """Generate hash for position comparison."""
+        """Generate hash for position comparison using SHA256."""
         key_fields = f"{position.quantity}:{position.side}:{position.entry_price}"
-        return hashlib.md5(key_fields.encode()).hexdigest()
+        return hashlib.sha256(key_fields.encode()).hexdigest()
 
     # ========================================================================
     # Background Tasks
@@ -1060,9 +1019,7 @@ class UnifiedStateManager:
                 "pending_events": self.metrics.pending_events,
                 "conflicts_detected": self.metrics.conflicts_detected,
                 "conflicts_resolved": self.metrics.conflicts_resolved,
-                "last_sync": self.metrics.last_sync.isoformat()
-                if self.metrics.last_sync
-                else None,
+                "last_sync": self.metrics.last_sync.isoformat() if self.metrics.last_sync else None,
                 "sync_latency_ms": self.metrics.sync_latency_ms,
             },
             "event_queue": {
@@ -1075,9 +1032,7 @@ class UnifiedStateManager:
     # Snapshot & Recovery (Data Integrity)
     # ========================================================================
 
-    async def create_snapshot(
-        self, snapshot_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def create_snapshot(self, snapshot_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Create a full state snapshot for disaster recovery.
 
@@ -1155,14 +1110,10 @@ class UnifiedStateManager:
                     "pending_events": len(pending_events),
                 },
                 "audit_log_count": len(self._audit_log),
-                "checksum": self._calculate_checksum(
-                    redis_orders_dict, postgres_positions_dict
-                ),
+                "checksum": self._calculate_checksum(redis_orders_dict, postgres_positions_dict),
             }
 
-            self._log_audit(
-                "snapshot_created", snapshot_id, {"metrics": snapshot["metrics"]}
-            )
+            self._log_audit("snapshot_created", snapshot_id, {"metrics": snapshot["metrics"]})
             logger.info(
                 f"Snapshot created: {snapshot_id} with {len(redis_orders)} orders, {len(redis_positions)} positions"
             )
@@ -1173,9 +1124,7 @@ class UnifiedStateManager:
             logger.error(f"Failed to create snapshot: {e}")
             raise
 
-    async def restore_from_snapshot(
-        self, snapshot: Dict[str, Any], target: str = "redis"
-    ) -> bool:
+    async def restore_from_snapshot(self, snapshot: Dict[str, Any], target: str = "redis") -> bool:
         """
         Restore state from a snapshot.
 
@@ -1290,9 +1239,7 @@ class UnifiedStateManager:
                 "positions_only_in_redis": list(positions_only_in_redis),
                 "positions_only_in_postgres": list(positions_only_in_postgres),
             },
-            "recommendation": "No action needed"
-            if is_consistent
-            else "Run sync_state() to reconcile",
+            "recommendation": "No action needed" if is_consistent else "Run sync_state() to reconcile",
         }
 
         if not is_consistent:

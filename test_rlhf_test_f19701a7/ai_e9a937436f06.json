@@ -1,0 +1,15 @@
+{
+  "id": "ai_e9a937436f06",
+  "prompt": "Write a function",
+  "response_a": "def foo(): pass",
+  "response_b": "foo = lambda: None",
+  "preference": 0,
+  "preference_type": "ai",
+  "confidence": 0.5,
+  "reasoning": "Responses are similar in quality",
+  "created_at": "2026-01-28T07:50:34.571338+00:00",
+  "metadata": {
+    "response_a_index": 0,
+    "response_b_index": 1
+  }
+}

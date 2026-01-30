@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -18,6 +19,19 @@ from typing import Any, Dict, List, Optional
 import requests
 
 logger = logging.getLogger(__name__)
+
+# Simple in-memory cache for tickers (reduces API calls from 4s to ~0ms)
+_tickers_cache: Dict[str, Any] = {"data": None, "timestamp": 0, "ttl": 30}  # 30 sec TTL
+
+# Circuit breaker for API resilience
+try:
+    from backend.core.circuit_breaker import get_circuit_registry
+
+    _circuit_registry = get_circuit_registry()
+    _HAS_CIRCUIT_BREAKER = True
+except ImportError:
+    _circuit_registry = None
+    _HAS_CIRCUIT_BREAKER = False
 
 try:
     # pybit v2+ (the unofficial/official clients vary by name); attempt common import
@@ -29,7 +43,33 @@ except Exception:
     _HAS_PYBIT = False
 
 
+def _with_circuit_breaker(name: str = "bybit_api"):
+    """Decorator to wrap API calls with circuit breaker protection."""
+
+    def decorator(func):
+        if not _HAS_CIRCUIT_BREAKER or _circuit_registry is None:
+            return func
+
+        def wrapper(*args, **kwargs):
+            breaker = _circuit_registry.get_or_create(name)
+            if not breaker.can_execute():
+                raise ConnectionError(f"Circuit breaker '{name}' is OPEN - API calls blocked")
+            try:
+                result = func(*args, **kwargs)
+                breaker.record_success()
+                return result
+            except Exception as e:
+                breaker.record_failure()
+                raise
+
+        return wrapper
+
+    return decorator
+
+
 class BybitAdapter:
+    """Bybit API v5 adapter with thread-safe caching and circuit breaker."""
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -47,15 +87,36 @@ class BybitAdapter:
                 self._client = None
         else:
             self._client = None
-        # cache of discovered instruments: symbol -> metadata
+
+        # Thread-safe cache for instruments
+        self._cache_lock = threading.RLock()
         self._instruments_cache: Dict[str, Dict] = {}
         self._instruments_cache_at: Optional[float] = None
         # cache TTL in seconds
         self._instruments_cache_ttl = 60 * 5
 
-    def get_klines(
-        self, symbol: str, interval: str = "1", limit: int = 200
-    ) -> List[Dict]:
+        # Circuit breaker for API calls
+        self._circuit_breaker = None
+        if _HAS_CIRCUIT_BREAKER and _circuit_registry:
+            self._circuit_breaker = _circuit_registry.get_or_create("bybit_api")
+
+    def _api_get(self, url: str, params: dict, timeout: Optional[int] = None) -> requests.Response:
+        """Make GET request with circuit breaker protection."""
+        if self._circuit_breaker and not self._circuit_breaker.can_execute():
+            raise ConnectionError("Circuit breaker OPEN - Bybit API temporarily unavailable")
+
+        try:
+            r = requests.get(url, params=params, timeout=timeout or self.timeout)
+            r.raise_for_status()
+            if self._circuit_breaker:
+                self._circuit_breaker.record_success()
+            return r
+        except Exception as e:
+            if self._circuit_breaker:
+                self._circuit_breaker.record_failure()
+            raise
+
+    def get_klines(self, symbol: str, interval: str = "1", limit: int = 200) -> List[Dict]:
         """Fetch kline/candle data. interval is minutes as string in Bybit public API mapping.
 
         Returns list of dicts with keys: open_time, open, high, low, close, volume
@@ -83,7 +144,7 @@ class BybitAdapter:
         symbol_upper = symbol.upper()
         if symbol_upper.endswith("USDT") and len(symbol_upper) >= 6:
             v5_kline_url = "https://api.bybit.com/v5/market/kline"
-            params = {
+            params: Dict[str, str | int] = {
                 "category": "linear",
                 "symbol": symbol_upper,
                 "interval": interval_norm,
@@ -136,9 +197,7 @@ class BybitAdapter:
             pass
 
         try:
-            r = requests.get(
-                v5_url_info, params={"category": "linear"}, timeout=self.timeout
-            )
+            r = requests.get(v5_url_info, params={"category": "linear"}, timeout=self.timeout)
             r.raise_for_status()
             info = r.json()
             instruments = (
@@ -148,9 +207,7 @@ class BybitAdapter:
             )
             # Build a mapping of symbol -> instrument metadata for smarter selection
             available_meta = {
-                itm.get("symbol"): itm
-                for itm in instruments
-                if isinstance(itm, dict) and itm.get("symbol")
+                itm.get("symbol"): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
             }
             available = set(available_meta.keys())
         except Exception:
@@ -188,11 +245,7 @@ class BybitAdapter:
             pattern = re.compile(r"^[A-Z]{3,}USDT$")
             for sym, meta in available_meta.items():
                 try:
-                    if (
-                        meta.get("status") == "Trading"
-                        and not meta.get("isPreListing")
-                        and pattern.match(sym)
-                    ):
+                    if meta.get("status") == "Trading" and not meta.get("isPreListing") and pattern.match(sym):
                         chosen = sym
                         break
                 except Exception:
@@ -261,9 +314,7 @@ class BybitAdapter:
                         logger.exception("Failed to persist klines to DB")
                     return normalized
             except Exception:
-                logger.debug(
-                    "Bybit linear kline probe failed for %s", chosen, exc_info=True
-                )
+                logger.debug("Bybit linear kline probe failed for %s", chosen, exc_info=True)
 
         # If we reach here, try v5 spot API as fallback (best-effort)
         # NOTE: Legacy endpoints (/public/linear/kline and /spot/quote/v1/kline) are deprecated and return 404
@@ -306,11 +357,7 @@ class BybitAdapter:
         try:
             v5_inverse_url = "https://api.bybit.com/v5/market/kline"
             # Inverse perpetuals use different symbol format (e.g., BTCUSD)
-            inverse_symbol = (
-                symbol.upper().replace("USDT", "USD")
-                if "USDT" in symbol.upper()
-                else symbol.upper()
-            )
+            inverse_symbol = symbol.upper().replace("USDT", "USD") if "USDT" in symbol.upper() else symbol.upper()
             params = {
                 "category": "inverse",
                 "symbol": inverse_symbol,
@@ -333,8 +380,15 @@ class BybitAdapter:
             logger.exception("All Bybit v5 probes failed (linear, spot, inverse)")
             raise
 
+        # If all paths failed but no exception was raised, return empty list
+        return []
+
     def get_klines_before(
-        self, symbol: str, interval: str = "60", end_time: int = None, limit: int = 200
+        self,
+        symbol: str,
+        interval: str = "60",
+        end_time: Optional[int] = None,
+        limit: int = 200,
     ) -> List[Dict]:
         """
         Fetch historical klines BEFORE a specific timestamp.
@@ -403,8 +457,8 @@ class BybitAdapter:
         self,
         symbol: str,
         interval: str = "60",
-        start_time: int = None,
-        end_time: int = None,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
         limit: int = 1000,
         market_type: str = "linear",
     ) -> List[Dict]:
@@ -453,9 +507,7 @@ class BybitAdapter:
 
         # Use market_type for category selection (spot for TradingView parity)
         category = "spot" if market_type == "spot" else "linear"
-        logger.info(
-            f"Fetching klines with category={category} (market_type={market_type})"
-        )
+        logger.info(f"Fetching klines with category={category} (market_type={market_type})")
 
         for iteration in range(max_iterations):
             params = {
@@ -477,7 +529,7 @@ class BybitAdapter:
                 loop = asyncio.get_event_loop()
                 r = await loop.run_in_executor(
                     None,
-                    lambda p=params: requests.get(
+                    lambda p=params: requests.get(  # type: ignore[misc]
                         v5_kline_url, params=p, timeout=self.timeout
                     ),
                 )
@@ -499,8 +551,7 @@ class BybitAdapter:
                 all_candles.extend(normalized)
 
                 logger.debug(
-                    f"Fetched {len(data)} candles for {symbol_upper}/{interval_norm}, "
-                    f"iteration {iteration + 1}"
+                    f"Fetched {len(data)} candles for {symbol_upper}/{interval_norm}, iteration {iteration + 1}"
                 )
 
                 # Check if we got all data or need to paginate
@@ -536,8 +587,7 @@ class BybitAdapter:
                 unique_candles.append(c)
 
         logger.info(
-            f"Historical fetch complete: {len(unique_candles)} unique candles "
-            f"for {symbol_upper}/{interval_norm}"
+            f"Historical fetch complete: {len(unique_candles)} unique candles for {symbol_upper}/{interval_norm}"
         )
 
         return unique_candles
@@ -552,9 +602,7 @@ class BybitAdapter:
             try:
                 start_ms = int(raw[0])
                 parsed["open_time"] = start_ms
-                parsed["open_time_dt"] = datetime.fromtimestamp(
-                    start_ms / 1000.0, tz=timezone.utc
-                )
+                parsed["open_time_dt"] = datetime.fromtimestamp(start_ms / 1000.0, tz=timezone.utc)
             except Exception:
                 parsed["open_time"] = None
                 parsed["open_time_dt"] = None
@@ -584,11 +632,7 @@ class BybitAdapter:
             parsed["volume"] = _as_float(parsed["volume_str"])
             # turnover is optional (index 6)
             parsed["turnover_str"] = _as_str(6) if len(raw) > 6 else None
-            parsed["turnover"] = (
-                _as_float(parsed["turnover_str"])
-                if parsed.get("turnover_str") is not None
-                else None
-            )
+            parsed["turnover"] = _as_float(parsed["turnover_str"]) if parsed.get("turnover_str") is not None else None
             return parsed
         elif isinstance(row, dict):
             raw = dict(row)
@@ -616,9 +660,7 @@ class BybitAdapter:
                         continue
             parsed["open_time"] = start_ms
             parsed["open_time_dt"] = (
-                datetime.fromtimestamp(start_ms / 1000.0, tz=timezone.utc)
-                if start_ms is not None
-                else None
+                datetime.fromtimestamp(start_ms / 1000.0, tz=timezone.utc) if start_ms is not None else None
             )
 
             def get_str(*keys) -> Optional[str]:
@@ -629,11 +671,7 @@ class BybitAdapter:
                 return None
 
             parsed["open_price_str"] = get_str("openPrice", "open", "o")
-            parsed["open"] = (
-                _safe_float(parsed["open_price_str"])
-                if "open_price_str" in parsed
-                else None
-            )
+            parsed["open"] = _safe_float(parsed["open_price_str"]) if "open_price_str" in parsed else None
             parsed["high_price_str"] = get_str("highPrice", "high", "h")
             parsed["high"] = _safe_float(parsed["high_price_str"])
             parsed["low_price_str"] = get_str("lowPrice", "low", "l")
@@ -741,9 +779,7 @@ class BybitAdapter:
             _database_url = os.environ.get("DATABASE_URL", "sqlite:///:memory:")
             _engine = _create_engine(
                 _database_url,
-                connect_args={"check_same_thread": False}
-                if _database_url.startswith("sqlite")
-                else {},
+                connect_args={"check_same_thread": False} if _database_url.startswith("sqlite") else {},
             )
 
         # determine dialect from engine
@@ -795,10 +831,7 @@ class BybitAdapter:
         # Accept the candidate only if it looks like a real SQLAlchemy Session
         def _is_session_like(o):
             return o is not None and (
-                hasattr(o, "execute")
-                or hasattr(o, "query")
-                or hasattr(o, "begin")
-                or hasattr(o, "get_bind")
+                hasattr(o, "execute") or hasattr(o, "query") or hasattr(o, "begin") or hasattr(o, "get_bind")
             )
 
         if _is_session_like(candidate):
@@ -807,7 +840,7 @@ class BybitAdapter:
             # fallback: create a proper sessionmaker bound to the engine
             from sqlalchemy.orm import sessionmaker as _sessionmaker
 
-            db = _sessionmaker(bind=_engine)()
+            db = _sessionmaker(bind=_engine)()  # type: ignore[arg-type]
 
         try:
             if dialect in ("postgres", "postgresql"):
@@ -927,9 +960,12 @@ class BybitAdapter:
                 # best-effort close; ignore errors closing the session
                 pass
 
-    # Instrument discovery and validation
+    # Instrument discovery and validation (thread-safe)
     def _refresh_instruments_cache(self, force: bool = False):
+        """Refresh instruments cache with thread-safety."""
         now = time.time()
+
+        # Quick check without lock (read-only, safe for concurrent access)
         if (
             not force
             and self._instruments_cache
@@ -937,32 +973,40 @@ class BybitAdapter:
             and (now - self._instruments_cache_at) < self._instruments_cache_ttl
         ):
             return
-        v5_url_info = "https://api.bybit.com/v5/market/instruments-info"
-        try:
-            r = requests.get(
-                v5_url_info, params={"category": "linear"}, timeout=self.timeout
-            )
-            r.raise_for_status()
-            info = r.json()
-            instruments = (
-                info.get("result", {}).get("list", [])
-                if isinstance(info.get("result"), dict)
-                else info.get("result") or []
-            )
-            self._instruments_cache = {
-                itm.get("symbol"): itm
-                for itm in instruments
-                if isinstance(itm, dict) and itm.get("symbol")
-            }
-            self._instruments_cache_at = now
-        except Exception:
-            logger.exception("Failed to refresh instruments cache")
+
+        # Acquire lock for potential write
+        with self._cache_lock:
+            # Double-check after acquiring lock (another thread may have refreshed)
+            if (
+                not force
+                and self._instruments_cache
+                and self._instruments_cache_at
+                and (time.time() - self._instruments_cache_at) < self._instruments_cache_ttl
+            ):
+                return
+
+            v5_url_info = "https://api.bybit.com/v5/market/instruments-info"
+            try:
+                r = requests.get(v5_url_info, params={"category": "linear"}, timeout=self.timeout)
+                r.raise_for_status()
+                info = r.json()
+                instruments = (
+                    info.get("result", {}).get("list", [])
+                    if isinstance(info.get("result"), dict)
+                    else info.get("result") or []
+                )
+                self._instruments_cache = {
+                    itm.get("symbol"): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
+                }
+                self._instruments_cache_at = time.time()
+            except Exception:
+                logger.exception("Failed to refresh instruments cache")
 
     def validate_symbol(self, symbol: str) -> str:
         """Validate and normalize a symbol. Returns the canonical symbol if valid, else raises ValueError.
 
         Behavior:
-        - Refreshes instruments cache if stale
+        - Refreshes instruments cache if stale (thread-safe)
         - Accepts lower/upper case and optionally missing USDT suffix
         - Prefers exact match in cache, otherwise tries adding USDT suffix
         - Raises ValueError if no valid trading instrument found
@@ -971,17 +1015,22 @@ class BybitAdapter:
             raise ValueError("empty symbol")
         self._refresh_instruments_cache()
         s = symbol.upper()
+
+        # Thread-safe read from cache
+        with self._cache_lock:
+            cache_snapshot = dict(self._instruments_cache)
+
         # direct match
-        if s in self._instruments_cache:
-            meta = self._instruments_cache[s]
+        if s in cache_snapshot:
+            meta = cache_snapshot[s]
             if meta.get("status") == "Trading" and not meta.get("isPreListing"):
                 return s
             raise ValueError(f"symbol {s} not trading")
         # try adding USDT
         if not s.endswith("USDT"):
             cand = s + "USDT"
-            if cand in self._instruments_cache:
-                meta = self._instruments_cache[cand]
+            if cand in cache_snapshot:
+                meta = cache_snapshot[cand]
                 if meta.get("status") == "Trading" and not meta.get("isPreListing"):
                     return cand
                 raise ValueError(f"symbol {cand} not trading")
@@ -996,7 +1045,16 @@ class BybitAdapter:
         Returns:
             List of ticker dicts with: symbol, lastPrice, price24hPcnt, volume24h, highPrice24h, lowPrice24h
         """
+        global _tickers_cache
+
         v5_tickers_url = "https://api.bybit.com/v5/market/tickers"
+        current_time = time.time()
+
+        # Use cache if available and not expired (only for "all tickers" requests)
+        if symbols is None and _tickers_cache["data"] is not None:
+            if current_time - _tickers_cache["timestamp"] < _tickers_cache["ttl"]:
+                logger.debug(f"Using cached tickers (age: {current_time - _tickers_cache['timestamp']:.1f}s)")
+                return _tickers_cache["data"]
 
         try:
             params = {"category": "linear"}
@@ -1031,6 +1089,12 @@ class BybitAdapter:
                         "ask_price": _safe_float(ticker.get("ask1Price")),
                     }
                 )
+
+            # Update cache for "all tickers" requests
+            if symbols is None:
+                _tickers_cache["data"] = result
+                _tickers_cache["timestamp"] = current_time
+                logger.debug(f"Cached {len(result)} tickers")
 
             return result
 
@@ -1115,9 +1179,7 @@ class BybitAdapter:
                     return normalized
                 return []
             except Exception as e:
-                logger.warning(
-                    f"Failed to fetch {market_type} klines for {symbol}: {e}"
-                )
+                logger.warning(f"Failed to fetch {market_type} klines for {symbol}: {e}")
                 return []
 
         # Fetch both markets in parallel using ThreadPoolExecutor
@@ -1153,6 +1215,7 @@ class BybitAdapter:
             Number of rows inserted
         """
         from sqlalchemy import text
+
         from backend.database import SessionLocal
 
         if not normalized_rows:
@@ -1170,10 +1233,10 @@ class BybitAdapter:
                     # Check if already exists
                     existing = session.execute(
                         text("""
-                            SELECT id FROM bybit_kline_audit 
-                            WHERE symbol = :symbol 
-                            AND interval = :interval 
-                            AND market_type = :market_type 
+                            SELECT id FROM bybit_kline_audit
+                            WHERE symbol = :symbol
+                            AND interval = :interval
+                            AND market_type = :market_type
                             AND open_time = :open_time
                         """),
                         {
@@ -1194,10 +1257,10 @@ class BybitAdapter:
 
                     session.execute(
                         text("""
-                            INSERT INTO bybit_kline_audit 
-                            (symbol, interval, market_type, open_time, open_time_dt, 
+                            INSERT INTO bybit_kline_audit
+                            (symbol, interval, market_type, open_time, open_time_dt,
                              open_price, high_price, low_price, close_price, volume, turnover, raw)
-                            VALUES 
+                            VALUES
                             (:symbol, :interval, :market_type, :open_time, :open_time_dt,
                              :open_price, :high_price, :low_price, :close_price, :volume, :turnover, :raw)
                         """),
@@ -1235,10 +1298,6 @@ def _safe_float(val: Optional[str]) -> Optional[float]:
 
 def _to_dt(ms: Optional[int]):
     try:
-        return (
-            datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
-            if ms is not None
-            else None
-        )
+        return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc) if ms is not None else None
     except Exception:
         return None

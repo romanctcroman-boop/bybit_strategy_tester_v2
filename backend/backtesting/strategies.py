@@ -22,12 +22,25 @@ except ImportError:
 
 @dataclass
 class SignalResult:
-    """Result of signal generation"""
+    """Result of signal generation
+
+    Attributes:
+        entries: Boolean series for long entry signals
+        exits: Boolean series for long exit signals
+        short_entries: Boolean series for short entry signals
+        short_exits: Boolean series for short exit signals
+        entry_sizes: Optional series of position sizes for each long entry (for Volume Scale)
+        short_entry_sizes: Optional series of position sizes for each short entry
+    """
 
     entries: pd.Series  # Boolean series for entry signals
     exits: pd.Series  # Boolean series for exit signals
     short_entries: Optional[pd.Series] = None  # For short positions
     short_exits: Optional[pd.Series] = None
+    entry_sizes: Optional[pd.Series] = (
+        None  # Position size per entry (for DCA Volume Scale)
+    )
+    short_entry_sizes: Optional[pd.Series] = None  # Position size per short entry
 
 
 class BaseStrategy(ABC):
@@ -508,63 +521,212 @@ class GridStrategy(BaseStrategy):
 
 class DCAStrategy(BaseStrategy):
     """
-    Dollar Cost Averaging (DCA) Strategy - for pyramiding testing
+    DCA (Dollar Cost Averaging) Strategy - 3commas/WunderTrading style
 
-    Generates BUY/SELL signals at regular TIME intervals.
-    Ideal for systematic accumulation regardless of price.
+    Professional DCA bot with all standard parameters:
+    - Base Order + Safety Orders with volume scaling
+    - Price deviation with step multiplier (logarithmic distribution)
+    - Take Profit from average price with trailing
+    - Stop Loss with configurable reference point
+    - RSI-based trade start conditions
 
-    Logic for LONG:
-    - Generates LONG entry every N bars
-    - Continues adding positions up to pyramiding limit
-    - Exits when profit target is reached or after holding period
+    Parameters (3commas naming convention):
+        base_order_size: Base order size as % of capital (default: 10%)
+        safety_order_size: First safety order size as % (default: 10%)
+        safety_order_volume_scale: Multiplier for each subsequent SO (default: 1.05 = +5%)
+        price_deviation: First SO trigger deviation % (default: 1.0%)
+        step_scale: Deviation multiplier for subsequent SOs (default: 1.4)
+        max_safety_orders: Max number of safety orders (default: 5)
+        target_profit: Take profit % from average (default: 2.5%)
+        trailing_deviation: Trailing TP deviation % (default: 0.4%)
+        stop_loss: Stop loss % (default: 0%)  # 0 = disabled
+        stop_loss_type: 'average' or 'last_order' (default: 'last_order')
+        cooldown_between_deals: Min bars between deals (default: 4)
 
-    Logic for SHORT:
-    - Generates SHORT entry every N bars
-    - Continues adding positions up to pyramiding limit
-    - Exits when price drops by profit target % or after holding period
+        # Trade start conditions (RSI)
+        rsi_period: RSI indicator period (default: 14)
+        rsi_trigger: RSI level to trigger entry (default: 30 for long, 70 for short)
 
-    Parameters:
-        entry_interval: Bars between each buy (default: 10)
-        max_entries: Maximum entries (should match pyramiding setting)
-        take_profit: Profit target from average price in % (default: 3.0%)
-        holding_period: Max bars to hold before exit (default: 100)
-        _direction: "long", "short", or "both" (default: "long")
+        _direction: 'long' or 'short'
 
-    Usage with pyramiding:
-        config.pyramiding = 5
-        strategy = DCAStrategy({"entry_interval": 10, "max_entries": 5, "_direction": "long"})
+    Usage:
+        strategy = DCAStrategy({
+            "base_order_size": 10,
+            "safety_order_size": 10,
+            "max_safety_orders": 5,
+            "price_deviation": 1.0,
+            "step_scale": 1.4,
+            "target_profit": 2.5,
+            "_direction": "long"
+        })
     """
 
     name = "dca"
-    description = (
-        "DCA Strategy - Buy/Sell at regular intervals, pyramiding accumulation"
-    )
+    description = "DCA Bot - 3commas/WunderTrading style with safety orders, volume scaling, trailing TP"
 
     def _validate_params(self) -> None:
-        self.entry_interval = int(self.params.get("entry_interval", 10))
-        self.max_entries = int(self.params.get("max_entries", 5))
-        self.take_profit = float(self.params.get("take_profit", 3.0)) / 100
-        self.holding_period = int(self.params.get("holding_period", 100))
+        # === DEAL START ===
         self.direction = self.params.get("_direction", "long")
+        self.cooldown = int(
+            self.params.get("cooldown_between_deals", 4)
+        )  # Min bars between deals
 
-        if self.entry_interval < 1:
-            raise ValueError(f"entry_interval must be >= 1, got {self.entry_interval}")
-        if self.max_entries < 1:
-            raise ValueError(f"max_entries must be >= 1, got {self.max_entries}")
+        # RSI trigger (Trade Start Condition)
+        self.rsi_period = int(self.params.get("rsi_period", 14))
+        self.rsi_trigger = float(
+            self.params.get("rsi_trigger", 30 if self.direction == "long" else 70)
+        )
+
+        # === BASE ORDER ===
+        self.base_order_size = (
+            float(self.params.get("base_order_size", 10.0)) / 100
+        )  # % of capital
+
+        # === SAFETY ORDERS ===
+        self.max_safety_orders = int(self.params.get("max_safety_orders", 5))
+        self.safety_order_size = (
+            float(self.params.get("safety_order_size", 10.0)) / 100
+        )  # % of capital
+        self.safety_order_volume_scale = float(
+            self.params.get("safety_order_volume_scale", 1.05)
+        )  # Martingale
+
+        # Price deviation (% drop from entry to trigger SO)
+        self.price_deviation = float(self.params.get("price_deviation", 1.0)) / 100
+        self.step_scale = float(
+            self.params.get("step_scale", 1.4)
+        )  # Logarithmic scaling
+
+        # === TAKE PROFIT ===
+        self.target_profit = float(self.params.get("target_profit", 2.5)) / 100
+        self.trailing_deviation = (
+            float(self.params.get("trailing_deviation", 0.4)) / 100
+        )
+
+        # === STOP LOSS ===
+        self.stop_loss = float(self.params.get("stop_loss", 0.0)) / 100  # 0 = disabled
+        self.stop_loss_type = self.params.get(
+            "stop_loss_type", "last_order"
+        )  # 'average' or 'last_order'
+
+        # === VELES-STYLE PARAMETERS ===
+        # Max Active Safety Orders (Veles: "Частичное выставление сетки")
+        # 0 = disabled (all SOs active), >0 = limit to N active SOs
+        self.max_active_safety_orders = int(
+            self.params.get("max_active_safety_orders", 0)
+        )
+
+        # Grid Trailing Deviation (Veles: "Подтяжка сетки")
+        # If price moves away from entry by this %, cancel deal and wait for new entry
+        # 0 = disabled
+        self.grid_trailing_deviation = (
+            float(self.params.get("grid_trailing_deviation", 0.0)) / 100
+        )
+
+        # Max Deals (Veles: "Остановить бота после N сделок")
+        # 0 = unlimited, >0 = stop after N completed deals
+        self.max_deals = int(self.params.get("max_deals", 0))
+
+        # TP Signal Mode (Veles: "Тейк-профит Сигнал")
+        # 'disabled' = use normal trailing TP, 'rsi' = exit when RSI reverses
+        self.tp_signal_mode = self.params.get("tp_signal_mode", "disabled")
+        # RSI exit level: for LONG, exit when RSI > this value; for SHORT, exit when RSI < (100 - this)
+        self.tp_signal_rsi_exit = float(self.params.get("tp_signal_rsi_exit", 70))
+
+        # Validation
+        if self.max_safety_orders < 0:
+            raise ValueError(
+                f"max_safety_orders must be >= 0, got {self.max_safety_orders}"
+            )
+        if self.target_profit <= 0:
+            raise ValueError(
+                f"target_profit must be > 0, got {self.target_profit * 100}%"
+            )
+        if self.stop_loss_type not in ("average", "last_order"):
+            raise ValueError(
+                f"stop_loss_type must be 'average' or 'last_order', got {self.stop_loss_type}"
+            )
+        if self.direction not in ("long", "short"):
+            raise ValueError(
+                f"_direction must be 'long' or 'short', got {self.direction}"
+            )
+
+        # Pre-calculate safety order deviation levels
+        self._calculate_so_levels()
+
+    def _calculate_so_levels(self) -> None:
+        """Calculate price deviation levels for each safety order."""
+        # SO1 at price_deviation, SO2 at price_deviation * step_scale, etc.
+        self.so_levels = []
+        cumulative = 0.0
+        current_deviation = self.price_deviation
+
+        for i in range(self.max_safety_orders):
+            cumulative += current_deviation
+            self.so_levels.append(cumulative)
+            current_deviation *= self.step_scale
+
+        # Also pre-calculate volume for each SO (martingale)
+        self.so_volumes = []
+        current_size = self.safety_order_size
+        for i in range(self.max_safety_orders):
+            self.so_volumes.append(current_size)
+            current_size *= self.safety_order_volume_scale
 
     @classmethod
     def get_default_params(cls) -> dict[str, Any]:
         return {
-            "entry_interval": 10,  # Buy every 10 bars
-            "max_entries": 5,  # Up to 5 entries
-            "take_profit": 3.0,  # 3% TP from average
-            "holding_period": 100,  # Max 100 bars hold
-            "_direction": "long",  # Direction: long, short, or both
+            # Deal start
+            "_direction": "long",
+            "cooldown_between_deals": 4,  # Min bars between deals
+            "rsi_period": 14,
+            "rsi_trigger": 30,  # RSI < 30 for long entry
+            # Base order
+            "base_order_size": 10.0,  # 10% of capital
+            # Safety orders (averaging)
+            "max_safety_orders": 5,
+            "safety_order_size": 10.0,  # 10% of capital
+            "safety_order_volume_scale": 1.05,  # +5% per SO (martingale)
+            "price_deviation": 1.0,  # 1% drop triggers SO1
+            "step_scale": 1.4,  # SO2 at 1.4%, SO3 at 1.96%, etc.
+            # Take profit
+            "target_profit": 2.5,  # 2.5% from average price
+            "trailing_deviation": 0.4,  # 0.4% trailing
+            # Stop loss
+            "stop_loss": 0.0,  # Disabled by default
+            "stop_loss_type": "last_order",  # 'average' or 'last_order'
+            # Veles-style parameters
+            "max_active_safety_orders": 0,  # 0 = all active, >0 = limit to N
+            "grid_trailing_deviation": 0.0,  # 0 = disabled, >0 = cancel if price moves away by %
+            "max_deals": 0,  # 0 = unlimited, >0 = stop after N deals
+            "tp_signal_mode": "disabled",  # 'disabled', 'rsi'
+            "tp_signal_rsi_exit": 70,  # RSI level for LONG exit (overbought)
         }
+
+    def _calculate_rsi(self, close: pd.Series) -> pd.Series:
+        """Calculate RSI using Wilder's Smoothing (RMA) - matches TradingView."""
+        delta = close.diff()
+        gain = delta.where(delta > 0, 0.0)
+        loss = (-delta).where(delta < 0, 0.0)
+
+        # Wilder's Smoothing (RMA)
+        alpha = 1.0 / self.rsi_period
+        avg_gain = gain.ewm(alpha=alpha, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=alpha, adjust=False).mean()
+
+        rs = avg_gain / avg_loss.replace(0, np.inf)
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
 
     def generate_signals(self, ohlcv: pd.DataFrame) -> SignalResult:
         close = ohlcv["close"]
+        low = ohlcv["low"]
+        high = ohlcv["high"]
         n = len(close)
+
+        # Calculate RSI for entry filter
+        rsi = self._calculate_rsi(close)
+        warmup = self.rsi_period + 1
 
         # Initialize signal arrays
         long_entries = pd.Series(False, index=close.index)
@@ -572,97 +734,306 @@ class DCAStrategy(BaseStrategy):
         short_entries = pd.Series(False, index=close.index)
         short_exits = pd.Series(False, index=close.index)
 
-        # Determine if we should generate long and/or short signals
-        generate_long = self.direction in ("long", "both")
-        generate_short = self.direction in ("short", "both")
+        # Initialize entry sizes for Volume Scale (0.0 means use default position_size)
+        entry_sizes = pd.Series(0.0, index=close.index)
+        short_entry_sizes = pd.Series(0.0, index=close.index)
 
-        if generate_long:
-            # LONG DCA logic
+        # Max entries = 1 base order + max_safety_orders
+        max_entries = 1 + self.max_safety_orders
+
+        if self.direction == "long":
+            # LONG DCA logic - 3commas style
             entry_count = 0
-            first_entry_bar = None
+            last_deal_bar = -self.cooldown  # Allow first entry immediately
+            base_entry_price = 0.0
             cumulative_cost = 0.0
             cumulative_qty = 0.0
+            last_entry_price = 0.0
+            # Trailing TP state
+            trailing_active = False
+            peak_high = 0.0
+            # Deal counter (Veles: max_deals)
+            completed_deals = 0
 
-            for i in range(1, n):
-                # Entry signal every N bars (up to max_entries)
-                if i % self.entry_interval == 0 and entry_count < self.max_entries:
-                    long_entries.iloc[i] = True
-                    entry_count += 1
-                    if first_entry_bar is None:
-                        first_entry_bar = i
+            for i in range(warmup, n):
+                in_deal = entry_count > 0
 
-                    # Track average cost
-                    cumulative_cost += close.iloc[i]
-                    cumulative_qty += 1
-
-                # Check for exit conditions
-                if first_entry_bar is not None and cumulative_qty > 0:
+                # === CHECK EXIT CONDITIONS FIRST ===
+                if in_deal:
                     avg_price = cumulative_cost / cumulative_qty
+                    current_high = high.iloc[i]
+                    current_low = low.iloc[i]
 
-                    # Exit on profit target (price rises above average + TP)
-                    if close.iloc[i] >= avg_price * (1 + self.take_profit):
+                    # Trailing Take Profit logic
+                    tp_price = avg_price * (1 + self.target_profit)
+
+                    if trailing_active:
+                        # Update peak high
+                        if current_high > peak_high:
+                            peak_high = current_high
+
+                        # Exit if price retraces by trailing_deviation from peak
+                        trailing_exit_price = peak_high * (1 - self.trailing_deviation)
+                        if current_low <= trailing_exit_price:
+                            long_exits.iloc[i] = True
+                            # Reset for next deal
+                            entry_count = 0
+                            last_deal_bar = i
+                            base_entry_price = 0.0
+                            cumulative_cost = 0.0
+                            cumulative_qty = 0.0
+                            last_entry_price = 0.0
+                            trailing_active = False
+                            peak_high = 0.0
+                            completed_deals += 1  # Count completed deal for max_deals
+                            continue
+                    else:
+                        # Check if TP reached to activate trailing
+                        if current_high >= tp_price:
+                            trailing_active = True
+                            peak_high = current_high
+                            # Don't exit yet, start trailing
+
+                    # === TP SIGNAL MODE: RSI-based exit (Veles: "Тейк-профит Сигнал") ===
+                    # Exit when RSI goes overbought (for LONG), overriding trailing TP
+                    if (
+                        self.tp_signal_mode == "rsi"
+                        and rsi.iloc[i] > self.tp_signal_rsi_exit
+                    ):
                         long_exits.iloc[i] = True
-                        # Reset tracking
                         entry_count = 0
-                        first_entry_bar = None
+                        last_deal_bar = i
+                        base_entry_price = 0.0
                         cumulative_cost = 0.0
                         cumulative_qty = 0.0
+                        last_entry_price = 0.0
+                        trailing_active = False
+                        peak_high = 0.0
+                        completed_deals += 1  # Count completed deal for signal exit
+                        continue
 
-                    # Exit on max holding period
-                    elif i - first_entry_bar >= self.holding_period:
-                        long_exits.iloc[i] = True
-                        # Reset tracking
-                        entry_count = 0
-                        first_entry_bar = None
-                        cumulative_cost = 0.0
-                        cumulative_qty = 0.0
+                    # SL: if enabled (stop_loss > 0) and trailing not active
+                    if not trailing_active and self.stop_loss > 0:
+                        if self.stop_loss_type == "average":
+                            sl_reference = avg_price
+                        else:  # last_order
+                            sl_reference = last_entry_price
 
-        if generate_short:
-            # SHORT DCA logic - opposite of long
+                        sl_price = sl_reference * (1 - self.stop_loss)
+                        if current_low <= sl_price:
+                            long_exits.iloc[i] = True
+                            entry_count = 0
+                            last_deal_bar = i
+                            base_entry_price = 0.0
+                            cumulative_cost = 0.0
+                            cumulative_qty = 0.0
+                            last_entry_price = 0.0
+                            trailing_active = False
+                            peak_high = 0.0
+                            completed_deals += 1  # Count completed deal (SL exit)
+                            continue
+
+                    # === GRID TRAILING (Подтяжка сетки Veles-style) ===
+                    # If price moves UP away from entry, cancel deal and wait for new entry
+                    if self.grid_trailing_deviation > 0:
+                        grid_trailing_price = base_entry_price * (
+                            1 + self.grid_trailing_deviation
+                        )
+                        if current_high >= grid_trailing_price:
+                            # Cancel deal without exit signal (no position to close if just base order)
+                            long_exits.iloc[i] = True
+                            entry_count = 0
+                            last_deal_bar = i
+                            base_entry_price = 0.0
+                            cumulative_cost = 0.0
+                            cumulative_qty = 0.0
+                            last_entry_price = 0.0
+                            trailing_active = False
+                            peak_high = 0.0
+                            completed_deals += (
+                                1  # Count as completed deal (grid trailing cancel)
+                            )
+                            continue
+
+                # === CHECK ENTRY CONDITIONS ===
+                cooldown_ok = (i - last_deal_bar) >= self.cooldown
+                can_add = entry_count < max_entries
+
+                # Check max_deals limit (Veles: "Остановить бота после N сделок")
+                max_deals_ok = self.max_deals == 0 or completed_deals < self.max_deals
+
+                if can_add and cooldown_ok and max_deals_ok:
+                    if entry_count == 0:
+                        # BASE ORDER: triggered by RSI
+                        rsi_signal = rsi.iloc[i] < self.rsi_trigger
+                        if rsi_signal:
+                            long_entries.iloc[i] = True
+                            entry_sizes.iloc[i] = (
+                                self.base_order_size
+                            )  # Volume Scale: base order size
+                            entry_count = 1
+                            base_entry_price = close.iloc[i]
+                            last_entry_price = close.iloc[i]
+                            cumulative_cost = close.iloc[i]
+                            cumulative_qty = 1
+                    else:
+                        # SAFETY ORDER: triggered by price deviation
+                        so_index = entry_count - 1  # 0-indexed SO
+
+                        # Check max_active_safety_orders limit (Veles: "Частичное выставление сетки")
+                        max_active = self.max_active_safety_orders
+                        if max_active > 0 and so_index >= max_active:
+                            # Skip this SO - it's beyond the active limit
+                            # Only allow SOs up to max_active_safety_orders
+                            pass
+                        elif so_index < len(self.so_levels):
+                            so_deviation = self.so_levels[so_index]
+                            so_trigger_price = base_entry_price * (1 - so_deviation)
+
+                            if low.iloc[i] <= so_trigger_price:
+                                long_entries.iloc[i] = True
+                                entry_sizes.iloc[i] = self.so_volumes[
+                                    so_index
+                                ]  # Volume Scale: scaled SO size
+                                entry_count += 1
+                                last_entry_price = close.iloc[i]
+                                cumulative_cost += close.iloc[i]
+                                cumulative_qty += 1
+
+        elif self.direction == "short":
+            # SHORT DCA logic - 3commas style
             entry_count = 0
-            first_entry_bar = None
+            last_deal_bar = -self.cooldown
+            base_entry_price = 0.0
             cumulative_cost = 0.0
             cumulative_qty = 0.0
+            last_entry_price = 0.0
+            # Trailing TP state
+            trailing_active = False
+            peak_low = float("inf")
+            # Deal counter (Veles: max_deals)
+            completed_deals = 0
 
-            for i in range(1, n):
-                # Entry signal every N bars (up to max_entries)
-                if i % self.entry_interval == 0 and entry_count < self.max_entries:
-                    short_entries.iloc[i] = True
-                    entry_count += 1
-                    if first_entry_bar is None:
-                        first_entry_bar = i
+            for i in range(warmup, n):
+                in_deal = entry_count > 0
 
-                    # Track average cost
-                    cumulative_cost += close.iloc[i]
-                    cumulative_qty += 1
-
-                # Check for exit conditions
-                if first_entry_bar is not None and cumulative_qty > 0:
+                # === CHECK EXIT CONDITIONS FIRST ===
+                if in_deal:
                     avg_price = cumulative_cost / cumulative_qty
+                    current_high = high.iloc[i]
+                    current_low = low.iloc[i]
 
-                    # Exit on profit target (price drops below average - TP for short)
-                    if close.iloc[i] <= avg_price * (1 - self.take_profit):
+                    # Trailing Take Profit logic for SHORT
+                    tp_price = avg_price * (1 - self.target_profit)
+
+                    if trailing_active:
+                        # Update peak low (lowest price reached)
+                        if current_low < peak_low:
+                            peak_low = current_low
+
+                        # Exit if price rises by trailing_deviation from peak_low
+                        trailing_exit_price = peak_low * (1 + self.trailing_deviation)
+                        if current_high >= trailing_exit_price:
+                            short_exits.iloc[i] = True
+                            entry_count = 0
+                            last_deal_bar = i
+                            base_entry_price = 0.0
+                            cumulative_cost = 0.0
+                            cumulative_qty = 0.0
+                            last_entry_price = 0.0
+                            trailing_active = False
+                            peak_low = float("inf")
+                            completed_deals += 1  # Count completed deal for max_deals
+                            continue
+                    else:
+                        # Check if TP reached to activate trailing
+                        if current_low <= tp_price:
+                            trailing_active = True
+                            peak_low = current_low
+                            # Don't exit yet, start trailing
+
+                    # === TP SIGNAL MODE: RSI-based exit (Veles: "Тейк-профит Сигнал") ===
+                    # Exit when RSI goes oversold (for SHORT), overriding trailing TP
+                    short_rsi_exit = 100 - self.tp_signal_rsi_exit  # e.g., 100-70=30
+                    if self.tp_signal_mode == "rsi" and rsi.iloc[i] < short_rsi_exit:
                         short_exits.iloc[i] = True
-                        # Reset tracking
                         entry_count = 0
-                        first_entry_bar = None
+                        last_deal_bar = i
+                        base_entry_price = 0.0
                         cumulative_cost = 0.0
                         cumulative_qty = 0.0
+                        last_entry_price = 0.0
+                        trailing_active = False
+                        peak_low = float("inf")
+                        completed_deals += 1  # Count completed deal for signal exit
+                        continue
 
-                    # Exit on max holding period
-                    elif i - first_entry_bar >= self.holding_period:
-                        short_exits.iloc[i] = True
-                        # Reset tracking
-                        entry_count = 0
-                        first_entry_bar = None
-                        cumulative_cost = 0.0
-                        cumulative_qty = 0.0
+                    # SL: if enabled (stop_loss > 0) and trailing not active
+                    if not trailing_active and self.stop_loss > 0:
+                        if self.stop_loss_type == "average":
+                            sl_reference = avg_price
+                        else:  # last_order
+                            sl_reference = last_entry_price
+
+                        sl_price = sl_reference * (1 + self.stop_loss)
+                        if current_high >= sl_price:
+                            short_exits.iloc[i] = True
+                            entry_count = 0
+                            last_deal_bar = i
+                            base_entry_price = 0.0
+                            cumulative_cost = 0.0
+                            cumulative_qty = 0.0
+                            last_entry_price = 0.0
+                            trailing_active = False
+                            peak_low = float("inf")
+                            completed_deals += 1  # Count completed deal (SL exit)
+                            continue
+
+                # === CHECK ENTRY CONDITIONS ===
+                cooldown_ok = (i - last_deal_bar) >= self.cooldown
+                can_add = entry_count < max_entries
+
+                # Check max_deals limit (Veles: "Остановить бота после N сделок")
+                max_deals_ok = self.max_deals == 0 or completed_deals < self.max_deals
+
+                if can_add and cooldown_ok and max_deals_ok:
+                    if entry_count == 0:
+                        # BASE ORDER: triggered by RSI (overbought for short)
+                        rsi_signal = rsi.iloc[i] > self.rsi_trigger
+                        if rsi_signal:
+                            short_entries.iloc[i] = True
+                            short_entry_sizes.iloc[i] = (
+                                self.base_order_size
+                            )  # Volume Scale
+                            entry_count = 1
+                            base_entry_price = close.iloc[i]
+                            last_entry_price = close.iloc[i]
+                            cumulative_cost = close.iloc[i]
+                            cumulative_qty = 1
+                    else:
+                        # SAFETY ORDER: triggered by price deviation UP
+                        so_index = entry_count - 1
+                        if so_index < len(self.so_levels):
+                            so_deviation = self.so_levels[so_index]
+                            so_trigger_price = base_entry_price * (1 + so_deviation)
+
+                            if high.iloc[i] >= so_trigger_price:
+                                short_entries.iloc[i] = True
+                                short_entry_sizes.iloc[i] = self.so_volumes[
+                                    so_index
+                                ]  # Volume Scale
+                                entry_count += 1
+                                last_entry_price = close.iloc[i]
+                                cumulative_cost += close.iloc[i]
+                                cumulative_qty += 1
 
         return SignalResult(
             entries=long_entries,
             exits=long_exits,
             short_entries=short_entries,
             short_exits=short_exits,
+            entry_sizes=entry_sizes,
+            short_entry_sizes=short_entry_sizes,
         )
 
 

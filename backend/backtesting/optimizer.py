@@ -1,12 +1,40 @@
 """
 🚀 Universal Optimizer - Unified API for GPU and CPU optimization
 
-Provides a single interface for strategy optimization, automatically
-selecting the best available backend:
+⚠️ DEPRECATED: This module is deprecated for new development.
+
+This optimizer is RSI-only and doesn't support:
+- Pyramiding
+- ATR-based SL/TP
+- Multi-level TP
+- Trailing stop
+- Custom strategies
+
+For new projects, use NumbaEngineV2 directly with parameter grid:
+
+    from backend.backtesting.engine_selector import get_engine
+    from backend.backtesting.interfaces import BacktestInput
+    import itertools
+
+    engine = get_engine("numba")  # NumbaEngineV2 with full V4 support
+
+    param_grid = itertools.product(
+        rsi_periods, stop_losses, take_profits, ...
+    )
+
+    results = []
+    for params in param_grid:
+        input_data = BacktestInput(...params...)
+        output = engine.run(input_data)
+        results.append(output.metrics)
+
+    best = max(results, key=lambda x: x["sharpe_ratio"])
+
+For RSI-only optimization (legacy), this module still works:
 - GPU (CuPy + CUDA): ~200K combinations/sec - for large grids (>10K combinations)
 - CPU (Numba JIT): ~1K combinations/sec - fallback when GPU unavailable
 
-Usage:
+Usage (deprecated):
     from backend.backtesting.optimizer import UniversalOptimizer, optimize
 
     # Auto-select best backend
@@ -101,6 +129,14 @@ class UniversalOptimizer:
     """
 
     def __init__(self, backend: Literal["auto", "gpu", "cpu"] = "auto"):
+        import warnings
+        warnings.warn(
+            "UniversalOptimizer is deprecated (RSI-only). "
+            "Use NumbaEngineV2 with BacktestInput for full V4 support "
+            "(pyramiding, ATR, multi-TP, trailing).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.backend = backend
         self._gpu_optimizer = None
         self._cpu_optimizer = None

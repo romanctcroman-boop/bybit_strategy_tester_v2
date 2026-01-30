@@ -2,7 +2,8 @@
 Encrypt and save new API keys using backend's KeyManager
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.security.key_manager import get_key_manager
 

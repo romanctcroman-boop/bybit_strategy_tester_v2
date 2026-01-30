@@ -8,6 +8,7 @@ Exports:
 
 Behavior:
  - Reads DATABASE_URL from env; if missing, falls back to in-memory SQLite for safe imports.
+ - In production/staging, raises error if DATABASE_URL is not set.
  - Designed to be minimal and non-invasive; replace with production DB config when available.
 """
 
@@ -21,16 +22,29 @@ from sqlalchemy.pool import StaticPool
 
 logger = logging.getLogger(__name__)
 
+# Environment detection
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+
 # Read DATABASE_URL from environment; fallback to data.sqlite3 for local dev
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
-    # Use local SQLite file instead of in-memory for persistence
+    # Production/Staging check - require explicit DATABASE_URL
+    if ENVIRONMENT in ("production", "staging"):
+        raise RuntimeError(
+            f"DATABASE_URL must be set in {ENVIRONMENT} environment! "
+            "Example: postgresql://user:pass@host:5432/dbname or "
+            "mysql://user:pass@host:3306/dbname"
+        )
+
+    # Development fallback to local SQLite file
     import pathlib
 
     project_root = pathlib.Path(__file__).parent.parent.parent
     sqlite_path = project_root / "data.sqlite3"
     DATABASE_URL = f"sqlite:///{sqlite_path}"
-    logger.info(f"DATABASE_URL not set; using local SQLite: {sqlite_path}")
+    logger.warning(
+        f"DATABASE_URL not set; using local SQLite: {sqlite_path} (OK for development, NOT suitable for production)"
+    )
 
 # Use future engines compatible with SQLAlchemy 1.4+ behavior
 if DATABASE_URL.startswith("sqlite"):
@@ -43,13 +57,41 @@ if DATABASE_URL.startswith("sqlite"):
         )
     else:
         engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+elif DATABASE_URL.startswith("postgresql"):
+    # PostgreSQL with connection pooling best practices
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=5,  # Number of persistent connections
+        max_overflow=10,  # Additional connections beyond pool_size
+        pool_timeout=30,  # Seconds to wait for connection from pool
+        pool_recycle=1800,  # Recycle connections after 30 minutes (avoid stale connections)
+        pool_pre_ping=True,  # Verify connection is alive before using
+        echo=ENVIRONMENT == "development",  # SQL logging in dev only
+    )
+    logger.info("PostgreSQL engine created with pool_size=5, pool_recycle=1800s, pool_pre_ping=True")
+elif DATABASE_URL.startswith("mysql"):
+    # MySQL with connection pooling best practices
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=3600,  # MySQL default wait_timeout is 8 hours, but play safe
+        pool_pre_ping=True,
+        echo=ENVIRONMENT == "development",
+    )
+    logger.info("MySQL engine created with pool_size=5, pool_recycle=3600s, pool_pre_ping=True")
 else:
-    engine = create_engine(DATABASE_URL)
+    # Generic engine for other databases
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,  # Always verify connections
+        echo=ENVIRONMENT == "development",
+    )
+    logger.info(f"Generic engine created for: {DATABASE_URL.split('://')[0]}")
 
 # SessionLocal factory
-SessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=engine, class_=Session
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
 
 # Base declarative
 Base = declarative_base()
@@ -64,7 +106,32 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-__all__ = ["engine", "SessionLocal", "Base", "get_db", "DATABASE_URL"]
+__all__ = ["Base", "DATABASE_URL", "SessionLocal", "engine", "get_db", "get_pool_status"]
+
+
+def get_pool_status() -> dict:
+    """Get connection pool status for monitoring.
+
+    Returns:
+        dict with pool statistics (size, checkedout, overflow, checkedin)
+        or empty dict for SQLite (no pool monitoring).
+    """
+    if DATABASE_URL.startswith("sqlite"):
+        return {"pool_type": "sqlite", "message": "SQLite doesn't use connection pooling"}
+
+    try:
+        pool = engine.pool
+        return {
+            "pool_type": type(pool).__name__,
+            "pool_size": pool.size(),
+            "checked_out": pool.checkedout(),
+            "overflow": pool.overflow(),
+            "checked_in": pool.checkedin(),
+            "invalidated": getattr(pool, "_invalidate_time", None),
+        }
+    except Exception as e:
+        logger.warning(f"Failed to get pool status: {e}")
+        return {"error": str(e)}
 
 
 # Lazy imports for repository and unit of work

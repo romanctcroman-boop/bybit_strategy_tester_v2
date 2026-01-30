@@ -4,16 +4,17 @@ Implements distributed computing using Ray framework
 Based on Goldman Sachs and industry best practices 2024-2026
 """
 
-import numpy as np
-from typing import Dict, Any, Optional, List, Callable
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
-import os
+from typing import Any, Callable, Dict, List, Optional
+
+import numpy as np
 
 # Ray is optional dependency
 try:
     import ray
-    from ray.util.multiprocessing import Pool as RayPool
+    from ray.util.multiprocessing import Pool as RayPool  # noqa: F401
 
     RAY_AVAILABLE = True
 except ImportError:

@@ -54,6 +54,9 @@ class AlertConfigStatus(BaseModel):
     slack_enabled: bool
     slack_configured: bool
     slack_channel: str
+    telegram_enabled: bool
+    telegram_configured: bool
+    telegram_chat_count: int
     email_enabled: bool
     email_configured: bool
     email_recipients: int
@@ -65,6 +68,7 @@ class TestAlertResponse(BaseModel):
 
     test_sent: bool
     slack_result: Optional[bool] = None
+    telegram_result: Optional[bool] = None
     email_result: Optional[bool] = None
     message: str
 
@@ -83,6 +87,11 @@ async def get_alerting_status() -> AlertConfigStatus:
         slack_enabled=config.slack_enabled,
         slack_configured=bool(config.slack_webhook_url),
         slack_channel=config.slack_channel,
+        telegram_enabled=config.telegram_enabled,
+        telegram_configured=bool(
+            config.telegram_bot_token and config.telegram_chat_ids
+        ),
+        telegram_chat_count=len(config.telegram_chat_ids),
         email_enabled=config.email_enabled,
         email_configured=all(
             [

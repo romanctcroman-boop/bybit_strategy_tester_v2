@@ -1,0 +1,38 @@
+{
+  "mcpServers": {
+    "docker": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-docker"],
+      "description": "Docker container management for isolated testing"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "D:\\bybit_strategy_tester_v2"
+      ],
+      "description": "Enhanced filesystem access for the project"
+    },
+    "bybit": {
+      "command": "C:\\Users\\roman\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "args": ["D:\\bybit_strategy_tester_v2\\scripts\\mcp\\bybit_mcp_server.py"],
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      },
+      "description": "Custom Bybit trading API integration"
+    },
+    "deepseek": {
+      "command": "C:\\Users\\roman\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "args": ["D:\\bybit_strategy_tester_v2\\scripts\\mcp\\deepseek_mcp_server.py"],
+      "env": {
+        "DEEPSEEK_API_KEY": "sk-1630fbba63c64f88952c16ad33337242",
+        "DEEPSEEK_API_KEY_2": "sk-0a584271e8104aea89c9f5d7502093dd",
+        "DEEPSEEK_MODEL": "deepseek-chat",
+        "DEEPSEEK_TEMPERATURE": "0.7",
+        "PYTHONIOENCODING": "utf-8"
+      },
+      "description": "DeepSeek V3 API for code generation, analysis, and chat"
+    }
+  }
+}

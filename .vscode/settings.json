@@ -1,4 +1,5 @@
 {
+  "java.jdt.ls.java.home": "",
   "editor.formatOnSave": true,
   "prettier.requireConfig": true,
   "eslint.validate": [
@@ -18,7 +19,7 @@
     "${workspaceFolder}\\.isort.cfg"
   ],
   "[javascript]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.defaultFormatter": "vscode.typescript-language-features",
     "editor.codeActionsOnSave": {
       "source.fixAll.eslint": "explicit"
     }

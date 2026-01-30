@@ -4,14 +4,14 @@ Backtest Engine
 High-performance backtesting engine using vectorbt.
 Executes strategies on historical data and calculates performance metrics.
 
-NOTE: All metric calculations should use backend.core.metrics_calculator
+NOTE: All metric calculations use backend.core.metrics_calculator
 as the single source of truth. This ensures consistency across:
-- Backtest engine (this file)
+- Backtest engine (this file) ✅ Uses MetricsCalculator.calculate_all()
 - Fast optimizer (fast_optimizer.py)
 - GPU optimizer (gpu_optimizer.py)
 - Walk-forward optimizer (walk_forward.py)
 
-TODO: Refactor metric calculations to use MetricsCalculator.calculate_all()
+REFACTORED: 2026-01-25 - Now uses MetricsCalculator.calculate_all()
 """
 
 import uuid
@@ -45,7 +45,7 @@ from backend.backtesting.models import (
     PeriodAnalysis,
     TradeRecord,
 )
-from backend.backtesting.strategies import get_strategy
+from backend.backtesting.strategies import BaseStrategy, get_strategy
 
 # Centralized metrics calculator - single source of truth
 from backend.core.metrics_calculator import (
@@ -287,7 +287,7 @@ def _build_performance_metrics(
     timestamps: list,
     close: pd.Series,
     drawdown: pd.Series,
-    pnl_distribution: list = None,
+    pnl_distribution: Optional[list] = None,
 ) -> PerformanceMetrics:
     """
     Build PerformanceMetrics using centralized MetricsCalculator.
@@ -874,6 +874,7 @@ class BacktestEngine:
         config: BacktestConfig,
         ohlcv: pd.DataFrame,
         silent: bool = False,
+        custom_strategy: Optional[BaseStrategy] = None,
     ) -> BacktestResult:
         """
         Run a backtest with the given configuration.
@@ -900,27 +901,32 @@ class BacktestEngine:
             # Validate OHLCV data
             ohlcv = self._validate_ohlcv(ohlcv)
 
-            # Get strategy
-            strategy = get_strategy(config.strategy_type, config.strategy_params)
-            if not silent:
-                logger.info(f"Using strategy: {strategy}")
+            # Get strategy (use custom if provided, otherwise get from registry)
+            if custom_strategy is not None:
+                strategy = custom_strategy
+                if not silent:
+                    logger.info(f"Using custom strategy: {strategy}")
+            else:
+                strategy = get_strategy(config.strategy_type, config.strategy_params)
+                if not silent:
+                    logger.info(f"Using strategy: {strategy}")
 
             # Generate signals
             signals = strategy.generate_signals(ohlcv)
 
-            # Check if TP/SL are configured
-            has_tp_sl = getattr(config, "stop_loss", None) or getattr(
+            # Check if TP/SL are configured (reserved for future conditional logic)
+            has_tp_sl = getattr(config, "stop_loss", None) or getattr(  # noqa: F841
                 config, "take_profit", None
             )
-            has_trailing = getattr(config, "trailing_stop_activation", None)
+            has_trailing = getattr(config, "trailing_stop_activation", None)  # noqa: F841
 
             # Check if bidirectional trading (requires fallback engine)
             direction = getattr(config, "direction", "both")
-            is_bidirectional = direction == "both"
-            is_short_only = direction == "short"  # VBT doesn't handle shorts reliably
+            is_bidirectional = direction == "both"  # noqa: F841
+            is_short_only = direction == "short"  # noqa: F841  # VBT doesn't handle shorts reliably
 
             # Check if force_fallback is enabled (for 100% parity guarantee)
-            force_fallback = getattr(config, "force_fallback", False)
+            force_fallback = getattr(config, "force_fallback", False)  # noqa: F841
 
             # Run simulation
             # ALWAYS use fallback engine for regular backtests to ensure 100% consistent,
@@ -953,7 +959,7 @@ class BacktestEngine:
             # Cache result
             self._results_cache[backtest_id] = result
 
-            if not silent:
+            if not silent and result.metrics:
                 logger.info(
                     f"Backtest {backtest_id} completed: "
                     f"Return={result.metrics.total_return:.2%}, "
@@ -1031,7 +1037,7 @@ class BacktestEngine:
         - PnL recalculated proportionally to normalized size
         - Fees recalculated using taker_fee on position value
         """
-        trades = []
+        trades: list[TradeRecord] = []
         initial_capital = config.initial_capital
 
         try:
@@ -1132,9 +1138,11 @@ class BacktestEngine:
                 vbt_size = float(row.get("Size", 0))
 
                 # Check if we're using custom cash tracking (from_order_func with SL/TP)
-                has_custom_sltp = (
-                    getattr(config, "stop_loss", None) and config.stop_loss > 0
-                ) or (getattr(config, "take_profit", None) and config.take_profit > 0)
+                stop_loss_val = getattr(config, "stop_loss", None)
+                take_profit_val = getattr(config, "take_profit", None)
+                has_custom_sltp = (stop_loss_val is not None and stop_loss_val > 0) or (
+                    take_profit_val is not None and take_profit_val > 0
+                )
 
                 taker_fee = getattr(config, "taker_fee", 0.0004)
                 leverage = getattr(config, "leverage", 1.0)
@@ -1252,8 +1260,8 @@ class BacktestEngine:
                                     * normalized_size
                                     * leverage
                                 )
-                    except Exception:
-                        pass  # Keep defaults if calculation fails
+                    except Exception as e:
+                        logger.debug("MFE/MAE calculation failed, using defaults: {}", e)
 
                 # Calculate duration
                 if hasattr(entry_time, "timestamp") and hasattr(exit_time, "timestamp"):
@@ -1345,7 +1353,7 @@ class BacktestEngine:
         Supports TP/SL, bidirectional trading, and MFE/MAE calculation.
         """
         close = ohlcv["close"].values
-        open_price = ohlcv["open"].values if "open" in ohlcv.columns else close
+        open_price = ohlcv["open"].values if "open" in ohlcv.columns else close  # noqa: F841
         high = ohlcv["high"].values if "high" in ohlcv.columns else close
         low = ohlcv["low"].values if "low" in ohlcv.columns else close
         entries = signals.entries.values
@@ -1383,8 +1391,8 @@ class BacktestEngine:
         if use_bar_magnifier:
             try:
                 from backend.backtesting.intrabar_engine import (
-                    IntrabarEngine,
                     IntrabarConfig,
+                    IntrabarEngine,
                     OHLCPath,
                 )
 
@@ -1421,7 +1429,7 @@ class BacktestEngine:
                 conn = sqlite3.connect(str(db_path))
                 m1_df = pd.read_sql(
                     """
-                    SELECT open_time, open_price as open, high_price as high, 
+                    SELECT open_time, open_price as open, high_price as high,
                            low_price as low, close_price as close, volume
                     FROM bybit_kline_audit
                     WHERE symbol = ? AND interval = '1'
@@ -1829,7 +1837,9 @@ class BacktestEngine:
 
                     trades.append(
                         TradeRecord(
-                            entry_time=entry_time,
+                            entry_time=entry_time
+                            if entry_time is not None
+                            else timestamps[i],
                             exit_time=timestamps[i],
                             side=OrderSide.BUY if is_long else OrderSide.SELL,
                             entry_price=entry_price,

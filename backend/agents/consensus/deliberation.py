@@ -187,7 +187,7 @@ class MultiAgentDeliberation:
     # Prompts for different phases
     PHASE_PROMPTS = {
         "initial": """
-You are participating in a multi-agent deliberation. 
+You are participating in a multi-agent deliberation.
 Question: {question}
 Context: {context}
 
@@ -251,6 +251,8 @@ MAINTAINED_POINTS: [Points you stand by]
         self,
         agent_interface: Optional[Any] = None,
         ask_fn: Optional[Callable[[str, str], str]] = None,
+        enable_parallel_calls: bool = True,
+        enable_confidence_calibration: bool = True,
     ):
         """
         Initialize deliberation system
@@ -258,9 +260,13 @@ MAINTAINED_POINTS: [Points you stand by]
         Args:
             agent_interface: UnifiedAgentInterface instance
             ask_fn: Optional custom function (agent_type, prompt) -> response
+            enable_parallel_calls: Run agent calls in parallel with asyncio.gather
+            enable_confidence_calibration: Apply Platt scaling to calibrate confidences
         """
         self.agent_interface = agent_interface
         self.ask_fn = ask_fn
+        self.enable_parallel_calls = enable_parallel_calls
+        self.enable_confidence_calibration = enable_confidence_calibration
 
         self.deliberation_history: List[DeliberationResult] = []
 
@@ -272,7 +278,25 @@ MAINTAINED_POINTS: [Points you stand by]
             "avg_confidence": 0.0,
         }
 
-        logger.info("🎭 Multi-Agent Deliberation initialized")
+        # Confidence calibration parameters (Platt scaling)
+        self.calibration_a = 1.0  # Scale
+        self.calibration_b = 0.0  # Shift
+        self.calibration_samples: List[Tuple[float, bool]] = []  # (predicted_conf, was_correct)
+
+        # Evidence weight factors by type
+        self.evidence_weights = {
+            "empirical": 1.5,  # Data-backed evidence
+            "theoretical": 1.0,  # Logical reasoning
+            "citation": 1.3,  # Referenced sources
+            "example": 0.8,  # Anecdotal examples
+            "default": 1.0,  # Unclassified evidence
+        }
+
+        logger.info(
+            "🎭 Multi-Agent Deliberation initialized (parallel=%s, calibration=%s)",
+            enable_parallel_calls,
+            enable_confidence_calibration,
+        )
 
     async def deliberate(
         self,
@@ -310,18 +334,14 @@ MAINTAINED_POINTS: [Points you stand by]
         rounds: List[DeliberationRound] = []
         current_opinions: List[AgentVote] = []
 
-        logger.info(
-            f"🎭 Starting deliberation: {question[:50]}... ({len(agents)} agents)"
-        )
+        logger.info(f"🎭 Starting deliberation: {question[:50]}... ({len(agents)} agents)")
 
         for round_num in range(1, max_rounds + 1):
             logger.debug(f"📍 Round {round_num}/{max_rounds}")
 
             # Phase 1: Collect opinions (initial or refined)
             if round_num == 1:
-                current_opinions = await self._collect_initial_opinions(
-                    question, agents, context_str
-                )
+                current_opinions = await self._collect_initial_opinions(question, agents, context_str)
             else:
                 current_opinions = await self._collect_refined_opinions(
                     question, current_opinions, rounds[-1].critiques
@@ -350,16 +370,10 @@ MAINTAINED_POINTS: [Points you stand by]
                 break
 
         # Final vote
-        decision, confidence, final_votes = await self._final_vote(
-            question, current_opinions, voting_strategy
-        )
+        decision, confidence, final_votes = await self._final_vote(question, current_opinions, voting_strategy)
 
         # Identify dissenting opinions
-        dissenting = [
-            v
-            for v in final_votes
-            if v.position.lower() != decision.lower() and v.confidence >= 0.5
-        ]
+        dissenting = [v for v in final_votes if v.position.lower() != decision.lower() and v.confidence >= 0.5]
 
         # Build evidence chain
         evidence_chain = self._build_evidence_chain(rounds, final_votes)
@@ -396,20 +410,30 @@ MAINTAINED_POINTS: [Points you stand by]
         agents: List[str],
         context_str: str,
     ) -> List[AgentVote]:
-        """Collect initial opinions from all agents"""
-        opinions = []
+        """Collect initial opinions from all agents (parallel if enabled)"""
+        import asyncio
 
         prompt = self.PHASE_PROMPTS["initial"].format(
             question=question,
             context=context_str,
         )
 
-        for agent_type in agents:
-            response = await self._ask_agent(agent_type, prompt)
-            vote = self._parse_opinion(agent_type, response)
-            opinions.append(vote)
+        if self.enable_parallel_calls and len(agents) > 1:
+            # Parallel agent calls with asyncio.gather
+            async def get_opinion(agent_type: str) -> AgentVote:
+                response = await self._ask_agent(agent_type, prompt)
+                return self._parse_opinion(agent_type, response)
 
-        return opinions
+            opinions = await asyncio.gather(*[get_opinion(a) for a in agents])
+            return list(opinions)
+        else:
+            # Sequential calls
+            opinions = []
+            for agent_type in agents:
+                response = await self._ask_agent(agent_type, prompt)
+                vote = self._parse_opinion(agent_type, response)
+                opinions.append(vote)
+            return opinions
 
     async def _collect_refined_opinions(
         self,
@@ -424,9 +448,7 @@ MAINTAINED_POINTS: [Points you stand by]
             agent_type = opinion.agent_type
 
             # Gather critiques for this agent
-            agent_critiques = [
-                c for c in critiques if c.target_agent == opinion.agent_id
-            ]
+            agent_critiques = [c for c in critiques if c.target_agent == opinion.agent_id]
 
             critiques_text = "\n".join(
                 [
@@ -457,28 +479,48 @@ MAINTAINED_POINTS: [Points you stand by]
         question: str,
         opinions: List[AgentVote],
     ) -> List[Critique]:
-        """Each agent critiques others' positions"""
-        critiques = []
+        """Each agent critiques others' positions (parallel if enabled)"""
+        import asyncio
 
-        for critic in opinions:
-            for target in opinions:
-                if critic.agent_id == target.agent_id:
-                    continue
-
+        if self.enable_parallel_calls and len(opinions) > 1:
+            # Build all critique tasks
+            async def get_critique(critic: AgentVote, target: AgentVote) -> Critique:
                 prompt = self.PHASE_PROMPTS["critique"].format(
                     question=question,
                     position=target.position,
                     reasoning=target.reasoning,
                     evidence=", ".join(target.evidence),
                 )
-
                 response = await self._ask_agent(critic.agent_type, prompt)
-                critique = self._parse_critique(
-                    critic.agent_id, target.agent_id, response
-                )
-                critiques.append(critique)
+                return self._parse_critique(critic.agent_id, target.agent_id, response)
 
-        return critiques
+            tasks = []
+            for critic in opinions:
+                for target in opinions:
+                    if critic.agent_id != target.agent_id:
+                        tasks.append(get_critique(critic, target))
+
+            critiques = await asyncio.gather(*tasks)
+            return list(critiques)
+        else:
+            # Sequential cross-examination
+            critiques = []
+            for critic in opinions:
+                for target in opinions:
+                    if critic.agent_id == target.agent_id:
+                        continue
+
+                    prompt = self.PHASE_PROMPTS["critique"].format(
+                        question=question,
+                        position=target.position,
+                        reasoning=target.reasoning,
+                        evidence=", ".join(target.evidence),
+                    )
+
+                    response = await self._ask_agent(critic.agent_type, prompt)
+                    critique = self._parse_critique(critic.agent_id, target.agent_id, response)
+                    critiques.append(critique)
+            return critiques
 
     async def _final_vote(
         self,
@@ -527,26 +569,43 @@ MAINTAINED_POINTS: [Points you stand by]
         self,
         opinions: List[AgentVote],
     ) -> Tuple[str, float, List[AgentVote]]:
-        """Confidence-weighted voting"""
-        # Group by position with confidence weighting
+        """
+        Confidence-weighted voting with evidence scoring.
+
+        Combines:
+        - Agent confidence (calibrated if enabled)
+        - Evidence quality weighting
+        - Number of supporting agents
+        """
+        # Group by position with confidence + evidence weighting
         position_weights: Dict[str, float] = {}
         position_examples: Dict[str, str] = {}
+
+        # Get evidence scores for all positions
+        evidence_scores = self.compute_weighted_evidence_score(opinions)
 
         for op in opinions:
             key = op.position.lower().strip()[:100]
             if key not in position_weights:
                 position_weights[key] = 0.0
                 position_examples[key] = op.position
-            position_weights[key] += op.confidence
+
+            # Calibrate confidence if enabled
+            calibrated_conf = self.calibrate_confidence(op.confidence)
+
+            # Combine confidence with evidence weight
+            # Base: calibrated confidence, boosted by evidence
+            evidence_boost = evidence_scores.get(key, 0.0) / max(len(opinions), 1)
+            combined_weight = calibrated_conf * 0.7 + evidence_boost * 0.3
+
+            position_weights[key] += combined_weight
 
         # Find highest weighted position
         winner_key = max(position_weights.keys(), key=lambda k: position_weights[k])
         decision = position_examples[winner_key]
 
         total_weight = sum(position_weights.values())
-        confidence = (
-            position_weights[winner_key] / total_weight if total_weight > 0 else 0
-        )
+        confidence = position_weights[winner_key] / total_weight if total_weight > 0 else 0
 
         return decision, confidence, opinions
 
@@ -657,23 +716,17 @@ MAINTAINED_POINTS: [Points you stand by]
 
         if self.agent_interface:
             try:
-                from backend.agents.unified_agent_interface import AgentRequest
                 from backend.agents.models import AgentType
+                from backend.agents.unified_agent_interface import AgentRequest
 
-                at = (
-                    AgentType.DEEPSEEK
-                    if "deepseek" in agent_type.lower()
-                    else AgentType.PERPLEXITY
-                )
+                at = AgentType.DEEPSEEK if "deepseek" in agent_type.lower() else AgentType.PERPLEXITY
                 request = AgentRequest(
                     task_type="deliberation",
                     agent_type=at,
                     prompt=prompt,
                 )
                 response = await self.agent_interface.send_request(request)
-                return (
-                    response.content if response.success else f"Error: {response.error}"
-                )
+                return response.content if response.success else f"Error: {response.error}"
             except Exception as e:
                 logger.warning(f"Agent request failed: {e}")
                 return f"Error: {e}"
@@ -759,23 +812,14 @@ MAINTAINED_POINTS: Trailing mechanism is superior for trend capture
             if line.startswith("AGREES:"):
                 agrees = "yes" in line.lower()
             elif line.startswith("AGREEMENT_POINTS:"):
-                agreement_points = [
-                    p.strip() for p in line.replace("AGREEMENT_POINTS:", "").split(",")
-                ]
+                agreement_points = [p.strip() for p in line.replace("AGREEMENT_POINTS:", "").split(",")]
             elif line.startswith("DISAGREEMENT_POINTS:"):
-                disagreement_points = [
-                    p.strip()
-                    for p in line.replace("DISAGREEMENT_POINTS:", "").split(",")
-                ]
+                disagreement_points = [p.strip() for p in line.replace("DISAGREEMENT_POINTS:", "").split(",")]
             elif line.startswith("IMPROVEMENTS:"):
-                improvements = [
-                    p.strip() for p in line.replace("IMPROVEMENTS:", "").split(",")
-                ]
+                improvements = [p.strip() for p in line.replace("IMPROVEMENTS:", "").split(",")]
             elif line.startswith("CONFIDENCE_ADJUSTMENT:"):
                 try:
-                    confidence_adj = float(
-                        line.replace("CONFIDENCE_ADJUSTMENT:", "").strip()
-                    )
+                    confidence_adj = float(line.replace("CONFIDENCE_ADJUSTMENT:", "").strip())
                 except ValueError:
                     confidence_adj = 0.0
 
@@ -798,24 +842,153 @@ MAINTAINED_POINTS: Trailing mechanism is superior for trend capture
 
         total = self.stats["total_deliberations"]
         prev_avg_rounds = self.stats["avg_rounds"]
-        self.stats["avg_rounds"] = (
-            (prev_avg_rounds * (total - 1)) + len(result.rounds)
-        ) / total
+        self.stats["avg_rounds"] = ((prev_avg_rounds * (total - 1)) + len(result.rounds)) / total
 
         prev_avg_conf = self.stats["avg_confidence"]
-        self.stats["avg_confidence"] = (
-            (prev_avg_conf * (total - 1)) + result.confidence
-        ) / total
+        self.stats["avg_confidence"] = ((prev_avg_conf * (total - 1)) + result.confidence) / total
+
+    def calibrate_confidence(self, raw_confidence: float) -> float:
+        """
+        Apply Platt scaling to calibrate raw confidence scores.
+
+        Platt scaling uses a sigmoid function to map raw confidence
+        to calibrated probabilities based on historical accuracy.
+
+        Args:
+            raw_confidence: Raw confidence score (0-1)
+
+        Returns:
+            Calibrated confidence score (0-1)
+        """
+        import math
+
+        if not self.enable_confidence_calibration:
+            return raw_confidence
+
+        # Apply Platt scaling: P(correct) = 1 / (1 + exp(A*f + B))
+        # where f is the raw confidence
+        logit = self.calibration_a * raw_confidence + self.calibration_b
+        calibrated = 1.0 / (1.0 + math.exp(-logit))
+
+        return max(0.0, min(1.0, calibrated))
+
+    def update_calibration(self, predicted_confidence: float, was_correct: bool) -> None:
+        """
+        Update calibration parameters based on outcome.
+
+        Collects samples and periodically re-fits Platt scaling parameters
+        using logistic regression.
+
+        Args:
+            predicted_confidence: The confidence that was predicted
+            was_correct: Whether the prediction was correct
+        """
+        self.calibration_samples.append((predicted_confidence, was_correct))
+
+        # Re-fit calibration every 50 samples
+        if len(self.calibration_samples) >= 50 and len(self.calibration_samples) % 50 == 0:
+            self._fit_calibration()
+
+    def _fit_calibration(self) -> None:
+        """Fit Platt scaling parameters using gradient descent"""
+        import math
+
+        if len(self.calibration_samples) < 10:
+            return
+
+        # Simple gradient descent for logistic regression
+        a, b = self.calibration_a, self.calibration_b
+        lr = 0.01
+
+        for _ in range(100):  # 100 iterations
+            grad_a, grad_b = 0.0, 0.0
+
+            for conf, correct in self.calibration_samples:
+                logit = a * conf + b
+                pred = 1.0 / (1.0 + math.exp(-min(max(logit, -20), 20)))
+                error = pred - (1.0 if correct else 0.0)
+                grad_a += error * conf
+                grad_b += error
+
+            a -= lr * grad_a / len(self.calibration_samples)
+            b -= lr * grad_b / len(self.calibration_samples)
+
+        self.calibration_a = a
+        self.calibration_b = b
+
+        logger.debug(f"📊 Calibration updated: a={a:.4f}, b={b:.4f}")
+
+    def classify_evidence(self, evidence_text: str) -> str:
+        """
+        Classify evidence type for weighted scoring.
+
+        Returns:
+            Evidence type: empirical, theoretical, citation, example, or default
+        """
+        text_lower = evidence_text.lower()
+
+        # Empirical evidence markers
+        if any(
+            kw in text_lower
+            for kw in ["data", "backtest", "measured", "observed", "experiment", "study shows", "%", "correlation"]
+        ):
+            return "empirical"
+
+        # Citation markers
+        if any(
+            kw in text_lower
+            for kw in ["according to", "research by", "paper", "source:", "reference", "et al", "doi:", "arxiv"]
+        ):
+            return "citation"
+
+        # Example markers
+        if any(kw in text_lower for kw in ["for example", "e.g.", "instance", "like when", "such as"]):
+            return "example"
+
+        # Theoretical/logical markers
+        if any(kw in text_lower for kw in ["therefore", "logically", "implies", "because", "reason", "follows that"]):
+            return "theoretical"
+
+        return "default"
+
+    def compute_weighted_evidence_score(self, votes: List[AgentVote]) -> Dict[str, float]:
+        """
+        Compute weighted evidence scores for each position.
+
+        Weights evidence by type (empirical > citation > theoretical > example).
+
+        Args:
+            votes: List of agent votes with evidence
+
+        Returns:
+            Dict mapping position to weighted evidence score
+        """
+        position_scores: Dict[str, float] = {}
+        position_examples: Dict[str, str] = {}
+
+        for vote in votes:
+            key = vote.position.lower().strip()[:100]
+            if key not in position_scores:
+                position_scores[key] = 0.0
+                position_examples[key] = vote.position
+
+            # Score each piece of evidence
+            for evidence in vote.evidence:
+                evidence_type = self.classify_evidence(evidence)
+                weight = self.evidence_weights.get(evidence_type, 1.0)
+                position_scores[key] += weight
+
+            # Add confidence-weighted base score
+            position_scores[key] += vote.confidence * 2.0  # Base contribution
+
+        return position_scores
 
     def get_stats(self) -> Dict[str, Any]:
         """Get deliberation statistics"""
         return {
             **self.stats,
             "history_size": len(self.deliberation_history),
-            "consensus_rate": (
-                self.stats["consensus_reached"]
-                / max(self.stats["total_deliberations"], 1)
-            ),
+            "consensus_rate": (self.stats["consensus_reached"] / max(self.stats["total_deliberations"], 1)),
         }
 
 

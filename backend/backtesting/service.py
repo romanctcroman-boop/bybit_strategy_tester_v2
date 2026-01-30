@@ -12,6 +12,7 @@ import pandas as pd
 from loguru import logger
 
 from backend.backtesting.engine import BacktestEngine, get_engine
+from backend.backtesting.engine_selector import get_engine as select_engine
 from backend.backtesting.models import (
     BacktestConfig,
     BacktestResult,
@@ -76,9 +77,7 @@ class BacktestService:
                 duration = time.perf_counter() - started_at
 
                 status_str = getattr(result.status, "value", str(result.status))
-                strategy_label = getattr(
-                    config.strategy_type, "value", str(config.strategy_type)
-                )
+                strategy_label = getattr(config.strategy_type, "value", str(config.strategy_type))
 
                 metrics = result.metrics
 
@@ -121,8 +120,23 @@ class BacktestService:
 
             logger.info(f"Fetched {len(ohlcv)} candles for backtest")
 
-            # Run backtest
-            result = self.engine.run(config, ohlcv)
+            # Dynamically select engine based on config.dca_enabled
+            # If dca_enabled=True, use DCAEngine; otherwise use default engine
+            dca_enabled = getattr(config, "dca_enabled", False)
+            if dca_enabled:
+                engine = select_engine(
+                    engine_type=getattr(config, "engine_type", "auto"),
+                    dca_enabled=True,
+                    pyramiding=getattr(config, "pyramiding", 1),
+                    strategy_type=getattr(config, "strategy_type", None),
+                )
+                logger.info("Using DCAEngine for DCA-enabled backtest")
+                # DCAEngine uses run_from_config method
+                result = engine.run_from_config(config, ohlcv)
+            else:
+                engine = self.engine
+                # Standard engine uses run method
+                result = engine.run(config, ohlcv)
 
             _record_metrics(result)
             return result
@@ -194,9 +208,7 @@ class BacktestService:
                 repo = KlineRepository(session)
 
                 # Get klines from local DB (filter by market_type for SPOT/LINEAR)
-                logger.info(
-                    f"Querying local DB for {symbol} {interval} market_type={market_type}"
-                )
+                logger.info(f"Querying local DB for {symbol} {interval} market_type={market_type}")
                 local_klines = repo.get_klines(
                     symbol=symbol,
                     interval=db_interval,
@@ -238,18 +250,14 @@ class BacktestService:
                         logger.info(f"Using {len(df)} candles from local database")
                         return df
                     else:
-                        logger.info(
-                            f"Local DB has only {len(df)} candles, need more data"
-                        )
+                        logger.info(f"Local DB has only {len(df)} candles, need more data")
 
         except Exception as e:
             logger.warning(f"Error reading from local DB: {e}, falling back to API")
 
         # ===== STEP 2: Fetch from Bybit API =====
         try:
-            logger.info(
-                f"Fetching data from Bybit API for {symbol} {interval} market_type={market_type}"
-            )
+            logger.info(f"Fetching data from Bybit API for {symbol} {interval} market_type={market_type}")
 
             # Fetch data via adapter (pass market_type for SPOT/LINEAR selection)
             candles = await self.adapter.get_historical_klines(

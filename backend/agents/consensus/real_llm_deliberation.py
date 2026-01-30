@@ -3,51 +3,57 @@ Real LLM Deliberation Integration
 
 Connects MultiAgentDeliberation with real LLM APIs (DeepSeek, Perplexity).
 This module creates an enhanced deliberation system that uses actual AI responses.
+
+P2 Fix (2026-01-28): Now uses KeyManager for secure API key access instead of os.environ.
 """
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
+# Use KeyManager for secure API key access
+try:
+    from backend.security.key_manager import get_key_manager
 
-# Auto-load .env file if not already loaded
-def _load_env():
-    """Load .env file if API keys not in environment"""
-    if not os.environ.get("DEEPSEEK_API_KEY"):
+    _key_manager = get_key_manager()
+except ImportError:
+    logger.warning("KeyManager not available, falling back to environment variables")
+    _key_manager = None
+
+import os
+
+
+def _get_api_key(key_name: str) -> Optional[str]:
+    """
+    Get API key securely via KeyManager, fallback to env.
+    
+    Args:
+        key_name: Name of the key (e.g., "DEEPSEEK_API_KEY")
+        
+    Returns:
+        Decrypted API key or None
+    """
+    if _key_manager:
         try:
-            from dotenv import load_dotenv
+            return _key_manager.get_decrypted_key(key_name)
+        except Exception as e:
+            logger.debug(f"KeyManager failed for {key_name}: {e}")
+    
+    # Fallback to environment
+    return os.environ.get(key_name)
 
-            env_path = Path(__file__).parents[3] / ".env"
-            if env_path.exists():
-                load_dotenv(env_path)
-                logger.debug(f"Loaded .env from {env_path}")
-        except ImportError:
-            # Try manual loading
-            env_path = Path(__file__).parents[3] / ".env"
-            if env_path.exists():
-                with open(env_path) as f:
-                    for line in f:
-                        if "=" in line and not line.strip().startswith("#"):
-                            key, value = line.strip().split("=", 1)
-                            os.environ.setdefault(key.strip(), value.strip())
-
-
-_load_env()
-
-from backend.agents.consensus.deliberation import (
+from backend.agents.consensus.deliberation import (  # noqa: E402
+    DeliberationResult,
     MultiAgentDeliberation,
     VotingStrategy,
-    DeliberationResult,
 )
-from backend.agents.llm.connections import (
-    LLMProvider,
+from backend.agents.llm.connections import (  # noqa: E402
+    DeepSeekClient,
     LLMConfig,
     LLMMessage,
-    DeepSeekClient,
+    LLMProvider,
     PerplexityClient,
 )
 
@@ -85,9 +91,9 @@ class RealLLMDeliberation(MultiAgentDeliberation):
         logger.info("🤖 RealLLMDeliberation initialized with actual LLM APIs")
 
     def _initialize_clients(self) -> None:
-        """Initialize LLM clients from environment"""
-        # DeepSeek
-        deepseek_key = os.environ.get("DEEPSEEK_API_KEY")
+        """Initialize LLM clients using KeyManager for secure key access"""
+        # DeepSeek - use KeyManager
+        deepseek_key = _get_api_key("DEEPSEEK_API_KEY")
         if deepseek_key:
             config = LLMConfig(
                 provider=LLMProvider.DEEPSEEK,
@@ -97,12 +103,12 @@ class RealLLMDeliberation(MultiAgentDeliberation):
                 max_tokens=2048,
             )
             self._clients["deepseek"] = DeepSeekClient(config)
-            logger.info("✅ DeepSeek client ready")
+            logger.info("✅ DeepSeek client ready (via KeyManager)")
         else:
-            logger.warning("⚠️ DEEPSEEK_API_KEY not found")
+            logger.warning("⚠️ DEEPSEEK_API_KEY not found in KeyManager or environment")
 
-        # Perplexity
-        perplexity_key = os.environ.get("PERPLEXITY_API_KEY")
+        # Perplexity - use KeyManager
+        perplexity_key = _get_api_key("PERPLEXITY_API_KEY")
         if perplexity_key:
             config = LLMConfig(
                 provider=LLMProvider.PERPLEXITY,
@@ -112,9 +118,9 @@ class RealLLMDeliberation(MultiAgentDeliberation):
                 max_tokens=2048,
             )
             self._clients["perplexity"] = PerplexityClient(config)
-            logger.info("✅ Perplexity client ready")
+            logger.info("✅ Perplexity client ready (via KeyManager)")
         else:
-            logger.warning("⚠️ PERPLEXITY_API_KEY not found")
+            logger.warning("⚠️ PERPLEXITY_API_KEY not found in KeyManager or environment")
 
     async def _real_ask(self, agent_type: str, prompt: str) -> str:
         """

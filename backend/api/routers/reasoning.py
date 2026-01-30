@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 # Agents & monitoring
 from backend.agents.models import AgentType
 from backend.agents.reasoning_ab_harness import ABTestConfig, ReasoningABHarness
-from backend.database.session import get_db
+from backend.database import get_db
 from backend.monitoring import SelfLearningSignalPublisher
 from backend.services.reasoning_storage import ReasoningStorageService
 
@@ -195,9 +195,7 @@ async def get_reasoning_trace(
         raise
     except Exception as e:
         logger.error(f"Failed to get reasoning trace: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get(
@@ -220,9 +218,7 @@ async def get_reasoning_chain(
     service = ReasoningStorageService(db)
 
     try:
-        traces = await service.get_reasoning_chain(
-            session_id, include_steps=include_steps
-        )
+        traces = await service.get_reasoning_chain(session_id, include_steps=include_steps)
 
         if not traces:
             return []
@@ -231,9 +227,7 @@ async def get_reasoning_chain(
 
     except Exception as e:
         logger.error(f"Failed to get reasoning chain: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get(
@@ -262,17 +256,11 @@ async def search_reasoning_traces(
 
     try:
         if task_type:
-            traces = await service.search_by_task_type(
-                task_type, limit=limit, offset=offset
-            )
+            traces = await service.search_by_task_type(task_type, limit=limit, offset=offset)
         elif agent_type:
-            traces = await service.search_by_agent(
-                agent_type, limit=limit, offset=offset
-            )
+            traces = await service.search_by_agent(agent_type, limit=limit, offset=offset)
         elif start_date:
-            traces = await service.search_by_date_range(
-                start_date, end_date, limit=limit
-            )
+            traces = await service.search_by_date_range(start_date, end_date, limit=limit)
         elif status and status != "completed":
             traces = await service.search_failed_traces(limit=limit)
         else:
@@ -285,9 +273,7 @@ async def search_reasoning_traces(
 
     except Exception as e:
         logger.error(f"Failed to search reasoning traces: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get(
@@ -310,9 +296,7 @@ async def get_strategy_evolution(
     service = ReasoningStorageService(db)
 
     try:
-        evolutions = await service.get_strategy_evolution(
-            strategy_id, include_inactive=include_inactive
-        )
+        evolutions = await service.get_strategy_evolution(strategy_id, include_inactive=include_inactive)
 
         if not evolutions:
             return []
@@ -321,9 +305,7 @@ async def get_strategy_evolution(
 
     except Exception as e:
         logger.error(f"Failed to get strategy evolution: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get(
@@ -347,17 +329,13 @@ async def get_token_usage_stats(
     service = ReasoningStorageService(db)
 
     try:
-        stats = await service.get_token_usage_stats(
-            start_date=start_date, end_date=end_date, agent_type=agent_type
-        )
+        stats = await service.get_token_usage_stats(start_date=start_date, end_date=end_date, agent_type=agent_type)
 
         return TokenUsageStatsResponse(**stats)
 
     except Exception as e:
         logger.error(f"Failed to get token usage stats: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get(
@@ -385,9 +363,7 @@ async def get_agent_performance_stats(
 
     except Exception as e:
         logger.error(f"Failed to get agent performance stats: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.post(
@@ -396,9 +372,7 @@ async def get_agent_performance_stats(
     summary="Run reasoning agent A/B duel",
     description="Execute baseline vs challenger agents on the same prompt and record telemetry",
 )
-async def run_reasoning_ab_test(
-    request: ABTestRequest, db: Session = Depends(get_db)
-) -> ABTestResponse:
+async def run_reasoning_ab_test(request: ABTestRequest, db: Session = Depends(get_db)) -> ABTestResponse:
     service = ReasoningStorageService(db)
     publisher = SelfLearningSignalPublisher(namespace="self_learning:reasoning_ab")
     harness = ReasoningABHarness(
@@ -443,9 +417,7 @@ async def run_reasoning_ab_test(
         )
     except Exception as e:
         logger.error(f"Failed to run reasoning A/B harness: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get(
@@ -454,9 +426,7 @@ async def run_reasoning_ab_test(
     summary="Get chain-of-thought steps",
     description="Get detailed chain-of-thought steps for a reasoning trace",
 )
-async def get_chain_of_thought(
-    trace_id: uuid.UUID, db: Session = Depends(get_db)
-) -> List[ChainOfThoughtResponse]:
+async def get_chain_of_thought(trace_id: uuid.UUID, db: Session = Depends(get_db)) -> List[ChainOfThoughtResponse]:
     """
     Get chain-of-thought steps.
 
@@ -475,9 +445,7 @@ async def get_chain_of_thought(
 
     except Exception as e:
         logger.error(f"Failed to get chain-of-thought: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 # ==============================================================================

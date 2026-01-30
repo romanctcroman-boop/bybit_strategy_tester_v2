@@ -83,9 +83,7 @@ class ServiceInstance:
             "metadata": self.metadata,
             "weight": self.weight,
             "active_connections": self.active_connections,
-            "last_health_check": (
-                self.last_health_check.isoformat() if self.last_health_check else None
-            ),
+            "last_health_check": (self.last_health_check.isoformat() if self.last_health_check else None),
             "registered_at": self.registered_at.isoformat(),
             "health_check_url": self.health_check_url,
             "tags": self.tags,
@@ -105,9 +103,7 @@ class ServiceInstance:
             weight=data.get("weight", 100),
             active_connections=data.get("active_connections", 0),
             last_health_check=(
-                datetime.fromisoformat(data["last_health_check"])
-                if data.get("last_health_check")
-                else None
+                datetime.fromisoformat(data["last_health_check"]) if data.get("last_health_check") else None
             ),
             registered_at=(
                 datetime.fromisoformat(data["registered_at"])
@@ -128,9 +124,7 @@ class ServiceDefinition:
     load_balancing: LoadBalancingStrategy = LoadBalancingStrategy.ROUND_ROBIN
     health_check_interval: int = 30  # seconds
     deregister_after: int = 90  # seconds without health check
-    retry_policy: dict[str, Any] = field(
-        default_factory=lambda: {"max_retries": 3, "backoff_factor": 0.5}
-    )
+    retry_policy: dict[str, Any] = field(default_factory=lambda: {"max_retries": 3, "backoff_factor": 0.5})
 
     @property
     def healthy_instances(self) -> list[ServiceInstance]:
@@ -283,9 +277,7 @@ class InMemoryServiceRegistry:
         self._services[service_name].instances.append(instance)
         self._instances[instance_id] = instance
 
-        logger.info(
-            f"Registered service: {service_name} ({host}:{port}) -> {instance_id}"
-        )
+        logger.info(f"Registered service: {service_name} ({host}:{port}) -> {instance_id}")
 
         # Perform initial health check
         await self._check_instance_health(instance)
@@ -300,9 +292,7 @@ class InMemoryServiceRegistry:
 
         service = self._services.get(instance.service_name)
         if service:
-            service.instances = [
-                i for i in service.instances if i.instance_id != instance_id
-            ]
+            service.instances = [i for i in service.instances if i.instance_id != instance_id]
             if not service.instances:
                 del self._services[instance.service_name]
 
@@ -396,9 +386,7 @@ class InMemoryServiceRegistry:
                     if instance.last_health_check:
                         service = self._services.get(instance.service_name)
                         if service:
-                            seconds_since = (
-                                datetime.now(timezone.utc) - instance.last_health_check
-                            ).total_seconds()
+                            seconds_since = (datetime.now(timezone.utc) - instance.last_health_check).total_seconds()
                             if seconds_since > service.deregister_after:
                                 await self.deregister(instance.instance_id)
 
@@ -630,7 +618,20 @@ class RedisServiceRegistry:
 
 
 class ServiceClient:
-    """HTTP client with service discovery and load balancing."""
+    """
+    HTTP client with service discovery and load balancing.
+
+    Recommended usage (context manager):
+        async with ServiceClient(registry, "my-service") as client:
+            response = await client.request("GET", "/api/data")
+
+    Alternative (manual cleanup):
+        client = ServiceClient(registry, "my-service")
+        try:
+            response = await client.request("GET", "/api/data")
+        finally:
+            await client.close()
+    """
 
     def __init__(
         self,
@@ -646,9 +647,20 @@ class ServiceClient:
         self.timeout = timeout
         self.max_retries = max_retries
         self._client: Optional[Any] = None
+        self._closed = False
+
+    async def __aenter__(self) -> "ServiceClient":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit - ensures cleanup."""
+        await self.close()
 
     async def _get_client(self) -> Any:
         """Get or create HTTP client."""
+        if self._closed:
+            raise RuntimeError("ServiceClient is closed")
         if self._client is None:
             import httpx
 
@@ -670,9 +682,7 @@ class ServiceClient:
         last_error = None
 
         for attempt in range(self.max_retries):
-            instance = await self.registry.get_instance(
-                self.service_name, self.strategy
-            )
+            instance = await self.registry.get_instance(self.service_name, self.strategy)
             if not instance:
                 raise RuntimeError(f"No healthy instances for {self.service_name}")
 
@@ -685,15 +695,11 @@ class ServiceClient:
 
             except Exception as e:
                 last_error = e
-                logger.warning(
-                    f"Request to {instance.url} failed (attempt {attempt + 1}): {e}"
-                )
+                logger.warning(f"Request to {instance.url} failed (attempt {attempt + 1}): {e}")
 
                 # Mark instance as potentially unhealthy
                 if hasattr(self.registry, "update_status"):
-                    await self.registry.update_status(
-                        instance.instance_id, ServiceStatus.DEGRADED
-                    )
+                    await self.registry.update_status(instance.instance_id, ServiceStatus.DEGRADED)
 
             finally:
                 instance.active_connections -= 1

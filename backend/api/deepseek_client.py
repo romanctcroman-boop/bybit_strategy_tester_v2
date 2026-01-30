@@ -10,7 +10,7 @@ import time
 import httpx
 
 from backend.reliability.http_retry import httpx_retry
-from reliability.retry_policy import is_http_error_retryable
+from backend.reliability.retry_policy import is_http_error_retryable
 
 try:
     from backend.agents.circuit_breaker_manager import (

@@ -1,538 +1,1428 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Security Headers - relaxed for development -->
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
 
     <title>Backtest Results | Bybit Strategy Tester</title>
-    
-    <!-- Styles -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- External CSS (Phase 1) -->
-    <link rel="stylesheet" href="./css/variables.css">
-    <link rel="stylesheet" href="./css/components.css">
-    <link rel="stylesheet" href="./css/common.css">
-    <link rel="stylesheet" href="./css/backtest_results.css?v=20260113">
-    <!-- AI Assistant CSS -->
-    <link rel="stylesheet" href="./css/ai-assistant.css">
 
-    <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css" rel="stylesheet">
-    
-    </head>
-<body>
+    <!-- Styles -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+    <!-- External CSS (Phase 1) -->
+    <link rel="stylesheet" href="./css/variables.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+    <link rel="stylesheet" href="./css/common.css" />
+    <link rel="stylesheet" href="./css/backtest_results.css?v=20260113" />
+    <!-- AI Assistant CSS -->
+    <link rel="stylesheet" href="./css/ai-assistant.css" />
+
+    <link
+      href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css"
+      rel="stylesheet"
+    />
+      <script src="js/core/auto-event-binding.js"></script>
+</head>
+  <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="dashboard.html">
-                <i class="bi bi-graph-up-arrow me-2"></i>Bybit Strategy Tester
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" title="Toggle navigation" aria-label="Toggle navigation menu">
-                <span class="navbar-toggler-icon"></span>
+      <div class="container-fluid">
+        <a class="navbar-brand" href="dashboard.html">
+          <i class="bi bi-graph-up-arrow me-2"></i>Bybit Strategy Tester
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          title="Toggle navigation"
+          aria-label="Toggle navigation menu"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link" href="dashboard.html">
+                <i class="bi bi-speedometer2 me-1"></i>Dashboard
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="strategies.html">
+                <i class="bi bi-diagram-3 me-1"></i>Strategies
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link active" href="backtest-results.html">
+                <i class="bi bi-bar-chart-line me-1"></i>Backtest Results
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="analytics.html">
+                <i class="bi bi-pie-chart me-1"></i>Analytics
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="market-chart.html">
+                <i class="bi bi-graph-up me-1"></i>Market Data
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="streaming-chat.html">
+                <i class="bi bi-robot me-1"></i>AI Studio
+              </a>
+            </li>
+          </ul>
+          <div class="d-flex gap-2">
+            <button
+              class="btn btn-outline-secondary btn-sm"
+              onclick="refreshData()"
+              title="Refresh data"
+              aria-label="Refresh backtest data"
+            >
+              <i class="bi bi-arrow-clockwise"></i>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="dashboard.html">
-                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="strategies.html">
-                            <i class="bi bi-diagram-3 me-1"></i>Strategies
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="backtest-results.html">
-                            <i class="bi bi-bar-chart-line me-1"></i>Backtest Results
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="analytics.html">
-                            <i class="bi bi-pie-chart me-1"></i>Analytics
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="market-chart.html">
-                            <i class="bi bi-graph-up me-1"></i>Market Data
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="streaming-chat.html">
-                            <i class="bi bi-robot me-1"></i>AI Studio
-                        </a>
-                    </li>
-                </ul>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-secondary btn-sm" onclick="refreshData()" title="Refresh data" aria-label="Refresh backtest data">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
-                    <button class="btn btn-primary btn-sm" onclick="showNewBacktestModal()">
-                        <i class="bi bi-plus-lg me-1"></i>New Backtest
-                    </button>
-                </div>
-            </div>
+            <button
+              class="btn btn-primary btn-sm"
+              onclick="showNewBacktestModal()"
+            >
+              <i class="bi bi-plus-lg me-1"></i>New Backtest
+            </button>
+          </div>
         </div>
+      </div>
     </nav>
 
     <!-- Main Content -->
     <div class="main-content">
-        <div class="backtest-layout">
-            <!-- Left Panel - Collapsible Results List -->
-            <div class="results-panel" id="resultsPanel">
-                <!-- Toggle Button -->
-                <button class="panel-toggle-btn" id="panelToggleBtn" onclick="toggleResultsPanel()" title="Toggle results panel">
-                    <i class="bi bi-chevron-left" id="toggleIcon"></i>
+      <div class="backtest-layout">
+        <!-- Left Panel - Collapsible Results List -->
+        <div class="results-panel" id="resultsPanel">
+          <!-- Toggle Button -->
+          <button
+            class="panel-toggle-btn"
+            id="panelToggleBtn"
+            onclick="toggleResultsPanel()"
+            title="Toggle results panel"
+          >
+            <i class="bi bi-chevron-left" id="toggleIcon"></i>
+          </button>
+
+          <div class="panel-content" id="panelContent">
+            <div class="card h-100">
+              <div
+                class="card-header d-flex justify-content-between align-items-center"
+              >
+                <span class="card-title">
+                  <i class="bi bi-list-ul me-2"></i>Results
+                  <span class="badge bg-secondary ms-2" id="resultsCount"
+                    >0</span
+                  >
+                </span>
+                <button
+                  class="btn btn-sm btn-outline-secondary"
+                  onclick="toggleFilters()"
+                  title="Toggle filters"
+                  aria-label="Toggle filter panel"
+                >
+                  <i class="bi bi-funnel"></i>
                 </button>
-                
-                <div class="panel-content" id="panelContent">
-                    <div class="card h-100">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <span class="card-title">
-                                <i class="bi bi-list-ul me-2"></i>Results
-                                <span class="badge bg-secondary ms-2" id="resultsCount">0</span>
-                            </span>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleFilters()" title="Toggle filters" aria-label="Toggle filter panel">
-                                <i class="bi bi-funnel"></i>
-                            </button>
-                        </div>
-                    
-                    <!-- Filters -->
-                    <div class="filter-bar p-3 border-bottom d-none" id="filtersPanel">
-                        <select class="form-select form-select-sm filter-select-auto" id="filterStrategy" title="Filter by strategy" aria-label="Filter by strategy">
-                            <option value="">All Strategies</option>
-                        </select>
-                        <select class="form-select form-select-sm filter-select-auto" id="filterSymbol" title="Filter by symbol" aria-label="Filter by symbol">
-                            <option value="">All Symbols</option>
-                        </select>
-                        <select class="form-select form-select-sm filter-select-auto" id="filterPnL" title="Filter by P&L" aria-label="Filter by profit/loss">
-                            <option value="">All P&L</option>
-                            <option value="profit">Profitable</option>
-                            <option value="loss">Loss</option>
-                        </select>
-                        <input type="text" class="form-control form-control-sm filter-search-input" id="filterSearch" placeholder="Search..." title="Search backtests" aria-label="Search backtests">
-                    </div>
-                    
-                    <div class="card-body p-0">
-                        <div class="results-list" id="resultsList">
-                            <!-- Results will be loaded here -->
-                        </div>
-                        
-                        <div class="empty-state d-none" id="emptyState">
-                            <i class="bi bi-inbox"></i>
-                            <h5>No Backtest Results</h5>
-                            <p>Run a backtest from the Strategies page to see results here.</p>
-                            <a href="strategies.html" class="btn btn-primary btn-sm">
-                                <i class="bi bi-plus-lg me-1"></i>Create Strategy
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                </div> <!-- end panel-content -->
-            </div> <!-- end results-panel -->
+              </div>
 
-            <!-- Right Panel - TradingView Style Report -->
-            <div class="report-panel" id="reportPanel">
-                <!-- Report Container -->
-                <div class="card mb-4">
-                    <!-- TradingView Report Tabs with Date Range and Actions -->
-                    <div class="tv-report-tabs-row">
-                        <div class="tv-report-tabs" id="tvReportTabs">
-                            <button class="tv-report-tab active" data-tab="equity">
-                                <i class="bi bi-graph-up me-1"></i>График капитала
-                            </button>
-                            <button class="tv-report-tab" data-tab="dynamics">
-                                <i class="bi bi-bar-chart me-1"></i>Динамика
-                            </button>
-                            <button class="tv-report-tab" data-tab="trades-analysis">
-                                <i class="bi bi-pie-chart me-1"></i>Анализ сделок
-                            </button>
-                            <button class="tv-report-tab" data-tab="risk-return">
-                                <i class="bi bi-shield-check me-1"></i>Доходность с учётом риска
-                            </button>
-                            <button class="tv-report-tab" data-tab="trades-list">
-                                <i class="bi bi-list-ul me-1"></i>Список сделок
-                            </button>
-                        </div>
-                        <div class="tv-report-actions">
-                            <button class="tv-action-btn" id="btnCompare" onclick="toggleCompareMode()" disabled title="Compare Selected">
-                                <i class="bi bi-columns-gap"></i>
-                                <span>Compare</span>
-                            </button>
-                            <button class="tv-action-btn" onclick="exportResults()" title="Export">
-                                <i class="bi bi-download"></i>
-                                <span>Export</span>
-                            </button>
-                            <div class="tv-report-date-range">
-                                <i class="bi bi-calendar3"></i>
-                                <span id="tvReportDateRange">--</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Tab 1: График капитала (Equity Chart) -->
-                    <div class="tv-report-tab-content active" id="tab-equity">
-                        <!-- Summary Cards -->
-                        <div class="tv-summary-cards">
-                            <div class="tv-summary-card">
-                                <div class="tv-summary-card-label">Общие ПР/УБ</div>
-                                <div class="tv-summary-card-value tv-value-positive" id="tvNetProfit">--</div>
-                                <div class="tv-summary-card-sub" id="tvNetProfitPct">--</div>
-                            </div>
-                            <div class="tv-summary-card">
-                                <div class="tv-summary-card-label">Макс просадка</div>
-                                <div class="tv-summary-card-value tv-value-negative" id="tvMaxDrawdown">--</div>
-                                <div class="tv-summary-card-sub" id="tvMaxDrawdownPct">--</div>
-                            </div>
-                            <div class="tv-summary-card">
-                                <div class="tv-summary-card-label">Всего сделок</div>
-                                <div class="tv-summary-card-value tv-value-neutral" id="tvTotalTrades">--</div>
-                                <div class="tv-summary-card-sub" id="tvOpenTrades">открытых: 0</div>
-                            </div>
-                            <div class="tv-summary-card">
-                                <div class="tv-summary-card-label">Прибыльные сделки</div>
-                                <div class="tv-summary-card-value tv-value-neutral" id="tvWinningTrades">--</div>
-                                <div class="tv-summary-card-sub" id="tvWinRate">--</div>
-                            </div>
-                            <div class="tv-summary-card">
-                                <div class="tv-summary-card-label">Фактор прибыли</div>
-                                <div class="tv-summary-card-value tv-value-neutral" id="tvProfitFactor">--</div>
-                                <div class="tv-summary-card-sub">Валовая прибыль / убыток</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Equity Chart - TradingView Style -->
-                        <div class="tv-equity-section">
-                            <div class="tv-equity-chart-container">
-                                <div class="tv-chart-header">
-                                    <span class="tv-chart-title">График капитала</span>
-                                    <div class="tv-chart-header-right">
-                                        <span id="tvEquityCurrentValue" class="tv-equity-value-badge">+$0.00</span>
-                                        <button class="tv-chart-expand-btn" id="btnExpandChart" title="Развернуть">
-                                            <i class="bi bi-arrows-fullscreen"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="tv-chart-wrapper" id="equityChartWrapper">
-                                    <canvas id="equityChart"></canvas>
-                                </div>
-                                <div class="tv-chart-footer">
-                                    <div class="tv-chart-legend">
-                                        <label class="tv-legend-item">
-                                            <input type="checkbox" id="legendBuyHold" checked>
-                                            <span class="tv-legend-color tv-legend-color-bh"></span>
-                                            Покупка и удержание
-                                        </label>
-                                        <label class="tv-legend-item" title="Отклонение сделки (MFE/MAE) - максимальное благоприятное и неблагоприятное отклонение цены">
-                                            <input type="checkbox" id="legendTradesExcursions" checked>
-                                            <span class="tv-legend-color tv-legend-color-runup"></span>
-                                            Trades excursions
-                                        </label>
-                                    </div>
-                                    <div class="tv-chart-mode-toggle">
-                                        <button class="tv-mode-btn active" id="btnAbsoluteMode">Абсолютные значения</button>
-                                        <button class="tv-mode-btn" id="btnPercentMode">Проценты</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Tab 2: Динамика (Dynamics) -->
-                    <div class="tv-report-tab-content" id="tab-dynamics">
-                        <table class="tv-data-table" id="tvDynamicsTable">
-                            <thead>
-                                <tr>
-                                    <th>Показатель</th>
-                                    <th>Все</th>
-                                    <th>Длинная</th>
-                                    <th>Короткая</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr><td class="row-label">Исходный капитал</td><td id="dyn-initial-capital">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Нереализованная ПР/УБ</td><td id="dyn-unrealized">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Net P&L</td><td id="dyn-net-profit">--</td><td id="dyn-net-profit-long">--</td><td id="dyn-net-profit-short">--</td></tr>
-                                <tr><td class="row-label">Валовая прибыль</td><td id="dyn-gross-profit">--</td><td id="dyn-gross-profit-long">--</td><td id="dyn-gross-profit-short">--</td></tr>
-                                <tr><td class="row-label">Валовый убыток</td><td id="dyn-gross-loss">--</td><td id="dyn-gross-loss-long">--</td><td id="dyn-gross-loss-short">--</td></tr>
-                                <tr><td class="row-label">Фактор прибыли</td><td id="dyn-profit-factor">--</td><td id="dyn-profit-factor-long">--</td><td id="dyn-profit-factor-short">--</td></tr>
-                                <tr><td class="row-label">Выплаченная комиссия</td><td id="dyn-commission">--</td><td id="dyn-commission-long">--</td><td id="dyn-commission-short">--</td></tr>
-                                <tr><td class="row-label">Ожидаемая прибыль</td><td id="dyn-expectancy">--</td><td id="dyn-expectancy-long">--</td><td id="dyn-expectancy-short">--</td></tr>
-                                <tr><td class="row-label">Прибыль от покупки и удержания</td><td id="dyn-buy-hold">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Опережающая динамика стратегии</td><td id="dyn-strategy-vs-bh">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Годовая доходность (CAGR)</td><td id="dyn-cagr">--</td><td id="dyn-cagr-long">--</td><td id="dyn-cagr-short">--</td></tr>
-                                <tr><td class="row-label">Доходность на исходный капитал</td><td id="dyn-return-capital">--</td><td id="dyn-return-capital-long">--</td><td id="dyn-return-capital-short">--</td></tr>
-                                <tr><td class="row-label">Сред. продолж. роста капитала</td><td id="dyn-avg-growth-duration">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Сред. рост капитала</td><td id="dyn-avg-equity-growth">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Макс. рост капитала</td><td id="dyn-max-equity-growth">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Сред. продолж. просадки капитала</td><td id="dyn-avg-dd-duration">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Сред. просадка капитала</td><td id="dyn-avg-drawdown">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Макс. просадка капитала</td><td id="dyn-max-drawdown">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Макс. просадка капитала (внутри бара)</td><td id="dyn-max-dd-intrabar">--</td><td>--</td><td>--</td></tr>
-                                <tr><td class="row-label">Доходность на макс. просадку</td><td id="dyn-return-on-dd">--</td><td id="dyn-return-on-dd-long">--</td><td id="dyn-return-on-dd-short">--</td></tr>
-                                <tr><td class="row-label">Чистая прибыль в % от наибольшего убытка</td><td id="dyn-profit-vs-max-loss">--</td><td id="dyn-profit-vs-max-loss-long">--</td><td id="dyn-profit-vs-max-loss-short">--</td></tr>
-                            </tbody>
-                        </table>
-                        
-                        <!-- Dynamics Charts - Profit Structure & Benchmarking -->
-                        <div class="tv-dynamics-charts">
-                            <div class="tv-chart-row">
-                                <div class="tv-profit-chart tv-chart-half">
-                                    <div class="tv-chart-title">Структура прибыли</div>
-                                    <canvas id="waterfallChart"></canvas>
-                                </div>
-                                <div class="tv-profit-chart tv-chart-half">
-                                    <div class="tv-chart-title">Benchmarking</div>
-                                    <canvas id="benchmarkingChart"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Tab 3: Анализ сделок (Trade Analysis) -->
-                    <div class="tv-report-tab-content" id="tab-trades-analysis">
-                        <table class="tv-data-table" id="tvTradeAnalysisTable">
-                            <thead>
-                                <tr>
-                                    <th>Показатель</th>
-                                    <th>Все</th>
-                                    <th>Длинная</th>
-                                    <th>Короткая</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr><td class="row-label">Всего открытых сделок</td><td id="ta-open-trades">--</td><td id="ta-open-trades-long">--</td><td id="ta-open-trades-short">--</td></tr>
-                                <tr><td class="row-label">Всего сделок</td><td id="ta-total-trades">--</td><td id="ta-total-trades-long">--</td><td id="ta-total-trades-short">--</td></tr>
-                                <tr><td class="row-label">Прибыльные сделки</td><td id="ta-winning-trades">--</td><td id="ta-winning-trades-long">--</td><td id="ta-winning-trades-short">--</td></tr>
-                                <tr><td class="row-label">Убыточные сделки</td><td id="ta-losing-trades">--</td><td id="ta-losing-trades-long">--</td><td id="ta-losing-trades-short">--</td></tr>
-                                <tr><td class="row-label">Сделки в безубыток</td><td id="ta-breakeven-trades">--</td><td id="ta-breakeven-trades-long">--</td><td id="ta-breakeven-trades-short">--</td></tr>
-                                <tr><td class="row-label">Процент прибыльных</td><td id="ta-win-rate">--</td><td id="ta-win-rate-long">--</td><td id="ta-win-rate-short">--</td></tr>
-                                <tr><td class="row-label">Средние ПР/УБ</td><td id="ta-avg-pnl">--</td><td id="ta-avg-pnl-long">--</td><td id="ta-avg-pnl-short">--</td></tr>
-                                <tr><td class="row-label">Средняя прибыль по сделке</td><td id="ta-avg-win">--</td><td id="ta-avg-win-long">--</td><td id="ta-avg-win-short">--</td></tr>
-                                <tr><td class="row-label">Средний убыток по сделке</td><td id="ta-avg-loss">--</td><td id="ta-avg-loss-long">--</td><td id="ta-avg-loss-short">--</td></tr>
-                                <tr><td class="row-label">Коэф. средней прибыли / убытка</td><td id="ta-payoff-ratio">--</td><td id="ta-payoff-ratio-long">--</td><td id="ta-payoff-ratio-short">--</td></tr>
-                                <tr><td class="row-label">Самая прибыльная сделка</td><td id="ta-largest-win">--</td><td id="ta-largest-win-long">--</td><td id="ta-largest-win-short">--</td></tr>
-                                <tr><td class="row-label">Самая прибыльная сделка, %</td><td id="ta-largest-win-pct">--</td><td id="ta-largest-win-pct-long">--</td><td id="ta-largest-win-pct-short">--</td></tr>
-                                <tr><td class="row-label">Самая убыточная сделка</td><td id="ta-largest-loss">--</td><td id="ta-largest-loss-long">--</td><td id="ta-largest-loss-short">--</td></tr>
-                                <tr><td class="row-label">Самая убыточная сделка, %</td><td id="ta-largest-loss-pct">--</td><td id="ta-largest-loss-pct-long">--</td><td id="ta-largest-loss-pct-short">--</td></tr>
-                                <tr><td class="row-label">Среднее # баров в позиции</td><td id="ta-avg-bars">--</td><td id="ta-avg-bars-long">--</td><td id="ta-avg-bars-short">--</td></tr>
-                                <tr><td class="row-label">Среднее # баров в прибыльной позиции</td><td id="ta-avg-bars-win">--</td><td id="ta-avg-bars-win-long">--</td><td id="ta-avg-bars-win-short">--</td></tr>
-                                <tr><td class="row-label">Среднее # баров в убыточной позиции</td><td id="ta-avg-bars-loss">--</td><td id="ta-avg-bars-loss-long">--</td><td id="ta-avg-bars-loss-short">--</td></tr>
-                                <tr><td class="row-label">Макс последовательных выигрышей</td><td id="ta-max-consec-wins">--</td><td id="ta-max-consec-wins-long">--</td><td id="ta-max-consec-wins-short">--</td></tr>
-                                <tr><td class="row-label">Макс последовательных проигрышей</td><td id="ta-max-consec-losses">--</td><td id="ta-max-consec-losses-long">--</td><td id="ta-max-consec-losses-short">--</td></tr>
-                            </tbody>
-                        </table>
-                        
-                        <!-- Trade Analysis Charts - TradingView Style -->
-                        <div class="tv-trade-analysis-charts">
-                            <div class="tv-chart-row">
-                                <div class="tv-profit-chart tv-chart-half">
-                                    <div class="tv-chart-title">Распределение прибыли и убытков</div>
-                                    <canvas id="tradeDistributionChart"></canvas>
-                                </div>
-                                <div class="tv-profit-chart tv-chart-half tv-donut-container">
-                                    <div class="tv-chart-title">Соотношение побед/поражений</div>
-                                    <div class="tv-donut-wrapper">
-                                        <div class="tv-donut-chart">
-                                            <canvas id="winLossDonutChart"></canvas>
-                                        </div>
-                                        <div class="tv-donut-legend" id="winLossLegend">
-                                            <div class="tv-legend-row">
-                                                <span class="tv-legend-marker win"></span>
-                                                <span class="tv-legend-label">Победы</span>
-                                                <span class="tv-legend-value" id="legend-wins">0 сделок</span>
-                                                <span class="tv-legend-pct" id="legend-wins-pct">0.00%</span>
-                                            </div>
-                                            <div class="tv-legend-row">
-                                                <span class="tv-legend-marker loss"></span>
-                                                <span class="tv-legend-label">Убытки</span>
-                                                <span class="tv-legend-value" id="legend-losses">0 сделок</span>
-                                                <span class="tv-legend-pct" id="legend-losses-pct">0.00%</span>
-                                            </div>
-                                            <div class="tv-legend-row">
-                                                <span class="tv-legend-marker breakeven"></span>
-                                                <span class="tv-legend-label">Безубыточность</span>
-                                                <span class="tv-legend-value" id="legend-breakeven">0 сделок</span>
-                                                <span class="tv-legend-pct" id="legend-breakeven-pct">0.00%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Tab 4: Доходность с учётом риска (Risk-Adjusted Returns) -->
-                    <div class="tv-report-tab-content" id="tab-risk-return">
-                        <table class="tv-data-table" id="tvRiskReturnTable">
-                            <thead>
-                                <tr>
-                                    <th>Показатель</th>
-                                    <th>Все</th>
-                                    <th>Длинная</th>
-                                    <th>Короткая</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr><td class="row-label">Коэффициент Шарпа</td><td id="rr-sharpe">--</td><td id="rr-sharpe-long">--</td><td id="rr-sharpe-short">--</td></tr>
-                                <tr><td class="row-label">Коэффициент Сортино</td><td id="rr-sortino">--</td><td id="rr-sortino-long">--</td><td id="rr-sortino-short">--</td></tr>
-                                <tr><td class="row-label">Фактор прибыли</td><td id="rr-profit-factor">--</td><td id="rr-profit-factor-long">--</td><td id="rr-profit-factor-short">--</td></tr>
-                                <tr><td class="row-label">Коэффициент Кальмара</td><td id="rr-calmar">--</td><td id="rr-calmar-long">--</td><td id="rr-calmar-short">--</td></tr>
-                                <tr><td class="row-label">Фактор восстановления</td><td id="rr-recovery">--</td><td id="rr-recovery-long">--</td><td id="rr-recovery-short">--</td></tr>
-                                <tr><td class="row-label">Индекс язвы (Ulcer Index)</td><td id="rr-ulcer">--</td><td id="rr-ulcer-long">--</td><td id="rr-ulcer-short">--</td></tr>
-                                <tr><td class="row-label">Эффективность маржи (%)</td><td id="rr-margin-eff">--</td><td id="rr-margin-eff-long">--</td><td id="rr-margin-eff-short">--</td></tr>
-                                <tr><td class="row-label">Стабильность (R²)</td><td id="rr-stability">--</td><td id="rr-stability-long">--</td><td id="rr-stability-short">--</td></tr>
-                                <tr><td class="row-label">SQN (System Quality Num)</td><td id="rr-sqn">--</td><td id="rr-sqn-long">--</td><td id="rr-sqn-short">--</td></tr>
-                                <tr><td class="row-label">Коэф. Kelly (%)</td><td id="rr-kelly">--</td><td id="rr-kelly-long">--</td><td id="rr-kelly-short">--</td></tr>
-                                <tr><td class="row-label">Payoff Ratio (Avg Win/Loss)</td><td id="rr-payoff">--</td><td id="rr-payoff-long">--</td><td id="rr-payoff-short">--</td></tr>
-                                <tr><td class="row-label">Макс. послед. выигрышей</td><td id="rr-max-consec-wins">--</td><td id="rr-max-consec-wins-long">--</td><td id="rr-max-consec-wins-short">--</td></tr>
-                                <tr><td class="row-label">Макс. послед. проигрышей</td><td id="rr-max-consec-losses">--</td><td id="rr-max-consec-losses-long">--</td><td id="rr-max-consec-losses-short">--</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Tab 5: Список сделок (Trades List) -->
-                    <div class="tv-report-tab-content" id="tab-trades-list">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="text-secondary">Всего сделок: </span>
-                                <span class="fw-bold" id="tvTradesCount">0</span>
-                            </div>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="exportTrades()">
-                                <i class="bi bi-download me-1"></i>Экспорт CSV
-                            </button>
-                        </div>
-                        <div class="tv-trades-container">
-                            <table class="tv-trades-table" id="tvTradesListTable">
-                                <thead>
-                                    <tr>
-                                        <th>№ Сделки</th>
-                                        <th>Тип</th>
-                                        <th>Дата и время</th>
-                                        <th>Сигнал</th>
-                                        <th>Цена</th>
-                                        <th>Размер позиции</th>
-                                        <th>Чистая прибыль / убыток</th>
-                                        <th>MFE</th>
-                                        <th>MAE</th>
-                                        <th>Совокупные ПР/УБ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tvTradesListBody">
-                                    <!-- Trades will be populated by JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+              <!-- Filters -->
+              <div
+                class="filter-bar p-3 border-bottom d-none"
+                id="filtersPanel"
+              >
+                <select
+                  class="form-select form-select-sm filter-select-auto"
+                  id="filterStrategy"
+                  title="Filter by strategy"
+                  aria-label="Filter by strategy"
+                >
+                  <option value="">All Strategies</option>
+                </select>
+                <select
+                  class="form-select form-select-sm filter-select-auto"
+                  id="filterSymbol"
+                  title="Filter by symbol"
+                  aria-label="Filter by symbol"
+                >
+                  <option value="">All Symbols</option>
+                </select>
+                <select
+                  class="form-select form-select-sm filter-select-auto"
+                  id="filterPnL"
+                  title="Filter by P&L"
+                  aria-label="Filter by profit/loss"
+                >
+                  <option value="">All P&L</option>
+                  <option value="profit">Profitable</option>
+                  <option value="loss">Loss</option>
+                </select>
+                <input
+                  type="text"
+                  class="form-control form-control-sm filter-search-input"
+                  id="filterSearch"
+                  placeholder="Search..."
+                  title="Search backtests"
+                  aria-label="Search backtests"
+                />
+              </div>
+
+              <div class="card-body p-0">
+                <div class="results-list" id="resultsList">
+                  <!-- Results will be loaded here -->
                 </div>
 
-                <!-- AI Analysis (moved below report) -->
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">
-                            <i class="bi bi-robot me-2"></i>AI Analysis
-                        </span>
+                <div class="empty-state d-none" id="emptyState">
+                  <i class="bi bi-inbox"></i>
+                  <h5>No Backtest Results</h5>
+                  <p>
+                    Run a backtest from the Strategies page to see results here.
+                  </p>
+                  <a href="strategies.html" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg me-1"></i>Create Strategy
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- end panel-content -->
+        </div>
+        <!-- end results-panel -->
+
+        <!-- Right Panel - TradingView Style Report -->
+        <div class="report-panel" id="reportPanel">
+          <!-- Report Container -->
+          <div class="card mb-4">
+            <!-- TradingView Report Tabs with Date Range and Actions -->
+            <div class="tv-report-tabs-row">
+              <div class="tv-report-tabs" id="tvReportTabs">
+                <button class="tv-report-tab active" data-tab="equity">
+                  <i class="bi bi-graph-up me-1"></i>График капитала
+                </button>
+                <button class="tv-report-tab" data-tab="dynamics">
+                  <i class="bi bi-bar-chart me-1"></i>Динамика
+                </button>
+                <button class="tv-report-tab" data-tab="trades-analysis">
+                  <i class="bi bi-pie-chart me-1"></i>Анализ сделок
+                </button>
+                <button class="tv-report-tab" data-tab="risk-return">
+                  <i class="bi bi-shield-check me-1"></i>Доходность с учётом
+                  риска
+                </button>
+                <button class="tv-report-tab" data-tab="trades-list">
+                  <i class="bi bi-list-ul me-1"></i>Список сделок
+                </button>
+              </div>
+              <div class="tv-report-actions">
+                <button
+                  class="tv-action-btn"
+                  id="btnCompare"
+                  onclick="toggleCompareMode()"
+                  disabled
+                  title="Compare Selected"
+                >
+                  <i class="bi bi-columns-gap"></i>
+                  <span>Compare</span>
+                </button>
+                <button
+                  class="tv-action-btn"
+                  onclick="exportResults()"
+                  title="Export"
+                >
+                  <i class="bi bi-download"></i>
+                  <span>Export</span>
+                </button>
+                <div class="tv-report-date-range">
+                  <i class="bi bi-calendar3"></i>
+                  <span id="tvReportDateRange">--</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 1: График капитала (Equity Chart) -->
+            <div class="tv-report-tab-content active" id="tab-equity">
+              <!-- Summary Cards -->
+              <div class="tv-summary-cards">
+                <div class="tv-summary-card">
+                  <div class="tv-summary-card-label">Общие ПР/УБ</div>
+                  <div
+                    class="tv-summary-card-value tv-value-positive"
+                    id="tvNetProfit"
+                  >
+                    --
+                  </div>
+                  <div class="tv-summary-card-sub" id="tvNetProfitPct">--</div>
+                </div>
+                <div class="tv-summary-card">
+                  <div class="tv-summary-card-label">Макс просадка</div>
+                  <div
+                    class="tv-summary-card-value tv-value-negative"
+                    id="tvMaxDrawdown"
+                  >
+                    --
+                  </div>
+                  <div class="tv-summary-card-sub" id="tvMaxDrawdownPct">
+                    --
+                  </div>
+                </div>
+                <div class="tv-summary-card">
+                  <div class="tv-summary-card-label">Всего сделок</div>
+                  <div
+                    class="tv-summary-card-value tv-value-neutral"
+                    id="tvTotalTrades"
+                  >
+                    --
+                  </div>
+                  <div class="tv-summary-card-sub" id="tvOpenTrades">
+                    открытых: 0
+                  </div>
+                </div>
+                <div class="tv-summary-card">
+                  <div class="tv-summary-card-label">Прибыльные сделки</div>
+                  <div
+                    class="tv-summary-card-value tv-value-neutral"
+                    id="tvWinningTrades"
+                  >
+                    --
+                  </div>
+                  <div class="tv-summary-card-sub" id="tvWinRate">--</div>
+                </div>
+                <div class="tv-summary-card">
+                  <div class="tv-summary-card-label">Фактор прибыли</div>
+                  <div
+                    class="tv-summary-card-value tv-value-neutral"
+                    id="tvProfitFactor"
+                  >
+                    --
+                  </div>
+                  <div class="tv-summary-card-sub">
+                    Валовая прибыль / убыток
+                  </div>
+                </div>
+              </div>
+
+              <!-- Equity Chart - TradingView Style -->
+              <div class="tv-equity-section">
+                <div class="tv-equity-chart-container">
+                  <div class="tv-chart-header">
+                    <span class="tv-chart-title">График капитала</span>
+                    <div class="tv-chart-header-right">
+                      <span
+                        id="tvEquityCurrentValue"
+                        class="tv-equity-value-badge"
+                        >+$0.00</span
+                      >
+                      <button
+                        class="tv-chart-expand-btn"
+                        id="btnExpandChart"
+                        title="Развернуть"
+                      >
+                        <i class="bi bi-arrows-fullscreen"></i>
+                      </button>
                     </div>
-                    <div class="card-body">
-                        <div class="ai-analysis" id="aiAnalysis">
-                            <div class="ai-analysis-header">
-                                <i class="bi bi-stars"></i>
-                                <strong>Strategy Insights</strong>
-                            </div>
-                            <p class="mb-0 text-secondary" id="aiAnalysisContent">
-                                Выберите бэктест для получения AI-анализа и рекомендаций.
-                            </p>
-                        </div>
-                        <div class="mt-3">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="requestAIAnalysis()" id="btnAIAnalysis" disabled>
-                                <i class="bi bi-magic me-1"></i>Сгенерировать анализ
-                            </button>
-                        </div>
+                  </div>
+                  <div class="tv-chart-wrapper" id="equityChartWrapper">
+                    <canvas id="equityChart"></canvas>
+                  </div>
+                  <div class="tv-chart-footer">
+                    <div class="tv-chart-legend">
+                      <label class="tv-legend-item">
+                        <input type="checkbox" id="legendBuyHold" checked />
+                        <span class="tv-legend-color tv-legend-color-bh"></span>
+                        Покупка и удержание
+                      </label>
+                      <label
+                        class="tv-legend-item"
+                        title="Отклонение сделки (MFE/MAE) - максимальное благоприятное и неблагоприятное отклонение цены"
+                      >
+                        <input
+                          type="checkbox"
+                          id="legendTradesExcursions"
+                          checked
+                        />
+                        <span
+                          class="tv-legend-color tv-legend-color-runup"
+                        ></span>
+                        Trades excursions
+                      </label>
                     </div>
-                </div> <!-- end ai-analysis card -->
-            </div> <!-- end report-panel -->
-        </div> <!-- end backtest-layout -->
-    </div> <!-- end main-content -->
+                    <div class="tv-chart-mode-toggle">
+                      <button class="tv-mode-btn active" id="btnAbsoluteMode">
+                        Абсолютные значения
+                      </button>
+                      <button class="tv-mode-btn" id="btnPercentMode">
+                        Проценты
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 2: Динамика (Dynamics) -->
+            <div class="tv-report-tab-content" id="tab-dynamics">
+              <table class="tv-data-table" id="tvDynamicsTable">
+                <thead>
+                  <tr>
+                    <th>Показатель</th>
+                    <th>Все</th>
+                    <th>Длинная</th>
+                    <th>Короткая</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="row-label">Исходный капитал</td>
+                    <td id="dyn-initial-capital">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Нереализованная ПР/УБ</td>
+                    <td id="dyn-unrealized">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Net P&L</td>
+                    <td id="dyn-net-profit">--</td>
+                    <td id="dyn-net-profit-long">--</td>
+                    <td id="dyn-net-profit-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Валовая прибыль</td>
+                    <td id="dyn-gross-profit">--</td>
+                    <td id="dyn-gross-profit-long">--</td>
+                    <td id="dyn-gross-profit-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Валовый убыток</td>
+                    <td id="dyn-gross-loss">--</td>
+                    <td id="dyn-gross-loss-long">--</td>
+                    <td id="dyn-gross-loss-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Фактор прибыли</td>
+                    <td id="dyn-profit-factor">--</td>
+                    <td id="dyn-profit-factor-long">--</td>
+                    <td id="dyn-profit-factor-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Выплаченная комиссия</td>
+                    <td id="dyn-commission">--</td>
+                    <td id="dyn-commission-long">--</td>
+                    <td id="dyn-commission-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Ожидаемая прибыль</td>
+                    <td id="dyn-expectancy">--</td>
+                    <td id="dyn-expectancy-long">--</td>
+                    <td id="dyn-expectancy-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Прибыль от покупки и удержания</td>
+                    <td id="dyn-buy-hold">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Опережающая динамика стратегии</td>
+                    <td id="dyn-strategy-vs-bh">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Годовая доходность (CAGR)</td>
+                    <td id="dyn-cagr">--</td>
+                    <td id="dyn-cagr-long">--</td>
+                    <td id="dyn-cagr-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Доходность на исходный капитал</td>
+                    <td id="dyn-return-capital">--</td>
+                    <td id="dyn-return-capital-long">--</td>
+                    <td id="dyn-return-capital-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Сред. продолж. роста капитала</td>
+                    <td id="dyn-avg-growth-duration">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Сред. рост капитала</td>
+                    <td id="dyn-avg-equity-growth">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Макс. рост капитала</td>
+                    <td id="dyn-max-equity-growth">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Сред. продолж. просадки капитала</td>
+                    <td id="dyn-avg-dd-duration">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Сред. просадка капитала</td>
+                    <td id="dyn-avg-drawdown">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Макс. просадка капитала</td>
+                    <td id="dyn-max-drawdown">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">
+                      Макс. просадка капитала (внутри бара)
+                    </td>
+                    <td id="dyn-max-dd-intrabar">--</td>
+                    <td>--</td>
+                    <td>--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Доходность на макс. просадку</td>
+                    <td id="dyn-return-on-dd">--</td>
+                    <td id="dyn-return-on-dd-long">--</td>
+                    <td id="dyn-return-on-dd-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">
+                      Чистая прибыль в % от наибольшего убытка
+                    </td>
+                    <td id="dyn-profit-vs-max-loss">--</td>
+                    <td id="dyn-profit-vs-max-loss-long">--</td>
+                    <td id="dyn-profit-vs-max-loss-short">--</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Dynamics Charts - Profit Structure & Benchmarking -->
+              <div class="tv-dynamics-charts">
+                <div class="tv-chart-row">
+                  <div class="tv-profit-chart tv-chart-half">
+                    <div class="tv-chart-title">Структура прибыли</div>
+                    <canvas id="waterfallChart"></canvas>
+                  </div>
+                  <div class="tv-profit-chart tv-chart-half">
+                    <div class="tv-chart-title">Benchmarking</div>
+                    <canvas id="benchmarkingChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 3: Анализ сделок (Trade Analysis) -->
+            <div class="tv-report-tab-content" id="tab-trades-analysis">
+              <table class="tv-data-table" id="tvTradeAnalysisTable">
+                <thead>
+                  <tr>
+                    <th>Показатель</th>
+                    <th>Все</th>
+                    <th>Длинная</th>
+                    <th>Короткая</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="row-label">Всего открытых сделок</td>
+                    <td id="ta-open-trades">--</td>
+                    <td id="ta-open-trades-long">--</td>
+                    <td id="ta-open-trades-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Всего сделок</td>
+                    <td id="ta-total-trades">--</td>
+                    <td id="ta-total-trades-long">--</td>
+                    <td id="ta-total-trades-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Прибыльные сделки</td>
+                    <td id="ta-winning-trades">--</td>
+                    <td id="ta-winning-trades-long">--</td>
+                    <td id="ta-winning-trades-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Убыточные сделки</td>
+                    <td id="ta-losing-trades">--</td>
+                    <td id="ta-losing-trades-long">--</td>
+                    <td id="ta-losing-trades-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Сделки в безубыток</td>
+                    <td id="ta-breakeven-trades">--</td>
+                    <td id="ta-breakeven-trades-long">--</td>
+                    <td id="ta-breakeven-trades-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Процент прибыльных</td>
+                    <td id="ta-win-rate">--</td>
+                    <td id="ta-win-rate-long">--</td>
+                    <td id="ta-win-rate-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Средние ПР/УБ</td>
+                    <td id="ta-avg-pnl">--</td>
+                    <td id="ta-avg-pnl-long">--</td>
+                    <td id="ta-avg-pnl-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Средняя прибыль по сделке</td>
+                    <td id="ta-avg-win">--</td>
+                    <td id="ta-avg-win-long">--</td>
+                    <td id="ta-avg-win-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Средний убыток по сделке</td>
+                    <td id="ta-avg-loss">--</td>
+                    <td id="ta-avg-loss-long">--</td>
+                    <td id="ta-avg-loss-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Коэф. средней прибыли / убытка</td>
+                    <td id="ta-payoff-ratio">--</td>
+                    <td id="ta-payoff-ratio-long">--</td>
+                    <td id="ta-payoff-ratio-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Самая прибыльная сделка</td>
+                    <td id="ta-largest-win">--</td>
+                    <td id="ta-largest-win-long">--</td>
+                    <td id="ta-largest-win-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Самая прибыльная сделка, %</td>
+                    <td id="ta-largest-win-pct">--</td>
+                    <td id="ta-largest-win-pct-long">--</td>
+                    <td id="ta-largest-win-pct-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Самая убыточная сделка</td>
+                    <td id="ta-largest-loss">--</td>
+                    <td id="ta-largest-loss-long">--</td>
+                    <td id="ta-largest-loss-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Самая убыточная сделка, %</td>
+                    <td id="ta-largest-loss-pct">--</td>
+                    <td id="ta-largest-loss-pct-long">--</td>
+                    <td id="ta-largest-loss-pct-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Среднее # баров в позиции</td>
+                    <td id="ta-avg-bars">--</td>
+                    <td id="ta-avg-bars-long">--</td>
+                    <td id="ta-avg-bars-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">
+                      Среднее # баров в прибыльной позиции
+                    </td>
+                    <td id="ta-avg-bars-win">--</td>
+                    <td id="ta-avg-bars-win-long">--</td>
+                    <td id="ta-avg-bars-win-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">
+                      Среднее # баров в убыточной позиции
+                    </td>
+                    <td id="ta-avg-bars-loss">--</td>
+                    <td id="ta-avg-bars-loss-long">--</td>
+                    <td id="ta-avg-bars-loss-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Макс последовательных выигрышей</td>
+                    <td id="ta-max-consec-wins">--</td>
+                    <td id="ta-max-consec-wins-long">--</td>
+                    <td id="ta-max-consec-wins-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Макс последовательных проигрышей</td>
+                    <td id="ta-max-consec-losses">--</td>
+                    <td id="ta-max-consec-losses-long">--</td>
+                    <td id="ta-max-consec-losses-short">--</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Trade Analysis Charts - TradingView Style -->
+              <div class="tv-trade-analysis-charts">
+                <div class="tv-chart-row">
+                  <div class="tv-profit-chart tv-chart-half">
+                    <div class="tv-chart-title">
+                      Распределение прибыли и убытков
+                    </div>
+                    <canvas id="tradeDistributionChart"></canvas>
+                  </div>
+                  <div class="tv-profit-chart tv-chart-half tv-donut-container">
+                    <div class="tv-chart-title">
+                      Соотношение побед/поражений
+                    </div>
+                    <div class="tv-donut-wrapper">
+                      <div class="tv-donut-chart">
+                        <canvas id="winLossDonutChart"></canvas>
+                      </div>
+                      <div class="tv-donut-legend" id="winLossLegend">
+                        <div class="tv-legend-row">
+                          <span class="tv-legend-marker win"></span>
+                          <span class="tv-legend-label">Победы</span>
+                          <span class="tv-legend-value" id="legend-wins"
+                            >0 сделок</span
+                          >
+                          <span class="tv-legend-pct" id="legend-wins-pct"
+                            >0.00%</span
+                          >
+                        </div>
+                        <div class="tv-legend-row">
+                          <span class="tv-legend-marker loss"></span>
+                          <span class="tv-legend-label">Убытки</span>
+                          <span class="tv-legend-value" id="legend-losses"
+                            >0 сделок</span
+                          >
+                          <span class="tv-legend-pct" id="legend-losses-pct"
+                            >0.00%</span
+                          >
+                        </div>
+                        <div class="tv-legend-row">
+                          <span class="tv-legend-marker breakeven"></span>
+                          <span class="tv-legend-label">Безубыточность</span>
+                          <span class="tv-legend-value" id="legend-breakeven"
+                            >0 сделок</span
+                          >
+                          <span class="tv-legend-pct" id="legend-breakeven-pct"
+                            >0.00%</span
+                          >
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 4: Доходность с учётом риска (Risk-Adjusted Returns) -->
+            <div class="tv-report-tab-content" id="tab-risk-return">
+              <table class="tv-data-table" id="tvRiskReturnTable">
+                <thead>
+                  <tr>
+                    <th>Показатель</th>
+                    <th>Все</th>
+                    <th>Длинная</th>
+                    <th>Короткая</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="row-label">Коэффициент Шарпа</td>
+                    <td id="rr-sharpe">--</td>
+                    <td id="rr-sharpe-long">--</td>
+                    <td id="rr-sharpe-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Коэффициент Сортино</td>
+                    <td id="rr-sortino">--</td>
+                    <td id="rr-sortino-long">--</td>
+                    <td id="rr-sortino-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Фактор прибыли</td>
+                    <td id="rr-profit-factor">--</td>
+                    <td id="rr-profit-factor-long">--</td>
+                    <td id="rr-profit-factor-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Коэффициент Кальмара</td>
+                    <td id="rr-calmar">--</td>
+                    <td id="rr-calmar-long">--</td>
+                    <td id="rr-calmar-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Фактор восстановления</td>
+                    <td id="rr-recovery">--</td>
+                    <td id="rr-recovery-long">--</td>
+                    <td id="rr-recovery-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Индекс язвы (Ulcer Index)</td>
+                    <td id="rr-ulcer">--</td>
+                    <td id="rr-ulcer-long">--</td>
+                    <td id="rr-ulcer-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Эффективность маржи (%)</td>
+                    <td id="rr-margin-eff">--</td>
+                    <td id="rr-margin-eff-long">--</td>
+                    <td id="rr-margin-eff-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Стабильность (R²)</td>
+                    <td id="rr-stability">--</td>
+                    <td id="rr-stability-long">--</td>
+                    <td id="rr-stability-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">SQN (System Quality Num)</td>
+                    <td id="rr-sqn">--</td>
+                    <td id="rr-sqn-long">--</td>
+                    <td id="rr-sqn-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Коэф. Kelly (%)</td>
+                    <td id="rr-kelly">--</td>
+                    <td id="rr-kelly-long">--</td>
+                    <td id="rr-kelly-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Payoff Ratio (Avg Win/Loss)</td>
+                    <td id="rr-payoff">--</td>
+                    <td id="rr-payoff-long">--</td>
+                    <td id="rr-payoff-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Макс. послед. выигрышей</td>
+                    <td id="rr-max-consec-wins">--</td>
+                    <td id="rr-max-consec-wins-long">--</td>
+                    <td id="rr-max-consec-wins-short">--</td>
+                  </tr>
+                  <tr>
+                    <td class="row-label">Макс. послед. проигрышей</td>
+                    <td id="rr-max-consec-losses">--</td>
+                    <td id="rr-max-consec-losses-long">--</td>
+                    <td id="rr-max-consec-losses-short">--</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Tab 5: Список сделок (Trades List) -->
+            <div class="tv-report-tab-content" id="tab-trades-list">
+              <div
+                class="d-flex justify-content-between align-items-center mb-3"
+              >
+                <div class="d-flex align-items-center gap-2">
+                  <span class="text-secondary">Всего сделок: </span>
+                  <span class="fw-bold" id="tvTradesCount">0</span>
+                </div>
+                <button
+                  class="btn btn-sm btn-outline-secondary"
+                  onclick="exportTrades()"
+                >
+                  <i class="bi bi-download me-1"></i>Экспорт CSV
+                </button>
+              </div>
+              <div class="tv-trades-container">
+                <table class="tv-trades-table" id="tvTradesListTable">
+                  <thead>
+                    <tr>
+                      <th>№ Сделки</th>
+                      <th>Тип</th>
+                      <th>Дата и время</th>
+                      <th>Сигнал</th>
+                      <th>Цена</th>
+                      <th>Размер позиции</th>
+                      <th>Чистая прибыль / убыток</th>
+                      <th>MFE</th>
+                      <th>MAE</th>
+                      <th>Совокупные ПР/УБ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tvTradesListBody">
+                    <!-- Trades will be populated by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Analysis (moved below report) -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">
+                <i class="bi bi-robot me-2"></i>AI Analysis
+              </span>
+            </div>
+            <div class="card-body">
+              <div class="ai-analysis" id="aiAnalysis">
+                <div class="ai-analysis-header">
+                  <i class="bi bi-stars"></i>
+                  <strong>Strategy Insights</strong>
+                </div>
+                <p class="mb-0 text-secondary" id="aiAnalysisContent">
+                  Выберите бэктест для получения AI-анализа и рекомендаций.
+                </p>
+              </div>
+              <div class="mt-3">
+                <button
+                  class="btn btn-outline-secondary btn-sm"
+                  onclick="requestAIAnalysis()"
+                  id="btnAIAnalysis"
+                  disabled
+                >
+                  <i class="bi bi-magic me-1"></i>Сгенерировать анализ
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- end ai-analysis card -->
+        </div>
+        <!-- end report-panel -->
+      </div>
+      <!-- end backtest-layout -->
+    </div>
+    <!-- end main-content -->
 
     <!-- New Backtest Modal -->
     <div class="modal fade" id="newBacktestModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content bg-dark text-light">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title">
-                        <i class="bi bi-play-circle me-2"></i>Run New Backtest
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" title="Close" aria-label="Close modal"></button>
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title">
+              <i class="bi bi-play-circle me-2"></i>Run New Backtest
+            </h5>
+            <button
+              type="button"
+              class="btn-close btn-close-white"
+              data-bs-dismiss="modal"
+              title="Close"
+              aria-label="Close modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <form id="backtestForm">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="btStrategy">Strategy</label>
+                  <select
+                    class="form-select bg-dark text-light border-secondary"
+                    id="btStrategy"
+                    required
+                    aria-label="Select strategy"
+                  >
+                    <option value="">Select strategy...</option>
+                  </select>
                 </div>
-                <div class="modal-body">
-                    <form id="backtestForm">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label" for="btStrategy">Strategy</label>
-                                <select class="form-select bg-dark text-light border-secondary" id="btStrategy" required aria-label="Select strategy">
-                                    <option value="">Select strategy...</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="btSymbol">Symbol</label>
-                                <select class="form-select bg-dark text-light border-secondary" id="btSymbol" required aria-label="Select trading symbol">
-                                    <option value="BTCUSDT">BTCUSDT</option>
-                                    <option value="ETHUSDT">ETHUSDT</option>
-                                    <option value="BNBUSDT">BNBUSDT</option>
-                                    <option value="SOLUSDT">SOLUSDT</option>
-                                    <option value="XRPUSDT">XRPUSDT</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="btInterval">Interval</label>
-                                <select class="form-select bg-dark text-light border-secondary" id="btInterval" required aria-label="Select timeframe interval">
-                                    <option value="15m">15 Minutes</option>
-                                    <option value="1h" selected>1 Hour</option>
-                                    <option value="4h">4 Hours</option>
-                                    <option value="1d">Daily</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="btEngine">Backtesting Engine</label>
-                                <select class="form-select bg-dark text-light border-secondary" id="btEngine" aria-label="Select backtesting engine">
-                                    <option value="auto">Auto (Best Available)</option>
-                                    <option value="gpu">GPU (CUDA) - Fastest</option>
-                                    <option value="numba">Numba (JIT) - Fast</option>
-                                    <option value="fallback">Fallback (Reference)</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="btCapital">Initial Capital</label>
-                                <input type="number" class="form-control bg-dark text-light border-secondary" id="btCapital" value="10000" min="100" required aria-label="Initial capital amount">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="btStartDate">Start Date</label>
-                                <input type="date" class="form-control bg-dark text-light border-secondary" id="btStartDate" required aria-label="Backtest start date">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="btEndDate">End Date</label>
-                                <input type="date" class="form-control bg-dark text-light border-secondary" id="btEndDate" required aria-label="Backtest end date">
-                            </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="btSymbol">Symbol</label>
+                  <select
+                    class="form-select bg-dark text-light border-secondary"
+                    id="btSymbol"
+                    required
+                    aria-label="Select trading symbol"
+                  >
+                    <option value="BTCUSDT">BTCUSDT</option>
+                    <option value="ETHUSDT">ETHUSDT</option>
+                    <option value="BNBUSDT">BNBUSDT</option>
+                    <option value="SOLUSDT">SOLUSDT</option>
+                    <option value="XRPUSDT">XRPUSDT</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="btInterval">Interval</label>
+                  <select
+                    class="form-select bg-dark text-light border-secondary"
+                    id="btInterval"
+                    required
+                    aria-label="Select timeframe interval"
+                  >
+                    <option value="15m">15 Minutes</option>
+                    <option value="1h" selected>1 Hour</option>
+                    <option value="4h">4 Hours</option>
+                    <option value="1d">Daily</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="btEngine"
+                    >Backtesting Engine</label
+                  >
+                  <select
+                    class="form-select bg-dark text-light border-secondary"
+                    id="btEngine"
+                    aria-label="Select backtesting engine"
+                  >
+                    <option value="auto">Auto (Best Available)</option>
+                    <option value="gpu">GPU (CUDA) - Fastest</option>
+                    <option value="numba">Numba (JIT) - Fast</option>
+                    <option value="fallback">Fallback (Reference)</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="btCapital"
+                    >Initial Capital</label
+                  >
+                  <input
+                    type="number"
+                    class="form-control bg-dark text-light border-secondary"
+                    id="btCapital"
+                    value="10000"
+                    min="100"
+                    required
+                    aria-label="Initial capital amount"
+                  />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="btStartDate">Start Date</label>
+                  <input
+                    type="date"
+                    class="form-control bg-dark text-light border-secondary"
+                    id="btStartDate"
+                    required
+                    aria-label="Backtest start date"
+                  />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="btEndDate">End Date</label>
+                  <input
+                    type="date"
+                    class="form-control bg-dark text-light border-secondary"
+                    id="btEndDate"
+                    required
+                    aria-label="Backtest end date"
+                  />
+                </div>
+
+                <!-- MTF Settings Section -->
+                <div class="col-12 mt-3">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="btMtfEnabled"
+                      onchange="toggleMtfSettings()"
+                    />
+                    <label class="form-check-label" for="btMtfEnabled">
+                      <i class="bi bi-layers me-1"></i>Enable Multi-Timeframe
+                      (MTF)
+                    </label>
+                  </div>
+                </div>
+
+                <div class="col-12" id="mtfSettingsPanel" style="display: none">
+                  <div
+                    class="card bg-secondary bg-opacity-25 border-secondary mt-2"
+                  >
+                    <div class="card-body">
+                      <h6 class="card-subtitle mb-3 text-info">
+                        <i class="bi bi-clock-history me-1"></i>HTF Filter
+                        Settings
+                      </h6>
+                      <div class="row g-3">
+                        <div class="col-md-4">
+                          <label class="form-label" for="btHtfInterval"
+                            >HTF Interval</label
+                          >
+                          <select
+                            class="form-select bg-dark text-light border-secondary"
+                            id="btHtfInterval"
+                            aria-label="Higher timeframe interval"
+                          >
+                            <option value="60">1 Hour</option>
+                            <option value="240">4 Hours</option>
+                            <option value="D" selected>Daily</option>
+                            <option value="W">Weekly</option>
+                          </select>
                         </div>
-                    </form>
+                        <div class="col-md-4">
+                          <label class="form-label" for="btHtfFilterType"
+                            >Filter Type</label
+                          >
+                          <select
+                            class="form-select bg-dark text-light border-secondary"
+                            id="btHtfFilterType"
+                            aria-label="HTF filter type"
+                          >
+                            <option value="sma" selected>
+                              SMA (Simple MA)
+                            </option>
+                            <option value="ema">EMA (Exponential MA)</option>
+                            <option value="supertrend">SuperTrend</option>
+                            <option value="ichimoku">Ichimoku Cloud</option>
+                            <option value="macd">MACD</option>
+                          </select>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label" for="btHtfPeriod"
+                            >Filter Period</label
+                          >
+                          <input
+                            type="number"
+                            class="form-control bg-dark text-light border-secondary"
+                            id="btHtfPeriod"
+                            value="200"
+                            min="5"
+                            max="500"
+                            aria-label="HTF filter period"
+                          />
+                        </div>
+                      </div>
+
+                      <!-- BTC Correlation Section -->
+                      <h6 class="card-subtitle mb-3 mt-4 text-warning">
+                        <i class="bi bi-currency-bitcoin me-1"></i>BTC
+                        Correlation Filter
+                      </h6>
+                      <div class="row g-3">
+                        <div class="col-md-4">
+                          <div class="form-check form-switch">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              id="btBtcFilterEnabled"
+                            />
+                            <label
+                              class="form-check-label"
+                              for="btBtcFilterEnabled"
+                            >
+                              Enable BTC Filter
+                            </label>
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label" for="btBtcSmaPeriod"
+                            >BTC SMA Period</label
+                          >
+                          <input
+                            type="number"
+                            class="form-control bg-dark text-light border-secondary"
+                            id="btBtcSmaPeriod"
+                            value="50"
+                            min="5"
+                            max="200"
+                            aria-label="BTC SMA period"
+                          />
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label" for="btBtcMinDistance"
+                            >Min Distance %</label
+                          >
+                          <input
+                            type="number"
+                            class="form-control bg-dark text-light border-secondary"
+                            id="btBtcMinDistance"
+                            value="0.5"
+                            min="0"
+                            max="5"
+                            step="0.1"
+                            aria-label="Minimum distance from BTC SMA"
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        class="alert alert-info alert-sm mt-3 mb-0 py-2"
+                        style="font-size: 0.85rem"
+                      >
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>MTF Mode:</strong> Only trade LTF signals when
+                        aligned with HTF trend. BTC filter adds market sentiment
+                        confirmation.
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="runBacktest()">
-                        <i class="bi bi-play-fill me-1"></i>Run Backtest
-                    </button>
+
+                <!-- ML Optimizer Section -->
+                <div class="col-12 mt-3">
+                  <div class="form-check form-switch">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="btOptimizeEnabled"
+                      onchange="toggleOptimizeSettings()"
+                    />
+                    <label class="form-check-label" for="btOptimizeEnabled">
+                      <i class="bi bi-gear-wide-connected me-1"></i>Enable
+                      Parameter Optimization
+                    </label>
+                  </div>
                 </div>
-            </div>
+
+                <div
+                  class="col-12"
+                  id="optimizeSettingsPanel"
+                  style="display: none"
+                >
+                  <div
+                    class="card bg-secondary bg-opacity-25 border-secondary mt-2"
+                  >
+                    <div class="card-body">
+                      <h6 class="card-subtitle mb-3 text-warning">
+                        <i class="bi bi-sliders me-1"></i>ML Optimizer Settings
+                      </h6>
+                      <div class="row g-3">
+                        <div class="col-md-4">
+                          <label class="form-label" for="btOptMethod"
+                            >Optimization Method</label
+                          >
+                          <select
+                            class="form-select bg-dark text-light border-secondary"
+                            id="btOptMethod"
+                            aria-label="Optimization method"
+                          >
+                            <option value="grid">Grid Search (Fast)</option>
+                            <option value="bayesian" selected>
+                              Bayesian (TPE)
+                            </option>
+                            <option value="genetic">Genetic Algorithm</option>
+                            <option value="random">Random Search</option>
+                          </select>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label" for="btOptObjective"
+                            >Objective</label
+                          >
+                          <select
+                            class="form-select bg-dark text-light border-secondary"
+                            id="btOptObjective"
+                            aria-label="Optimization objective"
+                          >
+                            <option value="sharpe" selected>
+                              Sharpe Ratio
+                            </option>
+                            <option value="sortino">Sortino Ratio</option>
+                            <option value="profit_factor">Profit Factor</option>
+                            <option value="total_return">Total Return</option>
+                            <option value="calmar">Calmar Ratio</option>
+                          </select>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label" for="btOptTrials"
+                            >Max Trials</label
+                          >
+                          <input
+                            type="number"
+                            class="form-control bg-dark text-light border-secondary"
+                            id="btOptTrials"
+                            value="100"
+                            min="10"
+                            max="1000"
+                            aria-label="Maximum optimization trials"
+                          />
+                        </div>
+                      </div>
+
+                      <!-- Parameter Ranges -->
+                      <h6 class="card-subtitle mb-3 mt-4 text-info">
+                        <i class="bi bi-sliders2 me-1"></i>Parameter Ranges to
+                        Optimize
+                      </h6>
+                      <div class="row g-3">
+                        <div class="col-md-4">
+                          <div class="form-check">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              id="optRsiPeriod"
+                              checked
+                            />
+                            <label class="form-check-label" for="optRsiPeriod"
+                              >RSI Period</label
+                            >
+                          </div>
+                          <div class="input-group input-group-sm mt-1">
+                            <input
+                              type="number"
+                              class="form-control bg-dark text-light border-secondary"
+                              id="optRsiPeriodMin"
+                              value="7"
+                              min="2"
+                              title="Min RSI period"
+                            />
+                            <span
+                              class="input-group-text bg-dark text-light border-secondary"
+                              >-</span
+                            >
+                            <input
+                              type="number"
+                              class="form-control bg-dark text-light border-secondary"
+                              id="optRsiPeriodMax"
+                              value="28"
+                              max="100"
+                              title="Max RSI period"
+                            />
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-check">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              id="optSlTp"
+                              checked
+                            />
+                            <label class="form-check-label" for="optSlTp"
+                              >SL/TP %</label
+                            >
+                          </div>
+                          <div class="input-group input-group-sm mt-1">
+                            <input
+                              type="number"
+                              class="form-control bg-dark text-light border-secondary"
+                              id="optSlMin"
+                              value="0.5"
+                              min="0.1"
+                              step="0.1"
+                              title="Min SL %"
+                            />
+                            <span
+                              class="input-group-text bg-dark text-light border-secondary"
+                              >-</span
+                            >
+                            <input
+                              type="number"
+                              class="form-control bg-dark text-light border-secondary"
+                              id="optSlMax"
+                              value="3"
+                              max="10"
+                              step="0.1"
+                              title="Max SL %"
+                            />
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-check">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              id="optOverbought"
+                            />
+                            <label class="form-check-label" for="optOverbought"
+                              >Overbought/Oversold</label
+                            >
+                          </div>
+                          <div class="input-group input-group-sm mt-1">
+                            <input
+                              type="number"
+                              class="form-control bg-dark text-light border-secondary"
+                              id="optOverboughtMin"
+                              value="65"
+                              title="Min overbought"
+                            />
+                            <span
+                              class="input-group-text bg-dark text-light border-secondary"
+                              >-</span
+                            >
+                            <input
+                              type="number"
+                              class="form-control bg-dark text-light border-secondary"
+                              id="optOverboughtMax"
+                              value="80"
+                              title="Max overbought"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Advanced Options -->
+                      <div class="row g-3 mt-2">
+                        <div class="col-md-4">
+                          <div class="form-check form-switch">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              id="optWalkForward"
+                            />
+                            <label
+                              class="form-check-label"
+                              for="optWalkForward"
+                            >
+                              Walk-Forward Validation
+                            </label>
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-check form-switch">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              id="optMultiObjective"
+                            />
+                            <label
+                              class="form-check-label"
+                              for="optMultiObjective"
+                            >
+                              Multi-Objective (Pareto)
+                            </label>
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="form-check form-switch">
+                            <input
+                              class="form-check-input"
+                              type="checkbox"
+                              id="optSaveResults"
+                              checked
+                            />
+                            <label
+                              class="form-check-label"
+                              for="optSaveResults"
+                            >
+                              Save All Results
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        class="alert alert-warning alert-sm mt-3 mb-0 py-2"
+                        style="font-size: 0.85rem"
+                      >
+                        <i class="bi bi-lightning-charge me-1"></i>
+                        <strong>Bayesian:</strong> Smart search using TPE
+                        sampler. <strong>Genetic:</strong> Evolution-based
+                        optimization. Both find optimal parameters faster than
+                        grid search.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="runBacktest()"
+            >
+              <i class="bi bi-play-fill me-1"></i>Run Backtest
+            </button>
+          </div>
         </div>
+      </div>
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
-        crossorigin="anonymous"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+      crossorigin="anonymous"
+    ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Date adapter for time scale -->
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -541,100 +1431,107 @@
     <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
     <!-- TradingView-style Equity Chart Component -->
     <script src="./js/components/TradingViewEquityChart.js?v=20260113"></script>
-    
+
     <!-- Custom plugin for donut center text -->
     <script>
-        // Plugin to draw text in center of doughnut chart
-        const centerTextPlugin = {
-            id: 'centerText',
-            beforeDraw: function(chart) {
-                if (chart.config.type !== 'doughnut') return;
-                const opts = chart.options.plugins.centerLabel;
-                if (!opts) return;
-                
-                const ctx = chart.ctx;
-                // Get the actual chart area (excluding legend)
-                const chartArea = chart.chartArea;
-                if (!chartArea) return;
-                
-                const centerX = (chartArea.left + chartArea.right) / 2;
-                const centerY = (chartArea.top + chartArea.bottom) / 2;
-                const innerRadius = chart._metasets[0]?.data[0]?.innerRadius || 50;
-                
-                ctx.save();
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                
-                // Main number - sized to fit inside donut hole
-                const fontSize = Math.min(innerRadius * 0.6, 28);
-                ctx.font = `bold ${fontSize}px sans-serif`;
-                ctx.fillStyle = '#ffffff';
-                const text = opts.text || '';
-                ctx.fillText(text, centerX, centerY - fontSize * 0.25);
-                
-                // Sub text
-                if (opts.subText) {
-                    const subFontSize = Math.min(innerRadius * 0.25, 12);
-                    ctx.font = `${subFontSize}px sans-serif`;
-                    ctx.fillStyle = '#8b949e';
-                    ctx.fillText(opts.subText, centerX, centerY + fontSize * 0.5);
-                }
-                ctx.restore();
-            }
-        };
-        Chart.register(centerTextPlugin);
-        // Register datalabels plugin but disable by default (only enable where needed)
-        if (typeof ChartDataLabels !== 'undefined') {
-            Chart.register(ChartDataLabels);
-            Chart.defaults.plugins.datalabels.display = false;
-        }
+      // Plugin to draw text in center of doughnut chart
+      const centerTextPlugin = {
+        id: "centerText",
+        beforeDraw: function (chart) {
+          if (chart.config.type !== "doughnut") return;
+          const opts = chart.options.plugins.centerLabel;
+          if (!opts) return;
+
+          const ctx = chart.ctx;
+          // Get the actual chart area (excluding legend)
+          const chartArea = chart.chartArea;
+          if (!chartArea) return;
+
+          const centerX = (chartArea.left + chartArea.right) / 2;
+          const centerY = (chartArea.top + chartArea.bottom) / 2;
+          const innerRadius = chart._metasets[0]?.data[0]?.innerRadius || 50;
+
+          ctx.save();
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+
+          // Main number - sized to fit inside donut hole
+          const fontSize = Math.min(innerRadius * 0.6, 28);
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          ctx.fillStyle = "#ffffff";
+          const text = opts.text || "";
+          ctx.fillText(text, centerX, centerY - fontSize * 0.25);
+
+          // Sub text
+          if (opts.subText) {
+            const subFontSize = Math.min(innerRadius * 0.25, 12);
+            ctx.font = `${subFontSize}px sans-serif`;
+            ctx.fillStyle = "#8b949e";
+            ctx.fillText(opts.subText, centerX, centerY + fontSize * 0.5);
+          }
+          ctx.restore();
+        },
+      };
+      Chart.register(centerTextPlugin);
+      // Register datalabels plugin but disable by default (only enable where needed)
+      if (typeof ChartDataLabels !== "undefined") {
+        Chart.register(ChartDataLabels);
+        Chart.defaults.plugins.datalabels.display = false;
+      }
     </script>
-    
+
     <!-- Debug: Test API before module loads -->
     <script>
-        window.onerror = function(msg, url, line) {
-            console.error('Global error:', msg, url, line);
-            document.getElementById('resultsCount').textContent = 'ERR';
-        };
-        console.log('Page loading...');
-        // Quick API test
-        fetch('/api/v1/backtests/?limit=5')
-            .then(r => r.json())
-            .then(d => console.log('API works! Items:', d.items?.length || 0))
-            .catch(e => console.error('API error:', e));
+      window.onerror = function (msg, url, line) {
+        console.error("Global error:", msg, url, line);
+        document.getElementById("resultsCount").textContent = "ERR";
+      };
+      console.log("Page loading...");
+      // Quick API test
+      fetch("/api/v1/backtests/?limit=5")
+        .then((r) => r.json())
+        .then((d) => console.log("API works! Items:", d.items?.length || 0))
+        .catch((e) => console.error("API error:", e));
     </script>
-    
-    <script type="module" src="./js/pages/backtest_results.js?v=20260123a"></script>
-    
+
+    <script
+      type="module"
+      src="./js/pages/backtest_results.js?v=20260123a"
+    ></script>
+
     <!-- Fallback: if module fails, load data manually after 2 seconds -->
     <script>
-        setTimeout(function() {
-            const countEl = document.getElementById('resultsCount');
-            // Also run fallback if ERR is shown (module error)
-            if (countEl && (countEl.textContent === '0' || countEl.textContent === 'ERR')) {
-                console.log('Module may have failed, trying fallback...');
-                fetch('/api/v1/backtests/?limit=100')
-                    .then(r => r.json())
-                    .then(data => {
-                        const items = data.items || [];
-                        countEl.textContent = items.length;
-                        if (items.length > 0) {
-                            const listEl = document.getElementById('resultsList');
-                            listEl.innerHTML = items.map(r => {
-                                const symbol = r.config?.symbol || 'Unknown';
-                                const strategy = r.config?.strategy_type || 'Unknown';
-                                const ret = r.metrics?.total_return || 0;
-                                const isProfitable = ret >= 0;
-                                return `
+      setTimeout(function () {
+        const countEl = document.getElementById("resultsCount");
+        // Also run fallback if ERR is shown (module error)
+        if (
+          countEl &&
+          (countEl.textContent === "0" || countEl.textContent === "ERR")
+        ) {
+          console.log("Module may have failed, trying fallback...");
+          fetch("/api/v1/backtests/?limit=100")
+            .then((r) => r.json())
+            .then((data) => {
+              const items = data.items || [];
+              countEl.textContent = items.length;
+              if (items.length > 0) {
+                const listEl = document.getElementById("resultsList");
+                listEl.innerHTML = items
+                  .map((r) => {
+                    const symbol = r.config?.symbol || "Unknown";
+                    const strategy = r.config?.strategy_type || "Unknown";
+                    const ret = r.metrics?.total_return || 0;
+                    const isProfitable = ret >= 0;
+                    return `
                                     <div class="result-item" data-id="${r.id}" style="padding:12px;border-bottom:1px solid #30363d;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
                                         <div onclick="window.selectBT('${r.id}')" style="flex:1">
                                             <div style="display:flex;justify-content:space-between;align-items:center">
                                                 <div>
                                                     <div style="font-weight:600">${strategy}</div>
-                                                    <div style="font-size:12px;color:#8b949e">${symbol} • ${r.config?.interval || '--'}</div>
+                                                    <div style="font-size:12px;color:#8b949e">${symbol} • ${r.config?.interval || "--"}</div>
                                                 </div>
                                                 <div style="text-align:right">
-                                                    <div style="color:${isProfitable ? '#3fb950' : '#f85149'}">${isProfitable?'+':''}${ret.toFixed(2)}%</div>
+                                                    <div style="color:${isProfitable ? "#3fb950" : "#f85149"}">${isProfitable ? "+" : ""}${ret.toFixed(2)}%</div>
                                                     <div style="font-size:12px;color:#8b949e">${r.metrics?.total_trades || 0} trades</div>
                                                 </div>
                                             </div>
@@ -644,213 +1541,308 @@
                                         </button>
                                     </div>
                                 `;
-                            }).join('');
-                            
-                            // Auto-select first
-                            if (items.length > 0) window.selectBT(items[0].id);
-                        }
-                    })
-                    .catch(e => console.error('Fallback error:', e));
-            }
-        }, 2000);
-        
-        // Simple backtest selector with TradingView cards support
-        window.selectBT = function(id) {
-            fetch('/api/v1/backtests/' + id)
-                .then(r => r.json())
-                .then(bt => {
-                    const m = bt.metrics || {};
-                    
-                    // Update TradingView Summary Cards
-                    const tvNetProfit = document.getElementById('tvNetProfit');
-                    const tvNetProfitPct = document.getElementById('tvNetProfitPct');
-                    if (tvNetProfit) {
-                        const val = m.net_profit || 0;
-                        tvNetProfit.textContent = (val >= 0 ? '+' : '') + val.toLocaleString('ru-RU', {minimumFractionDigits: 2}) + ' USD';
-                        tvNetProfit.className = 'tv-summary-card-value ' + (val >= 0 ? 'tv-value-positive' : 'tv-value-negative');
-                    }
-                    if (tvNetProfitPct) {
-                        const pct = m.net_profit_pct || m.total_return || 0;
-                        tvNetProfitPct.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
-                    }
-                    
-                    const tvMaxDD = document.getElementById('tvMaxDrawdown');
-                    const tvMaxDDPct = document.getElementById('tvMaxDrawdownPct');
-                    if (tvMaxDD) tvMaxDD.textContent = Math.abs(m.max_drawdown_value || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2}) + ' USD';
-                    if (tvMaxDDPct) tvMaxDDPct.textContent = Math.abs(m.max_drawdown || 0).toFixed(2) + '%';
-                    
-                    const tvTotalTrades = document.getElementById('tvTotalTrades');
-                    if (tvTotalTrades) tvTotalTrades.textContent = m.total_trades || 0;
-                    
-                    const tvWinningTrades = document.getElementById('tvWinningTrades');
-                    const tvWinRate = document.getElementById('tvWinRate');
-                    if (tvWinningTrades) tvWinningTrades.textContent = m.winning_trades || 0;
-                    // win_rate comes as 0-100 (percentage), not 0-1
-                    if (tvWinRate) tvWinRate.textContent = (m.win_rate || 0).toFixed(2) + '%';
-                    
-                    const tvProfitFactor = document.getElementById('tvProfitFactor');
-                    if (tvProfitFactor) tvProfitFactor.textContent = (m.profit_factor || 0).toFixed(3);
-                    
-                    // Update header
-                    const headerTitle = document.querySelector('.tv-report-title');
-                    if (headerTitle) {
-                        headerTitle.textContent = 'Стратегия ' + (bt.config?.strategy_type || 'RSI').toUpperCase() + ' — ' + (bt.config?.symbol || 'BTCUSDT');
-                    }
-                    
-                    // Legacy metrics fallback
-                    const setVal = (elId, val, fmt) => {
-                        const el = document.getElementById(elId);
-                        if (el) el.textContent = val !== null && val !== undefined ? 
-                            (fmt === 'pct' ? val.toFixed(2) + '%' : 
-                             fmt === 'num' ? val.toFixed(2) : val) : '--';
-                    };
-                    setVal('metricNetProfit', m.net_profit ? '$' + m.net_profit.toFixed(2) + ' (' + (m.net_profit_pct||0).toFixed(2) + '%)' : null);
-                    setVal('metricReturn', m.total_return, 'pct');
-                    setVal('metricWinRate', m.win_rate, 'pct');
-                    setVal('metricProfitFactor', m.profit_factor, 'num');
-                    setVal('metricDrawdown', m.max_drawdown ? '-' + m.max_drawdown.toFixed(2) + '%' : null);
-                    setVal('metricSharpe', m.sharpe_ratio, 'num');
-                    setVal('metricSortino', m.sortino_ratio, 'num');
-                    setVal('metricRecoveryFactor', m.recovery_factor, 'num');
-                    setVal('metricTrades', m.total_trades);
-                    setVal('metricAvgWin', m.avg_win ? '$' + (m.avg_win_value||0).toFixed(2) + ' (' + m.avg_win.toFixed(2) + '%)' : null);
-                    setVal('metricAvgLoss', m.avg_loss ? '-$' + Math.abs(m.avg_loss_value||0).toFixed(2) + ' (' + m.avg_loss.toFixed(2) + '%)' : null);
-                    setVal('metricAvgBars', m.avg_bars_in_trade, 'num');
-                    setVal('metricLargestWin', m.largest_win ? '$' + (m.largest_win_value||0).toFixed(2) : null);
-                    setVal('metricLargestLoss', m.largest_loss ? '-$' + Math.abs(m.largest_loss_value||0).toFixed(2) : null);
-                    setVal('metricExpectancy', m.expectancy, 'num');
-                    setVal('metricMaxConsecWins', m.max_consecutive_wins);
-                    setVal('metricMaxConsecLosses', m.max_consecutive_losses);
-                    
-                    // ========== UPDATE CHARTS ==========
-                    // Dispatch event for backtest_results.js module to handle charts
-                    window.dispatchEvent(new CustomEvent('backtestLoaded', { detail: bt }));
-                    
-                    console.log('Loaded backtest:', id, 'trades:', bt.trades?.length, 'equity:', bt.equity_curve?.equity?.length);
-                });
-        };
+                  })
+                  .join("");
 
-        // Fallback delete function
-        window.deleteBacktestFallback = async function(id) {
-            if (!confirm('Удалить этот бэктест?')) return;
-            
-            try {
-                const response = await fetch('/api/v1/backtests/' + id, { method: 'DELETE' });
-                if (response.ok) {
-                    // Remove from DOM
-                    const item = document.querySelector(`.result-item[data-id="${id}"]`);
-                    if (item) {
-                        item.style.transition = 'opacity 0.3s';
-                        item.style.opacity = '0';
-                        setTimeout(() => item.remove(), 300);
-                    }
-                    // Update count
-                    const countEl = document.getElementById('resultsCount');
-                    if (countEl) {
-                        const current = parseInt(countEl.textContent) || 0;
-                        countEl.textContent = Math.max(0, current - 1);
-                    }
-                    console.log('Deleted backtest:', id);
-                } else {
-                    alert('Ошибка удаления: ' + response.statusText);
-                }
-            } catch (e) {
-                console.error('Delete error:', e);
-                alert('Ошибка удаления: ' + e.message);
+                // Auto-select first
+                if (items.length > 0) window.selectBT(items[0].id);
+              }
+            })
+            .catch((e) => console.error("Fallback error:", e));
+        }
+      }, 2000);
+
+      // Simple backtest selector with TradingView cards support
+      window.selectBT = function (id) {
+        fetch("/api/v1/backtests/" + id)
+          .then((r) => r.json())
+          .then((bt) => {
+            const m = bt.metrics || {};
+
+            // Update TradingView Summary Cards
+            const tvNetProfit = document.getElementById("tvNetProfit");
+            const tvNetProfitPct = document.getElementById("tvNetProfitPct");
+            if (tvNetProfit) {
+              const val = m.net_profit || 0;
+              tvNetProfit.textContent =
+                (val >= 0 ? "+" : "") +
+                val.toLocaleString("ru-RU", { minimumFractionDigits: 2 }) +
+                " USD";
+              tvNetProfit.className =
+                "tv-summary-card-value " +
+                (val >= 0 ? "tv-value-positive" : "tv-value-negative");
             }
-        };
+            if (tvNetProfitPct) {
+              const pct = m.net_profit_pct || m.total_return || 0;
+              tvNetProfitPct.textContent =
+                (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+            }
+
+            const tvMaxDD = document.getElementById("tvMaxDrawdown");
+            const tvMaxDDPct = document.getElementById("tvMaxDrawdownPct");
+            if (tvMaxDD)
+              tvMaxDD.textContent =
+                Math.abs(m.max_drawdown_value || 0).toLocaleString("ru-RU", {
+                  minimumFractionDigits: 2,
+                }) + " USD";
+            if (tvMaxDDPct)
+              tvMaxDDPct.textContent =
+                Math.abs(m.max_drawdown || 0).toFixed(2) + "%";
+
+            const tvTotalTrades = document.getElementById("tvTotalTrades");
+            if (tvTotalTrades) tvTotalTrades.textContent = m.total_trades || 0;
+
+            const tvWinningTrades = document.getElementById("tvWinningTrades");
+            const tvWinRate = document.getElementById("tvWinRate");
+            if (tvWinningTrades)
+              tvWinningTrades.textContent = m.winning_trades || 0;
+            // win_rate comes as 0-100 (percentage), not 0-1
+            if (tvWinRate)
+              tvWinRate.textContent = (m.win_rate || 0).toFixed(2) + "%";
+
+            const tvProfitFactor = document.getElementById("tvProfitFactor");
+            if (tvProfitFactor)
+              tvProfitFactor.textContent = (m.profit_factor || 0).toFixed(3);
+
+            // Update header
+            const headerTitle = document.querySelector(".tv-report-title");
+            if (headerTitle) {
+              headerTitle.textContent =
+                "Стратегия " +
+                (bt.config?.strategy_type || "RSI").toUpperCase() +
+                " — " +
+                (bt.config?.symbol || "BTCUSDT");
+            }
+
+            // Legacy metrics fallback
+            const setVal = (elId, val, fmt) => {
+              const el = document.getElementById(elId);
+              if (el)
+                el.textContent =
+                  val !== null && val !== undefined
+                    ? fmt === "pct"
+                      ? val.toFixed(2) + "%"
+                      : fmt === "num"
+                        ? val.toFixed(2)
+                        : val
+                    : "--";
+            };
+            setVal(
+              "metricNetProfit",
+              m.net_profit
+                ? "$" +
+                    m.net_profit.toFixed(2) +
+                    " (" +
+                    (m.net_profit_pct || 0).toFixed(2) +
+                    "%)"
+                : null,
+            );
+            setVal("metricReturn", m.total_return, "pct");
+            setVal("metricWinRate", m.win_rate, "pct");
+            setVal("metricProfitFactor", m.profit_factor, "num");
+            setVal(
+              "metricDrawdown",
+              m.max_drawdown ? "-" + m.max_drawdown.toFixed(2) + "%" : null,
+            );
+            setVal("metricSharpe", m.sharpe_ratio, "num");
+            setVal("metricSortino", m.sortino_ratio, "num");
+            setVal("metricRecoveryFactor", m.recovery_factor, "num");
+            setVal("metricTrades", m.total_trades);
+            setVal(
+              "metricAvgWin",
+              m.avg_win
+                ? "$" +
+                    (m.avg_win_value || 0).toFixed(2) +
+                    " (" +
+                    m.avg_win.toFixed(2) +
+                    "%)"
+                : null,
+            );
+            setVal(
+              "metricAvgLoss",
+              m.avg_loss
+                ? "-$" +
+                    Math.abs(m.avg_loss_value || 0).toFixed(2) +
+                    " (" +
+                    m.avg_loss.toFixed(2) +
+                    "%)"
+                : null,
+            );
+            setVal("metricAvgBars", m.avg_bars_in_trade, "num");
+            setVal(
+              "metricLargestWin",
+              m.largest_win
+                ? "$" + (m.largest_win_value || 0).toFixed(2)
+                : null,
+            );
+            setVal(
+              "metricLargestLoss",
+              m.largest_loss
+                ? "-$" + Math.abs(m.largest_loss_value || 0).toFixed(2)
+                : null,
+            );
+            setVal("metricExpectancy", m.expectancy, "num");
+            setVal("metricMaxConsecWins", m.max_consecutive_wins);
+            setVal("metricMaxConsecLosses", m.max_consecutive_losses);
+
+            // ========== UPDATE CHARTS ==========
+            // Dispatch event for backtest_results.js module to handle charts
+            window.dispatchEvent(
+              new CustomEvent("backtestLoaded", { detail: bt }),
+            );
+
+            console.log(
+              "Loaded backtest:",
+              id,
+              "trades:",
+              bt.trades?.length,
+              "equity:",
+              bt.equity_curve?.equity?.length,
+            );
+          });
+      };
+
+      // Fallback delete function
+      window.deleteBacktestFallback = async function (id) {
+        if (!confirm("Удалить этот бэктест?")) return;
+
+        try {
+          const response = await fetch("/api/v1/backtests/" + id, {
+            method: "DELETE",
+          });
+          if (response.ok) {
+            // Remove from DOM
+            const item = document.querySelector(
+              `.result-item[data-id="${id}"]`,
+            );
+            if (item) {
+              item.style.transition = "opacity 0.3s";
+              item.style.opacity = "0";
+              setTimeout(() => item.remove(), 300);
+            }
+            // Update count
+            const countEl = document.getElementById("resultsCount");
+            if (countEl) {
+              const current = parseInt(countEl.textContent) || 0;
+              countEl.textContent = Math.max(0, current - 1);
+            }
+            console.log("Deleted backtest:", id);
+          } else {
+            alert("Ошибка удаления: " + response.statusText);
+          }
+        } catch (e) {
+          console.error("Delete error:", e);
+          alert("Ошибка удаления: " + e.message);
+        }
+      };
     </script>
 
     <!-- AI Assistant - MUST be loaded before inline AI scripts -->
     <script src="./js/ai-assistant.js"></script>
     <script>
-        // Current backtest data for AI analysis
-        window.currentBacktestForAI = null;
+      // Current backtest data for AI analysis
+      window.currentBacktestForAI = null;
 
-        // Listen for backtest selection - use capturing to ensure we get it
-        window.addEventListener('backtestLoaded', function(e) {
-            window.currentBacktestForAI = e.detail;
-            const btn = document.getElementById('btnAIAnalysis');
-            if (btn) {
-                btn.disabled = false;
-                console.log('AI Analysis enabled for backtest:', e.detail?.id);
-            }
-        });
+      // Listen for backtest selection - use capturing to ensure we get it
+      window.addEventListener("backtestLoaded", function (e) {
+        window.currentBacktestForAI = e.detail;
+        const btn = document.getElementById("btnAIAnalysis");
+        if (btn) {
+          btn.disabled = false;
+          console.log("AI Analysis enabled for backtest:", e.detail?.id);
+        }
+      });
 
-        // AI Analysis function
-        window.requestAIAnalysis = async function() {
-            if (!window.currentBacktestForAI) {
-                alert('Сначала выберите бэктест из списка слева');
-                return;
-            }
+      // AI Analysis function
+      window.requestAIAnalysis = async function () {
+        if (!window.currentBacktestForAI) {
+          alert("Сначала выберите бэктест из списка слева");
+          return;
+        }
 
-            const btn = document.getElementById('btnAIAnalysis');
-            const contentEl = document.getElementById('aiAnalysisContent');
+        const btn = document.getElementById("btnAIAnalysis");
+        const contentEl = document.getElementById("aiAnalysisContent");
 
-            if (!btn || !contentEl) {
-                console.error('AI Analysis UI elements not found');
-                return;
-            }
+        if (!btn || !contentEl) {
+          console.error("AI Analysis UI elements not found");
+          return;
+        }
 
-            btn.disabled = true;
-            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Анализирую...';
-            contentEl.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>AI анализирует результаты...';
+        btn.disabled = true;
+        btn.innerHTML =
+          '<i class="bi bi-hourglass-split me-1"></i>Анализирую...';
+        contentEl.innerHTML =
+          '<div class="spinner-border spinner-border-sm me-2"></div>AI анализирует результаты...';
 
-            try {
-                const backtest = window.currentBacktestForAI;
-                const metrics = backtest.metrics || {};
-                const config = backtest.config || {};
+        try {
+          const backtest = window.currentBacktestForAI;
+          const metrics = backtest.metrics || {};
+          const config = backtest.config || {};
 
-                // Make direct API call
-                const response = await fetch('/api/v1/agents/advanced/analyze-backtest', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        metrics: {
-                            net_pnl: metrics.net_profit || metrics.net_pnl || 0,
-                            total_return_pct: metrics.total_return || metrics.total_return_pct || 0,
-                            sharpe_ratio: metrics.sharpe_ratio || 0,
-                            max_drawdown_pct: metrics.max_drawdown || metrics.max_drawdown_pct || 0,
-                            win_rate: metrics.win_rate || 0,
-                            profit_factor: metrics.profit_factor || 1,
-                            total_trades: metrics.total_trades || 0
-                        },
-                        strategy_name: config.strategy_type || config.strategy_name || 'Unknown',
-                        symbol: config.symbol || 'BTCUSDT',
-                        timeframe: config.interval || config.timeframe || '1h',
-                        period: `${config.start_date || ''} - ${config.end_date || ''}`,
-                        agents: ['deepseek']
-                    })
-                });
+          // Make direct API call
+          const response = await fetch(
+            "/api/v1/agents/advanced/analyze-backtest",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                metrics: {
+                  net_pnl: metrics.net_profit || metrics.net_pnl || 0,
+                  total_return_pct:
+                    metrics.total_return || metrics.total_return_pct || 0,
+                  sharpe_ratio: metrics.sharpe_ratio || 0,
+                  max_drawdown_pct:
+                    metrics.max_drawdown || metrics.max_drawdown_pct || 0,
+                  win_rate: metrics.win_rate || 0,
+                  profit_factor: metrics.profit_factor || 1,
+                  total_trades: metrics.total_trades || 0,
+                },
+                strategy_name:
+                  config.strategy_type || config.strategy_name || "Unknown",
+                symbol: config.symbol || "BTCUSDT",
+                timeframe: config.interval || config.timeframe || "1h",
+                period: `${config.start_date || ""} - ${config.end_date || ""}`,
+                agents: ["deepseek"],
+              }),
+            },
+          );
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
 
-                const data = await response.json();
-                const ai = data.ai_analysis || {};
+          const data = await response.json();
+          const ai = data.ai_analysis || {};
 
-                // Build recommendations HTML
-                let recsHtml = '<li>Нет рекомендаций</li>';
-                if (ai.recommendations && Array.isArray(ai.recommendations) && ai.recommendations.length > 0) {
-                    recsHtml = ai.recommendations.map(r => `<li>${r}</li>`).join('');
-                }
+          // Build recommendations HTML
+          let recsHtml = "<li>Нет рекомендаций</li>";
+          if (
+            ai.recommendations &&
+            Array.isArray(ai.recommendations) &&
+            ai.recommendations.length > 0
+          ) {
+            recsHtml = ai.recommendations.map((r) => `<li>${r}</li>`).join("");
+          }
 
-                // Get overfitting class
-                const overfitRisk = ai.overfitting_risk || 'unknown';
-                const overfitClass = overfitRisk === 'low' ? 'bg-success' :
-                                    overfitRisk === 'high' ? 'bg-danger' : 'bg-warning';
+          // Get overfitting class
+          const overfitRisk = ai.overfitting_risk || "unknown";
+          const overfitClass =
+            overfitRisk === "low"
+              ? "bg-success"
+              : overfitRisk === "high"
+                ? "bg-danger"
+                : "bg-warning";
 
-                // Display results
-                contentEl.innerHTML = `
+          // Display results
+          contentEl.innerHTML = `
                     <div class="ai-analysis-result">
                         <div class="ai-section mb-3">
                             <h6 class="text-primary">📊 Резюме</h6>
-                            <p class="mb-0">${ai.summary || 'Нет данных'}</p>
+                            <p class="mb-0">${ai.summary || "Нет данных"}</p>
                         </div>
                         <div class="ai-section mb-3">
                             <h6 class="text-warning">⚠️ Оценка риска</h6>
-                            <p class="mb-0">${ai.risk_assessment || 'Нет данных'}</p>
+                            <p class="mb-0">${ai.risk_assessment || "Нет данных"}</p>
                         </div>
                         <div class="ai-section mb-3">
                             <h6 class="text-info">💡 Рекомендации</h6>
@@ -861,7 +1853,7 @@
                                 Риск переобучения: ${overfitRisk}
                             </span>
                             <span class="badge bg-info">
-                                Режим рынка: ${ai.market_regime_fit || 'unknown'}
+                                Режим рынка: ${ai.market_regime_fit || "unknown"}
                             </span>
                             <span class="badge bg-secondary">
                                 Уверенность: ${((ai.confidence || 0) * 100).toFixed(0)}%
@@ -869,14 +1861,14 @@
                         </div>
                     </div>
                 `;
-            } catch (error) {
-                console.error('AI Analysis error:', error);
-                contentEl.innerHTML = `<span class="text-danger">❌ Ошибка анализа: ${error.message}</span>`;
-            }
+        } catch (error) {
+          console.error("AI Analysis error:", error);
+          contentEl.innerHTML = `<span class="text-danger">❌ Ошибка анализа: ${error.message}</span>`;
+        }
 
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-magic me-1"></i>Сгенерировать анализ';
-        };
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-magic me-1"></i>Сгенерировать анализ';
+      };
     </script>
-</body>
+  </body>
 </html>

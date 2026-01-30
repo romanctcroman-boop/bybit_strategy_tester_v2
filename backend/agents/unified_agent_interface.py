@@ -118,9 +118,7 @@ class APIKey:
         **legacy_kwargs: Any,
     ) -> None:
         if legacy_kwargs:
-            logger.debug(
-                "APIKey received legacy kwargs: {}", list(legacy_kwargs.keys())
-            )
+            logger.debug("APIKey received legacy kwargs: {}", list(legacy_kwargs.keys()))
         self._value_override = value
         self.key_name = key_name
         self.agent_type = agent_type
@@ -245,9 +243,7 @@ class AgentRequest:
         if self.agent_type == AgentType.DEEPSEEK:
             # DeepSeek V3.2: Use thinking mode if enabled
             model = "deepseek-reasoner" if self.thinking_mode else "deepseek-chat"
-            max_tokens = (
-                16000 if self.thinking_mode else 4000
-            )  # Thinking needs more tokens
+            max_tokens = 16000 if self.thinking_mode else 4000  # Thinking needs more tokens
 
             # V3.2 recommended sampling params
             if self.thinking_mode:
@@ -284,15 +280,14 @@ class AgentRequest:
             # Add MCP file access tools for DeepSeek
             use_file_access = self.context.get("use_file_access", False)
             logger.debug(
-                f"🔍 use_file_access={use_file_access}, include_tools={include_tools}, thinking_mode={self.thinking_mode}, strict_mode={self.strict_mode}"
+                f"🔍 use_file_access={use_file_access}, include_tools={include_tools}, "
+                f"thinking_mode={self.thinking_mode}, strict_mode={self.strict_mode}"
             )
 
             if include_tools and use_file_access:
                 tools = self._get_mcp_tools_definition(strict_mode=self.strict_mode)
                 payload["tools"] = tools
-                logger.info(
-                    f"🔧 Added {len(tools)} MCP tools to DeepSeek request (strict={self.strict_mode})"
-                )
+                logger.info(f"🔧 Added {len(tools)} MCP tools to DeepSeek request (strict={self.strict_mode})")
             else:
                 logger.debug(
                     f"⚠️  Tools not included (include_tools={include_tools}, use_file_access={use_file_access})"
@@ -367,9 +362,7 @@ class AgentRequest:
             if not text:
                 return text
             for pattern in UNSAFE_PATTERNS:
-                new = re.sub(
-                    pattern, "[REDACTED_UNSAFE_PATTERN]", text, flags=re.IGNORECASE
-                )
+                new = re.sub(pattern, "[REDACTED_UNSAFE_PATTERN]", text, flags=re.IGNORECASE)
                 if new != text:
                     logger.warning(f"🚫 Unsafe pattern sanitized: {pattern}")
                 text = new
@@ -384,9 +377,7 @@ class AgentRequest:
 
         if self.context:
             safe_context = {
-                sanitize(str(k)): sanitize(str(v))
-                if not isinstance(v, (dict, list))
-                else v
+                sanitize(str(k)): sanitize(str(v)) if not isinstance(v, (dict, list)) else v
                 for k, v in self.context.items()
             }
             parts.append(f"\n\nContext: {json.dumps(safe_context, indent=2)}")
@@ -409,7 +400,10 @@ class AgentRequest:
                 "type": "function",
                 "function": {
                     "name": "mcp_read_project_file",
-                    "description": "Read a file from the project. Supports Python, JSON, Markdown, YAML files. Has security restrictions (cannot read .env, .git, secrets).",
+                    "description": (
+                        "Read a file from the project. Supports Python, JSON, Markdown, "
+                        "YAML files. Has security restrictions (cannot read .env, .git, secrets)."
+                    ),
                     "strict": strict_mode,  # DeepSeek Strict Mode
                     "parameters": {
                         "type": "object",
@@ -433,7 +427,10 @@ class AgentRequest:
                 "type": "function",
                 "function": {
                     "name": "mcp_list_project_structure",
-                    "description": "List directory structure of the project. Returns nested tree. Auto-blocks .git, __pycache__, node_modules.",
+                    "description": (
+                        "List directory structure of the project. Returns nested tree. "
+                        "Auto-blocks .git, __pycache__, node_modules."
+                    ),
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -461,7 +458,10 @@ class AgentRequest:
                 "type": "function",
                 "function": {
                     "name": "mcp_analyze_code_quality",
-                    "description": "Run code quality tools (Ruff, Black, Bandit) on a Python file. Returns linting issues, formatting problems, security vulnerabilities.",
+                    "description": (
+                        "Run code quality tools (Ruff, Black, Bandit) on a Python file. "
+                        "Returns linting issues, formatting problems, security vulnerabilities."
+                    ),
                     "strict": strict_mode,  # DeepSeek Strict Mode
                     "parameters": {
                         "type": "object",
@@ -577,17 +577,13 @@ class APIKeyManager:
                             )
                         )
                         # 🔐 SECURITY PATCH #5: Logging security (LOW) - don't expose key indices
-                        logger.debug(
-                            f"✅ DeepSeek key registered (pool size: {len(self.deepseek_keys)})"
-                        )
+                        logger.debug(f"✅ DeepSeek key registered (pool size: {len(self.deepseek_keys)})")
                 except Exception as e:
                     logger.warning(f"⚠️ DeepSeek key lookup failed: {e}")
 
             # Perplexity (8 keys - расширено с 4 до 8)
             for i in range(8):
-                key_name = (
-                    f"PERPLEXITY_API_KEY_{i + 1}" if i > 0 else "PERPLEXITY_API_KEY"
-                )
+                key_name = f"PERPLEXITY_API_KEY_{i + 1}" if i > 0 else "PERPLEXITY_API_KEY"
                 try:
                     if km.has_key(key_name, require_decryptable=True):
                         self.perplexity_keys.append(
@@ -599,26 +595,18 @@ class APIKeyManager:
                             )
                         )
                         # 🔐 SECURITY PATCH #5: Logging security (LOW) - don't expose key indices
-                        logger.debug(
-                            f"✅ Perplexity key registered (pool size: {len(self.perplexity_keys)})"
-                        )
+                        logger.debug(f"✅ Perplexity key registered (pool size: {len(self.perplexity_keys)})")
                 except Exception as e:
                     logger.warning(f"⚠️ Perplexity key lookup failed: {e}")
 
-            logger.info(
-                f"🔑 Loaded {len(self.deepseek_keys)} DeepSeek + {len(self.perplexity_keys)} Perplexity keys"
-            )
+            logger.info(f"🔑 Loaded {len(self.deepseek_keys)} DeepSeek + {len(self.perplexity_keys)} Perplexity keys")
 
         except ImportError:
             logger.error("❌ Encryption system not available!")
             raise
 
     def _get_pool(self, agent_type: AgentType) -> list[APIKey]:
-        return (
-            self.deepseek_keys
-            if agent_type == AgentType.DEEPSEEK
-            else self.perplexity_keys
-        )
+        return self.deepseek_keys if agent_type == AgentType.DEEPSEEK else self.perplexity_keys
 
     def _refresh_cooldowns(self, agent_type: AgentType) -> None:
         pool = self._get_pool(agent_type)
@@ -644,13 +632,7 @@ class APIKeyManager:
         if key.last_used:
             idle_time = max(0.0, time.time() - key.last_used)
             recency_bonus = min(1.2, 0.2 + idle_time / 30.0)
-        weight = (
-            health_weight
-            * request_penalty
-            * error_penalty
-            * cooldown_penalty
-            * recency_bonus
-        )
+        weight = health_weight * request_penalty * error_penalty * cooldown_penalty * recency_bonus
         return max(0.001, weight)
 
     def _apply_cooldown(
@@ -667,9 +649,7 @@ class APIKeyManager:
         self.pool_telemetry["cooldown_events"] += 1
         self.pool_telemetry.setdefault("cooldown_reasons", {}).setdefault(reason, 0)
         self.pool_telemetry["cooldown_reasons"][reason] += 1
-        logger.warning(
-            f"⏳ Cooling {key.agent_type.value} key #{key.index} for {cooldown_duration:.1f}s ({reason})"
-        )
+        logger.warning(f"⏳ Cooling {key.agent_type.value} key #{key.index} for {cooldown_duration:.1f}s ({reason})")
         self._emit_pool_telemetry(key.agent_type)
         self._maybe_alert_pool_pressure(key.agent_type)
         return actual
@@ -703,9 +683,7 @@ class APIKeyManager:
             if now - last_alert >= self.COOLDOWN_ALERT_COOLDOWN:
                 self._last_pool_alert_ts[agent_type] = now
                 self.pool_telemetry["alerts_triggered"] += 1
-                logger.error(
-                    f"🚨 {agent_type.value} key pool under pressure: {cooling}/{total} keys cooling"
-                )
+                logger.error(f"🚨 {agent_type.value} key pool under pressure: {cooling}/{total} keys cooling")
                 if self._alert_callback:
                     self._alert_callback(agent_type, cooling, total)
 
@@ -713,35 +691,19 @@ class APIKeyManager:
         pool = self._get_pool(agent_type)
         total = len(pool)
         cooling = sum(1 for key in pool if key.is_cooling)
-        healthy = sum(
-            1
-            for key in pool
-            if key.health == APIKeyHealth.HEALTHY and not key.is_cooling
-        )
-        degraded = sum(
-            1
-            for key in pool
-            if key.health == APIKeyHealth.DEGRADED and not key.is_cooling
-        )
+        healthy = sum(1 for key in pool if key.health == APIKeyHealth.HEALTHY and not key.is_cooling)
+        degraded = sum(1 for key in pool if key.health == APIKeyHealth.DEGRADED and not key.is_cooling)
         cooling_keys = [key for key in pool if key.is_cooling]
-        earliest_ready = (
-            min((key.cooldown_until or float("inf")) for key in cooling_keys)
-            if cooling_keys
-            else None
-        )
+        earliest_ready = min((key.cooldown_until or float("inf")) for key in cooling_keys) if cooling_keys else None
         return {
             "total": total,
             "cooling": cooling,
             "healthy": healthy,
             "degraded": degraded,
-            "next_available_in": max(0.0, earliest_ready - time.time())
-            if earliest_ready
-            else 0.0,
+            "next_available_in": max(0.0, earliest_ready - time.time()) if earliest_ready else 0.0,
         }
 
-    def register_alert_callback(
-        self, callback: Callable[[AgentType, int, int], None]
-    ) -> None:
+    def register_alert_callback(self, callback: Callable[[AgentType, int, int], None]) -> None:
         self._alert_callback = callback
 
     def _health_sort_key(self, key: APIKey) -> tuple[int, int, int, float]:
@@ -764,9 +726,7 @@ class APIKeyManager:
             return  # Skip health management for simplified key model
 
         if key.health == APIKeyHealth.DISABLED and key.error_count < 5:
-            key.health = (
-                APIKeyHealth.DEGRADED if key.error_count >= 2 else APIKeyHealth.HEALTHY
-            )
+            key.health = APIKeyHealth.DEGRADED if key.error_count >= 2 else APIKeyHealth.HEALTHY
 
         if key.error_count >= 5:
             key.health = APIKeyHealth.DISABLED
@@ -814,13 +774,13 @@ class APIKeyManager:
         try:
             key.last_error_time = time.time()
         except Exception:
-            # Graceful fallback if underlying key object doesn't define field (legacy Pydantic model)
-            setattr(key, "last_error_time", time.time())
+            # Graceful fallback if underlying key object doesn't define field
+            key.last_error_time = time.time()  # noqa: B012
         self._update_health_state(key)
         if hasattr(key, "health") and key.health == APIKeyHealth.DISABLED:
-            logger.warning(
-                f"⚠️ Disabled {getattr(key, 'agent_type', '?')} key #{getattr(key, 'index', '?')} (error_count={key.error_count})"
-            )
+            agent = getattr(key, "agent_type", "?")
+            idx = getattr(key, "index", "?")
+            logger.warning(f"⚠️ Disabled {agent} key #{idx} (error_count={key.error_count})")
 
     def mark_success(self, key: APIKey):
         """Отметить успешное использование"""
@@ -850,9 +810,7 @@ class APIKeyManager:
         key.last_error_time = time.time()
         self.pool_telemetry["rate_limit_events"] += 1
         self._update_health_state(key)
-        cooldown = (
-            retry_after if (retry_after is not None and retry_after > 0) else None
-        )
+        cooldown = retry_after if (retry_after is not None and retry_after > 0) else None
         self._apply_cooldown(key, reason="rate_limit", duration=cooldown)
 
     def mark_client_error(self, key: APIKey):
@@ -866,16 +824,10 @@ class APIKeyManager:
         key.error_count += 1
         key.last_error_time = time.time()
         key.health = APIKeyHealth.DISABLED
-        logger.warning(
-            f"⚠️ Disabled {key.agent_type.value} key #{key.index} due to auth error"
-        )
+        logger.warning(f"⚠️ Disabled {key.agent_type.value} key #{key.index} due to auth error")
 
     def count_active(self, agent_type: AgentType) -> int:
-        keys = (
-            self.deepseek_keys
-            if agent_type == AgentType.DEEPSEEK
-            else self.perplexity_keys
-        )
+        keys = self.deepseek_keys if agent_type == AgentType.DEEPSEEK else self.perplexity_keys
         return sum(1 for key in keys if key.is_usable)
 
 
@@ -903,14 +855,10 @@ class UnifiedAgentInterface:
         self.last_health_check = 0
         self.health_check_interval = 30  # seconds
         base_force_direct = FORCE_DIRECT_AGENT_API or self.mcp_disabled
-        self.force_direct_api = (
-            base_force_direct if force_direct_api is None else force_direct_api
-        )
+        self.force_direct_api = base_force_direct if force_direct_api is None else force_direct_api
         if self.mcp_disabled:
             self.force_direct_api = True
-            logger.info(
-                "MCP bridge disabled via MCP_DISABLED flag; using direct API mode"
-            )
+            logger.info("MCP bridge disabled via MCP_DISABLED flag; using direct API mode")
 
         # Phase 1: Circuit Breaker and Health Monitoring
         self.circuit_manager = get_circuit_manager()
@@ -939,9 +887,7 @@ class UnifiedAgentInterface:
         }
 
         logger.info("🚀 Unified Agent Interface initialized")
-        logger.info(
-            "🛡️ Circuit breakers registered: deepseek_api, perplexity_api, mcp_server"
-        )
+        logger.info("🛡️ Circuit breakers registered: deepseek_api, perplexity_api, mcp_server")
         logger.info("🏥 Health monitoring ready (will start with event loop)")
 
         # Start background health monitoring - lazy initialization
@@ -953,15 +899,11 @@ class UnifiedAgentInterface:
         if self._monitoring_task is None or self._monitoring_task.done():
             try:
                 loop = asyncio.get_running_loop()
-                self._monitoring_task = loop.create_task(
-                    self.health_monitor.start_monitoring(30)
-                )
+                self._monitoring_task = loop.create_task(self.health_monitor.start_monitoring(30))
                 logger.info("🏥 Health monitoring started (30s interval)")
             except RuntimeError:
                 # No event loop running - will start on first request
-                logger.debug(
-                    "⏳ No event loop yet, monitoring will start on first request"
-                )
+                logger.debug("⏳ No event loop yet, monitoring will start on first request")
 
     def _register_circuit_breakers(self) -> None:
         """Register circuit breakers for all external dependencies"""
@@ -1012,13 +954,9 @@ class UnifiedAgentInterface:
             recovery_func=self._recover_mcp,
         )
 
-    def _handle_pool_alert(
-        self, agent_type: AgentType, cooling: int, total: int
-    ) -> None:
+    def _handle_pool_alert(self, agent_type: AgentType, cooling: int, total: int) -> None:
         self.stats["key_pool_alerts"] += 1
-        logger.error(
-            f"🚨 Unified interface alert: {cooling}/{total} {agent_type.value} keys cooling simultaneously"
-        )
+        logger.error(f"🚨 Unified interface alert: {cooling}/{total} {agent_type.value} keys cooling simultaneously")
 
     def _record_rate_limit_event(self, agent_type: AgentType) -> None:
         self.stats["rate_limit_events"] += 1
@@ -1152,9 +1090,7 @@ class UnifiedAgentInterface:
         url = self._get_api_url(agent_type)
         headers = self._get_headers(key)
         payload = {
-            "model": "deepseek-chat"
-            if agent_type == AgentType.DEEPSEEK
-            else "sonar-pro",
+            "model": "deepseek-chat" if agent_type == AgentType.DEEPSEEK else "sonar-pro",
             "messages": [
                 {"role": "system", "content": "Health check ping"},
                 {"role": "user", "content": "ping"},
@@ -1197,13 +1133,9 @@ class UnifiedAgentInterface:
                         key.health = APIKeyHealth.DEGRADED
                         key.last_error_time = None
                         recovered += 1
-                        logger.info(
-                            f"✅ Validated DeepSeek key #{key.index} (re-enabled in DEGRADED state)"
-                        )
+                        logger.info(f"✅ Validated DeepSeek key #{key.index} (re-enabled in DEGRADED state)")
                     else:
-                        logger.warning(
-                            f"❌ DeepSeek key #{key.index} failed validation, remains disabled"
-                        )
+                        logger.warning(f"❌ DeepSeek key #{key.index} failed validation, remains disabled")
             if recovered:
                 self.stats["auto_recoveries"] += recovered
         elif action_type == RecoveryActionType.RESET_CIRCUIT_BREAKER:
@@ -1222,13 +1154,9 @@ class UnifiedAgentInterface:
                         key.health = APIKeyHealth.DEGRADED
                         key.last_error_time = None
                         recovered += 1
-                        logger.info(
-                            f"✅ Validated Perplexity key #{key.index} (re-enabled in DEGRADED state)"
-                        )
+                        logger.info(f"✅ Validated Perplexity key #{key.index} (re-enabled in DEGRADED state)")
                     else:
-                        logger.warning(
-                            f"❌ Perplexity key #{key.index} failed validation, remains disabled"
-                        )
+                        logger.warning(f"❌ Perplexity key #{key.index} failed validation, remains disabled")
             if recovered:
                 self.stats["auto_recoveries"] += recovered
         elif action_type == RecoveryActionType.RESET_CIRCUIT_BREAKER:
@@ -1283,14 +1211,8 @@ class UnifiedAgentInterface:
         if time.time() - self.last_health_check > self.health_check_interval:
             asyncio.create_task(self._health_check())
 
-        if (
-            self.force_direct_api or self.mcp_disabled
-        ) and preferred_channel == AgentChannel.MCP_SERVER:
-            reason = (
-                "MCP_DISABLED flag"
-                if self.mcp_disabled
-                else "FORCE_DIRECT_AGENT_API flag"
-            )
+        if (self.force_direct_api or self.mcp_disabled) and preferred_channel == AgentChannel.MCP_SERVER:
+            reason = "MCP_DISABLED flag" if self.mcp_disabled else "FORCE_DIRECT_AGENT_API flag"
             logger.info(f"🚫 MCP channel bypassed ({reason}); using direct API")
             preferred_channel = AgentChannel.DIRECT_API
 
@@ -1303,9 +1225,7 @@ class UnifiedAgentInterface:
                     return response
                 else:
                     self.stats["mcp_failed"] += 1
-                    logger.warning(
-                        f"⚠️ MCP failed, falling back to Direct API: {response.error}"
-                    )
+                    logger.warning(f"⚠️ MCP failed, falling back to Direct API: {response.error}")
             except Exception as e:
                 self.stats["mcp_failed"] += 1
                 logger.warning(f"⚠️ MCP exception, falling back: {e}")
@@ -1354,9 +1274,7 @@ class UnifiedAgentInterface:
                 content=request.prompt,
                 context=request.context,
                 error="All communication channels failed",
-                priority=DLQPriority.HIGH
-                if request.context.get("critical", False)
-                else DLQPriority.NORMAL,
+                priority=DLQPriority.HIGH if request.context.get("critical", False) else DLQPriority.NORMAL,
                 correlation_id=get_correlation_id(),
             )
 
@@ -1381,9 +1299,7 @@ class UnifiedAgentInterface:
             )
 
             if fallback_response:
-                logger.info(
-                    f"🔄 FallbackService provided response: {fallback_response.fallback_type.value}"
-                )
+                logger.info(f"🔄 FallbackService provided response: {fallback_response.fallback_type.value}")
                 return AgentResponse(
                     success=True,
                     content=fallback_response.content,
@@ -1392,10 +1308,8 @@ class UnifiedAgentInterface:
                     metadata={
                         "fallback": True,
                         "fallback_type": fallback_response.fallback_type.value,
-                        "is_cached": fallback_response.fallback_type
-                        == FallbackType.CACHED,
-                        "degraded_mode": fallback_response.fallback_type
-                        == FallbackType.DEGRADED,
+                        "is_cached": fallback_response.fallback_type == FallbackType.CACHED,
+                        "degraded_mode": fallback_response.fallback_type == FallbackType.DEGRADED,
                         **fallback_response.metadata,
                     },
                 )
@@ -1445,9 +1359,7 @@ class UnifiedAgentInterface:
                 error=f"MCP circuit breaker open: {str(e)}",
             )
 
-    async def _execute_mcp_call(
-        self, request: AgentRequest, start_time: float
-    ) -> AgentResponse:
+    async def _execute_mcp_call(self, request: AgentRequest, start_time: float) -> AgentResponse:
         """
         Internal method for actual MCP call execution (called by circuit breaker)
         """
@@ -1463,9 +1375,7 @@ class UnifiedAgentInterface:
                 correlation_id = get_correlation_id()
                 if correlation_id:
                     request.context["correlation_id"] = correlation_id
-                    logger.debug(
-                        f"Propagating correlation_id={correlation_id} to MCP tool"
-                    )
+                    logger.debug(f"Propagating correlation_id={correlation_id} to MCP tool")
             except ImportError:
                 pass  # Middleware not available
 
@@ -1524,11 +1434,7 @@ class UnifiedAgentInterface:
         start_time = time.time()
 
         # Determine circuit breaker name
-        breaker_name = (
-            "deepseek_api"
-            if request.agent_type == AgentType.DEEPSEEK
-            else "perplexity_api"
-        )
+        breaker_name = "deepseek_api" if request.agent_type == AgentType.DEEPSEEK else "perplexity_api"
 
         # Wrap API call with circuit breaker
         try:
@@ -1550,9 +1456,7 @@ class UnifiedAgentInterface:
                 error=f"Circuit breaker open: {str(e)}",
             )
 
-    async def _execute_api_call(
-        self, request: AgentRequest, start_time: float
-    ) -> AgentResponse:
+    async def _execute_api_call(self, request: AgentRequest, start_time: float) -> AgentResponse:
         """
         Internal method for actual API call execution (called by circuit breaker)
 
@@ -1587,13 +1491,9 @@ class UnifiedAgentInterface:
             or request.context.get("complex_task", False)
             or request.context.get("self_improvement_analysis", False)
         )
-        timeout = (
-            600.0 if is_complex_task else 120.0
-        )  # 10 min for complex, 2 min for standard
+        timeout = 600.0 if is_complex_task else 120.0  # 10 min for complex, 2 min for standard
 
-        logger.info(
-            f"⏱️ Using timeout: {timeout}s ({'complex' if is_complex_task else 'standard'} task)"
-        )
+        logger.info(f"⏱️ Using timeout: {timeout}s ({'complex' if is_complex_task else 'standard'} task)")
 
         # Retry configuration
         MAX_RETRIES = 3
@@ -1607,20 +1507,13 @@ class UnifiedAgentInterface:
             if retry_attempt > 1:
                 # Exponential backoff: 2^(attempt-1) seconds
                 backoff_delay = 2 ** (retry_attempt - 1)
-                logger.warning(
-                    f"🔄 Retry attempt {retry_attempt}/{MAX_RETRIES} "
-                    f"after {backoff_delay}s backoff"
-                )
+                logger.warning(f"🔄 Retry attempt {retry_attempt}/{MAX_RETRIES} after {backoff_delay}s backoff")
                 await asyncio.sleep(backoff_delay)
 
             # Make API request with tool calling loop
             try:
-                url = self._get_api_url(
-                    request.agent_type, strict_mode=request.strict_mode
-                )
-                logger.debug(
-                    f"🌐 URL for {request.agent_type.value}: {url} (strict={request.strict_mode})"
-                )
+                url = self._get_api_url(request.agent_type, strict_mode=request.strict_mode)
+                logger.debug(f"🌐 URL for {request.agent_type.value}: {url} (strict={request.strict_mode})")
                 headers = self._get_headers(key)
 
                 # Store the original payload with tools - IMPORTANT: Keep tools in all iterations
@@ -1650,9 +1543,7 @@ class UnifiedAgentInterface:
 
                     data = response.json()
                     logger.debug(f"   API response keys: {list(data.keys())}")
-                    logger.debug(
-                        f"   Response data: {json.dumps(data, indent=2)[:500]}..."
-                    )
+                    logger.debug(f"   Response data: {json.dumps(data, indent=2)[:500]}...")
 
                     # Check if agent wants to call tools (DeepSeek only)
                     if request.agent_type == AgentType.DEEPSEEK:
@@ -1662,21 +1553,21 @@ class UnifiedAgentInterface:
                         logger.debug(f"   Tool calls: {tool_calls}")
 
                         if tool_calls:
-                            logger.info(
-                                f"🔧 Agent requested {len(tool_calls)} tool calls (iteration {iteration})"
-                            )
+                            logger.info(f"🔧 Agent requested {len(tool_calls)} tool calls (iteration {iteration})")
 
                             # ✅ QUICK WIN #1: Check tool call budget
                             # Protection against runaway loops and cascading timeouts
                             if total_tool_calls + len(tool_calls) > tool_call_budget:
-                                logger.warning(
-                                    f"⚠️ Tool call budget exceeded: {total_tool_calls + len(tool_calls)} > {tool_call_budget}"
-                                )
+                                budget_used = total_tool_calls + len(tool_calls)
+                                logger.warning(f"⚠️ Tool call budget exceeded: {budget_used} > {tool_call_budget}")
                                 # Graceful degradation: ask agent to provide final analysis without tools
                                 messages.append(
                                     {
                                         "role": "system",
-                                        "content": f"Tool call budget exceeded ({tool_call_budget} calls). Please provide final analysis without additional tool calls.",
+                                        "content": (
+                                            f"Tool call budget exceeded ({tool_call_budget} calls). "
+                                            "Please provide final analysis without additional tool calls."
+                                        ),
                                     }
                                 )
                                 # Continue to get final response without executing tools
@@ -1689,15 +1580,11 @@ class UnifiedAgentInterface:
 
                             # Execute each tool call with retry
                             for tool_call in tool_calls:
-                                tool_result = await self._execute_tool_with_retry(
-                                    tool_call, max_retries=3
-                                )
+                                tool_result = await self._execute_tool_with_retry(tool_call, max_retries=3)
 
                                 # ✅ QUICK WIN #1: Track total tool calls
                                 total_tool_calls += 1
-                                tool_name = tool_call.get("function", {}).get(
-                                    "name", "unknown"
-                                )
+                                tool_name = tool_call.get("function", {}).get("name", "unknown")
                                 logger.debug(
                                     f"   Tool call #{total_tool_calls}/{tool_call_budget} completed: {tool_name}"
                                 )
@@ -1710,21 +1597,15 @@ class UnifiedAgentInterface:
                                     if "content" in tool_result:
                                         result_content = str(tool_result["content"])
                                     elif "structure" in tool_result:
-                                        result_content = json.dumps(
-                                            tool_result["structure"], indent=2
-                                        )
+                                        result_content = json.dumps(tool_result["structure"], indent=2)
                                     elif "report" in tool_result:
                                         result_content = tool_result["report"]
                                     else:
-                                        result_content = json.dumps(
-                                            tool_result, indent=2
-                                        )
+                                        result_content = json.dumps(tool_result, indent=2)
                                 else:
                                     result_content = f"Error: {tool_result.get('error', 'Unknown error')}"
 
-                                logger.debug(
-                                    f"   Tool result length: {len(result_content)} chars"
-                                )
+                                logger.debug(f"   Tool result length: {len(result_content)} chars")
 
                                 # Add tool result to messages
                                 messages.append(
@@ -1740,52 +1621,35 @@ class UnifiedAgentInterface:
                             continue
 
                     # No more tool calls - extract final content
-                    logger.debug(
-                        f"🔍 Extracting content from API response. Keys: {list(data.keys())}"
-                    )
+                    logger.debug(f"🔍 Extracting content from API response. Keys: {list(data.keys())}")
                     content = self._extract_content(data, request.agent_type)
 
                     # Extract reasoning_content for DeepSeek Thinking Mode
                     reasoning_content = None
-                    if (
-                        request.agent_type == AgentType.DEEPSEEK
-                        and request.thinking_mode
-                    ):
+                    if request.agent_type == AgentType.DEEPSEEK and request.thinking_mode:
                         reasoning_content = self._extract_reasoning_content(data)
                         if reasoning_content:
-                            logger.info(
-                                f"🧠 Thinking Mode CoT extracted: {len(reasoning_content)} chars"
-                            )
+                            logger.info(f"🧠 Thinking Mode CoT extracted: {len(reasoning_content)} chars")
 
                     # Extract token usage from response
                     token_usage = self._extract_token_usage(data, request.agent_type)
 
                     if not content or not content.strip():
-                        logger.warning(
-                            f"⚠️ Empty content extracted from {request.agent_type.value} response!"
-                        )
-                        logger.debug(
-                            f"🔍 Raw response data: {json.dumps(data, indent=2)[:1000]}"
-                        )
+                        logger.warning(f"⚠️ Empty content extracted from {request.agent_type.value} response!")
+                        logger.debug(f"🔍 Raw response data: {json.dumps(data, indent=2)[:1000]}")
                     else:
                         logger.debug(f"✅ Content extracted: {content[:100]}...")
 
                     self.key_manager.mark_success(key)
 
                     latency = (time.time() - start_time) * 1000
-                    logger.info(
-                        f"✅ Agent completed in {iteration} iterations ({latency:.0f}ms)"
-                    )
-                    logger.info(
-                        f"   Tool calls used: {total_tool_calls}/{tool_call_budget}"
-                    )
+                    logger.info(f"✅ Agent completed in {iteration} iterations ({latency:.0f}ms)")
+                    logger.info(f"   Tool calls used: {total_tool_calls}/{tool_call_budget}")
                     logger.info(f"🔍 DEBUG: metrics_enabled={metrics_enabled}")
 
                     # Record success metrics
                     if metrics_enabled:
-                        logger.info(
-                            f"📊 About to record metrics for {request.agent_type.value}"
-                        )
+                        logger.info(f"📊 About to record metrics for {request.agent_type.value}")
                         try:
                             await record_agent_call(
                                 agent_name=request.agent_type.value,
@@ -1830,18 +1694,12 @@ class UnifiedAgentInterface:
                         latency_ms=latency,
                         reasoning_content=reasoning_content,  # DeepSeek V3.2 Thinking Mode
                         tokens_used=token_usage,  # Token usage tracking
-                        citations=self._extract_citations(
-                            data, request.agent_type
-                        ),  # Perplexity sources
+                        citations=self._extract_citations(data, request.agent_type),  # Perplexity sources
                     )
 
                 # Max iterations reached
-                logger.warning(
-                    f"⚠️ Max iterations ({max_iterations}) reached for tool calling"
-                )
-                logger.info(
-                    f"   Total tool calls executed: {total_tool_calls}/{tool_call_budget}"
-                )
+                logger.warning(f"⚠️ Max iterations ({max_iterations}) reached for tool calling")
+                logger.info(f"   Total tool calls executed: {total_tool_calls}/{tool_call_budget}")
                 return AgentResponse(
                     success=False,
                     content="",
@@ -1856,17 +1714,16 @@ class UnifiedAgentInterface:
                     first_error = f"Timeout ({timeout}s) on {request.agent_type.value}"
                 # Timeouts are typically transient; do not disable key
                 self.key_manager.mark_network_error(key)
-                logger.error(
-                    f"❌ Timeout on attempt {retry_attempt}/{MAX_RETRIES}: "
-                    f"{timeout}s exceeded"
-                )
+                logger.error(f"❌ Timeout on attempt {retry_attempt}/{MAX_RETRIES}: {timeout}s exceeded")
                 # Continue to next retry iteration
                 continue
 
             except httpx.HTTPStatusError as e:
                 last_exception = e
                 if not first_error:
-                    first_error = f"HTTP {e.response.status_code} on {request.agent_type.value}: {e.response.text[:100]}"
+                    status = e.response.status_code
+                    text = e.response.text[:100]
+                    first_error = f"HTTP {status} on {request.agent_type.value}: {text}"
                 logger.error(
                     f"❌ HTTP error {e.response.status_code} on attempt {retry_attempt}/{MAX_RETRIES}: "
                     f"{e.response.text[:200]}"
@@ -1900,9 +1757,7 @@ class UnifiedAgentInterface:
                     first_error = f"{type(e).__name__} on {request.agent_type.value}: {str(e)[:100]}"
                 # Generic connectivity errors (e.g., DNS getaddrinfo) should not disable keys
                 self.key_manager.mark_network_error(key)
-                logger.error(
-                    f"❌ Request failed on attempt {retry_attempt}/{MAX_RETRIES}: {e}"
-                )
+                logger.error(f"❌ Request failed on attempt {retry_attempt}/{MAX_RETRIES}: {e}")
                 # Continue to next retry iteration
                 continue
 
@@ -1913,9 +1768,7 @@ class UnifiedAgentInterface:
         )
         return await self._try_backup_key(request, start_time)
 
-    async def _try_backup_key(
-        self, request: AgentRequest, start_time: float
-    ) -> AgentResponse:
+    async def _try_backup_key(self, request: AgentRequest, start_time: float) -> AgentResponse:
         """Попытка с backup API ключом"""
         key = await self.key_manager.get_active_key(request.agent_type)
         if not key:
@@ -1929,9 +1782,7 @@ class UnifiedAgentInterface:
 
         # ✅ FIX: Validate key type matches request
         if key.agent_type != request.agent_type:
-            logger.error(
-                f"❌ KEY TYPE MISMATCH: {key.agent_type.value} key for {request.agent_type.value} request"
-            )
+            logger.error(f"❌ KEY TYPE MISMATCH: {key.agent_type.value} key for {request.agent_type.value} request")
             return AgentResponse(
                 success=False,
                 content="",
@@ -1945,9 +1796,7 @@ class UnifiedAgentInterface:
         try:
             url = self._get_api_url(request.agent_type)
             headers = self._get_headers(key)
-            payload = request.to_direct_api_format(
-                include_tools=False
-            )  # No tools for backup
+            payload = request.to_direct_api_format(include_tools=False)  # No tools for backup
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(url, json=payload, headers=headers)
@@ -1975,9 +1824,7 @@ class UnifiedAgentInterface:
                 error=f"Backup API also failed: {str(e)}",
             )
 
-    async def _execute_tool_with_retry(
-        self, tool_call: dict[str, Any], max_retries: int = 3
-    ) -> dict[str, Any]:
+    async def _execute_tool_with_retry(self, tool_call: dict[str, Any], max_retries: int = 3) -> dict[str, Any]:
         """
         Execute MCP tool call with exponential backoff retry.
 
@@ -2000,9 +1847,7 @@ class UnifiedAgentInterface:
                 # Check if result is successful or is a known/expected error
                 if result.get("success"):
                     if attempt > 0:
-                        logger.info(
-                            f"🔄 Tool {function_name} succeeded on attempt {attempt + 1}"
-                        )
+                        logger.info(f"🔄 Tool {function_name} succeeded on attempt {attempt + 1}")
                     return result
 
                 # Check if error is retryable
@@ -2016,9 +1861,7 @@ class UnifiedAgentInterface:
                     "502",
                     "500",
                 ]
-                is_retryable = any(
-                    err.lower() in error_msg.lower() for err in retryable_errors
-                )
+                is_retryable = any(err.lower() in error_msg.lower() for err in retryable_errors)
 
                 if not is_retryable or attempt >= max_retries:
                     # Non-retryable error or max retries reached
@@ -2029,9 +1872,7 @@ class UnifiedAgentInterface:
             except Exception as e:
                 last_error = str(e)
                 if attempt >= max_retries:
-                    logger.error(
-                        f"❌ Tool {function_name} failed after {max_retries + 1} attempts: {e}"
-                    )
+                    logger.error(f"❌ Tool {function_name} failed after {max_retries + 1} attempts: {e}")
                     return {
                         "success": False,
                         "error": f"Tool failed after {max_retries + 1} attempts: {last_error}",
@@ -2096,9 +1937,7 @@ class UnifiedAgentInterface:
             # AUTONOMOUS MODE: If MCP is disabled, emulate critical tools locally
             # ------------------------------------------------------------------
             if self.mcp_disabled:
-                logger.debug(
-                    "🧩 MCP disabled: executing tool via local emulation layer"
-                )
+                logger.debug("🧩 MCP disabled: executing tool via local emulation layer")
                 return await self._execute_local_tool(function_name, arguments)
 
             # Normal path: import real MCP tool implementations
@@ -2135,9 +1974,7 @@ class UnifiedAgentInterface:
             try:
                 result = await tool_func(**arguments)
             except TypeError as e:
-                if "'FunctionTool' object is not callable" in str(
-                    e
-                ) or "not callable" in str(e):
+                if "'FunctionTool' object is not callable" in str(e) or "not callable" in str(e):
                     logger.warning("   Tool is wrapped, trying .fn attribute")
                     actual_func = getattr(tool_func, "fn", None)
                     if actual_func:
@@ -2147,9 +1984,7 @@ class UnifiedAgentInterface:
                 else:
                     raise
 
-            logger.info(
-                f"✅ Tool executed: {function_name} -> success={result.get('success')}"
-            )
+            logger.info(f"✅ Tool executed: {function_name} -> success={result.get('success')}")
             if not result.get("success"):
                 logger.warning(f"   Tool returned error: {result.get('error')}")
             return result
@@ -2162,18 +1997,14 @@ class UnifiedAgentInterface:
             logger.error(f"   Traceback:\n{traceback.format_exc()}")
             return {"success": False, "error": f"Tool execution error: {str(e)}"}
 
-    async def _execute_local_tool(
-        self, function_name: str | None, arguments: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _execute_local_tool(self, function_name: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
         """Local emulation for MCP tools when autonomy mode disables MCP bridge.
 
         🔐 SECURITY: Implements path traversal protection per consensus proposal (99% approval).
         """
         from pathlib import Path
 
-        project_root = (
-            Path(__file__).resolve().parent.parent.parent
-        )  # points to project root
+        project_root = Path(__file__).resolve().parent.parent.parent  # points to project root
 
         if not function_name:
             return {"success": False, "error": "No tool name provided"}
@@ -2271,9 +2102,7 @@ class UnifiedAgentInterface:
                                 "message": f"Truncated (>{MAX_ENTRIES_PER_DIR} entries)",
                             }
                         )
-                        logger.warning(
-                            f"⚠️ Directory {path} truncated at {MAX_ENTRIES_PER_DIR} entries"
-                        )
+                        logger.warning(f"⚠️ Directory {path} truncated at {MAX_ENTRIES_PER_DIR} entries")
                         truncation_markers.append(
                             f"Directory '{path.relative_to(base)}' truncated at {MAX_ENTRIES_PER_DIR} entries"
                         )
@@ -2294,9 +2123,7 @@ class UnifiedAgentInterface:
                             }
                         )
                         logger.warning(f"⚠️ Total file count exceeded {MAX_TOTAL_FILES}")
-                        truncation_markers.append(
-                            f"Max total files reached ({MAX_TOTAL_FILES})"
-                        )
+                        truncation_markers.append(f"Max total files reached ({MAX_TOTAL_FILES})")
                         break
 
                     if child.is_dir():
@@ -2308,9 +2135,7 @@ class UnifiedAgentInterface:
                             }
                         )
                     else:
-                        entries.append(
-                            {"type": "file", "name": name, "size": child.stat().st_size}
-                        )
+                        entries.append({"type": "file", "name": name, "size": child.stat().st_size})
                 return entries
 
             tree[directory] = walk(base, 0)
@@ -2422,9 +2247,7 @@ class UnifiedAgentInterface:
 
         try:
             async with httpx.AsyncClient(timeout=300.0) as client:
-                async with client.stream(
-                    "POST", url, headers=headers, json=payload
-                ) as response:
+                async with client.stream("POST", url, headers=headers, json=payload) as response:
                     response.raise_for_status()
 
                     async for line in response.aiter_lines():
@@ -2527,17 +2350,13 @@ class UnifiedAgentInterface:
             try:
                 content = path_func(data)
                 if content and isinstance(content, str) and content.strip():
-                    logger.debug(
-                        f"✅ Content extracted successfully via {path_func.__name__}"
-                    )
+                    logger.debug(f"✅ Content extracted successfully via {path_func.__name__}")
                     return content.strip()
             except (KeyError, IndexError, TypeError):
                 continue
 
         # If all paths failed, log the full response for debugging
-        logger.error(
-            f"❌ Failed to extract content from response. Full data: {json.dumps(data, indent=2)[:500]}..."
-        )
+        logger.error(f"❌ Failed to extract content from response. Full data: {json.dumps(data, indent=2)[:500]}...")
         logger.warning(f"⚠️ Available keys in response: {list(data.keys())}")
 
         # Last resort: try to find any text-like value
@@ -2648,23 +2467,17 @@ class UnifiedAgentInterface:
             if citations and isinstance(citations, list):
                 # Filter valid URLs
                 valid_citations = [
-                    url
-                    for url in citations
-                    if isinstance(url, str) and url.startswith(("http://", "https://"))
+                    url for url in citations if isinstance(url, str) and url.startswith(("http://", "https://"))
                 ]
                 if valid_citations:
-                    logger.info(
-                        f"📚 Extracted {len(valid_citations)} citations from Perplexity"
-                    )
+                    logger.info(f"📚 Extracted {len(valid_citations)} citations from Perplexity")
                     return valid_citations
         except Exception as e:
             logger.debug(f"Failed to extract citations: {e}")
 
         return None
 
-    def _extract_token_usage(
-        self, data: dict, agent_type: AgentType
-    ) -> TokenUsage | None:
+    def _extract_token_usage(self, data: dict, agent_type: AgentType) -> TokenUsage | None:
         """
         Extract token usage from API response.
 
@@ -2724,9 +2537,7 @@ class UnifiedAgentInterface:
 
                 # Calculate cache savings percentage
                 if prompt_tokens > 0:
-                    cache_savings_pct = round(
-                        (cache_hit_tokens / prompt_tokens) * 100, 2
-                    )
+                    cache_savings_pct = round((cache_hit_tokens / prompt_tokens) * 100, 2)
 
             # Perplexity: cost in usage.cost
             cost_usd = None
@@ -2761,9 +2572,7 @@ class UnifiedAgentInterface:
             # Log with cache info if available
             cache_info = ""
             if cache_hit_tokens > 0:
-                cache_info = (
-                    f" | Cache: {cache_savings_pct:.1f}% ({cache_hit_tokens} tokens)"
-                )
+                cache_info = f" | Cache: {cache_savings_pct:.1f}% ({cache_hit_tokens} tokens)"
 
             logger.debug(
                 f"📊 Token usage: {total_tokens} total "
@@ -2796,10 +2605,7 @@ class UnifiedAgentInterface:
                     resp = await client.get("http://127.0.0.1:8000/mcp/health")
                     if resp.status_code == 200:
                         data = resp.json()
-                        self.mcp_available = bool(
-                            data.get("tool_count", 0) >= 1
-                            and data.get("status") == "healthy"
-                        )
+                        self.mcp_available = bool(data.get("tool_count", 0) >= 1 and data.get("status") == "healthy")
                     else:
                         self.mcp_available = False
             except Exception as e:
@@ -2808,18 +2614,14 @@ class UnifiedAgentInterface:
 
         # Check API keys
         deepseek_active = sum(1 for k in self.key_manager.deepseek_keys if k.is_usable)
-        perplexity_active = sum(
-            1 for k in self.key_manager.perplexity_keys if k.is_usable
-        )
+        perplexity_active = sum(1 for k in self.key_manager.perplexity_keys if k.is_usable)
 
         logger.info(
             f"🏥 Health: MCP={'✅' if self.mcp_available else '❌'} | "
             f"DeepSeek={deepseek_active}/8 | Perplexity={perplexity_active}/4"
         )
 
-        adaptations = self.circuit_manager.maybe_adapt_breakers(
-            force=True, min_interval_seconds=0
-        )
+        adaptations = self.circuit_manager.maybe_adapt_breakers(force=True, min_interval_seconds=0)
         if adaptations:
             logger.info(f"⚙️ Adaptive circuit thresholds updated: {adaptations}")
 
@@ -2835,21 +2637,13 @@ class UnifiedAgentInterface:
             **self.stats,
             "mcp_available": self.mcp_available,
             "mcp_disabled": self.mcp_disabled,
-            "deepseek_keys_active": sum(
-                1 for k in self.key_manager.deepseek_keys if k.is_usable
-            ),
-            "perplexity_keys_active": sum(
-                1 for k in self.key_manager.perplexity_keys if k.is_usable
-            ),
-            "last_health_check": datetime.fromtimestamp(
-                self.last_health_check
-            ).isoformat(),
+            "deepseek_keys_active": sum(1 for k in self.key_manager.deepseek_keys if k.is_usable),
+            "perplexity_keys_active": sum(1 for k in self.key_manager.perplexity_keys if k.is_usable),
+            "last_health_check": datetime.fromtimestamp(self.last_health_check).isoformat(),
             # Phase 1 additions:
             "circuit_breakers": cb_metrics.to_dict(),
             "health_monitoring": health_metrics,
-            "autonomy_score": self._calculate_autonomy_score(
-                cb_metrics, health_metrics
-            ),
+            "autonomy_score": self._calculate_autonomy_score(cb_metrics, health_metrics),
         }
 
     def _calculate_autonomy_score(self, cb_metrics, health_metrics) -> float:
@@ -2870,21 +2664,14 @@ class UnifiedAgentInterface:
         # Lower trip rate = better score
         # Calculate from all breakers if metrics has breakers dict
         if hasattr(cb_metrics, "breakers") and cb_metrics.breakers:
-            total_calls = sum(
-                b.get("total_calls", 0) for b in cb_metrics.breakers.values()
-            )
-            total_trips = sum(
-                b.get("total_trips", 0) for b in cb_metrics.breakers.values()
-            )
+            total_calls = sum(b.get("total_calls", 0) for b in cb_metrics.breakers.values())
+            total_trips = sum(b.get("total_trips", 0) for b in cb_metrics.breakers.values())
             total_calls = total_calls or 1
             trip_rate = (total_trips / total_calls) * 100
         else:
             # Fallback: use data from cb_metrics.to_dict() if available
             cb_data = cb_metrics.to_dict() if hasattr(cb_metrics, "to_dict") else {}
-            total_calls = sum(
-                b.get("success_count", 0) + b.get("failure_count", 0)
-                for b in cb_data.values()
-            )
+            total_calls = sum(b.get("success_count", 0) + b.get("failure_count", 0) for b in cb_data.values())
             total_calls = total_calls or 1
             trip_rate = 0  # No trip data available
 
@@ -2893,9 +2680,7 @@ class UnifiedAgentInterface:
         # Component health score (0-3.0 points)
         total_components = health_metrics.get("total_components", 3)
         healthy_components = health_metrics.get("healthy_components", 0)
-        health_score = (
-            (healthy_components / total_components) * 3.0 if total_components > 0 else 0
-        )
+        health_score = (healthy_components / total_components) * 3.0 if total_components > 0 else 0
 
         # Total score (0-10)
         total_score = auto_recovery_score + circuit_score + health_score
@@ -2978,9 +2763,7 @@ class UnifiedAgentInterface:
             "model": model,
             "tokens_used": tokens_used,
             "latency_ms": latency_ms,
-            "api_key_id": str(response.api_key_index)
-            if response.api_key_index is not None
-            else None,
+            "api_key_id": str(response.api_key_index) if response.api_key_index is not None else None,
             "success": response.success,
             "error": response.error,
             "from_cache": False,
@@ -3078,9 +2861,7 @@ class UnifiedAgentInterface:
             "model": model,
             "tokens_used": tokens_used,
             "latency_ms": latency_ms,
-            "api_key_id": str(response.api_key_index)
-            if response.api_key_index is not None
-            else None,
+            "api_key_id": str(response.api_key_index) if response.api_key_index is not None else None,
             "success": response.success,
             "error": response.error,
             "from_cache": False,
@@ -3140,7 +2921,5 @@ async def analyze_with_deepseek(code: str, focus: str = "all") -> AgentResponse:
 async def ask_perplexity(question: str) -> AgentResponse:
     """Быстрый метод для вопроса к Perplexity"""
     interface = get_agent_interface()
-    request = AgentRequest(
-        agent_type=AgentType.PERPLEXITY, task_type="search", prompt=question
-    )
+    request = AgentRequest(agent_type=AgentType.PERPLEXITY, task_type="search", prompt=question)
     return await interface.send_request(request)

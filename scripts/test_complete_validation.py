@@ -8,7 +8,8 @@
 - И все остальные параметры
 """
 import sys
-sys.path.insert(0, 'd:/bybit_strategy_tester_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 import pandas as pd
@@ -28,7 +29,7 @@ print(f"Время: {datetime.now()}")
 # ЗАГРУЗКА ДАННЫХ
 # ============================================================================
 print("\n📊 Загрузка данных...")
-conn = sqlite3.connect("d:/bybit_strategy_tester_v2/data.sqlite3")
+conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 
 # 1H данные
 df_1h = pd.read_sql("""

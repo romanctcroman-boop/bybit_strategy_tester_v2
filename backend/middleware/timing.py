@@ -4,7 +4,7 @@ Timing Middleware - Log slow requests for performance monitoring.
 
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request

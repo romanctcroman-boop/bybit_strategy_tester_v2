@@ -1,462 +1,1071 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Security Headers -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="DENY">
-    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
 
     <title>Advanced Analytics - Bybit Strategy Tester v2</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="./css/analytics_advanced.css">
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="./css/analytics_advanced.css" />
+      <script src="js/core/auto-event-binding.js"></script>
 </head>
-<body>
+  <body>
     <!-- Navigation -->
     <nav class="top-nav">
-        <a href="dashboard.html" class="nav-brand">
-            <i class="fas fa-chart-line"></i>
-            Bybit Strategy Tester v2
-        </a>
-        <div class="nav-links">
-            <a href="dashboard.html" class="nav-link">Dashboard</a>
-            <a href="trading.html" class="nav-link">Trading</a>
-            <a href="strategies.html" class="nav-link">Strategies</a>
-            <a href="analytics.html" class="nav-link">Analytics</a>
-            <a href="analytics-advanced.html" class="nav-link active">Advanced</a>
-            <a href="portfolio.html" class="nav-link">Portfolio</a>
-            <a href="risk-management.html" class="nav-link">Risk</a>
-        </div>
-        <div class="nav-actions">
-            <button class="btn-icon" title="Refresh Data" aria-label="Refresh data">
-                <i class="fas fa-sync-alt"></i>
-            </button>
-            <button class="btn-icon" title="Export Report" aria-label="Export report">
-                <i class="fas fa-download"></i>
-            </button>
-            <button class="btn-icon" title="Settings" aria-label="Settings">
-                <i class="fas fa-cog"></i>
-            </button>
-        </div>
+      <a href="dashboard.html" class="nav-brand">
+        <i class="fas fa-chart-line"></i>
+        Bybit Strategy Tester v2
+      </a>
+      <div class="nav-links">
+        <a href="dashboard.html" class="nav-link">Dashboard</a>
+        <a href="trading.html" class="nav-link">Trading</a>
+        <a href="strategies.html" class="nav-link">Strategies</a>
+        <a href="analytics.html" class="nav-link">Analytics</a>
+        <a href="analytics-advanced.html" class="nav-link active">Advanced</a>
+        <a href="portfolio.html" class="nav-link">Portfolio</a>
+        <a href="risk-management.html" class="nav-link">Risk</a>
+      </div>
+      <div class="nav-actions">
+        <button class="btn-icon" title="Refresh Data" aria-label="Refresh data">
+          <i class="fas fa-sync-alt"></i>
+        </button>
+        <button
+          class="btn-icon"
+          title="Export Report"
+          aria-label="Export report"
+        >
+          <i class="fas fa-download"></i>
+        </button>
+        <button class="btn-icon" title="Settings" aria-label="Settings">
+          <i class="fas fa-cog"></i>
+        </button>
+      </div>
     </nav>
 
     <div class="container">
-        <!-- Page Header -->
-        <div class="page-header">
-            <div class="page-title">
-                <h1><i class="fas fa-chart-bar"></i> Advanced Analytics</h1>
-                <span class="badge">Pro</span>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-secondary">
-                    <i class="fas fa-calendar"></i>
-                    Last 30 Days
-                </button>
-                <button class="btn btn-secondary">
-                    <i class="fas fa-filter"></i>
-                    Filters
-                </button>
-                <button class="btn btn-primary">
-                    <i class="fas fa-file-pdf"></i>
-                    Export PDF
-                </button>
-            </div>
+      <!-- Page Header -->
+      <div class="page-header">
+        <div class="page-title">
+          <h1><i class="fas fa-chart-bar"></i> Advanced Analytics</h1>
+          <span class="badge">Pro</span>
         </div>
-
-        <!-- Tabs -->
-        <div class="tabs" role="tablist">
-            <button class="tab active" role="tab" aria-selected="true">Overview</button>
-            <button class="tab" role="tab" aria-selected="false">Performance</button>
-            <button class="tab" role="tab" aria-selected="false">Risk Analysis</button>
-            <button class="tab" role="tab" aria-selected="false">Correlations</button>
-            <button class="tab" role="tab" aria-selected="false">Backtests</button>
+        <div class="header-actions">
+          <button class="btn btn-secondary">
+            <i class="fas fa-calendar"></i>
+            Last 30 Days
+          </button>
+          <button class="btn btn-secondary">
+            <i class="fas fa-filter"></i>
+            Filters
+          </button>
+          <button class="btn btn-primary">
+            <i class="fas fa-file-pdf"></i>
+            Export PDF
+          </button>
         </div>
+      </div>
 
-        <!-- Performance Summary -->
-        <div class="performance-summary">
-            <div class="summary-card">
-                <h4>Total Return</h4>
-                <div class="summary-value positive">+47.82%</div>
-                <div class="summary-change positive">
-                    <i class="fas fa-arrow-up"></i>
-                    +12.4% vs last month
-                </div>
-            </div>
-            <div class="summary-card">
-                <h4>Sharpe Ratio</h4>
-                <div class="summary-value neutral">2.34</div>
-                <div class="summary-change positive">
-                    <i class="fas fa-arrow-up"></i>
-                    +0.18 improvement
-                </div>
-            </div>
-            <div class="summary-card">
-                <h4>Max Drawdown</h4>
-                <div class="summary-value negative">-8.42%</div>
-                <div class="summary-change positive">
-                    <i class="fas fa-arrow-up"></i>
-                    Recovered in 12 days
-                </div>
-            </div>
-            <div class="summary-card">
-                <h4>Win Rate</h4>
-                <div class="summary-value positive">68.5%</div>
-                <div class="summary-change positive">
-                    <i class="fas fa-arrow-up"></i>
-                    +3.2% vs average
-                </div>
-            </div>
-            <div class="summary-card">
-                <h4>Profit Factor</h4>
-                <div class="summary-value positive">2.87</div>
-                <div class="summary-change neutral">
-                    <i class="fas fa-minus"></i>
-                    Stable
-                </div>
-            </div>
-            <div class="summary-card">
-                <h4>Total Trades</h4>
-                <div class="summary-value neutral">1,847</div>
-                <div class="summary-change positive">
-                    <i class="fas fa-arrow-up"></i>
-                    +234 this month
-                </div>
-            </div>
+      <!-- Tabs -->
+      <div class="tabs" role="tablist">
+        <button class="tab active" role="tab" aria-selected="true">
+          Overview
+        </button>
+        <button class="tab" role="tab" aria-selected="false">
+          Performance
+        </button>
+        <button class="tab" role="tab" aria-selected="false">
+          Risk Analysis
+        </button>
+        <button class="tab" role="tab" aria-selected="false">
+          Correlations
+        </button>
+        <button class="tab" role="tab" aria-selected="false">Backtests</button>
+      </div>
+
+      <!-- Performance Summary -->
+      <div class="performance-summary">
+        <div class="summary-card">
+          <h4>Total Return</h4>
+          <div class="summary-value positive">+47.82%</div>
+          <div class="summary-change positive">
+            <i class="fas fa-arrow-up"></i>
+            +12.4% vs last month
+          </div>
         </div>
+        <div class="summary-card">
+          <h4>Sharpe Ratio</h4>
+          <div class="summary-value neutral">2.34</div>
+          <div class="summary-change positive">
+            <i class="fas fa-arrow-up"></i>
+            +0.18 improvement
+          </div>
+        </div>
+        <div class="summary-card">
+          <h4>Max Drawdown</h4>
+          <div class="summary-value negative">-8.42%</div>
+          <div class="summary-change positive">
+            <i class="fas fa-arrow-up"></i>
+            Recovered in 12 days
+          </div>
+        </div>
+        <div class="summary-card">
+          <h4>Win Rate</h4>
+          <div class="summary-value positive">68.5%</div>
+          <div class="summary-change positive">
+            <i class="fas fa-arrow-up"></i>
+            +3.2% vs average
+          </div>
+        </div>
+        <div class="summary-card">
+          <h4>Profit Factor</h4>
+          <div class="summary-value positive">2.87</div>
+          <div class="summary-change neutral">
+            <i class="fas fa-minus"></i>
+            Stable
+          </div>
+        </div>
+        <div class="summary-card">
+          <h4>Total Trades</h4>
+          <div class="summary-value neutral">1,847</div>
+          <div class="summary-change positive">
+            <i class="fas fa-arrow-up"></i>
+            +234 this month
+          </div>
+        </div>
+      </div>
 
-        <!-- Charts Grid -->
-        <div class="charts-grid">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h3><i class="fas fa-chart-area"></i> Equity Curve</h3>
-                    <div class="chart-controls">
-                        <button class="chart-btn active">1M</button>
-                        <button class="chart-btn">3M</button>
-                        <button class="chart-btn">6M</button>
-                        <button class="chart-btn">1Y</button>
-                        <button class="chart-btn">All</button>
+      <!-- Charts Grid -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3><i class="fas fa-chart-area"></i> Equity Curve</h3>
+            <div class="chart-controls">
+              <button class="chart-btn active">1M</button>
+              <button class="chart-btn">3M</button>
+              <button class="chart-btn">6M</button>
+              <button class="chart-btn">1Y</button>
+              <button class="chart-btn">All</button>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="equityCurveChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3><i class="fas fa-pie-chart"></i> Returns Distribution</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="returnsDistChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Technical Indicators -->
+      <h3 class="section-title">Technical Indicators</h3>
+      <div class="indicators-grid">
+        <div class="indicator-card">
+          <div class="indicator-header">
+            <span class="indicator-name">RSI (14)</span>
+            <span class="indicator-signal buy">Buy</span>
+          </div>
+          <div class="indicator-value">32.4</div>
+          <div class="indicator-range">
+            <span>0 (Oversold)</span>
+            <span>100 (Overbought)</span>
+          </div>
+          <div class="indicator-bar">
+            <div class="indicator-fill bullish w-32"></div>
+          </div>
+        </div>
+        <div class="indicator-card">
+          <div class="indicator-header">
+            <span class="indicator-name">MACD</span>
+            <span class="indicator-signal buy">Bullish</span>
+          </div>
+          <div class="indicator-value">+128.5</div>
+          <div class="indicator-range">
+            <span>Signal: 98.2</span>
+            <span>Histogram: +30.3</span>
+          </div>
+          <div class="indicator-bar">
+            <div class="indicator-fill bullish w-65"></div>
+          </div>
+        </div>
+        <div class="indicator-card">
+          <div class="indicator-header">
+            <span class="indicator-name">Bollinger Bands</span>
+            <span class="indicator-signal neutral">Neutral</span>
+          </div>
+          <div class="indicator-value">Middle</div>
+          <div class="indicator-range">
+            <span>Lower: $41,200</span>
+            <span>Upper: $44,800</span>
+          </div>
+          <div class="indicator-bar">
+            <div class="indicator-fill neutral w-50"></div>
+          </div>
+        </div>
+        <div class="indicator-card">
+          <div class="indicator-header">
+            <span class="indicator-name">ATR (14)</span>
+            <span class="indicator-signal sell">High Vol</span>
+          </div>
+          <div class="indicator-value">$1,245</div>
+          <div class="indicator-range">
+            <span>Low: $400</span>
+            <span>High: $2,000</span>
+          </div>
+          <div class="indicator-bar">
+            <div class="indicator-fill bearish w-62"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drawdown Analysis -->
+      <div class="drawdown-section">
+        <div class="drawdown-chart">
+          <div class="chart-header">
+            <h3><i class="fas fa-chart-line"></i> Drawdown Analysis</h3>
+            <div class="chart-controls">
+              <button class="chart-btn active">Underwater</button>
+              <button class="chart-btn">Duration</button>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="drawdownChart"></canvas>
+          </div>
+        </div>
+        <div class="drawdown-stats">
+          <h3 class="section-title-sm">Drawdown Statistics</h3>
+          <div class="stat-item">
+            <span class="stat-label">Max Drawdown</span>
+            <span class="stat-value negative">-8.42%</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Average Drawdown</span>
+            <span class="stat-value negative">-3.21%</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Max DD Duration</span>
+            <span class="stat-value">18 days</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Avg DD Duration</span>
+            <span class="stat-value">7 days</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Recovery Factor</span>
+            <span class="stat-value positive">5.68</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Calmar Ratio</span>
+            <span class="stat-value positive">4.12</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Current Drawdown</span>
+            <span class="stat-value negative">-2.1%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trade Distribution -->
+      <div class="distribution-section">
+        <div class="distribution-card">
+          <h3><i class="fas fa-clock"></i> Trades by Hour</h3>
+          <div class="chart-container h-200">
+            <canvas id="hourlyChart"></canvas>
+          </div>
+        </div>
+        <div class="distribution-card">
+          <h3><i class="fas fa-calendar-week"></i> Trades by Day</h3>
+          <div class="chart-container h-200">
+            <canvas id="dailyChart"></canvas>
+          </div>
+        </div>
+        <div class="distribution-card">
+          <h3><i class="fas fa-coins"></i> Trades by Symbol</h3>
+          <div class="chart-container h-200">
+            <canvas id="symbolChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly Performance Heatmap -->
+      <div class="heatmap-section">
+        <div class="heatmap-header">
+          <h3><i class="fas fa-th"></i> Monthly Performance Heatmap</h3>
+          <div class="heatmap-legend">
+            <span>Loss</span>
+            <div class="legend-gradient">
+              <div class="legend-box loss-high"></div>
+              <div class="legend-box loss-medium"></div>
+              <div class="legend-box loss-low"></div>
+              <div class="legend-box neutral"></div>
+              <div class="legend-box profit-low"></div>
+              <div class="legend-box profit-medium"></div>
+              <div class="legend-box profit-high"></div>
+            </div>
+            <span>Profit</span>
+          </div>
+        </div>
+        <div class="heatmap-grid" id="heatmapGrid">
+          <!-- Generated by JavaScript -->
+        </div>
+      </div>
+
+      <!-- Strategy Comparison -->
+      <div class="comparison-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Strategy</th>
+              <th>Return</th>
+              <th>Sharpe</th>
+              <th>Max DD</th>
+              <th>Win Rate</th>
+              <th>Trades</th>
+              <th>Equity</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="strategy-name">
+                  <div class="strategy-icon momentum">
+                    <i class="fas fa-rocket"></i>
+                  </div>
+                  <div>
+                    <strong>Momentum Pro</strong>
+                    <div class="text-subtext">BTC/USDT, ETH/USDT</div>
+                  </div>
+                </div>
+              </td>
+              <td class="text-green">+24.5%</td>
+              <td>2.41</td>
+              <td class="text-red">-6.2%</td>
+              <td>72%</td>
+              <td>458</td>
+              <td><canvas class="mini-chart" id="miniChart1"></canvas></td>
+              <td><span class="indicator-signal buy">Active</span></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="strategy-name">
+                  <div class="strategy-icon mean-reversion">
+                    <i class="fas fa-exchange-alt"></i>
+                  </div>
+                  <div>
+                    <strong>Mean Reversion</strong>
+                    <div class="text-subtext">Multi-pair</div>
+                  </div>
+                </div>
+              </td>
+              <td class="text-green">+18.2%</td>
+              <td>1.89</td>
+              <td class="text-red">-8.4%</td>
+              <td>65%</td>
+              <td>892</td>
+              <td><canvas class="mini-chart" id="miniChart2"></canvas></td>
+              <td><span class="indicator-signal buy">Active</span></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="strategy-name">
+                  <div class="strategy-icon breakout">
+                    <i class="fas fa-bolt"></i>
+                  </div>
+                  <div>
+                    <strong>Breakout Hunter</strong>
+                    <div class="text-subtext">SOL/USDT</div>
+                  </div>
+                </div>
+              </td>
+              <td class="text-green">+31.8%</td>
+              <td>2.78</td>
+              <td class="text-red">-5.1%</td>
+              <td>58%</td>
+              <td>234</td>
+              <td><canvas class="mini-chart" id="miniChart3"></canvas></td>
+              <td><span class="indicator-signal neutral">Paused</span></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="strategy-name">
+                  <div class="strategy-icon grid">
+                    <i class="fas fa-th"></i>
+                  </div>
+                  <div>
+                    <strong>Grid Trading</strong>
+                    <div class="text-subtext">BTC/USDT</div>
+                  </div>
+                </div>
+              </td>
+              <td class="text-green">+12.4%</td>
+              <td>1.52</td>
+              <td class="text-red">-3.8%</td>
+              <td>81%</td>
+              <td>1,247</td>
+              <td><canvas class="mini-chart" id="miniChart4"></canvas></td>
+              <td><span class="indicator-signal buy">Active</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Monte Carlo Simulation Section -->
+      <div class="monte-carlo-section mb-4">
+        <div class="card bg-dark border-secondary">
+          <div
+            class="card-header d-flex justify-content-between align-items-center"
+          >
+            <h5 class="mb-0">
+              <i class="fas fa-dice text-primary"></i> Monte Carlo Simulation
+            </h5>
+            <div class="d-flex gap-2">
+              <select
+                id="mcBacktestSelect"
+                class="form-select form-select-sm bg-dark text-light border-secondary"
+                style="width: 200px"
+                title="Select backtest for simulation"
+              >
+                <option value="">Select Backtest...</option>
+              </select>
+              <button
+                class="btn btn-sm btn-primary"
+                onclick="runMonteCarloSimulation()"
+                title="Run Simulation"
+              >
+                <i class="fas fa-play"></i> Run Simulation
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row g-3 mb-3">
+              <div class="col-md-3">
+                <label class="form-label small">Simulations</label>
+                <input
+                  type="number"
+                  id="mcSimulations"
+                  class="form-control form-control-sm bg-dark text-light border-secondary"
+                  value="1000"
+                  min="100"
+                  max="10000"
+                  title="Number of simulations"
+                />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Initial Capital</label>
+                <input
+                  type="number"
+                  id="mcCapital"
+                  class="form-control form-control-sm bg-dark text-light border-secondary"
+                  value="10000"
+                  min="1000"
+                  title="Initial capital"
+                />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Method</label>
+                <select
+                  id="mcMethod"
+                  class="form-select form-select-sm bg-dark text-light border-secondary"
+                  title="Simulation method"
+                >
+                  <option value="bootstrap">Bootstrap</option>
+                  <option value="shuffle">Trade Shuffle</option>
+                  <option value="parametric">Parametric</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Confidence Level</label>
+                <select
+                  id="mcConfidence"
+                  class="form-select form-select-sm bg-dark text-light border-secondary"
+                  title="Confidence level"
+                >
+                  <option value="0.95">95%</option>
+                  <option value="0.99">99%</option>
+                  <option value="0.90">90%</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Monte Carlo Results -->
+            <div id="mcResults" style="display: none">
+              <div class="row g-3 mb-3">
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-success" id="mcProbProfit">
+                      -
                     </div>
-                </div>
-                <div class="chart-container">
-                    <canvas id="equityCurveChart"></canvas>
-                </div>
-            </div>
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h3><i class="fas fa-pie-chart"></i> Returns Distribution</h3>
-                </div>
-                <div class="chart-container">
-                    <canvas id="returnsDistChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Technical Indicators -->
-        <h3 class="section-title">Technical Indicators</h3>
-        <div class="indicators-grid">
-            <div class="indicator-card">
-                <div class="indicator-header">
-                    <span class="indicator-name">RSI (14)</span>
-                    <span class="indicator-signal buy">Buy</span>
-                </div>
-                <div class="indicator-value">32.4</div>
-                <div class="indicator-range">
-                    <span>0 (Oversold)</span>
-                    <span>100 (Overbought)</span>
-                </div>
-                <div class="indicator-bar">
-                    <div class="indicator-fill bullish w-32"></div>
-                </div>
-            </div>
-            <div class="indicator-card">
-                <div class="indicator-header">
-                    <span class="indicator-name">MACD</span>
-                    <span class="indicator-signal buy">Bullish</span>
-                </div>
-                <div class="indicator-value">+128.5</div>
-                <div class="indicator-range">
-                    <span>Signal: 98.2</span>
-                    <span>Histogram: +30.3</span>
-                </div>
-                <div class="indicator-bar">
-                    <div class="indicator-fill bullish w-65"></div>
-                </div>
-            </div>
-            <div class="indicator-card">
-                <div class="indicator-header">
-                    <span class="indicator-name">Bollinger Bands</span>
-                    <span class="indicator-signal neutral">Neutral</span>
-                </div>
-                <div class="indicator-value">Middle</div>
-                <div class="indicator-range">
-                    <span>Lower: $41,200</span>
-                    <span>Upper: $44,800</span>
-                </div>
-                <div class="indicator-bar">
-                    <div class="indicator-fill neutral w-50"></div>
-                </div>
-            </div>
-            <div class="indicator-card">
-                <div class="indicator-header">
-                    <span class="indicator-name">ATR (14)</span>
-                    <span class="indicator-signal sell">High Vol</span>
-                </div>
-                <div class="indicator-value">$1,245</div>
-                <div class="indicator-range">
-                    <span>Low: $400</span>
-                    <span>High: $2,000</span>
-                </div>
-                <div class="indicator-bar">
-                    <div class="indicator-fill bearish w-62"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Drawdown Analysis -->
-        <div class="drawdown-section">
-            <div class="drawdown-chart">
-                <div class="chart-header">
-                    <h3><i class="fas fa-chart-line"></i> Drawdown Analysis</h3>
-                    <div class="chart-controls">
-                        <button class="chart-btn active">Underwater</button>
-                        <button class="chart-btn">Duration</button>
+                    <div class="stat-label small text-muted">
+                      Prob. of Profit
                     </div>
+                  </div>
                 </div>
-                <div class="chart-container">
-                    <canvas id="drawdownChart"></canvas>
-                </div>
-            </div>
-            <div class="drawdown-stats">
-                <h3 class="section-title-sm">Drawdown Statistics</h3>
-                <div class="stat-item">
-                    <span class="stat-label">Max Drawdown</span>
-                    <span class="stat-value negative">-8.42%</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Average Drawdown</span>
-                    <span class="stat-value negative">-3.21%</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Max DD Duration</span>
-                    <span class="stat-value">18 days</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Avg DD Duration</span>
-                    <span class="stat-value">7 days</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Recovery Factor</span>
-                    <span class="stat-value positive">5.68</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Calmar Ratio</span>
-                    <span class="stat-value positive">4.12</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Current Drawdown</span>
-                    <span class="stat-value negative">-2.1%</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Trade Distribution -->
-        <div class="distribution-section">
-            <div class="distribution-card">
-                <h3><i class="fas fa-clock"></i> Trades by Hour</h3>
-                <div class="chart-container h-200">
-                    <canvas id="hourlyChart"></canvas>
-                </div>
-            </div>
-            <div class="distribution-card">
-                <h3><i class="fas fa-calendar-week"></i> Trades by Day</h3>
-                <div class="chart-container h-200">
-                    <canvas id="dailyChart"></canvas>
-                </div>
-            </div>
-            <div class="distribution-card">
-                <h3><i class="fas fa-coins"></i> Trades by Symbol</h3>
-                <div class="chart-container h-200">
-                    <canvas id="symbolChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Monthly Performance Heatmap -->
-        <div class="heatmap-section">
-            <div class="heatmap-header">
-                <h3><i class="fas fa-th"></i> Monthly Performance Heatmap</h3>
-                <div class="heatmap-legend">
-                    <span>Loss</span>
-                    <div class="legend-gradient">
-                        <div class="legend-box loss-high"></div>
-                        <div class="legend-box loss-medium"></div>
-                        <div class="legend-box loss-low"></div>
-                        <div class="legend-box neutral"></div>
-                        <div class="legend-box profit-low"></div>
-                        <div class="legend-box profit-medium"></div>
-                        <div class="legend-box profit-high"></div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-warning" id="mcMedianReturn">
+                      -
                     </div>
-                    <span>Profit</span>
+                    <div class="stat-label small text-muted">Median Return</div>
+                  </div>
                 </div>
-            </div>
-            <div class="heatmap-grid" id="heatmapGrid">
-                <!-- Generated by JavaScript -->
-            </div>
-        </div>
-
-        <!-- Strategy Comparison -->
-        <div class="comparison-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Strategy</th>
-                        <th>Return</th>
-                        <th>Sharpe</th>
-                        <th>Max DD</th>
-                        <th>Win Rate</th>
-                        <th>Trades</th>
-                        <th>Equity</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>
-                            <div class="strategy-name">
-                                <div class="strategy-icon momentum"><i class="fas fa-rocket"></i></div>
-                                <div>
-                                    <strong>Momentum Pro</strong>
-                                    <div class="text-subtext">BTC/USDT, ETH/USDT</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="text-green">+24.5%</td>
-                        <td>2.41</td>
-                        <td class="text-red">-6.2%</td>
-                        <td>72%</td>
-                        <td>458</td>
-                        <td><canvas class="mini-chart" id="miniChart1"></canvas></td>
-                        <td><span class="indicator-signal buy">Active</span></td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="strategy-name">
-                                <div class="strategy-icon mean-reversion"><i class="fas fa-exchange-alt"></i></div>
-                                <div>
-                                    <strong>Mean Reversion</strong>
-                                    <div class="text-subtext">Multi-pair</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="text-green">+18.2%</td>
-                        <td>1.89</td>
-                        <td class="text-red">-8.4%</td>
-                        <td>65%</td>
-                        <td>892</td>
-                        <td><canvas class="mini-chart" id="miniChart2"></canvas></td>
-                        <td><span class="indicator-signal buy">Active</span></td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="strategy-name">
-                                <div class="strategy-icon breakout"><i class="fas fa-bolt"></i></div>
-                                <div>
-                                    <strong>Breakout Hunter</strong>
-                                    <div class="text-subtext">SOL/USDT</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="text-green">+31.8%</td>
-                        <td>2.78</td>
-                        <td class="text-red">-5.1%</td>
-                        <td>58%</td>
-                        <td>234</td>
-                        <td><canvas class="mini-chart" id="miniChart3"></canvas></td>
-                        <td><span class="indicator-signal neutral">Paused</span></td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="strategy-name">
-                                <div class="strategy-icon grid"><i class="fas fa-th"></i></div>
-                                <div>
-                                    <strong>Grid Trading</strong>
-                                    <div class="text-subtext">BTC/USDT</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="text-green">+12.4%</td>
-                        <td>1.52</td>
-                        <td class="text-red">-3.8%</td>
-                        <td>81%</td>
-                        <td>1,247</td>
-                        <td><canvas class="mini-chart" id="miniChart4"></canvas></td>
-                        <td><span class="indicator-signal buy">Active</span></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Correlation Matrix -->
-        <div class="correlation-section">
-            <div class="correlation-matrix">
-                <div class="matrix-header">
-                    <h3><i class="fas fa-project-diagram"></i> Asset Correlation Matrix</h3>
-                    <div class="chart-controls">
-                        <button class="chart-btn active">1M</button>
-                        <button class="chart-btn">3M</button>
-                        <button class="chart-btn">1Y</button>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-danger" id="mcVaR">-</div>
+                    <div class="stat-label small text-muted">VaR (95%)</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-danger" id="mcCVaR">-</div>
+                    <div class="stat-label small text-muted">CVaR (ES)</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-info" id="mcMaxDD">-</div>
+                    <div class="stat-label small text-muted">
+                      Expected Max DD
                     </div>
+                  </div>
                 </div>
-                <!-- Row 1: Headers -->
-                <div class="matrix-cell header"></div>
-                <div class="matrix-cell header">BTC</div>
-                <div class="matrix-cell header">ETH</div>
-                <div class="matrix-cell header">SOL</div>
-                <div class="matrix-cell header">XRP</div>
-                <div class="matrix-cell header">DOGE</div>
-                <!-- Row 2: BTC -->
-                <div class="matrix-cell header">BTC</div>
-                <div class="matrix-cell positive-strong">1.00</div>
-                <div class="matrix-cell positive-strong">0.92</div>
-                <div class="matrix-cell positive-medium">0.78</div>
-                <div class="matrix-cell positive-medium">0.65</div>
-                <div class="matrix-cell positive-weak">0.45</div>
-                <!-- Row 3: ETH -->
-                <div class="matrix-cell header">ETH</div>
-                <div class="matrix-cell positive-strong">0.92</div>
-                <div class="matrix-cell positive-strong">1.00</div>
-                <div class="matrix-cell positive-strong">0.85</div>
-                <div class="matrix-cell positive-medium">0.58</div>
-                <div class="matrix-cell positive-weak">0.42</div>
-                <!-- Row 4: SOL -->
-                <div class="matrix-cell header">SOL</div>
-                <div class="matrix-cell positive-medium">0.78</div>
-                <div class="matrix-cell positive-strong">0.85</div>
-                <div class="matrix-cell positive-strong">1.00</div>
-                <div class="matrix-cell positive-weak">0.48</div>
-                <div class="matrix-cell positive-weak">0.38</div>
-                <!-- Row 5: XRP -->
-                <div class="matrix-cell header">XRP</div>
-                <div class="matrix-cell positive-medium">0.65</div>
-                <div class="matrix-cell positive-medium">0.58</div>
-                <div class="matrix-cell positive-weak">0.48</div>
-                <div class="matrix-cell positive-strong">1.00</div>
-                <div class="matrix-cell positive-medium">0.52</div>
-                <!-- Row 6: DOGE -->
-                <div class="matrix-cell header">DOGE</div>
-                <div class="matrix-cell positive-weak">0.45</div>
-                <div class="matrix-cell positive-weak">0.42</div>
-                <div class="matrix-cell positive-weak">0.38</div>
-                <div class="matrix-cell positive-medium">0.52</div>
-                <div class="matrix-cell positive-strong">1.00</div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-primary" id="mcKelly">-</div>
+                    <div class="stat-label small text-muted">Kelly %</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Charts Row -->
+              <div class="row g-3">
+                <div class="col-md-8">
+                  <div class="chart-container" style="height: 300px">
+                    <canvas id="mcEquityCurves"></canvas>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="chart-container" style="height: 300px">
+                    <canvas id="mcDistribution"></canvas>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            <!-- Loading State -->
+            <div id="mcLoading" class="text-center py-4" style="display: none">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Running simulation...</span>
+              </div>
+              <p class="text-muted mt-2">Running Monte Carlo simulation...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="mcEmpty" class="text-center py-4">
+              <i class="fas fa-dice fa-3x text-muted mb-3"></i>
+              <p class="text-muted">
+                Select a backtest and run simulation to see probabilistic
+                analysis
+              </p>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- Parameter Sensitivity Section -->
+      <div class="sensitivity-section mb-4">
+        <div class="card bg-dark border-secondary">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fas fa-sliders-h text-warning"></i> Parameter
+              Sensitivity Analysis
+            </h5>
+          </div>
+          <div class="card-body">
+            <div id="sensitivityChart" style="height: 250px">
+              <div class="text-center text-muted py-5">
+                <i class="fas fa-chart-line fa-2x mb-2"></i>
+                <p>Run optimization to see parameter sensitivity</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optimization Heatmap Section -->
+      <div class="heatmap-analysis-section mb-4">
+        <div class="card bg-dark border-secondary">
+          <div class="card-header">
+            <h5 class="mb-0">
+              <i class="fas fa-th text-info"></i> Optimization Heatmap
+            </h5>
+          </div>
+          <div class="card-body">
+            <div id="optimizationHeatmap" style="height: 300px">
+              <div class="text-center text-muted py-5">
+                <i class="fas fa-fire fa-2x mb-2"></i>
+                <p>Run parameter optimization to see heatmap</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Market Regime Detection Section -->
+      <div class="market-regime-section mb-4" id="market-regime-section">
+        <div class="card bg-dark border-secondary">
+          <div
+            class="card-header d-flex justify-content-between align-items-center"
+          >
+            <h5 class="mb-0">
+              <i class="fas fa-chart-pie text-success"></i> Market Regime
+              Detection
+            </h5>
+            <div class="d-flex gap-2">
+              <select
+                id="regimeSymbol"
+                class="form-select form-select-sm bg-dark text-light border-secondary"
+                style="width: 140px"
+                title="Trading pair"
+              >
+                <option value="BTCUSDT">BTCUSDT</option>
+                <option value="ETHUSDT">ETHUSDT</option>
+                <option value="SOLUSDT">SOLUSDT</option>
+                <option value="XRPUSDT">XRPUSDT</option>
+                <option value="DOGEUSDT">DOGEUSDT</option>
+              </select>
+              <select
+                id="regimeInterval"
+                class="form-select form-select-sm bg-dark text-light border-secondary"
+                style="width: 100px"
+                title="Timeframe"
+              >
+                <option value="15m">15m</option>
+                <option value="1h" selected>1H</option>
+                <option value="4h">4H</option>
+                <option value="1d">1D</option>
+              </select>
+              <button
+                class="btn btn-sm btn-success"
+                onclick="detectMarketRegime()"
+                title="Detect Regime"
+              >
+                <i class="fas fa-search"></i> Detect
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- Regime Results -->
+            <div id="regimeResults" style="display: none">
+              <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-3 rounded text-center"
+                  >
+                    <div class="stat-value h4 mb-1" id="regimeType">-</div>
+                    <div class="stat-label small text-muted">
+                      Current Regime
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-3 rounded text-center"
+                  >
+                    <div class="stat-value text-info" id="regimeConfidence">
+                      -
+                    </div>
+                    <div class="stat-label small text-muted">Confidence</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-3 rounded text-center"
+                  >
+                    <div class="stat-value text-warning" id="regimeADX">-</div>
+                    <div class="stat-label small text-muted">ADX</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-3 rounded text-center"
+                  >
+                    <div class="stat-value text-success" id="regimePlusDI">
+                      -
+                    </div>
+                    <div class="stat-label small text-muted">+DI</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-3 rounded text-center"
+                  >
+                    <div class="stat-value text-danger" id="regimeMinusDI">
+                      -
+                    </div>
+                    <div class="stat-label small text-muted">-DI</div>
+                  </div>
+                </div>
+                <div class="col-md-1">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-3 rounded text-center"
+                  >
+                    <div class="stat-value" id="regimeBandwidth">-</div>
+                    <div class="stat-label small text-muted">BB Width</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Trading Signals -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <div
+                    class="alert alert-dark mb-0 d-flex align-items-center gap-3"
+                  >
+                    <span id="regimeAllowLong" class="badge bg-secondary"
+                      >LONG: -</span
+                    >
+                    <span id="regimeAllowShort" class="badge bg-secondary"
+                      >SHORT: -</span
+                    >
+                    <span class="text-muted"
+                      >Position Size:
+                      <strong id="regimePositionSize">-</strong></span
+                    >
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span id="regimeDescription">-</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Regime History Chart -->
+              <div class="chart-container" style="height: 200px">
+                <canvas id="regimeHistoryChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Loading State -->
+            <div
+              id="regimeLoading"
+              class="text-center py-4"
+              style="display: none"
+            >
+              <div class="spinner-border text-success" role="status">
+                <span class="visually-hidden">Detecting regime...</span>
+              </div>
+              <p class="text-muted mt-2">Analyzing market conditions...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="regimeEmpty" class="text-center py-4">
+              <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+              <p class="text-muted">
+                Select symbol and timeframe, then click Detect to analyze market
+                regime
+              </p>
+              <p class="small text-muted">
+                Uses ADX, +DI/-DI, Bollinger Bandwidth to classify: TRENDING_UP,
+                TRENDING_DOWN, RANGING, VOLATILE, BREAKOUT
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Portfolio Backtesting Section -->
+      <div class="portfolio-backtest-section mb-4">
+        <div class="card bg-dark border-secondary">
+          <div
+            class="card-header d-flex justify-content-between align-items-center"
+          >
+            <h5 class="mb-0">
+              <i class="fas fa-briefcase text-primary"></i> Portfolio
+              Backtesting
+            </h5>
+            <button
+              class="btn btn-sm btn-primary"
+              onclick="runPortfolioBacktest()"
+              title="Run Backtest"
+            >
+              <i class="fas fa-play"></i> Run Portfolio Backtest
+            </button>
+          </div>
+          <div class="card-body">
+            <!-- Portfolio Settings -->
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <label class="form-label small">Select Assets</label>
+                <select
+                  id="portfolioAssets"
+                  class="form-select form-select-sm bg-dark text-light border-secondary"
+                  multiple
+                  size="5"
+                  title="Hold Ctrl to select multiple"
+                >
+                  <option value="BTCUSDT" selected>BTCUSDT</option>
+                  <option value="ETHUSDT" selected>ETHUSDT</option>
+                  <option value="SOLUSDT">SOLUSDT</option>
+                  <option value="XRPUSDT">XRPUSDT</option>
+                  <option value="BNBUSDT">BNBUSDT</option>
+                  <option value="DOGEUSDT">DOGEUSDT</option>
+                  <option value="ADAUSDT">ADAUSDT</option>
+                  <option value="AVAXUSDT">AVAXUSDT</option>
+                </select>
+                <small class="text-muted">Hold Ctrl to select multiple</small>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small">Allocation Method</label>
+                <select
+                  id="portfolioAllocation"
+                  class="form-select form-select-sm bg-dark text-light border-secondary"
+                  title="Allocation method"
+                >
+                  <option value="equal_weight">Equal Weight</option>
+                  <option value="risk_parity">Risk Parity</option>
+                  <option value="min_variance">Min Variance</option>
+                  <option value="max_sharpe">Max Sharpe</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small">Rebalance</label>
+                <select
+                  id="portfolioRebalance"
+                  class="form-select form-select-sm bg-dark text-light border-secondary"
+                  title="Rebalance frequency"
+                >
+                  <option value="none">None</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly" selected>Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small">Initial Capital</label>
+                <input
+                  type="number"
+                  id="portfolioCapital"
+                  class="form-control form-control-sm bg-dark text-light border-secondary"
+                  value="100000"
+                  min="1000"
+                  title="Initial capital"
+                />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small">Period</label>
+                <select
+                  id="portfolioPeriod"
+                  class="form-select form-select-sm bg-dark text-light border-secondary"
+                  title="Backtest period"
+                >
+                  <option value="30">30 Days</option>
+                  <option value="90" selected>90 Days</option>
+                  <option value="180">180 Days</option>
+                  <option value="365">1 Year</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Portfolio Results -->
+            <div id="portfolioResults" style="display: none">
+              <div class="row g-3 mb-3">
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-success" id="portfolioReturn">
+                      -
+                    </div>
+                    <div class="stat-label small text-muted">Total Return</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-info" id="portfolioSharpe">
+                      -
+                    </div>
+                    <div class="stat-label small text-muted">Sharpe Ratio</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-danger" id="portfolioMaxDD">
+                      -
+                    </div>
+                    <div class="stat-label small text-muted">Max Drawdown</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div
+                      class="stat-value text-warning"
+                      id="portfolioVolatility"
+                    >
+                      -
+                    </div>
+                    <div class="stat-label small text-muted">Volatility</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value text-primary" id="portfolioSortino">
+                      -
+                    </div>
+                    <div class="stat-label small text-muted">Sortino Ratio</div>
+                  </div>
+                </div>
+                <div class="col-md-2">
+                  <div
+                    class="stat-box bg-secondary bg-opacity-25 p-2 rounded text-center"
+                  >
+                    <div class="stat-value" id="portfolioTrades">-</div>
+                    <div class="stat-label small text-muted">Total Trades</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Charts Row -->
+              <div class="row g-3">
+                <div class="col-md-8">
+                  <div class="chart-container" style="height: 250px">
+                    <canvas id="portfolioEquityChart"></canvas>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="chart-container" style="height: 250px">
+                    <canvas id="portfolioAllocationChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Loading State -->
+            <div
+              id="portfolioLoading"
+              class="text-center py-4"
+              style="display: none"
+            >
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Running backtest...</span>
+              </div>
+              <p class="text-muted mt-2">Running portfolio backtest...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="portfolioEmpty" class="text-center py-4">
+              <i class="fas fa-briefcase fa-3x text-muted mb-3"></i>
+              <p class="text-muted">
+                Configure portfolio settings and run backtest to see multi-asset
+                performance
+              </p>
+              <p class="small text-muted">
+                Supports: Equal Weight, Risk Parity, Min Variance, Max Sharpe
+                allocation methods
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Correlation Matrix -->
+      <div class="correlation-section">
+        <div class="correlation-matrix">
+          <div class="matrix-header">
+            <h3>
+              <i class="fas fa-project-diagram"></i> Asset Correlation Matrix
+            </h3>
+            <div class="chart-controls">
+              <button class="chart-btn active">1M</button>
+              <button class="chart-btn">3M</button>
+              <button class="chart-btn">1Y</button>
+            </div>
+          </div>
+          <!-- Row 1: Headers -->
+          <div class="matrix-cell header"></div>
+          <div class="matrix-cell header">BTC</div>
+          <div class="matrix-cell header">ETH</div>
+          <div class="matrix-cell header">SOL</div>
+          <div class="matrix-cell header">XRP</div>
+          <div class="matrix-cell header">DOGE</div>
+          <!-- Row 2: BTC -->
+          <div class="matrix-cell header">BTC</div>
+          <div class="matrix-cell positive-strong">1.00</div>
+          <div class="matrix-cell positive-strong">0.92</div>
+          <div class="matrix-cell positive-medium">0.78</div>
+          <div class="matrix-cell positive-medium">0.65</div>
+          <div class="matrix-cell positive-weak">0.45</div>
+          <!-- Row 3: ETH -->
+          <div class="matrix-cell header">ETH</div>
+          <div class="matrix-cell positive-strong">0.92</div>
+          <div class="matrix-cell positive-strong">1.00</div>
+          <div class="matrix-cell positive-strong">0.85</div>
+          <div class="matrix-cell positive-medium">0.58</div>
+          <div class="matrix-cell positive-weak">0.42</div>
+          <!-- Row 4: SOL -->
+          <div class="matrix-cell header">SOL</div>
+          <div class="matrix-cell positive-medium">0.78</div>
+          <div class="matrix-cell positive-strong">0.85</div>
+          <div class="matrix-cell positive-strong">1.00</div>
+          <div class="matrix-cell positive-weak">0.48</div>
+          <div class="matrix-cell positive-weak">0.38</div>
+          <!-- Row 5: XRP -->
+          <div class="matrix-cell header">XRP</div>
+          <div class="matrix-cell positive-medium">0.65</div>
+          <div class="matrix-cell positive-medium">0.58</div>
+          <div class="matrix-cell positive-weak">0.48</div>
+          <div class="matrix-cell positive-strong">1.00</div>
+          <div class="matrix-cell positive-medium">0.52</div>
+          <!-- Row 6: DOGE -->
+          <div class="matrix-cell header">DOGE</div>
+          <div class="matrix-cell positive-weak">0.45</div>
+          <div class="matrix-cell positive-weak">0.42</div>
+          <div class="matrix-cell positive-weak">0.38</div>
+          <div class="matrix-cell positive-medium">0.52</div>
+          <div class="matrix-cell positive-strong">1.00</div>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="./js/pages/analytics_advanced.js"></script>
-</body>
+  </body>
 </html>

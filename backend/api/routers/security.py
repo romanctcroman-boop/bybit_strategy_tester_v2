@@ -5,13 +5,19 @@ Provides REST API endpoints for:
 - Key Usage Audit Logging
 - Secure Configuration Handler
 - IP Whitelisting
+
+SECURITY: All endpoints require security API key authentication.
 """
 
+import hmac
+import logging
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
 from backend.services.ip_whitelist import (
@@ -31,7 +37,50 @@ from backend.services.secure_config import (
     get_config_handler,
 )
 
-router = APIRouter(prefix="/security", tags=["security"])
+logger = logging.getLogger(__name__)
+
+# Security API key header
+security_api_key_header = APIKeyHeader(name="X-Security-Key", auto_error=False)
+
+
+async def verify_security_key(api_key: str = Depends(security_api_key_header)) -> str:
+    """
+    Verify security API key for protected endpoints.
+
+    Uses constant-time comparison to prevent timing attacks.
+
+    Raises:
+        HTTPException: If key is missing, not configured, or invalid.
+    """
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Security API key required",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    # Check SECURITY_API_KEY or fallback to ADMIN_API_KEY
+    expected_key = os.environ.get("SECURITY_API_KEY") or os.environ.get("ADMIN_API_KEY")
+    if not expected_key:
+        logger.error("SECURITY_API_KEY or ADMIN_API_KEY not configured in environment")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Security authentication not configured",
+        )
+
+    # Constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(api_key.encode(), expected_key.encode()):
+        logger.warning("Invalid security key attempt")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid security key",
+        )
+
+    return api_key
+
+
+# All security routes require authentication
+router = APIRouter(prefix="/security", tags=["security"], dependencies=[Depends(verify_security_key)])
 
 
 # ============================================
@@ -467,10 +516,7 @@ async def get_auto_blocked():
     service = get_ip_whitelist_service()
     blocked = service.get_auto_blocked()
 
-    return [
-        {"ip_address": ip, "blocked_until": until.isoformat()}
-        for ip, until in blocked.items()
-    ]
+    return [{"ip_address": ip, "blocked_until": until.isoformat()} for ip, until in blocked.items()]
 
 
 @router.post("/ip/unblock/{ip_address}")

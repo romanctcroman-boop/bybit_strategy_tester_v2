@@ -102,9 +102,7 @@ class MCPMessage:
         )
 
     @classmethod
-    def request(
-        cls, method: str, params: Optional[Dict[str, Any]] = None
-    ) -> "MCPMessage":
+    def request(cls, method: str, params: Optional[Dict[str, Any]] = None) -> "MCPMessage":
         """Create request message"""
         return cls(
             id=str(uuid.uuid4()),
@@ -118,9 +116,7 @@ class MCPMessage:
         return cls(id=id, result=result)
 
     @classmethod
-    def error_response(
-        cls, id: str, code: int, message: str, data: Any = None
-    ) -> "MCPMessage":
+    def error_response(cls, id: str, code: int, message: str, data: Any = None) -> "MCPMessage":
         """Create error response"""
         error = {"code": code, "message": message}
         if data:
@@ -336,15 +332,15 @@ class MCPServer:
 
                 param_type = "string"
                 if param.annotation != inspect.Parameter.empty:
-                    if param.annotation == int:
+                    if param.annotation is int:
                         param_type = "integer"
-                    elif param.annotation == float:
+                    elif param.annotation is float:
                         param_type = "number"
-                    elif param.annotation == bool:
+                    elif param.annotation is bool:
                         param_type = "boolean"
-                    elif param.annotation == list:
+                    elif param.annotation is list:
                         param_type = "array"
-                    elif param.annotation == dict:
+                    elif param.annotation is dict:
                         param_type = "object"
 
                 properties[param_name] = {"type": param_type}
@@ -472,9 +468,7 @@ class MCPServer:
             "content": [
                 {
                     "type": "text",
-                    "text": json.dumps(result)
-                    if not isinstance(result, str)
-                    else result,
+                    "text": json.dumps(result) if not isinstance(result, str) else result,
                 }
             ]
         }
@@ -593,9 +587,7 @@ class MCPClient:
                 if message.id and message.id in self._pending_requests:
                     future = self._pending_requests.pop(message.id)
                     if message.error:
-                        future.set_exception(
-                            Exception(message.error.get("message", "Unknown error"))
-                        )
+                        future.set_exception(Exception(message.error.get("message", "Unknown error")))
                     else:
                         future.set_result(message.result)
 

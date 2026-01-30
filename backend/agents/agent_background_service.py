@@ -76,6 +76,11 @@ class AIAgentBackgroundService:
         self.health_check_interval = 30  # seconds - lightweight check
         self.full_health_check_interval = 300  # seconds (5 min) - with real API calls
         self.last_full_check = 0
+
+        # Skip full API health checks if AGENT_SKIP_API_HEALTHCHECK=1
+        # This prevents unnecessary API calls when not actively using agents
+        self.skip_api_healthcheck = os.getenv("AGENT_SKIP_API_HEALTHCHECK", "0") == "1"
+
         self.mcp_health_url = (
             os.getenv("MCP_AGENT_HEALTH_URL")
             or os.getenv("MCP_HEALTH_URL")
@@ -121,12 +126,8 @@ class AIAgentBackgroundService:
         logger.info("=" * 80)
         # UTC-aware start timestamp
         logger.info(f"📅 Started at: {utc_now().isoformat()}")
-        logger.info(
-            f"🔑 DeepSeek keys: {len(self.interface.key_manager.deepseek_keys)}"
-        )
-        logger.info(
-            f"🔑 Perplexity keys: {len(self.interface.key_manager.perplexity_keys)}"
-        )
+        logger.info(f"🔑 DeepSeek keys: {len(self.interface.key_manager.deepseek_keys)}")
+        logger.info(f"🔑 Perplexity keys: {len(self.interface.key_manager.perplexity_keys)}")
         logger.info("=" * 80)
 
         # Initial health check
@@ -154,10 +155,14 @@ class AIAgentBackgroundService:
         current_time = time.time()
 
         # Determine if this should be a full check (with API calls)
+        # Skip full checks if AGENT_SKIP_API_HEALTHCHECK=1
         is_full_check = (
-            current_time - self.last_full_check
-        ) >= self.full_health_check_interval
+            not self.skip_api_healthcheck and (current_time - self.last_full_check) >= self.full_health_check_interval
+        )
         check_type = "FULL" if is_full_check else "LIGHTWEIGHT"
+
+        if self.skip_api_healthcheck and self.stats["health_checks"] == 1:
+            logger.info("ℹ️ AGENT_SKIP_API_HEALTHCHECK=1: No API calls for health checks")
 
         logger.info("─" * 80)
         logger.info(f"🏥 HEALTH CHECK #{self.stats['health_checks']} ({check_type})")
@@ -207,15 +212,11 @@ class AIAgentBackgroundService:
         perplexity_total = len(km.perplexity_keys)
 
         logger.info(f"🔑 DeepSeek keys: {deepseek_active}/{deepseek_total} usable")
-        logger.info(
-            f"🔑 Perplexity keys: {perplexity_active}/{perplexity_total} usable"
-        )
+        logger.info(f"🔑 Perplexity keys: {perplexity_active}/{perplexity_total} usable")
 
         # Check if need to rotate keys (all have errors)
         if deepseek_active == 0 and deepseek_total > 0:
-            logger.warning(
-                "⚠️ All DeepSeek keys disabled, attempting validation-based recovery..."
-            )
+            logger.warning("⚠️ All DeepSeek keys disabled, attempting validation-based recovery...")
             recovered = 0
             for key in km.deepseek_keys:
                 if getattr(key, "health", None) == APIKeyHealth.DISABLED:
@@ -230,16 +231,11 @@ class AIAgentBackgroundService:
                 self.stats["api_key_rotations"] += 1
 
         if perplexity_active == 0 and perplexity_total > 0:
-            logger.warning(
-                "⚠️ All Perplexity keys disabled, "
-                "attempting validation-based recovery..."
-            )
+            logger.warning("⚠️ All Perplexity keys disabled, attempting validation-based recovery...")
             recovered = 0
             for key in km.perplexity_keys:
                 if getattr(key, "health", None) == APIKeyHealth.DISABLED:
-                    ok = await self.interface._test_key_health(
-                        AgentType.PERPLEXITY, key
-                    )
+                    ok = await self.interface._test_key_health(AgentType.PERPLEXITY, key)
                     if ok:
                         key.error_count = 1
                         key.health = APIKeyHealth.DEGRADED
@@ -289,9 +285,10 @@ class AIAgentBackgroundService:
             ]
 
             # Verify all required tools exist
-            is_available = all(tool in tools for tool in required_tools) and data.get(
-                "status"
-            ) in ("healthy", "degraded")
+            is_available = all(tool in tools for tool in required_tools) and data.get("status") in (
+                "healthy",
+                "degraded",
+            )
 
             if is_available:
                 logger.debug(f"✅ MCP tools: {len(tools)} total, agent tools available")
@@ -333,11 +330,7 @@ class AIAgentBackgroundService:
             self.fallback_service.update_service_health(
                 "mcp_server",
                 health=health,
-                circuit_state=str(
-                    circuit_manager.get_breaker_state("mcp_server")
-                    if circuit_manager
-                    else "unknown"
-                ),
+                circuit_state=str(circuit_manager.get_breaker_state("mcp_server") if circuit_manager else "unknown"),
             )
 
     async def _check_circuit_breakers(self):
@@ -387,9 +380,7 @@ class AIAgentBackgroundService:
         if open_breakers:
             logger.warning(f"⛔ OPEN circuit breakers: {', '.join(open_breakers)}")
         if half_open_breakers:
-            logger.info(
-                f"⚠️ HALF_OPEN circuit breakers: {', '.join(half_open_breakers)}"
-            )
+            logger.info(f"⚠️ HALF_OPEN circuit breakers: {', '.join(half_open_breakers)}")
         if not open_breakers and not half_open_breakers:
             logger.info("✅ All circuit breakers: CLOSED")
 
@@ -418,9 +409,7 @@ class AIAgentBackgroundService:
             if active_keys:
                 # Check if at least one key is available (no actual API call)
                 total = len(km.perplexity_keys)
-                logger.success(
-                    f"✅ Perplexity: Ready ({len(active_keys)}/{total} keys)"
-                )
+                logger.success(f"✅ Perplexity: Ready ({len(active_keys)}/{total} keys)")
             else:
                 logger.warning("⚠️ Perplexity: No usable keys available")
 
@@ -442,9 +431,7 @@ class AIAgentBackgroundService:
             if response.success:
                 key_idx = response.api_key_index
                 latency = response.latency_ms
-                logger.success(
-                    f"✅ DeepSeek: Connected (key #{key_idx}, {latency:.0f}ms)"
-                )
+                logger.success(f"✅ DeepSeek: Connected (key #{key_idx}, {latency:.0f}ms)")
             else:
                 logger.warning(f"⚠️ DeepSeek: Failed - {response.error}")
 
@@ -466,9 +453,7 @@ class AIAgentBackgroundService:
             if response.success:
                 key_idx = response.api_key_index
                 latency = response.latency_ms
-                logger.success(
-                    f"✅ Perplexity: Connected (key #{key_idx}, {latency:.0f}ms)"
-                )
+                logger.success(f"✅ Perplexity: Connected (key #{key_idx}, {latency:.0f}ms)")
             else:
                 logger.warning(f"⚠️ Perplexity: Failed - {response.error}")
 
@@ -478,9 +463,7 @@ class AIAgentBackgroundService:
     def _print_health_summary(self):
         """Вывести сводку о здоровье системы"""
         uptime = time.time() - self.start_time
-        uptime_str = (
-            f"{int(uptime // 3600)}h {int((uptime % 3600) // 60)}m {int(uptime % 60)}s"
-        )
+        uptime_str = f"{int(uptime // 3600)}h {int((uptime % 3600) // 60)}m {int(uptime % 60)}s"
 
         try:
             stats = self.interface.get_stats()
@@ -503,16 +486,12 @@ class AIAgentBackgroundService:
         logger.info(f"✅ Direct API success: {stats.get('direct_api_success', 0)}")
         logger.info(f"❌ Direct API failed: {stats.get('direct_api_failed', 0)}")
         logger.info(f"🔄 Key rotations: {self.stats.get('api_key_rotations', 0)}")
-        logger.info(
-            f"🚦 MCP breaker skips: {self.stats.get('mcp_breaker_rejections', 0)}"
-        )
+        logger.info(f"🚦 MCP breaker skips: {self.stats.get('mcp_breaker_rejections', 0)}")
         logger.info("─" * 80)
 
     def _increment_mcp_breaker_rejections(self) -> None:
         self.stats["mcp_breaker_rejections"] += 1
-        self.interface.stats["mcp_breaker_rejections"] = self.stats[
-            "mcp_breaker_rejections"
-        ]
+        self.interface.stats["mcp_breaker_rejections"] = self.stats["mcp_breaker_rejections"]
 
     async def stop(self):
         """Остановить сервис"""
@@ -536,14 +515,11 @@ async def main():
     # Create a UTF-8 safe stdout sink
     import io
 
-    utf8_stdout = io.TextIOWrapper(
-        sys.stdout.buffer, encoding="utf-8", errors="replace"
-    )
+    utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
     logger.add(
         utf8_stdout,
-        format="<green>{time:HH:mm:ss.SSS}</green> | "
-        "<level>{level: <8}</level> | <level>{message}</level>",
+        format="<green>{time:HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <level>{message}</level>",
         level="INFO",
         colorize=True,
     )

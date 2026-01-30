@@ -434,7 +434,8 @@ class PredictionEngine:
         ]
         actual_positive = actual_return > threshold
 
-        was_correct = predicted_positive == actual_positive
+        # Track correctness for ensemble accuracy
+        was_correct = predicted_positive == actual_positive  # noqa: F841
 
         # Update individual model accuracy
         for name, vote in last_prediction.model_votes.items():

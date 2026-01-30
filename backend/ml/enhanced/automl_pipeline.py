@@ -207,11 +207,7 @@ class AutoMLPipeline:
             )
 
             is_classifier = params.pop("is_classifier", True)
-            cls = (
-                GradientBoostingClassifier
-                if is_classifier
-                else GradientBoostingRegressor
-            )
+            cls = GradientBoostingClassifier if is_classifier else GradientBoostingRegressor
             return cls(**params)
 
         def create_xgboost(params: Dict) -> Any:
@@ -279,9 +275,7 @@ class AutoMLPipeline:
             ModelType.NEURAL_NETWORK: create_neural_network,
         }
 
-    def _get_hyperparameter_space(
-        self, model_type: ModelType, trial: Any
-    ) -> Dict[str, Any]:
+    def _get_hyperparameter_space(self, model_type: ModelType, trial: Any) -> Dict[str, Any]:
         """Get hyperparameter search space for model type"""
 
         if model_type == ModelType.RANDOM_FOREST:
@@ -290,9 +284,7 @@ class AutoMLPipeline:
                 "max_depth": trial.suggest_int("max_depth", 3, 20),
                 "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
                 "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 10),
-                "max_features": trial.suggest_categorical(
-                    "max_features", ["sqrt", "log2", None]
-                ),
+                "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2", None]),
             }
 
         elif model_type in [
@@ -303,9 +295,7 @@ class AutoMLPipeline:
             return {
                 "n_estimators": trial.suggest_int("n_estimators", 50, 500),
                 "max_depth": trial.suggest_int("max_depth", 3, 15),
-                "learning_rate": trial.suggest_float(
-                    "learning_rate", 0.01, 0.3, log=True
-                ),
+                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
                 "subsample": trial.suggest_float("subsample", 0.5, 1.0),
                 "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0)
                 if model_type != ModelType.GRADIENT_BOOSTING
@@ -318,9 +308,7 @@ class AutoMLPipeline:
             return {
                 "iterations": trial.suggest_int("iterations", 100, 1000),
                 "depth": trial.suggest_int("depth", 4, 10),
-                "learning_rate": trial.suggest_float(
-                    "learning_rate", 0.01, 0.3, log=True
-                ),
+                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
                 "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 1, 10),
                 "border_count": trial.suggest_int("border_count", 32, 255),
             }
@@ -333,23 +321,17 @@ class AutoMLPipeline:
         elif model_type == ModelType.SVM:
             return {
                 "C": trial.suggest_float("C", 1e-3, 100, log=True),
-                "kernel": trial.suggest_categorical(
-                    "kernel", ["rbf", "linear", "poly"]
-                ),
+                "kernel": trial.suggest_categorical("kernel", ["rbf", "linear", "poly"]),
                 "gamma": trial.suggest_categorical("gamma", ["scale", "auto"]),
             }
 
         elif model_type == ModelType.NEURAL_NETWORK:
             n_layers = trial.suggest_int("n_layers", 1, 3)
-            hidden_layer_sizes = tuple(
-                trial.suggest_int(f"layer_{i}", 32, 256) for i in range(n_layers)
-            )
+            hidden_layer_sizes = tuple(trial.suggest_int(f"layer_{i}", 32, 256) for i in range(n_layers))
             return {
                 "hidden_layer_sizes": hidden_layer_sizes,
                 "alpha": trial.suggest_float("alpha", 1e-5, 1e-1, log=True),
-                "learning_rate_init": trial.suggest_float(
-                    "learning_rate_init", 1e-4, 1e-2, log=True
-                ),
+                "learning_rate_init": trial.suggest_float("learning_rate_init", 1e-4, 1e-2, log=True),
             }
 
         return {}
@@ -384,20 +366,16 @@ class AutoMLPipeline:
             cross_val_score,
         )
 
-        run_id = hashlib.md5(f"{datetime.now(timezone.utc)}".encode()).hexdigest()[:12]
+        run_id = hashlib.sha256(f"{datetime.now(timezone.utc)}".encode()).hexdigest()[:12]
 
-        result = PipelineResult(
-            run_id=run_id, config=self.config, started_at=datetime.now(timezone.utc)
-        )
+        result = PipelineResult(run_id=run_id, config=self.config, started_at=datetime.now(timezone.utc))
 
         if feature_names is None:
             feature_names = [f"feature_{i}" for i in range(X.shape[1])]
 
         # Feature selection
         if self.config.feature_selection:
-            X, selected_features, importance = await self._select_features(
-                X, y, feature_names, is_classifier
-            )
+            X, selected_features, importance = await self._select_features(X, y, feature_names, is_classifier)
             result.selected_features = selected_features
             result.feature_importance = importance
         else:
@@ -414,11 +392,7 @@ class AutoMLPipeline:
 
         def objective(trial: optuna.Trial) -> float:
             # Select model type
-            model_type = ModelType(
-                trial.suggest_categorical(
-                    "model_type", [m.value for m in self.config.model_types]
-                )
-            )
+            model_type = ModelType(trial.suggest_categorical("model_type", [m.value for m in self.config.model_types]))
 
             # Get hyperparameters
             params = self._get_hyperparameter_space(model_type, trial)
@@ -444,9 +418,7 @@ class AutoMLPipeline:
                         X,
                         y,
                         cv=cv,
-                        scoring="accuracy"
-                        if is_classifier
-                        else "neg_mean_squared_error",
+                        scoring="accuracy" if is_classifier else "neg_mean_squared_error",
                     )
 
                 mean_score = np.mean(scores)
@@ -454,11 +426,7 @@ class AutoMLPipeline:
 
             except Exception as e:
                 logger.warning(f"Model {model_type.value} failed: {e}")
-                return (
-                    float("-inf")
-                    if self.config.direction == "maximize"
-                    else float("inf")
-                )
+                return float("-inf") if self.config.direction == "maximize" else float("inf")
 
             training_time = time.time() - start_time
 
@@ -486,9 +454,7 @@ class AutoMLPipeline:
         try:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-            self.study = optuna.create_study(
-                direction=self.config.direction, study_name=run_id
-            )
+            self.study = optuna.create_study(direction=self.config.direction, study_name=run_id)
 
             self.study.optimize(
                 objective,
@@ -521,10 +487,7 @@ class AutoMLPipeline:
             result.best_model.model.fit(X, y)
 
         # Create ensemble
-        if (
-            self.config.create_ensemble
-            and len(result.candidates) >= self.config.top_n_models
-        ):
+        if self.config.create_ensemble and len(result.candidates) >= self.config.top_n_models:
             result.ensemble_model, result.ensemble_score = await self._create_ensemble(
                 X, y, result.candidates[: self.config.top_n_models], cv, is_classifier
             )
@@ -534,10 +497,7 @@ class AutoMLPipeline:
 
         self.results.append(result)
 
-        logger.info(
-            f"AutoML completed: {result.trials_completed} trials, "
-            f"best score: {result.best_score:.4f}"
-        )
+        logger.info(f"AutoML completed: {result.trials_completed} trials, best score: {result.best_score:.4f}")
 
         return result
 

@@ -12,9 +12,9 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from loguru import logger
+from pydantic import BaseModel
 
 
 # Pydantic models for API
@@ -85,7 +85,7 @@ async def list_metrics():
     try:
         from backend.agents.monitoring.metrics_collector import MetricsCollector
 
-        collector = MetricsCollector()
+        MetricsCollector()  # Verify import works
 
         return {
             "metrics": [

@@ -1,0 +1,931 @@
+/**
+ * 🎨 UI Design Standard - Strategy Builder & Optimization Components
+ * 
+ * Unified design system for all Strategy Builder pages:
+ * - Strategy Builder (strategy-builder.html)
+ * - Optimization Results (optimization-results.html)
+ * - Backtest Results integration (backtest-results.html)
+ * 
+ * IMPORTANT: All new components MUST follow this standard.
+ * 
+ * @version 1.0.0
+ * @date 2025-01-29
+ */
+
+/* ============================================
+   OPTIMIZATION COMPONENT VARIABLES
+   ============================================ 
+   
+   These extend variables.css with optimization-specific tokens.
+   Use existing variables where possible, add new ones only when needed.
+*/
+
+:root {
+  /* ---- Optimization Status Colors ---- */
+  --color-opt-running: #58a6ff;
+  --color-opt-completed: #3fb950;
+  --color-opt-failed: #f85149;
+  --color-opt-queued: #d29922;
+
+  /* ---- Metrics Colors ---- */
+  --color-metric-sharpe: #58a6ff;
+  --color-metric-return: #3fb950;
+  --color-metric-drawdown: #f85149;
+  --color-metric-winrate: #a371f7;
+  --color-metric-profit-factor: #d29922;
+
+  /* ---- Chart Colors (consistent with backtest_results.css) ---- */
+  --color-chart-line-primary: #58a6ff;
+  --color-chart-line-secondary: rgba(88, 166, 255, 0.4);
+  --color-chart-area: rgba(88, 166, 255, 0.1);
+  --color-chart-positive: #3fb950;
+  --color-chart-negative: #f85149;
+  --color-chart-grid: rgba(48, 54, 61, 0.5);
+
+  /* ---- Panel Dimensions ---- */
+  --panel-criteria-width: 320px;
+  --panel-config-width: 320px;
+  --panel-results-min-width: 400px;
+
+  /* ---- Component Sizing ---- */
+  --slider-track-height: 6px;
+  --slider-thumb-size: 16px;
+  --checkbox-size: 18px;
+  --badge-height: 22px;
+}
+
+/* ============================================
+   DESIGN PRINCIPLES
+   ============================================
+   
+   1. CONSISTENCY: Use same patterns as backtest-results.html
+   2. DENSITY: Compact but readable (8px/16px spacing)
+   3. HIERARCHY: Clear visual hierarchy with size/weight
+   4. FEEDBACK: Immediate visual feedback on interactions
+   5. ACCESSIBILITY: Proper contrast, focus states, ARIA labels
+*/
+
+/* ============================================
+   PANEL STRUCTURE (Reusable)
+   ============================================ */
+
+/* Base panel container - same as Properties Panel in Strategy Builder */
+.opt-panel {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.opt-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  min-height: 44px;
+}
+
+.opt-panel-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.opt-panel-title i {
+  color: var(--color-accent);
+}
+
+.opt-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+}
+
+/* Collapsible sections within panels */
+.opt-section {
+  margin-bottom: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.opt-section.collapsed .opt-section-content {
+  display: none;
+}
+
+.opt-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg-tertiary);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+
+.opt-section-header:hover {
+  background: var(--color-bg-card-hover);
+}
+
+.opt-section-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.opt-section-toggle {
+  color: var(--color-text-secondary);
+  transition: transform var(--transition-fast);
+}
+
+.opt-section.collapsed .opt-section-toggle {
+  transform: rotate(-90deg);
+}
+
+.opt-section-content {
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+}
+
+/* ============================================
+   FORM CONTROLS (Consistent with existing UI)
+   ============================================ */
+
+/* Input group - label + input */
+.opt-field {
+  margin-bottom: var(--spacing-md);
+}
+
+.opt-field:last-child {
+  margin-bottom: 0;
+}
+
+.opt-label {
+  display: block;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.opt-label.required::after {
+  content: " *";
+  color: var(--color-danger);
+}
+
+/* Select dropdown - same as Strategy Builder */
+.opt-select {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+.opt-select:hover {
+  border-color: var(--color-border-hover);
+}
+
+.opt-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Number input */
+.opt-input {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.opt-input:hover {
+  border-color: var(--color-border-hover);
+}
+
+.opt-input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.opt-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* Checkbox list */
+.opt-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.opt-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.opt-checkbox {
+  width: var(--checkbox-size);
+  height: var(--checkbox-size);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-input);
+  cursor: pointer;
+  appearance: none;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.opt-checkbox:checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.opt-checkbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--color-text-inverse);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.opt-checkbox:focus {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.opt-checkbox-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+/* ============================================
+   RANGE SLIDER (Parameter Range)
+   ============================================ */
+
+.opt-slider-container {
+  margin-bottom: var(--spacing-md);
+}
+
+.opt-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.opt-slider-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.opt-slider-values {
+  display: flex;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.opt-slider-value {
+  padding: 2px 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-mono);
+}
+
+.opt-slider-track {
+  position: relative;
+  height: var(--slider-track-height);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  margin: var(--spacing-sm) 0;
+}
+
+.opt-slider-range {
+  position: absolute;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+}
+
+.opt-slider-thumb {
+  position: absolute;
+  width: var(--slider-thumb-size);
+  height: var(--slider-thumb-size);
+  background: var(--color-text-primary);
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  transition: transform var(--transition-fast);
+}
+
+.opt-slider-thumb:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.opt-slider-thumb:active {
+  cursor: grabbing;
+}
+
+/* Native range input styling */
+.opt-range-input {
+  width: 100%;
+  height: var(--slider-track-height);
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+.opt-range-input::-webkit-slider-track {
+  height: var(--slider-track-height);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+}
+
+.opt-range-input::-webkit-slider-thumb {
+  appearance: none;
+  width: var(--slider-thumb-size);
+  height: var(--slider-thumb-size);
+  background: var(--color-text-primary);
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  cursor: grab;
+  margin-top: -5px;
+}
+
+.opt-range-input::-moz-range-track {
+  height: var(--slider-track-height);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+}
+
+.opt-range-input::-moz-range-thumb {
+  width: var(--slider-thumb-size);
+  height: var(--slider-thumb-size);
+  background: var(--color-text-primary);
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  cursor: grab;
+}
+
+/* ============================================
+   CONSTRAINT BUILDER
+   ============================================ */
+
+.opt-constraint-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.opt-constraint-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.opt-constraint-metric {
+  flex: 1;
+  min-width: 100px;
+}
+
+.opt-constraint-operator {
+  width: 60px;
+}
+
+.opt-constraint-value {
+  width: 80px;
+}
+
+.opt-constraint-remove {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.opt-constraint-remove:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-hover);
+  background: rgba(248, 81, 73, 0.1);
+}
+
+.opt-add-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.opt-add-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: rgba(88, 166, 255, 0.05);
+}
+
+/* ============================================
+   SORT ORDER (Multi-level)
+   ============================================ */
+
+.opt-sort-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.opt-sort-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  cursor: grab;
+}
+
+.opt-sort-item:active {
+  cursor: grabbing;
+}
+
+.opt-sort-handle {
+  color: var(--color-text-muted);
+  cursor: grab;
+}
+
+.opt-sort-rank {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.opt-sort-metric {
+  flex: 1;
+}
+
+.opt-sort-direction {
+  display: flex;
+  gap: 2px;
+}
+
+.opt-sort-dir-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.opt-sort-dir-btn:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.opt-sort-dir-btn:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.opt-sort-dir-btn.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+/* ============================================
+   RESULTS TABLE (TradingView Style)
+   ============================================ */
+
+.opt-results-table-container {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.opt-results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.opt-results-table th {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.opt-results-table th.sortable {
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.opt-results-table th.sortable:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-card-hover);
+}
+
+.opt-results-table th.sorted {
+  color: var(--color-accent);
+}
+
+.opt-results-table th .sort-icon {
+  margin-left: var(--spacing-xs);
+  opacity: 0.5;
+}
+
+.opt-results-table th.sorted .sort-icon {
+  opacity: 1;
+}
+
+.opt-results-table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.opt-results-table tr:hover td {
+  background: var(--color-bg-card-hover);
+}
+
+.opt-results-table tr.best td {
+  background: rgba(63, 185, 80, 0.1);
+}
+
+.opt-results-table tr.selected td {
+  background: rgba(88, 166, 255, 0.1);
+}
+
+/* Rank badge in table */
+.opt-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: var(--badge-height);
+  padding: 0 var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.opt-rank-badge.rank-1 {
+  background: linear-gradient(135deg, #ffd700, #ffa500);
+  color: #000;
+}
+
+.opt-rank-badge.rank-2 {
+  background: linear-gradient(135deg, #c0c0c0, #a0a0a0);
+  color: #000;
+}
+
+.opt-rank-badge.rank-3 {
+  background: linear-gradient(135deg, #cd7f32, #8b4513);
+  color: #fff;
+}
+
+.opt-rank-badge.rank-other {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+/* Metric values */
+.opt-metric-value {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+}
+
+.opt-metric-value.positive {
+  color: var(--color-success);
+}
+
+.opt-metric-value.negative {
+  color: var(--color-danger);
+}
+
+.opt-metric-value.neutral {
+  color: var(--color-text-primary);
+}
+
+/* ============================================
+   PROGRESS INDICATOR
+   ============================================ */
+
+.opt-progress-container {
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.opt-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.opt-progress-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.opt-progress-stats {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.opt-progress-bar {
+  height: 8px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.opt-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-success));
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+.opt-progress-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+/* ============================================
+   SENSITIVITY CHART (Heatmap Style)
+   ============================================ */
+
+.opt-sensitivity-container {
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.opt-sensitivity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.opt-sensitivity-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.opt-sensitivity-controls {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.opt-sensitivity-chart {
+  width: 100%;
+  height: 200px;
+  position: relative;
+}
+
+.opt-sensitivity-legend {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.opt-sensitivity-gradient {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.opt-sensitivity-gradient-bar {
+  width: 100px;
+  height: 10px;
+  background: linear-gradient(
+    90deg,
+    var(--color-danger),
+    var(--color-warning),
+    var(--color-success)
+  );
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   ACTION BUTTONS (Bottom Panel)
+   ============================================ */
+
+.opt-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-bg-tertiary);
+  border-top: 1px solid var(--color-border);
+}
+
+.opt-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.opt-action-btn.primary {
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  color: var(--color-text-inverse);
+}
+
+.opt-action-btn.primary:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.opt-action-btn.secondary {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.opt-action-btn.secondary:hover {
+  border-color: var(--color-border-hover);
+  background: var(--color-bg-card-hover);
+}
+
+.opt-action-btn.success {
+  background: var(--color-success);
+  border: 1px solid var(--color-success);
+  color: var(--color-text-inverse);
+}
+
+.opt-action-btn.success:hover {
+  background: var(--color-success-hover);
+  border-color: var(--color-success-hover);
+}
+
+.opt-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 1200px) {
+  :root {
+    --panel-criteria-width: 280px;
+    --panel-config-width: 280px;
+  }
+}
+
+@media (max-width: 992px) {
+  .opt-constraint-item {
+    flex-wrap: wrap;
+  }
+
+  .opt-constraint-metric {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .opt-panel {
+    width: 100%;
+  }
+
+  .opt-actions {
+    flex-direction: column;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY & UTILITY CLASSES
+   ============================================ */
+
+/* Sort select auto width */
+.opt-sort-select {
+  width: auto;
+}
+
+/* Table column widths */
+.opt-results-table th.col-rank,
+.opt-results-table td.col-rank {
+  width: 60px;
+}
+
+.opt-results-table th.col-actions,
+.opt-results-table td.col-actions {
+  width: 80px;
+}
+
+/* Pagination info text */
+.opt-pagination-info {
+  font-size: 0.875rem;
+}
+
+/* Visually hidden but accessible for screen readers */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}

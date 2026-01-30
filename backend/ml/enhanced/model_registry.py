@@ -215,15 +215,9 @@ class ModelRegistry:
                     self.models[name] = {}
                     for version, model_data in versions.items():
                         model_data["status"] = ModelStatus(model_data["status"])
-                        model_data["metadata"] = ModelMetadata.from_dict(
-                            model_data["metadata"]
-                        )
-                        model_data["created_at"] = datetime.fromisoformat(
-                            model_data["created_at"]
-                        )
-                        model_data["updated_at"] = datetime.fromisoformat(
-                            model_data["updated_at"]
-                        )
+                        model_data["metadata"] = ModelMetadata.from_dict(model_data["metadata"])
+                        model_data["created_at"] = datetime.fromisoformat(model_data["created_at"])
+                        model_data["updated_at"] = datetime.fromisoformat(model_data["updated_at"])
                         self.models[name][version] = ModelVersion(**model_data)
 
                 logger.info(f"Loaded {len(self.models)} models from registry")
@@ -239,9 +233,7 @@ class ModelRegistry:
                 name: {version: mv.to_dict() for version, mv in versions.items()}
                 for name, versions in self.models.items()
             },
-            "ab_tests": {
-                test_id: test.to_dict() for test_id, test in self.ab_tests.items()
-            },
+            "ab_tests": {test_id: test.to_dict() for test_id, test in self.ab_tests.items()},
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -346,8 +338,113 @@ class ModelRegistry:
                 return version
         return None
 
+    def validate_model(
+        self,
+        name: str,
+        version: str,
+        min_accuracy: float = 0.6,
+        min_precision: float = 0.5,
+        min_recall: float = 0.5,
+        max_loss: float = 0.5,
+        required_metrics: list[str] | None = None,
+    ) -> tuple[bool, dict[str, any]]:
+        """
+        Validate a model before deployment/promotion.
+
+        Checks validation_metrics against minimum thresholds.
+
+        Args:
+            name: Model name
+            version: Version to validate
+            min_accuracy: Minimum accuracy threshold (default 0.6)
+            min_precision: Minimum precision threshold (default 0.5)
+            min_recall: Minimum recall threshold (default 0.5)
+            max_loss: Maximum acceptable loss (default 0.5)
+            required_metrics: List of metrics that must be present
+
+        Returns:
+            (is_valid, validation_report) tuple
+        """
+        if name not in self.models or version not in self.models[name]:
+            return False, {"error": f"Model {name}:{version} not found"}
+
+        mv = self.models[name][version]
+        metrics = mv.metadata.validation_metrics
+
+        if not metrics:
+            return False, {"error": "No validation metrics available"}
+
+        report = {
+            "model": name,
+            "version": version,
+            "checks": [],
+            "passed": True,
+            "metrics": metrics,
+        }
+
+        # Check required metrics exist
+        if required_metrics:
+            missing = [m for m in required_metrics if m not in metrics]
+            if missing:
+                report["checks"].append(
+                    {
+                        "check": "required_metrics",
+                        "passed": False,
+                        "message": f"Missing required metrics: {missing}",
+                    }
+                )
+                report["passed"] = False
+
+        # Standard threshold checks
+        thresholds = {
+            "accuracy": (">=", min_accuracy),
+            "precision": (">=", min_precision),
+            "recall": (">=", min_recall),
+            "loss": ("<=", max_loss),
+            "val_loss": ("<=", max_loss),
+            "test_loss": ("<=", max_loss),
+        }
+
+        for metric_name, (op, threshold) in thresholds.items():
+            if metric_name in metrics:
+                value = metrics[metric_name]
+                if op == ">=":
+                    passed = value >= threshold
+                else:  # <=
+                    passed = value <= threshold
+
+                report["checks"].append(
+                    {
+                        "check": metric_name,
+                        "passed": passed,
+                        "value": value,
+                        "threshold": threshold,
+                        "operator": op,
+                    }
+                )
+
+                if not passed:
+                    report["passed"] = False
+
+        # Update model status based on validation
+        if report["passed"]:
+            mv.status = ModelStatus.STAGING
+            logger.info(f"Model {name}:{version} passed validation")
+        else:
+            mv.status = ModelStatus.FAILED
+            logger.warning(f"Model {name}:{version} failed validation")
+
+        mv.updated_at = datetime.now(timezone.utc)
+        self._save_registry()
+
+        return report["passed"], report
+
     def promote_model(
-        self, name: str, version: str, demote_current: bool = True
+        self,
+        name: str,
+        version: str,
+        demote_current: bool = True,
+        skip_validation: bool = False,
     ) -> None:
         """
         Promote a model version to production
@@ -356,6 +453,7 @@ class ModelRegistry:
             name: Model name
             version: Version to promote
             demote_current: Whether to archive current production version
+            skip_validation: Skip validation check (not recommended)
         """
         if name not in self.models or version not in self.models[name]:
             raise ValueError(f"Model {name}:{version} not found")
@@ -366,6 +464,19 @@ class ModelRegistry:
             if current_prod and current_prod != version:
                 self.models[name][current_prod].status = ModelStatus.ARCHIVED
                 self.models[name][current_prod].updated_at = datetime.now(timezone.utc)
+
+        # Validate before promotion (unless skipped)
+        if not skip_validation:
+            mv = self.models[name][version]
+            if mv.status == ModelStatus.FAILED:
+                raise ValueError(
+                    f"Model {name}:{version} failed validation. Run validate_model() first or use skip_validation=True"
+                )
+            # Auto-validate if not yet validated
+            if mv.status not in (ModelStatus.STAGING, ModelStatus.PRODUCTION):
+                is_valid, report = self.validate_model(name, version)
+                if not is_valid:
+                    raise ValueError(f"Model {name}:{version} failed validation: {report.get('checks', [])}")
 
         # Promote new version
         self.models[name][version].status = ModelStatus.PRODUCTION
@@ -391,11 +502,7 @@ class ModelRegistry:
         # Find version to rollback to
         if to_version is None:
             # Find latest archived version
-            archived = [
-                (v, mv)
-                for v, mv in self.models[name].items()
-                if mv.status == ModelStatus.ARCHIVED
-            ]
+            archived = [(v, mv) for v, mv in self.models[name].items() if mv.status == ModelStatus.ARCHIVED]
             if not archived:
                 raise ValueError(f"No archived versions for {name}")
 
@@ -425,7 +532,7 @@ class ModelRegistry:
             model_b: Treatment model
             traffic_split: Fraction of traffic to model_b
         """
-        test_id = f"ab_{hashlib.md5(f'{model_a}{model_b}{datetime.now(timezone.utc)}'.encode()).hexdigest()[:8]}"
+        test_id = f"ab_{hashlib.sha256(f'{model_a}{model_b}{datetime.now(timezone.utc)}'.encode()).hexdigest()[:8]}"
 
         ab_test = ABTest(
             test_id=test_id,
@@ -462,9 +569,7 @@ class ModelRegistry:
             test.model_a_predictions += 1
             return test.model_a
 
-    def record_ab_outcome(
-        self, test_id: str, model: str, metric_name: str, value: float
-    ) -> None:
+    def record_ab_outcome(self, test_id: str, model: str, metric_name: str, value: float) -> None:
         """Record outcome for A/B test"""
         if test_id not in self.ab_tests:
             return
@@ -502,9 +607,7 @@ class ModelRegistry:
         }
 
         # Compare metrics
-        all_metrics = set(test.model_a_metrics.keys()) | set(
-            test.model_b_metrics.keys()
-        )
+        all_metrics = set(test.model_a_metrics.keys()) | set(test.model_b_metrics.keys())
 
         for metric in all_metrics:
             a_values = test.model_a_metrics.get(metric, [])
@@ -536,9 +639,7 @@ class ModelRegistry:
                 "significant": p_value < 0.05,
                 "winner": "model_b"
                 if b_mean > a_mean and p_value < 0.05
-                else (
-                    "model_a" if a_mean > b_mean and p_value < 0.05 else "inconclusive"
-                ),
+                else ("model_a" if a_mean > b_mean and p_value < 0.05 else "inconclusive"),
             }
 
         return results
@@ -590,9 +691,7 @@ class ModelRegistry:
         logger.info(f"Deleted model {name}:{version}")
         return True
 
-    def get_model_metrics(
-        self, name: str, version: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def get_model_metrics(self, name: str, version: Optional[str] = None) -> Dict[str, Any]:
         """Get performance metrics for a model"""
         if version is None:
             version = self.get_production_version(name)
@@ -628,9 +727,7 @@ class ModelRegistry:
         if mv.prediction_count % 100 == 0:
             self._save_registry()
 
-    def check_degradation(
-        self, name: str, threshold: float = 0.1
-    ) -> Optional[Dict[str, Any]]:
+    def check_degradation(self, name: str, threshold: float = 0.1) -> Optional[Dict[str, Any]]:
         """
         Check if production model has degraded
 

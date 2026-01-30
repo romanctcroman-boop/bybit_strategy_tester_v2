@@ -403,25 +403,86 @@ class CodeGenerator:
         variables: Dict[str, str],
         options: GenerationOptions,
     ) -> str:
-        """Build signal extraction code"""
+        """Build signal extraction code
+        
+        For Strategy Builder graphs, we need to extract signals from connections
+        to the main strategy node (entry_long, exit_long, entry_short, exit_short).
+        The generated code processes data vectorized, so we iterate through bars
+        and check signal conditions at each bar index.
+        """
         indent = options.indent * 2
         lines = []
 
-        # Find action blocks
+        # Find main strategy node (can be OUTPUT_SIGNAL with name "strategy" or isMain flag)
+        main_node_id = None
         for block_id, block in graph.blocks.items():
-            if block.block_type in [BlockType.ACTION_BUY, BlockType.ACTION_SELL]:
-                var_name = variables.get(block_id)
-                if var_name:
-                    action = (
-                        "buy" if block.block_type == BlockType.ACTION_BUY else "sell"
-                    )
-                    lines.append(f'{indent}if {var_name}.get("signal"):')
-                    lines.append(
-                        f'{indent}    signals.append({{"action": "{action}", "block": "{block.name}"}})'
-                    )
+            # Check for main strategy node by type or name
+            if block.block_type == BlockType.OUTPUT_SIGNAL and (
+                block.name.lower() == "strategy" or getattr(block, "isMain", False)
+            ):
+                main_node_id = block_id
+                break
+
+        if not main_node_id:
+            # Fallback: look for action blocks (old style)
+            for block_id, block in graph.blocks.items():
+                if block.block_type in [BlockType.ACTION_BUY, BlockType.ACTION_SELL]:
+                    var_name = variables.get(block_id)
+                    if var_name:
+                        action = (
+                            "buy" if block.block_type == BlockType.ACTION_BUY else "sell"
+                        )
+                        lines.append(f'{indent}if {var_name}.get("signal"):')
+                        lines.append(
+                            f'{indent}    signals.append({{"action": "{action}", "block": "{block.name}"}})'
+                        )
+        else:
+            # New style: extract signals from connections to main node
+            # Find connections to main node ports
+            entry_long_var = None
+            exit_long_var = None
+            entry_short_var = None
+            exit_short_var = None
+
+            for conn in graph.connections:
+                if conn.target_block_id == main_node_id:
+                    source_var = variables.get(conn.source_block_id)
+                    if source_var:
+                        if conn.target_input == "entry_long":
+                            entry_long_var = source_var
+                        elif conn.target_input == "exit_long":
+                            exit_long_var = source_var
+                        elif conn.target_input == "entry_short":
+                            entry_short_var = source_var
+                        elif conn.target_input == "exit_short":
+                            exit_short_var = source_var
+
+            # Generate bar-by-bar signal extraction
+            # Since calculate_code processes data vectorized, we need to iterate
+            # through bars and check signal conditions
+            lines.append(f"{indent}# Extract signals bar by bar")
+            lines.append(f"{indent}n = len(candles['close'])")
+            lines.append(f"{indent}for i in range(n):")
+            
+            if entry_long_var:
+                # Check if signal is True at bar i
+                lines.append(f'{indent}    if i < len({entry_long_var}.get("result", [])) and {entry_long_var}.get("result", [False])[i]:')
+                lines.append(f'{indent}        signals.append({{"action": "buy", "index": i}})')
+            
+            if exit_long_var:
+                lines.append(f'{indent}    if i < len({exit_long_var}.get("result", [])) and {exit_long_var}.get("result", [False])[i]:')
+                lines.append(f'{indent}        signals.append({{"action": "sell", "index": i}})')
+            
+            if entry_short_var:
+                lines.append(f'{indent}    if i < len({entry_short_var}.get("result", [])) and {entry_short_var}.get("result", [False])[i]:')
+                lines.append(f'{indent}        signals.append({{"action": "short", "index": i}})')
+            
+            if exit_short_var:
+                lines.append(f'{indent}    if i < len({exit_short_var}.get("result", [])) and {exit_short_var}.get("result", [False])[i]:')
+                lines.append(f'{indent}        signals.append({{"action": "close", "index": i}})')
 
         if not lines:
-            lines.append(f"{indent}# No action blocks found")
+            lines.append(f"{indent}# No signal extraction logic found")
 
         return "\n".join(lines)
 

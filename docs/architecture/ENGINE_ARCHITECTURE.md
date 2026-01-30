@@ -2,21 +2,33 @@
 
 ## Overview
 
-The backtesting system uses **two engines** with different purposes:
+The backtesting system uses **five engines** with different purposes:
 
-| Engine | Purpose | Accuracy | Speed |
-|--------|---------|----------|-------|
-| **Fallback** | Regular backtests | 100% accurate | Standard |
-| **VectorBT** | Optimization only | ~85% accurate | 5-10x faster |
+| Engine         | Purpose           | Accuracy | Speed  | Features                       |
+| -------------- | ----------------- | -------- | ------ | ------------------------------ |
+| **FallbackV2** | Basic reference   | 100%     | 1x     | Bar Magnifier                  |
+| **FallbackV3** | Pyramiding        | 100%     | 1x     | + Multiple entries, FIFO/LIFO  |
+| **FallbackV4** | Gold Standard     | 100%     | 1x     | + Multi-TP, ATR, Trailing, DCA |
+| **NumbaV2**    | Fast optimization | 100%     | 41x    | JIT compiled                   |
+| **GPUV2**      | Mass optimization | 100%     | 10-50x | CUDA accelerated               |
 
 ## Engine Selection Logic
 
 ```python
-# In BacktestEngine.run():
-use_fallback = True  # ALWAYS use fallback for regular backtests
+# Default selection in production
+if need_multi_tp or need_dca or need_atr:
+    engine = FallbackEngineV4()  # Gold standard
+elif need_pyramiding:
+    engine = FallbackEngineV3()
+elif mass_optimization and GPU_AVAILABLE:
+    engine = GPUEngineV2()
+elif optimization:
+    engine = NumbaEngineV2()  # 41x faster
+else:
+    engine = FallbackEngineV2()  # Basic
 ```
 
-### Why Fallback is Authoritative
+### Why Fallback Engines are Authoritative
 
 The Fallback engine is the **single source of truth** for all backtest metrics because:
 
@@ -39,6 +51,7 @@ These differences cause **10-60% metric mismatches** depending on trading direct
 ## When to Use Each Engine
 
 ### Fallback Engine (Default)
+
 - ✅ All regular backtests via `BacktestEngine.run()`
 - ✅ Any backtest with SL/TP
 - ✅ Bidirectional trading (long + short)
@@ -46,6 +59,7 @@ These differences cause **10-60% metric mismatches** depending on trading direct
 - ✅ When accuracy matters
 
 ### VectorBT Engine (Optimization Only)
+
 - ✅ Parameter optimization (thousands of iterations)
 - ✅ When relative ranking matters more than absolute values
 - ⚠️ Called directly via `_run_vectorbt()` by optimizer
@@ -54,6 +68,7 @@ These differences cause **10-60% metric mismatches** depending on trading direct
 ## Implementation Details
 
 ### Fallback Engine (`_run_fallback`)
+
 ```
 Location: backend/backtesting/engine.py
 Features:
@@ -65,6 +80,7 @@ Features:
 ```
 
 ### VectorBT Engine (`_run_vectorbt`)
+
 ```
 Location: backend/backtesting/engine.py
 Features:
@@ -77,6 +93,7 @@ Features:
 ## Testing
 
 ### Engine Consistency Test
+
 ```bash
 python scripts/test_engine_identity.py
 ```
@@ -84,6 +101,7 @@ python scripts/test_engine_identity.py
 This test validates that Fallback produces consistent results across all directions.
 
 ### Bar Magnifier Test
+
 ```bash
 python scripts/test_full_metrics_comparison.py
 ```
@@ -98,6 +116,7 @@ Decision: Use Fallback as authoritative engine for all regular backtests, reserv
 VectorBT for optimization where speed matters more than precision.
 
 Key findings:
+
 - LONG direction: 5 vs 4 trades (VBT creates extra trade)
 - SHORT direction: Same trade count but ~10% PnL difference
 - BOTH direction: 10 vs 8 trades (VBT creates 2 extra trades)

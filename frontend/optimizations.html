@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Strategy Optimizations - Bybit Strategy Tester</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/common.css" />
+    <style>
+      body {
+        background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+        color: #c9d1d9;
+        min-height: 100vh;
+      }
+      .card {
+        background: #21262d;
+        border: 1px solid #30363d;
+      }
+      .table {
+        color: #c9d1d9;
+      }
+      .table-dark {
+        background-color: #161b22;
+      }
+      .progress {
+        background-color: #30363d;
+      }
+      .optimization-card {
+        transition: transform 0.2s;
+      }
+      .optimization-card:hover {
+        transform: translateY(-2px);
+      }
+      .status-running {
+        color: #58a6ff;
+      }
+      .status-completed {
+        color: #3fb950;
+      }
+      .status-failed {
+        color: #f85149;
+      }
+      .status-pending {
+        color: #8b949e;
+      }
+      .param-badge {
+        background: #30363d;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        margin-right: 5px;
+      }
+    </style>
+      <script src="js/core/auto-event-binding.js"></script>
+</head>
+  <body>
+    <div class="container-fluid py-4">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <a href="dashboard.html" class="text-decoration-none text-secondary">
+            <i class="bi bi-arrow-left"></i> Dashboard
+          </a>
+          <h1 class="mt-2 mb-0">
+            <i class="bi bi-sliders text-primary"></i> Strategy Optimizations
+          </h1>
+          <p class="text-secondary mb-0">
+            Optimize strategy parameters for maximum performance
+          </p>
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="showNewOptimization()">
+            <i class="bi bi-plus-lg"></i> New Optimization
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card h-100">
+            <div class="card-body text-center">
+              <h3 class="text-primary mb-1" id="totalOptimizations">0</h3>
+              <small class="text-secondary">Total Optimizations</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card h-100">
+            <div class="card-body text-center">
+              <h3 class="text-success mb-1" id="completedCount">0</h3>
+              <small class="text-secondary">Completed</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card h-100">
+            <div class="card-body text-center">
+              <h3 class="text-info mb-1" id="runningCount">0</h3>
+              <small class="text-secondary">Running</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card h-100">
+            <div class="card-body text-center">
+              <h3 class="text-warning mb-1" id="avgImprovement">0%</h3>
+              <small class="text-secondary">Avg. Improvement</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optimizations List -->
+      <div class="card">
+        <div
+          class="card-header d-flex justify-content-between align-items-center"
+        >
+          <h5 class="mb-0"><i class="bi bi-list-ul"></i> Optimization Jobs</h5>
+          <div class="d-flex gap-2">
+            <select
+              class="form-select form-select-sm bg-dark text-light border-secondary"
+              id="statusFilter"
+              title="Filter by status"
+              aria-label="Status filter"
+            >
+              <option value="all">All Status</option>
+              <option value="running">Running</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+            </select>
+            <button
+              class="btn btn-sm btn-outline-secondary"
+              onclick="loadOptimizations()"
+            >
+              <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Strategy</th>
+                  <th>Symbol</th>
+                  <th>Parameters</th>
+                  <th>Progress</th>
+                  <th>Best Result</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="optimizationsTable">
+                <tr>
+                  <td colspan="8" class="text-center py-4">
+                    <div
+                      class="spinner-border spinner-border-sm text-primary"
+                      role="status"
+                    ></div>
+                    <span class="ms-2">Loading optimizations...</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- New Optimization Modal -->
+      <div class="modal fade" id="newOptimizationModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content bg-dark text-light">
+            <div class="modal-header border-secondary">
+              <h5 class="modal-title">
+                <i class="bi bi-plus-circle"></i> New Optimization
+              </h5>
+              <button
+                type="button"
+                class="btn-close btn-close-white"
+                data-bs-dismiss="modal"
+                title="Close"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <form id="optimizationForm">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Strategy Type</label>
+                    <select
+                      class="form-select bg-dark text-light border-secondary"
+                      id="optStrategy"
+                      title="Strategy type"
+                      required
+                    >
+                      <option value="rsi">RSI Strategy</option>
+                      <option value="macd">MACD Strategy</option>
+                      <option value="bollinger">Bollinger Bands</option>
+                      <option value="ema_cross">EMA Crossover</option>
+                      <option value="supertrend">Supertrend</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Symbol</label>
+                    <select
+                      class="form-select bg-dark text-light border-secondary"
+                      id="optSymbol"
+                      title="Trading pair"
+                      required
+                    >
+                      <option value="BTCUSDT">BTCUSDT</option>
+                      <option value="ETHUSDT">ETHUSDT</option>
+                      <option value="SOLUSDT">SOLUSDT</option>
+                      <option value="XRPUSDT">XRPUSDT</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Interval</label>
+                    <select
+                      class="form-select bg-dark text-light border-secondary"
+                      id="optInterval"
+                      title="Time interval"
+                      required
+                    >
+                      <option value="15m">15 minutes</option>
+                      <option value="1h" selected>1 hour</option>
+                      <option value="4h">4 hours</option>
+                      <option value="1d">1 day</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Optimization Method</label>
+                    <select
+                      class="form-select bg-dark text-light border-secondary"
+                      id="optMethod"
+                      title="Optimization method"
+                      required
+                    >
+                      <option value="grid">Grid Search</option>
+                      <option value="random">Random Search</option>
+                      <option value="bayesian">Bayesian Optimization</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Start Date</label>
+                    <input
+                      type="date"
+                      class="form-control bg-dark text-light border-secondary"
+                      id="optStartDate"
+                      title="Start date"
+                      required
+                    />
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">End Date</label>
+                    <input
+                      type="date"
+                      class="form-control bg-dark text-light border-secondary"
+                      id="optEndDate"
+                      title="End date"
+                      required
+                    />
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Optimization Target</label>
+                    <select
+                      class="form-select bg-dark text-light border-secondary"
+                      id="optTarget"
+                      title="Optimization target"
+                      required
+                    >
+                      <option value="sharpe_ratio">Sharpe Ratio</option>
+                      <option value="total_return">Total Return</option>
+                      <option value="profit_factor">Profit Factor</option>
+                      <option value="max_drawdown">Min Drawdown</option>
+                      <option value="win_rate">Win Rate</option>
+                    </select>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer border-secondary">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-bs-dismiss="modal"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                onclick="startOptimization()"
+              >
+                <i class="bi bi-play-fill"></i> Start Optimization
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // Initialize dates
+      document.addEventListener("DOMContentLoaded", function () {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 3);
+
+        document.getElementById("optStartDate").value = startDate
+          .toISOString()
+          .split("T")[0];
+        document.getElementById("optEndDate").value = endDate
+          .toISOString()
+          .split("T")[0];
+
+        loadOptimizations();
+      });
+
+      // Load optimizations list
+      async function loadOptimizations() {
+        try {
+          const response = await fetch("/api/v1/optimizations/");
+          if (response.ok) {
+            const data = await response.json();
+            renderOptimizations(data.optimizations || []);
+            updateStats(data.optimizations || []);
+          } else {
+            renderOptimizations([]);
+          }
+        } catch (error) {
+          console.error("Failed to load optimizations:", error);
+          document.getElementById("optimizationsTable").innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-secondary">
+                            <i class="bi bi-inbox"></i> No optimizations found. Create your first one!
+                        </td>
+                    </tr>
+                `;
+        }
+      }
+
+      // Render optimizations table
+      function renderOptimizations(optimizations) {
+        const tbody = document.getElementById("optimizationsTable");
+
+        if (!optimizations.length) {
+          tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-secondary">
+                            <i class="bi bi-inbox"></i> No optimizations found. Create your first one!
+                        </td>
+                    </tr>
+                `;
+          return;
+        }
+
+        tbody.innerHTML = optimizations
+          .map(
+            (opt) => `
+                <tr class="optimization-card">
+                    <td><code>${opt.id?.substring(0, 8) || "-"}</code></td>
+                    <td><strong>${opt.strategy_type || "-"}</strong></td>
+                    <td>${opt.symbol || "-"}</td>
+                    <td>
+                        ${(opt.parameters || [])
+                          .slice(0, 3)
+                          .map((p) => `<span class="param-badge">${p}</span>`)
+                          .join("")}
+                    </td>
+                    <td>
+                        <div class="progress" style="height: 6px; width: 100px;">
+                            <div class="progress-bar bg-primary" style="width: ${opt.progress || 0}%"></div>
+                        </div>
+                        <small class="text-secondary">${opt.progress || 0}%</small>
+                    </td>
+                    <td>
+                        ${
+                          opt.best_result
+                            ? `
+                            <span class="text-success">${opt.best_result.toFixed(2)}</span>
+                        `
+                            : "-"
+                        }
+                    </td>
+                    <td>
+                        <span class="status-${opt.status || "pending"}">
+                            <i class="bi bi-${getStatusIcon(opt.status)}"></i>
+                            ${(opt.status || "pending").charAt(0).toUpperCase() + (opt.status || "pending").slice(1)}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewResults('${opt.id}')" title="View Results">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        ${
+                          opt.status === "running"
+                            ? `
+                            <button class="btn btn-sm btn-outline-danger" onclick="cancelOptimization('${opt.id}')" title="Cancel">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        `
+                            : ""
+                        }
+                    </td>
+                </tr>
+            `,
+          )
+          .join("");
+      }
+
+      // Get status icon
+      function getStatusIcon(status) {
+        const icons = {
+          running: "arrow-repeat",
+          completed: "check-circle",
+          failed: "x-circle",
+          pending: "hourglass-split",
+        };
+        return icons[status] || "question-circle";
+      }
+
+      // Update stats
+      function updateStats(optimizations) {
+        document.getElementById("totalOptimizations").textContent =
+          optimizations.length;
+        document.getElementById("completedCount").textContent =
+          optimizations.filter((o) => o.status === "completed").length;
+        document.getElementById("runningCount").textContent =
+          optimizations.filter((o) => o.status === "running").length;
+
+        const completed = optimizations.filter(
+          (o) => o.status === "completed" && o.improvement,
+        );
+        const avgImprovement =
+          completed.length > 0
+            ? completed.reduce((sum, o) => sum + o.improvement, 0) /
+              completed.length
+            : 0;
+        document.getElementById("avgImprovement").textContent =
+          avgImprovement.toFixed(1) + "%";
+      }
+
+      // Show new optimization modal
+      function showNewOptimization() {
+        new bootstrap.Modal(
+          document.getElementById("newOptimizationModal"),
+        ).show();
+      }
+
+      // Start optimization
+      async function startOptimization() {
+        const form = document.getElementById("optimizationForm");
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+
+        const payload = {
+          strategy_type: document.getElementById("optStrategy").value,
+          symbol: document.getElementById("optSymbol").value,
+          interval: document.getElementById("optInterval").value,
+          method: document.getElementById("optMethod").value,
+          start_date: document.getElementById("optStartDate").value,
+          end_date: document.getElementById("optEndDate").value,
+          target: document.getElementById("optTarget").value,
+        };
+
+        try {
+          const response = await fetch("/api/v1/optimizations/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            bootstrap.Modal.getInstance(
+              document.getElementById("newOptimizationModal"),
+            ).hide();
+            loadOptimizations();
+            alert("Optimization started successfully!");
+          } else {
+            const error = await response.json();
+            alert(
+              "Failed to start optimization: " +
+                (error.detail || "Unknown error"),
+            );
+          }
+        } catch (error) {
+          console.error("Failed to start optimization:", error);
+          alert("Failed to start optimization: " + error.message);
+        }
+      }
+
+      // View optimization results
+      function viewResults(id) {
+        window.location.href = `backtest-results.html?optimization_id=${id}`;
+      }
+
+      // Cancel optimization
+      async function cancelOptimization(id) {
+        if (!confirm("Are you sure you want to cancel this optimization?"))
+          return;
+
+        try {
+          const response = await fetch(`/api/v1/optimizations/${id}/cancel`, {
+            method: "POST",
+          });
+          if (response.ok) {
+            loadOptimizations();
+          }
+        } catch (error) {
+          console.error("Failed to cancel:", error);
+        }
+      }
+
+      // Auto-refresh running optimizations
+      setInterval(() => {
+        const hasRunning = document.querySelector(".status-running");
+        if (hasRunning) {
+          loadOptimizations();
+        }
+      }, 5000);
+    </script>
+  </body>
+</html>
