@@ -16,9 +16,9 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class GenerationRequest:
     pattern_description: str = ""
 
     # Indicators to use
-    indicators: List[IndicatorType] = field(default_factory=list)
+    indicators: list[IndicatorType] = field(default_factory=list)
     custom_conditions: str = ""
 
     # Risk parameters
@@ -90,8 +90,8 @@ class GenerationRequest:
     target_risk_reward: float = 2.0
 
     # Backtesting requirements
-    symbols: List[str] = field(default_factory=lambda: ["BTCUSDT"])
-    timeframes: List[str] = field(default_factory=lambda: ["60", "240"])
+    symbols: list[str] = field(default_factory=lambda: ["BTCUSDT"])
+    timeframes: list[str] = field(default_factory=lambda: ["60", "240"])
     min_backtest_period_days: int = 30
 
     # Advanced
@@ -99,7 +99,7 @@ class GenerationRequest:
     multi_timeframe: bool = False
     position_sizing: str = "fixed"  # fixed, kelly, volatility_adjusted
 
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -117,26 +117,26 @@ class GeneratedStrategy:
     # Metadata
     description: str = ""
     pattern_type: PatternType = PatternType.CUSTOM
-    indicators_used: List[str] = field(default_factory=list)
+    indicators_used: list[str] = field(default_factory=list)
 
     # Parameters schema
-    parameters: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    default_params: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, dict[str, Any]] = field(default_factory=dict)
+    default_params: dict[str, Any] = field(default_factory=dict)
 
     # Backtest results (if ran)
-    backtest_results: Optional[Dict[str, Any]] = None
+    backtest_results: dict[str, Any] | None = None
 
     # Status
     status: GenerationStatus = GenerationStatus.PENDING
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     # Timestamps
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
 
     # Validation
     is_valid: bool = False
-    validation_errors: List[str] = field(default_factory=list)
+    validation_errors: list[str] = field(default_factory=list)
 
 
 # ============================================================================
@@ -270,8 +270,8 @@ class AIStrategyGenerator:
 
     def __init__(self):
         self._agent_interface = None
-        self._generation_cache: Dict[str, GeneratedStrategy] = {}
-        self._active_generations: Dict[str, asyncio.Task] = {}
+        self._generation_cache: dict[str, GeneratedStrategy] = {}
+        self._active_generations: dict[str, asyncio.Task] = {}
 
     async def _get_agent(self):
         """Get the unified agent interface lazily."""
@@ -353,7 +353,7 @@ class AIStrategyGenerator:
 
             # Done
             strategy.status = GenerationStatus.COMPLETED
-            strategy.completed_at = datetime.now(timezone.utc)
+            strategy.completed_at = datetime.now(UTC)
 
             logger.info(f"Strategy generation completed: {strategy.id}")
             return strategy
@@ -408,7 +408,7 @@ class AIStrategyGenerator:
         code = self._extract_code_block(response.get("response", ""))
         return code
 
-    async def _validate_code(self, code: str) -> Dict[str, Any]:
+    async def _validate_code(self, code: str) -> dict[str, Any]:
         """Validate generated code using AI + static analysis."""
         # First, try static validation
         static_errors = self._static_validate(code)
@@ -442,7 +442,7 @@ class AIStrategyGenerator:
                 "suggestions": [],
             }
 
-    def _static_validate(self, code: str) -> List[str]:
+    def _static_validate(self, code: str) -> list[str]:
         """Static validation of Python code."""
         errors = []
 
@@ -487,7 +487,7 @@ class AIStrategyGenerator:
             return match.group(1)
         return "GeneratedStrategy"
 
-    def _extract_parameters(self, code: str) -> Dict[str, Dict[str, Any]]:
+    def _extract_parameters(self, code: str) -> dict[str, dict[str, Any]]:
         """Extract parameter specifications from code."""
         parameters = {}
 
@@ -524,7 +524,7 @@ class AIStrategyGenerator:
 
         return parameters
 
-    def _extract_defaults(self, code: str) -> Dict[str, Any]:
+    def _extract_defaults(self, code: str) -> dict[str, Any]:
         """Extract default parameter values."""
         defaults = {}
         for name, info in self._extract_parameters(code).items():
@@ -549,7 +549,7 @@ class AIStrategyGenerator:
         # Return as-is if no code blocks
         return response.strip()
 
-    def _parse_json_response(self, response: str) -> Dict[str, Any]:
+    def _parse_json_response(self, response: str) -> dict[str, Any]:
         """Parse JSON from AI response."""
         # Try to find JSON in response
         pattern = r"\{[^{}]*\}"
@@ -626,7 +626,7 @@ class AIStrategyGenerator:
         self,
         strategy: GeneratedStrategy,
         request: GenerationRequest,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run automatic backtesting on generated strategy."""
         try:
             # Import backtest executor
@@ -674,11 +674,11 @@ class AIStrategyGenerator:
                 "win_rate": 0,
             }
 
-    def get_generation_status(self, strategy_id: str) -> Optional[GeneratedStrategy]:
+    def get_generation_status(self, strategy_id: str) -> GeneratedStrategy | None:
         """Get status of a generation request."""
         return self._generation_cache.get(strategy_id)
 
-    def list_generations(self, limit: int = 50) -> List[GeneratedStrategy]:
+    def list_generations(self, limit: int = 50) -> list[GeneratedStrategy]:
         """List recent generations."""
         strategies = list(self._generation_cache.values())
         strategies.sort(key=lambda s: s.created_at, reverse=True)
@@ -689,7 +689,7 @@ class AIStrategyGenerator:
 # Singleton Instance
 # ============================================================================
 
-_generator_instance: Optional[AIStrategyGenerator] = None
+_generator_instance: AIStrategyGenerator | None = None
 
 
 def get_ai_strategy_generator() -> AIStrategyGenerator:

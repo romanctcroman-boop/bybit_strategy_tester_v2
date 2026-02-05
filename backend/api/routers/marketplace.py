@@ -11,8 +11,8 @@ Endpoints for:
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -41,7 +41,7 @@ class PublishStrategyRequest(BaseModel):
     """Request to publish a strategy."""
 
     name: str = Field(..., min_length=3, max_length=200)
-    description: Optional[str] = Field(None, max_length=2000)
+    description: str | None = Field(None, max_length=2000)
     strategy_type: str = Field(..., description="Strategy type: rsi, sma, macd, etc.")
     strategy_params: dict[str, Any] = Field(..., description="Strategy parameters")
     tags: list[str] = Field(default_factory=list, max_length=10)
@@ -49,13 +49,13 @@ class PublishStrategyRequest(BaseModel):
     version: str = Field(default="1.0.0")
 
     # Performance metrics (optional, from backtest)
-    total_return: Optional[float] = None
-    sharpe_ratio: Optional[float] = None
-    max_drawdown: Optional[float] = None
-    win_rate: Optional[float] = None
-    profit_factor: Optional[float] = None
-    total_trades: Optional[int] = None
-    backtest_period: Optional[str] = None
+    total_return: float | None = None
+    sharpe_ratio: float | None = None
+    max_drawdown: float | None = None
+    win_rate: float | None = None
+    profit_factor: float | None = None
+    total_trades: int | None = None
+    backtest_period: str | None = None
 
 
 class StrategyResponse(BaseModel):
@@ -63,7 +63,7 @@ class StrategyResponse(BaseModel):
 
     id: int
     name: str
-    description: Optional[str]
+    description: str | None
     strategy_type: str
     username: str
     visibility: str
@@ -71,13 +71,13 @@ class StrategyResponse(BaseModel):
     tags: list[str]
 
     # Performance
-    total_return: Optional[float]
-    sharpe_ratio: Optional[float]
-    max_drawdown: Optional[float]
-    win_rate: Optional[float]
-    profit_factor: Optional[float]
-    total_trades: Optional[int]
-    backtest_period: Optional[str]
+    total_return: float | None
+    sharpe_ratio: float | None
+    max_drawdown: float | None
+    win_rate: float | None
+    profit_factor: float | None
+    total_trades: int | None
+    backtest_period: str | None
 
     # Stats
     downloads: int
@@ -92,7 +92,7 @@ class StrategyResponse(BaseModel):
 
     # Timestamps
     created_at: datetime
-    published_at: Optional[datetime]
+    published_at: datetime | None
 
     model_config = {"from_attributes": True}
 
@@ -108,8 +108,8 @@ class ReviewRequest(BaseModel):
     """Request to review a strategy."""
 
     rating: int = Field(..., ge=1, le=5)
-    title: Optional[str] = Field(None, max_length=200)
-    comment: Optional[str] = Field(None, max_length=2000)
+    title: str | None = Field(None, max_length=200)
+    comment: str | None = Field(None, max_length=2000)
 
 
 class ReviewResponse(BaseModel):
@@ -118,8 +118,8 @@ class ReviewResponse(BaseModel):
     id: int
     username: str
     rating: int
-    title: Optional[str]
-    comment: Optional[str]
+    title: str | None
+    comment: str | None
     is_verified_purchase: bool
     created_at: datetime
 
@@ -192,12 +192,12 @@ def strategy_to_response(strategy: MarketplaceStrategy) -> dict:
 @router.get("/strategies", response_model=list[StrategyResponse])
 async def list_strategies(
     db: Session = Depends(get_db),
-    search: Optional[str] = Query(None, description="Search by name or description"),
-    strategy_type: Optional[str] = Query(None, description="Filter by strategy type"),
+    search: str | None = Query(None, description="Search by name or description"),
+    strategy_type: str | None = Query(None, description="Filter by strategy type"),
     sort_by: str = Query(
         "downloads", description="Sort by: downloads, rating, newest, return"
     ),
-    min_rating: Optional[float] = Query(None, ge=0, le=5),
+    min_rating: float | None = Query(None, ge=0, le=5),
     featured_only: bool = Query(False),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -325,7 +325,7 @@ async def publish_strategy(
         profit_factor=request.profit_factor,
         total_trades=request.total_trades,
         backtest_period=request.backtest_period,
-        published_at=datetime.now(timezone.utc)
+        published_at=datetime.now(UTC)
         if request.visibility == "public"
         else None,
     )
@@ -427,7 +427,7 @@ async def review_strategy(
         existing.rating = request.rating
         existing.title = request.title
         existing.comment = request.comment
-        existing.updated_at = datetime.now(timezone.utc)
+        existing.updated_at = datetime.now(UTC)
         review = existing
     else:
         # Create new review

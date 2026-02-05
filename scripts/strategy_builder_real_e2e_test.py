@@ -17,8 +17,8 @@ Note:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -103,8 +103,8 @@ def run_single(direction: str) -> None:
 
     # Backtest request: 6 months from 2025-01-01 on 15m
     backtest_payload = {
-        "start_date": datetime(2025, 1, 1, tzinfo=timezone.utc).isoformat(),
-        "end_date": datetime(2025, 6, 30, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
+        "start_date": datetime(2025, 1, 1, tzinfo=UTC).isoformat(),
+        "end_date": datetime(2025, 6, 30, 23, 59, 59, tzinfo=UTC).isoformat(),
         "engine": "auto",
         "commission": 0.0007,
         "slippage": 0.0005,

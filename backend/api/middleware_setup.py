@@ -59,12 +59,22 @@ def configure_middleware(app: FastAPI) -> None:
 
     # ========================================================================
     # Slow Request Timing Middleware (performance monitoring)
+    # - extended_threshold_paths: 2x thresholds (WARNING/ERROR at 1s/4s)
+    # - long_running_paths: Bybit instruments/symbols, 8x very_slow (~16s) before ERROR
     # ========================================================================
     app.add_middleware(
         TimingMiddleware,
         slow_threshold_ms=500,  # Warn for requests > 500ms
         very_slow_threshold_ms=2000,  # Error for requests > 2s
         excluded_paths=["/health", "/metrics", "/favicon.ico", "/api/v1/health"],
+        extended_threshold_paths=[
+            "/api/v1/marketdata/bybit/klines",
+            "/api/v1/agents/query",
+        ],
+        long_running_paths=[
+            "/api/v1/marketdata/symbols",  # instrument-info, symbols-list
+            "/api/v1/refresh-tickers",
+        ],
     )
 
     # ========================================================================

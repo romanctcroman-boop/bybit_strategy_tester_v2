@@ -72,6 +72,22 @@ from backend.backtesting.engines.dca_engine import DCAEngine, DCAGridCalculator,
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
 
+# Event-driven engine (skeleton, ROADMAP_REMAINING_TASKS)
+try:
+    from backend.backtesting.engines.event_driven_engine import (
+        BarEvent,
+        EventDrivenEngine,
+        EventQueue,
+        FillEvent,
+        OrderEvent,
+    )
+except ImportError:
+    EventDrivenEngine = None  # type: ignore[misc,assignment]
+    EventQueue = None  # type: ignore[misc,assignment]
+    BarEvent = None  # type: ignore[misc,assignment]
+    OrderEvent = None  # type: ignore[misc,assignment]
+    FillEvent = None  # type: ignore[misc,assignment]
+
 __all__ = [
     # Interfaces
     "BaseBacktestEngine",
@@ -97,4 +113,10 @@ __all__ = [
     "FallbackEngineV3",  # deprecated
     # Availability flags
     "NUMBA_AVAILABLE",
+    # Event-driven (skeleton, ROADMAP)
+    "EventDrivenEngine",
+    "EventQueue",
+    "BarEvent",
+    "OrderEvent",
+    "FillEvent",
 ]

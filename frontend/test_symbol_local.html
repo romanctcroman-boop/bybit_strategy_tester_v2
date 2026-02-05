@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Symbol Dropdown</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background: #1a1a2e;
+        color: #eee;
+      }
+      .container {
+        max-width: 400px;
+        margin: 0 auto;
+      }
+      label {
+        display: block;
+        margin: 10px 0 5px;
+      }
+      select,
+      input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 15px;
+        background: #2d2d44;
+        color: #eee;
+        border: 1px solid #444;
+        border-radius: 4px;
+      }
+      .symbol-picker {
+        position: relative;
+      }
+      .dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #2d2d44;
+        border: 1px solid #444;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
+        z-index: 1000;
+      }
+      .dropdown.open {
+        display: block;
+      }
+      .dropdown li {
+        list-style: none;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+      .dropdown li:hover {
+        background: #3d3d54;
+      }
+      .dropdown li.has-local {
+        background: rgba(16, 185, 129, 0.2);
+      }
+      .badge {
+        margin-right: 6px;
+      }
+      #result {
+        margin-top: 20px;
+        padding: 15px;
+        background: #2d2d44;
+        border-radius: 4px;
+      }
+      button {
+        padding: 10px 20px;
+        background: #3d5afe;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+      }
+      button:hover {
+        background: #536dfe;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>🧪 Symbol Dropdown Test</h2>
+
+      <label for="marketType">Тип рынка:</label>
+      <select id="marketType">
+        <option value="spot">📊 SPOT</option>
+        <option value="linear" selected>📈 Futures (LINEAR)</option>
+      </select>
+
+      <label for="symbolInput">Symbol:</label>
+      <div class="symbol-picker">
+        <input
+          type="text"
+          id="symbolInput"
+          placeholder="Search symbol..."
+          autocomplete="off"
+        />
+        <ul class="dropdown" id="dropdown"></ul>
+      </div>
+
+      <button id="btnTest">Test API</button>
+      <button id="btnRefresh">Refresh</button>
+
+      <div id="result">Click "Test API" to check endpoints...</div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:8000/api/v1";
+      let bybitCache = { linear: [], spot: [] };
+      let localCache = null;
+
+      async function fetchBybitSymbols(category) {
+        if (bybitCache[category].length > 0) return bybitCache[category];
+        try {
+          const res = await fetch(
+            `${API_BASE}/marketdata/symbols-list?category=${category}`,
+          );
+          const data = await res.json();
+          bybitCache[category] = data.symbols || [];
+          console.log(
+            `Loaded ${bybitCache[category].length} ${category} symbols`,
+          );
+          return bybitCache[category];
+        } catch (e) {
+          console.error("Failed to fetch Bybit symbols:", e);
+          return [];
+        }
+      }
+
+      async function fetchLocalSymbols() {
+        if (localCache) return localCache;
+        try {
+          const res = await fetch(`${API_BASE}/marketdata/symbols/local`);
+          localCache = await res.json();
+          console.log(
+            `Loaded ${localCache.symbols?.length || 0} local symbols`,
+          );
+          return localCache;
+        } catch (e) {
+          console.error("Failed to fetch local symbols:", e);
+          localCache = { symbols: [], details: {} };
+          return localCache;
+        }
+      }
+
+      function showDropdown(query = "") {
+        const dropdown = document.getElementById("dropdown");
+        const cat =
+          document.getElementById("marketType").value === "spot"
+            ? "spot"
+            : "linear";
+        const list = bybitCache[cat] || [];
+        const localSet = new Set(localCache?.symbols || []);
+
+        const q = query.toUpperCase().trim();
+
+        // Sort: local first, then alphabetically
+        const sorted = [...list].sort((a, b) => {
+          const aLocal = localSet.has(a);
+          const bLocal = localSet.has(b);
+          if (aLocal && !bLocal) return -1;
+          if (!aLocal && bLocal) return 1;
+          return a.localeCompare(b);
+        });
+
+        const filtered = q ? sorted.filter((s) => s.includes(q)) : sorted;
+
+        dropdown.innerHTML = filtered
+          .slice(0, 100)
+          .map((s) => {
+            const isLocal = localSet.has(s);
+            const cls = isLocal ? "has-local" : "";
+            const badge = isLocal ? '<span class="badge">📊</span>' : "";
+            return `<li class="${cls}" data-symbol="${s}">${badge}${s}</li>`;
+          })
+          .join("");
+
+        dropdown.classList.add("open");
+      }
+
+      async function testAPI() {
+        const result = document.getElementById("result");
+        result.innerHTML = "Testing...";
+
+        let html = "<h3>API Test Results:</h3>";
+
+        // Test symbols-list
+        try {
+          const res = await fetch(
+            `${API_BASE}/marketdata/symbols-list?category=linear`,
+          );
+          const data = await res.json();
+          html += `<p>✅ /symbols-list (linear): ${data.symbols?.length || 0} symbols</p>`;
+        } catch (e) {
+          html += `<p>❌ /symbols-list: ${e.message}</p>`;
+        }
+
+        // Test symbols/local
+        try {
+          const res = await fetch(`${API_BASE}/marketdata/symbols/local`);
+          const data = await res.json();
+          html += `<p>✅ /symbols/local: ${data.symbols?.length || 0} local symbols</p>`;
+          html += `<p>Local: ${data.symbols?.join(", ")}</p>`;
+        } catch (e) {
+          html += `<p>❌ /symbols/local: ${e.message}</p>`;
+        }
+
+        result.innerHTML = html;
+      }
+
+      // Initialize
+      document.addEventListener("DOMContentLoaded", async () => {
+        const input = document.getElementById("symbolInput");
+        const dropdown = document.getElementById("dropdown");
+        const marketType = document.getElementById("marketType");
+
+        // Load initial data
+        await Promise.all([fetchBybitSymbols("linear"), fetchLocalSymbols()]);
+
+        input.addEventListener("focus", () => showDropdown(input.value));
+        input.addEventListener("input", () => showDropdown(input.value));
+        input.addEventListener("blur", () =>
+          setTimeout(() => dropdown.classList.remove("open"), 150),
+        );
+
+        dropdown.addEventListener("click", (e) => {
+          const li = e.target.closest("li");
+          if (li) {
+            input.value = li.dataset.symbol;
+            dropdown.classList.remove("open");
+          }
+        });
+
+        marketType.addEventListener("change", async () => {
+          const cat = marketType.value === "spot" ? "spot" : "linear";
+          await fetchBybitSymbols(cat);
+          showDropdown(input.value);
+        });
+
+        document.getElementById("btnTest").addEventListener("click", testAPI);
+        document
+          .getElementById("btnRefresh")
+          .addEventListener("click", async () => {
+            bybitCache = { linear: [], spot: [] };
+            localCache = null;
+            await Promise.all([
+              fetchBybitSymbols(
+                document.getElementById("marketType").value === "spot"
+                  ? "spot"
+                  : "linear",
+              ),
+              fetchLocalSymbols(),
+            ]);
+            showDropdown(document.getElementById("symbolInput").value);
+          });
+      });
+    </script>
+  </body>
+</html>

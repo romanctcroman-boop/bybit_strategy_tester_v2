@@ -94,7 +94,7 @@ def test_walk_forward_basic():
         optimize_metric="sharpe_ratio",
     )
 
-    print(f"\n📊 Walk-Forward Results:")
+    print("\n📊 Walk-Forward Results:")
     print(f"  Status: {result.status}")
     print(f"  Windows: {result.completed_windows}/{result.total_windows}")
     print(f"  Time: {result.execution_time_seconds:.2f}s")
@@ -127,7 +127,7 @@ def test_walk_forward_robustness():
     ltf, htf = load_test_data()
 
     if len(ltf) < 2000 or len(htf) < 500:
-        print(f"⚠️ SKIPPED: Not enough data")
+        print("⚠️ SKIPPED: Not enough data")
         return True
 
     # Create index map
@@ -152,7 +152,7 @@ def test_walk_forward_robustness():
         htf_filter_periods=[50, 200],
     )
 
-    print(f"\n📊 Robustness Metrics:")
+    print("\n📊 Robustness Metrics:")
     print(f"  Completed windows: {result.completed_windows}")
     print(f"  Avg OOS Return: {result.avg_oos_return:.2f}%")
     print(f"  OOS Return Std: {result.oos_return_std:.2f}%")

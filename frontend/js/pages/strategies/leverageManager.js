@@ -60,13 +60,13 @@ export function initLeverageSliderScroll() {
         this.value = newValue;
         updateLeverageDisplay(newValue);
         // Update warning when leverage changes
-        updateLeverageLimits().catch(() => {});
+        updateLeverageLimits().catch(() => { });
     }, { passive: false });
 
     // Update warning dynamically when slider moves
     leverageSlider.addEventListener('input', function () {
         updateLeverageDisplay(parseInt(this.value));
-        updateLeverageLimits().catch(() => {});
+        updateLeverageLimits().catch(() => { });
     });
 }
 
@@ -283,40 +283,78 @@ function updateRiskIndicator(indicator, leverage, volatility, positionValue = 10
         const avgRange = volatility.avg_daily_range;
         const riskRatio = liquidationPercent / avgRange;
         const maxMoveWarning = maxMove > 0 && liquidationPercent < maxMove;
+        const maxSuffix = maxMove > 0 ? ` макс. ${maxMove.toFixed(0)}%` : '';
 
         if (riskRatio < 2) {
             riskClass = 'risk-extreme';
-            riskText = `🔴 ОПАСНО! Ликвидация: ${liquidationPercent.toFixed(1)}% | Ср. волатильность: ${avgRange.toFixed(1)}%/день`;
+            riskText = `🔴 ОПАСНО! ликв. ${liquidationPercent.toFixed(1)}% | вол. ${avgRange.toFixed(1)}%/день${maxSuffix}`;
         } else if (riskRatio < 4 || maxMoveWarning) {
             riskClass = 'risk-high';
-            const extra = maxMoveWarning ? ` (макс. ${maxMove.toFixed(0)}%)` : '';
-            riskText = `🟠 Высокий риск: ликвидация ${liquidationPercent.toFixed(1)}% | Волатильность: ${avgRange.toFixed(1)}%${extra}`;
+            riskText = `🟠 Высокий риск: ликв. ${liquidationPercent.toFixed(1)}% | вол. ${avgRange.toFixed(1)}%/день${maxSuffix}`;
         } else if (riskRatio < 8) {
             riskClass = 'risk-medium';
-            riskText = `🟡 Средний риск: ликвидация ${liquidationPercent.toFixed(1)}% | Волатильность: ${avgRange.toFixed(1)}%/день`;
+            riskText = `🟡 Средний риск: ликв. ${liquidationPercent.toFixed(1)}% | вол. ${avgRange.toFixed(1)}%/день${maxSuffix}`;
         } else {
             riskClass = 'risk-low';
-            riskText = `🟢 Низкий риск: ликвидация ${liquidationPercent.toFixed(1)}% | Волатильность: ${avgRange.toFixed(1)}%/день`;
+            riskText = `🟢 Низкий риск: ликв. ${liquidationPercent.toFixed(1)}% | вол. ${avgRange.toFixed(1)}%/день${maxSuffix}`;
         }
     } else {
         // Fallback to simple leverage-based assessment
         if (leverage <= 5) {
             riskClass = 'risk-low';
-            riskText = `🟢 Низкий риск: ликвидация при движении ${liquidationPercent.toFixed(2)}%`;
+            riskText = `🟢 Низкий риск: ликв. при движении ${liquidationPercent.toFixed(2)}%`;
         } else if (leverage <= 20) {
             riskClass = 'risk-medium';
-            riskText = `🟡 Средний риск: ликвидация при движении ${liquidationPercent.toFixed(2)}%`;
+            riskText = `🟡 Средний риск: ликв. при движении ${liquidationPercent.toFixed(2)}%`;
         } else if (leverage <= 50) {
             riskClass = 'risk-high';
-            riskText = `🟠 Высокий риск: ликвидация при движении ${liquidationPercent.toFixed(2)}%`;
+            riskText = `🟠 Высокий риск: ликв. при движении ${liquidationPercent.toFixed(2)}%`;
         } else {
             riskClass = 'risk-extreme';
-            riskText = `🔴 Экстремальный риск: ликвидация при движении ${liquidationPercent.toFixed(2)}%`;
+            riskText = `🔴 Экстремальный риск: ликв. при движении ${liquidationPercent.toFixed(2)}%`;
         }
     }
 
     indicator.textContent = riskText;
-    indicator.className = `leverage-risk-indicator ${riskClass}`;
+    // Сохранить существующие классы (properties-leverage-risk и т.д.), обновить только risk level
+    indicator.classList.remove('risk-low', 'risk-medium', 'risk-high', 'risk-extreme');
+    indicator.classList.add('leverage-risk-indicator', riskClass);
+    indicator.title = 'Ликв. = порог до ликвидации. Волатильность по дневным свечам (D).';
+}
+
+/**
+ * Update risk indicator for arbitrary elements (e.g. Strategy Builder Properties).
+ * Fetches instrument/price/volatility and updates the risk text.
+ * @param {Object} opts - Elements: symbolEl, capitalEl, positionSizeTypeEl, positionSizeEl, leverageVal (number), riskIndicatorEl
+ */
+export async function updateLeverageRiskForElements(opts) {
+    const { symbolEl, capitalEl, positionSizeTypeEl, positionSizeEl, leverageVal, riskIndicatorEl } = opts;
+    if (!riskIndicatorEl || leverageVal == null) return;
+    const symbol = symbolEl?.value?.trim()?.toUpperCase() || 'BTCUSDT';
+    const capital = parseFloat(capitalEl?.value) || 10000;
+    const positionSizeType = positionSizeTypeEl?.value || 'percent';
+    const positionSize = parseFloat(positionSizeEl?.value) || 100;
+
+    const [info, currentPrice, volatility] = await Promise.all([
+        fetchInstrumentInfo(symbol),
+        fetchCurrentPrice(symbol),
+        fetchVolatility(symbol)
+    ]);
+
+    let margin = capital;
+    let positionValue = 100000;
+    if (positionSizeType === 'percent') {
+        margin = capital * (positionSize / 100);
+        positionValue = margin * leverageVal;
+    } else if (positionSizeType === 'fixed_amount') {
+        margin = positionSize;
+        positionValue = margin * leverageVal;
+    } else if (positionSizeType === 'contracts' && currentPrice) {
+        positionValue = positionSize * currentPrice;
+    } else {
+        positionValue = margin * leverageVal;
+    }
+    updateRiskIndicator(riskIndicatorEl, leverageVal, volatility, positionValue);
 }
 
 // Expose to global scope for inline handlers (backwards compatibility)

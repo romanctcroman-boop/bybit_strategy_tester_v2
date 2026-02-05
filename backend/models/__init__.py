@@ -32,6 +32,9 @@ OptimizationResult = Optimization
 __all__ = [
     "Backtest",
     "BacktestStatus",
+    "BybitKlineAudit",
+    "ChatConversation",
+    "MarketData",  # Alias for BybitKlineAudit
     "Optimization",
     "OptimizationResult",  # Alias for Optimization
     "OptimizationStatus",
@@ -42,7 +45,4 @@ __all__ = [
     "Trade",
     "TradeSide",
     "TradeStatus",
-    "ChatConversation",
-    "BybitKlineAudit",
-    "MarketData",  # Alias for BybitKlineAudit
 ]

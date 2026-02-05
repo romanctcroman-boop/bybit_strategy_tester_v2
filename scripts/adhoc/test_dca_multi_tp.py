@@ -13,11 +13,10 @@ Symbol: BTCUSDT
 Timeframes: 15m (signals), 1H (MTF filter)
 """
 
-import asyncio
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -56,17 +55,16 @@ class DCAMultiTPTester:
         self.start_date = self.end_date - timedelta(days=240)  # ~8 months
 
         # Results storage
-        self.results: Dict[str, Dict[str, Any]] = {}
+        self.results: dict[str, dict[str, Any]] = {}
 
     async def load_candles_from_db(
         self, symbol: str, interval: str, start_date: datetime, end_date: datetime
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """
         Load candles from the SQLite database.
         """
         try:
             from backend.database.kline_repository import KlineRepository
-
             from backend.database.session import get_session
 
             async with get_session() as session:
@@ -104,7 +102,7 @@ class DCAMultiTPTester:
 
     def load_candles_from_audit(
         self, symbol: str, interval: str, start_date: datetime, end_date: datetime
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """
         Load candles from bybit_kline_audit table.
         """
@@ -143,7 +141,7 @@ class DCAMultiTPTester:
 
     def load_candles_direct(
         self, symbol: str, interval: str, start_date: datetime, end_date: datetime
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """
         Load candles directly from SQLite (synchronous fallback).
         """
@@ -239,9 +237,9 @@ class DCAMultiTPTester:
         strategy_name: str,
         candles: pd.DataFrame,
         signals,
-        htf_candles: Optional[pd.DataFrame] = None,
-        htf_index_map: Optional[np.ndarray] = None,
-    ) -> Dict[str, Any]:
+        htf_candles: pd.DataFrame | None = None,
+        htf_index_map: np.ndarray | None = None,
+    ) -> dict[str, Any]:
         """
         Run backtest using FallbackEngineV4.
         """
@@ -355,9 +353,9 @@ class DCAMultiTPTester:
     def test_dca_long_multi_tp(
         self,
         candles: pd.DataFrame,
-        htf_candles: Optional[pd.DataFrame],
-        htf_index_map: Optional[np.ndarray],
-    ) -> Dict[str, Any]:
+        htf_candles: pd.DataFrame | None,
+        htf_index_map: np.ndarray | None,
+    ) -> dict[str, Any]:
         """
         Test DCA Long with Multi-TP.
         """
@@ -416,9 +414,9 @@ class DCAMultiTPTester:
     def test_dca_short_multi_tp(
         self,
         candles: pd.DataFrame,
-        htf_candles: Optional[pd.DataFrame],
-        htf_index_map: Optional[np.ndarray],
-    ) -> Dict[str, Any]:
+        htf_candles: pd.DataFrame | None,
+        htf_index_map: np.ndarray | None,
+    ) -> dict[str, Any]:
         """
         Test DCA Short with Multi-TP.
         """
@@ -475,9 +473,9 @@ class DCAMultiTPTester:
     def test_dca_long_atr(
         self,
         candles: pd.DataFrame,
-        htf_candles: Optional[pd.DataFrame],
-        htf_index_map: Optional[np.ndarray],
-    ) -> Dict[str, Any]:
+        htf_candles: pd.DataFrame | None,
+        htf_index_map: np.ndarray | None,
+    ) -> dict[str, Any]:
         """
         Test DCA Long with ATR-based TP/SL.
         """
@@ -530,9 +528,9 @@ class DCAMultiTPTester:
     def test_dca_short_atr(
         self,
         candles: pd.DataFrame,
-        htf_candles: Optional[pd.DataFrame],
-        htf_index_map: Optional[np.ndarray],
-    ) -> Dict[str, Any]:
+        htf_candles: pd.DataFrame | None,
+        htf_index_map: np.ndarray | None,
+    ) -> dict[str, Any]:
         """
         Test DCA Short with ATR-based TP/SL.
         """
@@ -589,9 +587,9 @@ class DCAMultiTPTester:
     def test_dca_trailing_stop(
         self,
         candles: pd.DataFrame,
-        htf_candles: Optional[pd.DataFrame],
-        htf_index_map: Optional[np.ndarray],
-    ) -> Dict[str, Any]:
+        htf_candles: pd.DataFrame | None,
+        htf_index_map: np.ndarray | None,
+    ) -> dict[str, Any]:
         """
         Test DCA Long with Trailing Stop.
         """
@@ -640,7 +638,7 @@ class DCAMultiTPTester:
         self._print_result(result)
         return result
 
-    def _print_result(self, result: Dict[str, Any]):
+    def _print_result(self, result: dict[str, Any]):
         """Print test result."""
         if "error" in result:
             logger.error(f"Test failed: {result['error']}")
@@ -704,7 +702,7 @@ class DCAMultiTPTester:
                 logger.warning(f"Could not build HTF index map: {e}")
                 htf_candles = None
 
-        logger.info(f"\n📊 Data Summary:")
+        logger.info("\n📊 Data Summary:")
         logger.info(
             f"  LTF candles: {len(ltf_candles)} ({ltf_candles.index[0]} to {ltf_candles.index[-1]})"
         )

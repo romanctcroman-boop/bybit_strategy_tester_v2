@@ -3,11 +3,13 @@ Deep compare individual trades between Fallback and Numba
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
 
 import numpy as np
 import pandas as pd
-import sqlite3
 
 # Load data
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
@@ -26,8 +28,8 @@ df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
 df.set_index('open_time', inplace=True)
 
 # ============ NUMBA ============
-from backend.backtesting.strategies import RSIStrategy
 from backend.backtesting.numba_engine import simulate_trades_numba
+from backend.backtesting.strategies import RSIStrategy
 
 strategy = RSIStrategy(params={"period": 14, "overbought": 70, "oversold": 30})
 signals = strategy.generate_signals(df)
@@ -88,26 +90,26 @@ total_pnl_numba = 0
 for i in range(min(len(result_fallback.trades), n_trades)):
     fb_trade = result_fallback.trades[i]
     numba_trade = trades_numba[i]
-    
+
     fb_pnl = fb_trade.pnl
     numba_pnl = numba_trade[5]  # pnl column
-    
+
     fb_entry = fb_trade.entry_price
     fb_exit = fb_trade.exit_price
-    
+
     numba_entry = numba_trade[3]
     numba_exit = numba_trade[4]
-    
+
     fb_is_long = fb_trade.side == 'buy'
     numba_is_long = numba_trade[2] == 1.0
-    
+
     total_pnl_fb += fb_pnl
     total_pnl_numba += numba_pnl
-    
+
     pnl_diff = abs(fb_pnl - numba_pnl)
-    
+
     status = "✅" if pnl_diff < 1.0 else "⚠️" if pnl_diff < 10.0 else "❌"
-    
+
     print(f"\n{status} Trade {i+1}:")
     print(f"   Type:      FB={('LONG' if fb_is_long else 'SHORT'):5} | NUMBA={('LONG' if numba_is_long else 'SHORT'):5}")
     print(f"   Entry:     FB={fb_entry:10.2f} | NUMBA={numba_entry:10.2f} | diff={abs(fb_entry-numba_entry):.4f}")

@@ -9,8 +9,8 @@ project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
 import sqlite3
+
 import pandas as pd
-import numpy as np
 
 DB_PATH = project_root / "data.sqlite3"
 
@@ -20,14 +20,14 @@ def calculate_rsi_wilder(prices: pd.Series, period: int = 14) -> pd.Series:
     delta = prices.diff()
     gain = delta.where(delta > 0, 0.0)
     loss = (-delta).where(delta < 0, 0.0)
-    
+
     avg_gain = gain.rolling(window=period, min_periods=period).mean()
     avg_loss = loss.rolling(window=period, min_periods=period).mean()
-    
+
     for i in range(period, len(prices)):
         avg_gain.iloc[i] = (avg_gain.iloc[i-1] * (period - 1) + gain.iloc[i]) / period
         avg_loss.iloc[i] = (avg_loss.iloc[i-1] * (period - 1) + loss.iloc[i]) / period
-    
+
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
     return rsi
@@ -67,7 +67,7 @@ target_price = 108080.40
 mask = (df['datetime'] >= '2025-10-30 15:00') & (df['datetime'] <= '2025-10-30 20:00')
 region = df[mask].copy()
 
-print(f"\n📊 Bars around 2025-10-30 17:15:")
+print("\n📊 Bars around 2025-10-30 17:15:")
 print("-"*70)
 for _, row in region.iterrows():
     signal = "🟢 LONG" if row['long_signal'] else ""
@@ -77,7 +77,7 @@ for _, row in region.iterrows():
 # Find all LONG signals and number them
 long_signals = df[df['long_signal']].reset_index()
 
-print(f"\n📈 Finding signal around 2025-10-30:")
+print("\n📈 Finding signal around 2025-10-30:")
 print("-"*70)
 
 # Find signals around Oct 30
@@ -101,7 +101,7 @@ for offset_name, hours in [("UTC", 0), ("UTC+3 (MSK)", -3)]:
     if not match.empty:
         row = match.iloc[0]
         print(f"\n{offset_name}: {target}")
-        print(f"  Found: Yes")
+        print("  Found: Yes")
         print(f"  Close: ${row['close_price']:.2f}")
         print(f"  RSI: {row['prev_rsi']:.4f} → {row['rsi']:.4f}")
         print(f"  LONG signal: {'YES 🟢' if row['long_signal'] else 'NO ❌'}")
@@ -110,7 +110,7 @@ for offset_name, hours in [("UTC", 0), ("UTC+3 (MSK)", -3)]:
 
 # Show summary
 print("\n" + "="*70)
-print("📋 SUMMARY: Trade #24 Analysis")  
+print("📋 SUMMARY: Trade #24 Analysis")
 print("="*70)
 print("""
 TradingView Trade #24:

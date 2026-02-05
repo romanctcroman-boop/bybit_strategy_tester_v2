@@ -637,6 +637,22 @@ class DCAEngine(BaseBacktestEngine):
         self.multi_tp.tp4_percent = getattr(config, "dca_tp4_percent", 3.0)
         self.multi_tp.tp4_close_percent = getattr(config, "dca_tp4_close_percent", 25.0)
 
+        # Close Conditions and Indent Order from strategy_params (Strategy Builder graph)
+        params = getattr(config, "strategy_params", None) or {}
+        close_conditions_params = params.get("close_conditions", {})
+        if close_conditions_params:
+            cc = self.close_conditions
+            for key, value in close_conditions_params.items():
+                if hasattr(cc, key):
+                    setattr(cc, key, value)
+
+        indent_order_params = params.get("indent_order", {})
+        if indent_order_params:
+            io = self.indent_order
+            for key, value in indent_order_params.items():
+                if hasattr(io, key):
+                    setattr(io, key, value)
+
     def run_from_config(self, config: Any, ohlcv: pd.DataFrame) -> Any:
         """
         Run DCA backtest from BacktestConfig (Pydantic model).
@@ -686,6 +702,9 @@ class DCAEngine(BaseBacktestEngine):
         self.trades = []
         self.position = DCAPosition()
 
+        # Pre-calculate indicator caches for close conditions
+        self._precompute_close_condition_indicators(ohlcv)
+
         # Generate signals using strategy from config
         signals = self._generate_signals_from_config(config, ohlcv)
 
@@ -701,6 +720,10 @@ class DCAEngine(BaseBacktestEngine):
             if self.position.is_open:
                 equity = self._process_open_position(i, high, low, close, equity)
 
+            # Check pending indent order fill (when using run_from_config)
+            elif self.pending_indent is not None:
+                equity = self._check_indent_order_fill(i, high, low, close, equity)
+
             # Check for new entry signal
             elif signals[i] != 0:
                 direction = "long" if signals[i] > 0 else "short"
@@ -708,7 +731,10 @@ class DCAEngine(BaseBacktestEngine):
                 # Respect dca_direction setting
                 dca_direction = self.grid_config.direction
                 if dca_direction == "both" or dca_direction == direction:
-                    self._open_dca_position(i, close, direction)
+                    if self.indent_order.enabled:
+                        self._create_indent_order(i, close, direction)
+                    else:
+                        self._open_dca_position(i, close, direction)
                     self.total_signals += 1
 
             # Update equity curve
@@ -736,8 +762,8 @@ class DCAEngine(BaseBacktestEngine):
             trades=model_trades,
             metrics=metrics,
             equity_curve=EquityCurve(
-                timestamps=[int(ohlcv.index[i].timestamp() * 1000) for i in range(len(self.equity_curve))],
-                values=self.equity_curve,
+                timestamps=[ohlcv.index[i].to_pydatetime() for i in range(min(len(ohlcv.index), len(self.equity_curve)))],
+                equity=self.equity_curve,
             ),
             final_equity=equity,
             final_pnl=equity - initial_capital,

@@ -5,8 +5,13 @@ _run_fallback and reports differences in metrics, trades and equity.
 """
 
 import json
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
+
+project_root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(project_root))
 
 import numpy as np
 import pandas as pd
@@ -16,8 +21,8 @@ from backend.backtesting.fast_optimizer import load_candles_fast
 from backend.backtesting.models import BacktestConfig
 from backend.backtesting.strategies import get_strategy
 
-ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = ROOT / "data.sqlite3"
+ROOT = project_root
+DB_PATH = Path(os.environ.get("DATABASE_PATH", str(ROOT / "data.sqlite3")))
 
 
 def to_dataframe(data: np.ndarray) -> pd.DataFrame:

@@ -10,10 +10,11 @@ Simulates real-time trading without real money:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -61,13 +62,13 @@ class PaperOrder:
     side: OrderSide
     order_type: OrderType
     qty: float
-    price: Optional[float] = None  # For limit orders
-    stop_price: Optional[float] = None  # For stop orders
+    price: float | None = None  # For limit orders
+    stop_price: float | None = None  # For stop orders
     status: OrderStatus = OrderStatus.PENDING
     filled_qty: float = 0.0
     filled_price: float = 0.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     reduce_only: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -99,10 +100,10 @@ class PaperPosition:
     leverage: float = 1.0
     unrealized_pnl: float = 0.0
     realized_pnl: float = 0.0
-    liquidation_price: Optional[float] = None
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    opened_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    liquidation_price: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    opened_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def notional_value(self) -> float:
@@ -156,7 +157,7 @@ class PaperTrade:
     price: float
     fee: float
     pnl: float = 0.0
-    executed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    executed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict:
         return {
@@ -185,7 +186,7 @@ class PaperAccount:
     total_trades: int = 0
     winning_trades: int = 0
     losing_trades: int = 0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def available_balance(self) -> float:
@@ -304,10 +305,10 @@ class PaperTradingEngine:
         side: OrderSide,
         qty: float,
         order_type: OrderType = OrderType.MARKET,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        price: float | None = None,
+        stop_price: float | None = None,
         reduce_only: bool = False,
-        leverage: Optional[float] = None,
+        leverage: float | None = None,
     ) -> PaperOrder:
         """
         Place a paper trading order.
@@ -363,7 +364,7 @@ class PaperTradingEngine:
             return False
 
         order.status = OrderStatus.CANCELLED
-        order.updated_at = datetime.now(timezone.utc)
+        order.updated_at = datetime.now(UTC)
 
         if order in self.pending_orders:
             self.pending_orders.remove(order)
@@ -372,8 +373,8 @@ class PaperTradingEngine:
         return True
 
     def close_position(
-        self, symbol: str, qty: Optional[float] = None
-    ) -> Optional[PaperOrder]:
+        self, symbol: str, qty: float | None = None
+    ) -> PaperOrder | None:
         """
         Close a position (fully or partially).
 
@@ -480,7 +481,7 @@ class PaperTradingEngine:
         order.status = OrderStatus.FILLED
         order.filled_qty = order.qty
         order.filled_price = price
-        order.updated_at = datetime.now(timezone.utc)
+        order.updated_at = datetime.now(UTC)
 
         # Create trade record
         trade = PaperTrade(
@@ -626,7 +627,7 @@ class PaperTradingEngine:
         self,
         symbol: str,
         current_price: float,
-        old_price: Optional[float],
+        old_price: float | None,
     ) -> None:
         """Check and execute pending orders."""
         if old_price is None:
@@ -648,10 +649,7 @@ class PaperTradingEngine:
                     order.side == OrderSide.BUY
                     and order.price is not None
                     and current_price <= order.price
-                ):
-                    should_execute = True
-                    exec_price = order.price
-                elif (
+                ) or (
                     order.side == OrderSide.SELL
                     and order.price is not None
                     and current_price >= order.price
@@ -666,9 +664,7 @@ class PaperTradingEngine:
                     order.side == OrderSide.BUY
                     and order.stop_price is not None
                     and current_price >= order.stop_price
-                ):
-                    should_execute = True
-                elif (
+                ) or (
                     order.side == OrderSide.SELL
                     and order.stop_price is not None
                     and current_price <= order.stop_price
@@ -682,9 +678,7 @@ class PaperTradingEngine:
                     order.side == OrderSide.BUY
                     and order.stop_price is not None
                     and current_price <= order.stop_price
-                ):
-                    should_execute = True
-                elif (
+                ) or (
                     order.side == OrderSide.SELL
                     and order.stop_price is not None
                     and current_price >= order.stop_price
@@ -776,14 +770,14 @@ class PaperTradingEngine:
         """Record current equity to curve."""
         self.equity_curve.append(
             (
-                datetime.now(timezone.utc),
+                datetime.now(UTC),
                 self.account.equity,
             )
         )
 
 
 # Singleton instance
-_paper_engine: Optional[PaperTradingEngine] = None
+_paper_engine: PaperTradingEngine | None = None
 
 
 def get_paper_trading_engine(

@@ -1,10 +1,12 @@
 """Test pyramiding strategies"""
 import sys
+
 sys.path.insert(0, r'd:\bybit_strategy_tester_v2')
 
-from backend.backtesting.strategies import list_available_strategies, get_strategy
-import pandas as pd
 import numpy as np
+import pandas as pd
+
+from backend.backtesting.strategies import get_strategy, list_available_strategies
 
 print('Available Strategies:')
 print('=' * 60)

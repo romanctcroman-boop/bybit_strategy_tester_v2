@@ -16,9 +16,9 @@ import asyncio
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -61,8 +61,8 @@ class ServiceInstance:
     metadata: dict[str, Any] = field(default_factory=dict)
     weight: int = 100  # For weighted load balancing
     active_connections: int = 0
-    last_health_check: Optional[datetime] = None
-    registered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_health_check: datetime | None = None
+    registered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     health_check_url: str = "/health"
     tags: list[str] = field(default_factory=list)
 
@@ -108,7 +108,7 @@ class ServiceInstance:
             registered_at=(
                 datetime.fromisoformat(data["registered_at"])
                 if data.get("registered_at")
-                else datetime.now(timezone.utc)
+                else datetime.now(UTC)
             ),
             health_check_url=data.get("health_check_url", "/health"),
             tags=data.get("tags", []),
@@ -147,7 +147,7 @@ class LoadBalancer:
         self,
         instances: list[ServiceInstance],
         strategy: LoadBalancingStrategy = LoadBalancingStrategy.ROUND_ROBIN,
-    ) -> Optional[ServiceInstance]:
+    ) -> ServiceInstance | None:
         """Select instance based on strategy."""
         if not instances:
             return None
@@ -218,7 +218,7 @@ class InMemoryServiceRegistry:
         self._services: dict[str, ServiceDefinition] = {}
         self._instances: dict[str, ServiceInstance] = {}  # instance_id -> instance
         self._load_balancer = LoadBalancer()
-        self._health_check_task: Optional[asyncio.Task[None]] = None
+        self._health_check_task: asyncio.Task[None] | None = None
         self._running = False
 
     async def start(self) -> None:
@@ -244,9 +244,9 @@ class InMemoryServiceRegistry:
         host: str,
         port: int,
         version: str = "1.0.0",
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
         health_check_url: str = "/health",
-        tags: Optional[list[str]] = None,
+        tags: list[str] | None = None,
         weight: int = 100,
     ) -> str:
         """
@@ -302,7 +302,7 @@ class InMemoryServiceRegistry:
     async def discover(
         self,
         service_name: str,
-        tags: Optional[list[str]] = None,
+        tags: list[str] | None = None,
         healthy_only: bool = True,
     ) -> list[ServiceInstance]:
         """
@@ -334,7 +334,7 @@ class InMemoryServiceRegistry:
         self,
         service_name: str,
         strategy: LoadBalancingStrategy = LoadBalancingStrategy.ROUND_ROBIN,
-    ) -> Optional[ServiceInstance]:
+    ) -> ServiceInstance | None:
         """
         Get a single instance using load balancing.
 
@@ -359,7 +359,7 @@ class InMemoryServiceRegistry:
         if not instance:
             return False
 
-        instance.last_health_check = datetime.now(timezone.utc)
+        instance.last_health_check = datetime.now(UTC)
         instance.status = ServiceStatus.HEALTHY
         return True
 
@@ -370,7 +370,7 @@ class InMemoryServiceRegistry:
             return False
 
         instance.status = status
-        instance.last_health_check = datetime.now(timezone.utc)
+        instance.last_health_check = datetime.now(UTC)
         return True
 
     async def _health_check_loop(self) -> None:
@@ -386,7 +386,7 @@ class InMemoryServiceRegistry:
                     if instance.last_health_check:
                         service = self._services.get(instance.service_name)
                         if service:
-                            seconds_since = (datetime.now(timezone.utc) - instance.last_health_check).total_seconds()
+                            seconds_since = (datetime.now(UTC) - instance.last_health_check).total_seconds()
                             if seconds_since > service.deregister_after:
                                 await self.deregister(instance.instance_id)
 
@@ -415,7 +415,7 @@ class InMemoryServiceRegistry:
         except Exception:
             instance.status = ServiceStatus.UNHEALTHY
 
-        instance.last_health_check = datetime.now(timezone.utc)
+        instance.last_health_check = datetime.now(UTC)
 
     def get_all_services(self) -> dict[str, Any]:
         """Get summary of all registered services."""
@@ -440,10 +440,10 @@ class RedisServiceRegistry:
 
     def __init__(self, redis_url: str = "redis://localhost:6379/0"):
         self.redis_url = redis_url
-        self._redis: Optional[Any] = None
+        self._redis: Any | None = None
         self._load_balancer = LoadBalancer()
-        self._local_instance_id: Optional[str] = None
-        self._heartbeat_task: Optional[asyncio.Task[None]] = None
+        self._local_instance_id: str | None = None
+        self._heartbeat_task: asyncio.Task[None] | None = None
         self._running = False
         self._key_prefix = "service_registry:"
 
@@ -488,9 +488,9 @@ class RedisServiceRegistry:
         host: str,
         port: int,
         version: str = "1.0.0",
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
         health_check_url: str = "/health",
-        tags: Optional[list[str]] = None,
+        tags: list[str] | None = None,
         weight: int = 100,
         ttl: int = 30,
     ) -> str:
@@ -585,7 +585,7 @@ class RedisServiceRegistry:
         self,
         service_name: str,
         strategy: LoadBalancingStrategy = LoadBalancingStrategy.ROUND_ROBIN,
-    ) -> Optional[ServiceInstance]:
+    ) -> ServiceInstance | None:
         """Get a single instance using load balancing."""
         instances = await self.discover(service_name, healthy_only=True)
         return self._load_balancer.select(instances, strategy)
@@ -646,7 +646,7 @@ class ServiceClient:
         self.strategy = strategy
         self.timeout = timeout
         self.max_retries = max_retries
-        self._client: Optional[Any] = None
+        self._client: Any | None = None
         self._closed = False
 
     async def __aenter__(self) -> "ServiceClient":
@@ -743,7 +743,7 @@ def create_service_registry(
 # Global Instance
 # ============================================================================
 
-_registry: Optional[InMemoryServiceRegistry | RedisServiceRegistry] = None
+_registry: InMemoryServiceRegistry | RedisServiceRegistry | None = None
 
 
 def get_service_registry() -> InMemoryServiceRegistry | RedisServiceRegistry:

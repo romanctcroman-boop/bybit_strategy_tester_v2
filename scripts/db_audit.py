@@ -25,33 +25,33 @@ def main():
         GROUP BY symbol, interval, market_type
         ORDER BY symbol, interval
     ''')
-    
+
     header = f"{'Symbol':<15} {'TF':<6} {'Type':<8} {'Count':>10} {'Start Date':<20} {'End Date':<20}"
     print(header)
     print('-' * len(header))
-    
+
     for row in cur.fetchall():
         symbol, interval, market_type, cnt, start_dt, end_dt = row
         print(f'{symbol:<15} {interval:<6} {market_type:<8} {cnt:>10,} {start_dt:<20} {end_dt:<20}')
-    
+
     print()
-    
+
     # Check for UNKNOWN intervals
     cur.execute("SELECT COUNT(*) FROM bybit_kline_audit WHERE interval = 'UNKNOWN'")
     unknown_count = cur.fetchone()[0]
     print(f"=== UNKNOWN intervals: {unknown_count} ===")
-    
+
     # Check indexes
     print("\n=== INDEXES ===")
     cur.execute('PRAGMA index_list(bybit_kline_audit)')
     for row in cur.fetchall():
         print(f"  {row}")
-    
+
     # Check WAL mode
     cur.execute('PRAGMA journal_mode')
     journal_mode = cur.fetchone()[0]
     print(f"\n=== Journal Mode: {journal_mode} ===")
-    
+
     # Check market_type distribution
     cur.execute('''
         SELECT market_type, COUNT(*) as cnt
@@ -61,7 +61,7 @@ def main():
     print("\n=== Market Type Distribution ===")
     for row in cur.fetchall():
         print(f"  {row[0]}: {row[1]:,} candles")
-    
+
     conn.close()
 
 if __name__ == "__main__":

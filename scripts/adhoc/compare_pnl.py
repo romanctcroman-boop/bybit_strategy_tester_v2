@@ -100,6 +100,6 @@ else:
             print(f"  Trade {i + 1}: PnL={nb_pnls[i]:.2f}")
 
 # Total PnL comparison
-print(f"\nTotal PnL:")
+print("\nTotal PnL:")
 print(f"  FB: {sum(fb_pnls):.2f}")
 print(f"  NB: {sum(nb_pnls):.2f}")

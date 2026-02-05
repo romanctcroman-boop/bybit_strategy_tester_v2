@@ -1,11 +1,12 @@
 """Quick test for NumbaEngineV2 changes"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
+
+import pandas as pd
 
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df = pd.read_sql("""
@@ -34,14 +35,14 @@ lx = (r > 70).values
 se = (r > 70).values
 sx = (r < 30).values
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 inp = BacktestInput(
     candles=df, long_entries=le, long_exits=lx, short_entries=se, short_exits=sx,
-    symbol='BTCUSDT', interval='60', initial_capital=10000.0, position_size=0.1, 
-    leverage=10, stop_loss=0.02, take_profit=0.04, direction=TradeDirection.BOTH, 
+    symbol='BTCUSDT', interval='60', initial_capital=10000.0, position_size=0.1,
+    leverage=10, stop_loss=0.02, take_profit=0.04, direction=TradeDirection.BOTH,
     taker_fee=0.001, slippage=0.0005, use_bar_magnifier=False
 )
 
@@ -56,6 +57,6 @@ print(f"Match: {'YES' if abs(fb.metrics.net_profit - nb.metrics.net_profit) < 0.
 
 # Check trade details
 if fb.trades and nb.trades:
-    print(f"\nFirst trade comparison:")
+    print("\nFirst trade comparison:")
     print(f"  FB: size={fb.trades[0].size:.6f}, fees={fb.trades[0].fees:.4f}, pnl_pct={fb.trades[0].pnl_pct:.4f}")
     print(f"  NB: size={nb.trades[0].size:.6f}, fees={nb.trades[0].fees:.4f}, pnl_pct={nb.trades[0].pnl_pct:.4f}")

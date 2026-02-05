@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Re-export from main database module to avoid breaking existing imports
 from backend.database import Base, SessionLocal, engine, get_db
 
-__all__ = ["get_db", "SessionLocal", "engine", "Base"]
+__all__ = ["Base", "SessionLocal", "engine", "get_db"]
 
 
 # Deprecated helper - use backend.database.get_db() directly

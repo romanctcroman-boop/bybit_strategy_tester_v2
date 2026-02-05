@@ -13,7 +13,7 @@ import argparse
 import sqlite3
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Add project root to path
@@ -26,15 +26,33 @@ def get_db_path() -> Path:
     return PROJECT_ROOT / "data.sqlite3"
 
 
+def get_blocked_symbols() -> set:
+    """Load blocked symbols (skip auto-reload at startup)."""
+    try:
+        blocked_path = PROJECT_ROOT / "data" / "blocked_tickers.json"
+        if blocked_path.exists():
+            import json
+            with open(blocked_path, encoding="utf-8") as f:
+                data = json.load(f)
+            return {s.upper() for s in data.get("symbols", []) if s}
+    except Exception:
+        pass
+    return set()
+
+
 def get_all_symbols_intervals(conn: sqlite3.Connection) -> list:
-    """Get all unique symbol/interval pairs from database."""
+    """Get all unique symbol/interval pairs from database (excluding blocked)."""
     cursor = conn.cursor()
     cursor.execute("""
         SELECT DISTINCT symbol, interval
         FROM bybit_kline_audit
         ORDER BY symbol, interval
     """)
-    return cursor.fetchall()
+    pairs = cursor.fetchall()
+    blocked = get_blocked_symbols()
+    if blocked:
+        pairs = [(s, i) for s, i in pairs if s.upper() not in blocked]
+    return pairs
 
 
 def get_newest_candle_time(
@@ -56,20 +74,17 @@ def get_newest_candle_time(
 def interval_to_ms(interval: str) -> int:
     """Convert interval string to milliseconds."""
     mapping = {
-        "1": 60_000,
-        "3": 180_000,
-        "5": 300_000,
-        "15": 900_000,
-        "30": 1_800_000,
-        "60": 3_600_000,
-        "120": 7_200_000,
-        "240": 14_400_000,
-        "360": 21_600_000,
-        "720": 43_200_000,
-        "D": 86_400_000,
-        "W": 604_800_000,
+        "1": 60_000, "5": 300_000, "15": 900_000, "30": 1_800_000,
+        "60": 3_600_000, "240": 14_400_000,
+        "D": 86_400_000, "W": 604_800_000, "M": 30 * 86_400_000,
     }
     return mapping.get(interval, 3_600_000)
+
+
+def overlap_candles(interval: str) -> int:
+    """Нахлёст свечей при догрузке: 5 для малых TF, меньше для D/W/M."""
+    mapping = {"1": 5, "5": 5, "15": 5, "30": 5, "60": 5, "240": 4, "D": 3, "W": 2, "M": 2}
+    return mapping.get(interval, 3)
 
 
 def fetch_candles_from_api(
@@ -106,7 +121,7 @@ def fetch_candles_from_api(
                 r.raise_for_status()
                 data = r.json()
                 break
-            except (requests.exceptions.ConnectionError, 
+            except (requests.exceptions.ConnectionError,
                     requests.exceptions.Timeout,
                     requests.exceptions.RequestException) as e:
                 if attempt < max_retries - 1:
@@ -224,7 +239,7 @@ def update_symbol_interval(
         "gap_minutes": 0,
     }
 
-    now_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
+    now_ts = int(datetime.now(UTC).timestamp() * 1000)
     newest_ts = get_newest_candle_time(conn, symbol, interval)
 
     if not newest_ts:
@@ -251,8 +266,9 @@ def update_symbol_interval(
         result["status"] = "would_update"
         return result
 
-    # Fetch and insert new candles
-    start_ts = newest_ts + interval_ms
+    # Fetch with overlap (нахлёст N свечей — избегаем gaps на границе)
+    overlap = overlap_candles(interval)
+    start_ts = newest_ts - (overlap * interval_ms)
     candles = fetch_candles_from_api(symbol, interval, start_ts, now_ts)
 
     if candles:

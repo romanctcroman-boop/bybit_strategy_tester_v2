@@ -9,7 +9,6 @@ Endpoints for simulated trading:
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -36,10 +35,10 @@ class PlaceOrderRequest(BaseModel):
     side: str = Field(..., description="buy or sell")
     qty: float = Field(..., gt=0, description="Order quantity")
     order_type: str = Field(default="market", description="market, limit, stop_market")
-    price: Optional[float] = Field(None, description="Limit price")
-    stop_price: Optional[float] = Field(None, description="Stop trigger price")
+    price: float | None = Field(None, description="Limit price")
+    stop_price: float | None = Field(None, description="Stop trigger price")
     reduce_only: bool = Field(default=False, description="Only reduce position")
-    leverage: Optional[float] = Field(
+    leverage: float | None = Field(
         None, ge=1, le=100, description="Position leverage"
     )
 
@@ -52,7 +51,7 @@ class OrderResponse(BaseModel):
     side: str
     order_type: str
     qty: float
-    price: Optional[float]
+    price: float | None
     status: str
     filled_qty: float
     filled_price: float
@@ -71,9 +70,9 @@ class PositionResponse(BaseModel):
     realized_pnl: float
     notional_value: float
     margin_used: float
-    liquidation_price: Optional[float]
-    stop_loss: Optional[float]
-    take_profit: Optional[float]
+    liquidation_price: float | None
+    stop_loss: float | None
+    take_profit: float | None
 
 
 class AccountResponse(BaseModel):
@@ -117,8 +116,8 @@ class UpdatePriceRequest(BaseModel):
 class SetSLTPRequest(BaseModel):
     """Request to set SL/TP."""
 
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
 
 class ResetAccountRequest(BaseModel):
@@ -175,7 +174,7 @@ async def get_position(symbol: str):
 @router.post("/positions/{symbol}/close")
 async def close_position(
     symbol: str,
-    qty: Optional[float] = Query(None, description="Quantity to close (None = full)"),
+    qty: float | None = Query(None, description="Quantity to close (None = full)"),
 ):
     """Close a position (fully or partially)."""
     engine = get_paper_trading_engine()
@@ -254,7 +253,7 @@ async def place_order(request: PlaceOrderRequest):
 
 @router.get("/orders")
 async def get_orders(
-    status: Optional[str] = Query(None, description="Filter by status"),
+    status: str | None = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=500),
 ):
     """Get orders."""
@@ -301,7 +300,7 @@ async def cancel_order(order_id: str):
 
 @router.get("/trades", response_model=list[TradeResponse])
 async def get_trades(
-    symbol: Optional[str] = Query(None),
+    symbol: str | None = Query(None),
     limit: int = Query(100, ge=1, le=1000),
 ):
     """Get trade history."""

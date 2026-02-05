@@ -11,16 +11,24 @@ Endpoints:
 - Validation
 """
 
+import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+import os
+from datetime import UTC, datetime
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.database.models import Backtest, Strategy, StrategyStatus, StrategyType
+from backend.database.models import (
+    Backtest,
+    Strategy,
+    StrategyStatus,
+    StrategyType,
+    StrategyVersion,
+)
 from backend.database.models.backtest import BacktestStatus as DBBacktestStatus
 from backend.services.strategy_builder import (
     BlockType,
@@ -61,8 +69,11 @@ class CreateStrategyRequest(BaseModel):
     market_type: str = Field(default="linear", pattern="^(spot|linear)$")
     direction: str = Field(default="both", pattern="^(long|short|both)$")
     initial_capital: float = Field(default=10000.0, ge=100)
-    blocks: List[Dict[str, Any]] = Field(default_factory=list)
-    connections: List[Dict[str, Any]] = Field(default_factory=list)
+    leverage: float | None = Field(default=None, ge=1, le=125)
+    position_size: float | None = Field(default=None, ge=0)
+    parameters: dict[str, Any] | None = Field(default=None)
+    blocks: list[dict[str, Any]] = Field(default_factory=list)
+    connections: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AddBlockRequest(BaseModel):
@@ -72,7 +83,7 @@ class AddBlockRequest(BaseModel):
     block_type: str
     x: float = Field(default=0)
     y: float = Field(default=0)
-    parameters: Dict[str, Any] = Field(default_factory=dict)
+    parameters: dict[str, Any] = Field(default_factory=dict)
 
 
 class UpdateBlockRequest(BaseModel):
@@ -80,10 +91,10 @@ class UpdateBlockRequest(BaseModel):
 
     strategy_id: str
     block_id: str
-    parameters: Optional[Dict[str, Any]] = None
-    position_x: Optional[float] = None
-    position_y: Optional[float] = None
-    enabled: Optional[bool] = None
+    parameters: dict[str, Any] | None = None
+    position_x: float | None = None
+    position_y: float | None = None
+    enabled: bool | None = None
 
 
 class ConnectBlocksRequest(BaseModel):
@@ -115,13 +126,107 @@ class GenerateCodeFromDbRequest(BaseModel):
     async_mode: bool = Field(default=False)
 
 
+# === Evaluation Criteria Models ===
+
+
+class MetricConstraint(BaseModel):
+    """Single metric constraint"""
+
+    metric: str = Field(..., description="Metric name (e.g., max_drawdown)")
+    operator: str = Field(..., pattern="^(<=|>=|<|>|==|!=)$", description="Comparison operator")
+    value: float = Field(..., description="Threshold value")
+
+
+class SortSpec(BaseModel):
+    """Single sort specification"""
+
+    metric: str = Field(..., description="Metric to sort by")
+    direction: str = Field(default="desc", pattern="^(asc|desc)$", description="Sort direction")
+
+
+class EvaluationCriteria(BaseModel):
+    """User-defined evaluation criteria for optimization"""
+
+    primary_metric: str = Field(default="sharpe_ratio", description="Main metric to optimize")
+    secondary_metrics: list[str] = Field(
+        default=["win_rate", "max_drawdown", "profit_factor"],
+        description="Metrics to display in results",
+    )
+    constraints: list[MetricConstraint] = Field(
+        default_factory=list, description="Hard constraints that must be satisfied"
+    )
+    sort_order: list[SortSpec] = Field(default_factory=list, description="Multi-level sorting for results")
+    use_composite: bool = Field(default=False, description="Use composite score from weighted metrics")
+    weights: dict[str, float] | None = Field(default=None, description="Metric weights for composite scoring")
+
+
+# === Optimization Config Models ===
+
+
+class ParamRangeSpec(BaseModel):
+    """Single parameter range specification"""
+
+    name: str = Field(..., description="Parameter identifier")
+    param_path: str = Field(..., description="Path in block (e.g., blockId.paramKey)")
+    type: str = Field(default="float", pattern="^(int|float|categorical)$", description="Parameter type")
+    low: float | None = Field(default=None, description="Minimum value")
+    high: float | None = Field(default=None, description="Maximum value")
+    step: float | None = Field(default=None, description="Step size")
+    values: list[Any] | None = Field(default=None, description="Categorical values")
+
+
+class DataPeriod(BaseModel):
+    """Data period configuration"""
+
+    start_date: str = Field(..., description="Start date (YYYY-MM-DD)")
+    end_date: str = Field(..., description="End date (YYYY-MM-DD)")
+    train_split: float = Field(default=0.8, ge=0.5, le=0.95, description="Train/test split ratio")
+    walk_forward: dict[str, int] | None = Field(
+        default=None, description="Walk-forward settings (train_size, test_size, step_size)"
+    )
+
+
+class OptimizationLimits(BaseModel):
+    """Computational limits for optimization"""
+
+    max_trials: int = Field(default=200, ge=10, le=10000, description="Maximum optimization trials")
+    timeout_seconds: int = Field(default=3600, ge=60, le=86400, description="Timeout in seconds")
+    workers: int = Field(default=4, ge=1, le=16, description="Parallel workers")
+
+
+class AdvancedOptions(BaseModel):
+    """Advanced optimization options"""
+
+    early_stopping: bool = Field(default=True, description="Enable early stopping")
+    early_stopping_patience: int = Field(default=20, ge=5, le=100, description="Patience for early stopping")
+    prune_infeasible: bool = Field(default=True, description="Skip infeasible parameter combinations early")
+    warm_start: bool = Field(default=False, description="Start from previous best parameters")
+    random_seed: int | None = Field(default=None, description="Random seed for reproducibility")
+
+
+class OptimizationConfig(BaseModel):
+    """Complete optimization configuration"""
+
+    method: str = Field(
+        default="bayesian",
+        pattern="^(bayesian|grid_search|random_search|walk_forward)$",
+        description="Optimization method",
+    )
+    parameter_ranges: list[ParamRangeSpec] = Field(default_factory=list, description="Parameter search space")
+    data_period: DataPeriod = Field(default_factory=lambda: DataPeriod(start_date="2024-01-01", end_date="2025-01-01"))
+    limits: OptimizationLimits = Field(default_factory=OptimizationLimits)
+    advanced: AdvancedOptions = Field(default_factory=AdvancedOptions)
+    symbol: str = Field(default="BTCUSDT", description="Trading symbol")
+    timeframe: str = Field(default="1h", description="Timeframe")
+
+
 class InstantiateTemplateRequest(BaseModel):
     """Request to instantiate a template"""
 
     template_id: str
-    name: Optional[str] = None
-    symbols: Optional[List[str]] = None
-    timeframe: Optional[str] = None
+    name: str | None = None
+    symbols: list[str] | None = None
+    timeframe: str | None = None
 
 
 class StrategyResponse(BaseModel):
@@ -135,8 +240,11 @@ class StrategyResponse(BaseModel):
     market_type: str = "linear"
     direction: str = "both"
     initial_capital: float | None = None
-    blocks: List[Dict[str, Any]] = Field(default_factory=list)
-    connections: List[Dict[str, Any]] = Field(default_factory=list)
+    leverage: float | None = None
+    position_size: float | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    blocks: list[dict[str, Any]] = Field(default_factory=list)
+    connections: list[dict[str, Any]] = Field(default_factory=list)
     is_builder_strategy: bool = True
     version: int = 1
     created_at: str | None = None
@@ -151,10 +259,45 @@ class BlockResponse(BaseModel):
     name: str
     position_x: float
     position_y: float
-    parameters: Dict[str, Any]
-    inputs: List[Dict[str, Any]]
-    outputs: List[Dict[str, Any]]
+    parameters: dict[str, Any]
+    inputs: list[dict[str, Any]]
+    outputs: list[dict[str, Any]]
     enabled: bool
+
+
+# === Symbols cache (for Properties Symbol dropdown) ===
+
+
+@router.post("/symbols/cache-refresh")
+async def refresh_symbols_cache(request: Request):
+    """
+    Принудительно загрузить тикеры с Bybit (Futures + Spot) и обновить кэш.
+    Вызов по кнопке «Обновить список» в Properties.
+    """
+    try:
+        from backend.services.adapters.bybit import BybitAdapter
+
+        adapter = BybitAdapter(
+            api_key=os.environ.get("BYBIT_API_KEY"),
+            api_secret=os.environ.get("BYBIT_API_SECRET"),
+        )
+        loop = asyncio.get_event_loop()
+        linear = await loop.run_in_executor(
+            None, lambda: adapter.get_symbols_list(category="linear", trading_only=True)
+        )
+        spot = await loop.run_in_executor(None, lambda: adapter.get_symbols_list(category="spot", trading_only=True))
+        if not hasattr(request.app.state, "symbols_cache"):
+            request.app.state.symbols_cache = {}
+        request.app.state.symbols_cache["linear"] = linear or []
+        request.app.state.symbols_cache["spot"] = spot or []
+        return {
+            "ok": True,
+            "linear": len(request.app.state.symbols_cache["linear"]),
+            "spot": len(request.app.state.symbols_cache["spot"]),
+        }
+    except Exception as exc:
+        logger.exception("refresh_symbols_cache failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # === Strategy Endpoints ===
@@ -164,7 +307,10 @@ class BlockResponse(BaseModel):
 async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(get_db)):
     """Create a new strategy builder strategy"""
     try:
-        # Create Strategy in database
+        params = dict(request.parameters) if request.parameters else {}
+        if request.leverage is not None:
+            params["_leverage"] = request.leverage
+
         db_strategy = Strategy(
             name=request.name,
             description=request.description or "",
@@ -173,6 +319,8 @@ async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(
             symbol=request.symbol,
             timeframe=request.timeframe,
             initial_capital=request.initial_capital,
+            position_size=request.position_size if request.position_size is not None else 1.0,
+            parameters=params,
             is_builder_strategy=True,
             builder_graph={
                 "blocks": request.blocks,
@@ -187,7 +335,7 @@ async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(
         db.commit()
         db.refresh(db_strategy)
 
-        # Return response
+        lev = request.leverage if request.leverage is not None else params.get("_leverage")
         return StrategyResponse(
             id=db_strategy.id,
             name=db_strategy.name,
@@ -197,6 +345,9 @@ async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(
             market_type=request.market_type,
             direction=request.direction,
             initial_capital=db_strategy.initial_capital,
+            leverage=float(lev) if lev is not None else None,
+            position_size=db_strategy.position_size,
+            parameters=db_strategy.parameters or {},
             blocks=db_strategy.builder_blocks or [],
             connections=db_strategy.builder_connections or [],
             is_builder_strategy=db_strategy.is_builder_strategy,
@@ -228,12 +379,14 @@ async def get_strategy(strategy_id: str, db: Session = Depends(get_db)):
             detail=f"Strategy Builder strategy {strategy_id} not found",
         )
 
-    # Extract market_type and direction from builder_graph if available
     market_type = "linear"
     direction = "both"
     if db_strategy.builder_graph:
         market_type = db_strategy.builder_graph.get("market_type", "linear")
         direction = db_strategy.builder_graph.get("direction", "both")
+
+    params = db_strategy.parameters or {}
+    lev = params.get("_leverage")
 
     return StrategyResponse(
         id=db_strategy.id,
@@ -244,6 +397,9 @@ async def get_strategy(strategy_id: str, db: Session = Depends(get_db)):
         market_type=market_type,
         direction=direction,
         initial_capital=db_strategy.initial_capital,
+        leverage=float(lev) if lev is not None else None,
+        position_size=db_strategy.position_size,
+        parameters=params,
         blocks=db_strategy.builder_blocks or [],
         connections=db_strategy.builder_connections or [],
         is_builder_strategy=db_strategy.is_builder_strategy,
@@ -315,12 +471,29 @@ async def update_strategy(
         )
 
     try:
-        # Update fields
+        # Save version before update (версионирование)
+        ver = db.query(StrategyVersion).filter(StrategyVersion.strategy_id == strategy_id).count()
+        sv = StrategyVersion(
+            strategy_id=strategy_id,
+            version=ver + 1,
+            graph_json=db_strategy.builder_graph,
+            blocks_json=db_strategy.builder_blocks,
+            connections_json=db_strategy.builder_connections,
+        )
+        db.add(sv)
+
+        params = dict(request.parameters) if request.parameters else {}
+        if request.leverage is not None:
+            params["_leverage"] = request.leverage
+
         db_strategy.name = request.name
         db_strategy.description = request.description or ""
         db_strategy.symbol = request.symbol
         db_strategy.timeframe = request.timeframe
         db_strategy.initial_capital = request.initial_capital
+        if request.position_size is not None:
+            db_strategy.position_size = request.position_size
+        db_strategy.parameters = params
         db_strategy.builder_graph = {
             "blocks": request.blocks,
             "connections": request.connections,
@@ -333,6 +506,7 @@ async def update_strategy(
         db.commit()
         db.refresh(db_strategy)
 
+        lev = request.leverage if request.leverage is not None else params.get("_leverage")
         return StrategyResponse(
             id=db_strategy.id,
             name=db_strategy.name,
@@ -342,6 +516,9 @@ async def update_strategy(
             market_type=request.market_type,
             direction=request.direction,
             initial_capital=db_strategy.initial_capital,
+            leverage=float(lev) if lev is not None else None,
+            position_size=db_strategy.position_size,
+            parameters=db_strategy.parameters or {},
             blocks=db_strategy.builder_blocks or [],
             connections=db_strategy.builder_connections or [],
             is_builder_strategy=db_strategy.is_builder_strategy,
@@ -353,6 +530,85 @@ async def update_strategy(
         logger.error(f"Error updating strategy: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/strategies/{strategy_id}/versions")
+async def get_strategy_versions(strategy_id: str, db: Session = Depends(get_db)):
+    """Список версий стратегии (версионирование)."""
+    db_strategy = (
+        db.query(Strategy)
+        .filter(
+            Strategy.id == strategy_id,
+            Strategy.is_builder_strategy == True,
+            Strategy.is_deleted == False,
+        )
+        .first()
+    )
+    if not db_strategy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy {strategy_id} not found",
+        )
+    versions = (
+        db.query(StrategyVersion)
+        .filter(StrategyVersion.strategy_id == strategy_id)
+        .order_by(StrategyVersion.version.desc())
+        .limit(50)
+        .all()
+    )
+    return {
+        "strategy_id": strategy_id,
+        "versions": [
+            {
+                "id": v.id,
+                "version": v.version,
+                "created_at": v.created_at.isoformat() if v.created_at else None,
+            }
+            for v in versions
+        ],
+    }
+
+
+@router.post("/strategies/{strategy_id}/revert/{version_id}")
+async def revert_strategy_version(
+    strategy_id: str,
+    version_id: int,
+    db: Session = Depends(get_db),
+):
+    """Откат стратегии к указанной версии."""
+    db_strategy = (
+        db.query(Strategy)
+        .filter(
+            Strategy.id == strategy_id,
+            Strategy.is_builder_strategy == True,
+            Strategy.is_deleted == False,
+        )
+        .first()
+    )
+    if not db_strategy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy {strategy_id} not found",
+        )
+    ver = (
+        db.query(StrategyVersion)
+        .filter(
+            StrategyVersion.strategy_id == strategy_id,
+            StrategyVersion.id == version_id,
+        )
+        .first()
+    )
+    if not ver:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version {version_id} not found",
+        )
+    db_strategy.builder_graph = ver.graph_json
+    db_strategy.builder_blocks = ver.blocks_json
+    db_strategy.builder_connections = ver.connections_json
+    db.commit()
+    db.refresh(db_strategy)
+    return {"status": "reverted", "strategy_id": strategy_id, "version_id": version_id}
 
 
 @router.delete("/strategies/{strategy_id}")
@@ -374,14 +630,14 @@ async def delete_strategy(strategy_id: str, db: Session = Depends(get_db)):
         )
 
     db_strategy.is_deleted = True
-    db_strategy.deleted_at = datetime.now(timezone.utc)
+    db_strategy.deleted_at = datetime.now(UTC)
     db.commit()
 
     return {"status": "deleted", "strategy_id": strategy_id}
 
 
 @router.post("/strategies/{strategy_id}/clone", response_model=StrategyResponse)
-async def clone_strategy(strategy_id: str, new_name: Optional[str] = None):
+async def clone_strategy(strategy_id: str, new_name: str | None = None):
     """Clone a strategy"""
     if strategy_id not in strategy_builder.strategies:
         raise HTTPException(
@@ -833,9 +1089,9 @@ async def list_code_templates():
 
 @router.get("/templates")
 async def list_templates(
-    category: Optional[str] = None,
-    difficulty: Optional[str] = None,
-    tags: Optional[str] = None,
+    category: str | None = None,
+    difficulty: str | None = None,
+    tags: str | None = None,
 ):
     """List strategy templates"""
     cat = None
@@ -934,7 +1190,7 @@ async def get_indicator_info(indicator_type: str):
 
 
 @router.post("/import")
-async def import_strategy(data: Dict[str, Any]):
+async def import_strategy(data: dict[str, Any]):
     """Import a strategy from JSON"""
     try:
         graph = StrategyGraph.from_dict(data)
@@ -1021,14 +1277,14 @@ async def create_strategy_version(
         )
 
     graph = strategy_builder.strategies[strategy_id]
-    version_id = f"v_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    version_id = f"v_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
 
     return {
         "strategy_id": strategy_id,
         "version_id": version_id,
         "version_number": 1,
         "note": version_note,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "block_count": len(graph.blocks),
         "connection_count": len(graph.connections),
     }
@@ -1050,7 +1306,7 @@ async def list_strategy_versions(strategy_id: str):
                 "version_id": "v_current",
                 "version_number": 1,
                 "is_current": True,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
             }
         ],
         "total_versions": 1,
@@ -1230,7 +1486,7 @@ async def get_block_parameters(block_id: str):
 
 
 @router.post("/blocks/validate")
-async def validate_block_config(block_config: Dict[str, Any]):
+async def validate_block_config(block_config: dict[str, Any]):
     """Validate a block configuration"""
     block_type = block_config.get("type")
     parameters = block_config.get("parameters", {})
@@ -1261,15 +1517,22 @@ class BacktestRequest(BaseModel):
 
     start_date: datetime = Field(..., description="Backtest start date")
     end_date: datetime = Field(..., description="Backtest end date")
-    engine: Optional[str] = Field(
+    market_type: str = Field(
+        default="linear", description="Market type: 'spot' (TradingView parity) or 'linear' (perpetual futures)"
+    )
+    engine: str | None = Field(
         default=None, description="Engine: fallback_v2, fallback_v3, fallback_v4, numba_v2, gpu_v2, dca"
     )
     commission: float = Field(default=0.0007, description="Commission (0.07% for TradingView parity)")
     slippage: float = Field(default=0.0005, description="Slippage (0.05%)")
     leverage: int = Field(default=10, ge=1, le=125, description="Leverage")
     pyramiding: int = Field(default=1, ge=0, le=99, description="Max concurrent positions")
-    stop_loss: Optional[float] = Field(default=None, ge=0.001, le=0.5, description="Stop loss %")
-    take_profit: Optional[float] = Field(default=None, ge=0.001, le=1.0, description="Take profit %")
+    stop_loss: float | None = Field(default=None, ge=0.001, le=0.5, description="Stop loss %")
+    take_profit: float | None = Field(default=None, ge=0.001, le=1.0, description="Take profit %")
+    no_trade_days: list[int] | None = Field(
+        default=None,
+        description="Weekdays to block (0=Mon … 6=Sun). Unchecked in UI = trade that day.",
+    )
 
     # ===== DCA GRID SETTINGS =====
     dca_enabled: bool = Field(
@@ -1414,10 +1677,12 @@ async def run_backtest_from_builder(
         )
 
     # Extract market_type and direction
-    market_type = "linear"
+    # Priority: request > builder_graph > default
+    market_type = request.market_type or "linear"
     direction = "both"
     if db_strategy.builder_graph:
-        market_type = db_strategy.builder_graph.get("market_type", "linear")
+        if not request.market_type:
+            market_type = db_strategy.builder_graph.get("market_type", "linear")
         direction = db_strategy.builder_graph.get("direction", "both")
 
     try:
@@ -1505,13 +1770,22 @@ async def run_backtest_from_builder(
             # Use block config but ensure enabled flag is set correctly
             final_dca_config["dca_enabled"] = dca_enabled
 
+        # strategy_params for DCAEngine: close_conditions and indent_order from graph (grid/multi_tp are on config)
+        strategy_params_for_dca: dict[str, Any] = {
+            "close_conditions": final_dca_config.get("close_conditions", {}),
+            "indent_order": final_dca_config.get("indent_order", {}),
+        }
+
+        no_trade_days_tuple = (
+            tuple(request.no_trade_days) if request.no_trade_days is not None and len(request.no_trade_days) > 0 else ()
+        )
         backtest_config = BacktestConfig(
             symbol=db_strategy.symbol or "BTCUSDT",
             interval=db_strategy.timeframe or "1h",
             start_date=request.start_date,
             end_date=request.end_date,
             strategy_type=StrategyType.CUSTOM,  # Placeholder, adapter will be used
-            strategy_params={},
+            strategy_params=strategy_params_for_dca,
             initial_capital=db_strategy.initial_capital or 10000.0,
             position_size=1.0,
             leverage=request.leverage,
@@ -1523,6 +1797,7 @@ async def run_backtest_from_builder(
             slippage=request.slippage,
             pyramiding=request.pyramiding,
             market_type=market_type,
+            no_trade_days=no_trade_days_tuple,
             # DCA Grid settings (from merged config)
             dca_enabled=final_dca_config["dca_enabled"],
             dca_direction=final_dca_config["dca_direction"],
@@ -1651,7 +1926,7 @@ async def run_backtest_from_builder(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Backtest failed: {str(e)}",
+            detail=f"Backtest failed: {e!s}",
         )
 
 
@@ -1680,7 +1955,7 @@ async def create_template_from_strategy(
         "description": description,
         "source_strategy": strategy_id,
         "block_count": len(graph.blocks),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -1701,7 +1976,7 @@ async def delete_template(template_id: str):
 
 
 @router.put("/templates/{template_id}")
-async def update_template(template_id: str, update_data: Dict[str, Any]):
+async def update_template(template_id: str, update_data: dict[str, Any]):
     """Update a custom template"""
     if not template_id.startswith("custom_"):
         raise HTTPException(
@@ -1714,7 +1989,7 @@ async def update_template(template_id: str, update_data: Dict[str, Any]):
         "updated": True,
         "name": update_data.get("name", template_id),
         "description": update_data.get("description", ""),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -1742,7 +2017,7 @@ async def share_strategy(
         "share_token": share_token,
         "share_url": f"/api/strategy-builder/shared/{share_token}",
         "is_public": is_public,
-        "expires_at": None if is_public else (datetime.now(timezone.utc).isoformat()),
+        "expires_at": None if is_public else (datetime.now(UTC).isoformat()),
     }
 
 
@@ -1773,7 +2048,7 @@ async def clone_shared_strategy(share_token: str, new_name: str = Query(...)):
         "original_token": share_token,
         "new_strategy_id": new_id,
         "new_name": new_name,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -1818,5 +2093,190 @@ async def get_strategy_statistics(strategy_id: str):
             "depth": 3,
             "branches": 2,
             "loops": 0,
+        },
+    }
+
+
+# === Evaluation Criteria Endpoints ===
+
+
+@router.post("/strategies/{strategy_id}/criteria")
+async def set_evaluation_criteria(
+    strategy_id: str,
+    criteria: EvaluationCriteria,
+    db: Session = Depends(get_db),
+):
+    """Set evaluation criteria for a strategy"""
+    db_strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not db_strategy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy {strategy_id} not found",
+        )
+
+    # Store criteria in builder_graph
+    if db_strategy.builder_graph is None:
+        db_strategy.builder_graph = {}
+
+    db_strategy.builder_graph["evaluation_criteria"] = criteria.model_dump()
+    db_strategy.updated_at = datetime.now(UTC)
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": "Evaluation criteria saved",
+        "criteria": criteria.model_dump(),
+    }
+
+
+@router.get("/strategies/{strategy_id}/criteria")
+async def get_evaluation_criteria(
+    strategy_id: str,
+    db: Session = Depends(get_db),
+):
+    """Get evaluation criteria for a strategy"""
+    db_strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not db_strategy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy {strategy_id} not found",
+        )
+
+    # Get criteria from builder_graph or return defaults
+    criteria_data = db_strategy.builder_graph.get("evaluation_criteria") if db_strategy.builder_graph else None
+
+    if criteria_data:
+        return EvaluationCriteria(**criteria_data)
+
+    # Return default criteria
+    return EvaluationCriteria()
+
+
+# === Optimization Config Endpoints ===
+
+
+@router.post("/strategies/{strategy_id}/optimization-config")
+async def set_optimization_config(
+    strategy_id: str,
+    config: OptimizationConfig,
+    db: Session = Depends(get_db),
+):
+    """Set optimization configuration for a strategy"""
+    db_strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not db_strategy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy {strategy_id} not found",
+        )
+
+    # Store config in builder_graph
+    if db_strategy.builder_graph is None:
+        db_strategy.builder_graph = {}
+
+    db_strategy.builder_graph["optimization_config"] = config.model_dump()
+    db_strategy.updated_at = datetime.now(UTC)
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": "Optimization configuration saved",
+        "config": config.model_dump(),
+    }
+
+
+@router.get("/strategies/{strategy_id}/optimization-config")
+async def get_optimization_config(
+    strategy_id: str,
+    db: Session = Depends(get_db),
+):
+    """Get optimization configuration for a strategy"""
+    db_strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+    if not db_strategy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy {strategy_id} not found",
+        )
+
+    # Get config from builder_graph or return defaults
+    config_data = db_strategy.builder_graph.get("optimization_config") if db_strategy.builder_graph else None
+
+    if config_data:
+        return OptimizationConfig(**config_data)
+
+    # Return default config
+    return OptimizationConfig()
+
+
+@router.get("/metrics/available")
+async def get_available_metrics():
+    """Get list of all available metrics for evaluation criteria"""
+    return {
+        "metrics": {
+            "performance": {
+                "label": "Performance",
+                "metrics": {
+                    "total_return": {"label": "Total Return", "unit": "%", "direction": "maximize"},
+                    "cagr": {"label": "CAGR", "unit": "%", "direction": "maximize"},
+                    "sharpe_ratio": {"label": "Sharpe Ratio", "unit": "", "direction": "maximize"},
+                    "sortino_ratio": {"label": "Sortino Ratio", "unit": "", "direction": "maximize"},
+                    "calmar_ratio": {"label": "Calmar Ratio", "unit": "", "direction": "maximize"},
+                },
+            },
+            "risk": {
+                "label": "Risk",
+                "metrics": {
+                    "max_drawdown": {"label": "Max Drawdown", "unit": "%", "direction": "minimize"},
+                    "avg_drawdown": {"label": "Avg Drawdown", "unit": "%", "direction": "minimize"},
+                    "volatility": {"label": "Volatility", "unit": "%", "direction": "minimize"},
+                    "var_95": {"label": "VaR 95%", "unit": "%", "direction": "minimize"},
+                },
+            },
+            "trade_quality": {
+                "label": "Trade Quality",
+                "metrics": {
+                    "win_rate": {"label": "Win Rate", "unit": "%", "direction": "maximize"},
+                    "profit_factor": {"label": "Profit Factor", "unit": "", "direction": "maximize"},
+                    "avg_win": {"label": "Avg Win", "unit": "%", "direction": "maximize"},
+                    "avg_loss": {"label": "Avg Loss", "unit": "%", "direction": "minimize"},
+                    "expectancy": {"label": "Expectancy", "unit": "$", "direction": "maximize"},
+                },
+            },
+            "activity": {
+                "label": "Activity",
+                "metrics": {
+                    "total_trades": {"label": "Total Trades", "unit": "", "direction": "neutral"},
+                    "trades_per_month": {"label": "Trades/Month", "unit": "", "direction": "neutral"},
+                    "avg_trade_duration": {"label": "Avg Duration", "unit": "bars", "direction": "neutral"},
+                },
+            },
+        },
+        "presets": {
+            "conservative": {
+                "label": "Conservative",
+                "description": "Low risk, moderate returns",
+                "primary_metric": "sortino_ratio",
+                "constraints": [
+                    {"metric": "max_drawdown", "operator": "<=", "value": 10},
+                    {"metric": "total_trades", "operator": ">=", "value": 30},
+                ],
+            },
+            "aggressive": {
+                "label": "Aggressive",
+                "description": "High returns, higher risk tolerance",
+                "primary_metric": "total_return",
+                "constraints": [
+                    {"metric": "max_drawdown", "operator": "<=", "value": 25},
+                    {"metric": "total_trades", "operator": ">=", "value": 20},
+                ],
+            },
+            "balanced": {
+                "label": "Balanced",
+                "description": "Good risk-adjusted returns",
+                "primary_metric": "sharpe_ratio",
+                "constraints": [
+                    {"metric": "max_drawdown", "operator": "<=", "value": 15},
+                    {"metric": "total_trades", "operator": ">=", "value": 50},
+                ],
+            },
         },
     }

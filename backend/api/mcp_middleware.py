@@ -7,7 +7,7 @@ SECURITY: Uses constant-time comparison for auth token verification.
 
 import hmac
 import logging
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -35,8 +35,8 @@ class UnifiedMcpMiddleware(BaseHTTPMiddleware):
         self,
         app,
         require_auth: bool = False,
-        auth_token: Optional[str] = None,
-        allowed_origins: Optional[list[str]] = None,
+        auth_token: str | None = None,
+        allowed_origins: list[str] | None = None,
         **kwargs,
     ):
         super().__init__(app)

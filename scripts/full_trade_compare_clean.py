@@ -11,7 +11,7 @@ This is a clean, standalone script to avoid editing the corrupted original.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -46,7 +46,7 @@ def to_dataframe(data: np.ndarray) -> pd.DataFrame:
     return df
 
 
-def trade_to_dict(t: Any) -> Dict[str, Any]:
+def trade_to_dict(t: Any) -> dict[str, Any]:
     try:
         return t.model_dump() if hasattr(t, "model_dump") else t.dict()
     except Exception:
@@ -56,7 +56,7 @@ def trade_to_dict(t: Any) -> Dict[str, Any]:
             return t.__dict__ if hasattr(t, "__dict__") else dict(t)
 
 
-def _parse_dt(v: Any) -> Optional[datetime]:
+def _parse_dt(v: Any) -> datetime | None:
     if v is None:
         return None
     if isinstance(v, datetime):
@@ -75,10 +75,10 @@ def _parse_dt(v: Any) -> Optional[datetime]:
 
 
 def pairwise_match(
-    fb_trades: List[Dict[str, Any]],
-    vb_trades: List[Dict[str, Any]],
+    fb_trades: list[dict[str, Any]],
+    vb_trades: list[dict[str, Any]],
     max_time_diff_seconds: int = 86400,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     for t in fb_trades:
         t["entry_dt"] = _parse_dt(t.get("entry_time"))
         t["exit_dt"] = _parse_dt(t.get("exit_time"))
@@ -87,15 +87,15 @@ def pairwise_match(
         t["exit_dt"] = _parse_dt(t.get("exit_time"))
 
     used_vb = set()
-    matches: List[Dict[str, Any]] = []
+    matches: list[dict[str, Any]] = []
 
-    def num(x: Any) -> Optional[float]:
+    def num(x: Any) -> float | None:
         try:
             return float(x)
         except Exception:
             return None
 
-    def pct_diff(a: Optional[float], b: Optional[float]) -> Optional[float]:
+    def pct_diff(a: float | None, b: float | None) -> float | None:
         if a is None or b is None:
             return None
         if b == 0:

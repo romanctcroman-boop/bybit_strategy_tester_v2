@@ -19,9 +19,9 @@ Endpoints:
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from itertools import product
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -64,7 +64,7 @@ def _normalize_interval(interval: str) -> str:
     return interval
 
 
-def generate_param_values(spec: "ParamRangeSpec") -> List[Any]:
+def generate_param_values(spec: "ParamRangeSpec") -> list[Any]:
     """
     Generate parameter values from a ParamRangeSpec.
 
@@ -153,17 +153,17 @@ class ParamRangeSpec(BaseModel):
     """
 
     type: str = Field(..., description="Parameter type: int, float, categorical")
-    low: Optional[float] = Field(None, description="Minimum value (can be negative)")
-    high: Optional[float] = Field(None, description="Maximum value (can be negative)")
-    step: Optional[float] = Field(
+    low: float | None = Field(None, description="Minimum value (can be negative)")
+    high: float | None = Field(None, description="Maximum value (can be negative)")
+    step: float | None = Field(
         None,
         description="Step size for grid search (default: 1 for int, 0.01 for float)",
     )
-    precision: Optional[int] = Field(
+    precision: int | None = Field(
         None,
         description="Decimal precision for rounding (e.g., 2 for 0.01, 4 for 0.0001)",
     )
-    values: Optional[List[Any]] = Field(None, description="Explicit values (for categorical or grid)")
+    values: list[Any] | None = Field(None, description="Explicit values (for categorical or grid)")
     log: bool = Field(False, description="Use log scale for sampling")
 
 
@@ -179,7 +179,7 @@ class CreateOptimizationRequest(BaseModel):
     timeframe: str = Field("1h", description="Candle timeframe")
     start_date: str = Field(..., description="Start date (YYYY-MM-DD)")
     end_date: str = Field(..., description="End date (YYYY-MM-DD)")
-    param_ranges: Dict[str, ParamRangeSpec] = Field(..., description="Parameter search space")
+    param_ranges: dict[str, ParamRangeSpec] = Field(..., description="Parameter search space")
     metric: str = Field("sharpe_ratio", description="Metric to optimize")
     initial_capital: float = Field(10000.0, description="Starting capital")
 
@@ -189,7 +189,7 @@ class CreateOptimizationRequest(BaseModel):
     test_size: int = Field(60, description="Testing window days (Walk-Forward)")
     step_size: int = Field(30, description="Step size days (Walk-Forward)")
     n_jobs: int = Field(1, description="Parallel jobs")
-    random_state: Optional[int] = Field(None, description="Random seed")
+    random_state: int | None = Field(None, description="Random seed")
 
 
 class OptimizationResponse(BaseModel):
@@ -200,19 +200,19 @@ class OptimizationResponse(BaseModel):
     optimization_type: str
     symbol: str
     timeframe: str
-    start_date: Optional[str]
-    end_date: Optional[str]
+    start_date: str | None
+    end_date: str | None
     metric: str
     status: str
     progress: float
-    best_params: Optional[Dict[str, Any]]
-    best_score: Optional[float]
+    best_params: dict[str, Any] | None
+    best_score: float | None
     total_combinations: int
     evaluated_combinations: int
     created_at: str
-    started_at: Optional[str]
-    completed_at: Optional[str]
-    error_message: Optional[str]
+    started_at: str | None
+    completed_at: str | None
+    error_message: str | None
 
 
 class OptimizationResultsResponse(BaseModel):
@@ -222,12 +222,12 @@ class OptimizationResultsResponse(BaseModel):
     optimization_type: str
     status: str
     metric: str
-    best_params: Optional[Dict[str, Any]]
-    best_score: Optional[float]
-    all_results: Optional[List[Dict[str, Any]]]
-    param_importance: Optional[Dict[str, float]]
-    convergence: Optional[List[float]]
-    duration_seconds: Optional[float]
+    best_params: dict[str, Any] | None
+    best_score: float | None
+    all_results: list[dict[str, Any]] | None
+    param_importance: dict[str, float] | None
+    convergence: list[float] | None
+    duration_seconds: float | None
 
 
 class OptimizationStatusResponse(BaseModel):
@@ -238,9 +238,9 @@ class OptimizationStatusResponse(BaseModel):
     progress: float
     evaluated_combinations: int
     total_combinations: int
-    current_best_score: Optional[float]
-    current_best_params: Optional[Dict[str, Any]]
-    eta_seconds: Optional[float]
+    current_best_score: float | None
+    current_best_params: dict[str, Any] | None
+    eta_seconds: float | None
 
 
 # =============================================================================
@@ -290,7 +290,7 @@ def parse_optimization_type(type_str: str) -> OptimizationType:
     return type_map.get(type_str.lower(), OptimizationType.GRID_SEARCH)
 
 
-def calculate_total_combinations(param_ranges: Dict[str, ParamRangeSpec], opt_type: OptimizationType) -> int:
+def calculate_total_combinations(param_ranges: dict[str, ParamRangeSpec], opt_type: OptimizationType) -> int:
     """Calculate total parameter combinations."""
     if opt_type in (OptimizationType.BAYESIAN, OptimizationType.RANDOM_SEARCH):
         return 0
@@ -380,7 +380,7 @@ async def create_optimization(
 async def launch_optimization_task(
     optimization_id: int,
     opt_type: OptimizationType,
-    strategy_config: Dict[str, Any],
+    strategy_config: dict[str, Any],
     request: CreateOptimizationRequest,
 ):
     """Launch the appropriate Celery task for optimization."""
@@ -509,11 +509,11 @@ async def launch_optimization_task(
             db.close()
 
 
-@router.get("/", response_model=List[OptimizationResponse])
+@router.get("/", response_model=list[OptimizationResponse])
 async def list_optimizations(
-    strategy_id: Optional[int] = Query(None, description="Filter by strategy"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    optimization_type: Optional[str] = Query(None, description="Filter by type"),
+    strategy_id: int | None = Query(None, description="Filter by strategy"),
+    status: str | None = Query(None, description="Filter by status"),
+    optimization_type: str | None = Query(None, description="Filter by type"),
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -557,7 +557,7 @@ async def get_optimization_status(optimization_id: int, db: Session = Depends(ge
 
     eta_seconds = None
     if optimization.status == OptimizationStatus.RUNNING and optimization.started_at and optimization.progress > 0:
-        elapsed = (datetime.now(timezone.utc) - optimization.started_at).total_seconds()
+        elapsed = (datetime.now(UTC) - optimization.started_at).total_seconds()
         eta_seconds = elapsed / optimization.progress * (1 - optimization.progress)
 
     return OptimizationStatusResponse(
@@ -611,6 +611,276 @@ async def get_optimization_results(optimization_id: int, db: Session = Depends(g
     )
 
 
+# =============================================================================
+# Results Viewer API Endpoints (P0 - Optimization Results Viewer)
+# =============================================================================
+
+
+class ConvergenceDataResponse(BaseModel):
+    """Convergence chart data."""
+
+    trials: list[int]
+    best_scores: list[float]
+    all_scores: list[float]
+    metric: str
+
+
+class SensitivityDataResponse(BaseModel):
+    """Parameter sensitivity data."""
+
+    param_name: str
+    values: list[float]
+    scores: list[float]
+    metric: str
+
+
+class ApplyParamsRequest(BaseModel):
+    """Request to apply optimization result parameters."""
+
+    strategy_id: int
+    params: dict[str, Any]
+
+
+class ApplyParamsResponse(BaseModel):
+    """Response after applying parameters."""
+
+    success: bool
+    message: str
+    strategy_id: int
+    applied_params: dict[str, Any]
+
+
+@router.get("/{optimization_id}/charts/convergence", response_model=ConvergenceDataResponse)
+async def get_convergence_data(optimization_id: int, db: Session = Depends(get_db)):
+    """Get convergence chart data for visualization."""
+    optimization = db.query(Optimization).filter(Optimization.id == optimization_id).first()
+    if not optimization:
+        raise HTTPException(status_code=404, detail="Optimization not found")
+
+    if optimization.status != OptimizationStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Optimization not completed. Status: {optimization.status.value}",
+        )
+
+    results = optimization.results or {}
+    all_trials = results.get("all_trials") or results.get("top_10") or []
+
+    # Build convergence data
+    trials = []
+    best_scores = []
+    all_scores = []
+    best_so_far = float("-inf")
+
+    for i, trial in enumerate(all_trials):
+        score = float(trial.get(optimization.metric, trial.get("sharpe_ratio", 0)))
+        trials.append(i + 1)
+        all_scores.append(score)
+        if score > best_so_far:
+            best_so_far = score
+        best_scores.append(best_so_far)
+
+    # Also try convergence from results
+    if results.get("convergence"):
+        best_scores = results["convergence"]
+        trials = list(range(1, len(best_scores) + 1))
+
+    return ConvergenceDataResponse(
+        trials=trials,
+        best_scores=best_scores,
+        all_scores=all_scores,
+        metric=optimization.metric or "sharpe_ratio",
+    )
+
+
+@router.get("/{optimization_id}/charts/sensitivity/{param_name}", response_model=SensitivityDataResponse)
+async def get_sensitivity_data(optimization_id: int, param_name: str, db: Session = Depends(get_db)):
+    """Get parameter sensitivity data for visualization."""
+    optimization = db.query(Optimization).filter(Optimization.id == optimization_id).first()
+    if not optimization:
+        raise HTTPException(status_code=404, detail="Optimization not found")
+
+    if optimization.status != OptimizationStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Optimization not completed. Status: {optimization.status.value}",
+        )
+
+    results = optimization.results or {}
+    all_trials = results.get("all_trials") or results.get("top_10") or []
+
+    # Extract parameter values and scores
+    values = []
+    scores = []
+
+    for trial in all_trials:
+        if param_name in trial:
+            try:
+                val = float(trial[param_name])
+                score = float(trial.get(optimization.metric, trial.get("sharpe_ratio", 0)))
+                values.append(val)
+                scores.append(score)
+            except (ValueError, TypeError):
+                continue
+
+    if not values:
+        raise HTTPException(status_code=404, detail=f"Parameter '{param_name}' not found in results")
+
+    return SensitivityDataResponse(
+        param_name=param_name,
+        values=values,
+        scores=scores,
+        metric=optimization.metric or "sharpe_ratio",
+    )
+
+
+@router.post("/{optimization_id}/apply/{result_rank}", response_model=ApplyParamsResponse)
+async def apply_optimization_result(
+    optimization_id: int,
+    result_rank: int,
+    strategy_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Apply parameters from a specific optimization result to a strategy."""
+    optimization = db.query(Optimization).filter(Optimization.id == optimization_id).first()
+    if not optimization:
+        raise HTTPException(status_code=404, detail="Optimization not found")
+
+    if optimization.status != OptimizationStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Optimization not completed. Status: {optimization.status.value}",
+        )
+
+    # Get results and find the one with matching rank
+    results = optimization.results or {}
+    all_trials = results.get("all_trials") or results.get("top_10") or []
+
+    if result_rank < 1 or result_rank > len(all_trials):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid rank. Must be between 1 and {len(all_trials)}",
+        )
+
+    # Sort by metric to ensure correct ranking
+    metric = optimization.metric or "sharpe_ratio"
+    sorted_trials = sorted(all_trials, key=lambda x: float(x.get(metric, 0)), reverse=True)
+    selected_trial = sorted_trials[result_rank - 1]
+
+    # Extract parameters (exclude metrics)
+    metric_keys = {
+        "rank",
+        "sharpe_ratio",
+        "total_return",
+        "win_rate",
+        "max_drawdown",
+        "total_trades",
+        "profit_factor",
+        "expectancy",
+        "cagr",
+        "sortino_ratio",
+        "calmar_ratio",
+    }
+    params = {k: v for k, v in selected_trial.items() if k not in metric_keys and not k.startswith("_")}
+
+    # Target strategy ID
+    target_strategy_id = strategy_id or optimization.strategy_id
+
+    # Load and update strategy
+    strategy = db.query(Strategy).filter(Strategy.id == target_strategy_id).first()
+    if not strategy:
+        raise HTTPException(status_code=404, detail=f"Strategy {target_strategy_id} not found")
+
+    # Update strategy params
+    if strategy.config:
+        if isinstance(strategy.config, dict):
+            strategy.config["params"] = params
+        else:
+            strategy.config = {"params": params}
+    else:
+        strategy.config = {"params": params}
+
+    db.commit()
+
+    logger.info(
+        f"Applied params from optimization {optimization_id} rank #{result_rank} to strategy {target_strategy_id}"
+    )
+
+    return ApplyParamsResponse(
+        success=True,
+        message=f"Applied rank #{result_rank} parameters to strategy {target_strategy_id}",
+        strategy_id=target_strategy_id,
+        applied_params=params,
+    )
+
+
+@router.get("/{optimization_id}/results/paginated")
+async def get_paginated_results(
+    optimization_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    sort_by: str = Query("sharpe_ratio"),
+    sort_order: str = Query("desc"),
+    min_sharpe: float | None = None,
+    max_drawdown: float | None = None,
+    min_win_rate: float | None = None,
+    min_trades: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Get paginated and filtered optimization results."""
+    optimization = db.query(Optimization).filter(Optimization.id == optimization_id).first()
+    if not optimization:
+        raise HTTPException(status_code=404, detail="Optimization not found")
+
+    if optimization.status != OptimizationStatus.COMPLETED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Optimization not completed. Status: {optimization.status.value}",
+        )
+
+    results = optimization.results or {}
+    all_trials = results.get("all_trials") or results.get("top_10") or []
+
+    # Apply filters
+    filtered = all_trials
+    if min_sharpe is not None:
+        filtered = [t for t in filtered if float(t.get("sharpe_ratio", 0)) >= min_sharpe]
+    if max_drawdown is not None:
+        filtered = [t for t in filtered if float(t.get("max_drawdown", 0)) <= max_drawdown]
+    if min_win_rate is not None:
+        filtered = [t for t in filtered if float(t.get("win_rate", 0)) >= min_win_rate]
+    if min_trades is not None:
+        filtered = [t for t in filtered if int(t.get("total_trades", 0)) >= min_trades]
+
+    # Sort
+    try:
+        reverse = sort_order.lower() == "desc"
+        filtered = sorted(filtered, key=lambda x: float(x.get(sort_by, 0)), reverse=reverse)
+    except (ValueError, TypeError):
+        pass
+
+    # Add ranks
+    for i, trial in enumerate(filtered):
+        trial["rank"] = i + 1
+
+    # Paginate
+    total = len(filtered)
+    total_pages = (total + page_size - 1) // page_size
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_results = filtered[start:end]
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "results": page_results,
+        "optimization_id": optimization_id,
+        "metric": optimization.metric,
+    }
+
+
 @router.delete("/{optimization_id}")
 async def cancel_optimization(optimization_id: int, db: Session = Depends(get_db)):
     """Cancel a running or queued optimization."""
@@ -629,7 +899,7 @@ async def cancel_optimization(optimization_id: int, db: Session = Depends(get_db
         )
 
     optimization.status = OptimizationStatus.CANCELLED
-    optimization.completed_at = datetime.now(timezone.utc)
+    optimization.completed_at = datetime.now(UTC)
     db.commit()
 
     logger.info(f"Cancelled optimization {optimization_id}")
@@ -1235,6 +1505,86 @@ def _rank_by_multi_criteria(results: list, selection_criteria: list) -> list:
     return sorted_results
 
 
+def _compute_weighted_composite(result: dict, weights: dict) -> float:
+    """Compute weighted composite score from evaluation criteria weights.
+
+    Args:
+        result: Optimization result dict with metrics
+        weights: Dict mapping metric names to weights (should sum to 1.0)
+            Example: {"profit_factor": 0.4, "sharpe_ratio": 0.3, "max_drawdown": 0.3}
+
+    Returns:
+        Weighted composite score (higher is better)
+    """
+    if not weights:
+        return 0.0
+
+    score = 0.0
+
+    for metric, weight in weights.items():
+        value = result.get(metric, 0) or 0
+
+        # Normalize based on metric type
+        if metric == "profit_factor":
+            # PF: 0-3 is typical range, cap at 5
+            normalized = min(value, 5.0) / 5.0
+        elif metric == "sharpe_ratio":
+            # Sharpe: -2 to +3 typical, normalize to 0-1
+            normalized = (min(max(value, -2.0), 3.0) + 2.0) / 5.0
+        elif metric == "max_drawdown":
+            # Drawdown: 0-100%, lower is better, invert
+            normalized = 1.0 - min(abs(value), 100.0) / 100.0
+        elif metric == "win_rate":
+            # Win rate: 0-100%
+            normalized = min(value, 100.0) / 100.0
+        elif metric == "total_return":
+            # Return: -100% to +500% typical
+            normalized = (min(max(value, -100.0), 500.0) + 100.0) / 600.0
+        elif metric == "calmar_ratio":
+            # Calmar: -5 to +10 typical
+            normalized = (min(max(value, -5.0), 10.0) + 5.0) / 15.0
+        elif metric == "recovery_factor":
+            # Recovery: 0-10 typical
+            normalized = min(value, 10.0) / 10.0
+        else:
+            # Unknown metric - use raw value capped at 0-1
+            normalized = min(max(value, 0.0), 1.0)
+
+        score += normalized * weight
+
+    return round(score, 4)
+
+
+def _apply_custom_sort_order(results: list, sort_order: list[dict]) -> list:
+    """Apply custom multi-level sorting from frontend.
+
+    Sort order format: [{"metric": "sharpe_ratio", "direction": "desc"}, ...]
+    Direction: "asc" (ascending) or "desc" (descending)
+    """
+    if not results or not sort_order:
+        return results
+
+    # Build sort key function for multi-level sorting
+    def get_sort_key(result):
+        keys = []
+        for level in sort_order:
+            metric = level.get("metric", "score")
+            direction = level.get("direction", "desc")
+
+            value = result.get(metric, 0) or 0
+
+            # For numeric values, handle direction
+            if isinstance(value, (int, float)):
+                # Descending: negate so larger values come first
+                keys.append(-value if direction == "desc" else value)
+            else:
+                keys.append(value)
+
+        return tuple(keys)
+
+    return sorted(results, key=get_sort_key)
+
+
 def _generate_smart_recommendations(results: list) -> dict:
     """
     Генерирует умные рекомендации на основе результатов оптимизации.
@@ -1353,6 +1703,52 @@ def _passes_filters(result: dict, request_params: dict) -> bool:
         win_rate_fraction = win_rate_pct / 100.0
         if win_rate_fraction < min_wr:
             return False
+
+    # Dynamic constraints from frontend EvaluationCriteriaPanel
+    constraints = request_params.get("constraints")
+    if constraints and not _passes_dynamic_constraints(result, constraints):
+        return False
+
+    return True
+
+
+def _passes_dynamic_constraints(result: dict, constraints: list[dict]) -> bool:
+    """Check if result passes all dynamic constraints from frontend.
+
+    Constraint format: {"metric": "max_drawdown", "operator": "<=", "value": 15}
+    Supported operators: <=, >=, <, >, ==, !=
+    """
+    for constraint in constraints:
+        metric = constraint.get("metric")
+        operator = constraint.get("operator")
+        threshold = constraint.get("value")
+
+        if not all([metric, operator, threshold is not None]):
+            continue
+
+        # Get metric value from result
+        value = result.get(metric, 0) or 0
+
+        # For percentage metrics stored as negative (like max_drawdown), use absolute
+        if metric in ("max_drawdown", "avg_drawdown") and value < 0:
+            value = abs(value)
+
+        # Apply operator
+        try:
+            if operator == "<=" and value > threshold:
+                return False
+            elif operator == ">=" and value < threshold:
+                return False
+            elif operator == "<" and value >= threshold:
+                return False
+            elif operator == ">" and value <= threshold:
+                return False
+            elif operator == "==" and value != threshold:
+                return False
+            elif operator == "!=" and value == threshold:
+                return False
+        except (TypeError, ValueError):
+            continue
 
     return True
 
@@ -1474,16 +1870,16 @@ class SyncOptimizationRequest(BaseModel):
     fixed_amount: float = 100.0
     leverage: int = 10
     initial_capital: float = 10000.0
-    commission: float = 0.0006
+    commission: float = 0.0007  # 0.07% TradingView parity
 
     # Пространство параметров для оптимизации RSI (списки значений)
-    rsi_period_range: List[int] = [7, 14, 21]
-    rsi_overbought_range: List[int] = [70, 75, 80]
-    rsi_oversold_range: List[int] = [20, 25, 30]
+    rsi_period_range: list[int] = [7, 14, 21]
+    rsi_overbought_range: list[int] = [70, 75, 80]
+    rsi_oversold_range: list[int] = [20, 25, 30]
 
     # Пространство параметров TP/SL (списки значений в процентах)
-    stop_loss_range: List[float] = [10.0]  # По умолчанию одно значение
-    take_profit_range: List[float] = [1.5]  # По умолчанию одно значение
+    stop_loss_range: list[float] = [10.0]  # По умолчанию одно значение
+    take_profit_range: list[float] = [1.5]  # По умолчанию одно значение
 
     # Метрика для оптимизации (основная, для обратной совместимости)
     optimize_metric: str = "net_profit"
@@ -1491,7 +1887,7 @@ class SyncOptimizationRequest(BaseModel):
     # Новая система: массив критериев отбора
     # net_profit - Total P&L (больше = лучше)
     # max_drawdown - Max Equity Drawdown (меньше = лучше)
-    selection_criteria: List[str] = ["net_profit", "max_drawdown"]
+    selection_criteria: list[str] = ["net_profit", "max_drawdown"]
 
     # Выбор движка бэктеста
     # auto - автоматический выбор (GPU > Numba > Fallback)
@@ -1514,11 +1910,34 @@ class SyncOptimizationRequest(BaseModel):
     # linear - перпетуальные фьючерсы (для реальной торговли)
     market_type: str = "linear"
 
+    # Гибридный pipeline: после оптимизации на Numba/GPU перепроверить best_params на FallbackV4
+    # Даёт эталонные метрики для аудита (при Numba паритет 100%, drift = 0)
+    validate_best_with_fallback: bool = False
+
+    # Market Regime Filter (P1 Regime integration)
+    # При включении используется FallbackV4 (Numba не поддерживает regime)
+    market_regime_enabled: bool = False
+    market_regime_filter: str = "not_volatile"  # all|trending|ranging|volatile|not_volatile
+    market_regime_lookback: int = 50
+
+    # === NEW: Evaluation Criteria from Frontend ===
+    # Dynamic constraints from EvaluationCriteriaPanel
+    # Format: [{"metric": "max_drawdown", "operator": "<=", "value": 15}, ...]
+    constraints: list[dict] | None = None
+
+    # Multi-level sort order
+    # Format: [{"metric": "sharpe_ratio", "direction": "desc"}, ...]
+    sort_order: list[dict] | None = None
+
+    # Composite scoring (weighted metrics)
+    use_composite: bool = False
+    weights: dict[str, float] | None = None
+
 
 class OptimizationResult(BaseModel):
     """Результат одной комбинации параметров"""
 
-    params: Dict[str, Any]
+    params: dict[str, Any]
     score: float
     total_return: float
     sharpe_ratio: float
@@ -1530,20 +1949,20 @@ class OptimizationResult(BaseModel):
 class SmartRecommendation(BaseModel):
     """Одна рекомендация"""
 
-    params: Optional[Dict[str, Any]] = None
-    total_return: Optional[float] = None
-    max_drawdown: Optional[float] = None
-    sharpe_ratio: Optional[float] = None
-    win_rate: Optional[float] = None
-    total_trades: Optional[int] = None
+    params: dict[str, Any] | None = None
+    total_return: float | None = None
+    max_drawdown: float | None = None
+    sharpe_ratio: float | None = None
+    win_rate: float | None = None
+    total_trades: int | None = None
 
 
 class SmartRecommendations(BaseModel):
     """Умные рекомендации системы"""
 
-    best_balanced: Optional[SmartRecommendation] = None
-    best_conservative: Optional[SmartRecommendation] = None
-    best_aggressive: Optional[SmartRecommendation] = None
+    best_balanced: SmartRecommendation | None = None
+    best_conservative: SmartRecommendation | None = None
+    best_aggressive: SmartRecommendation | None = None
     recommendation_text: str = ""
 
 
@@ -1553,14 +1972,16 @@ class SyncOptimizationResponse(BaseModel):
     status: str
     total_combinations: int
     tested_combinations: int
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_score: float
-    best_metrics: Dict[str, Any]
-    top_results: List[Dict[str, Any]]
+    best_metrics: dict[str, Any]
+    top_results: list[dict[str, Any]]
     execution_time_seconds: float
-    speed_combinations_per_sec: Optional[int] = None  # Actual speed achieved
-    num_workers: Optional[int] = None  # Number of parallel workers used
-    smart_recommendations: Optional[SmartRecommendations] = None
+    speed_combinations_per_sec: int | None = None  # Actual speed achieved
+    num_workers: int | None = None  # Number of parallel workers used
+    smart_recommendations: SmartRecommendations | None = None
+    # Hybrid pipeline: эталонные метрики от FallbackV4 (при validate_best_with_fallback=True)
+    validated_metrics: dict[str, Any] | None = None
 
 
 @router.post("/sync/grid-search", response_model=SyncOptimizationResponse)
@@ -1690,6 +2111,12 @@ async def sync_grid_search_optimization(
     best_params = None
     best_result = None
 
+    # Market Regime: Numba не поддерживает regime → при включении используем FallbackV4
+    effective_engine = request.engine_type
+    if getattr(request, "market_regime_enabled", False):
+        effective_engine = "fallback_v4"
+        logger.info("📊 Market regime enabled → using FallbackV4 for regime filter support")
+
     # Подготовить параметры запроса для передачи в worker
     request_params = {
         "symbol": request.symbol,
@@ -1704,8 +2131,17 @@ async def sync_grid_search_optimization(
         "fixed_amount": request.fixed_amount,
         # Новая система: массив критериев отбора
         "selection_criteria": request.selection_criteria,
-        # Выбранный движок бэктеста
-        "engine_type": request.engine_type,
+        # Выбранный движок (fallback при regime)
+        "engine_type": effective_engine,
+        # Market Regime Filter (P1)
+        "market_regime_enabled": getattr(request, "market_regime_enabled", False),
+        "market_regime_filter": getattr(request, "market_regime_filter", "not_volatile"),
+        "market_regime_lookback": getattr(request, "market_regime_lookback", 50),
+        # EvaluationCriteriaPanel: constraints, sort_order, composite score
+        "constraints": getattr(request, "constraints", None),
+        "sort_order": getattr(request, "sort_order", None),
+        "use_composite": getattr(request, "use_composite", False),
+        "weights": getattr(request, "weights", None),
     }
 
     # Преобразуем strategy_type в StrategyType enum (сохраняем в request_params)
@@ -1721,7 +2157,7 @@ async def sync_grid_search_optimization(
     import os
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
-    engine_type = request.engine_type.lower()
+    engine_type = effective_engine.lower()
     completed = 0  # Initialize counter
 
     logger.info(f"🔧 Engine type requested: {engine_type}")
@@ -1828,6 +2264,9 @@ async def sync_grid_search_optimization(
                         use_bar_magnifier=False,
                         max_drawdown_limit=0.0,
                         pyramiding=1,
+                        market_regime_enabled=request_params.get("market_regime_enabled", False),
+                        market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
+                        market_regime_lookback=request_params.get("market_regime_lookback", 50),
                     )
 
                     bt_output = engine.run(backtest_input)
@@ -1870,8 +2309,10 @@ async def sync_grid_search_optimization(
             # Fall through to single-process mode
             engine_type = "numba"  # Use Numba as fallback
 
-    # Single-process mode for GPU/Numba OR small Fallback jobs (avoid multiprocessing overhead)
-    if completed == 0 and (engine_type in ("gpu", "numba") or total_combinations <= 10):
+    # Single-process mode for GPU/Numba/FallbackV4/Optimization OR small jobs
+    # FallbackV4 required for market_regime (Numba doesn't support it)
+    # "optimization" = Numba-based, works best in single-process (JIT warmup)
+    if completed == 0 and (engine_type in ("gpu", "numba", "fallback_v4", "optimization") or total_combinations <= 10):
         logger.info(f"⚡ Using single-process mode for {engine_type} ({total_combinations} combinations)")
 
         from backend.backtesting.engine_selector import get_engine
@@ -1928,6 +2369,9 @@ async def sync_grid_search_optimization(
                     use_bar_magnifier=False,
                     max_drawdown_limit=0.0,
                     pyramiding=1,
+                    market_regime_enabled=request_params.get("market_regime_enabled", False),
+                    market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
+                    market_regime_lookback=request_params.get("market_regime_lookback", 50),
                 )
 
                 # Run backtest
@@ -2094,6 +2538,21 @@ async def sync_grid_search_optimization(
         # Стандартная сортировка по одному критерию
         results.sort(key=lambda x: x["score"], reverse=True)
 
+    # Apply custom sort_order from frontend if provided
+    custom_sort_order = getattr(request, "sort_order", None)
+    if custom_sort_order and len(custom_sort_order) > 0:
+        results = _apply_custom_sort_order(results, custom_sort_order)
+        logger.info(f"   Applied custom sort order: {custom_sort_order}")
+
+    # Calculate composite_score for each result if use_composite=True
+    use_composite = getattr(request, "use_composite", False)
+    composite_weights = getattr(request, "weights", None)
+    if use_composite and composite_weights and results:
+        for result in results:
+            composite_score = _compute_weighted_composite(result, composite_weights)
+            result["composite_score"] = composite_score
+        logger.info(f"   Calculated composite scores with weights: {composite_weights}")
+
     # Обновляем лучший результат после ранжирования
     if results:
         best_result = results[0]
@@ -2101,6 +2560,70 @@ async def sync_grid_search_optimization(
         best_params = best_result["params"]
 
     execution_time = time.time() - start_time
+
+    # Hybrid pipeline: optional FallbackV4 validation for gold-standard metrics
+    validated_metrics = None
+    if getattr(request, "validate_best_with_fallback", False) and best_params and engine_type in ("numba", "gpu"):
+        try:
+            from backend.backtesting.engine_selector import get_engine
+            from backend.backtesting.interfaces import BacktestInput, TradeDirection
+            from backend.backtesting.signal_generators import generate_rsi_signals
+
+            fallback_engine = get_engine(engine_type="fallback_v4")
+            direction_str = request_params.get("direction", "both")
+            trade_direction = (
+                TradeDirection.LONG
+                if direction_str == "long"
+                else (TradeDirection.SHORT if direction_str == "short" else TradeDirection.BOTH)
+            )
+            long_entries, long_exits, short_entries, short_exits = generate_rsi_signals(
+                candles=candles,
+                period=best_params["rsi_period"],
+                overbought=best_params["rsi_overbought"],
+                oversold=best_params["rsi_oversold"],
+                direction=direction_str,
+            )
+            bt_input = BacktestInput(
+                candles=candles,
+                candles_1m=None,
+                long_entries=long_entries,
+                long_exits=long_exits,
+                short_entries=short_entries,
+                short_exits=short_exits,
+                symbol=request_params["symbol"],
+                interval=request_params["interval"],
+                initial_capital=request_params["initial_capital"],
+                position_size=0.1 if request_params.get("use_fixed_amount") else 1.0,
+                use_fixed_amount=request_params.get("use_fixed_amount", False),
+                fixed_amount=request_params.get("fixed_amount", 0.0),
+                leverage=request_params["leverage"],
+                stop_loss=best_params.get("stop_loss_pct", 0) / 100.0,
+                take_profit=best_params.get("take_profit_pct", 0) / 100.0,
+                direction=trade_direction,
+                taker_fee=request_params["commission"],
+                maker_fee=request_params["commission"],
+                slippage=0.0005,
+                use_bar_magnifier=False,
+                max_drawdown_limit=0.0,
+                pyramiding=1,
+                market_regime_enabled=request_params.get("market_regime_enabled", False),
+                market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
+                market_regime_lookback=request_params.get("market_regime_lookback", 50),
+            )
+            bt_out = fallback_engine.run(bt_input)
+            if bt_out.is_valid and bt_out.metrics:
+                validated_metrics = {
+                    "sharpe_ratio": bt_out.metrics.sharpe_ratio,
+                    "total_return": bt_out.metrics.total_return,
+                    "max_drawdown": bt_out.metrics.max_drawdown,
+                    "win_rate": bt_out.metrics.win_rate * 100,
+                    "total_trades": bt_out.metrics.total_trades,
+                    "net_profit": bt_out.metrics.net_profit,
+                    "profit_factor": bt_out.metrics.profit_factor,
+                }
+                logger.info(f"   ✅ FallbackV4 validation: Sharpe={validated_metrics['sharpe_ratio']:.4f}")
+        except Exception as val_err:
+            logger.warning(f"FallbackV4 validation failed: {val_err}")
 
     logger.info(f"✅ Optimization completed in {execution_time:.2f}s")
     logger.info(f"   Selection criteria: {selection_criteria}")
@@ -2110,7 +2633,7 @@ async def sync_grid_search_optimization(
     smart_recs = _generate_smart_recommendations(results)
 
     # Преобразуем в модель
-    def _to_recommendation(r: dict) -> Optional[SmartRecommendation]:
+    def _to_recommendation(r: dict) -> SmartRecommendation | None:
         if not r:
             return None
         return SmartRecommendation(
@@ -2217,6 +2740,300 @@ async def sync_grid_search_optimization(
         speed_combinations_per_sec=speed,
         num_workers=os.cpu_count() or 4,
         smart_recommendations=smart_recommendations,
+        validated_metrics=validated_metrics,
+    )
+
+
+# =============================================================================
+# OPTUNA BAYESIAN OPTIMIZATION (TPE/GP, fewer iterations, same quality)
+# =============================================================================
+
+
+class OptunaSyncRequest(SyncOptimizationRequest):
+    """Optuna Bayesian optimization — extends grid-search request."""
+
+    n_trials: int = Field(100, ge=10, le=500, description="Number of Optuna trials")
+    sampler_type: str = Field(
+        "tpe",
+        description="Optuna sampler: tpe (default), random, cmaes",
+    )
+    n_jobs: int = Field(1, ge=1, le=8, description="Parallel trials (n_jobs)")
+    validate_best_with_fallback: bool = False
+
+
+@router.post("/sync/optuna-search", response_model=SyncOptimizationResponse)
+async def sync_optuna_optimization(
+    request: OptunaSyncRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Bayesian оптимизация (Optuna TPE).
+
+    Меньше итераций при том же качестве, многокритериальность, ограничения.
+    """
+    import time
+    from datetime import datetime as dt
+
+    import pandas as pd
+
+    from backend.optimization.optuna_optimizer import OPTUNA_AVAILABLE, OptunaOptimizer
+    from backend.services.data_service import DataService
+
+    if not OPTUNA_AVAILABLE:
+        raise HTTPException(
+            status_code=501,
+            detail="Optuna not installed. pip install optuna",
+        )
+
+    start_time = time.time()
+    logger.info("🔬 Starting Optuna Bayesian optimization")
+    logger.info(f"   n_trials={request.n_trials}, sampler={request.sampler_type}")
+
+    db_interval = _normalize_interval(request.interval)
+    try:
+        start_dt = dt.fromisoformat(request.start_date)
+        end_dt = dt.fromisoformat(request.end_date)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date: {e}")
+
+    market_type = getattr(request, "market_type", "linear")
+    data_service = DataService(db)
+    candle_records = data_service.get_market_data(
+        symbol=request.symbol,
+        timeframe=db_interval,
+        start_time=start_dt,
+        end_time=end_dt,
+        market_type=market_type,
+    )
+    if not candle_records:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No data for {request.symbol} {request.interval}",
+        )
+
+    candles = pd.DataFrame(
+        [
+            {
+                "timestamp": pd.to_datetime(c.open_time, unit="ms", utc=True),
+                "open": float(c.open_price or 0),
+                "high": float(c.high_price or 0),
+                "low": float(c.low_price or 0),
+                "close": float(c.close_price or 0),
+                "volume": float(c.volume or 0),
+            }
+            for c in candle_records
+        ]
+    )
+    candles.set_index("timestamp", inplace=True)
+
+    # Param space from ranges (min/max for Optuna)
+    def _low_high(arr, default_lo, default_hi):
+        if not arr:
+            return default_lo, default_hi
+        return min(arr), max(arr)
+
+    param_space = {
+        "rsi_period": {
+            "type": "int",
+            "low": _low_high(request.rsi_period_range, 7, 30)[0],
+            "high": _low_high(request.rsi_period_range, 7, 30)[1],
+        },
+        "rsi_overbought": {
+            "type": "int",
+            "low": _low_high(request.rsi_overbought_range, 65, 85)[0],
+            "high": _low_high(request.rsi_overbought_range, 65, 85)[1],
+        },
+        "rsi_oversold": {
+            "type": "int",
+            "low": _low_high(request.rsi_oversold_range, 15, 35)[0],
+            "high": _low_high(request.rsi_oversold_range, 15, 35)[1],
+        },
+        "stop_loss_pct": {
+            "type": "float",
+            "low": _low_high(request.stop_loss_range, 1.0, 10.0)[0],
+            "high": _low_high(request.stop_loss_range, 1.0, 10.0)[1],
+            "step": 0.5,
+        },
+        "take_profit_pct": {
+            "type": "float",
+            "low": _low_high(request.take_profit_range, 1.0, 20.0)[0],
+            "high": _low_high(request.take_profit_range, 1.0, 20.0)[1],
+            "step": 0.5,
+        },
+    }
+
+    from backend.backtesting.engine_selector import get_engine
+    from backend.backtesting.interfaces import BacktestInput, TradeDirection
+    from backend.backtesting.signal_generators import generate_rsi_signals
+
+    # Market regime requires FallbackV4 (Numba doesn't support it)
+    optuna_engine = "fallback_v4" if getattr(request, "market_regime_enabled", False) else "numba"
+    engine = get_engine(engine_type=optuna_engine)
+    request_params = {
+        "symbol": request.symbol,
+        "interval": request.interval,
+        "initial_capital": request.initial_capital,
+        "leverage": request.leverage,
+        "commission": request.commission,
+        "use_fixed_amount": request.use_fixed_amount,
+        "fixed_amount": request.fixed_amount,
+        "optimize_metric": request.optimize_metric,
+        "direction": request.direction,
+        "market_regime_enabled": getattr(request, "market_regime_enabled", False),
+        "market_regime_filter": getattr(request, "market_regime_filter", "not_volatile"),
+        "market_regime_lookback": getattr(request, "market_regime_lookback", 50),
+    }
+    direction_str = request.direction
+    trade_direction = (
+        TradeDirection.LONG
+        if direction_str == "long"
+        else (TradeDirection.SHORT if direction_str == "short" else TradeDirection.BOTH)
+    )
+
+    def objective(params):
+        try:
+            le, lex, se, sex = generate_rsi_signals(
+                candles=candles,
+                period=int(params["rsi_period"]),
+                overbought=int(params["rsi_overbought"]),
+                oversold=int(params["rsi_oversold"]),
+                direction=direction_str,
+            )
+            sl = params.get("stop_loss_pct", 0) / 100.0
+            tp = params.get("take_profit_pct", 0) / 100.0
+            pos_size = 0.1 if request_params.get("use_fixed_amount") else 1.0
+            bt_input = BacktestInput(
+                candles=candles,
+                candles_1m=None,
+                long_entries=le,
+                long_exits=lex,
+                short_entries=se,
+                short_exits=sex,
+                symbol=request_params["symbol"],
+                interval=request_params["interval"],
+                initial_capital=request_params["initial_capital"],
+                position_size=pos_size,
+                use_fixed_amount=request_params.get("use_fixed_amount", False),
+                fixed_amount=request_params.get("fixed_amount", 0.0),
+                leverage=request_params["leverage"],
+                stop_loss=sl if sl else 0.0,
+                take_profit=tp if tp else 0.0,
+                direction=trade_direction,
+                taker_fee=request_params["commission"],
+                maker_fee=request_params["commission"],
+                slippage=0.0005,
+                use_bar_magnifier=False,
+                max_drawdown_limit=0.0,
+                pyramiding=1,
+                market_regime_enabled=request_params.get("market_regime_enabled", False),
+                market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
+                market_regime_lookback=request_params.get("market_regime_lookback", 50),
+            )
+            out = engine.run(bt_input)
+            if not out.is_valid or not out.metrics:
+                return float("-inf")
+            return _calculate_composite_score(
+                {
+                    "sharpe_ratio": out.metrics.sharpe_ratio,
+                    "total_return": out.metrics.total_return,
+                    "max_drawdown": out.metrics.max_drawdown,
+                    "win_rate": out.metrics.win_rate,
+                    "total_trades": out.metrics.total_trades,
+                    "profit_factor": out.metrics.profit_factor,
+                    "net_profit": out.metrics.net_profit,
+                },
+                request_params["optimize_metric"],
+                None,
+            )
+        except Exception as e:
+            logger.debug(f"Optuna trial failed: {e}")
+            return float("-inf")
+
+    optuna_opt = OptunaOptimizer(sampler_type=request.sampler_type)
+    result = optuna_opt.optimize_strategy(
+        objective_fn=objective,
+        param_space=param_space,
+        n_trials=request.n_trials,
+        n_jobs=request.n_jobs,
+        show_progress=True,
+    )
+
+    # Re-run best params for full metrics
+    best_p = result.best_params
+    le, lex, se, sex = generate_rsi_signals(
+        candles=candles,
+        period=int(best_p["rsi_period"]),
+        overbought=int(best_p["rsi_overbought"]),
+        oversold=int(best_p["rsi_oversold"]),
+        direction=direction_str,
+    )
+    sl = best_p.get("stop_loss_pct", 0) / 100.0
+    tp = best_p.get("take_profit_pct", 0) / 100.0
+    pos_size = 0.1 if request_params.get("use_fixed_amount") else 1.0
+    bt_input = BacktestInput(
+        candles=candles,
+        candles_1m=None,
+        long_entries=le,
+        long_exits=lex,
+        short_entries=se,
+        short_exits=sex,
+        symbol=request_params["symbol"],
+        interval=request_params["interval"],
+        initial_capital=request_params["initial_capital"],
+        position_size=pos_size,
+        use_fixed_amount=request_params.get("use_fixed_amount", False),
+        fixed_amount=request_params.get("fixed_amount", 0.0),
+        leverage=request_params["leverage"],
+        stop_loss=sl if sl else 0.0,
+        take_profit=tp if tp else 0.0,
+        direction=trade_direction,
+        taker_fee=request_params["commission"],
+        maker_fee=request_params["commission"],
+        slippage=0.0005,
+        use_bar_magnifier=False,
+        max_drawdown_limit=0.0,
+        pyramiding=1,
+        market_regime_enabled=request_params.get("market_regime_enabled", False),
+        market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
+        market_regime_lookback=request_params.get("market_regime_lookback", 50),
+    )
+    out = engine.run(bt_input)
+    metrics = out.metrics
+
+    best_result = {
+        "params": {
+            "rsi_period": int(best_p["rsi_period"]),
+            "rsi_overbought": int(best_p["rsi_overbought"]),
+            "rsi_oversold": int(best_p["rsi_oversold"]),
+            "stop_loss_pct": best_p.get("stop_loss_pct", 0),
+            "take_profit_pct": best_p.get("take_profit_pct", 0),
+        },
+        "score": result.best_value,
+        "total_return": metrics.total_return if metrics else 0,
+        "sharpe_ratio": metrics.sharpe_ratio if metrics else 0,
+        "max_drawdown": metrics.max_drawdown if metrics else 0,
+        "win_rate": metrics.win_rate * 100 if metrics else 0,
+        "total_trades": metrics.total_trades if metrics else 0,
+        "profit_factor": metrics.profit_factor if metrics else 0,
+        "net_profit": metrics.net_profit if metrics else 0,
+    }
+
+    execution_time = time.time() - start_time
+    results = [{"params": best_result["params"], "score": best_result["score"], **best_result}]
+
+    return SyncOptimizationResponse(
+        status="completed",
+        total_combinations=request.n_trials,
+        tested_combinations=request.n_trials,
+        best_params=best_result["params"],
+        best_score=best_result["score"],
+        best_metrics=best_result,
+        top_results=results[:10],
+        execution_time_seconds=round(execution_time, 2),
+        speed_combinations_per_sec=int(request.n_trials / execution_time) if execution_time > 0 else 0,
+        num_workers=request.n_jobs,
+        smart_recommendations=None,
+        validated_metrics=None,
     )
 
 
@@ -2237,18 +3054,18 @@ class VectorbtOptimizationRequest(BaseModel):
     direction: str = "long"
     leverage: int = 10
     initial_capital: float = 10000.0
-    commission: float = 0.0006
+    commission: float = 0.0007  # 0.07% TradingView parity
     slippage: float = 0.0005  # Slippage per trade (0.0005 = 0.05%)
     position_size: float = 1.0  # 1.0 = 100% of capital per trade
 
     # RSI parameter ranges (lists of values)
-    rsi_period_range: List[int] = [7, 14, 21]
-    rsi_overbought_range: List[int] = [70, 75, 80]
-    rsi_oversold_range: List[int] = [20, 25, 30]
+    rsi_period_range: list[int] = [7, 14, 21]
+    rsi_overbought_range: list[int] = [70, 75, 80]
+    rsi_oversold_range: list[int] = [20, 25, 30]
 
     # TP/SL ranges
-    stop_loss_range: List[float] = [5.0, 10.0, 15.0]
-    take_profit_range: List[float] = [1.0, 2.0, 3.0]
+    stop_loss_range: list[float] = [5.0, 10.0, 15.0]
+    take_profit_range: list[float] = [1.0, 2.0, 3.0]
 
     # Optimization settings
     optimize_metric: str = "sharpe_ratio"
@@ -2260,10 +3077,10 @@ class VectorbtOptimizationRequest(BaseModel):
     weight_win_rate: float = 0.1
 
     # Filters
-    min_trades: Optional[int] = None
-    max_drawdown_limit: Optional[float] = None
-    min_profit_factor: Optional[float] = None
-    min_win_rate: Optional[float] = None
+    min_trades: int | None = None
+    max_drawdown_limit: float | None = None
+    min_profit_factor: float | None = None
+    min_win_rate: float | None = None
 
 
 class VectorbtOptimizationResponse(BaseModel):
@@ -2273,14 +3090,14 @@ class VectorbtOptimizationResponse(BaseModel):
     total_combinations: int
     tested_combinations: int
     execution_time_seconds: float
-    speed_combinations_per_sec: Optional[int] = None  # Actual speed achieved
-    num_workers: Optional[int] = None  # Number of parallel workers used
-    best_params: Dict[str, Any]
+    speed_combinations_per_sec: int | None = None  # Actual speed achieved
+    num_workers: int | None = None  # Number of parallel workers used
+    best_params: dict[str, Any]
     best_score: float
-    best_metrics: Dict[str, Any]
-    top_results: List[Dict[str, Any]]
-    performance_stats: Dict[str, Any]
-    smart_recommendations: Optional[SmartRecommendations] = None
+    best_metrics: dict[str, Any]
+    top_results: list[dict[str, Any]]
+    performance_stats: dict[str, Any]
+    smart_recommendations: SmartRecommendations | None = None
 
 
 @router.post("/vectorbt/grid-search", response_model=VectorbtOptimizationResponse)
@@ -2474,7 +3291,7 @@ async def vectorbt_grid_search_optimization(
         )
     except Exception as e:
         logger.exception("Optimization failed")
-        raise HTTPException(status_code=500, detail=f"Optimization failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Optimization failed: {e!s}")
 
     # Enrich best result with full metrics using BacktestEngine
     if result.top_results:
@@ -2627,7 +3444,7 @@ async def vectorbt_grid_search_optimization(
         logger.info(f"DEBUG trades: {len(first.get('trades', [])) if first.get('trades') else 'None'}")
         logger.info(f"DEBUG equity_curve: {first.get('equity_curve') is not None}")
 
-    def _to_recommendation(r: dict) -> Optional[SmartRecommendation]:
+    def _to_recommendation(r: dict) -> SmartRecommendation | None:
         if not r:
             return None
         return SmartRecommendation(
@@ -2680,7 +3497,7 @@ async def vectorbt_grid_search_stream(
     direction: str = Query("long"),
     leverage: int = Query(10),
     initial_capital: float = Query(10000.0),
-    commission: float = Query(0.0006),
+    commission: float = Query(0.0007, description="0.07% TradingView parity"),
     position_size: float = Query(1.0),
     rsi_period_range: str = Query("7,14,21"),
     rsi_overbought_range: str = Query("70,75,80"),
@@ -2692,10 +3509,10 @@ async def vectorbt_grid_search_stream(
     weight_drawdown: float = Query(0.3),
     weight_sharpe: float = Query(0.2),
     weight_win_rate: float = Query(0.1),
-    min_trades: Optional[int] = Query(None),
-    max_drawdown_limit: Optional[float] = Query(None),
-    min_profit_factor: Optional[float] = Query(None),
-    min_win_rate: Optional[float] = Query(None),
+    min_trades: int | None = Query(None),
+    max_drawdown_limit: float | None = Query(None),
+    min_profit_factor: float | None = Query(None),
+    min_win_rate: float | None = Query(None),
     db: Session = Depends(get_db),
 ):
     """
@@ -2718,10 +3535,10 @@ async def vectorbt_grid_search_stream(
     from fastapi.responses import StreamingResponse
 
     # Parse comma-separated ranges
-    def parse_int_list(s: str) -> List[int]:
+    def parse_int_list(s: str) -> list[int]:
         return [int(x.strip()) for x in s.split(",") if x.strip()]
 
-    def parse_float_list(s: str) -> List[float]:
+    def parse_float_list(s: str) -> list[float]:
         return [float(x.strip()) for x in s.split(",") if x.strip()]
 
     period_range = parse_int_list(rsi_period_range)
@@ -3103,17 +3920,17 @@ class TwoStageOptimizationRequest(BaseModel):
     end_date: str = Field(..., description="End date (YYYY-MM-DD)")
 
     # Strategy parameters
-    rsi_period_range: List[int] = Field([7, 14, 21], description="RSI periods")
-    rsi_overbought_range: List[int] = Field([65, 70, 75, 80], description="Overbought levels")
-    rsi_oversold_range: List[int] = Field([20, 25, 30, 35], description="Oversold levels")
-    stop_loss_range: List[float] = Field([0.02, 0.03, 0.05], description="Stop loss %")
-    take_profit_range: List[float] = Field([0.02, 0.04, 0.06], description="Take profit %")
+    rsi_period_range: list[int] = Field([7, 14, 21], description="RSI periods")
+    rsi_overbought_range: list[int] = Field([65, 70, 75, 80], description="Overbought levels")
+    rsi_oversold_range: list[int] = Field([20, 25, 30, 35], description="Oversold levels")
+    stop_loss_range: list[float] = Field([0.02, 0.03, 0.05], description="Stop loss %")
+    take_profit_range: list[float] = Field([0.02, 0.04, 0.06], description="Take profit %")
 
     # Trading settings
     direction: str = Field("both", description="long/short/both")
     leverage: int = Field(10, ge=1, le=125)
     initial_capital: float = Field(10000.0)
-    commission: float = Field(0.0006)
+    commission: float = Field(0.0007, description="0.07% TradingView parity")
     slippage: float = Field(0.0005)
 
     # Two-stage settings
@@ -3139,7 +3956,7 @@ class TwoStageValidationResult(BaseModel):
     """Single validated result from Stage 2."""
 
     rank_stage1: int
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
     # VBT metrics
     vbt_sharpe: float
@@ -3176,13 +3993,13 @@ class TwoStageOptimizationResponse(BaseModel):
     use_bar_magnifier: bool
 
     # Best result
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_validated_sharpe: float
     best_validated_return: float
     best_confidence: float
 
     # All validated
-    validated_results: List[TwoStageValidationResult]
+    validated_results: list[TwoStageValidationResult]
 
     # Drift stats
     avg_sharpe_drift: float

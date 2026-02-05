@@ -10,8 +10,9 @@ REST API endpoints for advanced market analysis:
 Created: January 21, 2026
 """
 
-from fastapi import APIRouter, HTTPException, Query
 import logging
+
+from fastapi import APIRouter, HTTPException, Query
 
 from backend.services.market_analytics import MarketAnalyticsService
 

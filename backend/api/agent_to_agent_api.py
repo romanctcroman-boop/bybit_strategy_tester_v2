@@ -206,7 +206,7 @@ async def send_to_agent(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error sending message: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {e!s}")
 
 
 @router.post("/broadcast")

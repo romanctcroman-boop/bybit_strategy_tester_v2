@@ -1,10 +1,11 @@
 """
-OpenAI Gym-Compatible Trading Environment for RL Agent.
+Gymnasium-Compatible Trading Environment for RL Agent.
 
-This module provides a reinforcement learning environment for trading
-strategy development using the OpenAI Gym interface.
+Standardized RL environment for trading strategy development.
+Supports Gymnasium API (obs, info = reset(); obs, reward, term, trunc, info = step(action)).
 
-Audit Task: P2 - RL Agent Rewrite
+Reward functions: pnl, log_return, sharpe, sortino, calmar, drawdown_penalty.
+Register: gymnasium.make("TradingEnv-v1") after register_trading_env().
 """
 
 from __future__ import annotations
@@ -83,9 +84,9 @@ class TradingState:
     history: list[dict[str, Any]] = field(default_factory=list)
 
 
-class TradingEnv:
+class TradingEnv(gym.Env if GYM_AVAILABLE else object):
     """
-    OpenAI Gym-compatible trading environment.
+    OpenAI Gym/Gymnasium-compatible trading environment.
 
     This environment simulates trading on OHLCV data with realistic
     commission, slippage, and position management.
@@ -131,7 +132,7 @@ class TradingEnv:
             df: DataFrame with columns ['open', 'high', 'low', 'close', 'volume']
             config: Trading configuration
             indicators: Additional indicator columns to include in observations
-            reward_function: Reward function type ('pnl', 'sharpe', 'sortino', 'log_return')
+            reward_function: 'pnl', 'log_return', 'sharpe', 'sortino', 'calmar', 'drawdown_penalty'
             render_mode: Rendering mode
         """
         if not GYM_AVAILABLE:
@@ -140,6 +141,9 @@ class TradingEnv:
         self.df = df.copy()
         self.config = config or TradingConfig()
         self.indicators = indicators or []
+        if reward_function not in REWARD_FUNCTIONS:
+            logger.warning(f"Unknown reward_function '{reward_function}', using 'pnl'")
+            reward_function = "pnl"
         self.reward_function = reward_function
         self.render_mode = render_mode
 
@@ -445,6 +449,18 @@ class TradingEnv:
             else:
                 reward = (current_equity - prev_equity) / self.config.initial_balance
 
+        elif self.reward_function == "calmar":
+            # Calmar-like: return / drawdown
+            ret = (current_equity - prev_equity) / max(prev_equity, 1e-8)
+            dd = max(self.state.max_drawdown, 0.01)
+            reward = ret / dd
+
+        elif self.reward_function == "drawdown_penalty":
+            # PnL minus drawdown penalty
+            ret = (current_equity - prev_equity) / self.config.initial_balance
+            penalty = self.state.max_drawdown * 2.0  # Penalize drawdown
+            reward = ret - penalty
+
         else:
             reward = (current_equity - prev_equity) / self.config.initial_balance
 
@@ -568,7 +584,10 @@ class TradingEnv:
         pass
 
 
-# Register environment with Gym
+# Typed reward function names for Gymnasium
+REWARD_FUNCTIONS = ("pnl", "log_return", "sharpe", "sortino", "calmar", "drawdown_penalty")
+
+
 def register_trading_env() -> None:
     """Register the trading environment with Gym."""
     if not GYM_AVAILABLE:

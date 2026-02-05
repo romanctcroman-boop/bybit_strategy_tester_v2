@@ -186,12 +186,14 @@
 ### Auto-Execute (Safe Commands):
 
 **File Operations:**
+
 - `ls`, `dir`, `cat`, `type`, `head`, `tail`, `find`, `grep`
 - `mkdir`, `touch` (creating directories/files)
 - `mv`, `cp` (moving/copying files within workspace)
 - Reading any file in workspace
 
 **Git Operations (Read & Local):**
+
 - `git status`, `git log`, `git diff`, `git branch`, `git show`
 - `git add` (staging changes)
 - `git commit` (with descriptive messages)
@@ -200,7 +202,8 @@
 - `git pull`, `git fetch`
 
 **Development Commands:**
-- `py -3.14 <script>` for any Python scripts
+
+- Python 3.11+ required (3.14 recommended). `py -3.14 <script>` for any Python scripts
 - `python -m pytest` (all test commands)
 - `npm run dev`, `npm run build`, `npm run test`
 - `ruff check .`, `ruff format .`
@@ -209,24 +212,28 @@
 - `docker build`, `docker run` (non-destructive)
 
 **Code Quality:**
+
 - Running linters and formatters
 - Fixing linting errors automatically
 - Organizing imports
 - Formatting code
 
 **Testing & Analysis:**
+
 - Running all tests
 - Generating test coverage reports
 - Profiling code (`cProfile`, `memory_profiler`)
 - Performance benchmarking
 
 **Documentation:**
+
 - Updating CHANGELOG.md
 - Adding/updating docstrings
 - Creating/updating markdown documentation
 - Generating code comments
 
 **Refactoring (Safe):**
+
 - Renaming variables/functions (non-public)
 - Extracting methods/classes
 - Removing dead code
@@ -235,6 +242,7 @@
 - Applying DRY principle
 
 **Bug Fixes (Low Risk):**
+
 - Fixing syntax errors
 - Correcting type hints
 - Fixing import errors
@@ -278,7 +286,7 @@ Before saying "task complete":
 | ✅ Clean?      | No lint errors or warnings?        |
 | ✅ Context?    | Left enough info for next session? |
 | ✅ Improved?   | Did I improve code quality?        |
-| ✅ Secure?    | No security issues introduced?     |
+| ✅ Secure?     | No security issues introduced?     |
 
 ## 🎯 Enhanced Autonomy
 
@@ -296,6 +304,7 @@ Before saying "task complete":
 ### Autonomous Refactoring
 
 You are ENCOURAGED to:
+
 - Extract repeated code
 - Rename for clarity (non-public)
 - Remove dead code
@@ -307,6 +316,7 @@ You are ENCOURAGED to:
 ### Error Recovery
 
 When errors occur:
+
 1. Read error message carefully
 2. Check known issues (DECISIONS.md, CHANGELOG.md)
 3. Try obvious fixes (max 3 attempts)
@@ -314,5 +324,113 @@ When errors occur:
 
 ---
 
-_Last Updated: 2026-01-24_
-_Version: 1.0_
+## 🤖 VS Code Agent Mode Configuration
+
+### Required VS Code Settings
+
+Add to your `settings.json` (Ctrl+,):
+
+```json
+{
+    // Core Agent Mode
+    "github.copilot.chat.agent.enabled": true,
+
+    // Maximum Autonomy Settings
+    "chat.agent.maxRequests": 25, // Increase iteration limit (default: 5/15)
+    "chat.agent.runTasks": true, // Auto-run workspace tasks
+
+    // Tool Approval (CAUTION with autoApprove)
+    "chat.tools.autoApprove": false, // Keep false for safety in this project
+
+    // MCP Integration (already configured)
+    "github.copilot.chat.experimental.mcpServers": true
+}
+```
+
+### Agent Mode Capabilities
+
+In Agent Mode, Copilot can:
+
+| Capability                 | Status     | Notes                              |
+| -------------------------- | ---------- | ---------------------------------- |
+| Iterative error correction | ✅ Enabled | Self-fixes code generation errors  |
+| Terminal command execution | ✅ Enabled | Proposes and runs commands         |
+| Runtime error analysis     | ✅ Enabled | Self-healing with diagnostics      |
+| Auto file detection        | ✅ Enabled | Finds relevant files automatically |
+| Multi-file editing         | ✅ Enabled | Works across project               |
+| MCP tool access            | ✅ Enabled | 6 tools registered                 |
+
+### MCP Integration
+
+This project has MCP configured at `mcp-server/`:
+
+```
+mcp-server/
+├── orchestrator/          # Agent orchestration
+├── tools/                 # MCP tools (6 registered)
+└── config.json           # MCP configuration
+```
+
+**Available MCP Tools:**
+
+- Database queries
+- Bybit API access
+- Backtest execution
+- Strategy analysis
+- Market data fetching
+- Metric calculation
+
+### Recommended Workflow for Maximum Autonomy
+
+1. **Open Copilot Edits panel** (Ctrl+Shift+I)
+2. **Select "Agent" mode** from dropdown
+3. **Use clear prompts:**
+
+    ```text
+    ✅ "Fix all linting errors in backend/api/"
+    ✅ "Run backtest for RSI strategy and analyze results"
+    ✅ "Update commission rate and verify all usages"
+
+    ❌ "Make it better" (too vague)
+    ```
+
+### Safety Boundaries for This Project
+
+**Agent CAN autonomously:**
+
+- Run pytest, ruff, format code
+- Edit Python/JS/HTML files
+- Start/stop uvicorn server
+- Query Bybit API (read-only)
+- Run backtests
+- Update documentation
+
+**Agent MUST ask before:**
+
+- Changing `commission_rate` (TradingView parity)
+- Database migrations
+- `git push` to any branch
+- Installing new dependencies
+- Modifying `.env` or secrets
+
+### Quick Enable Script
+
+Run in PowerShell to configure VS Code:
+
+```powershell
+# Enable Agent Mode settings
+$settings = @"
+{
+  "github.copilot.chat.agent.enabled": true,
+  "chat.agent.maxRequests": 25,
+  "chat.agent.runTasks": true
+}
+"@
+Write-Host "Add these to your VS Code settings.json:"
+Write-Host $settings
+```
+
+---
+
+_Last Updated: 2026-02-04_
+_Version: 1.1_

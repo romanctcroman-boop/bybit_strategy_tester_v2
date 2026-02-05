@@ -1,8 +1,7 @@
-from datetime import datetime, timedelta, timezone
-
 # Small shims to import project modules without DB
 import sys
 import types
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 # celery app shim
@@ -65,7 +64,7 @@ class DummyDS:
             # ensure started_at is tz-aware
             sa = bt["started_at"]
             if getattr(sa, "tzinfo", None) is None:
-                sa = sa.replace(tzinfo=timezone.utc)
+                sa = sa.replace(tzinfo=UTC)
             if (now - sa).total_seconds() < stale_seconds:
                 return {"status": "running", "backtest": bt, "message": "recently running"}
         # claim
@@ -83,7 +82,7 @@ def make_task(backtest):
 
 
 def test_skip_recently_running(monkeypatch):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     bt = {"id": 1, "status": "running", "started_at": now - timedelta(seconds=60)}
     task_obj, ds = make_task(bt)
 
@@ -105,7 +104,7 @@ def test_skip_recently_running(monkeypatch):
 
 
 def test_takeover_stale_running(monkeypatch):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     bt = {"id": 2, "status": "running", "started_at": now - timedelta(hours=2)}
     task_obj, ds = make_task(bt)
 

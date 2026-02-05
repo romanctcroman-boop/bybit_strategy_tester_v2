@@ -6,11 +6,12 @@ to FallbackEngineV2 (reference).
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
+
+import pandas as pd
 
 print("=" * 100)
 print("GPU ENGINE V2 - BAR MAGNIFIER PARITY TEST")
@@ -67,9 +68,9 @@ lx = (rsi > 70).values
 se = (rsi > 70).values
 sx = (rsi < 30).values
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.gpu_engine_v2 import GPUEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 input_data = BacktestInput(
     candles=df_60m,
@@ -130,13 +131,13 @@ print("\nTrade Details (First 5):")
 for i in range(min(5, len(fb_result.trades))):
     fb_t = fb_result.trades[i]
     gpu_t = gpu_result.trades[i]
-    
+
     pnl_match = abs(fb_t.pnl - gpu_t.pnl) < 0.01
     reason_match = fb_t.exit_reason == gpu_t.exit_reason
-    
+
     status = "OK" if (pnl_match and reason_match) else "FAIL"
     print(f"   Trade {i+1}: {fb_t.direction:5s} PnL=${fb_t.pnl:8.2f} vs ${gpu_t.pnl:8.2f}  Exit={fb_t.exit_reason.name} vs {gpu_t.exit_reason.name}  {status}")
-    
+
     all_match &= pnl_match and reason_match
 
 # Verdict

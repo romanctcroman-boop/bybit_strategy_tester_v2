@@ -16,8 +16,7 @@ import os
 import sys
 import traceback
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import datetime
 
 # Add project to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -35,7 +34,7 @@ class TestResult:
     category: str
     passed: bool
     details: str
-    error: Optional[str] = None
+    error: str | None = None
 
 
 test_results: list[TestResult] = []
@@ -116,10 +115,10 @@ def test_sma_strategy():
     )
 
     # Validate signal arrays
-    assert len(result.entries) == len(ohlcv), f"entries length mismatch"
-    assert len(result.exits) == len(ohlcv), f"exits length mismatch"
-    assert len(result.short_entries) == len(ohlcv), f"short_entries length mismatch"
-    assert len(result.short_exits) == len(ohlcv), f"short_exits length mismatch"
+    assert len(result.entries) == len(ohlcv), "entries length mismatch"
+    assert len(result.exits) == len(ohlcv), "exits length mismatch"
+    assert len(result.short_entries) == len(ohlcv), "short_entries length mismatch"
+    assert len(result.short_exits) == len(ohlcv), "short_exits length mismatch"
 
     # Should have some signals after warmup period
     warmup = 20  # slow_period
@@ -811,10 +810,8 @@ print("=" * 70)
 def test_engine_consistency():
     """Test that engines produce similar results."""
     try:
-        from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
         from backend.backtesting.engines.numba_engine_v2 import (
             NUMBA_AVAILABLE,
-            NumbaEngineV2,
         )
 
         if not NUMBA_AVAILABLE:

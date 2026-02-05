@@ -30,8 +30,8 @@ class OptimizationPanels {
 
             // Optimization Config
             method: 'bayesian',
-            startDate: '2024-01-01',
-            endDate: '2025-01-01',
+            startDate: '2025-01-01',
+            endDate: '2030-01-01',
             maxTrials: 200,
             workers: 4,
             parameterRanges: [],
@@ -57,6 +57,31 @@ class OptimizationPanels {
 
         // Listen for block changes from strategy_builder.js
         this.setupBlockIntegration();
+
+        // Listen for startOptimization event from optimization_config_panel.js
+        document.addEventListener('startOptimization', (e) => {
+            console.log('[OptPanels] Received startOptimization event:', e.detail);
+            // Merge config from the event
+            if (e.detail) {
+                this.state.method = e.detail.method || this.state.method;
+                this.state.maxTrials = e.detail.limits?.maxTrials || this.state.maxTrials;
+                this.state.workers = e.detail.limits?.workers || this.state.workers;
+                // Parameter ranges from config panel
+                if (e.detail.parameter_ranges && e.detail.parameter_ranges.length > 0) {
+                    this.state.parameterRanges = e.detail.parameter_ranges.map(p => ({
+                        name: p.name,
+                        min: p.low,
+                        max: p.high,
+                        step: p.step
+                    }));
+                    this.state.runMode = 'optimization';
+                } else {
+                    this.state.parameterRanges = [];
+                    this.state.runMode = 'single';
+                }
+            }
+            this.startRun();
+        });
     }
 
     /**
@@ -99,6 +124,21 @@ class OptimizationPanels {
 
         // Update parameter ranges list
         this.updateParameterRangesFromBlocks(params);
+    }
+
+    /**
+     * Период бэктеста/оптимизации из блока «Основные параметры» (Start Date / End Date)
+     */
+    getBacktestDates() {
+        const startEl = document.getElementById('backtestStartDate');
+        const endEl = document.getElementById('backtestEndDate');
+        const today = new Date().toISOString().slice(0, 10);
+        let endDate = endEl?.value || '2030-01-01';
+        if (endDate > today) endDate = today;
+        return {
+            startDate: startEl?.value || '2025-01-01',
+            endDate
+        };
     }
 
     /**
@@ -361,21 +401,7 @@ class OptimizationPanels {
             });
         }
 
-        // Date inputs
-        const optStartDate = document.getElementById('optStartDate');
-        const optEndDate = document.getElementById('optEndDate');
-        if (optStartDate) {
-            optStartDate.addEventListener('change', (e) => {
-                this.state.startDate = e.target.value;
-                this.saveState();
-            });
-        }
-        if (optEndDate) {
-            optEndDate.addEventListener('change', (e) => {
-                this.state.endDate = e.target.value;
-                this.saveState();
-            });
-        }
+        // Период берётся из блока «Основные параметры» (backtestStartDate / backtestEndDate)
 
         // Max Trials
         const optMaxTrials = document.getElementById('optMaxTrials');
@@ -662,9 +688,10 @@ class OptimizationPanels {
         try {
             this.setRunningState(true, 'single');
 
+            const { startDate: sd, endDate: ed } = this.getBacktestDates();
             const payload = {
-                start_date: this.state.startDate + 'T00:00:00Z',
-                end_date: this.state.endDate + 'T23:59:59Z',
+                start_date: sd + 'T00:00:00Z',
+                end_date: ed + 'T23:59:59Z',
                 engine: 'single', // FallbackEngineV4
                 commission: 0.0007,
                 slippage: 0.0005,
@@ -725,11 +752,22 @@ class OptimizationPanels {
             // Build parameter ranges for API
             const paramRanges = this.buildParameterRangesForAPI();
 
+            // Get evaluation criteria from EvaluationCriteriaPanel
+            const evalCriteria = window.evaluationCriteriaPanel?.getCriteria() || {
+                primary_metric: this.state.primaryMetric,
+                secondary_metrics: this.state.secondaryMetrics,
+                constraints: [],
+                sort_order: [],
+                use_composite: false,
+                weights: null
+            };
+
+            const { startDate: sd, endDate: ed } = this.getBacktestDates();
             const payload = {
                 symbol: 'BTCUSDT', // TODO: get from strategy
                 interval: '1h',   // TODO: get from strategy
-                start_date: this.state.startDate,
-                end_date: this.state.endDate,
+                start_date: sd,
+                end_date: ed,
                 strategy_type: 'rsi', // TODO: detect from blocks
                 initial_capital: 10000,
                 leverage: 10,
@@ -739,15 +777,20 @@ class OptimizationPanels {
                 engine_type: 'optimization',
                 // Parameter ranges
                 ...paramRanges,
-                // Optimization settings
-                optimize_metric: this.state.primaryMetric,
-                selection_criteria: this.state.secondaryMetrics,
+                // Optimization settings from EvaluationCriteriaPanel
+                optimize_metric: evalCriteria.primary_metric,
+                selection_criteria: evalCriteria.secondary_metrics,
+                constraints: evalCriteria.constraints,
+                sort_order: evalCriteria.sort_order,
+                use_composite: evalCriteria.use_composite,
+                weights: evalCriteria.weights,
                 max_trials: this.state.maxTrials
             };
 
             console.log('[OptPanels] Starting optimization with:', payload);
 
-            const response = await fetch('/api/v1/optimizations/grid-search-sse', {
+            // Use sync grid-search endpoint (returns JSON, not SSE)
+            const response = await fetch('/api/v1/optimizations/sync/grid-search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -758,8 +801,9 @@ class OptimizationPanels {
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
 
-            // Handle SSE stream
-            this.handleOptimizationSSE(response);
+            // Handle JSON response (sync endpoint)
+            const data = await response.json();
+            this.handleOptimizationComplete(data);
 
         } catch (error) {
             console.error('Failed to start optimization:', error);
@@ -831,6 +875,36 @@ class OptimizationPanels {
         } catch (error) {
             console.error('SSE error:', error);
         }
+    }
+
+    /**
+     * Handle optimization JSON response (sync endpoint)
+     */
+    handleOptimizationComplete(data) {
+        this.setRunningState(false);
+
+        // Extract results from sync response
+        const results = {
+            top_results: data.top_results || [],
+            best_params: data.best_params || {},
+            best_score: data.best_score || 0,
+            total_combinations: data.total_combinations || 0,
+            execution_time: data.execution_time_seconds || 0,
+            smart_recommendations: data.smart_recommendations || null
+        };
+
+        this.state.lastResults = results;
+        this.saveState();
+        this.displayQuickResults(results);
+
+        const msg = `Optimization completed! ${results.total_combinations} combinations in ${results.execution_time.toFixed(1)}s`;
+        this.showNotification(msg, 'success');
+
+        // Show view results button
+        const btn = document.getElementById('btnViewFullResults');
+        if (btn) btn.style.display = 'block';
+
+        console.log('[OptPanels] Optimization complete:', results);
     }
 
     /**
@@ -1072,11 +1146,7 @@ class OptimizationPanels {
         const methodSelect = document.getElementById('optMethod');
         if (methodSelect) methodSelect.value = this.state.method;
 
-        // Dates
-        const startDate = document.getElementById('optStartDate');
-        const endDate = document.getElementById('optEndDate');
-        if (startDate) startDate.value = this.state.startDate;
-        if (endDate) endDate.value = this.state.endDate;
+        // Dates — в блоке Optimization период не редактируется, берётся из «Основные параметры»
 
         // Limits
         const maxTrials = document.getElementById('optMaxTrials');

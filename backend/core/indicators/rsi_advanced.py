@@ -30,9 +30,8 @@ Example Usage:
     long_signals, short_signals = rsi_filter.generate_signals(close_prices)
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Tuple
 
 import numpy as np
 
@@ -289,7 +288,7 @@ class RSIAdvancedFilter:
     def _detect_crosses(
         self,
         rsi: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Detect RSI crossover and crossunder events.
 
@@ -330,7 +329,7 @@ class RSIAdvancedFilter:
         self,
         cross_events: np.ndarray,
         memory_bars: int,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Apply signal memory - keep signal active for N bars after cross.
 
@@ -372,7 +371,7 @@ def apply_rsi_range_filter(
     long_upper: int = 50,
     short_lower: int = 50,
     short_upper: int = 100,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Apply simple RSI range filter.
 
@@ -411,7 +410,7 @@ def apply_rsi_cross_filter(
     short_cross_level: int = 70,
     opposite_signal: bool = False,
     memory_bars: int = 0,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Apply RSI cross level filter with optional memory.
 

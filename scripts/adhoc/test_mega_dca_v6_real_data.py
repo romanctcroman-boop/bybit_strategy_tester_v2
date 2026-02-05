@@ -18,14 +18,11 @@ import time
 import traceback
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional
 
 # Add project to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import numpy as np
 import pandas as pd
-from loguru import logger
 
 # ============================================================================
 # Configuration
@@ -44,7 +41,7 @@ class TestResult:
     passed: bool
     details: str
     execution_time: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 test_results: list[TestResult] = []

@@ -9,7 +9,7 @@ Provides endpoints for:
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -176,6 +176,71 @@ async def calculate_probability(request: ProbabilityRequest) -> ProbabilityRespo
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class RobustnessRequest(BaseModel):
+    """Request for Monte Carlo robustness (slippage_stress, price_randomization)."""
+
+    backtest_results: dict[str, Any] = Field(
+        ...,
+        description="Backtest results with 'trades' (list of dicts with 'pnl')",
+    )
+    method: str = Field(
+        default="slippage_stress",
+        description="slippage_stress | price_randomization",
+    )
+    n_simulations: int = Field(default=5000, ge=100, le=50000)
+    initial_capital: float = Field(default=10000.0, gt=0)
+    seed: int | None = Field(default=None, description="Random seed")
+
+
+@router.post("/robustness")
+async def run_robustness_analysis(request: RobustnessRequest) -> dict[str, Any]:
+    """
+    Monte Carlo robustness — slippage stress и price randomization.
+
+    Оценка реальных рисков при:
+    - slippage_stress: missed fills, slippage на PnL
+    - price_randomization: шум к PnL (curve-fitting detection)
+    """
+    from backend.backtesting.monte_carlo import (
+        MonteCarloSimulator,
+        SimulationMethod,
+    )
+
+    valid = ("slippage_stress", "price_randomization")
+    if request.method not in valid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"method must be one of: {valid}",
+        )
+
+    trades = request.backtest_results.get("trades", [])
+    if not trades:
+        raise HTTPException(
+            status_code=400,
+            detail="backtest_results must contain 'trades' list",
+        )
+
+    pnl_values = [float(t.get("pnl", 0)) for t in trades]
+    sim = MonteCarloSimulator(
+        trades=None,
+        pnl_values=pnl_values,
+        initial_capital=request.initial_capital,
+    )
+
+    method = (
+        SimulationMethod.SLIPPAGE_STRESS
+        if request.method == "slippage_stress"
+        else SimulationMethod.PRICE_RANDOMIZATION
+    )
+    result = sim.run_simulation(
+        n_simulations=request.n_simulations,
+        method=method,
+        seed=request.seed,
+    )
+
+    return result.to_dict()
+
+
 @router.post("/risk-metrics", response_model=RiskMetricsResponse)
 async def calculate_risk_metrics(request: RiskMetricsRequest) -> RiskMetricsResponse:
     """
@@ -247,7 +312,7 @@ async def list_methods() -> dict:
 
 @router.post("/quick-analysis")
 async def quick_analysis(
-    backtest_id: Optional[int] = None,
+    backtest_id: int | None = None,
     total_return: float = Query(
         ..., description="Total return as decimal (e.g., 0.25 for 25%)"
     ),
@@ -345,21 +410,21 @@ class KellyRequest(BaseModel):
 class KellyResponse(BaseModel):
     """Response model for Kelly calculation."""
 
-    kelly_fraction: Optional[float] = Field(
+    kelly_fraction: float | None = Field(
         None, description="Recommended position size as fraction of capital"
     )
-    full_kelly: Optional[float] = Field(
+    full_kelly: float | None = Field(
         None, description="Full Kelly value (use with caution)"
     )
-    half_kelly: Optional[float] = Field(
+    half_kelly: float | None = Field(
         None, description="Half-Kelly value (recommended)"
     )
-    win_rate: Optional[float] = Field(None, description="Win rate of analyzed trades")
-    win_loss_ratio: Optional[float] = Field(
+    win_rate: float | None = Field(None, description="Win rate of analyzed trades")
+    win_loss_ratio: float | None = Field(
         None, description="Average win / average loss ratio"
     )
-    avg_win: Optional[float] = Field(None, description="Average winning trade PnL")
-    avg_loss: Optional[float] = Field(None, description="Average losing trade PnL")
+    avg_win: float | None = Field(None, description="Average winning trade PnL")
+    avg_loss: float | None = Field(None, description="Average losing trade PnL")
     trades_analyzed: int = Field(..., description="Number of trades analyzed")
     sufficient_data: bool = Field(..., description="Whether enough data for Kelly")
     recommendation: str = Field(..., description="Position sizing recommendation")

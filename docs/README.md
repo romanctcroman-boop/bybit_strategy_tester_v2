@@ -10,6 +10,7 @@ This directory contains all project documentation organized by category.
 | [QUICK_REFERENCE.md](QUICK_REFERENCE.md)         | Command cheat sheet              |
 | [api/README.md](api/README.md)                   | API documentation                |
 | [architecture/README.md](architecture/README.md) | System architecture              |
+| [TICKERS_SYMBOLS_LIST.md](TICKERS_SYMBOLS_LIST.md) | Список тикеров Bybit в Strategy Builder (проблема и решение) |
 
 ## Documentation Structure
 

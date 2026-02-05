@@ -108,6 +108,12 @@ class BacktestConfig(BaseModel):
         description="Market data source: 'spot' (TradingView parity) or 'linear' (perpetual futures)",
     )
 
+    # Days to block (0=Mon … 6=Sun). No new entries on these weekdays.
+    no_trade_days: tuple[int, ...] = Field(
+        default_factory=tuple,
+        description="Weekdays to block (0=Mon, 6=Sun). Unchecked in UI = trade that day.",
+    )
+
     # Pyramiding - max concurrent positions (TradingView: 0-99)
     # 0 or 1 = disabled (single position)
     # 2-99 = max entries in same direction
@@ -274,9 +280,9 @@ class BacktestConfig(BaseModel):
         description="Commission type: 'percent', 'cash_per_contract', 'cash_per_order'",
     )
     commission_value: float = Field(
-        default=0.0,
+        default=0.0007,
         ge=0.0,
-        description="Commission value (depends on commission_type)",
+        description="Commission value (0.0007 = 0.07% for TradingView parity)",
     )
 
     # ===== NEW: Commission Calculation Base (TradingView) =====
@@ -1152,14 +1158,18 @@ class BacktestCreateRequest(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
     symbol: str = Field(..., min_length=1, max_length=20)
-    interval: str = Field(..., pattern=r"^(1m|3m|5m|15m|30m|1h|2h|4h|6h|12h|1d|1w|1M)$")
+    # Accepts both Bybit native (1, 5, 15, 30, 60, 240, D, W, M) and
+    # TradingView-style (1m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h, 1d, 1w, 1M) intervals
+    interval: str = Field(
+        ..., pattern=r"^(1|3|5|15|30|60|120|240|360|720|D|W|M|1m|3m|5m|15m|30m|1h|2h|4h|6h|12h|1d|1w|1M)$"
+    )
     start_date: datetime
     end_date: datetime
     strategy_type: StrategyType = StrategyType.SMA_CROSSOVER
     strategy_params: dict[str, Any] = Field(default_factory=dict)
-    initial_capital: float = Field(default=10000.0, ge=100)
+    initial_capital: float = Field(default=10000.0, ge=100, le=100_000_000)
     position_size: float = Field(default=1.0, ge=0.01, le=1.0)
-    leverage: float = Field(default=1.0, ge=1.0, le=100.0)
+    leverage: float = Field(default=1.0, ge=1.0, le=125.0)  # Bybit max leverage
     direction: str = Field(default="long", description="Trading direction: 'long', 'short', or 'both'")
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None

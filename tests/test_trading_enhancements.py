@@ -8,7 +8,6 @@ Tests cover:
 4. Market Simulation: Spread, Position Aging
 """
 
-import numpy as np
 
 from backend.backtesting.universal_engine import (
     # Risk Management
@@ -18,7 +17,6 @@ from backend.backtesting.universal_engine import (
     DrawdownGuardianConfig,
     NewsFilterConfig,
     OCOConfig,
-    Order,
     OrderManager,
     OrderSide,
     OrderStatus,
@@ -776,32 +774,11 @@ class TestTradingEnhancementsIntegration:
         """Test that all v2.2 classes can be imported."""
         from backend.backtesting.universal_engine import (
             # Risk Management
-            AntiLiquidationConfig,
-            BreakEvenConfig,
-            CooldownConfig,
-            DrawdownGuardianConfig,
-            NewsEvent,
-            NewsFilterConfig,
-            OCOConfig,
-            Order,
-            OrderManager,
-            OrderSide,
-            OrderStatus,
-            # Order Types
             OrderType,
-            PositionAgeMetrics,
             PositionTracker,
-            RiskAction,
             RiskManagement,
-            RiskPerTradeConfig,
-            SessionFilterConfig,
-            # Market Simulation
-            SpreadConfig,
             SpreadSimulator,
             TradingFilters,
-            # Trading Filters
-            TradingSession,
-            TrailingStopConfig,
         )
 
         # All imports successful

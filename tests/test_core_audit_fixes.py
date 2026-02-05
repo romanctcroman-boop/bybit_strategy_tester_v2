@@ -8,10 +8,7 @@ Tests the following fixes:
 4. Thread-safe Bayesian optimizer
 """
 
-import asyncio
-import threading
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -158,7 +155,7 @@ class TestAnomalyDetectorAlerts:
             anomaly_id="ANM-000001",
             anomaly_type=AnomalyType.DRAWDOWN_SPIKE,
             severity=AnomalySeverity.CRITICAL,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             strategy_id="test_strategy",
             metric_name="drawdown",
             current_value=15.0,
@@ -192,7 +189,7 @@ class TestAnomalyDetectorAlerts:
             anomaly_id="ANM-000002",
             anomaly_type=AnomalyType.WIN_RATE_DROP,
             severity=AnomalySeverity.WARNING,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             strategy_id="test_strategy",
             metric_name="win_rate",
             current_value=0.3,
@@ -246,7 +243,7 @@ class TestAnomalyDetectorAlerts:
             anomaly_id="ANM-000003",
             anomaly_type=AnomalyType.LATENCY_SPIKE,
             severity=AnomalySeverity.WARNING,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             strategy_id="test_strategy",
             metric_name="latency_ms",
             current_value=500.0,
@@ -417,7 +414,6 @@ class TestIntegration:
         """Test full anomaly detection flow."""
         from backend.core.anomaly_detector import (
             AnomalyDetector,
-            AnomalySeverity,
             AnomalyThresholds,
             LogAlertNotifier,
         )

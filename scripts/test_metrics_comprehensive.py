@@ -24,15 +24,15 @@ from typing import Any
 
 import pandas as pd
 
-from backend.backtesting.models import BacktestConfig, BacktestResult
 from backend.backtesting.engine import BacktestEngine
+from backend.backtesting.models import BacktestConfig, BacktestResult
 
 
 def load_test_data(symbol: str = "BTCUSDT", interval: str = "60", limit: int = 500) -> pd.DataFrame:
     """Load test data from database."""
     db_path = ROOT / "data.sqlite3"
     conn = sqlite3.connect(str(db_path))
-    
+
     df = pd.read_sql(
         """
         SELECT open_time, open_price as open, high_price as high,
@@ -46,15 +46,15 @@ def load_test_data(symbol: str = "BTCUSDT", interval: str = "60", limit: int = 5
         params=[symbol.upper(), interval, limit],
     )
     conn.close()
-    
+
     if len(df) == 0:
         raise ValueError(f"No data found for {symbol} {interval}")
-    
+
     # Prepare OHLCV
     df = df.sort_values("open_time")
     df["datetime"] = pd.to_datetime(df["open_time"], unit="ms")
     df = df.set_index("datetime")
-    
+
     return df
 
 
@@ -80,7 +80,7 @@ def create_config(direction: str, use_bar_magnifier: bool = True) -> dict:
 def extract_metrics(result: BacktestResult) -> dict[str, Any]:
     """Extract all metrics from BacktestResult."""
     m = result.metrics
-    
+
     return {
         # Core metrics
         "total_trades": m.total_trades,
@@ -91,26 +91,26 @@ def extract_metrics(result: BacktestResult) -> dict[str, Any]:
         "win_rate": round(m.win_rate, 4),
         "avg_trade": round(m.avg_trade, 4) if m.avg_trade else 0,
         "max_drawdown": round(m.max_drawdown, 4),
-        
+
         # Trade counts
         "winning_trades": m.winning_trades,
         "losing_trades": m.losing_trades,
         "long_trades": getattr(m, "long_trades", 0),
         "short_trades": getattr(m, "short_trades", 0),
-        
+
         # Averages
         "avg_winning_trade": round(getattr(m, "avg_winning_trade", 0) or 0, 4),
         "avg_losing_trade": round(getattr(m, "avg_losing_trade", 0) or 0, 4),
         "largest_winning_trade": round(getattr(m, "largest_winning_trade", 0) or 0, 4),
         "largest_losing_trade": round(getattr(m, "largest_losing_trade", 0) or 0, 4),
-        
+
         # Ratios
         "sharpe_ratio": round(getattr(m, "sharpe_ratio", 0) or 0, 4),
         "sortino_ratio": round(getattr(m, "sortino_ratio", 0) or 0, 4),
-        
+
         # Commissions
         "total_commission": round(getattr(m, "total_commission", 0) or 0, 4),
-        
+
         # Returns
         "total_return": round(getattr(m, "total_return", 0) or 0, 4),
     }
@@ -135,9 +135,9 @@ def extract_trade_details(result: BacktestResult) -> list[dict]:
 
 
 def compare_metrics(
-    metrics1: dict, 
-    metrics2: dict, 
-    name1: str = "Engine1", 
+    metrics1: dict,
+    metrics2: dict,
+    name1: str = "Engine1",
     name2: str = "Engine2",
     tolerance: float = 0.01
 ) -> tuple[int, int, list[str]]:
@@ -145,11 +145,11 @@ def compare_metrics(
     matches = 0
     mismatches = 0
     mismatch_details = []
-    
+
     for key in metrics1:
         val1 = metrics1.get(key)
         val2 = metrics2.get(key)
-        
+
         if isinstance(val1, float) and isinstance(val2, float):
             # Float comparison with tolerance
             if abs(val1 - val2) <= tolerance * max(abs(val1), abs(val2), 1):
@@ -168,7 +168,7 @@ def compare_metrics(
                 mismatch_details.append(
                     f"  ❌ {key}: {name1}={val1} vs {name2}={val2}"
                 )
-    
+
     return matches, mismatches, mismatch_details
 
 
@@ -189,7 +189,7 @@ def run_engine_test(
         except Exception:
             pass
         # Fall through to fallback
-    
+
     # Always use fallback for consistent results
     return engine._run_fallback(config, data, silent=True)
 
@@ -204,45 +204,45 @@ def test_direction(
     print(f"Testing Direction: {direction.upper()}")
     print(f"Bar Magnifier: {'ON' if use_bar_magnifier else 'OFF'}")
     print(f"{'='*60}")
-    
+
     # Create config
     config_dict = create_config(direction, use_bar_magnifier)
     config_dict["start_date"] = data.index[0]
     config_dict["end_date"] = data.index[-1]
     config = BacktestConfig(**config_dict)
-    
+
     # Create engine
     engine = BacktestEngine()
-    
+
     # Run engine (will use fallback internally)
     print("Running Backtest Engine...")
     result_fallback = engine.run(config, data, silent=True)
-    
+
     # Extract metrics
     metrics_fallback = extract_metrics(result_fallback)
     trades_fallback = extract_trade_details(result_fallback)
-    
+
     # Print results
-    print(f"\nFallback Engine Results:")
+    print("\nFallback Engine Results:")
     print(f"  Total Trades: {metrics_fallback['total_trades']}")
     print(f"  Net Profit: ${metrics_fallback['net_profit']:.2f}")
     print(f"  Win Rate: {metrics_fallback['win_rate']:.2f}%")
     print(f"  Max Drawdown: {metrics_fallback['max_drawdown']:.2f}%")
     print(f"  Profit Factor: {metrics_fallback['profit_factor']:.4f}")
-    
+
     # Count exit types
     sl_exits = sum(1 for t in trades_fallback if t.get("exit_comment") == "SL")
     tp_exits = sum(1 for t in trades_fallback if t.get("exit_comment") == "TP")
     signal_exits = sum(1 for t in trades_fallback if t.get("exit_comment") == "signal")
-    
+
     print(f"  SL Exits: {sl_exits}, TP Exits: {tp_exits}, Signal Exits: {signal_exits}")
-    
+
     # Calculate average MFE/MAE
     if trades_fallback:
         avg_mfe = sum(t["mfe_pct"] for t in trades_fallback) / len(trades_fallback)
         avg_mae = sum(t["mae_pct"] for t in trades_fallback) / len(trades_fallback)
         print(f"  Avg MFE: {avg_mfe:.4f}%, Avg MAE: {avg_mae:.4f}%")
-    
+
     return {
         "direction": direction,
         "metrics": metrics_fallback,
@@ -259,13 +259,13 @@ def run_comprehensive_test():
     print("COMPREHENSIVE METRICS TEST")
     print("=" * 80)
     print(f"Test Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
+
     # Load data
     print("\nLoading test data...")
     data = load_test_data("BTCUSDT", "60", 500)
     print(f"Loaded {len(data)} 1H candles")
     print(f"Period: {data.index[0]} to {data.index[-1]}")
-    
+
     # Check 1m data availability
     db_path = ROOT / "data.sqlite3"
     conn = sqlite3.connect(str(db_path))
@@ -275,108 +275,108 @@ def run_comprehensive_test():
     )["cnt"].iloc[0]
     conn.close()
     print(f"1m candles available: {m1_count:,}")
-    
+
     results = {}
-    
+
     # Test all directions with Bar Magnifier ON
     for direction in ["long", "short", "both"]:
         result = test_direction(direction, data, use_bar_magnifier=True)
         results[f"{direction}_magnifier"] = result
-    
+
     # Test all directions with Bar Magnifier OFF for comparison
     print("\n" + "=" * 80)
     print("COMPARISON: Bar Magnifier ON vs OFF")
     print("=" * 80)
-    
+
     for direction in ["long", "short", "both"]:
         result_off = test_direction(direction, data, use_bar_magnifier=False)
         results[f"{direction}_standard"] = result_off
-    
+
     # Compare Bar Magnifier ON vs OFF
     print("\n" + "=" * 80)
     print("IMPACT OF BAR MAGNIFIER")
     print("=" * 80)
-    
+
     for direction in ["long", "short", "both"]:
         mag = results[f"{direction}_magnifier"]["metrics"]
         std = results[f"{direction}_standard"]["metrics"]
-        
+
         print(f"\n{direction.upper()}:")
         print(f"{'Metric':<25} {'Standard':>15} {'Bar Magnifier':>15} {'Diff':>12}")
         print("-" * 70)
-        
+
         for key in ["total_trades", "net_profit", "win_rate", "max_drawdown", "profit_factor"]:
             val_std = std.get(key, 0)
             val_mag = mag.get(key, 0)
             diff = val_mag - val_std
-            
+
             if isinstance(val_std, float):
                 print(f"{key:<25} {val_std:>15.2f} {val_mag:>15.2f} {diff:>+12.2f}")
             else:
                 print(f"{key:<25} {val_std:>15} {val_mag:>15} {diff:>+12}")
-    
+
     # Trade-level comparison for "both" direction
     print("\n" + "=" * 80)
     print("TRADE-LEVEL COMPARISON (direction=both)")
     print("=" * 80)
-    
+
     trades_mag = results["both_magnifier"]["trades"]
     trades_std = results["both_standard"]["trades"]
-    
+
     print(f"\nTotal trades: Magnifier={len(trades_mag)}, Standard={len(trades_std)}")
-    
+
     # Compare first 10 trades
-    print(f"\nFirst 10 trades comparison:")
+    print("\nFirst 10 trades comparison:")
     print(f"{'#':<3} {'Side':<6} {'Entry':>10} {'Exit':>10} {'PnL Std':>12} {'PnL Mag':>12} {'Exit Std':<8} {'Exit Mag':<8}")
     print("-" * 85)
-    
+
     for i in range(min(10, len(trades_std), len(trades_mag))):
         t_std = trades_std[i]
         t_mag = trades_mag[i]
-        
+
         pnl_match = "✓" if abs(t_std["pnl"] - t_mag["pnl"]) < 0.01 else "✗"
         exit_match = "✓" if t_std["exit_comment"] == t_mag["exit_comment"] else "✗"
-        
+
         print(f"{i+1:<3} {t_std['side']:<6} {t_std['entry_price']:>10.2f} {t_std['exit_price']:>10.2f} "
               f"{t_std['pnl']:>12.2f} {t_mag['pnl']:>12.2f} {t_std['exit_comment']:<8} {t_mag['exit_comment']:<8} "
               f"{pnl_match}{exit_match}")
-    
+
     # Summary of exit type differences
     print("\n" + "=" * 80)
     print("EXIT TYPE SUMMARY")
     print("=" * 80)
-    
+
     for direction in ["long", "short", "both"]:
         mag = results[f"{direction}_magnifier"]
         std = results[f"{direction}_standard"]
-        
+
         sl_diff = mag["sl_exits"] - std["sl_exits"]
         tp_diff = mag["tp_exits"] - std["tp_exits"]
-        
+
         print(f"\n{direction.upper()}:")
         print(f"  SL Exits: Standard={std['sl_exits']}, Magnifier={mag['sl_exits']} (diff={sl_diff:+d})")
         print(f"  TP Exits: Standard={std['tp_exits']}, Magnifier={mag['tp_exits']} (diff={tp_diff:+d})")
         print(f"  Signal:   Standard={std['signal_exits']}, Magnifier={mag['signal_exits']}")
-    
+
     # Final summary
     print("\n" + "=" * 80)
     print("TEST SUMMARY")
     print("=" * 80)
-    
+
     print("\n✅ All tests completed successfully!")
     print("\nKey Findings:")
-    
+
     for direction in ["long", "short", "both"]:
         mag = results[f"{direction}_magnifier"]["metrics"]
         std = results[f"{direction}_standard"]["metrics"]
-        
+
         profit_improvement = mag["net_profit"] - std["net_profit"]
         wr_improvement = mag["win_rate"] - std["win_rate"]
-        
+
         print(f"\n{direction.upper()}:")
         print(f"  Net Profit: ${profit_improvement:+.2f} with Bar Magnifier")
         print(f"  Win Rate: {wr_improvement:+.2f}pp with Bar Magnifier")
-    
+
     return results
 
 

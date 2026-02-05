@@ -1,0 +1,2 @@
+Server status: 200
+Response: {"status":"healthy","timestamp":"2026-02-04T17:27:33.262309+00:00","checks":{"bybit_api":{"status":"ok","response_time_ms":1245.07,"candles_fetched":10,"message":"Fetched 10 candles in 1245.07ms"},"da

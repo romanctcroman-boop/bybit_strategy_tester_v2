@@ -12,42 +12,20 @@ print("=" * 60)
 print("\n[1/6] Testing imports...")
 from backend.backtesting.universal_engine import (
     AdvancedFeatures,
-    AdvancedOptimizer,
-    AllocationMethod,
-    BayesianConfig,
-    CorrelationManager,
     FundingConfig,
     GeneticConfig,
     GeneticOptimizer,
     HedgeConfig,
     HedgeManager,
     MetricsCalculator,
-    MetricsConfig,
     MonteCarloConfig,
-    MonteCarloResult,
     MonteCarloSimulator,
-    OptimizationMethod,
-    PartialCloseConfig,
     PortfolioConfig,
     PortfolioManager,
     PortfolioMode,
     ScaleInConfig,
-    ScaleInMode,
     SlippageConfig,
     SlippageModel,
-    TimeExitConfig,
-    TimeExitMode,
-    UniversalFilterEngine,
-    UniversalMathEngine,
-    UniversalOptimizer,
-    UniversalPositionManager,
-    UniversalRiskManager,
-    UniversalSignalGenerator,
-    UniversalTradeExecutor,
-    WalkForwardAnalyzer,
-    WalkForwardConfig,
-    WalkForwardMode,
-    WalkForwardResult,
 )
 
 print("  ✅ All 35+ classes imported successfully")
@@ -101,7 +79,7 @@ result = ga.optimize(lambda p: -(p["x"] ** 2 + p["y"] ** 2), verbose=False)
 print(
     f"  ✅ GA found x={result['best_params']['x']:.3f}, y={result['best_params']['y']:.3f}"
 )
-print(f"     (optimal: x=0, y=0)")
+print("     (optimal: x=0, y=0)")
 
 # 7. Test Monte Carlo
 print("\n[7/6] BONUS: Testing Monte Carlo Simulation...")

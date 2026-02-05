@@ -21,8 +21,8 @@ Protocol:
 import json
 import os
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -45,12 +45,12 @@ REQUEST_TIMEOUT = 120  # seconds
 
 class DeepSeekMCPServer:
     """MCP Server for DeepSeek V3 API integration (synchronous version)."""
-    
+
     def __init__(self):
         self.api_key = os.environ.get("DEEPSEEK_API_KEY")
         self.api_key_backup = os.environ.get("DEEPSEEK_API_KEY_2")
         self.current_api_key = self.api_key
-        
+
         self.tools = {
             "deepseek_chat": self.deepseek_chat,
             "deepseek_code": self.deepseek_code,
@@ -61,7 +61,7 @@ class DeepSeekMCPServer:
             "deepseek_debug": self.deepseek_debug,
             "deepseek_document": self.deepseek_document,
         }
-    
+
     def _call_deepseek_api(
         self,
         messages: list,
@@ -72,15 +72,15 @@ class DeepSeekMCPServer:
     ) -> dict:
         """Call DeepSeek API with automatic failover (synchronous)."""
         api_key = self.api_key_backup if use_backup else self.current_api_key
-        
+
         if not api_key:
             return {"error": "No API key available", "success": False}
-        
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}"
         }
-        
+
         payload = {
             "model": model or DEFAULT_MODEL,
             "messages": messages,
@@ -88,7 +88,7 @@ class DeepSeekMCPServer:
             "max_tokens": max_tokens,
             "stream": False
         }
-        
+
         try:
             data = json.dumps(payload).encode('utf-8')
             req = urllib.request.Request(
@@ -97,7 +97,7 @@ class DeepSeekMCPServer:
                 headers=headers,
                 method='POST'
             )
-            
+
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
                 result = json.loads(response.read().decode('utf-8'))
                 return {
@@ -107,7 +107,7 @@ class DeepSeekMCPServer:
                     "usage": result.get("usage", {}),
                     "finish_reason": result["choices"][0].get("finish_reason", "stop")
                 }
-                
+
         except urllib.error.HTTPError as e:
             if e.code in (401, 403) and not use_backup and self.api_key_backup:
                 # Try backup key on auth failure
@@ -130,13 +130,13 @@ class DeepSeekMCPServer:
             return {"error": f"Network error: {e.reason}", "success": False}
         except Exception as e:
             return {"error": str(e), "success": False}
-    
+
     def handle_request(self, request: dict) -> dict:
         """Handle incoming MCP request (synchronous)."""
         method = request.get("method", "")
         params = request.get("params", {})
         request_id = request.get("id")
-        
+
         if method == "initialize":
             return self._create_response(request_id, {
                 "protocolVersion": "2024-11-05",
@@ -148,7 +148,7 @@ class DeepSeekMCPServer:
                     "version": "1.0.0"
                 }
             })
-        
+
         elif method == "tools/list":
             return self._create_response(request_id, {
                 "tools": [
@@ -261,11 +261,11 @@ class DeepSeekMCPServer:
                     }
                 ]
             })
-        
+
         elif method == "tools/call":
             tool_name = params.get("name")
             tool_args = params.get("arguments", {})
-            
+
             if tool_name in self.tools:
                 try:
                     result = self.tools[tool_name](tool_args)
@@ -276,230 +276,230 @@ class DeepSeekMCPServer:
                     return self._create_error(request_id, -32000, str(e))
             else:
                 return self._create_error(request_id, -32601, f"Unknown tool: {tool_name}")
-        
+
         return self._create_error(request_id, -32601, f"Unknown method: {method}")
-    
+
     def _create_response(self, request_id: Any, result: Any) -> dict:
         return {"jsonrpc": "2.0", "id": request_id, "result": result}
-    
+
     def _create_error(self, request_id: Any, code: int, message: str) -> dict:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
-    
+
     # === Tool Implementations (synchronous) ===
-    
+
     def deepseek_chat(self, args: dict) -> dict:
         """General chat with DeepSeek."""
         message = args.get("message", "")
         system_prompt = args.get("system_prompt", "You are a helpful AI assistant.")
         temperature = args.get("temperature", DEFAULT_TEMPERATURE)
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": message}
         ]
-        
+
         return self._call_deepseek_api(messages, temperature=temperature)
-    
+
     def deepseek_code(self, args: dict) -> dict:
         """Generate code with DeepSeek."""
         task = args.get("task", "")
         language = args.get("language", "python")
         context = args.get("context", "")
         requirements = args.get("requirements", [])
-        
+
         system_prompt = f"""You are an expert {language} programmer. Generate clean, efficient, well-documented code.
 Follow best practices and modern conventions for {language}.
 Include necessary imports and type hints where applicable.
 """
-        
+
         user_message = f"Task: {task}"
         if context:
             user_message += f"\n\nExisting context/code:\n```{language}\n{context}\n```"
         if requirements:
-            user_message += f"\n\nRequirements:\n" + "\n".join(f"- {r}" for r in requirements)
-        
+            user_message += "\n\nRequirements:\n" + "\n".join(f"- {r}" for r in requirements)
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ]
-        
+
         return self._call_deepseek_api(messages, temperature=0.3)
-    
+
     def deepseek_analyze(self, args: dict) -> dict:
         """Analyze code for issues and improvements."""
         code = args.get("code", "")
         focus = args.get("focus", "all")
         language = args.get("language", "python")
-        
+
         focus_prompts = {
             "performance": "Focus on performance issues: inefficient algorithms, memory leaks, unnecessary operations.",
             "security": "Focus on security vulnerabilities: injection risks, data exposure, authentication issues.",
             "readability": "Focus on readability: naming, structure, comments, code organization.",
             "all": "Analyze for performance, security, readability, and best practices."
         }
-        
+
         system_prompt = f"""You are an expert code reviewer specializing in {language}.
 {focus_prompts.get(focus, focus_prompts['all'])}
 Provide specific, actionable feedback with examples.
 """
-        
+
         user_message = f"Analyze this {language} code:\n\n```{language}\n{code}\n```"
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ]
-        
+
         return self._call_deepseek_api(messages, temperature=0.3)
-    
+
     def deepseek_refactor(self, args: dict) -> dict:
         """Refactor code to improve quality."""
         code = args.get("code", "")
         goal = args.get("goal", "simplify")
         language = args.get("language", "python")
         preserve_interface = args.get("preserve_interface", True)
-        
+
         goal_prompts = {
             "simplify": "Simplify the code while maintaining functionality. Remove complexity.",
             "optimize": "Optimize for performance. Improve algorithmic efficiency.",
             "modernize": "Update to use modern language features and patterns.",
             "dry": "Apply DRY principle. Extract repeated code into reusable functions."
         }
-        
+
         interface_note = "IMPORTANT: Preserve the existing public API and interfaces." if preserve_interface else ""
-        
+
         system_prompt = f"""You are an expert {language} refactoring specialist.
 {goal_prompts.get(goal, goal_prompts['simplify'])}
 {interface_note}
 Show the refactored code with explanations of changes.
 """
-        
+
         user_message = f"Refactor this {language} code:\n\n```{language}\n{code}\n```"
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ]
-        
+
         return self._call_deepseek_api(messages, temperature=0.3)
-    
+
     def deepseek_explain(self, args: dict) -> dict:
         """Explain code in detail."""
         code = args.get("code", "")
         level = args.get("level", "intermediate")
         language = args.get("language", "python")
-        
+
         level_prompts = {
             "beginner": "Explain as if to someone new to programming. Define terms and concepts.",
             "intermediate": "Explain assuming familiarity with programming basics.",
             "advanced": "Provide technical depth, discuss trade-offs and alternatives."
         }
-        
+
         system_prompt = f"""You are a patient {language} instructor.
 {level_prompts.get(level, level_prompts['intermediate'])}
 Break down the code step by step. Use clear examples.
 """
-        
+
         user_message = f"Explain this {language} code:\n\n```{language}\n{code}\n```"
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ]
-        
+
         return self._call_deepseek_api(messages, temperature=0.5)
-    
+
     def deepseek_test(self, args: dict) -> dict:
         """Generate test cases for code."""
         code = args.get("code", "")
         framework = args.get("framework", "pytest")
         coverage = args.get("coverage", "comprehensive")
-        
+
         coverage_prompts = {
             "basic": "Generate basic happy-path tests.",
             "comprehensive": "Generate tests for normal cases, edge cases, and error handling.",
             "edge_cases": "Focus on edge cases, boundary conditions, and unusual inputs."
         }
-        
+
         system_prompt = f"""You are a test engineering expert using {framework}.
 {coverage_prompts.get(coverage, coverage_prompts['comprehensive'])}
 Generate well-organized, readable tests with clear assertions.
 Include appropriate fixtures, mocks, and parametrization where useful.
 """
-        
+
         user_message = f"Generate {framework} tests for this code:\n\n```python\n{code}\n```"
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ]
-        
+
         return self._call_deepseek_api(messages, temperature=0.3)
-    
+
     def deepseek_debug(self, args: dict) -> dict:
         """Help debug code issues."""
         code = args.get("code", "")
         error = args.get("error", "")
         expected = args.get("expected", "")
         actual = args.get("actual", "")
-        
+
         system_prompt = """You are an expert debugger. Analyze the code and error carefully.
 1. Identify the root cause of the issue
 2. Explain why the error occurs
 3. Provide a corrected version of the code
 4. Suggest how to prevent similar issues
 """
-        
+
         user_message = f"Debug this code:\n\n```python\n{code}\n```\n\nError: {error}"
         if expected:
             user_message += f"\n\nExpected behavior: {expected}"
         if actual:
             user_message += f"\n\nActual behavior: {actual}"
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ]
-        
+
         return self._call_deepseek_api(messages, temperature=0.3)
-    
+
     def deepseek_document(self, args: dict) -> dict:
         """Generate documentation for code."""
         code = args.get("code", "")
         style = args.get("style", "google")
         include_examples = args.get("include_examples", True)
-        
+
         examples_note = "Include usage examples in the documentation." if include_examples else ""
-        
+
         system_prompt = f"""You are a technical documentation expert.
 Generate {style}-style docstrings and documentation.
 {examples_note}
 Be thorough but concise. Document parameters, return values, exceptions.
 """
-        
+
         user_message = f"Add comprehensive documentation to this code:\n\n```python\n{code}\n```"
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
         ]
-        
+
         return self._call_deepseek_api(messages, temperature=0.3)
 
 
 def main():
     """Main entry point for MCP server (synchronous stdin/stdout)."""
     server = DeepSeekMCPServer()
-    
+
     # Read from stdin line by line (synchronous for Windows compatibility)
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
-        
+
         try:
             request = json.loads(line)
-            
+
             # Skip notifications (requests without id) - don't send response
             request_id = request.get("id")
             if request_id is None:
@@ -509,13 +509,13 @@ def main():
                 except Exception:
                     pass
                 continue
-            
+
             response = server.handle_request(request)
-            
+
             # Write response to stdout
             sys.stdout.write(json.dumps(response) + "\n")
             sys.stdout.flush()
-            
+
         except json.JSONDecodeError:
             # Invalid JSON - ignore silently
             continue

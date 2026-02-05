@@ -1,0 +1,13 @@
+=== Direct Backtest ===
+Status: 200
+Trades: 73
+Net Profit: -8940.411702396324
+
+=== Grid Search (single combo) ===
+Status: 200
+Results: 0
+Total combinations: 27
+Tested combinations: 27
+No results!
+
+Full response keys: ['status', 'total_combinations', 'tested_combinations', 'best_params', 'best_score', 'best_metrics', 'top_results', 'execution_time_seconds', 'speed_combinations_per_sec', 'num_workers', 'smart_recommendations', 'validated_metrics']

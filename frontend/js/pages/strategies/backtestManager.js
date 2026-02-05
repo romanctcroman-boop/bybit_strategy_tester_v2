@@ -1561,7 +1561,11 @@ export async function runOptimization(onComplete = null) {
         max_drawdown_trading: params._max_drawdown || 0,  // Stop trading when hit this drawdown %
         // Search method (Grid/Random)
         search_method: document.getElementById('searchMethod')?.value || 'grid',
-        max_iterations: parseInt(document.getElementById('maxIterations')?.value || 0)
+        max_iterations: parseInt(document.getElementById('maxIterations')?.value || 0),
+        // Market Regime Filter (P1) — фильтрация по режиму рынка (требует FallbackV4)
+        market_regime_enabled: document.getElementById('marketRegimeEnabled')?.checked ?? false,
+        market_regime_filter: document.getElementById('marketRegimeFilter')?.value || 'not_volatile',
+        market_regime_lookback: parseInt(document.getElementById('marketRegimeLookback')?.value || 50)
     };
 
     console.log('[runOptimization] Final payload:', {

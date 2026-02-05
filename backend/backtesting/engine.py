@@ -99,11 +99,7 @@ def compute_period_analysis(
         net_profit_pct = (net_profit / start_equity * 100) if start_equity > 0 else 0.0
 
         # Filter trades for this period
-        period_trades = [
-            t
-            for t in trades
-            if hasattr(t, "entry_time") and start_date <= t.entry_time <= end_date
-        ]
+        period_trades = [t for t in trades if hasattr(t, "entry_time") and start_date <= t.entry_time <= end_date]
 
         total_trades = len(period_trades)
         winning_trades = sum(1 for t in period_trades if t.pnl > 0)
@@ -115,13 +111,7 @@ def compute_period_analysis(
         gross_pnls = [(t.pnl + getattr(t, "fees", 0)) for t in period_trades]
         gross_profit = sum(g for g in gross_pnls if g > 0)
         gross_loss = abs(sum(g for g in gross_pnls if g < 0))
-        profit_factor = (
-            (gross_profit / gross_loss)
-            if gross_loss > 0
-            else float("inf")
-            if gross_profit > 0
-            else 0.0
-        )
+        profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else float("inf") if gross_profit > 0 else 0.0
 
         # Max drawdown for period
         running_max = group.cummax()
@@ -141,21 +131,15 @@ def compute_period_analysis(
         results.append(
             PeriodAnalysis(
                 period=period_str,
-                start_date=start_date.to_pydatetime()
-                if hasattr(start_date, "to_pydatetime")
-                else start_date,
-                end_date=end_date.to_pydatetime()
-                if hasattr(end_date, "to_pydatetime")
-                else end_date,
+                start_date=start_date.to_pydatetime() if hasattr(start_date, "to_pydatetime") else start_date,
+                end_date=end_date.to_pydatetime() if hasattr(end_date, "to_pydatetime") else end_date,
                 net_profit=float(net_profit),
                 net_profit_pct=float(net_profit_pct),
                 total_trades=total_trades,
                 winning_trades=winning_trades,
                 losing_trades=losing_trades,
                 win_rate=float(win_rate),
-                profit_factor=float(profit_factor)
-                if profit_factor != float("inf")
-                else 9999.99,
+                profit_factor=float(profit_factor) if profit_factor != float("inf") else 9999.99,
                 max_drawdown=float(max_drawdown),
                 sharpe_ratio=float(sharpe),
             )
@@ -164,9 +148,7 @@ def compute_period_analysis(
     return results
 
 
-def compute_buy_hold_equity(
-    ohlcv: pd.DataFrame, initial_capital: float
-) -> tuple[list[float], list[float]]:
+def compute_buy_hold_equity(ohlcv: pd.DataFrame, initial_capital: float) -> tuple[list[float], list[float]]:
     """
     Compute Buy & Hold equity curve and drawdown.
 
@@ -305,9 +287,7 @@ def _build_performance_metrics(
         first_ts = timestamps[0]
         last_ts = timestamps[-1]
         if hasattr(first_ts, "timestamp") and hasattr(last_ts, "timestamp"):
-            years = (last_ts.timestamp() - first_ts.timestamp()) / (
-                365.25 * 24 * 60 * 60
-            )
+            years = (last_ts.timestamp() - first_ts.timestamp()) / (365.25 * 24 * 60 * 60)
         else:
             years = (last_ts - first_ts).total_seconds() / (365.25 * 24 * 60 * 60)
         years = max(years, 0.001)  # Avoid division by zero
@@ -339,14 +319,8 @@ def _build_performance_metrics(
         buy_hold_return_pct = 0.0
 
     # Additional derived metrics
-    total_return = (
-        (equity[-1] - initial_capital) / initial_capital if initial_capital > 0 else 0.0
-    )
-    annual_return = (
-        total_return * (365 / max(1, (timestamps[-1] - timestamps[0]).days))
-        if len(timestamps) > 1
-        else 0.0
-    )
+    total_return = (equity[-1] - initial_capital) / initial_capital if initial_capital > 0 else 0.0
+    annual_return = total_return * (365 / max(1, (timestamps[-1] - timestamps[0]).days)) if len(timestamps) > 1 else 0.0
 
     # Exposure time calculation
     winning_trades_list = [t for t in trades if t.pnl > 0]
@@ -383,19 +357,13 @@ def _build_performance_metrics(
     gross_loss = calc_metrics.get("gross_loss", 0)
     largest_win_val = calc_metrics.get("largest_win_value", 0)
     largest_loss_val = abs(calc_metrics.get("largest_loss_value", 0))
-    largest_win_pct_of_gross = (
-        (largest_win_val / gross_profit * 100) if gross_profit > 0 else 0.0
-    )
-    largest_loss_pct_of_gross = (
-        (largest_loss_val / gross_loss * 100) if gross_loss > 0 else 0.0
-    )
+    largest_win_pct_of_gross = (largest_win_val / gross_profit * 100) if gross_profit > 0 else 0.0
+    largest_loss_pct_of_gross = (largest_loss_val / gross_loss * 100) if gross_loss > 0 else 0.0
 
     # Convert max_drawdown_duration_bars to days
     bars_per_day = 96 if config.interval == "15" else 24  # 15m = 96 bars/day, 1h = 24
     max_dd_duration_bars = calc_metrics.get("max_drawdown_duration_bars", 0)
-    max_dd_duration_days = (
-        max_dd_duration_bars / bars_per_day if bars_per_day > 0 else 0.0
-    )
+    max_dd_duration_days = max_dd_duration_bars / bars_per_day if bars_per_day > 0 else 0.0
 
     # ========== INTRABAR METRICS (TradingView-style simulation from OHLC) ==========
     # TradingView generates synthetic ticks from OHLC: Open → High → Low → Close
@@ -436,9 +404,7 @@ def _build_performance_metrics(
 
     # return_on_account_size = Net Profit / Account Size Required
     net_profit = calc_metrics.get("net_profit", 0)
-    return_on_account_size = (
-        (net_profit / account_size_required * 100) if account_size_required > 0 else 0.0
-    )
+    return_on_account_size = (net_profit / account_size_required * 100) if account_size_required > 0 else 0.0
 
     # total_slippage = sum of slippage applied to all trades
     # Formula: sum(entry_price * size * slippage_pct) for each trade
@@ -452,9 +418,7 @@ def _build_performance_metrics(
             total_slippage += entry_price * size * slippage_pct * 2  # Entry + Exit
 
     # max_contracts_held = maximum position size across all trades
-    max_contracts_held = (
-        max((getattr(t, "size", 0) for t in trades), default=0.0) if trades else 0.0
-    )
+    max_contracts_held = max((getattr(t, "size", 0) for t in trades), default=0.0) if trades else 0.0
 
     # Margin metrics (for leveraged trading)
     leverage = getattr(config, "leverage", 1.0)
@@ -480,14 +444,8 @@ def _build_performance_metrics(
     # Recovery factor per direction
     # recovery_long = long_net_profit / long_max_drawdown
     # recovery_short = short_net_profit / short_max_drawdown
-    long_trades_list = [
-        t for t in trades if getattr(t, "side", "") in ("buy", "long", "BUY", "LONG")
-    ]
-    short_trades_list = [
-        t
-        for t in trades
-        if getattr(t, "side", "") in ("sell", "short", "SELL", "SHORT")
-    ]
+    long_trades_list = [t for t in trades if getattr(t, "side", "") in ("buy", "long", "BUY", "LONG")]
+    short_trades_list = [t for t in trades if getattr(t, "side", "") in ("sell", "short", "SELL", "SHORT")]
 
     long_net = calc_metrics.get("long_net_profit", 0)
     short_net = calc_metrics.get("short_net_profit", 0)
@@ -532,17 +490,11 @@ def _build_performance_metrics(
     return PerformanceMetrics(
         # Net/Gross profit
         net_profit=calc_metrics["net_profit"],
-        net_profit_pct=(calc_metrics["net_profit"] / initial_capital) * 100
-        if initial_capital > 0
-        else 0,
+        net_profit_pct=(calc_metrics["net_profit"] / initial_capital) * 100 if initial_capital > 0 else 0,
         gross_profit=calc_metrics["gross_profit"],
-        gross_profit_pct=(calc_metrics["gross_profit"] / initial_capital) * 100
-        if initial_capital > 0
-        else 0,
+        gross_profit_pct=(calc_metrics["gross_profit"] / initial_capital) * 100 if initial_capital > 0 else 0,
         gross_loss=calc_metrics["gross_loss"],
-        gross_loss_pct=(calc_metrics["gross_loss"] / initial_capital) * 100
-        if initial_capital > 0
-        else 0,
+        gross_loss_pct=(calc_metrics["gross_loss"] / initial_capital) * 100 if initial_capital > 0 else 0,
         total_commission=calc_metrics["total_commission"],
         # Buy & Hold
         buy_hold_return=buy_hold_return,
@@ -558,9 +510,7 @@ def _build_performance_metrics(
         max_drawdown=calc_metrics["max_drawdown"],
         max_drawdown_value=calc_metrics["max_drawdown_value"],
         avg_drawdown=calc_metrics["avg_drawdown"],
-        avg_drawdown_value=calc_metrics["avg_drawdown"]
-        * initial_capital
-        / 100,  # Fix: was multiplying pct by capital
+        avg_drawdown_value=calc_metrics["avg_drawdown"] * initial_capital / 100,  # Fix: was multiplying pct by capital
         max_drawdown_duration_days=max_dd_duration_days,
         max_drawdown_duration_bars=max_dd_duration_bars,
         avg_drawdown_duration_bars=calc_metrics.get("avg_drawdown_duration_bars", 0),
@@ -598,11 +548,7 @@ def _build_performance_metrics(
         avg_bars_in_trade=avg_bars_in_trade,
         avg_bars_in_winning=avg_bars_in_winning,
         avg_bars_in_losing=avg_bars_in_losing,
-        avg_trade_duration_hours=np.mean(
-            [getattr(t, "duration_hours", 0) or 0 for t in trades]
-        )
-        if trades
-        else 0,
+        avg_trade_duration_hours=np.mean([getattr(t, "duration_hours", 0) or 0 for t in trades]) if trades else 0,
         # Win/Loss Ratio
         avg_win_loss_ratio=avg_win_loss_ratio,
         # Largest as pct of gross
@@ -620,23 +566,16 @@ def _build_performance_metrics(
         max_runup=calc_metrics["max_runup"],
         max_runup_value=calc_metrics["max_runup_value"],
         avg_runup=calc_metrics["avg_runup"],
-        avg_runup_value=calc_metrics.get(
-            "avg_runup_value", calc_metrics["avg_runup"] * initial_capital
-        ),
+        avg_runup_value=calc_metrics.get("avg_runup_value", calc_metrics["avg_runup"] * initial_capital),
         # TradingView comparison metrics
         strategy_outperformance=(total_return * 100) - buy_hold_return_pct,
-        net_profit_to_largest_loss=calc_metrics["net_profit"]
-        / abs(calc_metrics["largest_loss_value"])
+        net_profit_to_largest_loss=calc_metrics["net_profit"] / abs(calc_metrics["largest_loss_value"])
         if calc_metrics["largest_loss_value"] != 0
         else 0.0,
         # P&L Distribution
         pnl_distribution=pnl_distribution or [],
-        avg_profit_pct=np.mean([t.pnl_pct for t in winning_trades_list])
-        if winning_trades_list
-        else 0.0,
-        avg_loss_pct=abs(np.mean([t.pnl_pct for t in losing_trades_list]))
-        if losing_trades_list
-        else 0.0,
+        avg_profit_pct=np.mean([t.pnl_pct for t in winning_trades_list]) if winning_trades_list else 0.0,
+        avg_loss_pct=abs(np.mean([t.pnl_pct for t in losing_trades_list])) if losing_trades_list else 0.0,
         # ===== NEW: Additional calculated metrics =====
         closed_trades=closed_trades,
         account_size_required=account_size_required,
@@ -656,20 +595,14 @@ def _build_performance_metrics(
         long_winning_trades=calc_metrics["long_winning_trades"],
         long_losing_trades=calc_metrics["long_losing_trades"],
         long_pnl=calc_metrics["long_net_profit"],
-        long_pnl_pct=(calc_metrics["long_net_profit"] / initial_capital * 100)
-        if initial_capital > 0
-        else 0.0,
+        long_pnl_pct=(calc_metrics["long_net_profit"] / initial_capital * 100) if initial_capital > 0 else 0.0,
         long_win_rate=calc_metrics["long_win_rate"],
         long_gross_profit=calc_metrics["long_gross_profit"],
-        long_gross_profit_pct=(
-            calc_metrics["long_gross_profit"] / initial_capital * 100
-        )
+        long_gross_profit_pct=(calc_metrics["long_gross_profit"] / initial_capital * 100)
         if initial_capital > 0
         else 0.0,
         long_gross_loss=calc_metrics["long_gross_loss"],
-        long_gross_loss_pct=(calc_metrics["long_gross_loss"] / initial_capital * 100)
-        if initial_capital > 0
-        else 0.0,
+        long_gross_loss_pct=(calc_metrics["long_gross_loss"] / initial_capital * 100) if initial_capital > 0 else 0.0,
         long_net_profit=calc_metrics["long_net_profit"],
         long_profit_factor=min(calc_metrics["long_profit_factor"], 999.99),
         # Long Averages (Value & Pct)
@@ -700,20 +633,14 @@ def _build_performance_metrics(
         short_winning_trades=calc_metrics["short_winning_trades"],
         short_losing_trades=calc_metrics["short_losing_trades"],
         short_pnl=calc_metrics["short_net_profit"],
-        short_pnl_pct=(calc_metrics["short_net_profit"] / initial_capital * 100)
-        if initial_capital > 0
-        else 0.0,
+        short_pnl_pct=(calc_metrics["short_net_profit"] / initial_capital * 100) if initial_capital > 0 else 0.0,
         short_win_rate=calc_metrics["short_win_rate"],
         short_gross_profit=calc_metrics["short_gross_profit"],
-        short_gross_profit_pct=(
-            calc_metrics["short_gross_profit"] / initial_capital * 100
-        )
+        short_gross_profit_pct=(calc_metrics["short_gross_profit"] / initial_capital * 100)
         if initial_capital > 0
         else 0.0,
         short_gross_loss=calc_metrics["short_gross_loss"],
-        short_gross_loss_pct=(calc_metrics["short_gross_loss"] / initial_capital * 100)
-        if initial_capital > 0
-        else 0.0,
+        short_gross_loss_pct=(calc_metrics["short_gross_loss"] / initial_capital * 100) if initial_capital > 0 else 0.0,
         short_net_profit=calc_metrics["short_net_profit"],
         short_profit_factor=min(calc_metrics["short_profit_factor"], 999.99),
         # Short Averages (Value & Pct)
@@ -742,24 +669,12 @@ def _build_performance_metrics(
         # ===== NEW: LONG/SHORT ADVANCED METRICS (TradingView) =====
         # Sharpe/Sortino per direction (using overall values as baseline -
         # true per-direction calculation would require separate equity curves)
-        sharpe_long=calc_metrics["sharpe_ratio"]
-        if calc_metrics["long_trades"] > 0
-        else 0.0,
-        sharpe_short=calc_metrics["sharpe_ratio"]
-        if calc_metrics["short_trades"] > 0
-        else 0.0,
-        sortino_long=calc_metrics["sortino_ratio"]
-        if calc_metrics["long_trades"] > 0
-        else 0.0,
-        sortino_short=calc_metrics["sortino_ratio"]
-        if calc_metrics["short_trades"] > 0
-        else 0.0,
-        calmar_long=calc_metrics["calmar_ratio"]
-        if calc_metrics["long_trades"] > 0
-        else 0.0,
-        calmar_short=calc_metrics["calmar_ratio"]
-        if calc_metrics["short_trades"] > 0
-        else 0.0,
+        sharpe_long=calc_metrics["sharpe_ratio"] if calc_metrics["long_trades"] > 0 else 0.0,
+        sharpe_short=calc_metrics["sharpe_ratio"] if calc_metrics["short_trades"] > 0 else 0.0,
+        sortino_long=calc_metrics["sortino_ratio"] if calc_metrics["long_trades"] > 0 else 0.0,
+        sortino_short=calc_metrics["sortino_ratio"] if calc_metrics["short_trades"] > 0 else 0.0,
+        calmar_long=calc_metrics["calmar_ratio"] if calc_metrics["long_trades"] > 0 else 0.0,
+        calmar_short=calc_metrics["calmar_ratio"] if calc_metrics["short_trades"] > 0 else 0.0,
         # Expectancy per direction
         long_expectancy=(
             calc_metrics["long_win_rate"] / 100 * calc_metrics["long_avg_win"]
@@ -769,8 +684,7 @@ def _build_performance_metrics(
         else 0.0,
         short_expectancy=(
             calc_metrics["short_win_rate"] / 100 * calc_metrics["short_avg_win"]
-            + (1 - calc_metrics["short_win_rate"] / 100)
-            * calc_metrics["short_avg_loss"]
+            + (1 - calc_metrics["short_win_rate"] / 100) * calc_metrics["short_avg_loss"]
         )
         if calc_metrics["short_trades"] > 0
         else 0.0,
@@ -780,27 +694,17 @@ def _build_performance_metrics(
         long_largest_loss_pct=calc_metrics["long_largest_loss_pct"],
         short_largest_loss_pct=calc_metrics["short_largest_loss_pct"],
         # Largest as % of gross
-        long_largest_win_pct_of_gross=(
-            calc_metrics["long_largest_win"] / calc_metrics["long_gross_profit"] * 100
-        )
+        long_largest_win_pct_of_gross=(calc_metrics["long_largest_win"] / calc_metrics["long_gross_profit"] * 100)
         if calc_metrics["long_gross_profit"] > 0
         else 0.0,
-        short_largest_win_pct_of_gross=(
-            calc_metrics["short_largest_win"] / calc_metrics["short_gross_profit"] * 100
-        )
+        short_largest_win_pct_of_gross=(calc_metrics["short_largest_win"] / calc_metrics["short_gross_profit"] * 100)
         if calc_metrics["short_gross_profit"] > 0
         else 0.0,
-        long_largest_loss_pct_of_gross=(
-            abs(calc_metrics["long_largest_loss"])
-            / calc_metrics["long_gross_loss"]
-            * 100
-        )
+        long_largest_loss_pct_of_gross=(abs(calc_metrics["long_largest_loss"]) / calc_metrics["long_gross_loss"] * 100)
         if calc_metrics["long_gross_loss"] > 0
         else 0.0,
         short_largest_loss_pct_of_gross=(
-            abs(calc_metrics["short_largest_loss"])
-            / calc_metrics["short_gross_loss"]
-            * 100
+            abs(calc_metrics["short_largest_loss"]) / calc_metrics["short_gross_loss"] * 100
         )
         if calc_metrics["short_gross_loss"] > 0
         else 0.0,
@@ -808,34 +712,22 @@ def _build_performance_metrics(
         long_return_on_capital=(calc_metrics["long_net_profit"] / initial_capital * 100)
         if initial_capital > 0
         else 0.0,
-        short_return_on_capital=(
-            calc_metrics["short_net_profit"] / initial_capital * 100
-        )
+        short_return_on_capital=(calc_metrics["short_net_profit"] / initial_capital * 100)
         if initial_capital > 0
         else 0.0,
         # Return on account size per direction
-        long_return_on_account_size=(
-            calc_metrics["long_net_profit"] / account_size_required * 100
-        )
+        long_return_on_account_size=(calc_metrics["long_net_profit"] / account_size_required * 100)
         if account_size_required > 0
         else 0.0,
-        short_return_on_account_size=(
-            calc_metrics["short_net_profit"] / account_size_required * 100
-        )
+        short_return_on_account_size=(calc_metrics["short_net_profit"] / account_size_required * 100)
         if account_size_required > 0
         else 0.0,
         # Net profit as % of largest loss per direction
-        long_net_profit_to_largest_loss=(
-            calc_metrics["long_net_profit"]
-            / abs(calc_metrics["long_largest_loss"])
-            * 100
-        )
+        long_net_profit_to_largest_loss=(calc_metrics["long_net_profit"] / abs(calc_metrics["long_largest_loss"]) * 100)
         if calc_metrics["long_largest_loss"] != 0
         else 0.0,
         short_net_profit_to_largest_loss=(
-            calc_metrics["short_net_profit"]
-            / abs(calc_metrics["short_largest_loss"])
-            * 100
+            calc_metrics["short_net_profit"] / abs(calc_metrics["short_largest_loss"]) * 100
         )
         if calc_metrics["short_largest_loss"] != 0
         else 0.0,
@@ -890,6 +782,9 @@ class BacktestEngine:
         """
         backtest_id = str(uuid.uuid4())
         created_at = utc_now()
+
+        # Store interval for adaptive minimum bars validation
+        self._current_interval = config.interval
 
         if not silent:
             logger.info(
@@ -995,9 +890,7 @@ class BacktestEngine:
             if "timestamp" in ohlcv.columns:
                 ohlcv.index = pd.to_datetime(ohlcv["timestamp"])
             else:
-                raise ValueError(
-                    "OHLCV data must have DatetimeIndex or 'timestamp' column"
-                )
+                raise ValueError("OHLCV data must have DatetimeIndex or 'timestamp' column")
 
         # Sort by time
         ohlcv = ohlcv.sort_index()
@@ -1008,28 +901,30 @@ class BacktestEngine:
         # Validate OHLC data integrity
         if "high" in ohlcv.columns and "low" in ohlcv.columns:
             # Check for invalid OHLC relationships
-            invalid_bars = (
-                (ohlcv["high"] < ohlcv["low"])
-                | (ohlcv["close"] <= 0)
-                | (ohlcv["open"] <= 0)
-            )
+            invalid_bars = (ohlcv["high"] < ohlcv["low"]) | (ohlcv["close"] <= 0) | (ohlcv["open"] <= 0)
             if invalid_bars.any():
                 invalid_count = invalid_bars.sum()
-                logger.warning(
-                    f"Found {invalid_count} bars with invalid OHLC data, removing them"
-                )
+                logger.warning(f"Found {invalid_count} bars with invalid OHLC data, removing them")
                 ohlcv = ohlcv[~invalid_bars]
 
-        if len(ohlcv) < 50:
-            raise ValueError(
-                f"Insufficient data: {len(ohlcv)} rows (minimum 50 required)"
-            )
+        # Adaptive minimum bars based on timeframe
+        # Data starts from 2025-01-01, so D/W/M have limited history
+        min_bars = 50  # Default for intraday (1m-4h)
+        if hasattr(self, "_current_interval"):
+            interval = self._current_interval
+            if interval in ("D", "1d"):
+                min_bars = 10  # ~10 days minimum
+            elif interval in ("W", "1w"):
+                min_bars = 4  # ~1 month minimum
+            elif interval in ("M", "1M"):
+                min_bars = 2  # ~2 months minimum
+
+        if len(ohlcv) < min_bars:
+            raise ValueError(f"Insufficient data: {len(ohlcv)} rows (minimum {min_bars} required for this timeframe)")
 
         return ohlcv
 
-    def _extract_trades_vectorbt(
-        self, pf, ohlcv: pd.DataFrame, config: "BacktestConfig"
-    ) -> list[TradeRecord]:
+    def _extract_trades_vectorbt(self, pf, ohlcv: pd.DataFrame, config: "BacktestConfig") -> list[TradeRecord]:
         """Extract trades from vectorbt portfolio with MAE/MFE calculation.
 
         Normalizes size/PnL/fees to match fallback engine's calculation:
@@ -1092,30 +987,22 @@ class BacktestEngine:
 
                 # If indices not available, compute from timestamps
                 if entry_idx is None or entry_idx == 0:
-                    if hasattr(entry_time, "to_pydatetime") or isinstance(
-                        entry_time, (datetime, pd.Timestamp)
-                    ):
+                    if hasattr(entry_time, "to_pydatetime") or isinstance(entry_time, (datetime, pd.Timestamp)):
                         try:
                             entry_idx = ohlcv.index.get_loc(entry_time)
                         except KeyError:
                             # Find nearest index
-                            entry_idx = ohlcv.index.get_indexer(
-                                [entry_time], method="nearest"
-                            )[0]
+                            entry_idx = ohlcv.index.get_indexer([entry_time], method="nearest")[0]
                     else:
                         entry_idx = 0
 
                 if exit_idx is None or exit_idx == 0:
-                    if hasattr(exit_time, "to_pydatetime") or isinstance(
-                        exit_time, (datetime, pd.Timestamp)
-                    ):
+                    if hasattr(exit_time, "to_pydatetime") or isinstance(exit_time, (datetime, pd.Timestamp)):
                         try:
                             exit_idx = ohlcv.index.get_loc(exit_time)
                         except KeyError:
                             # Find nearest index
-                            exit_idx = ohlcv.index.get_indexer(
-                                [exit_time], method="nearest"
-                            )[0]
+                            exit_idx = ohlcv.index.get_indexer([exit_time], method="nearest")[0]
                     else:
                         exit_idx = 0
 
@@ -1126,9 +1013,7 @@ class BacktestEngine:
                     exit_time = ohlcv.index[min(int(exit_time), len(ohlcv) - 1)]
 
                 # Use VBT's original entry price (already includes slippage from Portfolio.from_signals)
-                entry_price = float(
-                    row.get("Avg Entry Price", row.get("Entry Price", 0))
-                )
+                entry_price = float(row.get("Avg Entry Price", row.get("Entry Price", 0)))
                 exit_price = float(row.get("Avg Exit Price", row.get("Exit Price", 0)))
 
                 # Determine side (is_long already set above for filtering)
@@ -1150,38 +1035,30 @@ class BacktestEngine:
                 if has_custom_sltp:
                     # vectorbt_sltp.py already does correct cash tracking
                     # Use VBT's size directly - it's calculated correctly in flex_order_func_nb
+                    # Size now includes leverage (size = margin * leverage / price)
                     normalized_size = vbt_size
 
-                    # Calculate PnL using VBT size and fallback formula
+                    # Calculate PnL using VBT size (size already includes leverage)
                     position_value_exit = normalized_size * exit_price
                     exit_fees = position_value_exit * taker_fee
 
                     if is_long:
-                        normalized_pnl = (
-                            exit_price - entry_price
-                        ) * normalized_size * leverage - exit_fees
+                        normalized_pnl = (exit_price - entry_price) * normalized_size - exit_fees
                     else:
-                        normalized_pnl = (
-                            entry_price - exit_price
-                        ) * normalized_size * leverage - exit_fees
+                        normalized_pnl = (entry_price - exit_price) * normalized_size - exit_fees
 
                     # Entry fees
                     position_value_entry = normalized_size * entry_price
                     entry_fees = position_value_entry * taker_fee
                     total_fees = entry_fees + exit_fees
 
-                    # Update running_cash using leveraged PnL for Short trades
-                    # This matches vectorbt_sltp.py state tracking
+                    # Update running_cash (size already includes leverage)
                     if is_long:
-                        cash_delta = (
-                            normalized_size * (exit_price - entry_price) - total_fees
-                        )
+                        cash_delta = normalized_size * (exit_price - entry_price) - total_fees
                     else:
-                        # Short: leverage PnL is added to cash
+                        # Short: PnL based on price difference
                         price_diff = entry_price - exit_price
-                        cash_delta = (
-                            normalized_size * price_diff * leverage - total_fees
-                        )
+                        cash_delta = normalized_size * price_diff - total_fees
                     running_cash = running_cash + cash_delta
                 else:
                     # Legacy path: from_signals without custom cash tracking
@@ -1189,32 +1066,25 @@ class BacktestEngine:
                     position_size_pct = getattr(config, "position_size", 1.0)
                     allocated_capital = running_cash * position_size_pct
 
-                    normalized_size = allocated_capital / (
-                        entry_price * (1 + taker_fee)
-                    )
+                    # Position size includes leverage for margin trading
+                    # size = (margin * leverage) / price
+                    normalized_size = (allocated_capital * leverage) / (entry_price * (1 + taker_fee))
 
-                    # Recalculate PnL
+                    # Recalculate PnL (size already includes leverage)
                     position_value_exit = normalized_size * exit_price
                     exit_fees = position_value_exit * taker_fee
 
                     if is_long:
-                        normalized_pnl = (
-                            exit_price - entry_price
-                        ) * normalized_size * leverage - exit_fees
+                        normalized_pnl = (exit_price - entry_price) * normalized_size - exit_fees
                     else:
-                        normalized_pnl = (
-                            entry_price - exit_price
-                        ) * normalized_size * leverage - exit_fees
+                        normalized_pnl = (entry_price - exit_price) * normalized_size - exit_fees
 
                     position_value_entry = normalized_size * entry_price
                     entry_fees = position_value_entry * taker_fee
                     total_fees = entry_fees + exit_fees
 
-                    price_diff = (
-                        exit_price - entry_price
-                        if is_long
-                        else entry_price - exit_price
-                    )
+                    price_diff = exit_price - entry_price if is_long else entry_price - exit_price
+                    # Cash change = margin returned + PnL (size already includes leverage)
                     cash_delta = normalized_size * price_diff - total_fees
                     running_cash = running_cash + cash_delta
 
@@ -1235,57 +1105,33 @@ class BacktestEngine:
                                 # Long: MFE = best high - entry, MAE = entry - worst low
                                 mfe_pct = (trade_high - entry_price) / entry_price * 100
                                 mae_pct = (entry_price - trade_low) / entry_price * 100
-                                # Absolute values in USDT
-                                mfe = (
-                                    (trade_high - entry_price)
-                                    * normalized_size
-                                    * leverage
-                                )
-                                mae = (
-                                    (entry_price - trade_low)
-                                    * normalized_size
-                                    * leverage
-                                )
+                                # Absolute values in USDT (size already includes leverage)
+                                mfe = (trade_high - entry_price) * normalized_size
+                                mae = (entry_price - trade_low) * normalized_size
                             else:
                                 # Short: MFE = entry - best low, MAE = worst high - entry
                                 mfe_pct = (entry_price - trade_low) / entry_price * 100
                                 mae_pct = (trade_high - entry_price) / entry_price * 100
-                                mfe = (
-                                    (entry_price - trade_low)
-                                    * normalized_size
-                                    * leverage
-                                )
-                                mae = (
-                                    (trade_high - entry_price)
-                                    * normalized_size
-                                    * leverage
-                                )
+                                mfe = (entry_price - trade_low) * normalized_size
+                                mae = (trade_high - entry_price) * normalized_size
                     except Exception as e:
                         logger.debug("MFE/MAE calculation failed, using defaults: {}", e)
 
                 # Calculate duration
                 if hasattr(entry_time, "timestamp") and hasattr(exit_time, "timestamp"):
-                    duration_hours = (
-                        exit_time.timestamp() - entry_time.timestamp()
-                    ) / 3600
+                    duration_hours = (exit_time.timestamp() - entry_time.timestamp()) / 3600
                 else:
                     duration_hours = 0
 
                 # Calculate PnL percentage (as percentage 0-100) relative to initial capital
-                pnl_pct = (
-                    (normalized_pnl / initial_capital * 100)
-                    if initial_capital and initial_capital > 0
-                    else 0
-                )
+                pnl_pct = (normalized_pnl / initial_capital * 100) if initial_capital and initial_capital > 0 else 0
 
                 trade = TradeRecord(
                     id=str(idx),
                     entry_time=entry_time
                     if isinstance(entry_time, datetime)
                     else pd.Timestamp(entry_time).to_pydatetime(),
-                    exit_time=exit_time
-                    if isinstance(exit_time, datetime)
-                    else pd.Timestamp(exit_time).to_pydatetime(),
+                    exit_time=exit_time if isinstance(exit_time, datetime) else pd.Timestamp(exit_time).to_pydatetime(),
                     entry_price=entry_price,
                     exit_price=exit_price,
                     side=side,
@@ -1294,9 +1140,7 @@ class BacktestEngine:
                     pnl_pct=pnl_pct,
                     fees=total_fees,
                     duration_hours=duration_hours,
-                    bars_in_trade=int(exit_idx - entry_idx)
-                    if exit_idx and entry_idx
-                    else 0,
+                    bars_in_trade=int(exit_idx - entry_idx) if exit_idx and entry_idx else 0,
                     entry_bar_index=int(entry_idx) if entry_idx else 0,
                     exit_bar_index=int(exit_idx) if exit_idx else 0,
                     mae=mae,
@@ -1356,22 +1200,35 @@ class BacktestEngine:
         open_price = ohlcv["open"].values if "open" in ohlcv.columns else close  # noqa: F841
         high = ohlcv["high"].values if "high" in ohlcv.columns else close
         low = ohlcv["low"].values if "low" in ohlcv.columns else close
-        entries = signals.entries.values
+        entries = np.asarray(signals.entries.values, dtype=bool).copy()
         exits = signals.exits.values
 
         # Get long/short signals if available
         long_entries = (
-            signals.long_entries.values if hasattr(signals, "long_entries") else entries
+            np.asarray(signals.long_entries.values, dtype=bool).copy()
+            if hasattr(signals, "long_entries")
+            else entries.copy()
         )
         short_entries = (
-            signals.short_entries.values if hasattr(signals, "short_entries") else None
+            np.asarray(signals.short_entries.values, dtype=bool).copy()
+            if hasattr(signals, "short_entries") and signals.short_entries is not None
+            else None
         )
-        long_exits = (
-            signals.long_exits.values if hasattr(signals, "long_exits") else exits
-        )
-        short_exits = (
-            signals.short_exits.values if hasattr(signals, "short_exits") else None
-        )
+        long_exits = signals.long_exits.values if hasattr(signals, "long_exits") else exits
+        short_exits = signals.short_exits.values if hasattr(signals, "short_exits") else None
+
+        # Mask entries on blocked weekdays (0=Mon … 6=Sun)
+        no_trade_days = getattr(config, "no_trade_days", ()) or ()
+        if no_trade_days and hasattr(ohlcv.index, "weekday"):
+            no_trade_set = set(no_trade_days)
+            for i in range(len(ohlcv)):
+                ts = ohlcv.index[i]
+                wd = ts.weekday() if hasattr(ts, "weekday") else getattr(ts, "dayofweek", 0)
+                if wd in no_trade_set:
+                    entries[i] = False
+                    long_entries[i] = False
+                    if short_entries is not None:
+                        short_entries[i] = False
 
         # Get direction and TP/SL
         direction = getattr(config, "direction", "both")
@@ -1486,20 +1343,19 @@ class BacktestEngine:
                 if direction in ("long", "both") and long_entries[i]:
                     entry_price = price * (1 + slippage)
 
-                    # Calculate max affordable position size including fees
-                    # Cost = Size * Price + Size * Price * Fee
-                    # Cap = Size * Price * (1 + Fee)
-                    # Size = Cap / (Price * (1 + Fee))
+                    # Calculate position size with leverage
+                    # Bybit formula: Position Value = Margin × Leverage
+                    # allocated_capital = margin (what we risk from our cash)
+                    # position_value = notional value of the position
+                    # entry_size = quantity in base currency (e.g., BTC)
 
-                    allocated_capital = cash * config.position_size
-                    entry_size = allocated_capital / (
-                        entry_price * (1 + config.taker_fee)
-                    )
+                    allocated_capital = cash * config.position_size  # margin
+                    position_value = allocated_capital * leverage  # notional with leverage
+                    entry_size = position_value / (entry_price * (1 + config.taker_fee))
 
-                    position_value = entry_size * entry_price
                     fees = position_value * config.taker_fee
 
-                    cash -= position_value + fees
+                    cash -= allocated_capital + fees  # Only deduct margin, not full position
                     position = entry_size
                     is_long = True
                     entry_time = timestamps[i]
@@ -1510,28 +1366,19 @@ class BacktestEngine:
                     max_adverse_price = current_low  # Worst low so far
 
                 # Short entry
-                elif (
-                    direction in ("short", "both")
-                    and short_entries is not None
-                    and short_entries[i]
-                ):
+                elif direction in ("short", "both") and short_entries is not None and short_entries[i]:
                     entry_price = price * (1 - slippage)
 
-                    # Calculate max affordable position size including fees
-                    # For short: Margin + Fee = Capital
-                    # We assume 1x leverage margin req = position value
+                    # Calculate position size with leverage (same as long)
+                    # Bybit formula: Position Value = Margin × Leverage
 
-                    allocated_capital = cash * config.position_size
-                    entry_size = allocated_capital / (
-                        entry_price * (1 + config.taker_fee)
-                    )
+                    allocated_capital = cash * config.position_size  # margin
+                    position_value = allocated_capital * leverage  # notional with leverage
+                    entry_size = position_value / (entry_price * (1 + config.taker_fee))
 
-                    position_value = entry_size * entry_price
                     fees = position_value * config.taker_fee
 
-                    cash -= (
-                        position_value + fees
-                    )  # Reserve margin for short (same as long)
+                    cash -= allocated_capital + fees  # Only deduct margin, not full position
                     position = entry_size
                     is_long = False
                     entry_time = timestamps[i]
@@ -1551,19 +1398,13 @@ class BacktestEngine:
                         interval_ms = self._get_interval_ms(config.interval)
                         bar_end_ms = bar_start_ms + interval_ms
 
-                        for tick in intrabar_engine.generate_ticks(
-                            bar_start_ms, bar_end_ms
-                        ):
+                        for tick in intrabar_engine.generate_ticks(bar_start_ms, bar_end_ms):
                             tick_price = tick.price
                             if is_long:
-                                max_favorable_price = max(
-                                    max_favorable_price, tick_price
-                                )
+                                max_favorable_price = max(max_favorable_price, tick_price)
                                 max_adverse_price = min(max_adverse_price, tick_price)
                             else:
-                                max_favorable_price = min(
-                                    max_favorable_price, tick_price
-                                )
+                                max_favorable_price = min(max_favorable_price, tick_price)
                                 max_adverse_price = max(max_adverse_price, tick_price)
                     except Exception:
                         # Fallback to OHLC-based MFE/MAE
@@ -1594,26 +1435,16 @@ class BacktestEngine:
 
                 # Calculate P/L % at worst and best points within bar
                 if is_long:
-                    worst_pnl_pct = (
-                        (worst_price_in_bar - entry_price) / entry_price * leverage
-                    )
-                    best_pnl_pct = (
-                        (best_price_in_bar - entry_price) / entry_price * leverage
-                    )
+                    worst_pnl_pct = (worst_price_in_bar - entry_price) / entry_price * leverage
+                    best_pnl_pct = (best_price_in_bar - entry_price) / entry_price * leverage
                 else:
-                    worst_pnl_pct = (
-                        (entry_price - worst_price_in_bar) / entry_price * leverage
-                    )
-                    best_pnl_pct = (
-                        (entry_price - best_price_in_bar) / entry_price * leverage
-                    )
+                    worst_pnl_pct = (entry_price - worst_price_in_bar) / entry_price * leverage
+                    best_pnl_pct = (entry_price - best_price_in_bar) / entry_price * leverage
 
                 should_exit = False
                 exit_reason = ""
                 exit_price = price  # Default to close price
-                apply_slippage = (
-                    True  # Signal exits use market orders -> slippage applies
-                )
+                apply_slippage = True  # Signal exits use market orders -> slippage applies
 
                 # ========== UNIVERSAL BAR MAGNIFIER SL/TP CHECK ==========
                 # If IntrabarEngine is enabled, use 1m intrabar ticks for precise detection
@@ -1626,35 +1457,17 @@ class BacktestEngine:
 
                         # Calculate SL/TP prices
                         if is_long:
-                            sl_price = (
-                                entry_price * (1 - stop_loss / leverage)
-                                if stop_loss
-                                else None
-                            )
-                            tp_price = (
-                                entry_price * (1 + take_profit / leverage)
-                                if take_profit
-                                else None
-                            )
+                            sl_price = entry_price * (1 - stop_loss / leverage) if stop_loss else None
+                            tp_price = entry_price * (1 + take_profit / leverage) if take_profit else None
                         else:
-                            sl_price = (
-                                entry_price * (1 + stop_loss / leverage)
-                                if stop_loss
-                                else None
-                            )
-                            tp_price = (
-                                entry_price * (1 - take_profit / leverage)
-                                if take_profit
-                                else None
-                            )
+                            sl_price = entry_price * (1 + stop_loss / leverage) if stop_loss else None
+                            tp_price = entry_price * (1 - take_profit / leverage) if take_profit else None
 
                         # Check SL/TP on each tick - find which triggers FIRST
                         sl_triggered_at = None  # (tick_index, fill_price)
                         tp_triggered_at = None
 
-                        for tick_idx, tick in enumerate(
-                            intrabar_engine.generate_ticks(bar_start_ms, bar_end_ms)
-                        ):
+                        for tick_idx, tick in enumerate(intrabar_engine.generate_ticks(bar_start_ms, bar_end_ms)):
                             tick_price = tick.price
 
                             # Check SL trigger
@@ -1712,9 +1525,7 @@ class BacktestEngine:
                             apply_slippage = False
 
                     except Exception as e:
-                        logger.debug(
-                            f"[UNIVERSAL_BAR_MAGNIFIER] Intrabar check failed: {e}"
-                        )
+                        logger.debug(f"[UNIVERSAL_BAR_MAGNIFIER] Intrabar check failed: {e}")
                         # Fall through to standard check
 
                 # Standard SL/TP check (no Bar Magnifier or fallback)
@@ -1765,53 +1576,43 @@ class BacktestEngine:
                             exit_price = exit_price * (1 + slippage)
 
                     # Close position at calculated exit price
+                    # position (entry_size) already includes leverage effect on quantity
+                    # position_value = notional value of the leveraged position
                     position_value = position * exit_price
                     fees = position_value * config.taker_fee
 
+                    # Calculate PnL (entry_size already reflects leveraged quantity)
+                    # PnL = price_diff × qty - fees
                     if is_long:
-                        cash += position_value - fees
-                        pnl = (
-                            (exit_price - entry_price) * entry_size * leverage - fees
-                        )  # Only exit fee (entry fee already in cash)
+                        pnl = (exit_price - entry_price) * entry_size - fees
                     else:
-                        # Short: profit when price goes down
-                        # Return margin + P&L (same structure as long)
-                        pnl = (
-                            (entry_price - exit_price) * entry_size * leverage - fees
-                        )  # Only exit fee (entry fee already in cash)
-                        cash += position_value + pnl  # Return position value + P&L
+                        pnl = (entry_price - exit_price) * entry_size - fees
 
-                    # Calculate P&L percentage
-                    if is_long:
-                        pnl_pct = (exit_price - entry_price) / entry_price * leverage
-                    else:
-                        pnl_pct = (entry_price - exit_price) / entry_price * leverage
+                    # Calculate margin that was originally allocated
+                    # margin = position_value_at_entry / leverage
+                    entry_position_value = entry_size * entry_price
+                    margin_used = entry_position_value / leverage if leverage > 0 else entry_position_value
+
+                    # Return margin + PnL (this is what trader gets back)
+                    cash += margin_used + pnl
+
+                    # Calculate P&L percentage (relative to margin, not position)
+                    pnl_pct = pnl / margin_used if margin_used > 0 else 0
 
                     # Calculate MFE/MAE in % and absolute values (TradingView style)
+                    # Note: entry_size already reflects leveraged quantity
                     if is_long:
-                        mfe_pct = (
-                            (max_favorable_price - entry_price) / entry_price * 100
-                        )
-                        mae_pct = (entry_price - max_adverse_price) / entry_price * 100
-                        # Absolute values (USDT) = price difference × size × leverage
-                        mfe_value = (
-                            (max_favorable_price - entry_price) * entry_size * leverage
-                        )
-                        mae_value = (
-                            (entry_price - max_adverse_price) * entry_size * leverage
-                        )
+                        mfe_pct = (max_favorable_price - entry_price) / entry_price * 100 * leverage
+                        mae_pct = (entry_price - max_adverse_price) / entry_price * 100 * leverage
+                        # Absolute values (USDT) = price difference x size (already leveraged)
+                        mfe_value = (max_favorable_price - entry_price) * entry_size
+                        mae_value = (entry_price - max_adverse_price) * entry_size
                     else:
-                        mfe_pct = (
-                            (entry_price - max_favorable_price) / entry_price * 100
-                        )
-                        mae_pct = (max_adverse_price - entry_price) / entry_price * 100
-                        # Absolute values (USDT) = price difference × size × leverage
-                        mfe_value = (
-                            (entry_price - max_favorable_price) * entry_size * leverage
-                        )
-                        mae_value = (
-                            (max_adverse_price - entry_price) * entry_size * leverage
-                        )
+                        mfe_pct = (entry_price - max_favorable_price) / entry_price * 100 * leverage
+                        mae_pct = (max_adverse_price - entry_price) / entry_price * 100 * leverage
+                        # Absolute values (USDT) = price difference x size (already leveraged)
+                        mfe_value = (entry_price - max_favorable_price) * entry_size
+                        mae_value = (max_adverse_price - entry_price) * entry_size
 
                     logger.debug(
                         f"Trade closed: is_long={is_long}, entry={entry_price:.2f}, "
@@ -1837,9 +1638,7 @@ class BacktestEngine:
 
                     trades.append(
                         TradeRecord(
-                            entry_time=entry_time
-                            if entry_time is not None
-                            else timestamps[i],
+                            entry_time=entry_time if entry_time is not None else timestamps[i],
                             exit_time=timestamps[i],
                             side=OrderSide.BUY if is_long else OrderSide.SELL,
                             entry_price=entry_price,
@@ -1848,8 +1647,7 @@ class BacktestEngine:
                             pnl=pnl,
                             pnl_pct=pnl_pct * 100,  # Convert to percentage
                             fees=total_trade_fees,
-                            duration_hours=(timestamps[i] - entry_time).total_seconds()
-                            / 3600,
+                            duration_hours=(timestamps[i] - entry_time).total_seconds() / 3600,
                             bars_in_trade=i - entry_idx if entry_idx is not None else 0,
                             entry_bar_index=entry_idx if entry_idx is not None else 0,
                             exit_bar_index=i,
@@ -1912,11 +1710,7 @@ class BacktestEngine:
                                     "bin_start": float(bin_edges[i]),
                                     "bin_end": float(bin_edges[i + 1]),
                                     "count": int(count),
-                                    "type": "profit"
-                                    if bin_center > 0
-                                    else "loss"
-                                    if bin_center < 0
-                                    else "breakeven",
+                                    "type": "profit" if bin_center > 0 else "loss" if bin_center < 0 else "breakeven",
                                 }
                             )
 
@@ -1992,9 +1786,7 @@ class BacktestEngine:
         close = ohlcv["close"]
 
         # Check if we have SL/TP configured
-        has_sl_tp = (config.stop_loss and config.stop_loss > 0) or (
-            config.take_profit and config.take_profit > 0
-        )
+        has_sl_tp = (config.stop_loss and config.stop_loss > 0) or (config.take_profit and config.take_profit > 0)
 
         if has_sl_tp:
             # Use our custom from_order_func implementation for SL/TP
@@ -2002,19 +1794,23 @@ class BacktestEngine:
             try:
                 pf = run_vectorbt_with_sltp(ohlcv, signals, config)
             except Exception as e:
-                logger.warning(
-                    f"VectorBT SL/TP simulation failed: {e}, falling back to from_signals"
-                )
+                logger.warning(f"VectorBT SL/TP simulation failed: {e}, falling back to from_signals")
                 has_sl_tp = False  # Fallback to simple mode
 
         if not has_sl_tp:
             # Simple mode without SL/TP - use from_signals
-            order_value = float(config.position_size) * float(config.initial_capital)
+            # Position value = margin × leverage (margin = position_size × capital)
+            # VectorBT uses init_cash to limit position size, so we must multiply by leverage
+            leverage = float(getattr(config, "leverage", 1.0))
+            margin = float(config.position_size) * float(config.initial_capital)
+            order_value = margin * leverage  # Full position value with leverage
+            # VectorBT needs init_cash >= position value to open the trade
+            effective_cash = float(config.initial_capital) * leverage
             pf_kwargs = dict(
                 close=close,
                 entries=signals.entries,
                 exits=signals.exits,
-                init_cash=config.initial_capital,
+                init_cash=effective_cash,  # Simulates buying power with leverage
                 size=order_value,
                 size_type="value",
                 fees=config.taker_fee,
@@ -2041,18 +1837,12 @@ class BacktestEngine:
             if direction == "short":
                 pf_kwargs["entries"] = pd.Series(False, index=close.index)
                 pf_kwargs["exits"] = pd.Series(False, index=close.index)
-                if (
-                    hasattr(signals, "short_entries")
-                    and signals.short_entries is not None
-                ):
+                if hasattr(signals, "short_entries") and signals.short_entries is not None:
                     pf_kwargs["short_entries"] = signals.short_entries
                 if hasattr(signals, "short_exits") and signals.short_exits is not None:
                     pf_kwargs["short_exits"] = signals.short_exits
             elif direction == "both":
-                if (
-                    hasattr(signals, "short_entries")
-                    and signals.short_entries is not None
-                ):
+                if hasattr(signals, "short_entries") and signals.short_entries is not None:
                     pf_kwargs["short_entries"] = signals.short_entries
                 if hasattr(signals, "short_exits") and signals.short_exits is not None:
                     pf_kwargs["short_exits"] = signals.short_exits
@@ -2106,9 +1896,7 @@ class BacktestEngine:
         )
 
         # Use final equity from our leveraged calculation
-        final_equity = (
-            float(equity_values[-1]) if equity_values else config.initial_capital
-        )
+        final_equity = float(equity_values[-1]) if equity_values else config.initial_capital
 
         return BacktestResult(
             id="",  # Will be set by caller
@@ -2120,8 +1908,7 @@ class BacktestEngine:
             equity_curve=equity_curve,
             final_equity=final_equity,
             final_pnl=final_equity - config.initial_capital,
-            final_pnl_pct=(final_equity - config.initial_capital)
-            / config.initial_capital,
+            final_pnl_pct=(final_equity - config.initial_capital) / config.initial_capital,
         )
 
     def get_result(self, backtest_id: str) -> Optional[BacktestResult]:

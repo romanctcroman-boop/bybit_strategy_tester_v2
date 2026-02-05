@@ -6,8 +6,8 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 import sqlite3
+
 import pandas as pd
-import numpy as np
 
 # Load data
 db_path = ROOT / "data.sqlite3"
@@ -35,6 +35,7 @@ class MockConfig:
 
 # Get signals
 from backend.backtesting.strategies import get_strategy
+
 strategy = get_strategy('rsi')
 strategy.params = {'period': 14, 'overbought': 70, 'oversold': 30}
 strategy.direction = 'short'

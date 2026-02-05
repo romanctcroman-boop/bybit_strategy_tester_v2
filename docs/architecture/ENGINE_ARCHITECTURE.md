@@ -108,6 +108,12 @@ python scripts/test_full_metrics_comparison.py
 
 Compares standard mode vs Bar Magnifier (1-minute data) for precision testing.
 
+## Модернизация и Roadmap
+
+См. [ENGINE_OPTIMIZER_MODERNIZATION_PROPOSALS.md](../ENGINE_OPTIMIZER_MODERNIZATION_PROPOSALS.md) — предложения по улучшению движков и оптимизаторов на основе мировых практик (event-driven, Monte Carlo, Bayesian/Optuna, L2, RL и др.).
+
+---
+
 ## Decision History
 
 **January 2026**: After extensive testing, we determined that VectorBT and Fallback

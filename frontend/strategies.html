@@ -117,14 +117,15 @@
                 <label for="strategyTimeframe">Таймфрейм</label>
                 <select id="strategyTimeframe">
                   <option value="" selected disabled>-- Выберите --</option>
-                  <option value="1m">1 минута</option>
-                  <option value="5m">5 минут</option>
-                  <option value="15m">15 минут</option>
-                  <option value="30m">30 минут</option>
-                  <option value="1h">1 час</option>
-                  <option value="4h">4 часа</option>
-                  <option value="1d">1 день</option>
-                  <option value="1w">1 неделя</option>
+                  <option value="1">1m</option>
+                  <option value="5">5m</option>
+                  <option value="15">15m</option>
+                  <option value="30">30m</option>
+                  <option value="60">1h</option>
+                  <option value="240">4h</option>
+                  <option value="D">1D</option>
+                  <option value="W">1W</option>
+                  <option value="M">1M</option>
                 </select>
               </div>
             </div>
@@ -1442,6 +1443,36 @@
                   <p class="section-description" id="searchMethodHint">
                     Grid Search проверяет все комбинации. Random Search быстрее
                     находит хорошие параметры при большом пространстве поиска.
+                  </p>
+                </div>
+
+                <!-- Market Regime Filter (P1) -->
+                <div class="form-section market-regime-section">
+                  <h4 class="section-subtitle">📊 Режим рынка</h4>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="checkbox-label">
+                        <input type="checkbox" id="marketRegimeEnabled" title="Фильтровать сделки по режиму рынка (использует FallbackV4)" />
+                        Фильтр по режиму
+                      </label>
+                    </div>
+                    <div class="form-group">
+                      <label for="marketRegimeFilter">Режим</label>
+                      <select id="marketRegimeFilter" title="Разрешённые режимы">
+                        <option value="all">Все</option>
+                        <option value="trending">Тренд</option>
+                        <option value="ranging">Боковик</option>
+                        <option value="not_volatile" selected>Не волатильно</option>
+                        <option value="volatile">Волатильно</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="marketRegimeLookback">Окно</label>
+                      <input type="number" id="marketRegimeLookback" value="50" min="10" max="200" step="5" title="Окно расчёта режима (бары)" />
+                    </div>
+                  </div>
+                  <p class="section-description">
+                    При включении используется FallbackV4 (медленнее, но точнее).
                   </p>
                 </div>
 

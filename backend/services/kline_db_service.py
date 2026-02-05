@@ -19,11 +19,11 @@ import sqlite3
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -67,13 +67,13 @@ class KlineDBService:
 
     _instance: Optional["KlineDBService"] = None
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or str(PROJECT_ROOT / "data.sqlite3")
         self._write_queue: Queue = Queue(maxsize=10000)
         self._read_lock = Lock()
         self._running = Event()
-        self._writer_thread: Optional[Thread] = None
-        self._connection: Optional[sqlite3.Connection] = None
+        self._writer_thread: Thread | None = None
+        self._connection: sqlite3.Connection | None = None
         self._stats = {
             "inserts": 0,
             "updates": 0,
@@ -84,7 +84,7 @@ class KlineDBService:
         logger.info(f"KlineDBService initialized with DB: {self.db_path}")
 
     @classmethod
-    def get_instance(cls, db_path: Optional[str] = None) -> "KlineDBService":
+    def get_instance(cls, db_path: str | None = None) -> "KlineDBService":
         """Get singleton instance."""
         if cls._instance is None:
             cls._instance = cls(db_path)
@@ -188,7 +188,7 @@ class KlineDBService:
     def _write_loop(self):
         """Background thread for processing write queue."""
         logger.info("Write loop started")
-        batch: List[KlineRecord] = []
+        batch: list[KlineRecord] = []
         batch_size = 100
         flush_interval = 1.0  # seconds
         last_flush = time.time()
@@ -222,7 +222,7 @@ class KlineDBService:
 
         logger.info("Write loop stopped")
 
-    def _flush_batch(self, batch: List[KlineRecord]):
+    def _flush_batch(self, batch: list[KlineRecord]):
         """Flush a batch of records to database."""
         if not batch:
             return
@@ -289,7 +289,7 @@ class KlineDBService:
     # Public API
     # =========================================================================
 
-    def queue_klines(self, symbol: str, interval: str, candles: List[Dict]) -> int:
+    def queue_klines(self, symbol: str, interval: str, candles: list[dict]) -> int:
         """
         Queue candles for database insertion.
 
@@ -307,7 +307,7 @@ class KlineDBService:
                     interval=interval,
                     open_time=open_time,
                     open_time_dt=datetime.fromtimestamp(
-                        open_time / 1000, tz=timezone.utc
+                        open_time / 1000, tz=UTC
                     ),
                     open_price=float(candle.get("open", 0)),
                     high_price=float(candle.get("high", 0)),
@@ -333,8 +333,8 @@ class KlineDBService:
         symbol: str,
         interval: str,
         limit: int = 500,
-        end_time: Optional[int] = None,
-    ) -> List[Dict]:
+        end_time: int | None = None,
+    ) -> list[dict]:
         """
         Get klines from database.
 
@@ -399,7 +399,7 @@ class KlineDBService:
 
     def get_coverage(
         self, symbol: str, interval: str
-    ) -> Optional[Tuple[int, int, int]]:
+    ) -> tuple[int, int, int] | None:
         """
         Get database coverage for a symbol/interval.
 
@@ -429,7 +429,7 @@ class KlineDBService:
                 logger.error(f"Coverage check error: {e}")
                 return None
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get service statistics."""
         return {
             **self._stats,
@@ -437,7 +437,7 @@ class KlineDBService:
             "running": self._running.is_set(),
         }
 
-    def get_all_symbols_summary(self) -> List[Dict]:
+    def get_all_symbols_summary(self) -> list[dict]:
         """Get summary of all symbols in database."""
         with self._read_lock:
             try:

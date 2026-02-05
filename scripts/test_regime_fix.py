@@ -1,17 +1,20 @@
 """Full module test for regime detection"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 print("Starting full module test...")
 
 import os
+
 # Disable numba parallel to avoid hanging
 os.environ['NUMBA_NUM_THREADS'] = '1'
 
+import sqlite3
+
 import numpy as np
 import pandas as pd
-import sqlite3
 
 print("Loading data...")
 

@@ -20,6 +20,30 @@ import {
 
 const API_BASE = "/api/v1";
 
+/** Единый набор таймфреймов: 1m, 5m, 15m, 30m, 60m, 4h, 1D, 1W, 1M */
+const BYBIT_INTERVALS = new Set(["1", "5", "15", "30", "60", "240", "D", "W", "M"]);
+
+/** Маппинг устаревших TF на ближайший из стандартного набора */
+const LEGACY_TF_MAP = { "3": "5", "120": "60", "360": "240", "720": "D" };
+
+/**
+ * Normalize stored timeframe (e.g. 1h, 15m) to Bybit dropdown value (60, 15).
+ * @param {string} tf - Timeframe from API or storage
+ * @returns {string} Value for #strategyTimeframe select
+ */
+function normalizeTimeframeForDropdown(tf) {
+  if (!tf) return "60";
+  const s = String(tf).trim();
+  if (BYBIT_INTERVALS.has(s)) return s;
+  if (LEGACY_TF_MAP[s]) return LEGACY_TF_MAP[s];
+  const map = {
+    "1m": "1", "3m": "5", "5m": "5", "15m": "15", "30m": "30",
+    "1h": "60", "2h": "60", "4h": "240", "6h": "240", "12h": "D",
+    "1d": "D", "1D": "D", "1w": "W", "1W": "W", "1M": "M", "M": "M",
+  };
+  return map[s] ?? "60";
+}
+
 // State
 let strategies = [];
 let strategyTypes = [];
@@ -144,7 +168,7 @@ export function renderStrategies() {
 
             <div class="strategy-meta">
                 <span>📈 ${strategy.symbol || "BTCUSDT"}</span>
-                <span>⏱ ${strategy.timeframe || "1h"}</span>
+                <span>⏱ ${strategy.timeframe || "60"}</span>
                 <span>💰 $${(strategy.initial_capital || 10000).toLocaleString()}</span>
             </div>
 
@@ -249,7 +273,7 @@ export async function editStrategy(id) {
     setVal("strategyType", strategy.strategy_type);
     setVal("strategyStatus", strategy.status);
     setVal("strategySymbol", strategy.symbol || "BTCUSDT");
-    setVal("strategyTimeframe", strategy.timeframe || "1h");
+    setVal("strategyTimeframe", normalizeTimeframeForDropdown(strategy.timeframe) || "60");
     setVal("strategyCapital", strategy.initial_capital || 10000);
     // TP/SL are now in extended fields (common TP/SL section)
     setVal("strategyTargetProfit", strategy.take_profit_pct || 1);
@@ -516,7 +540,7 @@ export async function saveStrategy() {
     strategy_type: document.getElementById("strategyType")?.value,
     status: document.getElementById("strategyStatus")?.value,
     symbol: document.getElementById("strategySymbol")?.value || "BTCUSDT",
-    timeframe: document.getElementById("strategyTimeframe")?.value || "1h",
+    timeframe: document.getElementById("strategyTimeframe")?.value || "60",
     initial_capital:
       parseFloat(document.getElementById("strategyCapital")?.value) || 10000,
     position_size: positionSizeForDB,

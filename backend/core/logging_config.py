@@ -44,8 +44,8 @@ LOGURU_FORMAT = (
 
 def setup_logging(
     level: str = "INFO",
-    log_file: Optional[Path] = None,
-    format_string: Optional[str] = None,
+    log_file: Path | None = None,
+    format_string: str | None = None,
     enable_console: bool = True,
 ) -> None:
     """
@@ -128,7 +128,7 @@ def set_log_level(level: str) -> None:
 
 def setup_loguru(
     level: str = "INFO",
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     rotation: str = "10 MB",
     retention: str = "7 days",
 ) -> None:
@@ -224,13 +224,13 @@ if LOGURU_AVAILABLE:
 
 
 __all__ = [
-    "setup_logging",
-    "setup_loguru",
+    "DEFAULT_FORMAT",
+    "LOGURU_AVAILABLE",
+    "LOGURU_FORMAT",
+    "SIMPLE_FORMAT",
+    "enable_loguru_intercept",
     "get_logger",
     "set_log_level",
-    "enable_loguru_intercept",
-    "DEFAULT_FORMAT",
-    "SIMPLE_FORMAT",
-    "LOGURU_FORMAT",
-    "LOGURU_AVAILABLE",
+    "setup_logging",
+    "setup_loguru",
 ]

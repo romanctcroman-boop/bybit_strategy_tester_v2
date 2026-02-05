@@ -1,4 +1,4 @@
-﻿# Byte-compiled / optimized / DLL files
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
@@ -442,8 +442,14 @@ test_e2e_test_*/
 test_eval_test_*/
 test_memory_test_*/
 test_integration_test_*/
+test_reflection_test_*/
+test_rlhf_test_*/
 test_feedback/
 test_memory/
+
+# Temporary test files in root (debug/dev)
+/test_*.py
+!/tests/test_*.py
 
 # Journal files
 journal/

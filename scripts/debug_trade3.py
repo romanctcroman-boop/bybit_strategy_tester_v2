@@ -6,10 +6,10 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 import sqlite3
-import pandas as pd
-import numpy as np
 
-# Load data  
+import pandas as pd
+
+# Load data
 db_path = ROOT / "data.sqlite3"
 conn = sqlite3.connect(str(db_path))
 df = pd.read_sql(
@@ -27,10 +27,10 @@ tp_pct = 0.04
 leverage = 10.0
 tp_price = entry_price * (1 + tp_pct / leverage)
 
-print(f"Trade 3 Analysis:")
+print("Trade 3 Analysis:")
 print(f"  Entry price: {entry_price}")
 print(f"  TP price (calculated): {tp_price:.2f}")
-print(f"  FB exit: 95037.00")
+print("  FB exit: 95037.00")
 
 # Find entry bar (where close ≈ entry price)
 entry_idx = None

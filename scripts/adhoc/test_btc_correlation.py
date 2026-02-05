@@ -118,7 +118,7 @@ def test_btc_correlation_with_real_data():
         print(f"   BTCUSDT 60m: {len(btc_htf)} bars")
         return True  # Skip but don't fail
 
-    print(f"Loaded data:")
+    print("Loaded data:")
     print(f"  ETHUSDT 15m: {len(eth_ltf)} bars")
     print(f"  ETHUSDT 1H:  {len(eth_htf)} bars")
     print(f"  BTCUSDT 1H:  {len(btc_htf)} bars")
@@ -171,7 +171,7 @@ def test_btc_correlation_with_real_data():
     n_long_no_btc = int(np.sum(long_no_btc))
     n_short_no_btc = int(np.sum(short_no_btc))
 
-    print(f"\nSignals comparison:")
+    print("\nSignals comparison:")
     print(f"  WITHOUT BTC filter: {n_long_no_btc} long, {n_short_no_btc} short")
     print(f"  WITH BTC filter:    {n_long_btc} long, {n_short_btc} short")
 
@@ -301,7 +301,7 @@ def test_btc_correlation_backtest():
     m_no_btc = result_no_btc.metrics
     m_btc = result_btc.metrics
 
-    print(f"\nResults comparison (ETHUSDT with MTF RSI):")
+    print("\nResults comparison (ETHUSDT with MTF RSI):")
     print(f"  {'Metric':<20} {'No BTC':<15} {'With BTC':<15} {'Delta':<15}")
     print(f"  {'-' * 65}")
     print(

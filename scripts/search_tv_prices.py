@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Search TV for entries 89596 or 90810."""
 import pandas as pd
 

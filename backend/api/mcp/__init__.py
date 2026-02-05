@@ -6,13 +6,13 @@ Includes circuit breaker, tools, and resources.
 """
 
 from backend.api.mcp.circuit_breaker import (
-    CircuitBreaker,
-    circuit_breakers,
-    mcp_semaphore,
-    get_circuit_breaker,
     CB_THRESHOLD,
     CB_TIMEOUT,
     MAX_CONCURRENCY,
+    CircuitBreaker,
+    circuit_breakers,
+    get_circuit_breaker,
+    mcp_semaphore,
 )
 
 
@@ -27,12 +27,12 @@ def register_all_tools(mcp):
 
 
 __all__ = [
-    "CircuitBreaker",
-    "circuit_breakers",
-    "mcp_semaphore",
-    "get_circuit_breaker",
     "CB_THRESHOLD",
     "CB_TIMEOUT",
     "MAX_CONCURRENCY",
+    "CircuitBreaker",
+    "circuit_breakers",
+    "get_circuit_breaker",
+    "mcp_semaphore",
     "register_all_tools",
 ]

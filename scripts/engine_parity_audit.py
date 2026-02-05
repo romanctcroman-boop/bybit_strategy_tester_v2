@@ -4,12 +4,14 @@ Compares our implementation with industry best practices
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import sqlite3
-from datetime import datetime
 
 print("=" * 80)
 print("🔬 ENGINE PARITY AUDIT REPORT")
@@ -37,10 +39,10 @@ conn.close()
 df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
 df.set_index('open_time', inplace=True)
 
-from backend.backtesting.strategies import RSIStrategy
-from backend.backtesting.numba_engine import simulate_trades_numba
 from backend.backtesting.engine import get_engine
 from backend.backtesting.models import BacktestConfig
+from backend.backtesting.numba_engine import simulate_trades_numba
+from backend.backtesting.strategies import RSIStrategy
 
 strategy = RSIStrategy(params={"period": 14, "overbought": 70, "oversold": 30})
 signals = strategy.generate_signals(df)

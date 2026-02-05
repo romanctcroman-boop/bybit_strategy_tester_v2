@@ -15,9 +15,8 @@ import logging
 import sqlite3
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +57,7 @@ class GapInfo:
 class DataGapRepairService:
     """Service to detect and repair data gaps in kline database."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or str(DB_PATH)
         self._adapter = None
 
@@ -137,10 +136,10 @@ class DataGapRepairService:
             # Parse datetime to check for weekend
             gap_start_dt = datetime.fromisoformat(
                 row["open_time_dt"].replace("+00:00", "")
-            ).replace(tzinfo=timezone.utc)
+            ).replace(tzinfo=UTC)
             gap_end_dt = datetime.fromisoformat(
                 row["next_open_time_dt"].replace("+00:00", "")
-            ).replace(tzinfo=timezone.utc)
+            ).replace(tzinfo=UTC)
 
             # Check if this is a weekend gap (Friday 21:00 UTC to Sunday 21:00 UTC typical)
             is_weekend = gap_start_dt.weekday() >= 4 and gap_end_dt.weekday() <= 1
@@ -257,8 +256,8 @@ class DataGapRepairService:
 
         logger.info(
             f"Fetching {expected_candles} candles for {symbol}:{interval} "
-            f"from {datetime.fromtimestamp(start_time / 1000, tz=timezone.utc)} "
-            f"to {datetime.fromtimestamp(end_time / 1000, tz=timezone.utc)}"
+            f"from {datetime.fromtimestamp(start_time / 1000, tz=UTC)} "
+            f"to {datetime.fromtimestamp(end_time / 1000, tz=UTC)}"
         )
 
         # Bybit API limits to 1000 candles per request
@@ -356,7 +355,7 @@ class DataGapRepairService:
             try:
                 # Prepare datetime string
                 open_time_dt = datetime.fromtimestamp(
-                    candle["open_time"] / 1000, tz=timezone.utc
+                    candle["open_time"] / 1000, tz=UTC
                 ).isoformat()
 
                 # Use INSERT OR REPLACE to handle existing candles
@@ -489,7 +488,7 @@ class DataGapRepairService:
 
 
 # Singleton instance
-_repair_service: Optional[DataGapRepairService] = None
+_repair_service: DataGapRepairService | None = None
 
 
 def get_repair_service() -> DataGapRepairService:

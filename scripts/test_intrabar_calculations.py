@@ -4,12 +4,13 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
 from datetime import datetime
+
+import pandas as pd
 
 print("=" * 120)
 print("🔬 ТЕСТ INTRABAR ВЫЧИСЛЕНИЙ (Bar Magnifier, Precise Intrabar)")
@@ -74,9 +75,9 @@ short_exits = (rsi < 30).values
 # ============================================================================
 # ИМПОРТЫ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection, ExitReason
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, ExitReason, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator
 
 # ============================================================================
@@ -134,7 +135,7 @@ def analyze_exits(trades, name):
     eod_count = sum(1 for t in trades if t.exit_reason == ExitReason.END_OF_DATA)
     intrabar_sl = sum(1 for t in trades if getattr(t, 'intrabar_sl_hit', False))
     intrabar_tp = sum(1 for t in trades if getattr(t, 'intrabar_tp_hit', False))
-    
+
     print(f"\n   {name} Exit Analysis:")
     print(f"   ├─ Stop Loss:     {sl_count} ({sl_count/len(trades)*100:.1f}%)" if trades else "")
     print(f"   ├─ Take Profit:   {tp_count} ({tp_count/len(trades)*100:.1f}%)" if trades else "")
@@ -142,7 +143,7 @@ def analyze_exits(trades, name):
     print(f"   ├─ End of Data:   {eod_count}")
     print(f"   ├─ Intrabar SL:   {intrabar_sl}")
     print(f"   └─ Intrabar TP:   {intrabar_tp}")
-    
+
     return {"sl": sl_count, "tp": tp_count, "signal": signal_count, "intrabar_sl": intrabar_sl, "intrabar_tp": intrabar_tp}
 
 no_bm_fb_exits = analyze_exits(fb_no_bm.trades, "Fallback")
@@ -183,7 +184,7 @@ print("=" * 120)
 def compare_metrics(m1, m2, name1, name2):
     print(f"\n{'Метрика':<30} {name1:>20} {name2:>20} {'Разница':>15}")
     print("-" * 90)
-    
+
     metrics_to_compare = [
         ("total_trades", "Total Trades"),
         ("net_profit", "Net Profit ($)"),
@@ -196,11 +197,11 @@ def compare_metrics(m1, m2, name1, name2):
         ("avg_win", "Avg Win ($)"),
         ("avg_loss", "Avg Loss ($)"),
     ]
-    
+
     for attr, label in metrics_to_compare:
         v1 = getattr(m1, attr, 0) or 0
         v2 = getattr(m2, attr, 0) or 0
-        
+
         if isinstance(v1, int):
             diff = v2 - v1
             print(f"{label:<30} {v1:>20} {v2:>20} {diff:>+15}")
@@ -238,22 +239,18 @@ print("-" * 75)
 for metric in metrics_to_check:
     fb_val = getattr(fb_with_bm.metrics, metric, 0) or 0
     nb_val = getattr(nb_with_bm.metrics, metric, 0) or 0
-    
+
     # Сравнение с tolerance
-    if abs(fb_val) < 1e-10 and abs(nb_val) < 1e-10:
-        match = True
-    elif abs(fb_val - nb_val) < 1e-6:
-        match = True
-    elif abs(fb_val) > 1e-10 and abs(fb_val - nb_val) / abs(fb_val) < 0.0001:
+    if (abs(fb_val) < 1e-10 and abs(nb_val) < 1e-10) or abs(fb_val - nb_val) < 1e-6 or (abs(fb_val) > 1e-10 and abs(fb_val - nb_val) / abs(fb_val) < 0.0001):
         match = True
     else:
         match = False
-    
+
     if match:
         matches += 1
-    
+
     status = "✅" if match else "❌"
-    
+
     if isinstance(fb_val, int):
         print(f"{metric:<25} {fb_val:>18} {nb_val:>18} {status:>8}")
     else:
@@ -273,22 +270,22 @@ def analyze_intrabar_detail(trades, name):
     if not trades:
         print(f"\n   {name}: Нет сделок")
         return
-    
+
     intrabar_sl = [t for t in trades if getattr(t, 'intrabar_sl_hit', False)]
     intrabar_tp = [t for t in trades if getattr(t, 'intrabar_tp_hit', False)]
-    
+
     print(f"\n   {name}:")
     print(f"   ├─ Всего сделок:           {len(trades)}")
     print(f"   ├─ Intrabar SL hits:       {len(intrabar_sl)} ({len(intrabar_sl)/len(trades)*100:.1f}%)")
     print(f"   └─ Intrabar TP hits:       {len(intrabar_tp)} ({len(intrabar_tp)/len(trades)*100:.1f}%)")
-    
+
     if intrabar_sl:
-        print(f"\n   Примеры Intrabar SL (первые 3):")
+        print("\n   Примеры Intrabar SL (первые 3):")
         for t in intrabar_sl[:3]:
             print(f"      Entry: {t.entry_time}, Exit: {t.exit_time}, PnL: ${t.pnl:.2f}")
-    
+
     if intrabar_tp:
-        print(f"\n   Примеры Intrabar TP (первые 3):")
+        print("\n   Примеры Intrabar TP (первые 3):")
         for t in intrabar_tp[:3]:
             print(f"      Entry: {t.entry_time}, Exit: {t.exit_time}, PnL: ${t.pnl:.2f}")
 

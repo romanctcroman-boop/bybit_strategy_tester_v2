@@ -1,12 +1,13 @@
 """Test GPU Optimizer"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
 import time
+
+import pandas as pd
 
 print("=" * 80)
 print("🚀 GPU OPTIMIZER TEST")
@@ -14,6 +15,7 @@ print("=" * 80)
 
 # Check GPU
 from backend.backtesting.gpu_optimizer import GPU_AVAILABLE, GPU_NAME
+
 print(f"GPU Available: {GPU_AVAILABLE}")
 print(f"GPU Name: {GPU_NAME}")
 
@@ -40,15 +42,15 @@ optimizer = GPUGridOptimizer(position_size=1.0, force_cpu=False)
 
 # Define parameter ranges
 rsi_period_range = list(range(8, 22, 2))      # 7 values
-rsi_overbought_range = list(range(65, 85, 5)) # 4 values  
+rsi_overbought_range = list(range(65, 85, 5)) # 4 values
 rsi_oversold_range = list(range(15, 40, 5))   # 5 values
 stop_loss_range = [0.02, 0.03, 0.04, 0.05]    # 4 values
 take_profit_range = [0.04, 0.06, 0.08, 0.10]  # 4 values
 
-total_combos = (len(rsi_period_range) * len(rsi_overbought_range) * 
+total_combos = (len(rsi_period_range) * len(rsi_overbought_range) *
                 len(rsi_oversold_range) * len(stop_loss_range) * len(take_profit_range))
 
-print(f"\n📈 Parameter grid:")
+print("\n📈 Parameter grid:")
 print(f"   rsi_period: {len(rsi_period_range)} values ({rsi_period_range})")
 print(f"   rsi_overbought: {len(rsi_overbought_range)} values")
 print(f"   rsi_oversold: {len(rsi_oversold_range)} values")
@@ -82,7 +84,7 @@ print(f"   Speed: {total_combos / elapsed:,.0f} combinations/second")
 print(f"   Execution mode: {result.execution_mode}")
 
 if result.top_results:
-    print(f"\n🏆 Top 5 Results:")
+    print("\n🏆 Top 5 Results:")
     for i, r in enumerate(result.top_results[:5]):
         print(f"   {i+1}. Sharpe={r.get('sharpe_ratio', 0):.2f}, "
               f"PnL=${r.get('total_pnl', 0):.2f}, "

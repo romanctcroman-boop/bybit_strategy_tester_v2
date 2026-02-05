@@ -16,9 +16,39 @@ import {
   formatDate,
   debounce
 } from '../utils.js';
+import { getFreshnessIcon, getFreshnessText } from './strategies/utils.js';
+import { updateLeverageRiskForElements } from './strategies/leverageManager.js';
 
 // Import WebSocket validation module
 import * as wsValidation from './strategy_builder_ws.js';
+
+// Forward declaration for checkSymbolDataForProperties (initialized later after runCheckSymbolDataForProperties is defined)
+let checkSymbolDataForProperties = null;
+
+// Global loading indicator functions
+function showGlobalLoading(text = 'Loading...') {
+  const indicator = document.getElementById('globalLoadingIndicator');
+  if (indicator) {
+    const textEl = indicator.querySelector('.loading-text');
+    if (textEl) textEl.textContent = text;
+    indicator.classList.remove('hidden');
+  }
+}
+
+function hideGlobalLoading() {
+  const indicator = document.getElementById('globalLoadingIndicator');
+  if (indicator) {
+    indicator.classList.add('hidden');
+  }
+}
+
+function updateGlobalLoadingText(text) {
+  const indicator = document.getElementById('globalLoadingIndicator');
+  if (indicator) {
+    const textEl = indicator.querySelector('.loading-text');
+    if (textEl) textEl.textContent = text;
+  }
+}
 
 // Block Library Data
 const blockLibrary = {
@@ -1233,6 +1263,9 @@ const templates = [
 // State
 let strategyBlocks = [];
 const connections = [];
+const undoStack = [];
+const redoStack = [];
+const MAX_UNDO_HISTORY = 50;
 let lastAutoSavePayload = null;
 const AUTOSAVE_INTERVAL_MS = 30000;
 let selectedBlockId = null;
@@ -1251,16 +1284,46 @@ let marqueeElement = null;
 let isGroupDragging = false;
 let groupDragOffsets = {}; // blockId -> {x, y} offset from mouse
 
-// Initialize
-document.addEventListener('DOMContentLoaded', function () {
+/** Global refresh for "База данных" panel (set by initDunnahBasePanel, used after sync). */
+let refreshDunnahBasePanel = null;
+
+// Show a dismissible banner when backend is unreachable or page opened from file
+function showBackendConnectionBanner(message) {
+  const existing = document.getElementById('strategy-builder-backend-banner');
+  if (existing) return;
+  const banner = document.createElement('div');
+  banner.id = 'strategy-builder-backend-banner';
+  banner.setAttribute('role', 'alert');
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#dc3545;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+  banner.innerHTML = `<span>${message}</span><a href="http://localhost:8000/frontend/strategy-builder.html" style="color:#fff;text-decoration:underline;white-space:nowrap;">Открыть с сервера</a><button type="button" aria-label="Закрыть" style="background:transparent;border:none;color:#fff;cursor:pointer;padding:4px;font-size:18px;">&times;</button>`;
+  banner.querySelector('button').addEventListener('click', () => banner.remove());
+  document.body.prepend(banner);
+}
+
+// Initialize - handle both cases: before and after DOMContentLoaded
+function initializeStrategyBuilder() {
   console.log('[Strategy Builder] Initializing...');
 
   try {
+    // If opened from file://, API requests won't reach backend - show hint
+    if (window.location.protocol === 'file:') {
+      showBackendConnectionBanner('Страница открыта с диска. Для связи с бэкендом откройте её с сервера.');
+    } else {
+      // Quick connectivity check (same-origin)
+      fetch('/healthz', { method: 'GET', cache: 'no-store' })
+        .then((res) => { if (!res.ok) throw new Error('health check failed'); })
+        .catch(() => {
+          showBackendConnectionBanner('Нет связи с бэкендом. Запустите start_all.ps1 и откройте страницу с сервера.');
+        });
+    }
+
     // Check if strategy ID in URL
     const urlParams = new URLSearchParams(window.location.search);
     const strategyId = urlParams.get('id');
 
     if (strategyId) {
+      const btnVersions = document.getElementById('btnVersions');
+      if (btnVersions) btnVersions.style.display = '';
       console.log('[Strategy Builder] Loading strategy:', strategyId);
       // Load existing strategy
       loadStrategy(strategyId).then(() => {
@@ -1289,6 +1352,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     console.log('[Strategy Builder] Setting up event listeners...');
     setupEventListeners();
+    syncStrategyNameDisplay();
+    initSymbolPicker();
+    // Тикеры предзагружаются в initSymbolPicker — дублирующий fetchBybitSymbols здесь убран
 
     console.log('[Strategy Builder] Initializing connection system...');
     initConnectionSystem();
@@ -1296,14 +1362,13 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log('[Strategy Builder] Rendering blocks...');
     renderBlocks();
 
-    // Раскрыть первую секцию Properties по умолчанию
-    setTimeout(() => {
-      const firstSection = document.querySelector('.properties-section');
-      if (firstSection) {
-        firstSection.classList.remove('collapsed');
-        console.log('[Strategy Builder] First properties section expanded');
-      }
-    }, 100);
+    // Properties: боковые закладки, первая панель активна по умолчанию
+
+    updateBacktestPositionSizeInput();
+    updateBacktestLeverageDisplay(document.getElementById('backtestLeverageRange')?.value || document.getElementById('backtestLeverage')?.value || 10);
+    updateBacktestLeverageRisk();
+
+    // Проверка данных БД только при смене Symbol/TF/Тип рынка, не при открытии блока Properties
 
     // Periodic autosave to localStorage and server
     setInterval(autoSaveStrategy, AUTOSAVE_INTERVAL_MS);
@@ -1313,7 +1378,15 @@ document.addEventListener('DOMContentLoaded', function () {
     console.error('[Strategy Builder] Initialization error:', error);
     alert('Ошибка инициализации Strategy Builder. Проверьте консоль браузера (F12) для деталей.');
   }
-});
+}
+
+// Run initialization - handle both cases: before and after DOMContentLoaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeStrategyBuilder);
+} else {
+  // DOM already loaded (module executed after DOMContentLoaded)
+  initializeStrategyBuilder();
+}
 
 // Create the main Strategy node that cannot be deleted
 function createMainStrategyNode() {
@@ -1351,13 +1424,31 @@ function renderBlockLibrary() {
     { key: 'session_mgmt', name: 'Session Management', iconType: 'session' },
     { key: 'time_mgmt', name: 'Time Management', iconType: 'time' },
     { key: 'logic', name: 'Logic', iconType: 'logic' },
-    { key: 'inputs', name: 'Inputs', iconType: 'input' }
+    { key: 'inputs', name: 'Inputs', iconType: 'input' },
+    { key: 'correlation', name: 'Correlation & Multi-Symbol', iconType: 'filter' },
+    { key: 'alerts', name: 'Alerts', iconType: 'session' },
+    { key: 'visualization', name: 'Visualization', iconType: 'visualization' },
+    { key: 'dca_grid', name: 'DCA Grid', iconType: 'entry' },
+    { key: 'multiple_tp', name: 'Multiple Take Profits', iconType: 'action' },
+    { key: 'atr_exit', name: 'ATR Exit', iconType: 'exit' },
+    { key: 'signal_memory', name: 'Signal Memory', iconType: 'logic' },
+    { key: 'close_conditions', name: 'Close Conditions (TradingView)', iconType: 'exit' },
+    { key: 'price_action', name: 'Price Action Patterns', iconType: 'filter' },
+    { key: 'divergence', name: 'Divergence', iconType: 'filter' }
   ];
 
+  const ADAPTER_SPECIFIC_CATEGORIES = [
+    'dca_grid', 'multiple_tp', 'atr_exit', 'signal_memory',
+    'close_conditions', 'price_action', 'divergence', 'correlation',
+    'session_mgmt', 'time_mgmt', 'risk_controls', 'entry_refinement',
+    'position_sizing', 'alerts', 'visualization'
+  ];
   categories.forEach((cat) => {
     const blocks = blockLibrary[cat.key];
+    if (!blocks || !Array.isArray(blocks)) return;
+    const blockCategory = ADAPTER_SPECIFIC_CATEGORIES.includes(cat.key) ? cat.key : cat.iconType;
     const html = `
-                    <div class="block-category collapsed">
+                    <div class="block-category">
                         <div class="category-header">
                             <i class="bi bi-chevron-right"></i>
                             <span class="category-count">(${blocks.length})</span>
@@ -1370,7 +1461,7 @@ function renderBlockLibrary() {
                                 <div class="block-item" 
                                      draggable="true" 
                                      data-block-id="${block.id}"
-                                     data-block-type="${cat.iconType}">
+                                     data-block-type="${blockCategory}">
                                     <div class="block-icon ${cat.iconType}">
                                         <i class="bi bi-${block.icon}"></i>
                                     </div>
@@ -1434,8 +1525,1071 @@ function renderTemplates() {
   );
 }
 
+/** Синхронизирует название стратегии: шапка -> панель Properties. */
+function syncStrategyNameDisplay() {
+  const nameInput = document.getElementById('strategyName');
+  const displayEl = document.getElementById('strategyNameDisplay');
+  if (nameInput && displayEl) {
+    displayEl.value = nameInput.value || 'New Strategy';
+  }
+}
+
+/** Синхронизирует название стратегии: панель Properties -> шапка. */
+function syncStrategyNameToNavbar() {
+  const nameInput = document.getElementById('strategyName');
+  const displayEl = document.getElementById('strategyNameDisplay');
+  if (displayEl && nameInput) {
+    nameInput.value = displayEl.value || 'New Strategy';
+  }
+}
+
+/** Кэш тикеров Bybit по категории (linear/spot). */
+const bybitSymbolsCache = { linear: [], spot: [] };
+
+/** Кэш символов с локальными данными в БД. */
+let localSymbolsCache = null;
+
+/** Кэш тикеров с ценами и объёмами по категории. */
+const tickersDataCache = {};
+
+/** Список заблокированных тикеров (единый источник для База данных и Symbol picker). */
+let blockedSymbolsCache = null;
+
+/** Текущая сортировка для symbol picker. */
+const symbolSortConfig = { field: 'name', direction: 'asc' };
+
+/** Загрузить список заблокированных тикеров (единый источник). */
+async function fetchBlockedSymbols() {
+  try {
+    const res = await fetch('/api/v1/marketdata/symbols/blocked');
+    if (!res.ok) return new Set();
+    const data = await res.json();
+    const list = (data.symbols || []).map((s) => String(s).toUpperCase());
+    blockedSymbolsCache = new Set(list);
+    return blockedSymbolsCache;
+  } catch (e) {
+    console.error('[Strategy Builder] fetchBlockedSymbols failed:', e);
+    return blockedSymbolsCache || new Set();
+  }
+}
+
+/** Загрузить тикеры с ценами, 24h%, объёмом. */
+async function fetchTickersData(category = 'linear') {
+  const key = category === 'spot' ? 'spot' : 'linear';
+  if (tickersDataCache[key] && Object.keys(tickersDataCache[key]).length > 0) {
+    return tickersDataCache[key];
+  }
+  try {
+    const res = await fetch(`/api/v1/marketdata/tickers?category=${encodeURIComponent(key)}`);
+    if (!res.ok) {
+      console.error('[Strategy Builder] fetchTickersData not ok:', res.statusText);
+      return {};
+    }
+    const data = await res.json();
+    const map = {};
+    (data.tickers || []).forEach((t) => {
+      map[t.symbol] = t;
+    });
+    if (Object.keys(map).length > 0) tickersDataCache[key] = map;
+    console.log('[Strategy Builder] Tickers data loaded:', key, Object.keys(map).length);
+    return map;
+  } catch (e) {
+    console.error('[Strategy Builder] fetchTickersData failed:', e);
+    return {};
+  }
+}
+
+/** Загрузить список символов с локальными данными. */
+async function fetchLocalSymbols() {
+  // Return cached data if already loaded successfully
+  if (localSymbolsCache !== null && localSymbolsCache.symbols && localSymbolsCache.symbols.length > 0) {
+    return localSymbolsCache;
+  }
+  try {
+    const base = typeof window !== 'undefined' && window.location && window.location.origin
+      ? window.location.origin
+      : '';
+    const url = `${base}/api/v1/marketdata/symbols/local`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error('[Strategy Builder] fetchLocalSymbols not ok:', res.statusText);
+      // Don't cache error - allow retry
+      return { symbols: [], details: {} };
+    }
+    const data = await res.json();
+    localSymbolsCache = data;
+    console.log('[Strategy Builder] Local symbols loaded:', data.symbols?.length || 0, data.symbols);
+    return localSymbolsCache;
+  } catch (e) {
+    console.error('[Strategy Builder] fetchLocalSymbols failed:', e);
+    // Don't cache error - allow retry
+    return { symbols: [], details: {} };
+  }
+}
+
+/** Загрузить список тикеров Bybit по типу рынка. */
+async function fetchBybitSymbols(category) {
+  const key = category === 'spot' ? 'spot' : 'linear';
+  console.log('[Strategy Builder] fetchBybitSymbols called, category:', key);
+  if (bybitSymbolsCache[key] && bybitSymbolsCache[key].length > 0) {
+    console.log('[Strategy Builder] Returning from cache:', bybitSymbolsCache[key].length, 'symbols');
+    return bybitSymbolsCache[key];
+  }
+  try {
+    const base = typeof window !== 'undefined' && window.location && window.location.origin
+      ? window.location.origin
+      : '';
+    const url = `${base}/api/v1/marketdata/symbols-list?category=${key}`;
+    console.log('[Strategy Builder] Fetching symbols from:', url);
+    const res = await fetch(url);
+    console.log('[Strategy Builder] Fetch response status:', res.status);
+    if (!res.ok) {
+      console.error('[Strategy Builder] Fetch not ok:', res.statusText);
+      return [];
+    }
+    const data = await res.json();
+    const list = data.symbols || [];
+    console.log('[Strategy Builder] Received symbols:', list.length, 'first 5:', list.slice(0, 5));
+    // DEBUG: Show alert with count
+    // alert(`Loaded ${list.length} symbols for ${key}`);
+    bybitSymbolsCache[key] = Array.isArray(list) ? list : [];
+    return bybitSymbolsCache[key];
+  } catch (e) {
+    console.error('[Strategy Builder] fetchBybitSymbols failed:', e);
+    return [];
+  }
+}
+
+/** Позиционировать выпадающий список по полю ввода (fixed), чтобы не обрезался sidebar overflow. */
+function positionSymbolDropdown() {
+  const input = document.getElementById('backtestSymbol');
+  const dropdown = document.getElementById('backtestSymbolDropdown');
+  if (!input || !dropdown || !dropdown.classList.contains('open')) return;
+
+  // Move dropdown to body to avoid overflow clipping issues
+  if (dropdown.parentElement !== document.body) {
+    document.body.appendChild(dropdown);
+  }
+
+  const rect = input.getBoundingClientRect();
+  const maxH = Math.min(400, window.innerHeight - rect.bottom - 24);
+
+  // Calculate optimal width and position
+  const dropdownWidth = 520; // Fixed width for table columns
+  let leftPos = rect.left;
+
+  // Prevent dropdown from going off-screen to the right
+  if (leftPos + dropdownWidth > window.innerWidth - 20) {
+    leftPos = window.innerWidth - dropdownWidth - 20;
+  }
+  // Prevent going off-screen to the left
+  if (leftPos < 10) {
+    leftPos = 10;
+  }
+
+  dropdown.style.position = 'fixed';
+  dropdown.style.left = `${leftPos}px`;
+  dropdown.style.top = `${rect.bottom + 4}px`;
+  dropdown.style.width = `${dropdownWidth}px`;
+  dropdown.style.minWidth = `${dropdownWidth}px`;
+  dropdown.style.maxHeight = `${Math.max(200, maxH)}px`;
+  dropdown.style.overflowY = 'auto';
+  dropdown.style.zIndex = '100000';
+  dropdown.style.display = 'block';
+  dropdown.style.visibility = 'visible';
+  dropdown.style.pointerEvents = 'auto';
+  dropdown.style.background = 'var(--bg-tertiary, #1e1e2e)';
+  dropdown.style.border = '1px solid var(--border-color, #444)';
+  dropdown.style.borderRadius = '6px';
+  dropdown.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.5)';
+
+  // Custom scrollbar styles
+  dropdown.style.scrollbarWidth = 'thin';
+  dropdown.style.scrollbarColor = 'var(--accent-blue, #3b82f6) transparent';
+}
+
+/** Показать выпадающий список тикеров с фильтром по поиску и сортировкой. */
+function showSymbolDropdown(query, options = {}) {
+  const { loading = false, error = null } = options;
+  console.log('[Strategy Builder] showSymbolDropdown called:', { query, loading, error });
+  const input = document.getElementById('backtestSymbol');
+  const dropdown = document.getElementById('backtestSymbolDropdown');
+  const marketEl = document.getElementById('builderMarketType');
+  if (!input || !dropdown || !marketEl) {
+    console.error('[Strategy Builder] showSymbolDropdown: Missing elements');
+    return;
+  }
+  if (error) {
+    console.log('[Strategy Builder] showSymbolDropdown: error mode');
+    dropdown.innerHTML = '';
+    dropdown.classList.remove('open');
+    dropdown.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  if (loading) {
+    console.log('[Strategy Builder] showSymbolDropdown: loading mode');
+    dropdown.innerHTML = '<li class="symbol-picker-item symbol-picker-message">Загрузка тикеров...</li>';
+    dropdown.setAttribute('aria-hidden', 'false');
+    dropdown.classList.add('open');
+    positionSymbolDropdown();
+    return;
+  }
+  const category = marketEl.value === 'spot' ? 'spot' : 'linear';
+  const list = bybitSymbolsCache[category] || [];
+  const localData = localSymbolsCache || { symbols: [], details: {}, blocked: [] };
+  const localSet = new Set(localData.symbols || []);
+  const blockedSet = blockedSymbolsCache || new Set((localData.blocked || []).map((s) => String(s).toUpperCase()));
+  const tickersData = (tickersDataCache && tickersDataCache[category]) || {};
+  console.log('[Strategy Builder] showSymbolDropdown: category =', category, ', cache size =', list.length, ', local symbols =', localSet.size, ', tickers data =', Object.keys(tickersData).length);
+  const q = (query || '').toUpperCase().trim();
+
+  // Build enriched list with ticker data
+  const enrichedList = list.map((symbol) => {
+    const ticker = tickersData[symbol] || {};
+    return {
+      symbol,
+      isLocal: localSet.has(symbol),
+      price: ticker.price || 0,
+      change_24h: ticker.change_24h || 0,
+      volume_24h: ticker.volume_24h || 0
+    };
+  });
+
+  // Sort by current sort config
+  const { field, direction } = symbolSortConfig;
+  enrichedList.sort((a, b) => {
+    // Local symbols always first
+    if (a.isLocal && !b.isLocal) return -1;
+    if (!a.isLocal && b.isLocal) return 1;
+
+    let cmp = 0;
+    if (field === 'name') {
+      cmp = a.symbol.localeCompare(b.symbol);
+    } else if (field === 'price') {
+      cmp = a.price - b.price;
+    } else if (field === 'change') {
+      cmp = a.change_24h - b.change_24h;
+    } else if (field === 'volume') {
+      cmp = a.volume_24h - b.volume_24h;
+    }
+    return direction === 'desc' ? -cmp : cmp;
+  });
+
+  const filtered = q ? enrichedList.filter((item) => item.symbol.toUpperCase().includes(q)) : enrichedList;
+  console.log('[Strategy Builder] showSymbolDropdown: filtered size =', filtered.length);
+
+  if (list.length === 0) {
+    console.log('[Strategy Builder] showSymbolDropdown: list is empty, hiding dropdown');
+    dropdown.innerHTML = '';
+    dropdown.classList.remove('open');
+    dropdown.setAttribute('aria-hidden', 'true');
+    return;
+  }
+
+  // Format numbers
+  const formatPrice = (p) => (p >= 1 ? p.toFixed(2) : p >= 0.0001 ? p.toFixed(6) : p.toExponential(2));
+  const formatChange = (c) => {
+    const sign = c >= 0 ? '+' : '';
+    const color = c >= 0 ? 'var(--success-green, #4caf50)' : 'var(--error-red, #f44336)';
+    return `<span style="color: ${color}">${sign}${Number(c).toFixed(2)}%</span>`;
+  };
+  const formatVolume = (v) => {
+    if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
+    if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+    return v.toFixed(0);
+  };
+
+  // Sort indicator
+  const sortIcon = (fld) => {
+    if (symbolSortConfig.field !== fld) return '⇅';
+    return symbolSortConfig.direction === 'asc' ? '↑' : '↓';
+  };
+
+  // Header with sortable columns
+  const headerRow = `
+        <li class="symbol-picker-header-row" style="display: grid; grid-template-columns: minmax(180px, 1fr) 90px 75px 80px; gap: 8px; padding: 8px 12px; background: var(--bg-secondary); border-bottom: 2px solid var(--accent-blue); font-size: 12px; color: var(--text-secondary);">
+            <span class="symbol-sort-col" data-sort="name" style="cursor: pointer;" title="Сортировать по названию">Символ ${sortIcon('name')}</span>
+            <span class="symbol-sort-col" data-sort="price" style="cursor: pointer; text-align: right;" title="Сортировать по цене">Цена ${sortIcon('price')}</span>
+            <span class="symbol-sort-col" data-sort="change" style="cursor: pointer; text-align: right;" title="Сортировать по изменению 24h">24H% ${sortIcon('change')}</span>
+            <span class="symbol-sort-col" data-sort="volume" style="cursor: pointer; text-align: right;" title="Сортировать по объёму">Объём ${sortIcon('volume')}</span>
+        </li>`;
+
+  // Info row
+  const infoText = q ? `Найдено: ${filtered.length} из ${list.length}` : `Всего: ${list.length} (📊 = лок. данные)`;
+  const infoRow = `<li class="symbol-picker-info" style="font-size: 10px; color: var(--text-muted); padding: 2px 10px; background: var(--bg-tertiary);">${infoText}</li>`;
+
+  // Data rows
+  const items = filtered
+    .slice(0, 500)
+    .map((item) => {
+      const details = localData.details?.[item.symbol];
+      const intervals = details ? Object.keys(details.intervals || {}).join(', ') : '';
+      const isBlocked = blockedSet.has(item.symbol.toUpperCase());
+      let badge = item.isLocal ? `<span class="symbol-local-badge" title="Локальные данные: ${intervals}">📊</span>` : '';
+      badge += isBlocked
+        ? '<span class="symbol-blocked-badge" title="Заблокирован для догрузки">🔒</span>'
+        : '<span class="symbol-unblocked-badge" title="Разблокирован">🔓</span>';
+      let cls = item.isLocal ? 'symbol-picker-item symbol-has-local' : 'symbol-picker-item';
+      if (isBlocked) cls += ' symbol-blocked';
+      return `<li class="${cls}" data-symbol="${item.symbol}" tabindex="0" role="option" style="display: grid; grid-template-columns: minmax(180px, 1fr) 90px 75px 80px; gap: 8px; align-items: center; padding: 6px 12px;">
+                <span class="symbol-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${badge}${item.symbol}</span>
+                <span style="text-align: right; font-size: 13px; color: var(--text-primary);">${Number.isFinite(item.price) ? formatPrice(item.price) : '-'}</span>
+                <span style="text-align: right; font-size: 13px;">${Number.isFinite(item.change_24h) ? formatChange(item.change_24h) : '-'}</span>
+                <span style="text-align: right; font-size: 13px; color: var(--text-primary);">${Number.isFinite(item.volume_24h) ? formatVolume(item.volume_24h) : '-'}</span>
+            </li>`;
+    })
+    .join('');
+
+  dropdown.innerHTML = headerRow + infoRow + (items || '<li class="symbol-picker-item symbol-picker-message">Нет совпадений</li>');
+  dropdown.setAttribute('aria-hidden', filtered.length === 0 && !items ? 'true' : 'false');
+  dropdown.classList.add('open');
+
+  // Add click handlers for sorting
+  dropdown.querySelectorAll('.symbol-sort-col').forEach((col) => {
+    col.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sortField = col.dataset.sort;
+      if (symbolSortConfig.field === sortField) {
+        symbolSortConfig.direction = symbolSortConfig.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        symbolSortConfig.field = sortField;
+        symbolSortConfig.direction = sortField === 'name' ? 'asc' : 'desc'; // Default: name asc, others desc
+      }
+      showSymbolDropdown(query, options);
+    });
+  });
+
+  console.log('[Strategy Builder] showSymbolDropdown: dropdown opened with', filtered.length, 'items');
+  positionSymbolDropdown();
+}
+
+/** Инициализация поля Symbol: тикеры с Bybit + поиск, привязка к типу рынка. */
+function initSymbolPicker() {
+  console.log('[Strategy Builder] initSymbolPicker called');
+  const input = document.getElementById('backtestSymbol');
+  const dropdown = document.getElementById('backtestSymbolDropdown');
+  const marketEl = document.getElementById('builderMarketType');
+  console.log('[Strategy Builder] Symbol picker elements:', { input: !!input, dropdown: !!dropdown, marketEl: !!marketEl });
+  if (!input || !dropdown || !marketEl) {
+    console.error('[Strategy Builder] initSymbolPicker: Missing elements!');
+    return;
+  }
+
+  function getCategory() {
+    return marketEl.value === 'spot' ? 'spot' : 'linear';
+  }
+
+  async function loadAndShow() {
+    showSymbolDropdown(input.value, { loading: true });
+    const cat = getCategory();
+    try {
+      // Load Bybit symbols, local symbols, and tickers data in parallel
+      await Promise.all([
+        fetchBybitSymbols(cat),
+        fetchLocalSymbols(),
+        fetchTickersData(cat),
+        fetchBlockedSymbols()
+      ]);
+      showSymbolDropdown(input.value);
+    } catch (e) {
+      showSymbolDropdown(input.value, { error: 'Ошибка загрузки тикеров. Проверьте сеть.' });
+    }
+  }
+
+  input.addEventListener('focus', function () {
+    loadAndShow();
+  });
+  input.addEventListener('input', function () {
+    const cat = getCategory();
+    const list = bybitSymbolsCache[cat] || [];
+    if (list.length > 0 && blockedSymbolsCache !== null) showSymbolDropdown(input.value);
+    else loadAndShow();
+  });
+  input.addEventListener('click', function () {
+    const cat = getCategory();
+    if ((bybitSymbolsCache[cat] || []).length > 0 && blockedSymbolsCache !== null) {
+      showSymbolDropdown(input.value);
+    } else {
+      loadAndShow();
+    }
+  });
+  input.addEventListener('blur', function (e) {
+    const related = e.relatedTarget;
+    if (related && dropdown.contains(related)) return;
+    setTimeout(function () {
+      if (!dropdown.classList.contains('open')) return;
+      closeSymbolDropdown();
+    }, 200);
+  });
+
+  /** Закрыть выпадающий список (скрыть и сбросить позиционирование). */
+  function closeSymbolDropdown() {
+    const d = document.getElementById('backtestSymbolDropdown');
+    if (!d) return;
+    d.classList.remove('open');
+    d.setAttribute('aria-hidden', 'true');
+    d.style.position = '';
+    d.style.left = '';
+    d.style.top = '';
+    d.style.width = '';
+    d.style.minWidth = '';
+    d.style.maxHeight = '';
+    d.style.overflowY = '';
+    d.style.zIndex = '';
+    d.style.display = 'none';
+    d.style.visibility = '';
+    d.style.pointerEvents = '';
+
+    // Return dropdown to its original parent if moved to body
+    const symbolPicker = document.querySelector('.symbol-picker');
+    if (symbolPicker && d.parentElement === document.body) {
+      symbolPicker.appendChild(d);
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    const t = e.target;
+    if (input.contains(t) || dropdown.contains(t)) return;
+    closeSymbolDropdown();
+  });
+
+  function onSymbolSelected(sym) {
+    input.value = sym;
+    closeSymbolDropdown();
+    input.blur();
+    console.log(`[SymbolPicker] Selected: ${sym}`);
+    document.dispatchEvent(new CustomEvent('properties-symbol-selected'));
+    // Отменить отложенный вызов от change/debounce, чтобы не прерывать только что запущенный sync
+    if (typeof checkSymbolDataForProperties === 'function' && checkSymbolDataForProperties.cancel) {
+      checkSymbolDataForProperties.cancel();
+    }
+    // При выборе тикера из списка всегда запускаем синхронизацию (игнорируем кэш 10 с)
+    runCheckSymbolDataForProperties(true);
+  }
+
+  dropdown.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const item = e.target.closest('.symbol-picker-item');
+    if (item && item.dataset.symbol) onSymbolSelected(item.dataset.symbol);
+  });
+
+  dropdown.addEventListener('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const item = e.target.closest('.symbol-picker-item');
+    if (item && item.dataset.symbol) onSymbolSelected(item.dataset.symbol);
+  });
+
+  marketEl.addEventListener('change', async function () {
+    // Clear cache and preload new symbols for the selected market type
+    bybitSymbolsCache.linear = [];
+    bybitSymbolsCache.spot = [];
+    delete tickersDataCache.linear;
+    delete tickersDataCache.spot;
+    const cat = getCategory();
+    console.log('[Strategy Builder] Market type changed to:', cat, '- preloading symbols');
+    try {
+      await Promise.all([
+        fetchBybitSymbols(cat),
+        fetchLocalSymbols(),
+        fetchTickersData(cat)
+      ]);
+      console.log('[Strategy Builder] Symbols preloaded for', cat, ':', bybitSymbolsCache[cat]?.length || 0);
+      // Sync current symbol for new market type (spot/linear) — сброс кэша для принудительной загрузки
+      const sym = input.value?.trim()?.toUpperCase();
+      if (sym) {
+        delete symbolSyncCache[sym];
+        checkSymbolDataForProperties();
+      }
+    } catch (e) {
+      console.warn('[Strategy Builder] Failed to preload symbols:', e);
+    }
+  });
+
+  // Предзагрузка тикеров и списка блокировок
+  fetchBybitSymbols(getCategory()).catch(() => { });
+  fetchBlockedSymbols().catch(() => { });
+}
+
+/** База данных: инициализация панели групп тикеров в БД. */
+function initDunnahBasePanel() {
+  const container = document.getElementById('dunnahBaseGroups');
+  const btnRefresh = document.getElementById('btnDunnahRefresh');
+  if (!container) return;
+
+  async function loadAndRender() {
+    container.innerHTML = '<p class="text-muted text-sm">Загрузка...</p>';
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
+      const res = await fetch(`${API_BASE}/marketdata/symbols/db-groups?_=${Date.now()}`, {
+        signal: ctrl.signal,
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
+      });
+      clearTimeout(t);
+      if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+      const data = await res.json();
+      const groups = data.groups || [];
+      const blocked = new Set((data.blocked || []).map((s) => String(s).toUpperCase()));
+
+      if (groups.length === 0) {
+        container.innerHTML = '<p class="text-muted text-sm mb-1">В БД нет тикеров.</p><p class="text-muted text-sm" style="font-size:12px">Выберите тикер в «ОСНОВНЫЕ ПАРАМЕТРЫ» и дождитесь синхронизации.</p>';
+        return;
+      }
+
+      container.innerHTML = groups
+        .map((g) => {
+          const sym = (g.symbol || '').trim();
+          const mt = g.market_type || 'linear';
+          const ivs = Object.keys(g.intervals || {}).sort().join(', ');
+          const total = g.total_rows || 0;
+          const isBlocked = blocked.has(sym.toUpperCase());
+
+          return `
+          <div class="dunnah-group-item" data-symbol="${sym}" data-market="${mt}">
+            <div class="dunnah-group-header">
+              <span class="dunnah-group-symbol">${sym}</span>
+              <span class="dunnah-group-mt">${mt}</span>
+              ${isBlocked ? '<span class="dunnah-blocked-badge" title="Заблокирован">🔒</span>' : '<span class="dunnah-unblocked-badge" title="Разблокирован">🔓</span>'}
+            </div>
+            <div class="dunnah-group-info text-muted text-sm">TF: ${ivs} · ${total.toLocaleString()} свечей</div>
+            <div class="dunnah-group-actions">
+              <button type="button" class="btn-dunnah-delete btn-sm" data-symbol="${sym}" data-market="${mt}" title="Удалить из БД">🗑️ Удалить</button>
+              ${isBlocked
+              ? `<button type="button" class="btn-dunnah-unblock btn-sm" data-symbol="${sym}" title="Разблокировать">🔒 Разблокировать</button>`
+              : `<button type="button" class="btn-dunnah-block btn-sm" data-symbol="${sym}" title="Блокировать догрузку">🔓 Блокировать</button>`
+            }
+            </div>
+          </div>`;
+        })
+        .join('');
+
+      container.querySelectorAll('.btn-dunnah-delete').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const symbol = btn.dataset.symbol;
+          const market = btn.dataset.market || 'linear';
+          if (!confirm(`Удалить все данные ${symbol} (${market}) из БД?`)) return;
+          container.innerHTML = '<p class="text-muted text-sm">Удаление...</p>';
+          try {
+            const r = await fetch(`${API_BASE}/marketdata/symbols/db-groups?symbol=${encodeURIComponent(symbol)}&market_type=${encodeURIComponent(market)}`, { method: 'DELETE' });
+            if (!r.ok) throw new Error(await r.text());
+            localSymbolsCache = null;
+            blockedSymbolsCache = null;
+            await fetchLocalSymbols();
+            await loadAndRender();
+          } catch (e) {
+            console.error(e);
+            alert('Ошибка удаления: ' + e.message);
+            await loadAndRender();
+          }
+        });
+      });
+      container.querySelectorAll('.btn-dunnah-block').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const symbol = btn.dataset.symbol;
+          try {
+            const r = await fetch(`${API_BASE}/marketdata/symbols/blocked?symbol=${encodeURIComponent(symbol)}`, { method: 'POST' });
+            if (!r.ok) throw new Error(await r.text());
+            localSymbolsCache = null;
+            blockedSymbolsCache = null;
+            await fetchBlockedSymbols();
+            await fetchLocalSymbols();
+          } catch (e) {
+            console.error(e);
+            alert('Ошибка: ' + e.message);
+          } finally {
+            await loadAndRender();
+          }
+        });
+      });
+      container.querySelectorAll('.btn-dunnah-unblock').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const symbol = btn.dataset.symbol;
+          try {
+            const r = await fetch(`${API_BASE}/marketdata/symbols/blocked/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
+            if (!r.ok) throw new Error(await r.text());
+            localSymbolsCache = null;
+            blockedSymbolsCache = null;
+            await fetchBlockedSymbols();
+            await fetchLocalSymbols();
+          } catch (e) {
+            console.error(e);
+            alert('Ошибка: ' + e.message);
+          } finally {
+            await loadAndRender();
+          }
+        });
+      });
+    } catch (e) {
+      console.error('[База данных]', e);
+      const msg = e.name === 'AbortError' ? 'Таймаут запроса (15 с)' : e.message;
+      container.innerHTML = `<p class="text-danger text-sm">Ошибка: ${msg}</p><p class="text-muted text-sm" style="font-size:12px">Проверьте, что сервер запущен. Нажмите «Обновить» для повтора.</p>`;
+    }
+  }
+
+  if (btnRefresh) btnRefresh.addEventListener('click', loadAndRender);
+  refreshDunnahBasePanel = loadAndRender;
+  loadAndRender();
+}
+
+const API_BASE = '/api/v1';
+
+function updatePropertiesProgressBar(visible, options = {}) {
+  const { indeterminate = false, percent = 0 } = options;
+  const progressContainer = document.getElementById('propertiesCandleLoadingProgress');
+  const bar = document.getElementById('propertiesCandleLoadingBar');
+  if (!progressContainer || !bar) return;
+  if (visible) {
+    progressContainer.classList.remove('hidden');
+    bar.classList.toggle('indeterminate', indeterminate);
+    bar.style.width = indeterminate ? '' : `${percent}%`;
+    bar.setAttribute('aria-valuenow', percent);
+  } else {
+    progressContainer.classList.add('hidden');
+    bar.classList.remove('indeterminate');
+  }
+}
+
+/**
+ * Render data sync status in Properties panel.
+ * States: checking, syncing, synced, error
+ */
+function renderPropertiesDataStatus(state, data = {}) {
+  const statusIndicator = document.getElementById('propertiesDataStatusIndicator');
+  if (!statusIndicator) return;
+
+  const { symbol = '', totalNew = 0, message = '', step = 0, totalSteps = 8 } = data;
+
+  if (state === 'checking') {
+    statusIndicator.className = 'data-status checking';
+    statusIndicator.innerHTML = `<span class="status-icon">🔍</span><span class="status-text">Проверка ${symbol}...</span>`;
+  } else if (state === 'syncing') {
+    const progressText = totalSteps > 0 ? ` (${step}/${totalSteps})` : '';
+    const newText = totalNew > 0 ? `<br><small>Загружено: +${totalNew} свечей</small>` : '';
+    statusIndicator.className = 'data-status loading';
+    statusIndicator.innerHTML = `<span class="status-icon">📥</span><span class="status-text">${message || 'Синхронизация...'}${progressText}${newText}</span>`;
+  } else if (state === 'syncing_background') {
+    statusIndicator.className = 'data-status loading';
+    statusIndicator.innerHTML = `<span class="status-icon">⏳</span><span class="status-text">${message || 'Синхронизация в фоне...'}<br><small>Загрузка исторических данных может занять время</small></span>`;
+  } else if (state === 'synced') {
+    const icon = totalNew > 0 ? '✅' : '✓';
+    const text = totalNew > 0 ? `Синхронизировано, +${totalNew} свечей` : 'Данные актуальны';
+    statusIndicator.className = 'data-status available';
+    statusIndicator.innerHTML = `<span class="status-icon">${icon}</span><span class="status-text">${text}<br><small>TF: 1m, 5m, 15m, 30m, 1h, 4h, 1D, 1W, 1M</small></span>`;
+  } else if (state === 'blocked') {
+    statusIndicator.className = 'data-status';
+    statusIndicator.innerHTML = `<span class="status-icon">🔒</span><span class="status-text">${message || 'Тикер заблокирован для догрузки'}<br><small>Разблокируйте в «База данных»</small></span>`;
+  } else if (state === 'error') {
+    statusIndicator.className = 'data-status error';
+    statusIndicator.innerHTML = `<span class="status-icon">⚠️</span><span class="status-text">Ошибка синхронизации<br><small>${message || 'Проверьте соединение'}</small></span>`;
+  }
+}
+
+/** Cache for last sync time per symbol to avoid too frequent syncs */
+const symbolSyncCache = {};
+
+/** Track symbols currently being synced to prevent duplicate requests */
+const symbolSyncInProgress = {};
+
+/** AbortController for the current sync — отмена при переключении на другой тикер */
+let currentSyncAbortController = null;
+/** Символ и время старта текущего sync — чтобы не прерывать дубликатом от change/debounce */
+let currentSyncSymbol = null;
+let currentSyncStartTime = 0;
+
+/** Auto-refresh interval IDs per symbol */
+const symbolRefreshTimers = {};
+
+/**
+ * Get refresh interval in ms based on timeframe (auto-actualization).
+ * 1m, 5m -> 5 min; 15m -> 15 min; 30m -> 30 min; 1h -> 1h; 4h -> 4h; D -> 1d; W -> 1w
+ */
+function getRefreshIntervalForTF(tf) {
+  // 1m, 5m, 15m, 30m, 60m, 4h, 1D, 1W, 1M
+  const tfIntervals = {
+    '1': 5 * 60 * 1000, '5': 5 * 60 * 1000, '15': 15 * 60 * 1000, '30': 30 * 60 * 1000,
+    '60': 60 * 60 * 1000, '240': 4 * 60 * 60 * 1000,
+    'D': 24 * 60 * 60 * 1000, 'W': 7 * 24 * 60 * 60 * 1000,
+    'M': 30 * 24 * 60 * 60 * 1000  // 1 month
+  };
+  return tfIntervals[tf] || 60 * 60 * 1000;
+}
+
+/**
+ * Sync all timeframes for selected symbol using SSE for real-time progress.
+ * Called when symbol is selected or periodically for auto-refresh.
+ */
+async function syncSymbolData(forceRefresh = false) {
+  const symbolEl = document.getElementById('backtestSymbol');
+  const marketEl = document.getElementById('builderMarketType');
+  const statusRow = document.getElementById('propertiesDataStatusRow');
+
+  const symbol = symbolEl?.value?.trim()?.toUpperCase();
+  const marketType = marketEl?.value === 'spot' ? 'spot' : 'linear';
+
+  if (!symbol || !statusRow) return;
+
+  if ((blockedSymbolsCache || new Set()).has(symbol?.toUpperCase?.() ?? '')) {
+    console.log(`[DataSync] ${symbol} is blocked, skipping auto-sync`);
+    renderPropertiesDataStatus('blocked', { symbol, message: 'Тикер заблокирован для догрузки' });
+    return;
+  }
+
+  // Check if sync is already in progress for this symbol
+  if (symbolSyncInProgress[symbol]) {
+    console.log(`[DataSync] ${symbol} sync already in progress, skipping`);
+    return;
+  }
+
+  // Не прерывать текущий sync дубликатом от change/debounce (тот же символ, вызов через ~200 ms)
+  const DUPLICATE_SYNC_GRACE_MS = 600;
+  if (currentSyncAbortController && currentSyncSymbol === symbol && Date.now() - currentSyncStartTime < DUPLICATE_SYNC_GRACE_MS) {
+    console.log('[DataSync] Same symbol sync in progress, skipping duplicate (change/debounce)');
+    return;
+  }
+
+  // Abort only if in-flight sync is for a *different* symbol (переключение тикера во время загрузки)
+  if (currentSyncAbortController && currentSyncSymbol !== symbol) {
+    console.log(`[DataSync] Aborting previous sync (switched symbol ${currentSyncSymbol} -> ${symbol})`);
+    currentSyncAbortController.abort();
+    currentSyncAbortController = null;
+  }
+
+  // Check if we synced recently (within 10 seconds) unless forced — при выборе из списка forceRefresh=true
+  const SYNC_CACHE_MS = 10000;
+  const lastSync = symbolSyncCache[symbol];
+  if (!forceRefresh && lastSync && Date.now() - lastSync < SYNC_CACHE_MS) {
+    console.log(`[DataSync] ${symbol} synced recently, skipping`);
+    return;
+  }
+
+  // Mark sync as in progress
+  symbolSyncInProgress[symbol] = true;
+
+  statusRow.classList.remove('hidden');
+  renderPropertiesDataStatus('checking', { symbol });
+  updatePropertiesProgressBar(true, { indeterminate: true });
+
+  // Show global loading indicator
+  showGlobalLoading(`Синхронизация ${symbol}...`);
+
+  // Таймаут 60 с: бэкенд возвращает ответ ~45 с при таймауте 1m; дольше ждать не нужно
+  const controller = new AbortController();
+  currentSyncAbortController = controller;
+  currentSyncSymbol = symbol;
+  currentSyncStartTime = Date.now();
+  const SYNC_REQUEST_TIMEOUT_MS = 60000;
+  const timeoutId = setTimeout(() => controller.abort(), SYNC_REQUEST_TIMEOUT_MS);
+
+  try {
+    // Прогресс по TF: 1 → 5 → 15 → 30 → 60 → 240 → D → W → M
+    const totalSteps = 9;
+    renderPropertiesDataStatus('syncing', {
+      symbol,
+      message: 'Синхронизация БД с биржей...',
+      step: 0,
+      totalSteps
+    });
+    updatePropertiesProgressBar(true, { indeterminate: false, percent: 0 });
+
+    const streamUrl = `${API_BASE}/marketdata/symbols/sync-all-tf-stream?symbol=${encodeURIComponent(symbol)}&market_type=${marketType}`;
+    console.log('[DataSync] Starting sync (stream):', streamUrl);
+
+    const response = await fetch(streamUrl, { signal: controller.signal });
+
+    if (!response.ok) {
+      clearTimeout(timeoutId);
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let result = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const dataMatch = line.match(/^data:\s*(.+)$/m);
+        if (!dataMatch) continue;
+        try {
+          const data = JSON.parse(dataMatch[1]);
+          if (data.event === 'progress') {
+            const percent = Math.min(100, data.percent != null ? data.percent : Math.round(((data.step || 0) / (data.totalSteps || totalSteps)) * 100));
+            updatePropertiesProgressBar(true, { indeterminate: false, percent });
+            renderPropertiesDataStatus('syncing', {
+              symbol,
+              message: data.message || `Синхронизация ${data.tfName || data.tf}...`,
+              step: data.step || 0,
+              totalSteps: data.totalSteps || totalSteps,
+              totalNew: data.totalNew || 0
+            });
+          } else if (data.event === 'complete') {
+            clearTimeout(timeoutId);
+            result = { timeframes: data.results, total_new_candles: data.totalNew, summary: data.message, cancelled: !!data.cancelled };
+          } else if (data.event === 'error') {
+            throw new Error(data.message || 'Ошибка синхронизации');
+          }
+        } catch (parseErr) {
+          if (parseErr instanceof SyntaxError) continue;
+          throw parseErr;
+        }
+      }
+    }
+
+    if (!result) {
+      clearTimeout(timeoutId);
+      throw new Error('Синхронизация не вернула результат');
+    }
+
+    if (result.cancelled) {
+      console.log('[DataSync] Sync cancelled (client disconnected)');
+      updatePropertiesProgressBar(false);
+      hideGlobalLoading();
+      return;
+    }
+
+    console.log('[DataSync] Sync complete:', result);
+
+    symbolSyncCache[symbol] = Date.now();
+    updatePropertiesProgressBar(false);
+
+    const timeframes = result.timeframes || {};
+    const timeoutTfs = Object.entries(timeframes).filter(([, v]) => v && v.status === 'timeout').map(([tf]) => tf);
+    const totalNew = result.total_new_candles || 0;
+    if (timeoutTfs.length > 0) {
+      renderPropertiesDataStatus('synced', {
+        symbol,
+        totalNew,
+        message: `Синхронизировано частично: ${timeoutTfs.join(', ')} не успел(и). Остальные TF готовы. Кликните для повторной попытки.`
+      });
+    } else {
+      renderPropertiesDataStatus('synced', {
+        symbol,
+        totalNew,
+        message: result.summary || 'Данные синхронизированы'
+      });
+    }
+
+    hideGlobalLoading();
+    setupAutoRefresh(symbol);
+    if (typeof refreshDunnahBasePanel === 'function') refreshDunnahBasePanel();
+
+  } catch (e) {
+    clearTimeout(timeoutId);
+
+    const currentSymbol = document.getElementById('backtestSymbol')?.value?.trim()?.toUpperCase();
+    const wasAbortedBySwitch = e.name === 'AbortError' && currentSymbol !== symbol;
+
+    if (wasAbortedBySwitch) {
+      console.log(`[DataSync] ${symbol} sync aborted (switched to ${currentSymbol})`);
+      // Не сбрасывать прогресс и global loading — новая синхронизация (currentSymbol) уже отрисовала свой UI
+      return;
+    }
+
+    if (e.name === 'AbortError') {
+      console.log('[DataSync] Sync timeout — sync interrupted (frontend 1 min timeout)');
+      symbolSyncCache[symbol] = Date.now();
+      updatePropertiesProgressBar(false);
+      renderPropertiesDataStatus('error', {
+        message: 'Синхронизация заняла слишком много времени (таймаут 1 мин). Кликните для повторной попытки.'
+      });
+      hideGlobalLoading();
+      return;
+    }
+
+    console.error('[DataSync] Sync failed:', e);
+    updatePropertiesProgressBar(false);
+    renderPropertiesDataStatus('error', { message: e.message });
+    hideGlobalLoading();
+  } finally {
+    if (currentSyncAbortController === controller) {
+      currentSyncAbortController = null;
+      currentSyncSymbol = null;
+    }
+    delete symbolSyncInProgress[symbol];
+  }
+}
+
+/**
+ * Setup auto-refresh timer for the current symbol based on selected TF.
+ * Clears any previous timers (only one symbol is active at a time).
+ */
+function setupAutoRefresh(symbol) {
+  const tfEl = document.getElementById('strategyTimeframe');
+  const tf = tfEl?.value || '15';
+
+  // Clear all existing refresh timers (only one symbol active at a time)
+  for (const sym of Object.keys(symbolRefreshTimers)) {
+    clearInterval(symbolRefreshTimers[sym]);
+    delete symbolRefreshTimers[sym];
+  }
+
+  const interval = getRefreshIntervalForTF(tf);
+  const intervalMin = interval / 60000;
+  console.log(`[DataSync] Auto-refresh for ${symbol} every ${intervalMin} min (TF=${tf})`);
+
+  symbolRefreshTimers[symbol] = setInterval(() => {
+    console.log(`[DataSync] Auto-refresh triggered for ${symbol}`);
+    syncSymbolData(true);
+  }, interval);
+}
+
+/** Force refresh - called from button click */
+window.forceRefreshTickerData = function () {
+  syncSymbolData(true);
+};
+
+/**
+ * Main function called when symbol or TF changes.
+ * Triggers data sync for the selected symbol.
+ * @param {boolean} [forceRefresh=false] — при true игнорируем кэш «недавно синхронизирован» (выбор из списка)
+ */
+async function runCheckSymbolDataForProperties(forceRefresh = false) {
+  await syncSymbolData(forceRefresh);
+}
+
+// Debounce 200 ms — быстрее запуск синхронизации после смены Symbol/TF/типа рынка (было 600 ms)
+checkSymbolDataForProperties = debounce(runCheckSymbolDataForProperties, 200);
+
+/** Обновить подпись и ограничения поля «Размер позиции» в Properties по типу ордера. */
+function updateBacktestPositionSizeInput() {
+  const typeSelect = document.getElementById('backtestPositionSizeType');
+  const sizeInput = document.getElementById('backtestPositionSize');
+  const sizeLabel = document.getElementById('backtestPositionSizeLabel');
+  if (!typeSelect || !sizeInput || !sizeLabel) return;
+  const type = typeSelect.value;
+  switch (type) {
+    case 'percent':
+      sizeLabel.textContent = 'Размер позиции (%)';
+      sizeInput.min = 1;
+      sizeInput.max = 100;
+      sizeInput.step = 1;
+      sizeInput.value = sizeInput.value || 100;
+      break;
+    case 'fixed_amount':
+      sizeLabel.textContent = 'Сумма на ордер ($)';
+      sizeInput.min = 1;
+      sizeInput.max = 1000000;
+      sizeInput.step = 1;
+      sizeInput.value = sizeInput.value || 100;
+      break;
+    case 'contracts':
+      sizeLabel.textContent = 'Контракты/Лоты';
+      sizeInput.min = 0.001;
+      sizeInput.max = 10000;
+      sizeInput.step = 0.001;
+      sizeInput.value = sizeInput.value || 1;
+      break;
+    default:
+      sizeLabel.textContent = 'Размер позиции (%)';
+  }
+}
+
+/** Обновить отображение плеча и скрытое поле в Properties. */
+function updateBacktestLeverageDisplay(value) {
+  const val = parseInt(value, 10) || 1;
+  const rangeEl = document.getElementById('backtestLeverageRange');
+  const valueEl = document.getElementById('backtestLeverageValue');
+  const hiddenEl = document.getElementById('backtestLeverage');
+  if (rangeEl) rangeEl.value = val;
+  if (valueEl) valueEl.textContent = val + 'x';
+  if (hiddenEl) hiddenEl.value = val;
+  const maxL = rangeEl ? parseInt(rangeEl.max, 10) || 50 : 50;
+
+  // Обновить CSS переменную для градиента трека слайдера
+  if (rangeEl) {
+    const percent = ((val - 1) / (maxL - 1)) * 100;
+    rangeEl.style.setProperty('--leverage-percent', `${percent}%`);
+  }
+
+  if (valueEl) {
+    const pct = val / maxL;
+    valueEl.style.color = pct >= 0.5 ? '#ff6b6b' : pct >= 0.2 ? '#ffd93d' : 'var(--accent-blue)';
+  }
+}
+
+/** Обновить индикатор риска плеча в Properties (символ, капитал, тип/размер позиции, плечо). */
+async function updateBacktestLeverageRisk() {
+  await updateLeverageRiskForElements({
+    symbolEl: document.getElementById('backtestSymbol'),
+    capitalEl: document.getElementById('backtestCapital'),
+    positionSizeTypeEl: document.getElementById('backtestPositionSizeType'),
+    positionSizeEl: document.getElementById('backtestPositionSize'),
+    leverageVal: parseInt(document.getElementById('backtestLeverageRange')?.value || document.getElementById('backtestLeverage')?.value, 10) || 10,
+    riskIndicatorEl: document.getElementById('backtestLeverageRiskIndicator')
+  });
+}
+
 function setupEventListeners() {
   console.log('[Strategy Builder] Setting up event listeners...');
+
+  // Синхронизация названия стратегии: шапка <-> панель Properties
+  const nameInput = document.getElementById('strategyName');
+  const nameDisplay = document.getElementById('strategyNameDisplay');
+  if (nameInput) {
+    nameInput.addEventListener('input', syncStrategyNameDisplay);
+    nameInput.addEventListener('change', syncStrategyNameDisplay);
+  }
+  if (nameDisplay) {
+    nameDisplay.addEventListener('input', syncStrategyNameToNavbar);
+    nameDisplay.addEventListener('change', syncStrategyNameToNavbar);
+  }
+
+  // Sync data when Symbol/TF/Market type change (symbol picker selection handled in initSymbolPicker)
+  const backtestSymbolEl = document.getElementById('backtestSymbol');
+  const strategyTimeframeEl = document.getElementById('strategyTimeframe');
+  const builderMarketTypeEl = document.getElementById('builderMarketType');
+  if (backtestSymbolEl) backtestSymbolEl.addEventListener('change', checkSymbolDataForProperties);
+  if (strategyTimeframeEl) strategyTimeframeEl.addEventListener('change', () => {
+    checkSymbolDataForProperties();
+    // Restart auto-refresh with new TF interval
+    const sym = backtestSymbolEl?.value?.trim()?.toUpperCase();
+    if (sym && symbolSyncCache[sym]) setupAutoRefresh(sym);
+  });
+  if (builderMarketTypeEl) builderMarketTypeEl.addEventListener('change', checkSymbolDataForProperties);
+
+  const backtestPositionSizeTypeEl = document.getElementById('backtestPositionSizeType');
+  const backtestLeverageRangeEl = document.getElementById('backtestLeverageRange');
+  if (backtestPositionSizeTypeEl) {
+    backtestPositionSizeTypeEl.addEventListener('change', () => {
+      updateBacktestPositionSizeInput();
+      updateBacktestLeverageRisk();
+    });
+  }
+  const backtestPositionSizeEl = document.getElementById('backtestPositionSize');
+  if (backtestPositionSizeEl) backtestPositionSizeEl.addEventListener('change', updateBacktestLeverageRisk);
+  const backtestCapitalEl = document.getElementById('backtestCapital');
+  if (backtestCapitalEl) backtestCapitalEl.addEventListener('change', updateBacktestLeverageRisk);
+  if (backtestLeverageRangeEl) {
+    backtestLeverageRangeEl.addEventListener('input', () => {
+      const v = backtestLeverageRangeEl.value;
+      updateBacktestLeverageDisplay(v);
+      updateBacktestLeverageRisk();
+    });
+    // Колёсико мыши на весь блок плеча: зона по Y увеличена (подпись + слайдер + шкала + риск)
+    const leverageBlock = backtestLeverageRangeEl.closest('.properties-leverage-block');
+    if (leverageBlock) {
+      leverageBlock.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const min = parseInt(backtestLeverageRangeEl.min, 10) || 1;
+        const max = parseInt(backtestLeverageRangeEl.max, 10) || 50;
+        const step = e.deltaY < 0 ? 1 : -1;
+        let v = parseInt(backtestLeverageRangeEl.value, 10) + step;
+        v = Math.max(min, Math.min(max, v));
+        backtestLeverageRangeEl.value = v;
+        updateBacktestLeverageDisplay(String(v));
+        updateBacktestLeverageRisk();
+      }, { passive: false });
+    }
+  }
 
   // Canvas drop zone
   const canvas = document.getElementById('canvasContainer');
@@ -1446,6 +2600,20 @@ function setupEventListeners() {
   } else {
     console.error('[Strategy Builder] Canvas container not found!');
   }
+
+  // Properties section collapse/expand — обрабатывается sidebar-toggle.js (без дублирования)
+
+  // Клик по блоку статуса данных при ошибке — повторная попытка синхронизации
+  const dataStatusRow = document.getElementById('propertiesDataStatusRow');
+  if (dataStatusRow) {
+    dataStatusRow.addEventListener('click', function () {
+      const indicator = document.getElementById('propertiesDataStatusIndicator');
+      if (indicator?.classList.contains('error')) syncSymbolData(true);
+    });
+  }
+
+  // База данных
+  initDunnahBasePanel();
 
   // Block search
   document
@@ -1502,6 +2670,32 @@ function setupEventListeners() {
           e.stopPropagation();
           addBlockToCanvas(blockId, blockType);
         }
+      }
+    });
+  }
+
+  // Properties panel: delegated change/input for block params (uses selectedBlockId)
+  const propertiesPanel = document.getElementById('propertiesPanel');
+  if (propertiesPanel) {
+    propertiesPanel.addEventListener('change', function (e) {
+      const target = e.target;
+      if (!target.closest('#blockProperties')) return;
+      const key = target.dataset?.paramKey;
+      if (!key || !selectedBlockId) return;
+      if (target.classList.contains('tv-checkbox')) {
+        updateBlockParam(selectedBlockId, key, target.checked);
+      } else if (target.classList.contains('tv-select') || target.classList.contains('tv-input') || target.classList.contains('property-input')) {
+        const val = target.type === 'number' ? (parseFloat(target.value) || 0) : target.value;
+        updateBlockParam(selectedBlockId, key, val);
+      }
+    });
+    propertiesPanel.addEventListener('input', function (e) {
+      const target = e.target;
+      if (!target.closest('#blockProperties')) return;
+      const key = target.dataset?.paramKey;
+      if (!key || !selectedBlockId) return;
+      if (target.classList.contains('tv-input') && target.type !== 'number') {
+        updateBlockParam(selectedBlockId, key, target.value);
       }
     });
   }
@@ -1583,9 +2777,24 @@ function setupEventListeners() {
 
   // Keyboard shortcuts
   document.addEventListener('keydown', function (e) {
+    // Undo Ctrl+Z
+    if (e.key === 'z' && e.ctrlKey && !e.shiftKey) {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        undo();
+      }
+      return;
+    }
+    // Redo Ctrl+Y or Ctrl+Shift+Z
+    if ((e.key === 'y' && e.ctrlKey) || (e.key === 'z' && e.ctrlKey && e.shiftKey)) {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        redo();
+      }
+      return;
+    }
     // Delete selected block
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBlockId) {
-      // Don't delete if typing in an input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')
         return;
       e.preventDefault();
@@ -1657,6 +2866,18 @@ function setupEventListeners() {
   } else {
     console.error('[Strategy Builder] Templates button not found!');
   }
+
+  // Versions button and modal
+  const btnVersions = document.getElementById('btnVersions');
+  if (btnVersions) btnVersions.addEventListener('click', openVersionsModal);
+  const versionsModal = document.getElementById('versionsModal');
+  if (versionsModal) {
+    versionsModal.addEventListener('click', (e) => { if (e.target === versionsModal) closeVersionsModal(); });
+  }
+  const btnCloseVersionsModal = document.getElementById('btnCloseVersionsModal');
+  const btnCloseVersions = document.getElementById('btnCloseVersions');
+  if (btnCloseVersionsModal) btnCloseVersionsModal.addEventListener('click', closeVersionsModal);
+  if (btnCloseVersions) btnCloseVersions.addEventListener('click', closeVersionsModal);
 
   // Validation panel auto-close timer
   let validationAutoCloseTimer = null;
@@ -1921,6 +3142,17 @@ function setupEventListeners() {
     });
   }
 
+  const importTemplateInput = document.getElementById('importTemplateInput');
+  if (importTemplateInput) {
+    importTemplateInput.addEventListener('change', function (e) {
+      const file = e.target.files?.[0];
+      if (file) {
+        importTemplateFromFile(file);
+        e.target.value = '';
+      }
+    });
+  }
+
   // Templates modal: do NOT close on overlay click (caused immediate close / invisible content).
   // Close only via Close (X), Cancel, or Use Template buttons.
   const templatesModal = document.getElementById('templatesModal');
@@ -2038,6 +3270,7 @@ function addBlockToCanvas(blockId, blockType, x = null, y = null) {
   };
 
   console.log('[Strategy Builder] Created block:', block);
+  pushUndo();
   strategyBlocks.push(block);
   console.log(`[Strategy Builder] Total blocks: ${strategyBlocks.length}`);
 
@@ -3633,6 +4866,11 @@ function renderGroupedParams(block, optimizationMode = false) {
   const params = block.params || {};
   const optParams = block.optimizationParams || {};
 
+  // Только таймфреймы Bybit API v5: 1,3,5,15,30,60,120,240,360,720,D,W,M
+  // Единый набор: 1m, 5m, 15m, 30m, 60m, 4h, 1D, 1W, 1M
+  const BYBIT_TF_OPTS = ['Chart', '1', '5', '15', '30', '60', '240', 'D', 'W', 'M'];
+  const BYBIT_TF_DAY = ['D', 'W', 'M'];
+
   // Define custom layouts for complex blocks
   const customLayouts = {
     // =============================================
@@ -3643,7 +4881,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       fields: [
         { key: 'period', label: 'Length', type: 'number', optimizable: true },
         { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'overbought', label: 'Overbought Level', type: 'number', optimizable: true },
         { key: 'oversold', label: 'Oversold Level', type: 'number', optimizable: true }
       ]
@@ -3654,7 +4892,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'k_period', label: '%K Length', type: 'number', optimizable: true },
         { key: 'd_period', label: '%D Smoothing', type: 'number', optimizable: true },
         { key: 'smooth_k', label: '%K Smoothing', type: 'number', optimizable: true },
-        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'overbought', label: 'Overbought', type: 'number', optimizable: true },
         { key: 'oversold', label: 'Oversold', type: 'number', optimizable: true }
       ]
@@ -3812,7 +5050,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'qqe_factor', label: 'QQE Factor', type: 'number', optimizable: true },
         { key: 'smoothing_period', label: 'Smoothing Period', type: 'number', optimizable: true },
         { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] },
-        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] }
+        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS }
       ]
     },
 
@@ -3896,7 +5134,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       title: 'Pivot Points Settings',
       fields: [
         { key: 'type', label: 'Type', type: 'select', options: ['traditional', 'fibonacci', 'woodie', 'classic', 'demark', 'camarilla'] },
-        { key: 'timeframe', label: 'Timeframe', type: 'select', options: ['1D', '1W', '1M'] }
+        { key: 'timeframe', label: 'Timeframe', type: 'select', options: BYBIT_TF_DAY }
       ]
     },
 
@@ -3909,7 +5147,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'indicator', label: 'Indicator', type: 'select', options: ['ema', 'sma', 'wma', 'rsi', 'macd', 'stochastic', 'adx', 'atr', 'bollinger'] },
         { key: 'period', label: 'Period', type: 'number', optimizable: true },
         { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'timeframe', label: 'Timeframe', type: 'select', options: ['1m', '5m', '15m', '30m', '1h', '4h', '1D', '1W'] },
+        { key: 'timeframe', label: 'Timeframe', type: 'select', options: BYBIT_TF_OPTS.filter((t) => t !== 'Chart') },
         { key: 'show_on_chart', label: 'Show on Chart', type: 'checkbox' }
       ]
     },
@@ -3923,7 +5161,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         // TF1 (Main)
         { type: 'separator', label: '━━━ RSI TF1 (Main) ━━━' },
         { key: 'rsi_period', label: 'RSI Length', type: 'number', optimizable: true },
-        { key: 'rsi_timeframe', label: 'RSI TimeFrame', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'rsi_timeframe', label: 'RSI TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for RSI?', type: 'checkbox' },
         { key: 'use_long_range', label: 'Use RSI LONG Range', type: 'checkbox' },
         {
@@ -3953,7 +5191,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { type: 'separator', label: '━━━ RSI TF2 ━━━' },
         { key: 'use_rsi_tf2', label: 'Use RSI TF2?', type: 'checkbox' },
         { key: 'rsi_tf2_period', label: 'RSI Length', type: 'number', optimizable: true },
-        { key: 'rsi_tf2_timeframe', label: 'TimeFrame', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'rsi_tf2_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
         {
           type: 'inline',
           fields: [
@@ -3974,7 +5212,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { type: 'separator', label: '━━━ RSI TF3 ━━━' },
         { key: 'use_rsi_tf3', label: 'Use RSI TF3?', type: 'checkbox' },
         { key: 'rsi_tf3_period', label: 'RSI Length', type: 'number', optimizable: true },
-        { key: 'rsi_tf3_timeframe', label: 'TimeFrame', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'rsi_tf3_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
         {
           type: 'inline',
           fields: [
@@ -4005,7 +5243,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'show_supertrend', label: 'Show SuperTrend TF1?', type: 'checkbox' },
         { key: 'atr_period', label: 'ATR Period', type: 'number', optimizable: true },
         { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', step: 0.1, optimizable: true },
-        { key: 'timeframe', label: 'TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         // TF2
         { type: 'separator', label: '━━━ SuperTrend TF2 ━━━' },
         { key: 'use_supertrend_tf2', label: 'Use SuperTrend TF2?', type: 'checkbox' },
@@ -4014,7 +5252,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'supertrend_tf2_show', label: 'Show SuperTrend TF2?', type: 'checkbox' },
         { key: 'supertrend_tf2_period', label: 'ATR Period', type: 'number', optimizable: true },
         { key: 'supertrend_tf2_multiplier', label: 'ATR Multiplier', type: 'number', step: 0.1, optimizable: true },
-        { key: 'supertrend_tf2_timeframe', label: 'TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'supertrend_tf2_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         // TF3
         { type: 'separator', label: '━━━ SuperTrend TF3 ━━━' },
         { key: 'use_supertrend_tf3', label: 'Use SuperTrend TF3?', type: 'checkbox' },
@@ -4022,7 +5260,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'supertrend_tf3_show', label: 'Show SuperTrend TF3?', type: 'checkbox' },
         { key: 'supertrend_tf3_period', label: 'ATR Period', type: 'number', optimizable: true },
         { key: 'supertrend_tf3_multiplier', label: 'ATR Multiplier', type: 'number', step: 0.1, optimizable: true },
-        { key: 'supertrend_tf3_timeframe', label: 'TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] }
+        { key: 'supertrend_tf3_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS }
       ]
     },
     // =============================================
@@ -4046,7 +5284,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { type: 'separator', label: '------ Use MA1 as Filter. Long if Price > MA 1 ------' },
         { key: 'use_ma1_filter', label: 'Use MA1 as Filter', type: 'checkbox' },
         { key: 'opposite_ma1_filter', label: "Opposite Signal - 'MA1 as Filter'", type: 'checkbox' },
-        { key: 'two_ma_timeframe', label: 'TWO MAs TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] }
+        { key: 'two_ma_timeframe', label: 'TWO MAs TimeFrame:', type: 'select', options: BYBIT_TF_OPTS }
       ]
     },
     // =============================================
@@ -4058,7 +5296,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'stoch_k_length', label: 'Stochastic %K Length (14)', type: 'number', optimizable: true },
         { key: 'stoch_k_smoothing', label: 'Stochastic %K Smoothing (3)', type: 'number', optimizable: true },
         { key: 'stoch_d_smoothing', label: 'Stochastic %D Smoothing (3)', type: 'number', optimizable: true },
-        { key: 'stoch_timeframe', label: 'Stochastic TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'stoch_timeframe', label: 'Stochastic TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for Stochastic?', type: 'checkbox' },
         { type: 'separator', label: '------- Use Stochastic Range Filter -------' },
         { key: 'use_stoch_range_filter', label: 'Use Stochastic Range Filter', type: 'checkbox' },
@@ -4101,7 +5339,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'macd_slow_length', label: 'MACD Slow Length (26)', type: 'number', optimizable: true },
         { key: 'macd_signal_smoothing', label: 'MACD Signal Smoothing (9)', type: 'number', optimizable: true },
         { key: 'macd_source', label: 'MACD Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'macd_timeframe', label: 'MACD TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'macd_timeframe', label: 'MACD TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for MACD?', type: 'checkbox' },
         { key: 'enable_macd_visualization', label: 'Enable Visualization MACD', type: 'checkbox' },
         { type: 'separator', label: '------- Use MACD Cross with Level (0) -------' },
@@ -4139,7 +5377,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       title: 'CCI [TIMEFRAME]',
       fields: [
         { key: 'cci_length', label: 'CCI TF Long(14)', type: 'number', optimizable: true },
-        { key: 'cci_timeframe', label: 'CCI TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'cci_timeframe', label: 'CCI TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for CCI?', type: 'checkbox' },
         { type: 'separator', label: '------- Use CCI LONG Range -------' },
         { key: 'use_cci_long_range', label: 'Use CCI LONG Range', type: 'checkbox' },
@@ -4170,7 +5408,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       title: 'MOMENTUM',
       fields: [
         { key: 'momentum_length', label: 'Momentum TF Long(14)', type: 'number', optimizable: true },
-        { key: 'momentum_timeframe', label: 'Momentum TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'momentum_timeframe', label: 'Momentum TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'momentum_source', label: 'Momentum Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for Momentum?', type: 'checkbox' },
         { type: 'separator', label: '------- Use Momentum LONG Range -------' },
@@ -4203,7 +5441,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       fields: [
         { key: 'dmi_period', label: 'D Period Length (14)', type: 'number', optimizable: true },
         { key: 'adx_smoothing', label: 'ADX Smoothing Period (14)', type: 'number', optimizable: true },
-        { key: 'dmi_timeframe', label: 'DMI TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'dmi_timeframe', label: 'DMI TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for DMI?', type: 'checkbox' },
         { type: 'separator', label: '------- Far Long using DMI Line -------' },
         { key: 'use_dmi_long', label: 'Far Long using DMI Line', type: 'checkbox' },
@@ -4227,7 +5465,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'use_cmf', label: 'Use CMF Filter', type: 'checkbox' },
         { key: 'opposite_cmf', label: 'Opposite CMF Signal', type: 'checkbox' },
         { key: 'cmf_length', label: 'CMF Length (20)', type: 'number', optimizable: true },
-        { key: 'cmf_timeframe', label: 'CMF TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'cmf_timeframe', label: 'CMF TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for CMF?', type: 'checkbox' },
         { type: 'separator', label: '------- CMF LONG Range -------' },
         {
@@ -4259,7 +5497,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'opposite_bop', label: 'Opposite BoP Signal', type: 'checkbox' },
         { key: 'bop_smoothing', label: 'BoP Smoothing (14)', type: 'number', optimizable: true },
         { key: 'bop_triple_smooth_length', label: 'Triple Smooth Length (4)', type: 'number', optimizable: true },
-        { key: 'bop_timeframe', label: 'BoP TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'bop_timeframe', label: 'BoP TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for BoP?', type: 'checkbox' },
         { type: 'separator', label: '------- Cross Line Mode -------' },
         { key: 'bop_cross_line_enable', label: 'Use Cross Line Signal', type: 'checkbox' },
@@ -4300,7 +5538,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'levels_memory_enable', label: 'Enable Signal Memory', type: 'checkbox' },
         { key: 'levels_memory_bars', label: 'Signal Memory Bars', type: 'number', optimizable: true },
         { key: 'pivot_type', label: 'Pivot Type', type: 'select', options: ['Traditional', 'Fibonacci', 'Woodie', 'Classic', 'DeMark', 'Camarilla'] },
-        { key: 'levels_timeframe', label: 'Levels TimeFrame:', type: 'select', options: ['D', 'W', 'M'] },
+        { key: 'levels_timeframe', label: 'Levels TimeFrame:', type: 'select', options: BYBIT_TF_DAY },
         { type: 'separator', label: '------- LONG Conditions -------' },
         { key: 'long_above_s1', label: 'Price > S1 for LONG', type: 'checkbox' },
         { key: 'long_above_pivot', label: 'Price > Pivot for LONG', type: 'checkbox' },
@@ -4320,7 +5558,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'use_atr_filter', label: 'Use ATR Volatility Filter', type: 'checkbox' },
         { key: 'atr_length', label: 'ATR Length (14)', type: 'number', optimizable: true },
         { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true },
-        { key: 'atr_timeframe', label: 'ATR TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'atr_timeframe', label: 'ATR TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for ATR?', type: 'checkbox' },
         { type: 'separator', label: '------- ATR % Range -------' },
         {
@@ -4343,7 +5581,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'use_vol_compare', label: 'Use Volume Compare Filter', type: 'checkbox' },
         { key: 'vol_ma_length', label: 'Volume MA Length (20)', type: 'number', optimizable: true },
         { key: 'vol_ma_type', label: 'Volume MA Type', type: 'select', options: ['SMA', 'EMA', 'WMA', 'VWMA'] },
-        { key: 'vol_timeframe', label: 'Volume TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'vol_timeframe', label: 'Volume TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for Volume?', type: 'checkbox' },
         { type: 'separator', label: '------- Volume Threshold -------' },
         { key: 'vol_multiplier', label: 'Volume Multiplier (1.5)', type: 'number', optimizable: true },
@@ -4359,7 +5597,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       fields: [
         { key: 'use_highest_lowest', label: 'Use Highest/Lowest Filter', type: 'checkbox' },
         { key: 'lookback_period', label: 'Lookback Period (20)', type: 'number', optimizable: true },
-        { key: 'hl_timeframe', label: 'TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'hl_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source?', type: 'checkbox' },
         { type: 'separator', label: '------- LONG Conditions -------' },
         { key: 'long_break_highest', label: 'Break Above Highest (N-bar high)', type: 'checkbox' },
@@ -4383,7 +5621,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'volume_threshold', label: 'Volume Threshold (x avg)', type: 'number', optimizable: true },
         { key: 'price_range_percent', label: 'Price Range %', type: 'number', optimizable: true },
         { key: 'min_bars_in_range', label: 'Min Bars in Range', type: 'number', optimizable: true },
-        { key: 'acc_timeframe', label: 'TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'acc_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { type: 'separator', label: '------- Entry Conditions -------' },
         { key: 'enter_on_breakout', label: 'Enter on Breakout', type: 'checkbox' },
         { key: 'enter_in_range', label: 'Enter Inside Range', type: 'checkbox' }
@@ -4401,7 +5639,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'linreg_length', label: 'LinReg Length (100)', type: 'number', optimizable: true },
         { key: 'linreg_offset', label: 'Offset', type: 'number', optimizable: true },
         { key: 'channel_mult', label: 'Channel Deviation (2.0)', type: 'number', optimizable: true },
-        { key: 'linreg_timeframe', label: 'TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'linreg_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'linreg_source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4', 'hlcc4'] },
         { key: 'linreg_breakout_rebound', label: 'Band Action', type: 'select', options: ['Breakout', 'Rebound'] },
         { key: 'linreg_slope_direction', label: 'Slope Direction', type: 'select', options: ['Allow_Any', 'Follow', 'Opposite'] },
@@ -4423,7 +5661,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       fields: [
         { key: 'use_rvi', label: 'Use RVI Filter', type: 'checkbox' },
         { key: 'rvi_length', label: 'RVI Length (10)', type: 'number', optimizable: true },
-        { key: 'rvi_timeframe', label: 'TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'rvi_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'rvi_ma_type', label: 'MA Smoothing Type', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'] },
         { key: 'rvi_ma_length', label: 'MA Length (14)', type: 'number', optimizable: true },
         { type: 'separator', label: '------- LONG Range -------' },
@@ -4457,7 +5695,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'use_divergence', label: 'Use Divergence Filter', type: 'checkbox' },
         { key: 'div_indicator', label: 'Indicator', type: 'select', options: ['RSI', 'MACD', 'Stochastic', 'CCI', 'OBV', 'MFI'] },
         { key: 'div_period', label: 'Indicator Period', type: 'number', optimizable: true },
-        { key: 'div_timeframe', label: 'TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'div_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'pivot_lookback', label: 'Pivot Lookback', type: 'number', optimizable: true },
         { type: 'separator', label: '------- Divergence Types -------' },
         { key: 'use_regular_bullish', label: 'Regular Bullish (for LONG)', type: 'checkbox' },
@@ -4473,7 +5711,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       title: 'PRICE ACTION (47 CANDLESTICK PATTERNS)',
       fields: [
         { key: 'use_price_action', label: 'Use Price Action Filter', type: 'checkbox' },
-        { key: 'pa_timeframe', label: 'TimeFrame:', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'pa_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
         // ===== BULLISH REVERSAL (LONG) =====
         { type: 'separator', label: '━━━ Bullish Reversal (LONG) ━━━' },
         { key: 'use_hammer', label: 'Hammer', type: 'checkbox' },
@@ -4996,7 +6234,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       fields: [
         { key: 'rsi_close_enable', label: 'Enable RSI Close', type: 'checkbox' },
         { key: 'rsi_close_length', label: 'RSI Length', type: 'number', optimizable: true },
-        { key: 'rsi_close_timeframe', label: 'TimeFrame', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'rsi_close_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
         { type: 'separator', label: '------- Profit Filter -------' },
         { key: 'rsi_close_only_profit', label: 'Close Only With Profit', type: 'checkbox' },
         { key: 'rsi_close_min_profit', label: 'Min Profit %', type: 'number', optimizable: true },
@@ -5019,7 +6257,7 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'stoch_close_k_length', label: '%K Length', type: 'number', optimizable: true },
         { key: 'stoch_close_k_smooth', label: '%K Smoothing', type: 'number', optimizable: true },
         { key: 'stoch_close_d_smooth', label: '%D Smoothing', type: 'number', optimizable: true },
-        { key: 'stoch_close_timeframe', label: 'TimeFrame', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'stoch_close_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
         { type: 'separator', label: '------- Profit Filter -------' },
         { key: 'stoch_close_only_profit', label: 'Close Only With Profit', type: 'checkbox' },
         { key: 'stoch_close_min_profit', label: 'Min Profit %', type: 'number', optimizable: true },
@@ -5039,7 +6277,7 @@ function renderGroupedParams(block, optimizationMode = false) {
       title: 'CHANNEL CLOSE (KELTNER/BOLLINGER)',
       fields: [
         { key: 'channel_close_enable', label: 'Enable Channel Close', type: 'checkbox' },
-        { key: 'channel_close_timeframe', label: 'TimeFrame', type: 'select', options: ['Chart', '1m', '5m', '15m', '30m', '1h', '4h', '1D'] },
+        { key: 'channel_close_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
         { key: 'channel_close_band', label: 'Band Action', type: 'select', options: ['Breakout', 'Rebound'] },
         { key: 'channel_close_type', label: 'Channel Type', type: 'select', options: ['Keltner', 'Bollinger'] },
         { key: 'channel_close_condition', label: 'Condition', type: 'select', options: ['long_upper_short_lower', 'long_lower_short_upper', 'long_upper_short_upper', 'long_lower_short_lower'] },
@@ -6467,6 +7705,7 @@ function duplicateBlock(blockId) {
     params: { ...block.params }
   };
 
+  pushUndo();
   strategyBlocks.push(newBlock);
   renderBlocks();
   selectBlock(newBlock.id);
@@ -6478,6 +7717,7 @@ function deleteBlock(blockId) {
     console.log('[Strategy Builder] Cannot delete main Strategy node');
     return;
   }
+  pushUndo();
 
   // Remove connections involving this block
   for (let i = connections.length - 1; i >= 0; i--) {
@@ -6540,40 +7780,57 @@ function selectBlock(blockId) {
 
 function renderBlockProperties() {
   const container = document.getElementById('blockProperties');
+  if (!container) return;
   const block = strategyBlocks.find((b) => b.id === selectedBlockId);
 
   if (!block) {
     container.innerHTML =
-      '<p class="text-secondary" style="font-size: 13px; text-align: center; padding: 20px 0">Select a block to view its properties</p>';
+      '<p class="text-secondary" style="font-size: 13px; text-align: center; padding: 20px 0">Выберите блок на холсте, чтобы редактировать его параметры.</p>';
     return;
   }
 
-  container.innerHTML = `
-                <div class="property-row">
-                    <span class="property-label">Name</span>
-                    <span class="property-value">${block.name}</span>
-                </div>
-                <div class="property-row">
-                    <span class="property-label">Type</span>
-                    <span class="property-value">${block.type}</span>
-                </div>
-                <div class="property-row">
-                    <span class="property-label">Category</span>
-                    <span class="property-value">${block.category}</span>
-                </div>
-                <hr style="border-color: var(--border-color); margin: 12px 0">
-                ${Object.entries(block.params)
-      .map(
-        ([key, value]) => `
-                    <div class="property-row">
-                        <span class="property-label">${formatParamName(key)}</span>
-                        <input type="text" class="property-input" value="${value}" 
-                               onchange="updateBlockParam('${block.id}', '${key}', this.value)">
-                    </div>
-                `
-      )
-      .join('')}
-            `;
+  const headerHtml = `
+    <div class="property-row">
+      <span class="property-label">Name</span>
+      <span class="property-value">${escapeHtml(block.name)}</span>
+    </div>
+    <div class="property-row">
+      <span class="property-label">Type</span>
+      <span class="property-value">${escapeHtml(block.type)}</span>
+    </div>
+    <div class="property-row">
+      <span class="property-label">Category</span>
+      <span class="property-value">${escapeHtml(block.category || '')}</span>
+    </div>
+    <hr style="border-color: var(--border-color); margin: 12px 0">
+  `;
+
+  const groupedHtml = renderGroupedParams(block, false);
+  if (groupedHtml) {
+    container.innerHTML = headerHtml + groupedHtml;
+  } else {
+    container.innerHTML =
+      headerHtml +
+      Object.entries(block.params || {})
+        .map(
+          ([key, value]) => `
+        <div class="property-row">
+          <span class="property-label">${formatParamName(key)}</span>
+          <input type="text" class="property-input" value="${escapeHtml(String(value))}"
+                 data-param-key="${escapeHtml(key)}"
+                 data-block-id="${escapeHtml(block.id)}">
+        </div>
+      `
+        )
+        .join('');
+  }
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 // =============================================================================
@@ -7051,6 +8308,7 @@ function updateBlockParam(blockId, param, value) {
 function startDragBlock(event, blockId) {
   if (event.target.closest('.block-param-input')) return;
 
+  pushUndo();
   isDragging = true;
   const block = document.getElementById(blockId);
   const rect = block.getBoundingClientRect();
@@ -7239,6 +8497,7 @@ function clearMultiSelection() {
 // ============================================
 
 function startGroupDrag(event) {
+  pushUndo();
   isGroupDragging = true;
 
   const container = document.getElementById('canvasContainer');
@@ -7437,6 +8696,7 @@ function completeConnection(endPortElement) {
   );
 
   if (!exists) {
+    pushUndo();
     connections.push({
       id: `conn_${Date.now()}`,
       source,
@@ -7527,6 +8787,7 @@ function createBezierPath(x1, y1, x2, y2, fromOutput) {
 function deleteConnection(connectionId) {
   const index = connections.findIndex((c) => c.id === connectionId);
   if (index !== -1) {
+    pushUndo();
     connections.splice(index, 1);
     renderConnections();
     renderBlocks(); // Update port states
@@ -7644,6 +8905,7 @@ function loadSelectedTemplate() {
     const nameInput = document.getElementById('strategyName');
     if (nameInput) {
       nameInput.value = template.name;
+      syncStrategyNameDisplay();
     }
 
     // Load template blocks and connections
@@ -8152,6 +9414,8 @@ function loadTemplateData(templateId) {
   console.log('[Strategy Builder] Template data found:', data);
   console.log(`[Strategy Builder] Blocks: ${data.blocks.length}, Connections: ${data.connections.length}`);
 
+  pushUndo();
+
   // Keep main strategy node, clear others
   const mainNode = strategyBlocks.find((b) => b.isMain);
   strategyBlocks = mainNode ? [mainNode] : [];
@@ -8235,23 +9499,149 @@ function loadTemplateData(templateId) {
   showNotification(`Шаблон "${templateId}" загружен`, 'success');
 }
 
-// Toolbar functions
+function exportAsTemplate() {
+  const blocksToExport = strategyBlocks.filter((b) => !b.isMain);
+  if (blocksToExport.length === 0) {
+    showNotification('Добавьте блоки для экспорта', 'warning');
+    return;
+  }
+  const payload = {
+    name: document.getElementById('strategyName')?.value || 'Exported Strategy',
+    exportedAt: new Date().toISOString(),
+    blocks: blocksToExport.map((b) => ({
+      id: b.id,
+      type: b.type,
+      category: b.category,
+      name: b.name,
+      icon: b.icon,
+      x: b.x,
+      y: b.y,
+      params: { ...b.params }
+    })),
+    connections: connections.map((c) => ({
+      source: { blockId: c.source.blockId, portId: c.source.portId },
+      target: { blockId: c.target.blockId, portId: c.target.portId },
+      type: c.type
+    }))
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `strategy-template-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showNotification('Шаблон экспортирован', 'success');
+}
+
+function importTemplateFromFile(file) {
+  if (!file || !file.name?.toLowerCase().endsWith('.json')) {
+    showNotification('Выберите .json файл', 'warning');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      const blocks = data.blocks || [];
+      const conns = data.connections || [];
+      if (blocks.length === 0) {
+        showNotification('Файл не содержит блоков', 'error');
+        return;
+      }
+      pushUndo();
+      const mainNode = strategyBlocks.find((b) => b.isMain);
+      strategyBlocks = mainNode ? [mainNode] : [];
+      blocks.forEach((block) => {
+        if (block.id === 'main_strategy' || block.isMain) return;
+        strategyBlocks.push({ ...block });
+      });
+      connections.length = 0;
+      conns.forEach((conn) => {
+        const srcExists = strategyBlocks.some((b) => b.id === conn.source?.blockId);
+        const tgtExists = strategyBlocks.some((b) => b.id === conn.target?.blockId) ||
+          conn.target?.blockId === 'main_strategy';
+        if (srcExists && (tgtExists || strategyBlocks.some((b) => b.isMain))) {
+          const targetId = conn.target?.blockId === 'main_strategy'
+            ? strategyBlocks.find((b) => b.isMain)?.id
+            : conn.target?.blockId;
+          if (targetId) {
+            connections.push({
+              id: `conn_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+              source: { blockId: conn.source.blockId, portId: conn.source.portId || 'value' },
+              target: { blockId: targetId, portId: conn.target.portId || 'value' },
+              type: conn.type || 'data'
+            });
+          }
+        }
+      });
+      renderBlocks();
+      renderConnections();
+      dispatchBlocksChanged();
+      closeTemplatesModal();
+      showNotification(`Импортировано: ${blocks.length} блоков`, 'success');
+    } catch (err) {
+      showNotification(`Ошибка импорта: ${err.message}`, 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Undo/Redo helpers
+function getStateSnapshot() {
+  return {
+    blocks: JSON.parse(JSON.stringify(strategyBlocks)),
+    connections: JSON.parse(JSON.stringify(connections))
+  };
+}
+
+function restoreStateSnapshot(snapshot) {
+  if (!snapshot?.blocks) return;
+  strategyBlocks.length = 0;
+  strategyBlocks.push(...snapshot.blocks);
+  connections.length = 0;
+  connections.push(...(snapshot.connections || []));
+  if (selectedBlockId && !strategyBlocks.some((b) => b.id === selectedBlockId)) {
+    selectedBlockId = null;
+  }
+  renderBlocks();
+  renderConnections();
+  renderBlockProperties();
+  dispatchBlocksChanged();
+}
+
+function pushUndo() {
+  const snapshot = getStateSnapshot();
+  if (undoStack.length >= MAX_UNDO_HISTORY) undoStack.shift();
+  undoStack.push(snapshot);
+  redoStack.length = 0;
+}
+
 function undo() {
-  console.log('Undo');
+  if (undoStack.length === 0) return;
+  redoStack.push(getStateSnapshot());
+  const prev = undoStack.pop();
+  restoreStateSnapshot(prev);
+  showNotification('Отмена действия', 'info');
 }
 
 function redo() {
-  console.log('Redo');
+  if (redoStack.length === 0) return;
+  undoStack.push(getStateSnapshot());
+  const next = redoStack.pop();
+  restoreStateSnapshot(next);
+  showNotification('Повтор действия', 'info');
 }
+
+// Toolbar functions (called from HTML buttons)
 
 function deleteSelected() {
   if (selectedBlockId) {
-    // Don't delete main strategy node
     const block = strategyBlocks.find((b) => b.id === selectedBlockId);
     if (block && block.isMain) {
       console.log('Cannot delete main Strategy node');
       return;
     }
+    pushUndo();
 
     // Remove connections involving this block
     const connectionsToRemove = connections.filter(
@@ -8274,8 +9664,8 @@ function deleteSelected() {
 function duplicateSelected() {
   if (selectedBlockId) {
     const block = strategyBlocks.find((b) => b.id === selectedBlockId);
-    // Don't duplicate main node
     if (block && !block.isMain) {
+      pushUndo();
       const newBlock = {
         ...block,
         id: `block_${Date.now()}`,
@@ -8826,28 +10216,47 @@ function buildStrategyPayload() {
 
   const nameEl = document.getElementById('strategyName');
   const timeframeEl = document.getElementById('strategyTimeframe');
-  const symbolEl = document.getElementById('strategySymbol');
   const marketTypeEl = document.getElementById('builderMarketType');
   const directionEl = document.getElementById('builderDirection');
-  const initialCapitalEl = document.getElementById('initialCapital');
+  const symbolEl = document.getElementById('strategySymbol');
+  const backtestSymbolEl = document.getElementById('backtestSymbol');
+  const backtestCapitalEl = document.getElementById('backtestCapital');
+
+  const symbol = symbolEl?.value || backtestSymbolEl?.value || 'BTCUSDT';
+  const initialCapital = parseFloat(backtestCapitalEl?.value || 10000);
 
   console.log('[Strategy Builder] Form elements:', {
     name: nameEl?.value,
     timeframe: timeframeEl?.value,
-    symbol: symbolEl?.value,
+    symbol,
     market_type: marketTypeEl?.value,
     direction: directionEl?.value,
-    initial_capital: initialCapitalEl?.value
+    initial_capital: initialCapital
   });
 
+  const backtestLeverageEl = document.getElementById('backtestLeverage');
+  const backtestPositionSizeTypeEl = document.getElementById('backtestPositionSizeType');
+  const backtestPositionSizeEl = document.getElementById('backtestPositionSize');
+  const leverage = parseInt(backtestLeverageEl?.value, 10) || 10;
+  const positionSizeType = backtestPositionSizeTypeEl?.value || 'percent';
+  const positionSizeVal = parseFloat(backtestPositionSizeEl?.value) || 100;
+  const noTradeDays = getNoTradeDaysFromUI();
   const payload = {
     name: nameEl?.value || 'New Strategy',
-    description: '', // TODO: добавить поле описания в UI
-    timeframe: timeframeEl?.value || '1h',
-    symbol: symbolEl?.value || 'BTCUSDT',
+    description: '',
+    timeframe: timeframeEl?.value || '15',
+    symbol,
     market_type: marketTypeEl?.value || 'linear',
     direction: directionEl?.value || 'both',
-    initial_capital: parseFloat(initialCapitalEl?.value || 10000),
+    initial_capital: initialCapital,
+    leverage,
+    position_size: positionSizeType === 'percent' ? positionSizeVal / 100 : positionSizeVal,
+    parameters: {
+      _position_size_type: positionSizeType,
+      _order_amount: positionSizeType === 'fixed_amount' ? positionSizeVal : undefined,
+      _no_trade_days: noTradeDays.length ? noTradeDays : undefined,
+      _commission: parseFloat(document.getElementById('backtestCommission')?.value || '0.07') / 100
+    },
     blocks: strategyBlocks.filter((b) => !b.isMain),
     connections: connections
   };
@@ -8938,11 +10347,9 @@ async function loadStrategy(strategyId) {
 
     // Обновить UI поля
     document.getElementById('strategyName').value = strategy.name || 'New Strategy';
+    syncStrategyNameDisplay();
     if (document.getElementById('strategyTimeframe')) {
-      document.getElementById('strategyTimeframe').value = strategy.timeframe || '1h';
-    }
-    if (document.getElementById('strategySymbol')) {
-      document.getElementById('strategySymbol').value = strategy.symbol || 'BTCUSDT';
+      document.getElementById('strategyTimeframe').value = normalizeTimeframeForDropdown(strategy.timeframe) || '15';
     }
     if (document.getElementById('builderMarketType')) {
       document.getElementById('builderMarketType').value = strategy.market_type || 'linear';
@@ -8950,11 +10357,44 @@ async function loadStrategy(strategyId) {
     if (document.getElementById('builderDirection')) {
       document.getElementById('builderDirection').value = strategy.direction || 'both';
     }
-    if (document.getElementById('initialCapital')) {
-      document.getElementById('initialCapital').value = strategy.initial_capital || 10000;
+    // Синхронизировать поля бэктеста с данными стратегии
+    const backtestSymbol = document.getElementById('backtestSymbol');
+    const backtestCapital = document.getElementById('backtestCapital');
+    const backtestLeverage = document.getElementById('backtestLeverage');
+    if (backtestSymbol) backtestSymbol.value = strategy.symbol || 'BTCUSDT';
+    if (backtestCapital) backtestCapital.value = strategy.initial_capital || 10000;
+    const maxLeverage = 50;
+    const lev = Math.min(maxLeverage, Math.max(1, strategy.leverage != null ? strategy.leverage : 10));
+    const backtestLeverageRange = document.getElementById('backtestLeverageRange');
+    if (backtestLeverage) backtestLeverage.value = lev;
+    if (backtestLeverageRange) backtestLeverageRange.value = lev;
+    updateBacktestLeverageDisplay(lev);
+    const params = strategy.parameters || {};
+    const posType = params._position_size_type || 'percent';
+    const backtestPositionSizeType = document.getElementById('backtestPositionSizeType');
+    const backtestPositionSize = document.getElementById('backtestPositionSize');
+    if (backtestPositionSizeType) backtestPositionSizeType.value = posType;
+    if (backtestPositionSize) {
+      const posVal = strategy.position_size != null
+        ? (posType === 'percent' ? strategy.position_size * 100 : strategy.position_size)
+        : (params._order_amount || 100);
+      backtestPositionSize.value = posVal;
+    }
+    updateBacktestPositionSizeInput();
+    updateBacktestLeverageRisk();
+
+    const noTradeDays = strategy.parameters?._no_trade_days;
+    if (Array.isArray(noTradeDays) && noTradeDays.length >= 0) {
+      setNoTradeDaysInUI(noTradeDays);
+    }
+
+    const backtestCommission = document.getElementById('backtestCommission');
+    if (backtestCommission && strategy.parameters?._commission != null) {
+      backtestCommission.value = (strategy.parameters._commission * 100).toFixed(2);
     }
 
     // Восстановить блоки и соединения
+    pushUndo();
     // Сохранить main_strategy node если он есть
     const mainNode = strategyBlocks.find((b) => b.isMain);
     strategyBlocks = mainNode ? [mainNode] : [];
@@ -8976,8 +10416,69 @@ async function loadStrategy(strategyId) {
 
     updateLastSaved(strategy.updated_at);
     showNotification('Стратегия успешно загружена!', 'success');
+    // Запустить проверку/синхронизацию данных для загруженного символа и TF
+    runCheckSymbolDataForProperties();
   } catch (err) {
     showNotification(`Ошибка загрузки стратегии: ${err.message}`, 'error');
+  }
+}
+
+async function openVersionsModal() {
+  const strategyId = getStrategyIdFromURL();
+  if (!strategyId) {
+    showNotification('Откройте существующую стратегию', 'warning');
+    return;
+  }
+  const modal = document.getElementById('versionsModal');
+  const listEl = document.getElementById('versionsList');
+  if (!modal || !listEl) return;
+
+  listEl.innerHTML = '<p class="text-muted">Загрузка...</p>';
+  modal.classList.add('active');
+
+  try {
+    const res = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}/versions`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const versions = data.versions || [];
+    if (versions.length === 0) {
+      listEl.innerHTML = '<p class="text-muted">Нет сохранённых версий.</p>';
+      return;
+    }
+    listEl.innerHTML = versions
+      .map(
+        (v) => `
+        <div class="version-item d-flex justify-content-between align-items-center py-2 border-bottom">
+          <span><strong>v${v.version}</strong> · ${formatDate(v.created_at) || v.created_at || ''}</span>
+          <button class="btn btn-sm btn-outline-primary" onclick="revertToVersion('${strategyId}', ${v.id})">
+            <i class="bi bi-arrow-counterclockwise"></i> Restore
+          </button>
+        </div>
+      `
+      )
+      .join('');
+  } catch (err) {
+    listEl.innerHTML = `<p class="text-danger">Ошибка: ${err.message}</p>`;
+  }
+}
+
+function closeVersionsModal() {
+  const modal = document.getElementById('versionsModal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function revertToVersion(strategyId, versionId) {
+  if (!confirm('Восстановить эту версию? Текущие изменения будут заменены.')) return;
+  try {
+    const res = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}/revert/${versionId}`, {
+      method: 'POST'
+    });
+    if (!res.ok) throw new Error(await res.text());
+    closeVersionsModal();
+    await loadStrategy(strategyId);
+    showNotification('Версия восстановлена', 'success');
+  } catch (err) {
+    showNotification(`Ошибка: ${err.message}`, 'error');
   }
 }
 
@@ -9009,9 +10510,10 @@ function mapBlocksToBackendParams() {
     blockLibrary.filters.some(f => f.id === b.type)
   );
 
-  // Find exit conditions
+  // Find exit conditions (exits + close_conditions for DCA/TradingView-style)
   const exitBlocks = strategyBlocks.filter(b =>
-    blockLibrary.exits && blockLibrary.exits.some(e => e.id === b.type)
+    (blockLibrary.exits && blockLibrary.exits.some(e => e.id === b.type)) ||
+    (blockLibrary.close_conditions && blockLibrary.close_conditions.some(c => c.id === b.type))
   );
 
   // Find position sizing
@@ -9175,64 +10677,128 @@ function mapIndicatorParams(block) {
 function buildBacktestRequest() {
   const strategyMapping = mapBlocksToBackendParams();
 
-  // Get UI values for backtest params
-  const intervalRaw = document.getElementById('backtestInterval')?.value || '15';
-  const interval = convertIntervalToAPIFormat(intervalRaw);
+  // Таймфрейм и направление — из общей секции (формат Bybit: 1,3,5,15,30,60,120,240,360,720,D,W,M)
+  const timeframeRaw = document.getElementById('strategyTimeframe')?.value || '15';
+  const interval = convertIntervalToAPIFormat(timeframeRaw);
 
   const backtestConfig = {
     // Basic params
     symbol: document.getElementById('backtestSymbol')?.value || 'BTCUSDT',
     interval: interval,
-    start_date: document.getElementById('backtestStartDate')?.value || '2024-01-01',
-    end_date: document.getElementById('backtestEndDate')?.value || '2024-12-31',
+    start_date: document.getElementById('backtestStartDate')?.value || '2025-01-01',
+    end_date: (() => {
+      const endVal = document.getElementById('backtestEndDate')?.value || '2030-01-01';
+      const today = new Date().toISOString().slice(0, 10);
+      return endVal > today ? today : endVal;
+    })(),
+
+    // Market type: spot (TradingView parity) or linear (perpetual futures)
+    market_type: document.getElementById('builderMarketType')?.value || 'linear',
 
     // Capital & Risk
     initial_capital: parseFloat(document.getElementById('backtestCapital')?.value) || 10000,
     leverage: parseInt(document.getElementById('backtestLeverage')?.value) || 10,
-    direction: document.getElementById('backtestDirection')?.value || 'both',
+    direction: document.getElementById('builderDirection')?.value || 'both',
 
-    // Commission for TradingView parity
-    commission: 0.0007,  // 0.07%
-    slippage: 0.0005,    // 0.05%
+    // Commission: read from UI (default 0.07% = 0.0007)
+    commission: parseFloat(document.getElementById('backtestCommission')?.value || '0.07') / 100 || 0.0007,
+    slippage: 0.0005,
+
+    // Position sizing from Properties (position_size as fraction 0–1 for percent mode)
+    position_size_type: document.getElementById('backtestPositionSizeType')?.value || 'percent',
+    position_size: (() => {
+      const typeEl = document.getElementById('backtestPositionSizeType');
+      const sizeEl = document.getElementById('backtestPositionSize');
+      const type = typeEl?.value || 'percent';
+      const val = parseFloat(sizeEl?.value) || 100;
+      return type === 'percent' ? val / 100 : val;
+    })(),
 
     // Strategy from blocks
     strategy_type: strategyMapping.strategy_type,
-    strategy_params: strategyMapping.strategy_params,
+    strategy_params: (() => {
+      const params = { ...(strategyMapping.strategy_params || {}) };
+      const typeEl = document.getElementById('backtestPositionSizeType');
+      const sizeEl = document.getElementById('backtestPositionSize');
+      const type = typeEl?.value || 'percent';
+      const val = parseFloat(sizeEl?.value) || 100;
+      params._position_size_type = type;
+      if (type === 'fixed_amount' || type === 'contracts') params._order_amount = val;
+      return params;
+    })(),
 
     // Advanced: filters, exits, sizing
     filters: strategyMapping.filters,
     exit_rules: strategyMapping.exits,
     position_sizing: strategyMapping.position_sizing,
-    risk_controls: strategyMapping.risk_controls
+    risk_controls: strategyMapping.risk_controls,
+
+    // Time filter: days to block (0=Mon … 6=Sun). Unchecked = trade that day.
+    no_trade_days: getNoTradeDaysFromUI()
   };
 
   return backtestConfig;
 }
 
+/** UI day checkboxes: Su=6, Mo=0, Tu=1, We=2, Th=3, Fr=4, Sa=5 (Python weekday) */
+const DAY_BLOCK_IDS = [
+  { id: 'dayBlockMo', weekday: 0 },
+  { id: 'dayBlockTu', weekday: 1 },
+  { id: 'dayBlockWe', weekday: 2 },
+  { id: 'dayBlockTh', weekday: 3 },
+  { id: 'dayBlockFr', weekday: 4 },
+  { id: 'dayBlockSa', weekday: 5 },
+  { id: 'dayBlockSu', weekday: 6 }
+];
+
+function getNoTradeDaysFromUI() {
+  const out = [];
+  for (const { id, weekday } of DAY_BLOCK_IDS) {
+    const el = document.getElementById(id);
+    if (el && el.checked) out.push(weekday);
+  }
+  return out;
+}
+
+function setNoTradeDaysInUI(days) {
+  const set = new Set(Array.isArray(days) ? days : []);
+  for (const { id, weekday } of DAY_BLOCK_IDS) {
+    const el = document.getElementById(id);
+    if (el) el.checked = set.has(weekday);
+  }
+}
+
+/** Bybit API v5 kline intervals: 1,3,5,15,30,60,120,240,360,720,D,W,M */
+const BYBIT_INTERVALS = new Set(['1', '5', '15', '30', '60', '240', 'D', 'W', 'M']);
+
+const LEGACY_TF_MAP_DROPDOWN = { '3': '5', '120': '60', '360': '240', '720': 'D' };
+
 /**
- * Convert interval value to API format
+ * Нормализовать сохранённый таймфрейм к значению для выпадающего списка.
+ * Поддерживает старый формат (1h, 15m) и нативный (15, 60, D). Устаревшие TF → ближайший.
+ */
+function normalizeTimeframeForDropdown(stored) {
+  if (!stored) return '15';
+  const s = String(stored).trim();
+  if (BYBIT_INTERVALS.has(s)) return s;
+  if (LEGACY_TF_MAP_DROPDOWN[s]) return LEGACY_TF_MAP_DROPDOWN[s];
+  const mapping = {
+    '1m': '1', '3m': '5', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '2h': '60', '4h': '240', '6h': '240', '12h': 'D', '1d': 'D', '1D': 'D', '1w': 'W', '1W': 'W', '1M': 'M', 'M': 'M'
+  };
+  return mapping[s] || '15';
+}
+
+/**
+ * Привести интервал к формату API/БД (1m, 5m, 15m, 30m, 60m, 4h, 1D, 1W, 1M).
  */
 function convertIntervalToAPIFormat(value) {
+  const s = String(value).trim();
+  if (BYBIT_INTERVALS.has(s)) return s;
+  if (LEGACY_TF_MAP_DROPDOWN[s]) return LEGACY_TF_MAP_DROPDOWN[s];
   const mapping = {
-    '1': '1m',
-    '5': '5m',
-    '15': '15m',
-    '30': '30m',
-    '60': '1h',
-    '240': '4h',
-    'D': '1D',
-    'W': '1W',
-    // Already formatted
-    '1m': '1m',
-    '5m': '5m',
-    '15m': '15m',
-    '30m': '30m',
-    '1h': '1h',
-    '4h': '4h',
-    '1D': '1D',
-    '1W': '1W'
+    '1m': '1', '3m': '5', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '2h': '60', '4h': '240', '6h': '240', '12h': 'D', '1d': 'D', '1D': 'D', '1w': 'W', '1W': 'W', '1M': 'M', 'M': 'M'
   };
-  return mapping[value] || '15m';
+  return mapping[s] || '15';
 }
 
 async function runBacktest() {
@@ -9259,6 +10825,12 @@ async function runBacktest() {
 
   if (strategyBlocks.length === 0) {
     showNotification('Добавьте блоки в стратегию перед бэктестом', 'warning');
+    return;
+  }
+
+  const symbol = document.getElementById('backtestSymbol')?.value?.trim();
+  if (!symbol) {
+    showNotification('Выберите тикер в поле Symbol', 'warning');
     return;
   }
 
@@ -9790,21 +11362,9 @@ function showBlockMenu(blockId) {
   console.log('Show menu for', blockId);
 }
 
-// Toggle right sidebar collapse/expand
+// Механизмы сворачивания отключены — функция заглушка
 function toggleRightSidebar() {
-  const sidebar = document.getElementById('sidebarRight');
-  const btn = document.getElementById('toggleRightSidebarBtn');
-  const icon = btn.querySelector('i');
-
-  sidebar.classList.toggle('collapsed');
-
-  if (sidebar.classList.contains('collapsed')) {
-    icon.classList.remove('bi-chevron-right');
-    icon.classList.add('bi-chevron-left');
-  } else {
-    icon.classList.remove('bi-chevron-left');
-    icon.classList.add('bi-chevron-right');
-  }
+  // no-op
 }
 
 // Make toggleRightSidebar available globally
@@ -9854,6 +11414,9 @@ window.resetZoom = resetZoom;
 window.fitToScreen = fitToScreen;
 window.undo = undo;
 window.redo = redo;
+window.exportAsTemplate = exportAsTemplate;
+window.importTemplateFromFile = importTemplateFromFile;
+window.revertToVersion = revertToVersion;
 window.deleteSelected = deleteSelected;
 
 // Modal functions
@@ -9960,3 +11523,6 @@ if (typeof window !== 'undefined') {
     wsValidation: wsValidation
   };
 }
+
+// Export for frontend tests (ticker sync flow)
+export { syncSymbolData, runCheckSymbolDataForProperties };

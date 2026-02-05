@@ -4,14 +4,15 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
 import time
 from datetime import datetime
 from itertools import product
+
+import pandas as pd
 
 print("=" * 100)
 print("🔬 MEGA PARITY TEST: 150 КОМБИНАЦИЙ")
@@ -74,9 +75,9 @@ print(f"\n📝 {len(combinations)} комбинаций для тестиров�
 # ============================================================================
 # ИМПОРТ ДВИЖКОВ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 fallback = FallbackEngineV2()
 numba = NumbaEngineV2()
@@ -104,7 +105,7 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
     long_exits = (rsi > ob).values
     short_entries = (rsi > ob).values
     short_exits = (rsi < os).values
-    
+
     # Создаём input
     input_data = BacktestInput(
         candles=df_1h,
@@ -125,15 +126,15 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
         slippage=0.0005,
         use_bar_magnifier=False,
     )
-    
+
     # Запуск движков
     fb_result = fallback.run(input_data)
     nb_result = numba.run(input_data)
-    
+
     # Сравнение метрик
     fb_m = fb_result.metrics
     nb_m = nb_result.metrics
-    
+
     # Расчёт drift
     def safe_pct_diff(a, b):
         if a == 0 and b == 0:
@@ -141,14 +142,14 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
         if a == 0:
             return 100.0 if b != 0 else 0.0
         return abs(a - b) / abs(a) * 100
-    
+
     profit_drift = safe_pct_diff(fb_m.net_profit, nb_m.net_profit)
     sharpe_drift = safe_pct_diff(fb_m.sharpe_ratio, nb_m.sharpe_ratio)
     dd_drift = safe_pct_diff(fb_m.max_drawdown, nb_m.max_drawdown)
     winrate_drift = safe_pct_diff(fb_m.win_rate, nb_m.win_rate)
     trades_drift = safe_pct_diff(fb_m.total_trades, nb_m.total_trades)
     pf_drift = safe_pct_diff(fb_m.profit_factor, nb_m.profit_factor)
-    
+
     results.append({
         "combo": i + 1,
         "rsi": rsi_period,
@@ -174,7 +175,7 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
         "trades_drift": trades_drift,
         "pf_drift": pf_drift,
     })
-    
+
     # Прогресс
     if (i + 1) % 25 == 0:
         elapsed = time.time() - start_time
@@ -208,7 +209,7 @@ for col, name in zip(drift_cols, drift_names):
     min_val = df[col].min()
     std_val = df[col].std()
     zero_pct = (df[col] == 0).sum() / len(df) * 100
-    
+
     status = "✅" if mean_val < 0.01 and max_val < 1.0 else "⚠️"
     print(f"{name:<20} {mean_val:>10.4f} {max_val:>10.4f} {min_val:>10.4f} {std_val:>10.4f} {zero_pct:>9.1f}% {status}")
 
@@ -219,7 +220,7 @@ perfect_sharpe = (df["sharpe_drift"] < 0.001).sum()
 perfect_dd = (df["dd_drift"] < 0.001).sum()
 perfect_trades = (df["trades_drift"] == 0).sum()
 
-print(f"\n🎯 ИДЕАЛЬНЫЕ СОВПАДЕНИЯ (<0.001% drift):")
+print("\n🎯 ИДЕАЛЬНЫЕ СОВПАДЕНИЯ (<0.001% drift):")
 print(f"   Net Profit:    {perfect_profit}/{len(df)} ({perfect_profit/len(df)*100:.1f}%)")
 print(f"   Sharpe Ratio:  {perfect_sharpe}/{len(df)} ({perfect_sharpe/len(df)*100:.1f}%)")
 print(f"   Max Drawdown:  {perfect_dd}/{len(df)} ({perfect_dd/len(df)*100:.1f}%)")
@@ -234,7 +235,7 @@ if len(discrepancies) > 0:
               f"SL={row['sl']*100:.0f}% TP={row['tp']*100:.0f}% {row['dir']} "
               f"drift={row['profit_drift']:.4f}%")
 else:
-    print(f"\n🎉 ВСЕ КОМБИНАЦИИ ИМЕЮТ ИДЕАЛЬНОЕ СОВПАДЕНИЕ!")
+    print("\n🎉 ВСЕ КОМБИНАЦИИ ИМЕЮТ ИДЕАЛЬНОЕ СОВПАДЕНИЕ!")
 
 # ============================================================================
 # ФИНАЛЬНЫЙ ВЕРДИКТ
@@ -266,7 +267,7 @@ if all_perfect:
 else:
     avg_profit_drift = df["profit_drift"].mean()
     avg_sharpe_drift = df["sharpe_drift"].mean()
-    
+
     print(f"""
     Средний drift Net Profit: {avg_profit_drift:.4f}%
     Средний drift Sharpe:     {avg_sharpe_drift:.4f}%

@@ -5,6 +5,7 @@ import os
 os.chdir(str(Path(__file__).resolve().parents[1]))
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pathlib import Path
@@ -30,7 +31,7 @@ entry_price_46 = data[entry_bar_46, 0]  # 89596.40
 tp_price_46 = entry_price_46 * 1.015
 sl_price_46 = entry_price_46 * (1 - 0.03)
 
-print(f"Trade 46:")
+print("Trade 46:")
 print(f"  Entry bar: {entry_bar_46}, Entry price: {entry_price_46:.2f}")
 print(f"  TP price: {tp_price_46:.2f}")
 print(f"  SL price: {sl_price_46:.2f}")
@@ -66,11 +67,11 @@ Let me verify...
 """)
 
 # Find which bar has the signal for entry at 6320
-print(f"Checking signal at bar 6319:")
+print("Checking signal at bar 6319:")
 print(f"  long_entries[6319] = {long_entries[6319]}")
 print(f"  open[6320] = {data[6320, 0]:.2f}")
 
-print(f"\nChecking signal at bar 6320:")
+print("\nChecking signal at bar 6320:")
 print(f"  long_entries[6320] = {long_entries[6320]}")
 print(f"  open[6321] = {data[6321, 0]:.2f}")
 

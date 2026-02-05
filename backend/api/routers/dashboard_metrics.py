@@ -157,7 +157,7 @@ async def get_metrics_summary(
 
     except Exception as e:
         logger.error(f"Failed to get metrics summary: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve metrics: {e!s}")
     finally:
         db.close()
 
@@ -257,7 +257,7 @@ async def get_top_performers(
         raise
     except Exception as e:
         logger.error(f"Failed to get top performers: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve top performers: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve top performers: {e!s}")
     finally:
         db.close()
 
@@ -375,7 +375,7 @@ async def get_strategy_metrics(
         raise
     except Exception as e:
         logger.error(f"Failed to get strategy metrics: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve strategy metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve strategy metrics: {e!s}")
     finally:
         db.close()
 

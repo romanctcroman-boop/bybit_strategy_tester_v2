@@ -54,12 +54,8 @@ class Strategy(Base):
     # Basic info
     name = Column(String(100), nullable=False, index=True)
     description = Column(Text, nullable=True)
-    strategy_type = Column(
-        SQLEnum(StrategyType), nullable=False, default=StrategyType.SMA_CROSSOVER
-    )
-    status = Column(
-        SQLEnum(StrategyStatus), nullable=False, default=StrategyStatus.DRAFT
-    )
+    strategy_type = Column(SQLEnum(StrategyType), nullable=False, default=StrategyType.SMA_CROSSOVER)
+    status = Column(SQLEnum(StrategyStatus), nullable=False, default=StrategyStatus.DRAFT)
 
     # Strategy parameters (JSON for flexibility)
     parameters = Column(JSON, nullable=False, default=dict)
@@ -67,10 +63,10 @@ class Strategy(Base):
     # Trading configuration
     symbol = Column(String(20), nullable=True)  # e.g., "BTCUSDT"
     timeframe = Column(String(10), nullable=True)  # e.g., "1h", "4h", "1d"
+    market_type = Column(String(10), nullable=True, default="linear")  # linear or spot
+    direction = Column(String(10), nullable=True, default="both")  # both, long, short
     initial_capital = Column(Float, nullable=True, default=10000.0)
-    position_size = Column(
-        Float, nullable=True, default=1.0
-    )  # Position size multiplier
+    position_size = Column(Float, nullable=True, default=1.0)  # Position size multiplier
 
     # Risk management
     stop_loss_pct = Column(Float, nullable=True)  # Stop loss percentage
@@ -85,9 +81,7 @@ class Strategy(Base):
     backtest_count = Column(Integer, nullable=True, default=0)
 
     # Timestamps
-    created_at = Column(
-        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
-    )
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
         nullable=False,
@@ -110,31 +104,17 @@ class Strategy(Base):
     version = Column(Integer, nullable=False, default=1)
 
     # Strategy Builder fields (for visual block-based strategies)
-    builder_graph = Column(
-        JSON, nullable=True, default=None
-    )  # Full strategy graph: blocks + connections
-    builder_blocks = Column(
-        JSON, nullable=True, default=None
-    )  # Array of block objects (for quick access)
-    builder_connections = Column(
-        JSON, nullable=True, default=None
-    )  # Array of connection objects
-    is_builder_strategy = Column(
-        Boolean, nullable=False, default=False
-    )  # True if created via Strategy Builder
+    builder_graph = Column(JSON, nullable=True, default=None)  # Full strategy graph: blocks + connections
+    builder_blocks = Column(JSON, nullable=True, default=None)  # Array of block objects (for quick access)
+    builder_connections = Column(JSON, nullable=True, default=None)  # Array of connection objects
+    is_builder_strategy = Column(Boolean, nullable=False, default=False)  # True if created via Strategy Builder
 
     # Relationships
-    backtests = relationship(
-        "Backtest", back_populates="strategy", cascade="all, delete-orphan"
-    )
-    optimizations = relationship(
-        "Optimization", back_populates="strategy", cascade="all, delete-orphan"
-    )
+    backtests = relationship("Backtest", back_populates="strategy", cascade="all, delete-orphan")
+    optimizations = relationship("Optimization", back_populates="strategy", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
-        return (
-            f"<Strategy(id={self.id}, name='{self.name}', type={self.strategy_type})>"
-        )
+        return f"<Strategy(id={self.id}, name='{self.name}', type={self.strategy_type})>"
 
     def to_dict(self) -> dict:
         """Convert model to dictionary"""
@@ -159,9 +139,7 @@ class Strategy(Base):
             "backtest_count": self.backtest_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "last_backtest_at": self.last_backtest_at.isoformat()
-            if self.last_backtest_at
-            else None,
+            "last_backtest_at": self.last_backtest_at.isoformat() if self.last_backtest_at else None,
             "tags": self.tags,
             "version": self.version,
             "builder_graph": self.builder_graph,

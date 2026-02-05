@@ -47,7 +47,7 @@ class ExecutionSubmitRequest(BaseModel):
 
     @field_validator("tags", mode="before")
     @classmethod
-    def _ensure_unique_tags(cls, value: list[str] | None) -> list[str]:  # noqa: D417 - pydantic hook
+    def _ensure_unique_tags(cls, value: list[str] | None) -> list[str]:
         unique = list(dict.fromkeys(value or []))
         return unique
 
@@ -186,7 +186,7 @@ class InMemoryExecutionManager(ExecutionManagerProtocol):
             return updated
 
     async def metrics(self) -> ExecutionMetrics:
-        counts: dict[ExecutionStatus, int] = {status: 0 for status in ExecutionStatus}
+        counts: dict[ExecutionStatus, int] = dict.fromkeys(ExecutionStatus, 0)
         for record in self._records.values():
             counts[record.status] += 1
         total = len(self._records)

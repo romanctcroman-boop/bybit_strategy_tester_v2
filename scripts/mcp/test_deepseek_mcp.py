@@ -6,8 +6,8 @@ Usage:
     py -3 scripts/mcp/test_deepseek_mcp.py
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Force UTF-8 output on Windows
@@ -31,26 +31,26 @@ def test_server():
     print("=" * 60)
     print("[TEST] DeepSeek MCP Server (Sync)")
     print("=" * 60)
-    
+
     server = DeepSeekMCPServer()
-    
+
     # Test 1: Check initialization
     print("\n[1] Server initialization...")
     init_request = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
     init_response = server.handle_request(init_request)
-    
+
     if "result" in init_response:
         print(f"   [OK] Server: {init_response['result']['serverInfo']['name']}")
         print(f"   [OK] Version: {init_response['result']['serverInfo']['version']}")
     else:
         print(f"   [FAIL] Error: {init_response}")
         return False
-    
+
     # Test 2: List tools
     print("\n[2] List tools...")
     tools_request = {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
     tools_response = server.handle_request(tools_request)
-    
+
     if "result" in tools_response:
         tools = tools_response['result']['tools']
         print(f"   [OK] Available tools: {len(tools)}")
@@ -59,11 +59,11 @@ def test_server():
     else:
         print(f"   [FAIL] Error: {tools_response}")
         return False
-    
+
     # Test 3: Call deepseek_chat (real API request)
     print("\n[3] DeepSeek API call (deepseek_chat)...")
     print("   [..] Sending request...")
-    
+
     chat_request = {
         "jsonrpc": "2.0",
         "id": 3,
@@ -76,16 +76,16 @@ def test_server():
             }
         }
     }
-    
+
     chat_response = server.handle_request(chat_request)
-    
+
     if "result" in chat_response:
         import json
         content = chat_response['result']['content'][0]['text']
         result = json.loads(content)
-        
+
         if result.get("success"):
-            print(f"   [OK] Response received!")
+            print("   [OK] Response received!")
             print(f"   [OK] Model: {result.get('model', 'unknown')}")
             print(f"   [OK] Response: {result.get('content', '')[:100]}")
             usage = result.get('usage', {})
@@ -97,11 +97,11 @@ def test_server():
     else:
         print(f"   [FAIL] Error: {chat_response}")
         return False
-    
+
     print("\n" + "=" * 60)
     print("[SUCCESS] All tests passed! DeepSeek MCP is ready.")
     print("=" * 60)
-    
+
     return True
 
 

@@ -24,15 +24,12 @@ import sys
 import time
 import traceback
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Optional
 
 # Add project to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import numpy as np
 import pandas as pd
-from loguru import logger
 
 
 # ============================================================================
@@ -45,7 +42,7 @@ class TestResult:
     passed: bool
     details: str
     execution_time: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 test_results: list[TestResult] = []
@@ -134,13 +131,12 @@ def test_fast_optimizer_import():
     from backend.backtesting.fast_optimizer import (
         NUMBA_AVAILABLE,
         FastGridOptimizer,
-        FastOptimizationResult,
     )
 
     if NUMBA_AVAILABLE:
-        print(f"    [INFO] Numba is available")
+        print("    [INFO] Numba is available")
     else:
-        print(f"    [WARN] Numba not available - fallback mode")
+        print("    [WARN] Numba not available - fallback mode")
 
     assert FastGridOptimizer is not None
     return True
@@ -442,7 +438,7 @@ def test_gpu_availability():
         if GPU_AVAILABLE:
             print(f"    [INFO] GPU available: {GPU_NAME}")
         else:
-            print(f"    [INFO] GPU not available - tests will be skipped")
+            print("    [INFO] GPU not available - tests will be skipped")
 
         return True
     except ImportError:

@@ -299,40 +299,22 @@ class StrategyStatusEnum(str, Enum):
 class StrategyCreate(BaseModel):
     """Schema for creating a new strategy"""
 
-    name: str = Field(
-        ..., min_length=1, max_length=100, description="Strategy name (1-100 chars)"
-    )
-    description: str | None = Field(
-        None, max_length=1000, description="Strategy description"
-    )
+    name: str = Field(..., min_length=1, max_length=100, description="Strategy name (1-100 chars)")
+    description: str | None = Field(None, max_length=1000, description="Strategy description")
     strategy_type: StrategyTypeEnum = Field(..., description="Type of trading strategy")
-    parameters: dict[str, Any] = Field(
-        default_factory=dict, description="Strategy parameters"
-    )
-    symbol: str | None = Field(
-        None, max_length=20, description="Trading symbol (e.g., BTCUSDT)"
-    )
-    timeframe: str | None = Field(
-        None, max_length=10, description="Timeframe (e.g., 1h, 4h, 1d)"
-    )
+    parameters: dict[str, Any] = Field(default_factory=dict, description="Strategy parameters")
+    symbol: str | None = Field(None, max_length=20, description="Trading symbol (e.g., BTCUSDT)")
+    timeframe: str | None = Field(None, max_length=10, description="Timeframe (e.g., 1h, 4h, 1d)")
+    market_type: str | None = Field("linear", description="Market type: linear (perpetual) or spot")
+    direction: str | None = Field("both", description="Trading direction: both, long, or short")
     initial_capital: float | None = Field(10000.0, ge=0, description="Initial capital")
-    position_size: float | None = Field(
-        1.0, ge=0, le=100, description="Position size multiplier"
-    )
-    stop_loss_pct: float | None = Field(
-        None, ge=0, le=100, description="Stop loss percentage"
-    )
-    take_profit_pct: float | None = Field(
-        None, ge=0, le=1000, description="Take profit percentage"
-    )
-    max_drawdown_pct: float | None = Field(
-        None, ge=0, le=100, description="Maximum drawdown"
-    )
+    position_size: float | None = Field(1.0, ge=0, le=100, description="Position size multiplier")
+    stop_loss_pct: float | None = Field(None, ge=0, le=100, description="Stop loss percentage")
+    take_profit_pct: float | None = Field(None, ge=0, le=1000, description="Take profit percentage")
+    max_drawdown_pct: float | None = Field(None, ge=0, le=100, description="Maximum drawdown")
     tags: list[str] | None = Field(default_factory=list, description="Tags")
     is_active: bool = True
-    config: dict[str, Any] = Field(
-        default_factory=dict, description="Legacy config field"
-    )
+    config: dict[str, Any] = Field(default_factory=dict, description="Legacy config field")
 
     @field_validator("name")
     @classmethod
@@ -367,6 +349,8 @@ class StrategyUpdate(BaseModel):
     parameters: dict[str, Any] | None = None
     symbol: str | None = Field(None, max_length=20)
     timeframe: str | None = Field(None, max_length=10)
+    market_type: str | None = Field(None, description="Market type: linear or spot")
+    direction: str | None = Field(None, description="Trading direction: both, long, short")
     initial_capital: float | None = Field(None, ge=0)
     position_size: float | None = Field(None, ge=0, le=100)
     stop_loss_pct: float | None = Field(None, ge=0, le=100)
@@ -398,6 +382,8 @@ class StrategyResponse(BaseModel):
     parameters: dict[str, Any]
     symbol: str | None = None
     timeframe: str | None = None
+    market_type: str | None = None
+    direction: str | None = None
     initial_capital: float | None = None
     position_size: float | None = None
     stop_loss_pct: float | None = None
@@ -433,15 +419,11 @@ class ParameterMeta(BaseModel):
     """Metadata for a strategy parameter supporting optimization"""
 
     default: float = Field(description="Default value for this parameter")
-    min: float | None = Field(
-        None, description="Minimum value (None = no limit, supports negative)"
-    )
+    min: float | None = Field(None, description="Minimum value (None = no limit, supports negative)")
     max: float | None = Field(None, description="Maximum value (None = no limit)")
     step: float = Field(1.0, description="Default step for optimization grid")
     param_type: str = Field("float", description="Parameter type: int, float")
-    description: str | None = Field(
-        None, description="Human-readable parameter description"
-    )
+    description: str | None = Field(None, description="Human-readable parameter description")
 
 
 class StrategyDefaultParameters(BaseModel):
@@ -465,24 +447,16 @@ class BacktestCreate(BaseModel):
         pattern=r"^[A-Z0-9]+USDT$",
         description="Trading pair ending with USDT",
     )
-    timeframe: str = Field(
-        ..., pattern=r"^(1|3|5|15|30|60|120|240|D|W|M)$", description="Valid timeframe"
-    )
+    timeframe: str = Field(..., pattern=r"^(1|3|5|15|30|60|120|240|D|W|M)$", description="Valid timeframe")
     start_date: datetime
     end_date: datetime
-    initial_capital: float = Field(
-        ..., gt=0, le=1_000_000, description="Initial capital (0, 1M]"
-    )
+    initial_capital: float = Field(..., gt=0, le=1_000_000, description="Initial capital (0, 1M]")
     leverage: int | None = Field(1, ge=1, le=100, description="Leverage 1-100x")
     commission: float | None = Field(
-        0.0006, ge=0, le=0.01, description="Commission 0-1% (0.0006 = 0.06%)"
+        0.0007, ge=0, le=0.01, description="Commission 0-1% (0.0007 = 0.07% TradingView parity)"
     )
-    slippage: float | None = Field(
-        0.0005, ge=0, le=0.02, description="Slippage 0-2% (0.0005 = 0.05%)"
-    )
-    pyramiding: int | None = Field(
-        1, ge=0, le=100, description="Max orders in same direction (1 = no averaging)"
-    )
+    slippage: float | None = Field(0.0005, ge=0, le=0.02, description="Slippage 0-2% (0.0005 = 0.05%)")
+    pyramiding: int | None = Field(1, ge=0, le=100, description="Max orders in same direction (1 = no averaging)")
     margin_long: float | None = Field(
         1.0,
         ge=0.01,
@@ -769,9 +743,7 @@ class OptimizationRunBayesianRequest(BaseModel):
 # Admin/Backfill examples (OpenAPI)
 # ========================
 
-BackfillAsyncResponse.model_config = ConfigDict(
-    json_schema_extra={"example": {"mode": "async", "task_id": "1e2d3c"}}
-)
+BackfillAsyncResponse.model_config = ConfigDict(json_schema_extra={"example": {"mode": "async", "task_id": "1e2d3c"}})
 BackfillSyncResponse.model_config = ConfigDict(
     json_schema_extra={
         "example": {

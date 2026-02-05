@@ -14,13 +14,15 @@ Full Parameter Support:
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
+from dataclasses import asdict
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import sqlite3
-from datetime import datetime
-from dataclasses import asdict
 
 print("=" * 120)
 print("COMPREHENSIVE 147-METRIC ENGINE PARITY TEST")
@@ -38,35 +40,35 @@ STRATEGY_CONFIG = {
     "trading_pair": "BTCUSDT",
     "timeframe": "60",  # 1 hour
     "strategy_type": "Mean Reversion",
-    
+
     # CAPITAL
     "initial_capital": 10000.0,
     "order_size_type": "percent",  # percent, fixed, risk_based
     "position_size_pct": 10.0,     # 10% of capital
-    
+
     # RISK
     "stop_loss_pct": 2.0,          # 2%
     "take_profit_pct": 4.0,        # 4%
     "drawdown_limit_pct": 50.0,    # Max 50% drawdown
-    
+
     # POSITION
     "position_mode": "both",       # long, short, both
     "pyramiding": 1,               # Max 1 position
-    
+
     # FEES
     "commission_pct": 0.10,        # 0.1% taker fee
     "slippage_pct": 0.05,          # 0.05% slippage
     "leverage": 10,
-    
+
     # BAR MAGNIFIER
     "bar_magnifier": True,
     "ohlc_path_model": "sequential_inclusive",  # Sequential Inclusive Checks
     "subticks": 60,                # 60 1-minute subticks per hour
-    
+
     # EXECUTION
     "order_execution": "market",   # market, limit
     "two_stage_optimization": False,
-    
+
     # DATE RANGE
     "date_start": "2025-01-01",
     "date_end": "2025-01-21",
@@ -147,12 +149,11 @@ for key, value in STRATEGY_CONFIG.items():
 # =============================================================================
 # IMPORT ENGINES AND PREPARE INPUT
 # =============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
-from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
 from backend.backtesting.engines.gpu_engine_v2 import GPUEngineV2
+from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.core.extended_metrics import calculate_extended_metrics
-from backend.core.metrics_calculator import MetricsCalculator
 
 # Map position mode
 direction_map = {
@@ -211,7 +212,7 @@ print("=" * 80)
 def collect_all_metrics(result, equity_curve, initial_capital):
     """Collect all 147 metrics from a backtest result."""
     metrics = {}
-    
+
     # =========================================================================
     # 1. CORE BACKTEST METRICS (22 metrics)
     # =========================================================================
@@ -219,7 +220,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
     for k, v in core.items():
         if isinstance(v, (int, float)):
             metrics[f"core.{k}"] = v
-    
+
     # =========================================================================
     # 2. EXTENDED METRICS (14 metrics)
     # =========================================================================
@@ -234,7 +235,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
             for k, v in asdict(extended).items():
                 if isinstance(v, (int, float)):
                     metrics[f"ext.{k}"] = v
-    
+
     # =========================================================================
     # 3. TRADE STATISTICS (25 metrics)
     # =========================================================================
@@ -248,14 +249,14 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         metrics["trade.var_pnl"] = np.var(pnls)
         metrics["trade.skew_pnl"] = float(pd.Series(pnls).skew()) if len(pnls) > 2 else 0
         metrics["trade.kurtosis_pnl"] = float(pd.Series(pnls).kurtosis()) if len(pnls) > 3 else 0
-        
+
         # Percentiles
         metrics["trade.p10_pnl"] = np.percentile(pnls, 10)
         metrics["trade.p25_pnl"] = np.percentile(pnls, 25)
         metrics["trade.p50_pnl"] = np.percentile(pnls, 50)
         metrics["trade.p75_pnl"] = np.percentile(pnls, 75)
         metrics["trade.p90_pnl"] = np.percentile(pnls, 90)
-        
+
         # Win/Loss
         wins = [p for p in pnls if p > 0]
         losses = [p for p in pnls if p < 0]
@@ -266,7 +267,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         metrics["trade.loss_total"] = sum(losses) if losses else 0
         metrics["trade.win_avg"] = np.mean(wins) if wins else 0
         metrics["trade.loss_avg"] = np.mean(losses) if losses else 0
-        
+
         # Durations
         durations = [t.duration_bars for t in result.trades]
         metrics["trade.avg_duration"] = np.mean(durations)
@@ -274,20 +275,20 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         metrics["trade.min_duration"] = min(durations)
         metrics["trade.std_duration"] = np.std(durations)
         metrics["trade.median_duration"] = np.median(durations)
-        
+
         # Sizes
         sizes = [t.size for t in result.trades]
         metrics["trade.avg_size"] = np.mean(sizes)
         metrics["trade.total_volume"] = sum(sizes)
         metrics["trade.max_size"] = max(sizes)
         metrics["trade.min_size"] = min(sizes)
-        
+
         # Fees
         fees = [t.fees for t in result.trades]
         metrics["trade.total_fees"] = sum(fees)
         metrics["trade.avg_fees"] = np.mean(fees)
         metrics["trade.max_fees"] = max(fees)
-        
+
         # Long/Short breakdown
         long_trades = [t for t in result.trades if t.direction == "long"]
         short_trades = [t for t in result.trades if t.direction == "short"]
@@ -297,13 +298,13 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         metrics["trade.short_pnl"] = sum(t.pnl for t in short_trades)
         metrics["trade.long_avg_pnl"] = np.mean([t.pnl for t in long_trades]) if long_trades else 0
         metrics["trade.short_avg_pnl"] = np.mean([t.pnl for t in short_trades]) if short_trades else 0
-        
+
         # Exit reasons
         from collections import Counter
         exit_reasons = Counter(t.exit_reason.name for t in result.trades)
         for reason, count in exit_reasons.items():
             metrics[f"exit.{reason}"] = count
-        
+
         # Streaks
         max_win_streak = max_loss_streak = current_win = current_loss = 0
         for p in pnls:
@@ -317,7 +318,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
                 max_loss_streak = max(max_loss_streak, current_loss)
         metrics["streak.max_wins"] = max_win_streak
         metrics["streak.max_losses"] = max_loss_streak
-    
+
     # =========================================================================
     # 4. EQUITY CURVE METRICS (20 metrics)
     # =========================================================================
@@ -330,7 +331,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
     metrics["eq.range"] = np.max(equity_curve) - np.min(equity_curve)
     metrics["eq.change"] = equity_curve[-1] - initial_capital
     metrics["eq.change_pct"] = (equity_curve[-1] - initial_capital) / initial_capital * 100
-    
+
     # Returns
     returns = np.diff(equity_curve) / equity_curve[:-1]
     returns = np.nan_to_num(returns, nan=0, posinf=0, neginf=0)
@@ -345,7 +346,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
     metrics["ret.negative_sum"] = np.sum(returns[returns < 0])
     metrics["ret.skew"] = float(pd.Series(returns).skew()) if len(returns) > 2 else 0
     metrics["ret.kurtosis"] = float(pd.Series(returns).kurtosis()) if len(returns) > 3 else 0
-    
+
     # =========================================================================
     # 5. DRAWDOWN METRICS (15 metrics)
     # =========================================================================
@@ -357,7 +358,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
     metrics["dd.std"] = np.std(dd)
     metrics["dd.median"] = np.median(dd)
     metrics["dd.p95"] = np.percentile(dd, 95)
-    
+
     # Drawdown duration
     in_dd = dd > 0
     dd_starts = np.where(np.diff(in_dd.astype(int)) == 1)[0]
@@ -379,29 +380,29 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         metrics["dd.max_duration"] = 0
         metrics["dd.avg_duration"] = 0
         metrics["dd.count"] = 0
-    
+
     # =========================================================================
     # 6. RISK METRICS (15 metrics)
     # =========================================================================
     # VaR (Value at Risk)
     metrics["risk.var_95"] = np.percentile(returns, 5) * 100 if len(returns) > 0 else 0
     metrics["risk.var_99"] = np.percentile(returns, 1) * 100 if len(returns) > 0 else 0
-    
+
     # CVaR (Conditional VaR)
     var_95_idx = returns <= np.percentile(returns, 5)
     metrics["risk.cvar_95"] = np.mean(returns[var_95_idx]) * 100 if np.any(var_95_idx) else 0
-    
+
     # Ulcer Index
     sq_dd = dd ** 2
     metrics["risk.ulcer_index"] = np.sqrt(np.mean(sq_dd))
-    
+
     # Pain Index
     metrics["risk.pain_index"] = np.mean(dd)
-    
+
     # Downside deviation
     negative_returns = returns[returns < 0]
     metrics["risk.downside_dev"] = np.std(negative_returns) if len(negative_returns) > 0 else 0
-    
+
     # =========================================================================
     # 7. ROLLING METRICS (10 metrics)
     # =========================================================================
@@ -409,7 +410,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         eq_series = pd.Series(equity_curve)
         rolling_mean = eq_series.rolling(20).mean()
         rolling_std = eq_series.rolling(20).std()
-        
+
         metrics["roll.mean_last"] = rolling_mean.iloc[-1] if not np.isnan(rolling_mean.iloc[-1]) else 0
         metrics["roll.std_last"] = rolling_std.iloc[-1] if not np.isnan(rolling_std.iloc[-1]) else 0
         metrics["roll.mean_max"] = rolling_mean.max() if not np.isnan(rolling_mean.max()) else 0
@@ -419,7 +420,7 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         metrics["roll.std_last"] = 0
         metrics["roll.mean_max"] = 0
         metrics["roll.mean_min"] = 0
-    
+
     # =========================================================================
     # 8. TIME ANALYSIS (10 metrics)
     # =========================================================================
@@ -431,18 +432,18 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         metrics["time.avg_exit_price"] = np.mean(exit_prices)
         metrics["time.entry_price_std"] = np.std(entry_prices)
         metrics["time.exit_price_std"] = np.std(exit_prices)
-        
+
         # PnL percentages
         pnl_pcts = [t.pnl_pct for t in result.trades]
         metrics["time.avg_pnl_pct"] = np.mean(pnl_pcts)
         metrics["time.max_pnl_pct"] = max(pnl_pcts)
         metrics["time.min_pnl_pct"] = min(pnl_pcts)
         metrics["time.std_pnl_pct"] = np.std(pnl_pcts)
-    
+
     # =========================================================================
     # 9. ADDITIONAL METRICS (11 more to reach 147)
     # =========================================================================
-    
+
     # Kelly Criterion
     if len(result.trades) > 0:
         wins_list = [t.pnl for t in result.trades if t.pnl > 0]
@@ -450,30 +451,30 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         win_rate_calc = len(wins_list) / len(result.trades) if len(result.trades) > 0 else 0
         avg_win_calc = np.mean(wins_list) if wins_list else 0
         avg_loss_calc = abs(np.mean(losses_list)) if losses_list else 1
-        
+
         if avg_loss_calc > 0:
             win_loss_ratio = avg_win_calc / avg_loss_calc
             kelly = win_rate_calc - ((1 - win_rate_calc) / win_loss_ratio) if win_loss_ratio > 0 else 0
         else:
             kelly = 0
         metrics["adv.kelly_criterion"] = kelly
-    
+
     # MAR Ratio (Annualized Return / Max Drawdown)
     if metrics.get("dd.max", 0) > 0:
         annual_return = metrics.get("eq.change_pct", 0) * (365 * 24 / len(equity_curve))
         metrics["adv.mar_ratio"] = annual_return / metrics.get("dd.max", 1)
     else:
         metrics["adv.mar_ratio"] = 0
-    
+
     # Gross exposure
     if len(result.trades) > 0:
         metrics["adv.gross_exposure"] = sum(t.size * t.entry_price for t in result.trades)
         metrics["adv.avg_exposure"] = metrics["adv.gross_exposure"] / len(result.trades)
-    
+
     # Risk-adjusted metrics
     metrics["adv.return_per_trade"] = metrics.get("eq.change", 0) / max(1, len(result.trades))
     metrics["adv.profit_per_bar"] = metrics.get("eq.change", 0) / max(1, len(equity_curve))
-    
+
     # Tail ratios
     if len(returns) > 10:
         metrics["adv.tail_ratio_95"] = abs(np.percentile(returns, 95) / np.percentile(returns, 5)) if np.percentile(returns, 5) != 0 else 0
@@ -481,17 +482,17 @@ def collect_all_metrics(result, equity_curve, initial_capital):
     else:
         metrics["adv.tail_ratio_95"] = 0
         metrics["adv.tail_ratio_99"] = 0
-    
+
     # Common sense ratio
     if metrics.get("dd.max", 0) > 0:
         metrics["adv.common_sense_ratio"] = metrics.get("core.profit_factor", 0) * metrics.get("core.tail_ratio", 1)
     else:
         metrics["adv.common_sense_ratio"] = 0
-    
+
     # =========================================================================
     # 10. FINAL 5 METRICS to reach 147
     # =========================================================================
-    
+
     # Omega ratio
     if len(returns) > 0:
         threshold = 0
@@ -500,10 +501,10 @@ def collect_all_metrics(result, equity_curve, initial_capital):
         metrics["final.omega_ratio"] = np.sum(gains) / np.sum(losses) if np.sum(losses) > 0 else 0
     else:
         metrics["final.omega_ratio"] = 0
-    
+
     # Gain/Pain ratio
     metrics["final.gain_pain_ratio"] = metrics.get("core.net_profit", 0) / max(1, metrics.get("dd.max", 1))
-    
+
     # CAGR (Compound Annual Growth Rate)
     if len(equity_curve) > 1:
         years = len(equity_curve) / (365 * 24)  # Assuming hourly data
@@ -513,25 +514,25 @@ def collect_all_metrics(result, equity_curve, initial_capital):
             metrics["final.cagr"] = 0
     else:
         metrics["final.cagr"] = 0
-    
+
     # Average R-multiple
     if len(result.trades) > 0:
         r_multiples = [t.pnl / (t.entry_price * t.size * 0.02) for t in result.trades if t.entry_price * t.size > 0]
         metrics["final.avg_r_multiple"] = np.mean(r_multiples) if r_multiples else 0
     else:
         metrics["final.avg_r_multiple"] = 0
-    
+
     # Trade efficiency (profitable bars / total bars)
     metrics["final.trade_efficiency"] = metrics.get("ret.positive_count", 0) / max(1, len(returns))
-    
+
     return metrics
 
 # Collect metrics for all engines
 all_metrics = {}
 for name, result in results.items():
     all_metrics[name] = collect_all_metrics(
-        result, 
-        result.equity_curve, 
+        result,
+        result.equity_curve,
         STRATEGY_CONFIG["initial_capital"]
     )
 
@@ -565,18 +566,18 @@ for metric_name in all_metric_names:
     fb_val = fb_metrics.get(metric_name, 0)
     numba_val = numba_metrics.get(metric_name, 0)
     gpu_val = gpu_metrics.get(metric_name, 0)
-    
+
     if not isinstance(fb_val, (int, float)):
         continue
-    
+
     total_compared += 1
-    
+
     # Check Numba match
     if abs(fb_val - numba_val) < 0.01:
         numba_matches += 1
     else:
         mismatches.append(("Numba", metric_name, fb_val, numba_val))
-    
+
     # Check GPU match
     if abs(fb_val - gpu_val) < 0.01:
         gpu_matches += 1

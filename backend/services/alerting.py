@@ -10,12 +10,13 @@ import logging
 import os
 import smtplib
 import ssl
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import httpx
 
@@ -98,7 +99,7 @@ class Alert:
     title: str
     message: str
     source: str = "system"
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -247,7 +248,7 @@ class AlertingService:
         await service.info("Backtest Complete", "Strategy XYZ finished")
     """
 
-    def __init__(self, config: Optional[AlertConfig] = None):
+    def __init__(self, config: AlertConfig | None = None):
         """Initialize alerting service."""
         self.config = config or AlertConfig.from_env()
         self._last_alerts: dict[str, datetime] = {}
@@ -267,7 +268,7 @@ class AlertingService:
     def _should_rate_limit(self, alert: Alert) -> bool:
         """Check if alert should be rate limited."""
         key = f"{alert.level.value}:{alert.title}:{alert.source}"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if key in self._last_alerts:
             elapsed = (now - self._last_alerts[key]).total_seconds()
@@ -284,7 +285,7 @@ class AlertingService:
         title: str,
         message: str,
         source: str = "system",
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
         skip_rate_limit: bool = False,
     ) -> bool:
         """
@@ -437,7 +438,7 @@ class AlertingService:
         title: str,
         message: str,
         source: str = "system",
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Send INFO level alert."""
         return await self.send_alert(AlertLevel.INFO, title, message, source, metadata)
@@ -447,7 +448,7 @@ class AlertingService:
         title: str,
         message: str,
         source: str = "system",
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Send WARNING level alert."""
         return await self.send_alert(
@@ -459,7 +460,7 @@ class AlertingService:
         title: str,
         message: str,
         source: str = "system",
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Send CRITICAL level alert."""
         return await self.send_alert(
@@ -468,7 +469,7 @@ class AlertingService:
 
 
 # Singleton instance for easy import
-_default_service: Optional[AlertingService] = None
+_default_service: AlertingService | None = None
 
 
 def get_alerting_service() -> AlertingService:
@@ -484,7 +485,7 @@ async def send_alert(
     title: str,
     message: str,
     source: str = "system",
-    metadata: Optional[dict[str, Any]] = None,
+    metadata: dict[str, Any] | None = None,
 ) -> bool:
     """Convenience function to send alert using default service."""
     return await get_alerting_service().send_alert(

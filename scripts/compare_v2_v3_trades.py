@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
 """Compare individual trades between V2 and V3."""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # Load data
 ohlc_file = Path('d:/TV/BYBIT_BTCUSDT.P_15m_full.csv')
@@ -51,12 +51,14 @@ input_data = BacktestInput(
 
 # Run V2
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
+
 v2 = FallbackEngineV2()
 r2 = v2.run(input_data)
 print(f"\nV2: {len(r2.trades)} trades, Net Profit: {r2.metrics.net_profit:.2f}")
 
 # Run V3
 from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
+
 v3 = FallbackEngineV3()
 r3 = v3.run(input_data)
 print(f"V3: {len(r3.trades)} trades, Net Profit: {r3.metrics.net_profit:.2f}")
@@ -73,7 +75,7 @@ diff_count = 0
 for i in range(min_trades):
     t2 = r2.trades[i]
     t3 = r3.trades[i]
-    
+
     pnl_diff = t3.pnl - t2.pnl
     if abs(pnl_diff) > 0.01:
         diff_count += 1

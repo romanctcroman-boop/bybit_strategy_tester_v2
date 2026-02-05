@@ -4,7 +4,6 @@ Tests for the comprehensive health checks system.
 Based on MONITORING_SYSTEM_AUDIT_2026_01_28 recommendations.
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -191,28 +190,26 @@ class TestHealthChecker:
             checker,
             "check_database",
             return_value=HealthCheckResult(name="database", status=HealthStatus.HEALTHY, message="OK"),
+        ), patch.object(
+            checker,
+            "check_redis",
+            return_value=HealthCheckResult(name="redis", status=HealthStatus.DEGRADED, message="Slow"),
+        ), patch.object(
+            checker,
+            "check_bybit_api",
+            return_value=HealthCheckResult(name="bybit_api", status=HealthStatus.HEALTHY, message="OK"),
         ):
-            with patch.object(
-                checker,
-                "check_redis",
-                return_value=HealthCheckResult(name="redis", status=HealthStatus.DEGRADED, message="Slow"),
-            ):
-                with patch.object(
-                    checker,
-                    "check_bybit_api",
-                    return_value=HealthCheckResult(name="bybit_api", status=HealthStatus.HEALTHY, message="OK"),
-                ):
-                    # Real checks for system resources
-                    report = await checker.check_all(force=True)
+            # Real checks for system resources
+            report = await checker.check_all(force=True)
 
-                    assert isinstance(report, SystemHealthReport)
-                    assert report.overall_status in [
-                        HealthStatus.HEALTHY,
-                        HealthStatus.DEGRADED,
-                        HealthStatus.UNHEALTHY,
-                    ]
-                    assert len(report.checks) > 0
-                    assert "total_checks" in report.summary
+            assert isinstance(report, SystemHealthReport)
+            assert report.overall_status in [
+                HealthStatus.HEALTHY,
+                HealthStatus.DEGRADED,
+                HealthStatus.UNHEALTHY,
+            ]
+            assert len(report.checks) > 0
+            assert "total_checks" in report.summary
 
     @pytest.mark.asyncio
     async def test_check_all_caching(self, checker):

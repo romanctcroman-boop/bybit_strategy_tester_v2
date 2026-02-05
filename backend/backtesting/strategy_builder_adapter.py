@@ -59,6 +59,15 @@ from backend.core.indicators import (
 logger = logging.getLogger(__name__)
 
 
+def _param(params: dict, default: Any, *keys: str) -> Any:
+    """Get param value trying keys in order (supports snake_case and camelCase from frontend)."""
+    for k in keys:
+        v = params.get(k)
+        if v is not None:
+            return v
+    return default
+
+
 class StrategyBuilderAdapter(BaseStrategy):
     """
     Adapter for Strategy Builder generated strategies.
@@ -317,9 +326,9 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"value": rsi}
 
         elif indicator_type == "macd":
-            fast = params.get("fast", 12)
-            slow = params.get("slow", 26)
-            signal = params.get("signal", 9)
+            fast = _param(params, 12, "fast_period", "fast")
+            slow = _param(params, 26, "slow_period", "slow")
+            signal = _param(params, 9, "signal_period", "signal")
             macd_result = vbt.MACD.run(close, fast_window=fast, slow_window=slow, signal_window=signal)
             return {
                 "macd": macd_result.macd,
@@ -339,7 +348,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         elif indicator_type == "bollinger":
             period = params.get("period", 20)
-            std_dev = params.get("stdDev", 2.0)
+            std_dev = _param(params, 2.0, "std_dev", "stdDev")
             bb = vbt.BBANDS.run(close, window=period, num_std=std_dev)
             return {
                 "upper": bb.upper,
@@ -355,8 +364,8 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"value": atr}
 
         elif indicator_type == "stochastic":
-            k_period = params.get("k", 14)
-            d_period = params.get("d", 3)
+            k_period = _param(params, 14, "k_period", "k")
+            d_period = _param(params, 3, "d_period", "d")
             high = ohlcv["high"]
             low = ohlcv["low"]
             stoch = vbt.STOCH.run(high, low, close, k_window=k_period, d_window=d_period)
@@ -371,9 +380,9 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== QQE Indicator ==========
         elif indicator_type == "qqe":
-            rsi_period = params.get("rsiPeriod", 14)
-            smoothing = params.get("smoothing", 5)
-            qqe_factor = params.get("qqeFactor", 4.236)
+            rsi_period = _param(params, 14, "rsi_period", "rsiPeriod")
+            smoothing = _param(params, 5, "smoothing_period", "smoothing")
+            qqe_factor = _param(params, 4.236, "qqe_factor", "qqeFactor")
             qqe_result = calculate_qqe(
                 close.values, rsi_period=rsi_period, smoothing_factor=smoothing, qqe_factor=qqe_factor
             )
@@ -388,10 +397,10 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== Momentum Indicators ==========
         elif indicator_type == "stoch_rsi":
-            rsi_period = params.get("rsiPeriod", 14)
-            stoch_period = params.get("stochPeriod", 14)
-            k_period = params.get("kPeriod", 3)
-            d_period = params.get("dPeriod", 3)
+            rsi_period = _param(params, 14, "rsi_period", "rsiPeriod")
+            stoch_period = _param(params, 14, "stoch_period", "stochPeriod")
+            k_period = _param(params, 3, "k_period", "kPeriod")
+            d_period = _param(params, 3, "d_period", "dPeriod")
             result = calculate_stoch_rsi(close.values, rsi_period, stoch_period, k_period, d_period)
             return {
                 "k": pd.Series(result["k"], index=ohlcv.index),
@@ -465,9 +474,9 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "ichimoku":
-            tenkan = params.get("tenkan", 9)
-            kijun = params.get("kijun", 26)
-            senkou_b = params.get("senkouB", 52)
+            tenkan = _param(params, 9, "tenkan_period", "tenkan")
+            kijun = _param(params, 26, "kijun_period", "kijun")
+            senkou_b = _param(params, 52, "senkou_b_period", "senkouB")
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             result = calculate_ichimoku(high, low, close.values, tenkan, kijun, senkou_b)
@@ -480,9 +489,9 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "parabolic_sar":
-            af_start = params.get("afStart", 0.02)
-            af_step = params.get("afStep", 0.02)
-            af_max = params.get("afMax", 0.2)
+            af_start = _param(params, 0.02, "start", "afStart")
+            af_step = _param(params, 0.02, "increment", "afStep")
+            af_max = _param(params, 0.2, "max_value", "afMax")
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             result = calculate_parabolic_sar(high, low, af_start, af_step, af_max)
@@ -508,9 +517,9 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "keltner":
-            period = params.get("period", 20)
+            period = _param(params, 20, "ema_period", "period")
             multiplier = params.get("multiplier", 2.0)
-            atr_period = params.get("atrPeriod", 10)
+            atr_period = _param(params, 10, "atr_period", "atrPeriod")
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             result = calculate_keltner(high, low, close.values, period, multiplier, atr_period)
@@ -768,6 +777,35 @@ class StrategyBuilderAdapter(BaseStrategy):
         def crossunder(a, b):
             return (a < b) & (np.roll(a, 1) >= np.roll(b, 1))
 
+        def apply_signal_memory(
+            buy_events: np.ndarray,
+            sell_events: np.ndarray,
+            memory_bars: int,
+        ) -> tuple[np.ndarray, np.ndarray]:
+            """
+            Extend buy/sell signals for N bars after each event; opposite signal cancels.
+
+            If a buy occurs at bar i, buy is True for bars i..i+N unless a sell occurs
+            in that window (then buy memory stops at that bar). Same for sell.
+            """
+            n = len(buy_events)
+            buy_out = np.zeros(n, dtype=bool)
+            sell_out = np.zeros(n, dtype=bool)
+            active_buy_until = -1
+            active_sell_until = -1
+            for i in range(n):
+                if sell_events[i]:
+                    active_buy_until = -1
+                if buy_events[i]:
+                    active_buy_until = i + memory_bars
+                buy_out[i] = active_buy_until >= i
+                if buy_events[i]:
+                    active_sell_until = -1
+                if sell_events[i]:
+                    active_sell_until = i + memory_bars
+                sell_out[i] = active_sell_until >= i
+            return buy_out, sell_out
+
         # ========== RSI Filter ==========
         if filter_type == "rsi_filter":
             from backend.core.indicators import calculate_rsi
@@ -786,6 +824,12 @@ class StrategyBuilderAdapter(BaseStrategy):
                 buy = crossunder(rsi, np.full(n, oversold))
                 sell = crossover(rsi, np.full(n, overbought))
 
+            mem_bars = int(params.get("signal_memory_bars", 0))
+            if mem_bars > 0 and (
+                params.get("signal_memory_enable", False) or params.get("use_signal_memory", False)
+            ):
+                buy, sell = apply_signal_memory(np.asarray(buy, dtype=bool), np.asarray(sell, dtype=bool), mem_bars)
+
             return {
                 "buy": pd.Series(buy, index=ohlcv.index),
                 "sell": pd.Series(sell, index=ohlcv.index),
@@ -794,9 +838,9 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== QQE Filter ==========
         elif filter_type == "qqe_filter":
-            rsi_period = params.get("rsiPeriod", 14)
-            smoothing = params.get("smoothing", 5)
-            qqe_factor = params.get("qqeFactor", 4.236)
+            rsi_period = _param(params, 14, "rsi_period", "rsiPeriod")
+            smoothing = _param(params, 5, "smoothing_period", "smoothing")
+            qqe_factor = _param(params, 4.236, "qqe_factor", "qqeFactor")
 
             qqe_result = calculate_qqe_cross(
                 close, rsi_period=rsi_period, smoothing_factor=smoothing, qqe_factor=qqe_factor
@@ -832,9 +876,9 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif filter_type == "two_ma_filter":
             from backend.core.indicators import calculate_ema, calculate_sma
 
-            fast_period = params.get("fastPeriod", 9)
-            slow_period = params.get("slowPeriod", 21)
-            ma_type = params.get("maType", "ema")
+            fast_period = _param(params, 9, "fast_period", "fastPeriod")
+            slow_period = _param(params, 21, "slow_period", "slowPeriod")
+            ma_type = _param(params, "ema", "ma_type", "maType")
 
             if ma_type == "ema":
                 fast = calculate_ema(close, fast_period)
@@ -846,6 +890,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             buy = crossover(fast, slow)
             sell = crossunder(fast, slow)
 
+            mem_bars = int(params.get("ma_cross_memory_bars", 0))
+            if mem_bars > 0:
+                buy, sell = apply_signal_memory(np.asarray(buy, dtype=bool), np.asarray(sell, dtype=bool), mem_bars)
+
             return {
                 "buy": pd.Series(buy, index=ohlcv.index),
                 "sell": pd.Series(sell, index=ohlcv.index),
@@ -855,15 +903,13 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== Stochastic Filter ==========
         elif filter_type == "stochastic_filter":
-            k_period = params.get("kPeriod", 14)
-            d_period = params.get("dPeriod", 3)
+            k_period = _param(params, 14, "k_period", "kPeriod")
+            d_period = _param(params, 3, "d_period", "dPeriod")
             oversold = params.get("oversold", 20)
             overbought = params.get("overbought", 80)
             mode = params.get("mode", "cross")  # range, cross, kd_cross
 
-            result = calculate_stochastic(close, high, low, k_period, d_period)
-            k = result["k"]
-            d = result["d"]
+            k, d = calculate_stochastic(high, low, close, k_period, d_period)
 
             if mode == "range":
                 buy = k < oversold
@@ -874,6 +920,14 @@ class StrategyBuilderAdapter(BaseStrategy):
             else:  # cross
                 buy = crossunder(k, np.full(n, oversold))
                 sell = crossover(k, np.full(n, overbought))
+
+            mem_bars = 0
+            if mode == "cross" and params.get("activate_stoch_cross_memory", False):
+                mem_bars = int(params.get("stoch_cross_memory_bars", 0))
+            elif mode == "kd_cross" and params.get("activate_stoch_kd_memory", False):
+                mem_bars = int(params.get("stoch_kd_memory_bars", 0))
+            if mem_bars > 0:
+                buy, sell = apply_signal_memory(np.asarray(buy, dtype=bool), np.asarray(sell, dtype=bool), mem_bars)
 
             return {
                 "buy": pd.Series(buy, index=ohlcv.index),
@@ -886,15 +940,12 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif filter_type == "macd_filter":
             from backend.core.indicators import calculate_macd
 
-            fast = params.get("fast", 12)
-            slow = params.get("slow", 26)
-            signal_period = params.get("signal", 9)
+            fast = _param(params, 12, "fast_period", "fast")
+            slow = _param(params, 26, "slow_period", "slow")
+            signal_period = _param(params, 9, "signal_period", "signal")
             mode = params.get("mode", "signal_cross")  # signal_cross, zero_cross, histogram
 
-            result = calculate_macd(close, fast, slow, signal_period)
-            macd_line = result["macd"]
-            signal_line = result["signal"]
-            histogram = result["histogram"]
+            macd_line, signal_line, histogram = calculate_macd(close, fast, slow, signal_period)
 
             if mode == "zero_cross":
                 buy = crossover(macd_line, np.zeros(n))
@@ -905,6 +956,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             else:  # signal_cross
                 buy = crossover(macd_line, signal_line)
                 sell = crossunder(macd_line, signal_line)
+
+            mem_bars = int(params.get("macd_signal_memory_bars", 0))
+            if mem_bars > 0 and not params.get("disable_macd_signal_memory", True):
+                buy, sell = apply_signal_memory(np.asarray(buy, dtype=bool), np.asarray(sell, dtype=bool), mem_bars)
 
             return {
                 "buy": pd.Series(buy, index=ohlcv.index),
@@ -934,7 +989,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         # ========== DMI/ADX Filter ==========
         elif filter_type == "dmi_filter":
             period = params.get("period", 14)
-            adx_threshold = params.get("adxThreshold", 25)
+            adx_threshold = _param(params, 25, "threshold", "adxThreshold")
 
             from backend.core.indicators import calculate_adx
 
@@ -1022,7 +1077,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             ema_period = params.get("emaPeriod", 50)
             adx_period = params.get("adxPeriod", 14)
-            adx_threshold = params.get("adxThreshold", 25)
+            adx_threshold = _param(params, 25, "threshold", "adxThreshold")
 
             ema = calculate_ema(close, ema_period)
             adx_result = calculate_adx(high, low, close, adx_period)
@@ -2317,9 +2372,9 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         elif close_type == "close_psar":
             # Close on Parabolic SAR signal
-            af_start = params.get("af_start", 0.02)
-            af_step = params.get("af_step", 0.02)
-            af_max = params.get("af_max", 0.2)
+            af_start = _param(params, 0.02, "af_start", "start", "afStart")
+            af_step = _param(params, 0.02, "af_step", "increment", "afStep")
+            af_max = _param(params, 0.2, "af_max", "max_value", "afMax")
 
             psar = calculate_parabolic_sar(ohlcv, af_start=af_start, af_step=af_step, af_max=af_max)
 
@@ -2447,6 +2502,77 @@ class StrategyBuilderAdapter(BaseStrategy):
                         dca_config[f"dca_tp{i}_percent"] = level.get("percent", i * 0.5)
                         dca_config[f"dca_tp{i}_close_percent"] = level.get("close_percent", 25.0)
 
+        # Close Conditions (Session 5.5): extract from exit blocks
+        close_conditions: dict[str, Any] = {}
+        for block_id, block in self.blocks.items():
+            block_type = block.get("type", "")
+            params = block.get("params", {})
+            if block_type == "rsi_close":
+                close_conditions["rsi_close_enable"] = True
+                close_conditions["rsi_close_length"] = params.get("rsi_close_length", 14)
+                close_conditions["rsi_close_only_profit"] = params.get("rsi_close_only_profit", True)
+                close_conditions["rsi_close_min_profit"] = params.get("rsi_close_min_profit", 0.5)
+                close_conditions["rsi_close_reach_enable"] = params.get("rsi_close_reach_enable", False)
+                close_conditions["rsi_close_reach_long_more"] = params.get("rsi_close_reach_long_more", 70)
+                close_conditions["rsi_close_reach_long_less"] = params.get("rsi_close_reach_long_less", 0)
+                close_conditions["rsi_close_reach_short_more"] = params.get("rsi_close_reach_short_more", 100)
+                close_conditions["rsi_close_reach_short_less"] = params.get("rsi_close_reach_short_less", 30)
+                close_conditions["rsi_close_cross_enable"] = params.get("rsi_close_cross_enable", False)
+                close_conditions["rsi_close_cross_long_level"] = params.get("rsi_close_cross_long_level", 70)
+                close_conditions["rsi_close_cross_short_level"] = params.get("rsi_close_cross_short_level", 30)
+            elif block_type == "stoch_close":
+                close_conditions["stoch_close_enable"] = True
+                close_conditions["stoch_close_k_length"] = params.get("stoch_close_k_length", 14)
+                close_conditions["stoch_close_k_smooth"] = params.get("stoch_close_k_smooth", 1)
+                close_conditions["stoch_close_d_smooth"] = params.get("stoch_close_d_smooth", 3)
+                close_conditions["stoch_close_only_profit"] = params.get("stoch_close_only_profit", True)
+                close_conditions["stoch_close_min_profit"] = params.get("stoch_close_min_profit", 0.5)
+                close_conditions["stoch_close_reach_enable"] = params.get("stoch_close_reach_enable", False)
+                close_conditions["stoch_close_reach_long_more"] = params.get("stoch_close_reach_long_more", 80)
+                close_conditions["stoch_close_reach_short_less"] = params.get("stoch_close_reach_short_less", 20)
+            elif block_type == "channel_close":
+                close_conditions["channel_close_enable"] = True
+                close_conditions["channel_close_type"] = params.get("channel_close_type", "Keltner")
+                close_conditions["channel_close_band"] = params.get("channel_close_band", "Breakout")
+                close_conditions["channel_close_keltner_length"] = params.get("channel_close_keltner_length", 20)
+                close_conditions["channel_close_keltner_mult"] = params.get("channel_close_keltner_mult", 2.0)
+                close_conditions["channel_close_bb_length"] = params.get("channel_close_bb_length", 20)
+                close_conditions["channel_close_bb_deviation"] = params.get("channel_close_bb_deviation", 2.0)
+            elif block_type == "ma_close":
+                close_conditions["ma_close_enable"] = True
+                close_conditions["ma_close_only_profit"] = params.get("ma_close_only_profit", True)
+                close_conditions["ma_close_min_profit"] = params.get("ma_close_min_profit", 0.5)
+                close_conditions["ma_close_ma1_length"] = params.get("ma_close_ma1_length", 9)
+                close_conditions["ma_close_ma1_type"] = params.get("ma_close_ma1_type", "EMA")
+                close_conditions["ma_close_ma2_length"] = params.get("ma_close_ma2_length", 21)
+                close_conditions["ma_close_ma2_type"] = params.get("ma_close_ma2_type", "EMA")
+            elif block_type == "psar_close":
+                close_conditions["psar_close_enable"] = True
+                close_conditions["psar_close_only_profit"] = params.get("psar_close_only_profit", True)
+                close_conditions["psar_close_min_profit"] = params.get("psar_close_min_profit", 0.5)
+                close_conditions["psar_close_start"] = params.get("psar_close_start", 0.02)
+                close_conditions["psar_close_increment"] = params.get("psar_close_increment", 0.02)
+                close_conditions["psar_close_maximum"] = params.get("psar_close_maximum", 0.2)
+            elif block_type == "time_bars_close":
+                close_conditions["time_bars_close_enable"] = True
+                close_conditions["close_after_bars"] = params.get("close_after_bars", 20)
+                close_conditions["close_only_profit"] = params.get("close_only_profit", True)
+                close_conditions["close_min_profit"] = params.get("close_min_profit", 0.5)
+                close_conditions["close_max_bars"] = params.get("close_max_bars", 100)
+
+        # Indent Order (Session 5.5): extract from action block
+        indent_order: dict[str, Any] = {}
+        for block_id, block in self.blocks.items():
+            block_type = block.get("type", "")
+            params = block.get("params", {})
+            if block_type == "indent_order":
+                indent_order["enabled"] = params.get("indent_enable", True)
+                indent_order["indent_percent"] = params.get("indent_percent", 0.1)
+                indent_order["cancel_after_bars"] = params.get("indent_cancel_bars", 10)
+                break
+
+        dca_config["close_conditions"] = close_conditions
+        dca_config["indent_order"] = indent_order
         return dca_config
 
     def has_dca_blocks(self) -> bool:

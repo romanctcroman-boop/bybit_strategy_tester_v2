@@ -10,7 +10,7 @@ Extended endpoints for the AI Agent System:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -28,7 +28,7 @@ class DeliberationRequest(BaseModel):
     """Multi-agent deliberation request"""
 
     question: str = Field(..., description="Question for agents to deliberate on")
-    agents: List[str] = Field(
+    agents: list[str] = Field(
         default=["deepseek", "perplexity"],
         description="List of agent IDs to participate",
     )
@@ -62,9 +62,9 @@ class DeliberationResponse(BaseModel):
     decision: str
     confidence: float
     rounds_used: int
-    votes: Dict[str, Any]
-    evidence_chain: List[str]
-    dissenting_views: List[str]
+    votes: dict[str, Any]
+    evidence_chain: list[str]
+    dissenting_views: list[str]
 
     model_config = {
         "json_schema_extra": {
@@ -91,7 +91,7 @@ class MemoryStoreRequest(BaseModel):
     importance: float = Field(
         default=0.5, ge=0.0, le=1.0, description="Importance score"
     )
-    tags: List[str] = Field(default=[], description="Tags for categorization")
+    tags: list[str] = Field(default=[], description="Tags for categorization")
 
 
 class MemoryRecallRequest(BaseModel):
@@ -99,7 +99,7 @@ class MemoryRecallRequest(BaseModel):
 
     query: str = Field(..., description="Query to search for")
     top_k: int = Field(default=5, ge=1, le=50, description="Number of results")
-    memory_types: Optional[List[str]] = Field(
+    memory_types: list[str] | None = Field(
         default=None, description="Filter by memory types"
     )
 
@@ -112,17 +112,17 @@ class SelfImprovementFeedbackRequest(BaseModel):
     feedback_type: str = Field(
         default="human", description="Feedback type: human or ai"
     )
-    score: Optional[float] = Field(
+    score: float | None = Field(
         None, ge=0.0, le=1.0, description="Quality score (for human feedback)"
     )
-    reasoning: Optional[str] = Field(None, description="Reasoning for the score")
+    reasoning: str | None = Field(None, description="Reasoning for the score")
 
 
 class ToolCallRequest(BaseModel):
     """MCP tool call request"""
 
     tool_name: str = Field(..., description="Name of the tool to call")
-    arguments: Dict[str, Any] = Field(default={}, description="Tool arguments")
+    arguments: dict[str, Any] = Field(default={}, description="Tool arguments")
 
 
 # ============================================================================
@@ -142,8 +142,8 @@ async def deliberate(request: DeliberationRequest) -> DeliberationResponse:
     """
     try:
         from backend.agents.consensus.real_llm_deliberation import (
-            get_real_deliberation,
             VotingStrategy,
+            get_real_deliberation,
         )
 
         deliberation = get_real_deliberation()
@@ -596,7 +596,7 @@ async def get_agent_alerts():
 
 
 @router.get("/monitoring/anomalies")
-async def get_detected_anomalies(metric_name: Optional[str] = None, limit: int = 100):
+async def get_detected_anomalies(metric_name: str | None = None, limit: int = 100):
     """Get detected anomalies"""
     try:
         from backend.agents.monitoring.ml_anomaly import get_anomaly_detector
@@ -688,12 +688,12 @@ async def get_system_overview():
 class BacktestAnalysisRequest(BaseModel):
     """Request for AI backtest analysis"""
 
-    metrics: Dict[str, Any] = Field(..., description="Backtest metrics")
+    metrics: dict[str, Any] = Field(..., description="Backtest metrics")
     strategy_name: str = Field(..., description="Strategy name")
     symbol: str = Field(default="BTCUSDT", description="Trading symbol")
     timeframe: str = Field(default="1h", description="Chart timeframe")
     period: str = Field(default="Unknown", description="Backtest period")
-    agents: List[str] = Field(default=["deepseek"], description="AI agents to use")
+    agents: list[str] = Field(default=["deepseek"], description="AI agents to use")
 
     model_config = {
         "json_schema_extra": {
@@ -719,12 +719,12 @@ class BacktestAnalysisRequest(BaseModel):
 class OptimizationAnalysisRequest(BaseModel):
     """Request for AI optimization analysis"""
 
-    best_params: Dict[str, Any] = Field(..., description="Best parameters found")
+    best_params: dict[str, Any] = Field(..., description="Best parameters found")
     best_sharpe: float = Field(..., description="Best Sharpe ratio")
     best_return: float = Field(..., description="Best return percentage")
     total_trials: int = Field(..., description="Total optimization trials")
     convergence_score: float = Field(default=0.8, description="Convergence score 0-1")
-    param_ranges: Dict[str, Any] = Field(..., description="Parameter search ranges")
+    param_ranges: dict[str, Any] = Field(..., description="Parameter search ranges")
     strategy_name: str = Field(..., description="Strategy name")
     symbol: str = Field(default="BTCUSDT", description="Trading symbol")
     method: str = Field(default="Bayesian", description="Optimization method")

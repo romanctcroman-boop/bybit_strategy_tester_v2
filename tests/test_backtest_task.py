@@ -1,7 +1,8 @@
 import sys
 import types
-import pytest
 from types import SimpleNamespace
+
+import pytest
 
 # Create a dummy backend.celery_app module so importing tasks in tests doesn't fail
 mod = types.ModuleType("backend.celery_app")

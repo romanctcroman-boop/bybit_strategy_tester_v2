@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
 """
 🔍 Debug Engine Trades - Detailed trade comparison between engines.
 """
 
 import sys
-import time
 from pathlib import Path
 
 import numpy as np
@@ -131,7 +129,7 @@ def main():
             fb_val = getter(fb_t)
             nb_val = getter(nb_t)
             match = "✅" if str(fb_val) == str(nb_val) else "❌"
-            print(f"{fname:<20} {str(fb_val):<25} {str(nb_val):<25} {match}")
+            print(f"{fname:<20} {fb_val!s:<25} {nb_val!s:<25} {match}")
 
     # Show signal context for first mismatched trade
     print("\n" + "=" * 80)
@@ -170,7 +168,7 @@ def main():
     nb_entries = [t.entry_index for t in nb_trades]
 
     if fb_entries != nb_entries:
-        print(f"\n⚠️ Entry indices differ!")
+        print("\n⚠️ Entry indices differ!")
         # Find first difference
         for i in range(min(len(fb_entries), len(nb_entries))):
             if fb_entries[i] != nb_entries[i]:

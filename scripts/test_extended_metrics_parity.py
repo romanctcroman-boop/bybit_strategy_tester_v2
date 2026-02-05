@@ -5,14 +5,16 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
 import time
 from datetime import datetime
 from itertools import product
+
+import numpy as np
+import pandas as pd
 
 print("=" * 100)
 print("🔬 EXTENDED METRICS PARITY TEST: 150 КОМБИНАЦИЙ × 15+ МЕТРИК")
@@ -72,9 +74,9 @@ print(f"\n📝 {len(combinations)} комбинаций для тестиров�
 # ============================================================================
 # ИМПОРТЫ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator
 
 fallback = FallbackEngineV2()
@@ -143,7 +145,7 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
     long_exits = (rsi > ob).values
     short_entries = (rsi > ob).values
     short_exits = (rsi < os).values
-    
+
     input_data = BacktestInput(
         candles=df_1h,
         candles_1m=None,
@@ -163,20 +165,20 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
         slippage=0.0005,
         use_bar_magnifier=False,
     )
-    
+
     # Запуск
     fb_result = fallback.run(input_data)
     nb_result = numba.run(input_data)
-    
+
     # Вычисление extended metrics
     fb_ext = metrics_calc.calculate_all(fb_result.equity_curve, fb_result.trades)
     nb_ext = metrics_calc.calculate_all(nb_result.equity_curve, nb_result.trades)
-    
+
     # Extended metrics names that should be read from ext_metrics first
     EXT_METRICS = {"sortino_ratio", "calmar_ratio", "omega_ratio", "recovery_factor",
-                   "ulcer_index", "tail_ratio", "downside_deviation", 
+                   "ulcer_index", "tail_ratio", "downside_deviation",
                    "upside_potential_ratio", "gain_to_pain_ratio"}
-    
+
     def get_metric(result, ext_metrics, name):
         # For extended metrics, read from ext_metrics first
         if name in EXT_METRICS:
@@ -186,7 +188,7 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
         if hasattr(result.metrics, name):
             return getattr(result.metrics, name)
         return 0.0
-    
+
     def safe_pct_diff(a, b):
         # Both zero or both very close = perfect match
         if abs(a) < 1e-10 and abs(b) < 1e-10:
@@ -198,7 +200,7 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
         if abs(a) < 1e-10:
             return 0.0  # Treat as match if base is 0
         return abs(a - b) / abs(a) * 100
-    
+
     # Сравнение по каждой метрике
     combo_drifts = {}
     for metric in METRICS:
@@ -207,12 +209,12 @@ for i, (rsi_period, ob, os, sl, tp, direction) in enumerate(combinations):
         drift = safe_pct_diff(fb_val, nb_val)
         combo_drifts[metric] = drift
         metric_drifts[metric].append(drift)
-    
+
     results.append({
         "combo": i + 1,
         **combo_drifts
     })
-    
+
     if (i + 1) % 30 == 0:
         elapsed = time.time() - start_time
         eta = elapsed / (i + 1) * (len(combinations) - i - 1)
@@ -242,13 +244,13 @@ for metric in METRICS:
     std_val = np.std(drifts)
     perfect = sum(1 for d in drifts if d < 0.001)
     perfect_pct = perfect / len(drifts) * 100
-    
+
     status = "✅" if max_val < 0.001 else ("⚠️" if max_val < 1.0 else "❌")
-    
+
     if max_val < 0.001:
         perfect_count += 1
     total_metrics += 1
-    
+
     print(f"{metric:<25} {mean_val:>10.4f} {max_val:>10.4f} {std_val:>10.4f} {perfect_pct:>9.1f}% {status:>8}")
 
 # ============================================================================
@@ -294,7 +296,7 @@ else:
     print(f"\n⚠️ Метрики с расхождениями ({len(problem_metrics)}):")
     for m in problem_metrics:
         print(f"   - {m}: max drift = {max(metric_drifts[m]):.4f}%")
-    
+
     overall_pct = perfect_comparisons / total_comparisons * 100
     print(f"\n📊 Общий уровень совпадения: {overall_pct:.2f}%")
 

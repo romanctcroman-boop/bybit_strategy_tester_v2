@@ -16,9 +16,9 @@ import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -51,8 +51,8 @@ class AnomalyReport:
     interval: str
     severity: str  # 'low', 'medium', 'high', 'critical'
     description: str
-    timestamp: Optional[int] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    timestamp: int | None = None
+    details: dict[str, Any] = field(default_factory=dict)
     auto_repaired: bool = False
 
 
@@ -68,7 +68,7 @@ class QualityCheckResult:
     freshness_ok: bool
     continuity_issues: int
     ml_anomalies: int
-    anomalies: List[AnomalyReport] = field(default_factory=list)
+    anomalies: list[AnomalyReport] = field(default_factory=list)
 
 
 class DataQualityService:
@@ -92,13 +92,13 @@ class DataQualityService:
     COMPLETENESS_THRESHOLD = 95.0  # Minimum completeness percentage
     MONITORING_INTERVAL_SECONDS = 60  # Background check interval
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or str(DB_PATH)
         self._executor = ThreadPoolExecutor(
             max_workers=2, thread_name_prefix="DataQuality"
         )
-        self._monitoring_task: Optional[asyncio.Task] = None
-        self._monitored_symbols: Dict[str, set] = {}  # symbol -> set of intervals
+        self._monitoring_task: asyncio.Task | None = None
+        self._monitored_symbols: dict[str, set] = {}  # symbol -> set of intervals
         self._repair_service = None
         self._adapter = None
 
@@ -134,7 +134,7 @@ class DataQualityService:
 
     def check_completeness(
         self, symbol: str, interval: str
-    ) -> Tuple[float, List[AnomalyReport]]:
+    ) -> tuple[float, list[AnomalyReport]]:
         """
         Check data completeness - are all expected candles present?
 
@@ -230,7 +230,7 @@ class DataQualityService:
 
     def check_freshness(
         self, symbol: str, interval: str
-    ) -> Tuple[bool, List[AnomalyReport]]:
+    ) -> tuple[bool, list[AnomalyReport]]:
         """
         Check if data is up-to-date.
 
@@ -263,7 +263,7 @@ class DataQualityService:
                 ]
 
             last_time_ms = row["last_time"]
-            now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+            now_ms = int(datetime.now(UTC).timestamp() * 1000)
             interval_ms = INTERVAL_MS.get(interval, 60_000)
 
             # Data is stale if last candle is older than threshold
@@ -305,7 +305,7 @@ class DataQualityService:
 
     def check_continuity(
         self, symbol: str, interval: str, limit: int = 500
-    ) -> Tuple[int, List[AnomalyReport]]:
+    ) -> tuple[int, list[AnomalyReport]]:
         """
         Check price continuity using Z-score to detect unusual jumps.
 
@@ -419,7 +419,7 @@ class DataQualityService:
 
     def check_ml_anomalies(
         self, symbol: str, interval: str, limit: int = 500
-    ) -> Tuple[int, List[AnomalyReport]]:
+    ) -> tuple[int, list[AnomalyReport]]:
         """
         Use Isolation Forest to detect complex anomalies.
 
@@ -539,7 +539,7 @@ class DataQualityService:
         """
         Run all quality checks and return comprehensive report.
         """
-        check_time = datetime.now(timezone.utc)
+        check_time = datetime.now(UTC)
         all_anomalies = []
 
         # Layer 1: Completeness
@@ -616,10 +616,10 @@ class DataQualityService:
                         gap_start=anomaly.details["gap_start"],
                         gap_end=anomaly.details["gap_end"],
                         gap_start_dt=datetime.fromtimestamp(
-                            anomaly.details["gap_start"] / 1000, tz=timezone.utc
+                            anomaly.details["gap_start"] / 1000, tz=UTC
                         ),
                         gap_end_dt=datetime.fromtimestamp(
-                            anomaly.details["gap_end"] / 1000, tz=timezone.utc
+                            anomaly.details["gap_end"] / 1000, tz=UTC
                         ),
                         missing_candles=anomaly.details["missing_candles"],
                     )
@@ -793,7 +793,7 @@ class DataQualityService:
         try:
             for candle in candles:
                 open_time_dt = datetime.fromtimestamp(
-                    candle["open_time"] / 1000, tz=timezone.utc
+                    candle["open_time"] / 1000, tz=UTC
                 ).isoformat()
 
                 conn.execute(

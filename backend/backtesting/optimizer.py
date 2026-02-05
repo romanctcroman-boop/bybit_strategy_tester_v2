@@ -194,7 +194,7 @@ class UniversalOptimizer:
         take_profit_range: List[float],
         initial_capital: float = 10000.0,
         leverage: int = 10,
-        commission: float = 0.0006,
+        commission: float = 0.0007,  # 0.07% TradingView parity
         slippage: float = 0.0005,
         optimize_metric: str = "sharpe_ratio",
         direction: str = "both",

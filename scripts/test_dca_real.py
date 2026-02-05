@@ -1,11 +1,12 @@
-# -*- coding: utf-8 -*-
 """Test DCA with real OHLC data and V3 engine via selector."""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 from backend.backtesting.engine_selector import get_engine
 from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
@@ -38,10 +39,10 @@ for pyramiding in [1, 4]:
     print(f"\n{'='*60}")
     print(f"Testing with pyramiding={pyramiding}")
     print(f"{'='*60}")
-    
+
     engine = get_engine(engine_type='auto', pyramiding=pyramiding)
     print(f"Engine: {engine.name}")
-    
+
     input_data = BacktestInput(
         candles=candles,
         candles_1m=None,
@@ -58,16 +59,16 @@ for pyramiding in [1, 4]:
         pyramiding=pyramiding,
         use_bar_magnifier=False,
     )
-    
+
     result = engine.run(input_data)
-    
-    print(f"\nResults:")
+
+    print("\nResults:")
     print(f"  Trades: {len(result.trades)}")
     print(f"  Net Profit: ${result.metrics.net_profit:.2f}")
     print(f"  Win Rate: {result.metrics.win_rate*100:.1f}%")
-    
+
     if result.trades:
-        print(f"\nFirst 3 trades:")
+        print("\nFirst 3 trades:")
         for i, t in enumerate(result.trades[:3]):
             print(f"  #{i+1}: {t.direction} entry=${t.entry_price:.2f} exit=${t.exit_price:.2f} pnl=${t.pnl:.2f}")
 

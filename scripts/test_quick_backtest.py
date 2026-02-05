@@ -1,6 +1,8 @@
 """Quick test: Verify fallback engine works correctly."""
 import sqlite3
+
 import pandas as pd
+
 from backend.backtesting.engine import BacktestEngine
 from backend.backtesting.models import BacktestConfig
 
@@ -39,8 +41,8 @@ config = BacktestConfig(
 engine = BacktestEngine()
 result = engine.run(config, df, silent=True)
 
-print(f"✅ Backtest completed successfully!")
+print("✅ Backtest completed successfully!")
 print(f"   Trades: {result.metrics.total_trades}")
 print(f"   Net Profit: ${result.metrics.net_profit:.2f}")
 print(f"   Win Rate: {result.metrics.win_rate:.1f}%")
-print(f"   Engine: Fallback (authoritative)")
+print("   Engine: Fallback (authoritative)")

@@ -922,6 +922,330 @@
 			"args": [
 				"d:\\bybit_strategy_tester_v2\\test_api_mfe.py"
 			]
+		},
+		{
+			"label": "Check Backtests Schema",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\check_backtests_schema.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Fix Backtests Table",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\fix_backtests_table.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Fix Backtests V2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\fix_backtests_v2.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Test Dashboard Endpoints",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_dashboard_endpoints.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Run Dashboard Tests",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_dashboard_endpoints.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Fix Strategies Schema",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\fix_strategies_schema.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Final Dashboard Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_dashboard_endpoints.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Fix All Strategies Columns",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\fix_all_strategies.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Fix Optimizations",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\fix_optimizations.py"
+			]
+		},
+		{
+			"label": "Quick Test",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\quick_test.py"
+			]
+		},
+		{
+			"label": "Final Dashboard Test",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\final_test.py"
+			]
+		},
+		{
+			"label": "Cleanup Debug Files",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\cleanup_debug.py"
+			]
+		},
+		{
+			"label": "Check Backend Health",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\check_backend.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Quick Health Check",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\quick_health.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Test Direction Filtering",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\test_direction.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Run Eval Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_eval_criteria.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Simple API Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\simple_api_test.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Run Eval Test 2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\run_eval_test.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Quick Opt Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\quick_opt_test.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Quick Test 2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\quick_test2.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Health Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\health_test.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Min Opt Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\min_opt_test.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check Endpoint",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\check_endpoint.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Test Opt Full2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_opt_full2.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Final Eval Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_final_eval.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Final Eval Test 2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_final_eval.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Health Quick",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\health_quick.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check Health File",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\check_health.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check Health 2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\check_health.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Uvicorn Direct",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\uvicorn.exe",
+			"args": [
+				"backend.api.app:app",
+				"--host",
+				"0.0.0.0",
+				"--port",
+				"8000"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "Check Health 3",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\check_health.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Final Eval Test 3",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_final_eval.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Find Active Period",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\find_active_period.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Test Eval Full",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_eval_full.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Debug Compare",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\debug_compare.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Test Eval Fixed",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_eval_fixed.py"
+			],
+			"isBackground": false
 		}
 	]
 }

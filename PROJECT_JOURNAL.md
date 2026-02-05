@@ -17,6 +17,20 @@
 
 ---
 
+## СЕССИЯ: 2026-01-30 (MCP DeepSeek)
+
+### Цели сессии
+
+- [x] MCP DeepSeek Node.js — создан `mcp-deepseek/`, 2 инструмента (deepseek_chat, deepseek_code_completion), ESM + SDK 0.6, запись в `.cursor/mcp.json`.
+- [x] deepseek-node в Cursor — «2 tools enabled», без ошибки (запуск через `cmd /c cd /d ...\mcp-deepseek && node server.js`).
+- [x] Docker MCP — в `.cursor/mcp.json` переключён запуск на `npx` без `cmd` (как у filesystem); при необходимости отключить в Settings, если ошибка остаётся.
+
+### Следующая сессия
+
+**TODO для AI:** при работе с DeepSeek через MCP задавать `DEEPSEEK_API_KEY` в env или в `mcp-deepseek/.env`.
+
+---
+
 ## СЕССИЯ: [дата время]
 
 ### Цели сессии
@@ -73,4 +87,5 @@
 
 ## ИСТОРИЯ ИЗМЕНЕНИЙ
 
+- 2026-01-30: MCP DeepSeek Node (mcp-deepseek/, deepseek-node в Cursor), правка Docker MCP (npx без cmd), запись в CHANGELOG.
 - 2026-01-30: Создан PROJECT_JOURNAL; добавлены правила декомпозиции и task-decomposition/task-breakdown.

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * рџ“„ Backtest Results Page JavaScript
  *
  * Page-specific scripts for backtest_results.html
@@ -1047,6 +1047,100 @@ function initChartLegendControls() {
         equityChart.update("none");
       }
     });
+  }
+
+  const legendRegimeOverlay = document.getElementById("legendRegimeOverlay");
+  if (legendRegimeOverlay) {
+    legendRegimeOverlay.addEventListener("change", () => {
+      if (equityChart && currentBacktest) {
+        if (legendRegimeOverlay.checked) {
+          loadAndApplyRegimeOverlay(currentBacktest);
+        } else {
+          clearRegimeOverlay();
+        }
+      }
+    });
+  }
+}
+
+function clearRegimeOverlay() {
+  if (!equityChart?.options?.plugins?.annotation?.annotations) return;
+  const ann = equityChart.options.plugins.annotation.annotations;
+  Object.keys(ann).forEach((k) => {
+    if (k.startsWith("regime_")) delete ann[k];
+  });
+  equityChart.update("none");
+}
+
+async function loadAndApplyRegimeOverlay(backtest) {
+  if (!equityChart || !equityChart._equityData?.length) return;
+  const symbol = backtest.symbol || backtest.config?.symbol;
+  const rawInterval = backtest.interval || backtest.config?.interval || "60";
+  if (!symbol) return;
+  const s = String(rawInterval);
+  const intervalMap = { 1: "1m", 5: "5m", 15: "15m", 30: "30m", 60: "1h", 120: "2h", 240: "4h", 360: "6h", 720: "12h", D: "1d", W: "1w" };
+  const interval = intervalMap[s] || (/^(\d+[mhdw]|[mhdw])$/i.test(s) ? s : "1h");
+
+  const equityData = equityChart._equityData;
+  const firstTs = equityData[0]?.timestamp;
+  const lastTs = equityData[equityData.length - 1]?.timestamp;
+  const days = firstTs && lastTs ? Math.max(7, Math.ceil((new Date(lastTs) - new Date(firstTs)) / (24 * 60 * 60 * 1000))) : 30;
+
+  try {
+    const res = await fetch(`${API_BASE}/market-regime/history/${encodeURIComponent(symbol)}?interval=${encodeURIComponent(interval)}&days=${days}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data?.history?.length) return;
+
+    const toMs = (t) => {
+      if (typeof t === "number") return t < 1e12 ? t * 1000 : t;
+      const d = new Date(t);
+      return isNaN(d) ? 0 : d.getTime();
+    };
+    const regimeColors = { trending_up: "rgba(38,166,154,0.15)", trending_down: "rgba(239,83,80,0.15)", ranging: "rgba(120,144,156,0.15)", volatile: "rgba(255,167,38,0.2)", breakout_up: "rgba(102,187,106,0.12)", breakout_down: "rgba(244,67,54,0.12)", unknown: "rgba(158,158,158,0.08)" };
+
+    const regHist = data.history.map((h) => ({ ts: toMs(h.timestamp), regime: h.regime || "unknown" })).sort((a, b) => a.ts - b.ts);
+    if (regHist.length === 0) return;
+
+    const getRegimeAt = (eqTs) => {
+      const ms = toMs(eqTs);
+      let best = regHist[0];
+      let bestDiff = Math.abs(regHist[0].ts - ms);
+      for (const r of regHist) {
+        const d = Math.abs(r.ts - ms);
+        if (d < bestDiff) { bestDiff = d; best = r; }
+      }
+      return best.regime;
+    };
+
+    const regimePerIdx = equityData.map((p, i) => getRegimeAt(p.timestamp));
+    const segments = [];
+    let start = 0;
+    for (let i = 1; i <= regimePerIdx.length; i++) {
+      if (i === regimePerIdx.length || regimePerIdx[i] !== regimePerIdx[start]) {
+        segments.push({ start, end: i - 1, regime: regimePerIdx[start] });
+        start = i;
+      }
+    }
+
+    const ann = equityChart.options.plugins.annotation.annotations;
+    Object.keys(ann).forEach((k) => { if (k.startsWith("regime_")) delete ann[k]; });
+    segments.forEach((seg, idx) => {
+      if (seg.end < seg.start) return;
+      ann[`regime_${idx}`] = {
+        type: "box",
+        xMin: seg.start - 0.5,
+        xMax: seg.end + 0.5,
+        yMin: "chartMin",
+        yMax: "chartMax",
+        backgroundColor: regimeColors[seg.regime] || regimeColors.unknown,
+        borderWidth: 0,
+        drawTime: "beforeDatasetsDraw",
+      };
+    });
+    equityChart.update("none");
+  } catch (e) {
+    console.warn("[Regime overlay] Failed to load:", e.message);
   }
 }
 
@@ -3018,6 +3112,13 @@ function updateCharts(backtest) {
 
         equityChart.update("none");
         console.log("[updateCharts] equityChart updated with P&L values");
+
+        const legendRegimeOverlay = document.getElementById("legendRegimeOverlay");
+        if (legendRegimeOverlay?.checked) {
+          loadAndApplyRegimeOverlay(backtest);
+        } else {
+          clearRegimeOverlay();
+        }
 
         // Update current value badge in header
         const lastPnL = pnlValues[pnlValues.length - 1] || 0;

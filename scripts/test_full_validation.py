@@ -5,15 +5,14 @@ FallbackEngineV2 vs NumbaEngineV2
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
-import time
-from datetime import datetime
-from itertools import product
 from dataclasses import fields
+from datetime import datetime
+
+import pandas as pd
 
 print("=" * 120)
 print("🔬 ПОЛНЫЙ ТЕСТ ВАЛИДАЦИИ АЛГОРИТМОВ")
@@ -300,9 +299,9 @@ def calculate_rsi(close, period=14):
 # ============================================================================
 # ИМПОРТЫ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection, BacktestMetrics
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, BacktestMetrics, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator
 
 fallback = FallbackEngineV2()
@@ -331,7 +330,7 @@ for i, config in enumerate(STRATEGY_CONFIGS):
     print(f"\n{'='*80}")
     print(f"[{i+1}/{len(STRATEGY_CONFIGS)}] {config['name']}")
     print(f"{'='*80}")
-    
+
     # Показать конфигурацию
     print(f"""
    📋 КОНФИГУРАЦИЯ:
@@ -356,10 +355,10 @@ for i, config in enumerate(STRATEGY_CONFIGS):
    ├─ RSI Oversold:      {config['rsi_oversold']}
    └─ RSI Overbought:    {config['rsi_overbought']}
     """)
-    
+
     # Генерация сигналов
     rsi = calculate_rsi(df_1h['close'], period=config['rsi_period'])
-    
+
     if config.get('ema_fast') and config.get('ema_slow'):
         ema_fast = df_1h['close'].ewm(span=config['ema_fast']).mean()
         ema_slow = df_1h['close'].ewm(span=config['ema_slow']).mean()
@@ -370,10 +369,10 @@ for i, config in enumerate(STRATEGY_CONFIGS):
     else:
         long_entries = (rsi < config['rsi_oversold']).values
         short_entries = (rsi > config['rsi_overbought']).values
-    
+
     long_exits = (rsi > config['rsi_overbought']).values
     short_exits = (rsi < config['rsi_oversold']).values
-    
+
     # Создание input
     input_data = BacktestInput(
         candles=df_1h,
@@ -396,76 +395,72 @@ for i, config in enumerate(STRATEGY_CONFIGS):
         max_drawdown_limit=config['max_drawdown_limit'],
         pyramiding=config['pyramiding'],
     )
-    
+
     # Запуск обоих движков
     fb_result = fallback.run(input_data)
     nb_result = numba_engine.run(input_data)
-    
+
     # Extended metrics
     fb_ext = ext_calc.calculate_all(fb_result.equity_curve, fb_result.trades)
     nb_ext = ext_calc.calculate_all(nb_result.equity_curve, nb_result.trades)
-    
+
     # Сравнение ВСЕХ 147 метрик
     fb_m = fb_result.metrics
     nb_m = nb_result.metrics
-    
+
     # 1. BacktestMetrics (32 поля)
-    from backend.backtesting.interfaces import BacktestMetrics
     from backend.core.extended_metrics import ExtendedMetricsResult
-    from backend.core.metrics_calculator import TradeMetrics, RiskMetrics, LongShortMetrics
-    
+
     all_categories = []
-    
+
     # BacktestMetrics
     backtest_fields = [f.name for f in fields(BacktestMetrics) if not f.name.startswith('_')]
     all_categories.append(("BacktestMetrics", backtest_fields, fb_m, nb_m))
-    
+
     # ExtendedMetrics
     extended_fields = [f.name for f in fields(ExtendedMetricsResult) if not f.name.startswith('_')]
     all_categories.append(("ExtendedMetrics", extended_fields, fb_ext, nb_ext))
-    
+
     config_matches = 0
     config_total = 0
-    
-    print(f"\n   📊 СРАВНЕНИЕ ВСЕХ МЕТРИК:")
-    
+
+    print("\n   📊 СРАВНЕНИЕ ВСЕХ МЕТРИК:")
+
     for cat_name, cat_fields, fb_obj, nb_obj in all_categories:
         cat_matches = 0
         cat_total = 0
-        
+
         for field_name in cat_fields:
             fb_val = getattr(fb_obj, field_name, 0)
             nb_val = getattr(nb_obj, field_name, 0)
-            
+
             # Проверка совпадения
             if fb_val is None and nb_val is None:
                 match = True
             elif fb_val is None or nb_val is None:
                 match = False
-            elif abs(float(fb_val)) < 1e-10 and abs(float(nb_val)) < 1e-10:
-                match = True
-            elif abs(float(fb_val) - float(nb_val)) < 1e-6:
+            elif (abs(float(fb_val)) < 1e-10 and abs(float(nb_val)) < 1e-10) or abs(float(fb_val) - float(nb_val)) < 1e-6:
                 match = True
             elif abs(float(fb_val)) > 1e-10:
                 pct_diff = abs(float(fb_val) - float(nb_val)) / abs(float(fb_val)) * 100
                 match = pct_diff < 0.001
             else:
                 match = False
-            
+
             cat_matches += 1 if match else 0
             cat_total += 1
-            
+
             if not match:
                 problems.append((config['name'], field_name, fb_val, nb_val))
-        
+
         config_matches += cat_matches
         config_total += cat_total
         status = "✅" if cat_matches == cat_total else "⚠️"
         print(f"   {status} {cat_name}: {cat_matches}/{cat_total}")
-    
+
     total_metrics_checked += config_total
     total_matches += config_matches
-    
+
     pct = config_matches / config_total * 100 if config_total > 0 else 0
     status_icon = "✅" if pct == 100 else "⚠️"
     print(f"\n   {status_icon} ИТОГО: {config_matches}/{config_total} ({pct:.1f}%)")

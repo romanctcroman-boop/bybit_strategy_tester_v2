@@ -14,7 +14,7 @@ Behavior:
 
 import logging
 import os
-from typing import Generator
+from collections.abc import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
@@ -106,7 +106,7 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-__all__ = ["Base", "DATABASE_URL", "SessionLocal", "engine", "get_db", "get_pool_status"]
+__all__ = ["DATABASE_URL", "Base", "SessionLocal", "engine", "get_db", "get_pool_status"]
 
 
 def get_pool_status() -> dict:

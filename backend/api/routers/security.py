@@ -14,7 +14,6 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.security import APIKeyHeader
@@ -94,9 +93,9 @@ class LogKeyAccessRequest(BaseModel):
     key_id: str = Field(..., description="Key identifier")
     key_provider: KeyProvider = Field(..., description="Key provider")
     access_type: KeyAccessType = Field(..., description="Type of access")
-    user_id: Optional[str] = None
+    user_id: str | None = None
     success: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
     latency_ms: float = 0.0
     metadata: dict = Field(default_factory=dict)
 
@@ -108,8 +107,8 @@ class AddIPRuleRequest(BaseModel):
     is_whitelist: bool = Field(default=True)
     action_types: list[str] = Field(default=["all"])
     description: str = ""
-    expires_in_hours: Optional[int] = None
-    created_by: Optional[str] = None
+    expires_in_hours: int | None = None
+    created_by: str | None = None
 
 
 class CheckIPRequest(BaseModel):
@@ -131,7 +130,7 @@ class AddVariableRequest(BaseModel):
     name: str
     config_type: str = "string"
     required: bool = False
-    default_value: Optional[str] = None
+    default_value: str | None = None
     description: str = ""
     is_sensitive: bool = False
 
@@ -187,9 +186,9 @@ async def log_key_access(request: LogKeyAccessRequest, req: Request):
 
 @router.get("/audit/events")
 async def get_audit_events(
-    key_id: Optional[str] = Query(None),
-    access_type: Optional[str] = Query(None),
-    success_only: Optional[bool] = Query(None),
+    key_id: str | None = Query(None),
+    access_type: str | None = Query(None),
+    success_only: bool | None = Query(None),
     limit: int = Query(default=100, ge=1, le=1000),
 ):
     """Get audit events."""
@@ -231,8 +230,8 @@ async def get_audit_events(
 
 @router.get("/audit/anomalies")
 async def get_anomalies(
-    key_id: Optional[str] = Query(None),
-    severity: Optional[str] = Query(None),
+    key_id: str | None = Query(None),
+    severity: str | None = Query(None),
     unacknowledged_only: bool = Query(default=False),
     limit: int = Query(default=100, ge=1, le=1000),
 ):
@@ -380,7 +379,7 @@ async def add_ip_rule(request: AddIPRuleRequest):
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid action type: {str(e)}",
+            detail=f"Invalid action type: {e!s}",
         )
 
     expires_at = None
@@ -413,7 +412,7 @@ async def add_ip_rule(request: AddIPRuleRequest):
 
 @router.get("/ip/rules")
 async def get_ip_rules(
-    is_whitelist: Optional[bool] = Query(None),
+    is_whitelist: bool | None = Query(None),
     enabled_only: bool = Query(default=False),
 ):
     """Get IP rules."""
@@ -486,7 +485,7 @@ async def disable_ip_rule(rule_id: str):
 
 @router.get("/ip/blocked")
 async def get_blocked_requests(
-    ip_address: Optional[str] = Query(None),
+    ip_address: str | None = Query(None),
     limit: int = Query(default=100, ge=1, le=1000),
 ):
     """Get blocked request records."""
@@ -651,7 +650,7 @@ async def get_variable_info(name: str):
 
 @router.get("/config/issues")
 async def get_config_issues(
-    severity: Optional[str] = Query(None),
+    severity: str | None = Query(None),
 ):
     """Get configuration issues."""
     handler = get_config_handler()

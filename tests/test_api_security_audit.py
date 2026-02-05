@@ -10,14 +10,12 @@ Tests all P0 and P1 security fixes:
 - P1-1: HSTS header
 """
 
-import hmac
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from starlette.middleware.base import BaseHTTPMiddleware
 
 
 class TestAdminAuthMiddleware:

@@ -1,14 +1,15 @@
-# -*- coding: utf-8 -*-
 """Test V2/V3 parity on verified data period (Dec 21+)."""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 import numpy as np
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
+import pandas as pd
+
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 # Load full data
 ohlc = pd.read_csv('d:/TV/BYBIT_BTCUSDT.P_15m_full.csv')
@@ -53,10 +54,10 @@ r2 = v2.run(input_data)
 v3 = FallbackEngineV3()
 r3 = v3.run(input_data)
 
-print(f"\n=== V2 ===")
+print("\n=== V2 ===")
 print(f"Trades: {len(r2.trades)}, Net Profit: {r2.metrics.net_profit:.2f}")
 
-print(f"\n=== V3 ===")
+print("\n=== V3 ===")
 print(f"Trades: {len(r3.trades)}, Net Profit: {r3.metrics.net_profit:.2f}")
 
 # Compare

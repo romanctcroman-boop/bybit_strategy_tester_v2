@@ -122,19 +122,25 @@ class BybitAdapter:
         Returns list of dicts with keys: open_time, open, high, low, close, volume
         """
 
-        # normalize interval to Bybit v5 format: minutes as integer strings (e.g. '1', '3', '60')
+        # Normalize interval to Bybit v5 format: 1,3,5,15,30,60,120,240,360,720,D,W,M
         def _to_v5_interval(itv: str) -> str:
-            itv = str(itv)
-            if itv.endswith("m") or itv.endswith("M"):
-                return itv[:-1]
+            itv = str(itv).strip()
+            u = itv.upper()
+            if u in ("W", "1W"):
+                return "W"
+            if u in ("M", "1M"):
+                return "M"
+            if itv.endswith("d") or itv.endswith("D"):
+                return "D"
             if itv.endswith("h") or itv.endswith("H"):
                 try:
                     return str(int(itv[:-1]) * 60)
                 except Exception:
                     return itv[:-1]
-            if itv.endswith("d") or itv.endswith("D"):
-                # Bybit often uses 'D' for daily; return 'D'
-                return "D"
+            if itv.endswith("m"):
+                return itv[:-1]
+            if itv.endswith("M"):
+                return itv[:-1]
             return itv
 
         interval_norm = _to_v5_interval(interval)
@@ -453,6 +459,97 @@ class BybitAdapter:
             logger.exception(f"Failed to fetch historical klines: {e}")
             raise
 
+    def get_klines_historical(
+        self,
+        symbol: str,
+        interval: str = "60",
+        total_candles: int = 2000,
+        end_time: Optional[int] = None,
+        market_type: str = "linear",
+    ) -> List[Dict]:
+        """
+        Load historical candles in chunks of 1000 (Bybit API limit per request).
+        Sync version for SmartKlineService background loading.
+
+        Args:
+            symbol: Trading pair (e.g. BTCUSDT)
+            interval: Timeframe ('1', '5', '15', '60', 'D' etc.)
+            total_candles: Target number of candles to load
+            end_time: End timestamp (ms). If None, use current time
+            market_type: 'spot' or 'linear'
+
+        Returns:
+            List of candles sorted by open_time ascending
+        """
+        # Normalize interval to Bybit v5
+        def _to_v5(itv: str) -> str:
+            itv = str(itv)
+            if itv.endswith("m") or itv.endswith("M"):
+                return itv[:-1]
+            if itv.endswith("h") or itv.endswith("H"):
+                try:
+                    return str(int(itv[:-1]) * 60)
+                except Exception:
+                    return itv
+            if itv.lower() in ("d", "1d"):
+                return "D"
+            if itv.lower() in ("w", "1w"):
+                return "W"
+            return itv
+
+        interval_norm = _to_v5(interval)
+        symbol_upper = symbol.upper()
+        category = "spot" if market_type == "spot" else "linear"
+        v5_kline_url = "https://api.bybit.com/v5/market/kline"
+        batch_size = 1000  # Bybit max per request
+        all_candles: List[Dict] = []
+        current_end = end_time or int(time.time() * 1000)
+        max_iterations = (total_candles // batch_size) + 2
+        iteration = 0
+
+        while len(all_candles) < total_candles and iteration < max_iterations:
+            params = {
+                "category": category,
+                "symbol": symbol_upper,
+                "interval": interval_norm,
+                "limit": batch_size,
+                "end": current_end,
+            }
+            try:
+                r = requests.get(v5_kline_url, params=params, timeout=self.timeout)
+                r.raise_for_status()
+                payload = r.json()
+                result = payload.get("result") or payload.get("data") or payload
+                if isinstance(result, dict) and "list" in result:
+                    data = result["list"]
+                elif isinstance(result, list):
+                    data = result
+                else:
+                    data = []
+                if not data:
+                    break
+                normalized = [self._normalize_kline_row(d) for d in data]
+                all_candles.extend(normalized)
+                oldest = min(c.get("open_time", 0) for c in normalized)
+                current_end = oldest - 1
+                iteration += 1
+                if len(data) < batch_size:
+                    break
+                time.sleep(0.02)
+            except Exception as e:
+                logger.exception("get_klines_historical batch failed: %s", e)
+                break
+
+        all_candles.sort(key=lambda x: x.get("open_time", 0))
+        seen = set()
+        unique = []
+        for c in all_candles:
+            t = c.get("open_time")
+            if t is not None and t not in seen:
+                seen.add(t)
+                unique.append(c)
+        return unique
+
     async def get_historical_klines(
         self,
         symbol: str,
@@ -480,18 +577,25 @@ class BybitAdapter:
         """
         import asyncio
 
-        # Normalize interval
+        # Normalize interval (Bybit v5: 1,5,15,30,60,240,D,W,M). D/W/M — не обрезать.
         def _to_v5_interval(itv: str) -> str:
-            itv = str(itv)
-            if itv.endswith("m") or itv.endswith("M"):
+            itv = str(itv).strip()
+            if not itv:
+                return "60"
+            u = itv.upper()
+            if u in ("D", "W", "M"):
+                return u
+            if itv.endswith("m") and itv[:-1].isdigit():
                 return itv[:-1]
             if itv.endswith("h") or itv.endswith("H"):
                 try:
                     return str(int(itv[:-1]) * 60)
                 except Exception:
                     return itv[:-1]
-            if itv.endswith("d") or itv.endswith("D"):
+            if u in ("D", "1D"):
                 return "D"
+            if u in ("W", "1W"):
+                return "W"
             return itv
 
         interval_norm = _to_v5_interval(interval)
@@ -569,8 +673,8 @@ class BybitAdapter:
                 # Move end backwards for next iteration
                 current_end = oldest_time - 1
 
-                # Rate limiting
-                await asyncio.sleep(0.1)
+                # Минимальная пауза: Bybit ~120 req/s по IP, 8 TF параллельно — 0.02 с достаточно
+                await asyncio.sleep(0.02)
 
             except Exception as e:
                 logger.exception(f"Failed to fetch historical klines: {e}")
@@ -771,8 +875,8 @@ class BybitAdapter:
 
                 _engine = _engine or getattr(_dbmod, "engine", None)
                 SessionLocal = getattr(_dbmod, "SessionLocal", SessionLocal)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Database module import/bind skipped: %s", e)
 
         if _engine is None:
             # Last-resort: create engine from DATABASE_URL
@@ -823,10 +927,10 @@ class BybitAdapter:
                     session_engine = candidate.get_bind()
                     if session_engine is not None:
                         _engine = session_engine
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    logger.debug("get_bind failed: %s", e)
+        except Exception as e:
+            logger.debug("Session candidate resolution failed: %s", e)
 
         # Accept the candidate only if it looks like a real SQLAlchemy Session
         def _is_session_like(o):
@@ -1036,11 +1140,14 @@ class BybitAdapter:
                 raise ValueError(f"symbol {cand} not trading")
         raise ValueError(f"symbol {symbol} not found in instruments-info")
 
-    def get_tickers(self, symbols: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def get_tickers(
+        self, symbols: Optional[List[str]] = None, category: str = "linear"
+    ) -> List[Dict[str, Any]]:
         """Fetch real-time ticker data from Bybit V5 API.
 
         Args:
-            symbols: Optional list of symbols. If None, returns all linear USDT perpetuals.
+            symbols: Optional list of symbols. If None, returns all tickers for category.
+            category: 'linear' (USDT perpetual) or 'spot'.
 
         Returns:
             List of ticker dicts with: symbol, lastPrice, price24hPcnt, volume24h, highPrice24h, lowPrice24h
@@ -1049,15 +1156,21 @@ class BybitAdapter:
 
         v5_tickers_url = "https://api.bybit.com/v5/market/tickers"
         current_time = time.time()
+        cat = "spot" if category == "spot" else "linear"
 
-        # Use cache if available and not expired (only for "all tickers" requests)
-        if symbols is None and _tickers_cache["data"] is not None:
-            if current_time - _tickers_cache["timestamp"] < _tickers_cache["ttl"]:
-                logger.debug(f"Using cached tickers (age: {current_time - _tickers_cache['timestamp']:.1f}s)")
-                return _tickers_cache["data"]
+        # Use cache if available and not expired (only for "all tickers" requests, per category)
+        cache_key = f"tickers_{cat}"
+        if not hasattr(_tickers_cache, "by_cat"):
+            _tickers_cache["by_cat"] = {}
+        bc = _tickers_cache["by_cat"]
+        if symbols is None and cache_key in bc:
+            entry = bc[cache_key]
+            if entry and current_time - entry.get("timestamp", 0) < _tickers_cache.get("ttl", 30):
+                logger.debug(f"Using cached tickers for {cat}")
+                return entry.get("data", [])
 
         try:
-            params = {"category": "linear"}
+            params = {"category": cat}
             r = requests.get(v5_tickers_url, params=params, timeout=self.timeout)
             r.raise_for_status()
             data = r.json()
@@ -1070,8 +1183,8 @@ class BybitAdapter:
                 # Filter by requested symbols if provided
                 if symbols and sym not in symbols:
                     continue
-                # Only include USDT perpetuals
-                if not sym.endswith("USDT"):
+                # For linear: only USDT perpetuals; for spot: include USDT pairs (main liquid pairs)
+                if cat == "linear" and not sym.endswith("USDT"):
                     continue
 
                 result.append(
@@ -1092,9 +1205,10 @@ class BybitAdapter:
 
             # Update cache for "all tickers" requests
             if symbols is None:
-                _tickers_cache["data"] = result
-                _tickers_cache["timestamp"] = current_time
-                logger.debug(f"Cached {len(result)} tickers")
+                if "by_cat" not in _tickers_cache:
+                    _tickers_cache["by_cat"] = {}
+                _tickers_cache["by_cat"][cache_key] = {"data": result, "timestamp": current_time}
+                logger.debug(f"Cached {len(result)} tickers for {cat}")
 
             return result
 
@@ -1113,6 +1227,105 @@ class BybitAdapter:
         """
         tickers = self.get_tickers(symbols=[symbol.upper()])
         return tickers[0] if tickers else None
+
+    def get_orderbook(
+        self,
+        symbol: str,
+        category: str = "linear",
+        limit: int = 25,
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch L2 order book snapshot from Bybit.
+
+        Args:
+            symbol: Trading pair (e.g. BTCUSDT)
+            category: spot, linear, inverse, option
+            limit: Depth levels. linear/inverse: 1-500, spot: 1-200, option: 1-25
+
+        Returns:
+            Dict with keys: symbol, bids [[price, size], ...], asks, ts (ms), u, seq, cts
+            or None on error
+        """
+        v5_url = "https://api.bybit.com/v5/market/orderbook"
+        try:
+            r = requests.get(
+                v5_url,
+                params={"category": category, "symbol": symbol.upper(), "limit": limit},
+                timeout=self.timeout,
+            )
+            r.raise_for_status()
+            data = r.json()
+            if data.get("retCode", -1) != 0:
+                logger.warning("get_orderbook retCode=%s", data.get("retMsg", ""))
+                return None
+            return data.get("result") or data.get("data")
+        except Exception as e:
+            logger.error("get_orderbook failed: %s", e)
+            return None
+
+    def get_symbols_list(
+        self, category: str = "linear", trading_only: bool = True
+    ) -> List[str]:
+        """Fetch full list of symbols from Bybit instruments-info (all pages).
+
+        Args:
+            category: 'linear' (USDT perpetual), 'spot', or 'inverse'
+            trading_only: If True, return only instruments with status 'Trading'
+
+        Returns:
+            List of symbol strings (e.g. ['BTCUSDT', 'ETHUSDT', ...])
+        """
+        v5_url = "https://api.bybit.com/v5/market/instruments-info"
+        result: List[str] = []
+        cursor: Optional[str] = None
+        limit = 1000  # max per request
+        max_pages = 50  # safety
+        timeout_sec = max(self.timeout, 30)  # instruments-info can be slow (many pages)
+        try:
+            for page in range(max_pages):
+                params: Dict[str, Any] = {"category": category, "limit": limit}
+                if cursor:
+                    params["cursor"] = cursor
+                r = requests.get(v5_url, params=params, timeout=timeout_sec)
+                r.raise_for_status()
+                data = r.json()
+                ret_code = data.get("retCode", -1)
+                if ret_code != 0:
+                    logger.warning(
+                        "get_symbols_list Bybit retCode=%s retMsg=%s",
+                        ret_code,
+                        data.get("retMsg", ""),
+                    )
+                    break
+                res = data.get("result")
+                if not isinstance(res, dict):
+                    break
+                items = res.get("list") or []
+                for it in items:
+                    if not isinstance(it, dict):
+                        continue
+                    sym = it.get("symbol", "")
+                    if not sym:
+                        continue
+                    if trading_only and it.get("status") != "Trading":
+                        continue
+                    if category == "linear" and not sym.endswith("USDT"):
+                        continue
+                    if category == "spot" and "USDT" not in sym:
+                        continue
+                    result.append(sym)
+                next_cursor = res.get("nextPageCursor")
+                if not next_cursor or len(items) < limit:
+                    break
+                cursor = next_cursor
+            out = sorted(set(result))
+            logger.info("get_symbols_list category=%s count=%d", category, len(out))
+            return out
+        except requests.exceptions.RequestException as e:
+            logger.warning("get_symbols_list network failed: %s", e)
+            return []
+        except Exception as e:
+            logger.warning("get_symbols_list failed: %s", e)
+            return []
 
     def get_klines_both_markets(
         self,

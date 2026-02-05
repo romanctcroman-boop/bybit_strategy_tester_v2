@@ -19,8 +19,8 @@ Usage:
         return APIResponse.success(data=item)
 """
 
-from datetime import datetime, timezone
-from typing import Any, Generic, List, Optional, TypeVar
+from datetime import UTC, datetime
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -44,21 +44,21 @@ class APIResponse(BaseModel, Generic[T]):
     """
 
     success: bool = Field(default=True, description="Whether the request succeeded")
-    data: Optional[T] = Field(default=None, description="Response payload")
-    message: Optional[str] = Field(default=None, description="Human-readable message")
-    error: Optional[str] = Field(default=None, description="Error details if failed")
+    data: T | None = Field(default=None, description="Response payload")
+    message: str | None = Field(default=None, description="Human-readable message")
+    error: str | None = Field(default=None, description="Error details if failed")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Response timestamp",
     )
-    request_id: Optional[str] = Field(default=None, description="Request tracking ID")
+    request_id: str | None = Field(default=None, description="Request tracking ID")
 
     @classmethod
     def ok(
         cls,
-        data: Optional[T] = None,
-        message: Optional[str] = None,
-        request_id: Optional[str] = None,
+        data: T | None = None,
+        message: str | None = None,
+        request_id: str | None = None,
     ) -> "APIResponse[T]":
         """Create a successful response."""
         return cls(
@@ -72,9 +72,9 @@ class APIResponse(BaseModel, Generic[T]):
     def fail(
         cls,
         error: str,
-        message: Optional[str] = None,
-        data: Optional[T] = None,
-        request_id: Optional[str] = None,
+        message: str | None = None,
+        data: T | None = None,
+        request_id: str | None = None,
     ) -> "APIResponse[T]":
         """Create an error response."""
         return cls(
@@ -130,19 +130,19 @@ class PaginatedResponse(BaseModel, Generic[T]):
     """
 
     success: bool = True
-    data: List[T] = Field(default_factory=list, description="List of items")
+    data: list[T] = Field(default_factory=list, description="List of items")
     pagination: PaginationMeta = Field(description="Pagination metadata")
-    message: Optional[str] = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    message: str | None = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @classmethod
     def create(
         cls,
-        items: List[T],
+        items: list[T],
         page: int,
         per_page: int,
         total_items: int,
-        message: Optional[str] = None,
+        message: str | None = None,
     ) -> "PaginatedResponse[T]":
         """Create a paginated response."""
         return cls(
@@ -157,10 +157,10 @@ class ErrorDetail(BaseModel):
 
     code: str = Field(description="Error code for programmatic handling")
     message: str = Field(description="Human-readable error message")
-    field: Optional[str] = Field(
+    field: str | None = Field(
         default=None, description="Field that caused the error"
     )
-    details: Optional[dict[str, Any]] = Field(
+    details: dict[str, Any] | None = Field(
         default=None, description="Additional error context"
     )
 
@@ -175,17 +175,17 @@ class ErrorResponse(BaseModel):
     success: bool = False
     error: str = Field(description="Main error message")
     code: str = Field(description="Error code")
-    errors: Optional[List[ErrorDetail]] = Field(
+    errors: list[ErrorDetail] | None = Field(
         default=None, description="Detailed errors (for validation)"
     )
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    request_id: Optional[str] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    request_id: str | None = None
 
     @classmethod
     def validation_error(
         cls,
-        errors: List[ErrorDetail],
-        request_id: Optional[str] = None,
+        errors: list[ErrorDetail],
+        request_id: str | None = None,
     ) -> "ErrorResponse":
         """Create a validation error response."""
         return cls(
@@ -200,7 +200,7 @@ class ErrorResponse(BaseModel):
         cls,
         resource: str,
         identifier: Any = None,
-        request_id: Optional[str] = None,
+        request_id: str | None = None,
     ) -> "ErrorResponse":
         """Create a not found error response."""
         msg = f"{resource} not found"
@@ -216,7 +216,7 @@ class ErrorResponse(BaseModel):
     def internal_error(
         cls,
         message: str = "Internal server error",
-        request_id: Optional[str] = None,
+        request_id: str | None = None,
     ) -> "ErrorResponse":
         """Create an internal error response."""
         return cls(
@@ -235,15 +235,15 @@ class HealthStatus(BaseModel):
     checks: dict[str, Any] = Field(
         default_factory=dict, description="Individual component checks"
     )
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # Export commonly used types
 __all__ = [
     "APIResponse",
+    "ErrorDetail",
+    "ErrorResponse",
+    "HealthStatus",
     "PaginatedResponse",
     "PaginationMeta",
-    "ErrorResponse",
-    "ErrorDetail",
-    "HealthStatus",
 ]

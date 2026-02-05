@@ -5,6 +5,7 @@ import os
 os.chdir(str(Path(__file__).resolve().parents[1]))
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pathlib import Path
@@ -51,7 +52,7 @@ print()
 # Find Trade 45
 if len(fb_result.trades) >= 45:
     t = fb_result.trades[44]  # 0-indexed
-    print(f"Trade 45:")
+    print("Trade 45:")
     print(f"  Direction: {t.direction}")
     print(f"  Entry price: {t.entry_price:.2f}")
     print(f"  Exit price: {t.exit_price:.2f}")

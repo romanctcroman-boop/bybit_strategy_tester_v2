@@ -5,6 +5,7 @@ import os
 os.chdir(str(Path(__file__).resolve().parents[1]))
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pathlib import Path
@@ -112,35 +113,35 @@ for j in range(t46_entry_bar, len(data)):
         t46_exit_bar = j
         break
 
-print(f"Trade 45 (SHORT):")
+print("Trade 45 (SHORT):")
 print(f"  Signal bar: {t45_signal_bar}")
 print(f"  Entry bar: {t45_entry_bar}")
 print(f"  Exit bar: {t45_exit_bar}")
 print()
-print(f"Trade 46 (LONG):")
+print("Trade 46 (LONG):")
 print(f"  Signal bar: {t46_signal_bar}")
 print(f"  Entry bar: {t46_entry_bar}")
 print(f"  Exit bar: {t46_exit_bar}")
 print()
 
 # Check if Trade 45 exit and Trade 46 signal overlap
-print(f"=== OVERLAP CHECK ===")
+print("=== OVERLAP CHECK ===")
 print(f"Trade 45 exits at bar {t45_exit_bar}")
 print(f"Trade 46 signal at bar {t46_signal_bar}")
 print(f"Trade 46 TP hits (exit) at bar {t46_exit_bar}")
 
 if t45_exit_bar is not None and t46_signal_bar is not None:
     if t45_exit_bar == t46_signal_bar:
-        print(f"\n*** OVERLAP: Trade 45 exit and Trade 46 signal on SAME bar! ***")
-        print(f"This means:")
+        print("\n*** OVERLAP: Trade 45 exit and Trade 46 signal on SAME bar! ***")
+        print("This means:")
         print(
             f"  1. At bar {t45_exit_bar}: SHORT TP hit detected, pending_short_exit=True, in_short=False"
         )
         print(
             f"  2. At bar {t45_exit_bar}: LONG signal exists, but need not in_long AND not in_short"
         )
-        print(f"  3. Wait... in_short was just set to False...")
+        print("  3. Wait... in_short was just set to False...")
     elif t45_exit_bar < t46_signal_bar:
-        print(f"\nTrade 45 exits before Trade 46 signal - sequential (OK)")
+        print("\nTrade 45 exits before Trade 46 signal - sequential (OK)")
     else:
-        print(f"\nTrade 45 exits after Trade 46 signal - overlapping positions!")
+        print("\nTrade 45 exits after Trade 46 signal - overlapping positions!")

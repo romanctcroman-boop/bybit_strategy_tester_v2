@@ -12,7 +12,7 @@ Usage:
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Query
@@ -42,13 +42,13 @@ class RegimeDetectionRequest(BaseModel):
     )
 
     # Optional custom thresholds
-    adx_trending_threshold: Optional[float] = Field(
+    adx_trending_threshold: float | None = Field(
         default=None, ge=10, le=50, description="ADX threshold for trending"
     )
-    adx_weak_threshold: Optional[float] = Field(
+    adx_weak_threshold: float | None = Field(
         default=None, ge=5, le=25, description="ADX threshold for ranging"
     )
-    bandwidth_squeeze: Optional[float] = Field(
+    bandwidth_squeeze: float | None = Field(
         default=None, ge=1, le=10, description="BB bandwidth squeeze threshold"
     )
 

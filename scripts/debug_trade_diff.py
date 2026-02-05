@@ -5,13 +5,14 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
+import logging
 import sqlite3
+
 import pandas as pd
 
-from backend.backtesting.models import BacktestConfig
 from backend.backtesting.engine import BacktestEngine
+from backend.backtesting.models import BacktestConfig
 
-import logging
 logging.getLogger("backend").setLevel(logging.WARNING)
 
 # Load data
@@ -43,6 +44,7 @@ config = BacktestConfig(**config_dict)
 engine = BacktestEngine()
 
 from backend.backtesting.strategies import get_strategy
+
 strategy = get_strategy(config.strategy_type)
 strategy.params = config.strategy_params
 strategy.direction = config.direction
@@ -60,7 +62,7 @@ for i, (t_vbt, t_fb) in enumerate(zip(result_vbt.trades, result_fb.trades)):
     print(f"\nTrade {i+1}:")
     print(f"  VBT: entry={t_vbt.entry_price:.2f}, exit={t_vbt.exit_price:.2f}, size={t_vbt.size:.6f}, pnl={t_vbt.pnl:.2f}, fees={t_vbt.fees:.4f}")
     print(f"  FB:  entry={t_fb.entry_price:.2f}, exit={t_fb.exit_price:.2f}, size={t_fb.size:.6f}, pnl={t_fb.pnl:.2f}, fees={t_fb.fees:.4f}")
-    
+
     if abs(t_vbt.entry_price - t_fb.entry_price) > 0.01:
         print(f"  ❌ Entry price diff: {t_vbt.entry_price - t_fb.entry_price:.6f}")
     if abs(t_vbt.exit_price - t_fb.exit_price) > 0.01:

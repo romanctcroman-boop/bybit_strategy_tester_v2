@@ -14,11 +14,15 @@ Usage:
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from backend.backtesting.interfaces import BacktestInput
+from backend.backtesting.portfolio_strategy import StrategyPortfolioBacktester
 from backend.services.advanced_backtesting.analytics import (
     analyze_backtest,
 )
@@ -67,9 +71,7 @@ class AdvancedBacktestRequest(BaseModel):
     candles: list[dict[str, Any]] = Field(..., description="Candle data")
 
     # Strategy
-    strategy_config: dict[str, Any] = Field(
-        default_factory=dict, description="Strategy configuration parameters"
-    )
+    strategy_config: dict[str, Any] = Field(default_factory=dict, description="Strategy configuration parameters")
 
     # Capital & Leverage
     initial_capital: float = Field(default=10000.0, gt=0)
@@ -81,12 +83,10 @@ class AdvancedBacktestRequest(BaseModel):
     taker_fee: float = Field(default=0.0006, ge=0, le=0.01)
 
     # Slippage
-    slippage_config: Optional[SlippageConfig] = None
+    slippage_config: SlippageConfig | None = None
 
     # Execution
-    fill_model: str = Field(
-        default="realistic", description="Fill model: instant, realistic, pessimistic"
-    )
+    fill_model: str = Field(default="realistic", description="Fill model: instant, realistic, pessimistic")
     partial_fills: bool = Field(default=True)
 
     # Risk
@@ -138,9 +138,9 @@ class PortfolioBacktestRequest(BaseModel):
     # Allocation
     allocation_method: str = Field(
         default="equal_weight",
-        description="Method: equal_weight, risk_parity, momentum, min_variance",
+        description="Method: equal_weight, risk_parity, momentum, min_variance, max_sharpe, cvxportfolio",
     )
-    custom_weights: Optional[dict[str, float]] = Field(
+    custom_weights: dict[str, float] | None = Field(
         default=None, description="Custom weights if allocation_method is custom"
     )
 
@@ -158,7 +158,7 @@ class PortfolioBacktestRequest(BaseModel):
 
     # Capital
     initial_capital: float = Field(default=10000.0, gt=0)
-    commission: float = Field(default=0.0006, ge=0, le=0.01)
+    commission: float = Field(default=0.0007, ge=0, le=0.01, description="0.07% TradingView parity")
 
     model_config = {
         "json_schema_extra": {
@@ -188,12 +188,55 @@ class PortfolioBacktestResponse(BaseModel):
     duration_seconds: float
 
 
+class StrategyPortfolioBacktestRequest(BaseModel):
+    """Request for strategy-based portfolio backtest (multi-asset RSI strategy)."""
+
+    asset_data: dict[str, list[dict[str, Any]]] = Field(
+        ..., description="Dictionary mapping asset symbols to candle lists"
+    )
+    allocation_method: str = Field(
+        default="equal_weight",
+        description="Method: equal_weight, risk_parity, momentum",
+    )
+    initial_capital: float = Field(default=10000.0, gt=0)
+    commission: float = Field(default=0.0007, ge=0, le=0.01)
+    interval: str = Field(default="60", description="Candle interval (1, 5, 15, 60, ...)")
+    position_size: float = Field(default=0.10, ge=0.01, le=1)
+    leverage: int = Field(default=10, ge=1, le=125)
+    stop_loss: float = Field(default=0.02, ge=0.001, le=0.5)
+    take_profit: float = Field(default=0.03, ge=0.001, le=1)
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "asset_data": {
+                    "BTCUSDT": [{"open": 50000, "high": 51000, "low": 49000, "close": 50500, "volume": 1000}],
+                    "ETHUSDT": [{"open": 3000, "high": 3050, "low": 2950, "close": 3020, "volume": 5000}],
+                },
+                "allocation_method": "equal_weight",
+                "initial_capital": 10000,
+            }
+        }
+    }
+
+
+class StrategyPortfolioBacktestResponse(BaseModel):
+    """Response from strategy portfolio backtest."""
+
+    status: str
+    per_asset: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    portfolio_metrics: dict[str, Any] = Field(default_factory=dict)
+    portfolio_equity_curve: list[float] = Field(default_factory=list)
+    all_trades: list[dict[str, Any]] = Field(default_factory=list)
+    correlation: dict[str, Any] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
+    duration_seconds: float = 0.0
+
+
 class AnalyzeBacktestRequest(BaseModel):
     """Request for backtest analysis."""
 
-    backtest_results: dict[str, Any] = Field(
-        ..., description="Backtest results to analyze"
-    )
+    backtest_results: dict[str, Any] = Field(..., description="Backtest results to analyze")
 
 
 class AnalyzeBacktestResponse(BaseModel):
@@ -210,10 +253,8 @@ class MetricsRequest(BaseModel):
     """Request for metrics calculation."""
 
     equity_curve: list[float] = Field(..., description="Portfolio value series")
-    trades: Optional[list[dict[str, Any]]] = Field(default=None)
-    benchmark_returns: Optional[list[float]] = Field(
-        default=None, description="Benchmark return series for comparison"
-    )
+    trades: list[dict[str, Any]] | None = Field(default=None)
+    benchmark_returns: list[float] | None = Field(default=None, description="Benchmark return series for comparison")
     benchmark_name: str = Field(default="Benchmark")
 
 
@@ -223,7 +264,7 @@ class MetricsResponse(BaseModel):
     risk_adjusted: dict[str, Any]
     rolling: dict[str, Any]
     trade_metrics: dict[str, Any]
-    benchmark_comparison: Optional[dict[str, Any]] = None
+    benchmark_comparison: dict[str, Any] | None = None
     calculated_at: str
 
 
@@ -235,7 +276,7 @@ class SlippageEstimateRequest(BaseModel):
     side: str = Field(..., description="buy or sell")
     volume: float = Field(default=1_000_000, gt=0)
     volatility: float = Field(default=0.02, ge=0, le=1)
-    slippage_config: Optional[SlippageConfig] = None
+    slippage_config: SlippageConfig | None = None
 
 
 class SlippageEstimateResponse(BaseModel):
@@ -293,7 +334,7 @@ async def run_advanced_backtest(
         engine = AdvancedBacktestEngine(config)
 
         # Define simple strategy runner from config
-        def strategy_func(candle: dict, state: dict) -> Optional[dict]:
+        def strategy_func(candle: dict, state: dict) -> dict | None:
             """Simple strategy based on config signals."""
             strategy_config = request.strategy_config
 
@@ -388,6 +429,82 @@ async def run_portfolio_backtest_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _candles_to_dataframe(candles: list[dict[str, Any]]) -> pd.DataFrame:
+    """Convert candle list to DataFrame with required columns."""
+    if not candles:
+        return pd.DataFrame(columns=["open", "high", "low", "close", "volume"])
+    df = pd.DataFrame(candles)
+    for col in ["open", "high", "low", "close", "volume"]:
+        if col not in df.columns:
+            df[col] = 0.0 if col != "volume" else 1.0
+    return df[["open", "high", "low", "close", "volume"]].copy()
+
+
+@router.post(
+    "/strategy-portfolio",
+    response_model=StrategyPortfolioBacktestResponse,
+)
+async def run_strategy_portfolio_backtest_endpoint(
+    request: StrategyPortfolioBacktestRequest,
+) -> StrategyPortfolioBacktestResponse:
+    """
+    Run multi-asset strategy portfolio backtest.
+
+    Runs RSI-based strategy on each asset with allocated capital,
+    then aggregates results into portfolio-level metrics.
+    """
+    try:
+        data = {symbol: _candles_to_dataframe(candles) for symbol, candles in request.asset_data.items()}
+        symbols = list(data.keys())
+        if len(symbols) < 1:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one asset required",
+            )
+
+        backtester = StrategyPortfolioBacktester(
+            symbols=symbols,
+            initial_capital=request.initial_capital,
+            commission=request.commission,
+        )
+        allocation = AssetAllocation(
+            method=AllocationMethod(request.allocation_method),
+        )
+        dummy_candles = data[symbols[0]].head(1)
+        template = BacktestInput(
+            candles=dummy_candles,
+            long_entries=dummy_candles["close"].values > 0,
+            long_exits=np.zeros(len(dummy_candles), dtype=bool),
+            short_entries=np.zeros(len(dummy_candles), dtype=bool),
+            short_exits=np.zeros(len(dummy_candles), dtype=bool),
+            symbol=symbols[0],
+            interval=request.interval,
+            initial_capital=request.initial_capital,
+            position_size=request.position_size,
+            leverage=request.leverage,
+            stop_loss=request.stop_loss,
+            take_profit=request.take_profit,
+        )
+        result = backtester.run(data, template, allocation)
+
+        return StrategyPortfolioBacktestResponse(
+            status=result.status,
+            per_asset=result.to_dict().get("per_asset", {}),
+            portfolio_metrics=result.portfolio_metrics.to_dict(),
+            portfolio_equity_curve=result.portfolio_equity_curve[-1000:],
+            all_trades=result.all_trades[-500:],
+            correlation=result.correlation.to_dict(),
+            config=result.config,
+            duration_seconds=result.duration_seconds,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Strategy portfolio backtest failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/analyze", response_model=AnalyzeBacktestResponse)
 async def analyze_backtest_endpoint(
     request: AnalyzeBacktestRequest,
@@ -409,9 +526,7 @@ async def analyze_backtest_endpoint(
             trade_analysis=report.get("trade_analysis", {}),
             performance_attribution=report.get("performance_attribution", {}),
             drawdown_analysis=report.get("drawdown_analysis", {}),
-            generated_at=report.get(
-                "generated_at", datetime.now(timezone.utc).isoformat()
-            ),
+            generated_at=report.get("generated_at", datetime.now(timezone.utc).isoformat()),
         )
 
     except Exception as e:
@@ -445,9 +560,7 @@ async def calculate_metrics_endpoint(
             rolling=result.get("rolling", {}),
             trade_metrics=result.get("trade_metrics", {}),
             benchmark_comparison=result.get("benchmark_comparison"),
-            calculated_at=result.get(
-                "calculated_at", datetime.now(timezone.utc).isoformat()
-            ),
+            calculated_at=result.get("calculated_at", datetime.now(timezone.utc).isoformat()),
         )
 
     except Exception as e:
@@ -567,6 +680,11 @@ async def list_allocation_methods() -> dict[str, Any]:
                 "id": "max_sharpe",
                 "name": "Maximum Sharpe",
                 "description": "Maximize risk-adjusted returns",
+            },
+            {
+                "id": "cvxportfolio",
+                "name": "Cvxportfolio",
+                "description": "Convex optimization (cvxpy), fallback to scipy",
             },
             {
                 "id": "custom",

@@ -142,7 +142,7 @@ class VectorbtGridOptimizer:
         take_profit_range: List[float],
         initial_capital: float = 10000.0,
         leverage: int = 1,
-        commission: float = 0.0006,
+        commission: float = 0.0007,  # 0.07% TradingView parity
         optimize_metric: str = "sharpe_ratio",
         direction: str = "long",
         weights: Optional[Dict[str, float]] = None,

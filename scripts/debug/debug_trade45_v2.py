@@ -5,10 +5,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
-from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
-
 # Load data
 tv_data_dir = Path("d:/TV")
 df = pd.read_csv(tv_data_dir / "BYBIT_BTCUSDT.P_15m_full.csv")
@@ -61,8 +57,8 @@ for i in range(exit_bar, 6525):
 
 # The key question: at bar 6502 when there's a long signal,
 # was Fallback still in position from trade 45?
-print(f"\n\n=== Position state analysis ===")
+print("\n\n=== Position state analysis ===")
 print(f"Trade 45 entry bar: {entry_bar}, exit bar: {exit_bar}")
-print(f"Long signal at bar 6502")
-print(f"Short signal at bar 6521")
+print("Long signal at bar 6502")
+print("Short signal at bar 6521")
 print(f"Is exit_bar <= 6502? {exit_bar} <= 6502 = {exit_bar <= 6502}")

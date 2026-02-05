@@ -57,19 +57,19 @@ def test_kelly_calculator():
     # Test with insufficient trades
     small_trades = create_sample_trades(10)
     size = kelly.calculate(small_trades, default_size=0.1)
-    print(f"\n1. Insufficient trades (10):")
+    print("\n1. Insufficient trades (10):")
     print(f"   Position size: {size:.1%} (should be default 10%)")
     assert abs(size - 0.1) < 0.001, "Should return default size"
 
     # Test with sufficient trades
     trades = create_sample_trades(100, win_rate=0.55)
     size = kelly.calculate(trades)
-    print(f"\n2. Sufficient trades (100, 55% win rate):")
+    print("\n2. Sufficient trades (100, 55% win rate):")
     print(f"   Calculated position size: {size:.1%}")
 
     # Get detailed stats
     stats = kelly.get_kelly_stats(trades)
-    print(f"\n3. Kelly Statistics:")
+    print("\n3. Kelly Statistics:")
     print(f"   Win Rate: {stats['win_rate']:.1%}")
     print(f"   Win/Loss Ratio: {stats['win_loss_ratio']:.2f}")
     print(f"   Full Kelly: {stats['full_kelly']:.1%}")
@@ -79,14 +79,14 @@ def test_kelly_calculator():
     # Test with high win rate
     high_wr_trades = create_sample_trades(100, win_rate=0.70)
     high_stats = kelly.get_kelly_stats(high_wr_trades)
-    print(f"\n4. High win rate (70%):")
+    print("\n4. High win rate (70%):")
     print(f"   Full Kelly: {high_stats['full_kelly']:.1%}")
     print(f"   Recommended: {high_stats['kelly_fraction']:.1%}")
 
     # Test with low win rate
     low_wr_trades = create_sample_trades(100, win_rate=0.40)
     low_stats = kelly.get_kelly_stats(low_wr_trades)
-    print(f"\n5. Low win rate (40%):")
+    print("\n5. Low win rate (40%):")
     print(f"   Full Kelly: {low_stats['full_kelly']:.1%}")
     print(f"   Recommended: {low_stats['kelly_fraction']:.1%}")
 
@@ -123,19 +123,19 @@ def test_monte_carlo():
         f"   95% CI: [{results['return_ci_lower']:.1%}, {results['return_ci_upper']:.1%}]"
     )
 
-    print(f"\n3. Risk Metrics:")
+    print("\n3. Risk Metrics:")
     print(f"   Mean Max Drawdown: {results['max_drawdown_mean']:.1%}")
     print(f"   Worst Max Drawdown: {results['max_drawdown_worst']:.1%}")
     print(f"   VaR (95%): {results['var_95']:.1%}")
     print(f"   CVaR (95%): {results['cvar_95']:.1%}")
 
-    print(f"\n4. Sharpe Ratio:")
+    print("\n4. Sharpe Ratio:")
     print(f"   Mean: {results['sharpe_mean']:.2f}")
     print(
         f"   95% CI: [{results['sharpe_ci_lower']:.2f}, {results['sharpe_ci_upper']:.2f}]"
     )
 
-    print(f"\n5. Probability Metrics:")
+    print("\n5. Probability Metrics:")
     print(f"   P(Profit): {results['probability_of_profit']:.1%}")
     print(f"   P(50% Return): {results['probability_of_target']:.1%}")
     print(f"   Risk of Ruin (>20% DD): {results['risk_of_ruin']:.1%}")

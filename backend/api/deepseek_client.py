@@ -14,8 +14,8 @@ from backend.reliability.retry_policy import is_http_error_retryable
 
 try:
     from backend.agents.circuit_breaker_manager import (
-        get_circuit_manager,
         CircuitBreakerError,
+        get_circuit_manager,
     )
 except Exception:  # pragma: no cover - optional in lightweight scripts
     get_circuit_manager = None  # type: ignore

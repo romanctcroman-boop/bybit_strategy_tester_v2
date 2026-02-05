@@ -6,12 +6,14 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import sqlite3
-from datetime import datetime
 
 print("=" * 120)
 print("🔬 АУДИТ ПАРИТЕТА: FallbackEngineV2 vs GPU vs VectorBT")
@@ -76,8 +78,8 @@ print("\n" + "=" * 80)
 print("🎯 ТЕСТ 1: FallbackEngineV2 (ЭТАЛОН)")
 print("=" * 80)
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 input_data = BacktestInput(
     candles=df,
@@ -119,7 +121,7 @@ REFERENCE = {
 }
 
 # ============================================================================
-# ТЕСТ 2: NumbaEngineV2 
+# ТЕСТ 2: NumbaEngineV2
 # ============================================================================
 print("\n" + "=" * 80)
 print("🚀 ТЕСТ 2: NumbaEngineV2")
@@ -134,13 +136,13 @@ def compare_to_reference(name, result):
     trades_match = len(result.trades) == REFERENCE["trades"]
     profit_match = abs(result.metrics.net_profit - REFERENCE["net_profit"]) < 0.01
     return_match = abs(result.metrics.total_return - REFERENCE["total_return"]) < 0.01
-    
+
     print(f"   Trades: {len(result.trades)} {'✅' if trades_match else '❌'} (ref: {REFERENCE['trades']})")
     print(f"   Net Profit: ${result.metrics.net_profit:,.2f} {'✅' if profit_match else '❌'} (ref: ${REFERENCE['net_profit']:,.2f})")
     print(f"   Total Return: {result.metrics.total_return:.4f}% {'✅' if return_match else '❌'}")
     print(f"   Win Rate: {result.metrics.win_rate:.4f}")
     print(f"   Sharpe Ratio: {result.metrics.sharpe_ratio:.4f}")
-    
+
     return trades_match and profit_match
 
 compare_to_reference("NumbaEngineV2", nb_result)
@@ -154,22 +156,22 @@ print("=" * 80)
 
 try:
     from backend.backtesting.gpu_optimizer import (
-        GPU_AVAILABLE, 
-        _fast_simulate_backtest,
+        GPU_AVAILABLE,
         NUMBA_AVAILABLE,
+        _fast_simulate_backtest,
     )
-    
+
     if NUMBA_AVAILABLE:
         print(f"   GPU Available: {GPU_AVAILABLE}")
         print(f"   Numba Available: {NUMBA_AVAILABLE}")
-        
+
         # Подготовим данные для GPU optimizer
         close = df['close'].values.astype(np.float64)
         high = df['high'].values.astype(np.float64)
         low = df['low'].values.astype(np.float64)
         entries = long_entries.astype(np.bool_)
         exits = long_exits.astype(np.bool_)
-        
+
         # Запустим симуляцию
         gpu_result = _fast_simulate_backtest(
             close=close,
@@ -184,30 +186,30 @@ try:
             slippage=TEST_CONFIG["slippage"],
             position_size=TEST_CONFIG["position_size"],
         )
-        
+
         # gpu_result возвращает: (final_equity, total_return, max_dd, num_trades, win_rate)
-        print(f"\n   GPU Result:")
+        print("\n   GPU Result:")
         print(f"   Final Equity: ${gpu_result[0]:,.2f}")
         print(f"   Total Return: {gpu_result[1]:.4f}%")
         print(f"   Max Drawdown: {gpu_result[2]:.4f}%")
         print(f"   Num Trades: {gpu_result[3]}")
         print(f"   Win Rate: {gpu_result[4]:.4f}")
-        
+
         # Сравнение с эталоном
         gpu_net_profit = gpu_result[0] - TEST_CONFIG["initial_capital"]
         profit_match = abs(gpu_net_profit - REFERENCE["net_profit"]) < 0.01
         trades_match = gpu_result[3] == REFERENCE["trades"]
-        
-        print(f"\n   Сравнение с эталоном:")
+
+        print("\n   Сравнение с эталоном:")
         print(f"   Net Profit: ${gpu_net_profit:,.2f} {'✅' if profit_match else '❌'} (ref: ${REFERENCE['net_profit']:,.2f})")
         print(f"   Trades: {gpu_result[3]} {'✅' if trades_match else '❌'} (ref: {REFERENCE['trades']})")
-        
+
         if not profit_match:
             diff = gpu_net_profit - REFERENCE["net_profit"]
             print(f"   ⚠️ РАСХОЖДЕНИЕ: ${diff:,.2f} ({diff/abs(REFERENCE['net_profit'])*100:.2f}%)")
     else:
         print("   ⚠️ Numba не доступен для GPU optimizer")
-        
+
 except Exception as e:
     print(f"   ❌ Ошибка: {e}")
 
@@ -221,10 +223,10 @@ print("=" * 80)
 try:
     import vectorbt as vbt
     print(f"   VectorBT version: {vbt.__version__}")
-    
+
     # Используем vectorbt_sltp для более честного сравнения
     from backend.backtesting.vectorbt_sltp import run_vectorbt_with_sltp
-    
+
     # Подготовим конфиг
     vbt_config = {
         "initial_capital": TEST_CONFIG["initial_capital"],
@@ -235,7 +237,7 @@ try:
         "slippage": TEST_CONFIG["slippage"],
         "direction": "both",
     }
-    
+
     # Подготовим сигналы
     signals = {
         "long_entry": pd.Series(long_entries, index=df.index),
@@ -243,28 +245,28 @@ try:
         "short_entry": pd.Series(short_entries, index=df.index),
         "short_exit": pd.Series(short_exits, index=df.index),
     }
-    
+
     vbt_result = run_vectorbt_with_sltp(df, signals, vbt_config)
-    
-    print(f"\n   VectorBT Result:")
+
+    print("\n   VectorBT Result:")
     print(f"   Final Equity: ${vbt_result.get('final_equity', 0):,.2f}")
     print(f"   Net Profit: ${vbt_result.get('net_profit', 0):,.2f}")
     print(f"   Total Return: {vbt_result.get('total_return', 0):.4f}%")
     print(f"   Num Trades: {vbt_result.get('total_trades', 0)}")
-    
+
     # Сравнение с эталоном
     vbt_profit = vbt_result.get('net_profit', 0)
     profit_match = abs(vbt_profit - REFERENCE["net_profit"]) < 0.01
     trades_match = vbt_result.get('total_trades', 0) == REFERENCE["trades"]
-    
-    print(f"\n   Сравнение с эталоном:")
+
+    print("\n   Сравнение с эталоном:")
     print(f"   Net Profit: ${vbt_profit:,.2f} {'✅' if profit_match else '❌'} (ref: ${REFERENCE['net_profit']:,.2f})")
     print(f"   Trades: {vbt_result.get('total_trades', 0)} {'✅' if trades_match else '❌'} (ref: {REFERENCE['trades']})")
-    
+
     if not profit_match:
         diff = vbt_profit - REFERENCE["net_profit"]
         print(f"   ⚠️ РАСХОЖДЕНИЕ: ${diff:,.2f}")
-        
+
 except ImportError:
     print("   ⚠️ VectorBT не установлен")
 except Exception as e:

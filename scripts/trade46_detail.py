@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
 """Find Trade 46 entry bar discrepancy."""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # Load data
 ohlc = pd.read_csv('d:/TV/BYBIT_BTCUSDT.P_15m_full.csv')
@@ -13,9 +13,9 @@ ohlc['timestamp'] = pd.to_datetime(ohlc['timestamp'], utc=True).dt.tz_localize(N
 long_signals = np.load('d:/TV/long_signals.npy')
 short_signals = np.load('d:/TV/short_signals.npy')
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 candles = ohlc.reset_index(drop=True)
 input_data = BacktestInput(
@@ -36,15 +36,15 @@ t2 = r2.trades[45]  # Trade 46 (0-indexed)
 t3 = r3.trades[45]
 
 print("Trade 46 comparison:")
-print(f"\n=== V2 ===")
+print("\n=== V2 ===")
 print(f"  entry_time: {t2.entry_time}")
-print(f"  exit_time: {t2.exit_time}")  
+print(f"  exit_time: {t2.exit_time}")
 print(f"  entry_price: {t2.entry_price:.2f}")
 print(f"  exit_price: {t2.exit_price:.2f}")
 print(f"  exit_reason: {t2.exit_reason}")
 print(f"  duration_bars: {t2.duration_bars}")
 
-print(f"\n=== V3 ===")
+print("\n=== V3 ===")
 print(f"  entry_time: {t3.entry_time}")
 print(f"  exit_time: {t3.exit_time}")
 print(f"  entry_price: {t3.entry_price:.2f}")

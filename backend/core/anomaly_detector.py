@@ -21,10 +21,11 @@ import json
 import logging
 import statistics
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Protocol
 from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
@@ -63,13 +64,13 @@ class Anomaly:
     strategy_id: str
     metric_name: str
     current_value: float
-    expected_range: Tuple[float, float]
+    expected_range: tuple[float, float]
     deviation_score: float  # Z-score or similar
     description: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     acknowledged: bool = False
-    acknowledged_at: Optional[datetime] = None
-    acknowledged_by: Optional[str] = None
+    acknowledged_at: datetime | None = None
+    acknowledged_by: str | None = None
 
 
 @dataclass
@@ -87,10 +88,10 @@ class MetricWindow:
         if not hasattr(self.timestamps, "maxlen") or self.timestamps.maxlen != self.window_size:
             self.timestamps = deque(self.timestamps, maxlen=self.window_size)
 
-    def add(self, value: float, timestamp: Optional[datetime] = None) -> None:
+    def add(self, value: float, timestamp: datetime | None = None) -> None:
         """Add value to window."""
         self.values.append(value)
-        self.timestamps.append(timestamp or datetime.now(timezone.utc))
+        self.timestamps.append(timestamp or datetime.now(UTC))
 
     def mean(self) -> float:
         """Calculate mean."""
@@ -110,7 +111,7 @@ class MetricWindow:
             return 0.0
         return statistics.median(self.values)
 
-    def iqr(self) -> Tuple[float, float, float]:
+    def iqr(self) -> tuple[float, float, float]:
         """Calculate IQR (Q1, median, Q3)."""
         if len(self.values) < 4:
             return (0.0, 0.0, 0.0)
@@ -276,8 +277,8 @@ class LogAlertNotifier:
 class CompositeAlertNotifier:
     """Combines multiple alert notifiers."""
 
-    def __init__(self, notifiers: List[AlertNotifier] = None):
-        self.notifiers: List[AlertNotifier] = notifiers or []
+    def __init__(self, notifiers: list[AlertNotifier] = None):
+        self.notifiers: list[AlertNotifier] = notifiers or []
 
     def add_notifier(self, notifier: AlertNotifier) -> None:
         """Add a notifier to the composite."""
@@ -317,10 +318,10 @@ class AnomalyDetector:
 
     def __init__(
         self,
-        thresholds: Optional[AnomalyThresholds] = None,
+        thresholds: AnomalyThresholds | None = None,
         window_size: int = 100,
-        on_anomaly: Optional[Callable[[Anomaly], None]] = None,
-        alert_notifier: Optional[AlertNotifier] = None,
+        on_anomaly: Callable[[Anomaly], None] | None = None,
+        alert_notifier: AlertNotifier | None = None,
     ):
         self.thresholds = thresholds or AnomalyThresholds()
         self.window_size = window_size
@@ -330,13 +331,13 @@ class AnomalyDetector:
         self.alert_notifier = alert_notifier or LogAlertNotifier()
 
         # Per-strategy metric windows
-        self._strategy_metrics: Dict[str, Dict[str, MetricWindow]] = {}
+        self._strategy_metrics: dict[str, dict[str, MetricWindow]] = {}
 
         # Detected anomalies
-        self._anomalies: Dict[str, List[Anomaly]] = {}
+        self._anomalies: dict[str, list[Anomaly]] = {}
 
         # Consecutive loss tracking
-        self._consecutive_losses: Dict[str, int] = {}
+        self._consecutive_losses: dict[str, int] = {}
 
         # Anomaly counter for IDs
         self._anomaly_counter = 0
@@ -362,8 +363,8 @@ class AnomalyDetector:
         strategy_id: str,
         metric_name: str,
         value: float,
-        timestamp: Optional[datetime] = None,
-    ) -> Optional[Anomaly]:
+        timestamp: datetime | None = None,
+    ) -> Anomaly | None:
         """
         Record a metric value and check for anomalies.
 
@@ -413,7 +414,7 @@ class AnomalyDetector:
 
         return anomaly
 
-    def record_trade_result(self, strategy_id: str, is_win: bool) -> Optional[Anomaly]:
+    def record_trade_result(self, strategy_id: str, is_win: bool) -> Anomaly | None:
         """Record trade result and check for consecutive losses."""
         if strategy_id not in self._consecutive_losses:
             self._consecutive_losses[strategy_id] = 0
@@ -465,7 +466,7 @@ class AnomalyDetector:
 
     def _check_anomaly(
         self, strategy_id: str, metric_name: str, value: float, window: MetricWindow
-    ) -> Optional[Anomaly]:
+    ) -> Anomaly | None:
         """Check if value is anomalous."""
 
         # Need enough data for statistics
@@ -510,7 +511,7 @@ class AnomalyDetector:
 
     def _check_metric_specific_thresholds(
         self, metric_name: str, value: float, window: MetricWindow
-    ) -> Optional[AnomalySeverity]:
+    ) -> AnomalySeverity | None:
         """Check metric-specific thresholds."""
 
         if metric_name == "drawdown":
@@ -564,10 +565,10 @@ class AnomalyDetector:
         severity: AnomalySeverity,
         metric_name: str,
         current_value: float,
-        expected_range: Tuple[float, float],
+        expected_range: tuple[float, float],
         deviation_score: float,
         description: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Anomaly:
         """Create anomaly instance."""
         self._anomaly_counter += 1
@@ -576,7 +577,7 @@ class AnomalyDetector:
             anomaly_id=f"ANM-{self._anomaly_counter:06d}",
             anomaly_type=anomaly_type,
             severity=severity,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             strategy_id=strategy_id,
             metric_name=metric_name,
             current_value=current_value,
@@ -588,11 +589,11 @@ class AnomalyDetector:
 
     def get_anomalies(
         self,
-        strategy_id: Optional[str] = None,
-        severity: Optional[AnomalySeverity] = None,
-        since: Optional[datetime] = None,
+        strategy_id: str | None = None,
+        severity: AnomalySeverity | None = None,
+        since: datetime | None = None,
         unacknowledged_only: bool = False,
-    ) -> List[Anomaly]:
+    ) -> list[Anomaly]:
         """Get detected anomalies with filters."""
 
         if strategy_id:
@@ -620,7 +621,7 @@ class AnomalyDetector:
             for anomaly in anomalies:
                 if anomaly.anomaly_id == anomaly_id:
                     anomaly.acknowledged = True
-                    anomaly.acknowledged_at = datetime.now(timezone.utc)
+                    anomaly.acknowledged_at = datetime.now(UTC)
                     anomaly.acknowledged_by = acknowledged_by
 
                     try:
@@ -633,7 +634,7 @@ class AnomalyDetector:
                     return True
         return False
 
-    def get_strategy_health(self, strategy_id: str) -> Dict[str, Any]:
+    def get_strategy_health(self, strategy_id: str) -> dict[str, Any]:
         """Get overall health status for a strategy."""
         if strategy_id not in self._strategy_metrics:
             return {"status": "unknown", "strategy_id": strategy_id}
@@ -678,7 +679,7 @@ class AnomalyDetector:
 
     def cleanup_old_anomalies(self, max_age_hours: int = 24) -> int:
         """Remove old acknowledged anomalies."""
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
         removed = 0
 
         for strategy_id in self._anomalies:
@@ -698,7 +699,7 @@ class AnomalyDetector:
 # SINGLETON INSTANCE
 # =============================================================================
 
-_detector_instance: Optional[AnomalyDetector] = None
+_detector_instance: AnomalyDetector | None = None
 
 
 def get_anomaly_detector() -> AnomalyDetector:

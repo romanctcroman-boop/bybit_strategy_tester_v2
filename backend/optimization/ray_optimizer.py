@@ -5,9 +5,10 @@ Based on Goldman Sachs and industry best practices 2024-2026
 """
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -28,7 +29,7 @@ from loguru import logger
 class ParallelOptimizationResult:
     """Result container for parallel optimization"""
 
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_value: float
     total_combinations: int
     completed_combinations: int
@@ -36,13 +37,13 @@ class ParallelOptimizationResult:
     execution_time_seconds: float
 
     # All results
-    all_results: List[Dict[str, Any]] = field(default_factory=list)
+    all_results: list[dict[str, Any]] = field(default_factory=list)
 
     # Top N results
     top_n: int = 10
-    top_results: List[Dict[str, Any]] = field(default_factory=list)
+    top_results: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "best_params": self.best_params,
             "best_value": round(self.best_value, 6),
@@ -70,9 +71,9 @@ class RayParallelOptimizer:
 
     def __init__(
         self,
-        num_cpus: Optional[int] = None,
+        num_cpus: int | None = None,
         num_gpus: int = 0,
-        memory_per_worker: Optional[int] = None,
+        memory_per_worker: int | None = None,
         dashboard: bool = False,
     ):
         """
@@ -118,7 +119,7 @@ class RayParallelOptimizer:
 
     def parallel_backtest(
         self,
-        configs: List[Dict[str, Any]],
+        configs: list[dict[str, Any]],
         backtest_fn: Callable,
         data,
         metric: str = "sharpe_ratio",
@@ -248,11 +249,11 @@ class RayParallelOptimizer:
         self,
         data,
         strategy_class,
-        param_space: Dict[str, Any],
-        walk_forward_config: Dict[str, int],
+        param_space: dict[str, Any],
+        walk_forward_config: dict[str, int],
         optimizer_fn: Callable,
         backtest_fn: Callable,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Parallel walk-forward optimization.
 
@@ -363,7 +364,7 @@ class MultiprocessingOptimizer:
     Used when Ray is not available.
     """
 
-    def __init__(self, n_workers: Optional[int] = None):
+    def __init__(self, n_workers: int | None = None):
         """
         Initialize multiprocessing optimizer.
 
@@ -376,7 +377,7 @@ class MultiprocessingOptimizer:
 
     def parallel_backtest(
         self,
-        configs: List[Dict[str, Any]],
+        configs: list[dict[str, Any]],
         backtest_fn: Callable,
         data,
         metric: str = "sharpe_ratio",

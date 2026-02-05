@@ -1,5 +1,6 @@
 """Quick validation test for new agent modules"""
 import sys
+
 sys.path.insert(0, '.')
 
 print("=" * 60)
@@ -21,7 +22,7 @@ def test(name, fn):
 
 # Test 1: MCP Protocol
 def test_mcp():
-    from backend.agents.mcp.protocol import MCPServer, MCPMessage, MCPResource
+    from backend.agents.mcp.protocol import MCPMessage, MCPResource, MCPServer
     server = MCPServer("test")
     msg = MCPMessage.request("tools/list")
     assert msg.id is not None
@@ -30,22 +31,22 @@ def test_mcp():
 
 test("MCP Protocol", test_mcp)
 
-# Test 2: Tool Registry  
+# Test 2: Tool Registry
 def test_tool_registry():
-    from backend.agents.mcp.tool_registry import ToolRegistry, Tool
+    from backend.agents.mcp.tool_registry import ToolRegistry
     registry = ToolRegistry()
-    
+
     @registry.register(category="test")
     def my_tool(x: int) -> int:
         return x * 2
-    
+
     assert "my_tool" in registry.tools
 
 test("Tool Registry", test_tool_registry)
 
 # Test 3: Resource Manager
 def test_resource_manager():
-    from backend.agents.mcp.resource_manager import ResourceManager, MemoryResourceProvider
+    from backend.agents.mcp.resource_manager import MemoryResourceProvider, ResourceManager
     manager = ResourceManager()
     provider = MemoryResourceProvider()
     provider.add_resource("memory://test", "Test", "content")
@@ -66,9 +67,7 @@ test("Context Manager", test_context_manager)
 
 # Test 5: LLM Connections
 def test_llm():
-    from backend.agents.llm.connections import (
-        LLMProvider, LLMMessage, LLMResponse, LLMConfig, RateLimiter
-    )
+    from backend.agents.llm.connections import LLMConfig, LLMMessage, LLMProvider
     msg = LLMMessage(role="user", content="Hello")
     config = LLMConfig(provider=LLMProvider.DEEPSEEK, api_key="test")
     assert config.temperature == 0.7
@@ -77,19 +76,17 @@ test("LLM Connections", test_llm)
 
 # Test 6: Shared Memory
 def test_shared_memory():
-    from backend.agents.memory.shared_memory import (
-        SharedMemory, SharedValue, Transaction, ConflictResolution
-    )
-    
+    from backend.agents.memory.shared_memory import ConflictResolution, SharedMemory, SharedValue, Transaction
+
     # Just test the classes can be instantiated
     mem = SharedMemory()
     assert mem is not None
     assert mem.conflict_resolution == ConflictResolution.LAST_WRITE_WINS
-    
+
     # Test SharedValue
     sv = SharedValue(value="test", version=1)
     assert sv.value == "test"
-    
+
     # Test Transaction
     tx = Transaction(agent_id="agent1")
     tx.set("key", "value")
@@ -99,13 +96,11 @@ test("Shared Memory", test_shared_memory)
 
 # Test 7: Communication Protocol
 def test_communication():
-    from backend.agents.communication.protocol import (
-        MessageBroker, Message, AgentInfo
-    )
+    from backend.agents.communication.protocol import AgentInfo, Message, MessageBroker
     broker = MessageBroker()
     broker.register_agent(AgentInfo("agent1", "test"))
     assert len(broker.list_agents()) == 1
-    
+
     msg = Message(sender_id="a1", topic="test", payload={"x": 1})
     assert msg.id is not None
 
@@ -114,15 +109,16 @@ test("Communication Protocol", test_communication)
 # Test 8: ML Anomaly (basic)
 def test_ml_anomaly_basic():
     import numpy as np
-    from backend.agents.monitoring.ml_anomaly import ZScoreDetector, IQRDetector
-    
+
+    from backend.agents.monitoring.ml_anomaly import IQRDetector, ZScoreDetector
+
     data = np.array([100, 101, 99, 102, 100, 98])
-    
+
     zscore = ZScoreDetector(threshold=3.0)
     zscore.fit(data)
     scores = zscore.score(data)
     assert len(scores) == len(data)
-    
+
     iqr = IQRDetector()
     iqr.fit(data)
     detections = iqr.detect(data)
@@ -133,11 +129,12 @@ test("ML Anomaly Detection (Basic)", test_ml_anomaly_basic)
 # Test 9: Prometheus/Grafana
 def test_prometheus():
     from backend.agents.monitoring.prometheus_grafana import (
-        PrometheusConfig, GrafanaConfig, GrafanaDashboard, create_ai_agent_dashboard
+        PrometheusConfig,
+        create_ai_agent_dashboard,
     )
     config = PrometheusConfig()
     assert config.namespace == "ai_agent"
-    
+
     dashboard = create_ai_agent_dashboard()
     assert len(dashboard.panels) > 0
 
@@ -145,10 +142,10 @@ test("Prometheus/Grafana", test_prometheus)
 
 # Test 10: Dashboard API Models
 def test_dashboard_api():
-    from backend.agents.dashboard.api import MetricQuery, AlertCreate
+    from backend.agents.dashboard.api import AlertCreate, MetricQuery
     query = MetricQuery(metric_name="test")
     assert query.aggregation == "avg"
-    
+
     alert = AlertCreate(name="test", metric_name="m", condition="gt", threshold=100)
     assert alert.severity == "warning"
 

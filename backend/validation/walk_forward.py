@@ -4,13 +4,14 @@ Implements the "gold standard" in trading strategy validation
 Based on world best practices 2024-2026
 """
 
-import numpy as np
-import pandas as pd
-from typing import Dict, Any, List, Callable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
+import numpy as np
+import pandas as pd
 from loguru import logger
 
 
@@ -34,7 +35,7 @@ class WalkForwardPeriod:
     out_of_sample_end: datetime
 
     # Optimized parameters
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
 
     # Performance metrics
     in_sample_sharpe: float
@@ -83,12 +84,12 @@ class WalkForwardResult:
     robustness_score: float  # 0-100 score
 
     # Individual periods
-    periods: List[WalkForwardPeriod] = field(default_factory=list)
+    periods: list[WalkForwardPeriod] = field(default_factory=list)
 
     # Best overall parameters (most frequent or highest scoring)
-    recommended_params: Dict[str, Any] = field(default_factory=dict)
+    recommended_params: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "strategy_name": self.strategy_name,
             "validation_status": self.validation_status.value,
@@ -153,7 +154,7 @@ class WalkForwardValidator:
         strategy_class,
         optimizer: Callable,
         backtest_fn: Callable,
-        param_space: Dict[str, Any],
+        param_space: dict[str, Any],
         strategy_name: str = "Strategy",
     ) -> WalkForwardResult:
         """
@@ -271,7 +272,7 @@ class WalkForwardValidator:
         return self._analyze_results(periods, strategy_name)
 
     def _analyze_results(
-        self, periods: List[WalkForwardPeriod], strategy_name: str
+        self, periods: list[WalkForwardPeriod], strategy_name: str
     ) -> WalkForwardResult:
         """Analyze walk-forward results and determine robustness"""
 
@@ -378,8 +379,8 @@ class WalkForwardValidator:
         return min(100, max(0, score))
 
     def _find_recommended_params(
-        self, periods: List[WalkForwardPeriod]
-    ) -> Dict[str, Any]:
+        self, periods: list[WalkForwardPeriod]
+    ) -> dict[str, Any]:
         """Find recommended parameters from successful periods"""
         if not periods:
             return {}
@@ -477,8 +478,8 @@ class MonteCarloValidator:
         self.n_simulations = n_simulations
 
     def validate_trade_order(
-        self, trades: List, initial_capital: float, confidence: float = 0.95
-    ) -> Dict[str, Any]:
+        self, trades: list, initial_capital: float, confidence: float = 0.95
+    ) -> dict[str, Any]:
         """
         Test if strategy results are dependent on trade order.
 

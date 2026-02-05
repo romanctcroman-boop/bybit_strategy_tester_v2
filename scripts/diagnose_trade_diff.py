@@ -4,12 +4,12 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
-from datetime import datetime
+
+import pandas as pd
 
 print("=" * 100)
 print("🔍 ДИАГНОСТИКА РАСХОЖДЕНИЯ: Fallback (59) vs Numba (58) trades")
@@ -56,9 +56,9 @@ print(f"Long entries: {long_entries.sum()}, Short entries: {short_entries.sum()}
 # ============================================================================
 # ЗАПУСК ДВИЖКОВ И СБОР СДЕЛОК
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 input_data = BacktestInput(
     candles=df_1h,
@@ -101,9 +101,9 @@ print(f"Numba: {len(nb_result.trades)} сделок")
 print(f"Разница: {len(fb_result.trades) - len(nb_result.trades)} сделок")
 
 # Создадим таблицы для сравнения
-fb_trades = [(t.entry_time, t.direction, t.entry_price, t.exit_price, t.pnl, t.exit_reason.name) 
+fb_trades = [(t.entry_time, t.direction, t.entry_price, t.exit_price, t.pnl, t.exit_reason.name)
              for t in fb_result.trades]
-nb_trades = [(t.entry_time, t.direction, t.entry_price, t.exit_price, t.pnl, t.exit_reason.name) 
+nb_trades = [(t.entry_time, t.direction, t.entry_price, t.exit_price, t.pnl, t.exit_reason.name)
              for t in nb_result.trades]
 
 print("\n" + "-" * 100)
@@ -111,14 +111,14 @@ print("FALLBACK TRADES (первые 10):")
 print("-" * 100)
 print(f"{'#':<3} {'Entry Time':<22} {'Dir':<6} {'Entry Price':>12} {'Exit Price':>12} {'PnL':>12} {'Reason':<12}")
 for i, t in enumerate(fb_trades[:10]):
-    print(f"{i+1:<3} {str(t[0]):<22} {t[1]:<6} {t[2]:>12.2f} {t[3]:>12.2f} {t[4]:>12.2f} {t[5]:<12}")
+    print(f"{i+1:<3} {t[0]!s:<22} {t[1]:<6} {t[2]:>12.2f} {t[3]:>12.2f} {t[4]:>12.2f} {t[5]:<12}")
 
 print("\n" + "-" * 100)
 print("NUMBA TRADES (первые 10):")
 print("-" * 100)
 print(f"{'#':<3} {'Entry Time':<22} {'Dir':<6} {'Entry Price':>12} {'Exit Price':>12} {'PnL':>12} {'Reason':<12}")
 for i, t in enumerate(nb_trades[:10]):
-    print(f"{i+1:<3} {str(t[0]):<22} {t[1]:<6} {t[2]:>12.2f} {t[3]:>12.2f} {t[4]:>12.2f} {t[5]:<12}")
+    print(f"{i+1:<3} {t[0]!s:<22} {t[1]:<6} {t[2]:>12.2f} {t[3]:>12.2f} {t[4]:>12.2f} {t[5]:<12}")
 
 # ============================================================================
 # НАЙТИ ОТЛИЧАЮЩУЮСЯ СДЕЛКУ
@@ -159,11 +159,11 @@ diffs = []
 for time in sorted(common_times):
     fb_t = fb_by_time[time]
     nb_t = nb_by_time[time]
-    
+
     pnl_diff = abs(fb_t[4] - nb_t[4])
     entry_diff = abs(fb_t[2] - nb_t[2])
     exit_diff = abs(fb_t[3] - nb_t[3])
-    
+
     if pnl_diff > 0.01 or entry_diff > 0.01 or exit_diff > 0.01:
         diffs.append((time, fb_t, nb_t, pnl_diff))
 

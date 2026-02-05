@@ -11,8 +11,8 @@ Provides endpoints to check:
 """
 
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response, status
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -61,7 +61,7 @@ def startup_probe():
     return {"status": "ok"}
 
 
-@router.get("", response_model=Dict[str, Any])
+@router.get("", response_model=dict[str, Any])
 async def health_check():
     """
     Overall health check.
@@ -157,7 +157,7 @@ async def health_check():
     # Build response
     response = {
         "status": overall_status,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "checks": checks,
         "config": {
             "cache_enabled": config.CACHE_ENABLED,
@@ -173,7 +173,7 @@ async def health_check():
     return response
 
 
-@router.get("/bybit", response_model=Dict[str, Any])
+@router.get("/bybit", response_model=dict[str, Any])
 async def bybit_health():
     """
     Detailed Bybit API health check.
@@ -214,7 +214,7 @@ async def bybit_health():
     success_rate = (successful / total) * 100 if total > 0 else 0
 
     return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "success_rate": round(success_rate, 2),
         "successful": successful,
         "total": total,
@@ -249,7 +249,7 @@ async def readiness_check():
             not_ready_reasons.append("Bybit API not responding with data")
     except Exception as e:
         checks["bybit_api"] = False
-        not_ready_reasons.append(f"Bybit API error: {str(e)}")
+        not_ready_reasons.append(f"Bybit API error: {e!s}")
 
     # 2. Check Redis connectivity (for circuit breaker persistence)
     try:
@@ -263,7 +263,7 @@ async def readiness_check():
             checks["redis"] = None  # Not enabled
     except Exception as e:
         checks["redis"] = False
-        not_ready_reasons.append(f"Redis connection failed: {str(e)}")
+        not_ready_reasons.append(f"Redis connection failed: {e!s}")
 
     # 3. Check agent config loaded
     try:
@@ -273,7 +273,7 @@ async def readiness_check():
         checks["agent_config"] = cfg.meta.version >= 1
     except Exception as e:
         checks["agent_config"] = False
-        not_ready_reasons.append(f"Agent config not loaded: {str(e)}")
+        not_ready_reasons.append(f"Agent config not loaded: {e!s}")
 
     # 4. Check circuit breakers initialized
     try:
@@ -285,7 +285,7 @@ async def readiness_check():
             not_ready_reasons.append("No circuit breakers registered")
     except Exception as e:
         checks["circuit_breakers"] = False
-        not_ready_reasons.append(f"Circuit breaker manager error: {str(e)}")
+        not_ready_reasons.append(f"Circuit breaker manager error: {e!s}")
 
     # Determine overall readiness
     critical_checks = ["bybit_api", "agent_config", "circuit_breakers"]
@@ -300,14 +300,14 @@ async def readiness_check():
                 "status": "not_ready",
                 "checks": checks,
                 "reasons": not_ready_reasons,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
 
     return {
         "status": "ready",
         "checks": checks,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -320,11 +320,11 @@ async def liveness_check():
     """
     return {
         "status": "alive",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
-@router.get("/db_pool", response_model=Dict[str, Any])
+@router.get("/db_pool", response_model=dict[str, Any])
 async def database_pool_status():
     """
     Week 1, Day 3: Database connection pool monitoring.
@@ -356,7 +356,7 @@ async def database_pool_status():
         leak_detected = monitor.check_connection_leaks()
 
         response = {
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "pool_status": statistics,
             "recommendations": recommendations,
             "leak_detected": leak_detected,
@@ -380,7 +380,7 @@ async def database_pool_status():
         raise
     except Exception as e:
         logger.error("Failed to get DB pool status", extra={"error": str(e)})
-        raise HTTPException(status_code=500, detail=f"Failed to get DB pool status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get DB pool status: {e!s}")
 
 
 @router.get("/metrics")
@@ -406,10 +406,10 @@ async def metrics_endpoint():
         return Response(content=metrics_output, media_type=CONTENT_TYPE_LATEST)
     except Exception as e:
         logger.error("Failed to generate metrics", extra={"error": str(e)})
-        raise HTTPException(status_code=500, detail=f"Failed to generate metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate metrics: {e!s}")
 
 
-@router.get("/phase2", response_model=Dict[str, Any])
+@router.get("/phase2", response_model=dict[str, Any])
 async def phase2_status():
     """
     Phase 2 deployment status endpoint.
@@ -460,7 +460,7 @@ async def phase2_status():
         except Exception as e:
             config_status = {
                 "yaml_loaded": False,
-                "error": f"Config not loaded or file missing: {str(e)}",
+                "error": f"Config not loaded or file missing: {e!s}",
             }
 
         # Build response
@@ -491,7 +491,7 @@ async def phase2_status():
 
     except Exception as e:
         logger.error("Failed to get Phase 2 status", extra={"error": str(e)})
-        raise HTTPException(status_code=500, detail=f"Failed to get Phase 2 status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get Phase 2 status: {e!s}")
 
 
 # =============================================================================
@@ -499,7 +499,7 @@ async def phase2_status():
 # =============================================================================
 
 
-@router.get("/database", response_model=Dict[str, Any])
+@router.get("/database", response_model=dict[str, Any])
 async def database_health():
     """
     Detailed database health check.
@@ -521,10 +521,10 @@ async def database_health():
 
     except Exception as e:
         logger.error("Database health check failed", extra={"error": str(e)})
-        raise HTTPException(status_code=500, detail=f"Database health check failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database health check failed: {e!s}")
 
 
-@router.get("/database/metrics", response_model=Dict[str, Any])
+@router.get("/database/metrics", response_model=dict[str, Any])
 async def database_metrics():
     """
     Get database metrics as JSON.
@@ -542,7 +542,7 @@ async def database_metrics():
 
     except Exception as e:
         logger.error("Failed to get database metrics", extra={"error": str(e)})
-        raise HTTPException(status_code=500, detail=f"Failed to get database metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get database metrics: {e!s}")
 
 
 @router.get("/database/metrics/prometheus")
@@ -562,7 +562,7 @@ async def database_metrics_prometheus():
 
     except Exception as e:
         logger.error("Failed to get Prometheus metrics", extra={"error": str(e)})
-        raise HTTPException(status_code=500, detail=f"Failed to get Prometheus metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get Prometheus metrics: {e!s}")
 
 
 # =============================================================================
@@ -570,7 +570,7 @@ async def database_metrics_prometheus():
 # =============================================================================
 
 
-@router.get("/comprehensive", response_model=Dict[str, Any])
+@router.get("/comprehensive", response_model=dict[str, Any])
 async def comprehensive_health_check():
     """
     Comprehensive system health check.
@@ -615,11 +615,11 @@ async def comprehensive_health_check():
         logger.error("Comprehensive health check failed", extra={"error": str(e)})
         raise HTTPException(
             status_code=500,
-            detail=f"Comprehensive health check failed: {str(e)}",
+            detail=f"Comprehensive health check failed: {e!s}",
         )
 
 
-@router.get("/comprehensive/{component}", response_model=Dict[str, Any])
+@router.get("/comprehensive/{component}", response_model=dict[str, Any])
 async def component_health_check(component: str):
     """
     Check health of a specific component.
@@ -660,5 +660,5 @@ async def component_health_check(component: str):
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Component health check failed: {str(e)}",
+            detail=f"Component health check failed: {e!s}",
         )

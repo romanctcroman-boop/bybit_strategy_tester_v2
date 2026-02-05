@@ -3,12 +3,14 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
+from dataclasses import fields
 
 import numpy as np
 import pandas as pd
-import sqlite3
-from dataclasses import fields
 
 print("=" * 100)
 print("📊 ВСЕ 147 МЕТРИК СО ЗНАЧЕНИЯМИ")
@@ -44,10 +46,10 @@ long_exits = (rsi > 70).values
 short_entries = (rsi > 70).values
 short_exits = (rsi < 30).values
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection, BacktestMetrics
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
+from backend.backtesting.interfaces import BacktestInput, BacktestMetrics, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator, ExtendedMetricsResult
-from backend.core.metrics_calculator import TradeMetrics, RiskMetrics, LongShortMetrics, MetricsCalculator
+from backend.core.metrics_calculator import LongShortMetrics, MetricsCalculator, RiskMetrics, TradeMetrics
 
 input_data = BacktestInput(
     candles=df,
@@ -90,7 +92,7 @@ total = 0
 
 # === BacktestMetrics ===
 print(f"\n{'='*60}")
-print(f"📂 BacktestMetrics (32 метрик)")
+print("📂 BacktestMetrics (32 метрик)")
 print(f"{'='*60}")
 for f in fields(BacktestMetrics):
     if not f.name.startswith('_'):
@@ -108,7 +110,7 @@ for f in fields(BacktestMetrics):
 
 # === ExtendedMetrics ===
 print(f"\n{'='*60}")
-print(f"📂 ExtendedMetrics (14 метрик)")
+print("📂 ExtendedMetrics (14 метрик)")
 print(f"{'='*60}")
 for f in fields(ExtendedMetricsResult):
     if not f.name.startswith('_'):
@@ -123,7 +125,7 @@ for f in fields(ExtendedMetricsResult):
 
 # === TradeMetrics ===
 print(f"\n{'='*60}")
-print(f"📂 TradeMetrics (26 метрик)")
+print("📂 TradeMetrics (26 метрик)")
 print(f"{'='*60}")
 for f in fields(TradeMetrics):
     if not f.name.startswith('_'):
@@ -141,7 +143,7 @@ for f in fields(TradeMetrics):
 
 # === RiskMetrics ===
 print(f"\n{'='*60}")
-print(f"📂 RiskMetrics (21 метрик)")
+print("📂 RiskMetrics (21 метрик)")
 print(f"{'='*60}")
 for f in fields(RiskMetrics):
     if not f.name.startswith('_'):
@@ -159,7 +161,7 @@ for f in fields(RiskMetrics):
 
 # === LongShortMetrics ===
 print(f"\n{'='*60}")
-print(f"📂 LongShortMetrics (54 метрик)")
+print("📂 LongShortMetrics (54 метрик)")
 print(f"{'='*60}")
 for f in fields(LongShortMetrics):
     if not f.name.startswith('_'):
@@ -177,12 +179,12 @@ for f in fields(LongShortMetrics):
 
 # === ИТОГО ===
 print(f"\n{'='*100}")
-print(f"📊 ФИНАЛЬНЫЙ ИТОГ")
+print("📊 ФИНАЛЬНЫЙ ИТОГ")
 print(f"{'='*100}")
 print(f"   Всего метрик проверено:   {total}")
 print(f"   Ненулевых значений:       {non_zero} ({non_zero/total*100:.1f}%)")
 print(f"   Нулевых/None:             {total - non_zero}")
 
 if non_zero >= 120:
-    print(f"\n   🎉 БОЛЕЕ 120 МЕТРИК ИМЕЮТ РЕАЛЬНЫЕ НЕНУЛЕВЫЕ ЗНАЧЕНИЯ!")
+    print("\n   🎉 БОЛЕЕ 120 МЕТРИК ИМЕЮТ РЕАЛЬНЫЕ НЕНУЛЕВЫЕ ЗНАЧЕНИЯ!")
 print("=" * 100)

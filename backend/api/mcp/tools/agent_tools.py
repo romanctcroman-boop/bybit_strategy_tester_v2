@@ -9,7 +9,6 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Dict, List
 
 from backend.agents.agent_to_agent_communicator import (
     AgentMessage,
@@ -18,10 +17,10 @@ from backend.agents.agent_to_agent_communicator import (
     get_communicator,
 )
 from backend.api.mcp.circuit_breaker import (
-    CircuitBreaker,
-    mcp_semaphore,
     CB_THRESHOLD,
     CB_TIMEOUT,
+    CircuitBreaker,
+    mcp_semaphore,
 )
 from backend.api.mcp_errors import (
     AgentUnavailableError,
@@ -46,7 +45,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # Per-tool circuit breakers
-_circuit_breakers: Dict[str, CircuitBreaker] = {
+_circuit_breakers: dict[str, CircuitBreaker] = {
     "send_to_deepseek": CircuitBreaker(CB_THRESHOLD, CB_TIMEOUT),
     "send_to_perplexity": CircuitBreaker(CB_THRESHOLD, CB_TIMEOUT),
     "get_consensus": CircuitBreaker(CB_THRESHOLD, CB_TIMEOUT),
@@ -206,7 +205,7 @@ async def send_to_perplexity(
         return mcp_error.to_dict()
 
 
-async def get_consensus(question: str, agents: List[str] = None) -> dict:
+async def get_consensus(question: str, agents: list[str] = None) -> dict:
     """
     Get consensus from multiple agents.
 
@@ -295,8 +294,8 @@ def register_agent_tools(mcp):
 
 
 __all__ = [
-    "send_to_deepseek",
-    "send_to_perplexity",
     "get_consensus",
     "register_agent_tools",
+    "send_to_deepseek",
+    "send_to_perplexity",
 ]

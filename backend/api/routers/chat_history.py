@@ -16,9 +16,8 @@ Endpoints:
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -59,8 +58,8 @@ class ConversationMessage(BaseModel):
 
     role: str = Field(..., description="'user' or 'assistant'")
     content: str = Field(..., description="Message content")
-    reasoning: Optional[str] = Field(None, description="DeepSeek thinking/reasoning")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    reasoning: str | None = Field(None, description="DeepSeek thinking/reasoning")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ConversationCreate(BaseModel):
@@ -68,20 +67,20 @@ class ConversationCreate(BaseModel):
 
     prompt: str = Field(..., min_length=1, max_length=10000)
     response: str = Field(..., min_length=1)
-    reasoning: Optional[str] = Field(None, description="DeepSeek thinking output")
+    reasoning: str | None = Field(None, description="DeepSeek thinking output")
     tab: ChatTab = Field(default=ChatTab.STRATEGY)
     agent: AgentType = Field(default=AgentType.DEEPSEEK)
-    timestamp: Optional[int] = Field(None, description="Client timestamp (ms)")
+    timestamp: int | None = Field(None, description="Client timestamp (ms)")
 
 
 class ConversationUpdate(BaseModel):
     """Update existing conversation"""
 
-    prompt: Optional[str] = Field(None, min_length=1, max_length=10000)
-    response: Optional[str] = Field(None)
-    tab: Optional[ChatTab] = None
-    starred: Optional[bool] = None
-    title: Optional[str] = Field(None, max_length=200)
+    prompt: str | None = Field(None, min_length=1, max_length=10000)
+    response: str | None = Field(None)
+    tab: ChatTab | None = None
+    starred: bool | None = None
+    title: str | None = Field(None, max_length=200)
 
 
 class ConversationResponse(BaseModel):
@@ -90,10 +89,10 @@ class ConversationResponse(BaseModel):
     id: str
     prompt: str
     response: str
-    reasoning: Optional[str] = None
+    reasoning: str | None = None
     tab: ChatTab
     agent: AgentType
-    title: Optional[str] = None
+    title: str | None = None
     starred: bool = False
     created_at: datetime
     updated_at: datetime
@@ -144,10 +143,10 @@ def _generate_title(prompt: str) -> str:
 async def list_conversations(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    tab: Optional[ChatTab] = Query(None, description="Filter by tab"),
-    starred: Optional[bool] = Query(None, description="Filter starred only"),
-    search: Optional[str] = Query(None, description="Search in prompts", alias="q"),
-    days: Optional[int] = Query(None, ge=1, le=365, description="Last N days"),
+    tab: ChatTab | None = Query(None, description="Filter by tab"),
+    starred: bool | None = Query(None, description="Filter starred only"),
+    search: str | None = Query(None, description="Search in prompts", alias="q"),
+    days: int | None = Query(None, ge=1, le=365, description="Last N days"),
     db: Session = Depends(get_db),
 ) -> ConversationListResponse:
     """List conversation history with pagination and filters (DB-backed)."""
@@ -170,7 +169,7 @@ async def list_conversations(
             )
 
         if days:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+            cutoff = datetime.now(UTC) - timedelta(days=days)
             query = query.filter(ChatConversation.created_at >= cutoff)
 
         total = query.count()
@@ -238,9 +237,9 @@ async def create_conversation(
 ) -> ConversationResponse:
     """Save new conversation to persistent store."""
     try:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         created_at = (
-            datetime.fromtimestamp(data.timestamp / 1000, tz=timezone.utc)
+            datetime.fromtimestamp(data.timestamp / 1000, tz=UTC)
             if data.timestamp
             else now
         )
@@ -307,7 +306,7 @@ async def update_conversation(
     if data.title is not None:
         conversation.title = data.title
 
-    conversation.updated_at = datetime.now(timezone.utc)
+    conversation.updated_at = datetime.now(UTC)
 
     db.add(conversation)
     db.commit()
@@ -388,9 +387,9 @@ async def sync_conversations(
 
         for conv in data.conversations:
             try:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 created_at = (
-                    datetime.fromtimestamp(conv.timestamp / 1000, tz=timezone.utc)
+                    datetime.fromtimestamp(conv.timestamp / 1000, tz=UTC)
                     if conv.timestamp
                     else now
                 )
@@ -412,7 +411,7 @@ async def sync_conversations(
                 synced += 1
 
             except Exception as e:
-                errors.append(f"Failed to sync conversation: {str(e)}")
+                errors.append(f"Failed to sync conversation: {e!s}")
                 skipped += 1
 
         db.commit()

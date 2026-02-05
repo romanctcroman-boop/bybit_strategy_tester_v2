@@ -248,7 +248,6 @@ class TestCPUFallback:
 
     def test_cpu_rsi_calculation(self):
         """Test CPU RSI calculation works."""
-        from backend.backtesting.gpu_optimizer import NUMBA_AVAILABLE
 
         # Simple RSI test
         prices = np.array(

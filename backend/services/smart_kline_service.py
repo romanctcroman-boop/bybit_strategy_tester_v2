@@ -22,8 +22,8 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from datetime import UTC, datetime
+from typing import Any, Optional
 
 from backend.config.database_policy import (
     DATA_START_TIMESTAMP_MS,
@@ -95,9 +95,9 @@ class LoadingProgress:
     status: str = "pending"  # pending, loading, completed, failed
     total_candles: int = 0
     loaded_candles: int = 0
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    error: Optional[str] = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    error: str | None = None
 
     @property
     def progress_percent(self) -> float:
@@ -111,11 +111,11 @@ class SymbolState:
     """State of a loaded symbol."""
 
     symbol: str
-    loaded_intervals: Set[str] = field(default_factory=set)
-    db_coverage: Dict[str, tuple] = field(
+    loaded_intervals: set[str] = field(default_factory=set)
+    db_coverage: dict[str, tuple] = field(
         default_factory=dict
     )  # interval -> (oldest, newest)
-    last_update: Optional[datetime] = None
+    last_update: datetime | None = None
     is_primary: bool = False  # If this is the main selected symbol
 
 
@@ -140,18 +140,18 @@ class SmartKlineService:
     # Retention constants now imported from backend.config.database_policy
 
     def __init__(self):
-        self._ram_cache: Dict[str, List[Dict]] = {}  # key -> candles
-        self._symbol_states: Dict[str, SymbolState] = {}
-        self._loading_progress: Dict[str, LoadingProgress] = {}
+        self._ram_cache: dict[str, list[dict]] = {}  # key -> candles
+        self._symbol_states: dict[str, SymbolState] = {}
+        self._loading_progress: dict[str, LoadingProgress] = {}
         self._executor = ThreadPoolExecutor(max_workers=3)
-        self._update_task: Optional[asyncio.Task] = None
-        self._repair_task: Optional[asyncio.Task] = None
+        self._update_task: asyncio.Task | None = None
+        self._repair_task: asyncio.Task | None = None
         self._running = False
         self._adapter = None
         self._db_service = None
         self._quality_service = None  # DataQualityService for anomaly detection
-        self._last_repair_check: Optional[datetime] = None
-        self._last_retention_check: Optional[datetime] = None
+        self._last_repair_check: datetime | None = None
+        self._last_retention_check: datetime | None = None
         logger.info("SmartKlineService initialized")
 
     @classmethod
@@ -291,7 +291,7 @@ class SmartKlineService:
         limit: int = 500,
         from_db: bool = False,
         force_fresh: bool = False,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Get candles for display. Returns last `limit` candles.
 
@@ -317,10 +317,10 @@ class SmartKlineService:
         # Calculate freshness threshold (1x interval - strict to avoid price gaps)
         # This ensures chart data stays current
         interval_ms = self._interval_to_ms(interval)
-        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        now_ms = int(datetime.now(UTC).timestamp() * 1000)
         freshness_threshold = now_ms - interval_ms  # 1x interval tolerance
 
-        def is_fresh(candles: List[Dict]) -> bool:
+        def is_fresh(candles: list[dict]) -> bool:
             """Check if last candle is fresh enough."""
             if not candles:
                 return False
@@ -364,7 +364,7 @@ class SmartKlineService:
 
     def get_historical_candles(
         self, symbol: str, interval: str, end_time: int, limit: int = 200
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Get historical candles before a specific time.
         Used for infinite scroll.
@@ -419,7 +419,7 @@ class SmartKlineService:
         primary_interval: str,
         load_history: bool = True,
         load_adjacent: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Initialize a symbol for trading.
 
@@ -531,7 +531,7 @@ class SmartKlineService:
             symbol=symbol,
             interval=interval,
             total_candles=target_candles,
-            start_time=datetime.now(timezone.utc),
+            start_time=datetime.now(UTC),
             status="loading",
         )
         self._loading_progress[key] = progress
@@ -586,7 +586,7 @@ class SmartKlineService:
             progress.status = "failed"
             progress.error = str(e)
         finally:
-            progress.end_time = datetime.now(timezone.utc)
+            progress.end_time = datetime.now(UTC)
 
     async def _auto_repair_gaps(
         self, symbol: str, interval: str, max_gaps: int = 20
@@ -650,7 +650,7 @@ class SmartKlineService:
 
         Runs every REPAIR_INTERVAL_HOURS hours.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Check if it's time to run repair
         if self._last_repair_check is not None:
@@ -703,7 +703,7 @@ class SmartKlineService:
 
         Runs monthly (every RETENTION_CHECK_DAYS).
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Check if it's time to run retention cleanup
         if self._last_retention_check is not None:
@@ -769,10 +769,10 @@ class SmartKlineService:
 
                     min_ts, max_ts = result
                     min_date = datetime.utcfromtimestamp(min_ts / 1000).replace(
-                        tzinfo=timezone.utc
+                        tzinfo=UTC
                     )
                     max_date = datetime.utcfromtimestamp(max_ts / 1000).replace(
-                        tzinfo=timezone.utc
+                        tzinfo=UTC
                     )
                     period_days = (max_date - min_date).days
 
@@ -840,7 +840,7 @@ class SmartKlineService:
                 return
 
             newest_in_db = result
-            now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+            now_ms = int(datetime.now(UTC).timestamp() * 1000)
 
             # Get interval in ms
             interval_ms_map = {
@@ -888,7 +888,7 @@ class SmartKlineService:
         except Exception as e:
             logger.error(f"Freshness check failed for {symbol}:{interval}: {e}")
 
-    def get_loading_status(self) -> Dict[str, Any]:
+    def get_loading_status(self) -> dict[str, Any]:
         """Get status of all loading operations."""
         return {
             key: {
@@ -907,7 +907,7 @@ class SmartKlineService:
     # Database Operations (Using Repository Pattern)
     # =========================================================================
 
-    def _load_from_db(self, symbol: str, interval: str, limit: int = 500) -> List[Dict]:
+    def _load_from_db(self, symbol: str, interval: str, limit: int = 500) -> list[dict]:
         """
         Load candles from database using Repository pattern.
 
@@ -959,7 +959,7 @@ class SmartKlineService:
 
     def _load_from_db_before(
         self, symbol: str, interval: str, end_time: int, limit: int = 200
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Load historical candles from database before a specific time.
 
@@ -1011,7 +1011,7 @@ class SmartKlineService:
             logger.error(f"DB load before error: {e}")
             return []
 
-    def _get_db_coverage(self, symbol: str, interval: str) -> Optional[tuple]:
+    def _get_db_coverage(self, symbol: str, interval: str) -> tuple | None:
         """
         Get DB coverage info: (oldest_time, newest_time, count).
 
@@ -1053,7 +1053,7 @@ class SmartKlineService:
             logger.error(f"DB coverage check error: {e}")
             return None
 
-    def _persist_to_db(self, symbol: str, interval: str, candles: List[Dict]):
+    def _persist_to_db(self, symbol: str, interval: str, candles: list[dict]):
         """Persist candles to database using KlineDBService queue."""
         if not candles:
             return
@@ -1072,7 +1072,7 @@ class SmartKlineService:
 
         # Fallback to direct database insert
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             from backend.database import SessionLocal
             from backend.models.bybit_kline_audit import BybitKlineAudit
@@ -1125,7 +1125,7 @@ class SmartKlineService:
                         interval=interval,
                         open_time=open_time,
                         open_time_dt=datetime.fromtimestamp(
-                            open_time / 1000, tz=timezone.utc
+                            open_time / 1000, tz=UTC
                         ),
                         open_price=float(candle.get("open", 0)),
                         high_price=float(candle.get("high", 0)),
@@ -1146,7 +1146,7 @@ class SmartKlineService:
 
     def _fetch_from_api(
         self, symbol: str, interval: str, limit: int = 500
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Fetch candles from Bybit API."""
         try:
             adapter = self._get_adapter()
@@ -1161,7 +1161,7 @@ class SmartKlineService:
         interval: str,
         limit: int = 500,
         persist: bool = True,
-    ) -> Dict[str, List[Dict]]:
+    ) -> dict[str, list[dict]]:
         """
         Fetch candles from BOTH SPOT and LINEAR markets in parallel.
 
@@ -1282,11 +1282,11 @@ class SmartKlineService:
                             existing.sort(key=lambda x: x.get("open_time", 0))
                             self._ram_cache[key] = existing[-self.RAM_LIMIT :]
 
-                        state.last_update = datetime.now(timezone.utc)
+                        state.last_update = datetime.now(UTC)
                 except Exception as e:
                     logger.warning(f"Update failed for {symbol}:{interval}: {e}")
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get service status."""
         return {
             "running": self._running,

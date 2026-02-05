@@ -255,6 +255,36 @@ async def _warmup_cache():
         logger.info("SmartKline cache warmup skipped: %s", e)
 
 
+async def _preload_symbols_list(app: "FastAPI"):
+    """Preload Bybit symbols list (linear + spot) for Properties Symbol dropdown."""
+    await asyncio.sleep(3)  # Let server start
+    try:
+        from backend.services.adapters.bybit import BybitAdapter
+
+        adapter = BybitAdapter(
+            api_key=os.environ.get("BYBIT_API_KEY"),
+            api_secret=os.environ.get("BYBIT_API_SECRET"),
+        )
+        loop = asyncio.get_event_loop()
+        linear = await loop.run_in_executor(
+            None, lambda: adapter.get_symbols_list(category="linear", trading_only=True)
+        )
+        spot = await loop.run_in_executor(None, lambda: adapter.get_symbols_list(category="spot", trading_only=True))
+        if not hasattr(app.state, "symbols_cache"):
+            app.state.symbols_cache = {}
+        app.state.symbols_cache["linear"] = linear or []
+        app.state.symbols_cache["spot"] = spot or []
+        logger.info(
+            "[TICKERS] Preloaded symbols: linear=%s, spot=%s",
+            len(app.state.symbols_cache.get("linear", [])),
+            len(app.state.symbols_cache.get("spot", [])),
+        )
+    except Exception as e:
+        logger.warning("Tickers preload skipped: %s", e)
+        if not hasattr(app.state, "symbols_cache"):
+            app.state.symbols_cache = {}
+
+
 async def _refresh_daily_data_background():
     """Refresh daily candle data for all symbols in background."""
     await asyncio.sleep(5)  # Wait for server to fully start
@@ -342,8 +372,7 @@ async def _shutdown_config_watcher(app: "FastAPI"):
     cw = getattr(app.state, "config_watcher", None)
     if cw:
         try:
-            cw.stop()
-            cw.join(timeout=2)
+            cw.stop()  # stop() already includes thread join internally
             logger.info("🛑 Config watcher stopped")
         except Exception as e:
             logger.warning("⚠️ Config watcher shutdown error: %s", e)
@@ -355,7 +384,14 @@ async def _shutdown_plugin_manager(app: "FastAPI"):
     if pm:
         try:
             logger.info("🔌 Shutting down Plugin Manager...")
-            await pm.unload_all_plugins()
+            # Plugin manager cleanup - check for available methods
+            if hasattr(pm, "unload_all_plugins"):
+                await pm.unload_all_plugins()
+            elif hasattr(pm, "stop"):
+                await pm.stop()
+            elif hasattr(pm, "shutdown"):
+                await pm.shutdown()
+            logger.info("🔌 Plugin Manager shut down")
         except Exception as e:
             logger.warning("⚠️ Plugin Manager shutdown error: %s", e)
 
@@ -412,6 +448,10 @@ async def lifespan(app: "FastAPI"):
     """
     CONFIG = get_config()
 
+    # Cache for Bybit tickers (linear/spot), filled by _preload_symbols_list
+    if not hasattr(app.state, "symbols_cache"):
+        app.state.symbols_cache = {}
+
     # =========================================================================
     # STARTUP
     # =========================================================================
@@ -455,6 +495,9 @@ async def lifespan(app: "FastAPI"):
 
     # Start background daily data refresh
     asyncio.create_task(_refresh_daily_data_background())
+
+    # Preload Bybit tickers list for Properties Symbol dropdown (linear + spot)
+    asyncio.create_task(_preload_symbols_list(app))
 
     # Start WebSocket manager
     await _start_websocket_manager(app, CONFIG)

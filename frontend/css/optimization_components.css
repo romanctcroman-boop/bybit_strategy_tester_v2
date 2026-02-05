@@ -929,3 +929,198 @@
   white-space: nowrap !important;
   border: 0 !important;
 }
+
+/* ============================================
+   RESULTS TABLE ENHANCEMENTS
+   ============================================ */
+
+/* Results table styling */
+.opt-results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.opt-results-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-bg-tertiary);
+}
+
+.opt-results-table th {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.opt-results-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+
+.opt-results-table th.sortable:hover {
+  background: var(--color-bg-card-hover);
+  color: var(--color-text-primary);
+}
+
+.opt-results-table th.sortable.active {
+  color: var(--color-accent);
+}
+
+.opt-results-table th.sortable::after {
+  content: "";
+  display: inline-block;
+  margin-left: 4px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.3;
+  vertical-align: middle;
+}
+
+.opt-results-table th.sortable.active::after {
+  opacity: 1;
+}
+
+.opt-results-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.opt-results-table tbody tr:hover {
+  background: var(--color-bg-card-hover);
+}
+
+.opt-results-table tbody tr.selected {
+  background: rgba(88, 166, 255, 0.1);
+  border-left: 3px solid var(--color-accent);
+}
+
+.opt-results-table tbody tr.best {
+  background: rgba(63, 185, 80, 0.08);
+}
+
+.opt-results-table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+/* Rank badges */
+.opt-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.opt-rank-badge.rank-1 {
+  background: linear-gradient(135deg, #ffd700, #ffed4a);
+  color: #000;
+}
+
+.opt-rank-badge.rank-2 {
+  background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+  color: #000;
+}
+
+.opt-rank-badge.rank-3 {
+  background: linear-gradient(135deg, #cd7f32, #daa520);
+  color: #fff;
+}
+
+.opt-rank-badge.rank-other {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+/* Metric value styling */
+.opt-metric-value {
+  font-family: var(--font-family-mono);
+}
+
+.opt-metric-value.positive {
+  color: var(--color-success);
+}
+
+.opt-metric-value.negative {
+  color: var(--color-danger);
+}
+
+/* ============================================
+   LOADING & EMPTY STATES
+   ============================================ */
+
+.opt-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.opt-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.opt-empty-state i {
+  font-size: 3rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.opt-empty-state-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.opt-empty-state-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ============================================
+   COMPARISON MODAL
+   ============================================ */
+
+.opt-comparison-table {
+  width: 100%;
+}
+
+.opt-comparison-table th,
+.opt-comparison-table td {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+}
+
+.opt-comparison-table th {
+  background: var(--color-bg-tertiary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.opt-comparison-highlight {
+  background: rgba(63, 185, 80, 0.15);
+}

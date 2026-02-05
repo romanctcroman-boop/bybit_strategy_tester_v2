@@ -2,8 +2,9 @@
 🔬 Test: What if TradingView uses oversold=25?
 """
 import sqlite3
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 project_root = Path(__file__).resolve().parent.parent
 DB_PATH = project_root / "data.sqlite3"
@@ -44,11 +45,11 @@ region = df[mask]
 
 for i, row in region.iterrows():
     rsi = row['rsi']
-    
+
     # Check thresholds
     below_30 = "◀─ Below 30" if rsi < 30 else ""
     below_25 = "◀─ Below 25!" if rsi < 25 else ""
-    
+
     print(f"{row['datetime']} | RSI: {rsi:.4f} {below_30} {below_25}")
 
 print("\n" + "="*60)
@@ -76,17 +77,17 @@ if not key_bar.empty:
     row = key_bar.iloc[0]
     idx = key_bar.index[0]
     prev_row = df.iloc[idx - 1]
-    
+
     print(f"Previous bar (10:00): RSI = {prev_row['rsi']:.4f}")
     print(f"Current bar (10:15):  RSI = {row['rsi']:.4f}")
     print()
-    print(f"Crossover check:")
+    print("Crossover check:")
     print(f"  prev_rsi <= 30: {prev_row['rsi']:.4f} <= 30 = {prev_row['rsi'] <= 30}")
     print(f"  curr_rsi >  30: {row['rsi']:.4f} > 30 = {row['rsi'] > 30}")
     print()
     print(f"  prev_rsi <= 25: {prev_row['rsi']:.4f} <= 25 = {prev_row['rsi'] <= 25}")
     print(f"  curr_rsi >  25: {row['rsi']:.4f} > 25 = {row['rsi'] > 25}")
     print()
-    print(f"Result:")
+    print("Result:")
     print(f"  With oversold=30: {'LONG SIGNAL!' if prev_row['rsi'] <= 30 and row['rsi'] > 30 else 'No signal'}")
     print(f"  With oversold=25: {'LONG SIGNAL!' if prev_row['rsi'] <= 25 and row['rsi'] > 25 else 'No signal'}")

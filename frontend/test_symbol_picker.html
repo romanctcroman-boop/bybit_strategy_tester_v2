@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Symbol Picker Test</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        background: #1a1a2e;
+        color: #fff;
+      }
+      .symbol-picker {
+        position: relative;
+        width: 300px;
+      }
+      .property-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #444;
+        border-radius: 4px;
+        background: #2d2d44;
+        color: #fff;
+      }
+      .symbol-picker-dropdown {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 100%;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        max-height: 220px;
+        overflow-y: auto;
+        background: #2d2d44;
+        border: 1px solid #444;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        z-index: 9999;
+        display: none;
+      }
+      .symbol-picker-dropdown.open {
+        display: block;
+        margin-top: 4px;
+      }
+      .symbol-picker-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #444;
+      }
+      .symbol-picker-item:hover {
+        background: #58a6ff;
+        color: #fff;
+      }
+      .symbol-picker-item.symbol-picker-message {
+        cursor: default;
+        color: #888;
+        font-style: italic;
+      }
+      .property-select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #444;
+        border-radius: 4px;
+        background: #2d2d44;
+        color: #fff;
+      }
+      .result {
+        margin-top: 20px;
+        padding: 10px;
+        background: #2d2d44;
+        border-radius: 4px;
+      }
+      .log {
+        margin-top: 20px;
+        padding: 10px;
+        background: #1a1a1a;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .market-type-container {
+        margin-bottom: 20px;
+      }
+      .market-type-select {
+        width: 200px;
+      }
+      .refresh-btn {
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Symbol Picker Test</h1>
+
+    <div class="market-type-container">
+      <label for="builderMarketType">Market Type:</label>
+      <select
+        id="builderMarketType"
+        class="property-select market-type-select"
+        title="Select market type for trading"
+        aria-label="Market Type"
+      >
+        <option value="linear" selected>Futures (LINEAR)</option>
+        <option value="spot">SPOT</option>
+      </select>
+    </div>
+
+    <div class="symbol-picker">
+      <input
+        type="text"
+        class="property-input"
+        id="backtestSymbol"
+        autocomplete="off"
+        placeholder="Поиск тикера..."
+        value="BTCUSDT"
+      />
+      <ul class="symbol-picker-dropdown" id="backtestSymbolDropdown"></ul>
+    </div>
+
+    <button onclick="refreshSymbols()" class="refresh-btn">
+      Обновить список
+    </button>
+
+    <div id="result" class="result">Waiting...</div>
+
+    <div id="log" class="log"></div>
+
+    <script>
+      // Simple symbol picker implementation for testing
+      let bybitSymbolsCache = { linear: [], spot: [] };
+
+      function log(msg) {
+        const logEl = document.getElementById("log");
+        const time = new Date().toLocaleTimeString();
+        logEl.innerHTML = `[${time}] ${msg}<br>` + logEl.innerHTML;
+        console.log(msg);
+      }
+
+      async function fetchBybitSymbols(category) {
+        const key = category === "spot" ? "spot" : "linear";
+        log(`fetchBybitSymbols(${key})`);
+
+        if (bybitSymbolsCache[key] && bybitSymbolsCache[key].length > 0) {
+          log(`Returning from cache: ${bybitSymbolsCache[key].length} symbols`);
+          return bybitSymbolsCache[key];
+        }
+
+        try {
+          const url = `/api/v1/marketdata/symbols-list?category=${key}`;
+          log(`Fetching: ${url}`);
+          const res = await fetch(url);
+          log(`Response status: ${res.status}`);
+
+          if (!res.ok) {
+            log(`Fetch not ok: ${res.statusText}`);
+            return [];
+          }
+
+          const data = await res.json();
+          const list = data.symbols || [];
+          log(`Received ${list.length} symbols`);
+
+          bybitSymbolsCache[key] = Array.isArray(list) ? list : [];
+          document.getElementById("result").innerHTML =
+            `Loaded ${list.length} symbols for ${key}. First 5: ${list.slice(0, 5).join(", ")}`;
+          return bybitSymbolsCache[key];
+        } catch (e) {
+          log(`Error: ${e.message}`);
+          return [];
+        }
+      }
+
+      function showSymbolDropdown(query) {
+        const dropdown = document.getElementById("backtestSymbolDropdown");
+        const marketEl = document.getElementById("builderMarketType");
+        const category = marketEl.value === "spot" ? "spot" : "linear";
+        const list = bybitSymbolsCache[category] || [];
+
+        log(`showSymbolDropdown(${query}), list size: ${list.length}`);
+
+        if (list.length === 0) {
+          dropdown.innerHTML =
+            '<li class="symbol-picker-item symbol-picker-message">Нет данных</li>';
+          dropdown.classList.add("open");
+          return;
+        }
+
+        const q = (query || "").toUpperCase().trim();
+        const filtered = q
+          ? list.filter((s) => s.toUpperCase().includes(q))
+          : list;
+
+        log(`Filtered: ${filtered.length} symbols`);
+
+        const items = filtered
+          .slice(0, 100)
+          .map(
+            (s) =>
+              `<li class="symbol-picker-item" data-symbol="${s}">${s}</li>`,
+          )
+          .join("");
+
+        dropdown.innerHTML =
+          items ||
+          '<li class="symbol-picker-item symbol-picker-message">Нет совпадений</li>';
+        dropdown.classList.add("open");
+      }
+
+      function hideDropdown() {
+        document
+          .getElementById("backtestSymbolDropdown")
+          .classList.remove("open");
+      }
+
+      async function refreshSymbols() {
+        bybitSymbolsCache = { linear: [], spot: [] };
+        const marketEl = document.getElementById("builderMarketType");
+        await fetchBybitSymbols(marketEl.value);
+        showSymbolDropdown(document.getElementById("backtestSymbol").value);
+      }
+
+      // Initialize
+      document.addEventListener("DOMContentLoaded", async () => {
+        log("DOMContentLoaded");
+
+        const input = document.getElementById("backtestSymbol");
+        const dropdown = document.getElementById("backtestSymbolDropdown");
+        const marketEl = document.getElementById("builderMarketType");
+
+        // Pre-load symbols
+        await fetchBybitSymbols(marketEl.value);
+
+        // Event listeners
+        input.addEventListener("focus", () => {
+          log("Input focused");
+          showSymbolDropdown(input.value);
+        });
+
+        input.addEventListener("input", () => {
+          log("Input changed: " + input.value);
+          showSymbolDropdown(input.value);
+        });
+
+        input.addEventListener("blur", () => {
+          setTimeout(hideDropdown, 150);
+        });
+
+        dropdown.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          const item = e.target.closest(".symbol-picker-item");
+          if (item && item.dataset.symbol) {
+            input.value = item.dataset.symbol;
+            hideDropdown();
+            log("Selected: " + item.dataset.symbol);
+          }
+        });
+
+        marketEl.addEventListener("change", async () => {
+          log("Market changed: " + marketEl.value);
+          await fetchBybitSymbols(marketEl.value);
+          showSymbolDropdown(input.value);
+        });
+
+        log("Initialization complete");
+      });
+    </script>
+  </body>
+</html>

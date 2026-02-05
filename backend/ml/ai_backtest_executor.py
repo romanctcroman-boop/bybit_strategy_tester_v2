@@ -99,9 +99,7 @@ class AIBacktestExecutor:
 
             # Parse strategy design
             if "error" in strategy_design:
-                logger.error(
-                    f"AI strategy generation failed: {strategy_design['error']}"
-                )
+                logger.error(f"AI strategy generation failed: {strategy_design['error']}")
                 raise ValueError("Failed to generate AI strategy")
 
             # Extract components
@@ -113,9 +111,7 @@ class AIBacktestExecutor:
 
             # Create AIStrategy object
             ai_strategy = AIStrategy(
-                name=strategy_design.get(
-                    "strategy_name", f"AI_Strategy_{asset}_{timeframe}"
-                ),
+                name=strategy_design.get("strategy_name", f"AI_Strategy_{asset}_{timeframe}"),
                 features=features,
                 entry_long=entry_conditions.get("long", []),
                 entry_short=entry_conditions.get("short", []),
@@ -132,9 +128,7 @@ class AIBacktestExecutor:
 
             logger.info(f"✅ AI strategy generated: {ai_strategy.name}")
             logger.info(f"   Features: {', '.join(features[:3])}...")
-            logger.info(
-                f"   Expected Win Rate: {expected_metrics.get('win_rate', 'N/A')}"
-            )
+            logger.info(f"   Expected Win Rate: {expected_metrics.get('win_rate', 'N/A')}")
 
             return ai_strategy
 
@@ -246,9 +240,7 @@ class AIBacktestExecutor:
 
             logger.info(f"📊 Generated backtest config for {ai_strategy.name}")
             logger.info(f"   Features: {len(ai_strategy.features)} indicators")
-            logger.info(
-                f"   Entry signals: {len(ai_strategy.entry_long)} long, {len(ai_strategy.entry_short)} short"
-            )
+            logger.info(f"   Entry signals: {len(ai_strategy.entry_long)} long, {len(ai_strategy.entry_short)} short")
 
             # Store result
             result = {
@@ -262,9 +254,7 @@ class AIBacktestExecutor:
 
             # Run actual backtest using BacktestEngine
             try:
-                backtest_result = await self._run_backtest(
-                    backtest_config, start_date, end_date
-                )
+                backtest_result = await self._run_backtest(backtest_config, start_date, end_date)
                 result["backtest_results"] = backtest_result
                 result["status"] = "completed"
             except Exception as bt_error:
@@ -389,7 +379,6 @@ Provide recommendations in JSON format:
         """
         try:
             from backend.backtesting.engine import get_engine
-
             from backend.database import SessionLocal
             from backend.services.data_service import DataService
 
@@ -421,7 +410,7 @@ Provide recommendations in JSON format:
                     None,
                     data_service=ds,
                     initial_capital=10000.0,
-                    commission=0.0006,
+                    commission=0.0007,  # 0.07% TradingView parity
                     slippage=0.0001,
                 )
 

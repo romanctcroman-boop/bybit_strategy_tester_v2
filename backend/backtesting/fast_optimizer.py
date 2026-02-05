@@ -404,7 +404,7 @@ def generate_detailed_trades(
     take_profit_pct: float,
     initial_capital: float,
     leverage: float = 10.0,
-    commission: float = 0.0006,
+    commission: float = 0.0007,  # 0.07% TradingView parity
     slippage: float = 0.0005,
     direction: int = 0,
 ) -> Tuple[List[Dict], List[Dict]]:
@@ -1124,7 +1124,7 @@ class FastGridOptimizer:
         take_profit_range: List[float],
         initial_capital: float = 10000.0,
         leverage: int = 1,
-        commission: float = 0.0006,
+        commission: float = 0.0007,  # 0.07% TradingView parity
         slippage: float = 0.0005,
         optimize_metric: str = "sharpe_ratio",
         direction: str = "long",

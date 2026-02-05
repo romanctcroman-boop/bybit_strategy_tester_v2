@@ -15,8 +15,8 @@ Created: 2025-11-01
 
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -54,9 +54,9 @@ class ChainOfThoughtResponse(BaseModel):
     step_number: int
     thought_type: str
     content: str
-    intermediate_conclusion: Optional[str]
-    confidence_score: Optional[float]
-    citations: Optional[dict]
+    intermediate_conclusion: str | None
+    confidence_score: float | None
+    citations: dict | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -67,19 +67,19 @@ class ReasoningTraceResponse(BaseModel):
 
     id: str
     session_id: str
-    request_id: Optional[str]
+    request_id: str | None
     agent_type: str
-    agent_model: Optional[str]
+    agent_model: str | None
     task_type: str
     input_prompt: str
-    reasoning_chain: Optional[dict]
-    final_conclusion: Optional[str]
-    tokens_used: Optional[int]
-    processing_time: Optional[float]
-    confidence_score: Optional[float]
+    reasoning_chain: dict | None
+    final_conclusion: str | None
+    tokens_used: int | None
+    processing_time: float | None
+    confidence_score: float | None
     status: str
     created_at: datetime
-    chain_of_thought_steps: Optional[List[ChainOfThoughtResponse]] = None
+    chain_of_thought_steps: list[ChainOfThoughtResponse] | None = None
 
     model_config = {"from_attributes": True}
 
@@ -92,14 +92,14 @@ class StrategyEvolutionResponse(BaseModel):
     strategy_name: str
     version: int
     changes_description: str
-    performance_metrics: Optional[dict]
-    performance_delta: Optional[dict]
-    hypothesis: Optional[str]
-    outcome: Optional[str]
+    performance_metrics: dict | None
+    performance_delta: dict | None
+    hypothesis: str | None
+    outcome: str | None
     is_active: bool
     is_production: bool
     created_at: datetime
-    activated_at: Optional[datetime]
+    activated_at: datetime | None
 
     model_config = {"from_attributes": True}
 
@@ -147,7 +147,7 @@ class ABTestRequest(BaseModel):
     baseline_agent: AgentType = Field(default=AgentType.DEEPSEEK)
     challenger_agent: AgentType = Field(default=AgentType.PERPLEXITY)
     task_type: str = Field(default="analyze")
-    code: Optional[str] = Field(default=None)
+    code: str | None = Field(default=None)
     context: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -200,7 +200,7 @@ async def get_reasoning_trace(
 
 @router.get(
     "/session/{session_id}",
-    response_model=List[ReasoningTraceResponse],
+    response_model=list[ReasoningTraceResponse],
     summary="Get all reasoning traces for a session",
     description="Retrieve all reasoning traces for a given session ID",
 )
@@ -208,7 +208,7 @@ async def get_reasoning_chain(
     session_id: str,
     include_steps: bool = Query(False, description="Include chain-of-thought steps"),
     db: Session = Depends(get_db),
-) -> List[ReasoningTraceResponse]:
+) -> list[ReasoningTraceResponse]:
     """
     Get all reasoning traces for a session.
 
@@ -232,20 +232,20 @@ async def get_reasoning_chain(
 
 @router.get(
     "/search",
-    response_model=List[ReasoningTraceResponse],
+    response_model=list[ReasoningTraceResponse],
     summary="Search reasoning traces",
     description="Search reasoning traces by various criteria",
 )
 async def search_reasoning_traces(
-    task_type: Optional[str] = Query(None, description="Filter by task type"),
-    agent_type: Optional[str] = Query(None, description="Filter by agent type"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    start_date: Optional[datetime] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[datetime] = Query(None, description="End date (ISO format)"),
+    task_type: str | None = Query(None, description="Filter by task type"),
+    agent_type: str | None = Query(None, description="Filter by agent type"),
+    status: str | None = Query(None, description="Filter by status"),
+    start_date: datetime | None = Query(None, description="Start date (ISO format)"),
+    end_date: datetime | None = Query(None, description="End date (ISO format)"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
     db: Session = Depends(get_db),
-) -> List[ReasoningTraceResponse]:
+) -> list[ReasoningTraceResponse]:
     """
     Search reasoning traces.
 
@@ -265,7 +265,7 @@ async def search_reasoning_traces(
             traces = await service.search_failed_traces(limit=limit)
         else:
             # Default: recent traces
-            end = datetime.now(timezone.utc)
+            end = datetime.now(UTC)
             start = end - timedelta(days=7)
             traces = await service.search_by_date_range(start, end, limit=limit)
 
@@ -278,7 +278,7 @@ async def search_reasoning_traces(
 
 @router.get(
     "/strategy/{strategy_id}/evolution",
-    response_model=List[StrategyEvolutionResponse],
+    response_model=list[StrategyEvolutionResponse],
     summary="Get strategy evolution history",
     description="Retrieve evolution history for a trading strategy",
 )
@@ -286,7 +286,7 @@ async def get_strategy_evolution(
     strategy_id: str,
     include_inactive: bool = Query(False, description="Include inactive versions"),
     db: Session = Depends(get_db),
-) -> List[StrategyEvolutionResponse]:
+) -> list[StrategyEvolutionResponse]:
     """
     Get strategy evolution history.
 
@@ -315,9 +315,9 @@ async def get_strategy_evolution(
     description="Get aggregated token usage and cost statistics",
 )
 async def get_token_usage_stats(
-    start_date: Optional[datetime] = Query(None, description="Start date (ISO format)"),
-    end_date: Optional[datetime] = Query(None, description="End date (ISO format)"),
-    agent_type: Optional[str] = Query(None, description="Filter by agent type"),
+    start_date: datetime | None = Query(None, description="Start date (ISO format)"),
+    end_date: datetime | None = Query(None, description="End date (ISO format)"),
+    agent_type: str | None = Query(None, description="Filter by agent type"),
     db: Session = Depends(get_db),
 ) -> TokenUsageStatsResponse:
     """
@@ -345,7 +345,7 @@ async def get_token_usage_stats(
     description="Get aggregated agent performance metrics",
 )
 async def get_agent_performance_stats(
-    agent_type: Optional[str] = Query(None, description="Filter by agent type"),
+    agent_type: str | None = Query(None, description="Filter by agent type"),
     db: Session = Depends(get_db),
 ) -> AgentPerformanceStatsResponse:
     """
@@ -422,11 +422,11 @@ async def run_reasoning_ab_test(request: ABTestRequest, db: Session = Depends(ge
 
 @router.get(
     "/chain-of-thought/{trace_id}",
-    response_model=List[ChainOfThoughtResponse],
+    response_model=list[ChainOfThoughtResponse],
     summary="Get chain-of-thought steps",
     description="Get detailed chain-of-thought steps for a reasoning trace",
 )
-async def get_chain_of_thought(trace_id: uuid.UUID, db: Session = Depends(get_db)) -> List[ChainOfThoughtResponse]:
+async def get_chain_of_thought(trace_id: uuid.UUID, db: Session = Depends(get_db)) -> list[ChainOfThoughtResponse]:
     """
     Get chain-of-thought steps.
 
@@ -468,7 +468,7 @@ async def health_check(db: Session = Depends(get_db)) -> dict:
     try:
         # Simple query to check DB connectivity
         service = ReasoningStorageService(db)
-        end = datetime.now(timezone.utc)
+        end = datetime.now(UTC)
         start = end - timedelta(hours=1)
         traces = await service.search_by_date_range(start, end, limit=1)
 
@@ -476,7 +476,7 @@ async def health_check(db: Session = Depends(get_db)) -> dict:
             "status": "healthy",
             "database": "connected",
             "recent_traces": len(traces),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -485,5 +485,5 @@ async def health_check(db: Session = Depends(get_db)) -> dict:
             "status": "unhealthy",
             "database": "error",
             "error": str(e),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }

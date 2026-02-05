@@ -6,12 +6,10 @@ Verifies that DCA parameters are correctly passed and processed.
 """
 
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
 import pytest
-from fastapi.testclient import TestClient
 
 
 class TestDCAE2E:
@@ -110,7 +108,7 @@ class TestDCAE2E:
         engine = DCAEngine()
         # Verify engine has run_from_config method and can be configured
         assert hasattr(engine, "run_from_config")
-        assert callable(getattr(engine, "run_from_config"))
+        assert callable(engine.run_from_config)
         # Note: Full run_from_config execution has known issues in DCAEngine
         # that need separate fixes (TradeRecord fields, EquityCurve schema)
 

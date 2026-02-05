@@ -12,7 +12,7 @@ import io
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,8 @@ class BacktestReportData:
     largest_loss: float
     equity_curve: list[dict[str, Any]]
     trades: list[dict[str, Any]]
-    monthly_returns: Optional[list[dict[str, Any]]] = None
-    additional_metrics: Optional[dict[str, Any]] = None
+    monthly_returns: list[dict[str, Any]] | None = None
+    additional_metrics: dict[str, Any] | None = None
 
 
 class ReportExportService:
@@ -697,7 +697,7 @@ class ReportExportService:
 
 
 # Global instance
-_report_service: Optional[ReportExportService] = None
+_report_service: ReportExportService | None = None
 
 
 def get_report_service() -> ReportExportService:

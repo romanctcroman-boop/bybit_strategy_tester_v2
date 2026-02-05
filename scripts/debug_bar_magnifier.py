@@ -4,12 +4,12 @@ Aggressive Scalper: 50x leverage, 1% SL, 2% TP
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
-from datetime import datetime
+
+import pandas as pd
 
 print("=" * 80)
 print("🔍 ДИАГНОСТИКА Bar Magnifier - Aggressive Scalper")
@@ -59,9 +59,9 @@ short_entries = (rsi > 80).values
 short_exits = (rsi < 20).values
 
 # Импорты
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 config = {
     "initial_capital": 5000,
@@ -100,12 +100,12 @@ nb = NumbaEngineV2()
 fb_result = fb.run(input_data)
 nb_result = nb.run(input_data)
 
-print(f"\n📊 РЕЗУЛЬТАТЫ:")
+print("\n📊 РЕЗУЛЬТАТЫ:")
 print(f"   Fallback: {len(fb_result.trades)} trades, ${fb_result.metrics.net_profit:,.2f}")
 print(f"   Numba:    {len(nb_result.trades)} trades, ${nb_result.metrics.net_profit:,.2f}")
 
 # Детальное сравнение
-print(f"\n📋 ДЕТАЛЬНОЕ СРАВНЕНИЕ СДЕЛОК:")
+print("\n📋 ДЕТАЛЬНОЕ СРАВНЕНИЕ СДЕЛОК:")
 print(f"{'#':<4} {'Dir':<6} {'FB Entry':>10} {'NB Entry':>10} {'FB Exit':>10} {'NB Exit':>10} {'FB PnL':>10} {'NB PnL':>10} {'Match':>6}")
 print("-" * 90)
 
@@ -115,7 +115,7 @@ differences = []
 for i in range(min(max_trades, 70)):
     fb_t = fb_result.trades[i] if i < len(fb_result.trades) else None
     nb_t = nb_result.trades[i] if i < len(nb_result.trades) else None
-    
+
     if fb_t and nb_t:
         fb_entry = fb_t.entry_price
         nb_entry = nb_t.entry_price
@@ -123,16 +123,16 @@ for i in range(min(max_trades, 70)):
         nb_exit = nb_t.exit_price
         fb_pnl = fb_t.pnl
         nb_pnl = nb_t.pnl
-        
+
         entry_match = abs(fb_entry - nb_entry) < 0.01
         exit_match = abs(fb_exit - nb_exit) < 0.01
         pnl_match = abs(fb_pnl - nb_pnl) < 0.01
-        
+
         match = "✅" if (entry_match and exit_match and pnl_match) else "❌"
-        
+
         if not (entry_match and exit_match and pnl_match):
             differences.append(i)
-        
+
         print(f"{i+1:<4} {fb_t.direction:<6} {fb_entry:>10.2f} {nb_entry:>10.2f} {fb_exit:>10.2f} {nb_exit:>10.2f} {fb_pnl:>10.2f} {nb_pnl:>10.2f} {match:>6}")
     elif fb_t:
         print(f"{i+1:<4} {fb_t.direction:<6} {fb_t.entry_price:>10.2f} {'---':>10} {fb_t.exit_price:>10.2f} {'---':>10} {fb_t.pnl:>10.2f} {'---':>10} {'❌':>6}")
@@ -147,18 +147,18 @@ print(f"\n📍 РАСХОЖДЕНИЯ НА СДЕЛКАХ: {differences[:10]}")
 if differences:
     idx = differences[0]
     print(f"\n🔍 АНАЛИЗ ПЕРВОГО РАСХОЖДЕНИЯ (сделка #{idx+1}):")
-    
+
     if idx < len(fb_result.trades):
         fb_t = fb_result.trades[idx]
-        print(f"   Fallback:")
+        print("   Fallback:")
         print(f"      Entry: {fb_t.entry_time} @ ${fb_t.entry_price:.2f}")
         print(f"      Exit:  {fb_t.exit_time} @ ${fb_t.exit_price:.2f}")
         print(f"      PnL:   ${fb_t.pnl:.2f}")
         print(f"      Reason: {fb_t.exit_reason}")
-    
+
     if idx < len(nb_result.trades):
         nb_t = nb_result.trades[idx]
-        print(f"   Numba:")
+        print("   Numba:")
         print(f"      Entry: {nb_t.entry_time} @ ${nb_t.entry_price:.2f}")
         print(f"      Exit:  {nb_t.exit_time} @ ${nb_t.exit_price:.2f}")
         print(f"      PnL:   ${nb_t.pnl:.2f}")

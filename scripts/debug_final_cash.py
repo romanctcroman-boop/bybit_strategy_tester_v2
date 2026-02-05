@@ -3,11 +3,13 @@ Debug final cash vs expected
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
 
 import numpy as np
 import pandas as pd
-import sqlite3
 
 # Load data
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
@@ -26,8 +28,8 @@ df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
 df.set_index('open_time', inplace=True)
 
 # ============ NUMBA ============
-from backend.backtesting.strategies import RSIStrategy
 from backend.backtesting.numba_engine import simulate_trades_numba
+from backend.backtesting.strategies import RSIStrategy
 
 strategy = RSIStrategy(params={"period": 14, "overbought": 70, "oversold": 30})
 signals = strategy.generate_signals(df)
@@ -60,6 +62,6 @@ print(f"Expected equity (10000 + pnl): {10000 + total_pnl:.2f}")
 print(f"Difference: {equity[-1] - (10000 + total_pnl):.2f}")
 
 # Check if last position is still open
-print(f"\nLast equity values:")
+print("\nLast equity values:")
 for i in range(-5, 0):
     print(f"  equity[{504+i}] = {equity[i]:.2f}")

@@ -1,7 +1,8 @@
 """Find RSI values near 25.0 boundary"""
 import sqlite3
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 DB = Path("data.sqlite3")
 conn = sqlite3.connect(DB)
@@ -38,7 +39,7 @@ print(f"\nTotal bars with RSI between 24.9 and 25.1: {len(boundary)}")
 print("\nThese cases:")
 for _, row in boundary.iterrows():
     delta_25 = abs(row['rsi'] - 25)
-    
+
     # Check if it's a crossover
     is_crossover = ""
     if not pd.isna(row['prev_rsi']):
@@ -46,7 +47,7 @@ for _, row in boundary.iterrows():
             is_crossover = " ↗️ CROSSOVER UP"
         elif row['prev_rsi'] > 25 and row['rsi'] <= 25:
             is_crossover = " ↘️ CROSSOVER DOWN"
-    
+
     print(f"  {row['datetime']} | RSI: {row['rsi']:.6f} | Δ from 25: {delta_25:.6f}{is_crossover}")
 
 print("\n" + "="*70)
@@ -58,10 +59,10 @@ critical = []
 for i in range(1, len(df)):
     curr = df.iloc[i]['rsi']
     prev = df.iloc[i-1]['rsi']
-    
+
     if pd.isna(curr) or pd.isna(prev):
         continue
-    
+
     # Crossover and very close to 25
     if prev <= 25 and curr > 25:
         if abs(curr - 25) < 0.1 or abs(prev - 25) < 0.1:

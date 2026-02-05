@@ -8,10 +8,10 @@ from datetime import datetime, timezone
 from itertools import product
 from typing import Any, Dict, List, Optional
 
-from backend.celery_app import celery_app
 from celery import Task
 from loguru import logger
 
+from backend.celery_app import celery_app
 from backend.core.engine_adapter import get_engine
 from backend.database import SessionLocal
 from backend.models import Optimization
@@ -29,11 +29,7 @@ class OptimizationTask(Task):
         if optimization_id:
             try:
                 db = SessionLocal()
-                opt = (
-                    db.query(Optimization)
-                    .filter(Optimization.id == optimization_id)
-                    .first()
-                )
+                opt = db.query(Optimization).filter(Optimization.id == optimization_id).first()
                 if opt:
                     opt.status = "failed"
                     opt.error_message = str(exc)
@@ -93,9 +89,7 @@ def grid_search_task(
         if not opt:
             raise ValueError(f"Optimization {optimization_id} not found")
 
-        data_service.update_optimization(
-            optimization_id, status="running", started_at=datetime.now(timezone.utc)
-        )
+        data_service.update_optimization(optimization_id, status="running", started_at=datetime.now(timezone.utc))
 
         # Загрузить данные
         logger.info("📥 Loading market data...")
@@ -118,9 +112,7 @@ def grid_search_task(
         logger.info(f"🔢 Testing {total_combinations} parameter combinations")
 
         # Прогресс
-        self.update_state(
-            state="PROGRESS", meta={"current": 0, "total": total_combinations}
-        )
+        self.update_state(state="PROGRESS", meta={"current": 0, "total": total_combinations})
 
         # Запуск бэктестов для каждой комбинации
         results = []
@@ -128,7 +120,7 @@ def grid_search_task(
         best_params = None
         best_result = None
 
-        engine = get_engine(None, initial_capital=10000.0, commission=0.0006)
+        engine = get_engine(None, initial_capital=10000.0, commission=0.0007)  # 0.07% TradingView parity
 
         for idx, params in enumerate(combinations, 1):
             # Обновить конфигурацию стратегии
@@ -163,9 +155,7 @@ def grid_search_task(
 
                 # Обновить прогресс
                 if idx % 10 == 0 or idx == total_combinations:
-                    logger.info(
-                        f"Progress: {idx}/{total_combinations} ({idx / total_combinations * 100:.1f}%)"
-                    )
+                    logger.info(f"Progress: {idx}/{total_combinations} ({idx / total_combinations * 100:.1f}%)")
                     self.update_state(
                         state="PROGRESS",
                         meta={
@@ -236,9 +226,7 @@ def grid_search_task(
         db.close()
 
 
-@celery_app.task(
-    bind=True, base=OptimizationTask, name="backend.tasks.optimize_tasks.walk_forward"
-)
+@celery_app.task(bind=True, base=OptimizationTask, name="backend.tasks.optimize_tasks.walk_forward")
 def walk_forward_task(
     self,
     optimization_id: int,
@@ -279,7 +267,6 @@ def walk_forward_task(
     from datetime import datetime
 
     from backend.core.walkforward import WalkForwardAnalyzer
-
     from backend.services.data_service import DataService
 
     logger.info(f"🚶 Starting walk-forward optimization: {optimization_id}")
@@ -299,9 +286,7 @@ def walk_forward_task(
         )
 
         data_service = DataService()
-        data = data_service.get_candles(
-            symbol=symbol, interval=interval, start_date=start_date, end_date=end_date
-        )
+        data = data_service.get_candles(symbol=symbol, interval=interval, start_date=start_date, end_date=end_date)
 
         if data is None or len(data) == 0:
             raise ValueError(f"No data available for {symbol} {interval}")
@@ -348,9 +333,7 @@ def walk_forward_task(
             asyncio.set_event_loop(loop)
 
         results = loop.run_until_complete(
-            analyzer.run_async(
-                strategy_config=strategy_config, param_space=param_space, metric=metric
-            )
+            analyzer.run_async(strategy_config=strategy_config, param_space=param_space, metric=metric)
         )
 
         # 4. Формируем результат
@@ -364,8 +347,7 @@ def walk_forward_task(
         )
 
         logger.success(
-            f"✅ Walk-forward completed: {optimization_id}, "
-            f"processed {len(results['windows'])}/{num_windows} windows"
+            f"✅ Walk-forward completed: {optimization_id}, processed {len(results['windows'])}/{num_windows} windows"
         )
 
         return {
@@ -447,7 +429,6 @@ def bayesian_optimization_task(
     from datetime import datetime
 
     from backend.core.bayesian import BayesianOptimizer
-
     from backend.services.data_service import DataService
 
     logger.info(f"🧠 Starting Bayesian optimization: {optimization_id}")
@@ -466,9 +447,7 @@ def bayesian_optimization_task(
         )
 
         data_service = DataService()
-        data = data_service.get_candles(
-            symbol=symbol, interval=interval, start_date=start_date, end_date=end_date
-        )
+        data = data_service.get_candles(symbol=symbol, interval=interval, start_date=start_date, end_date=end_date)
 
         if data is None or len(data) == 0:
             raise ValueError(f"No data available for {symbol} {interval}")

@@ -6,8 +6,8 @@ Provides real backtesting functionality using vectorbt engine.
 Integrates with Strategies CRUD for running backtests from saved strategies.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, cast
+from datetime import UTC, datetime
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
@@ -74,7 +74,7 @@ def _safe_str(val: Any, default: str = "") -> str:
     return str(val)
 
 
-def downsample_list(data: List, max_points: int = 500) -> List:
+def downsample_list(data: list, max_points: int = 500) -> list:
     """Evenly downsample a list to max_points, keeping first and last."""
     if not data or len(data) <= max_points:
         return data
@@ -88,8 +88,8 @@ def downsample_list(data: List, max_points: int = 500) -> List:
 
 
 def build_equity_curve_response(
-    equity_curve: EquityCurve, trades: Optional[List] = None, max_points: int = 800
-) -> Optional[Dict[str, Any]]:
+    equity_curve: EquityCurve, trades: list | None = None, max_points: int = 800
+) -> dict[str, Any] | None:
     """Build equity curve response with one point per trade exit.
 
     Returns equity value at the moment each trade closes.
@@ -112,21 +112,13 @@ def build_equity_curve_response(
     if not trades or len(trades) == 0:
         return {
             "timestamps": [
-                timestamps[0].isoformat()
-                if hasattr(timestamps[0], "isoformat")
-                else str(timestamps[0]),
-                timestamps[-1].isoformat()
-                if hasattr(timestamps[-1], "isoformat")
-                else str(timestamps[-1]),
+                timestamps[0].isoformat() if hasattr(timestamps[0], "isoformat") else str(timestamps[0]),
+                timestamps[-1].isoformat() if hasattr(timestamps[-1], "isoformat") else str(timestamps[-1]),
             ],
             "equity": [float(equity[0]), float(equity[-1])] if equity else [],
             "drawdown": [float(drawdown[0]), float(drawdown[-1])] if drawdown else [],
-            "bh_equity": [float(bh_equity[0]), float(bh_equity[-1])]
-            if bh_equity
-            else [],
-            "bh_drawdown": [float(bh_drawdown[0]), float(bh_drawdown[-1])]
-            if bh_drawdown
-            else [],
+            "bh_equity": [float(bh_equity[0]), float(bh_equity[-1])] if bh_equity else [],
+            "bh_drawdown": [float(bh_drawdown[0]), float(bh_drawdown[-1])] if bh_drawdown else [],
         }
 
     # Create timestamp -> index mapping for fast lookup
@@ -142,16 +134,10 @@ def build_equity_curve_response(
     # Collect indices for trade EXIT times only (one point per closed trade)
     exit_indices = []
     for trade in trades:
-        exit_time = (
-            trade.exit_time if hasattr(trade, "exit_time") else trade.get("exit_time")
-        )
+        exit_time = trade.exit_time if hasattr(trade, "exit_time") else trade.get("exit_time")
 
         if exit_time:
-            exit_str = (
-                exit_time.isoformat()
-                if hasattr(exit_time, "isoformat")
-                else str(exit_time)
-            )
+            exit_str = exit_time.isoformat() if hasattr(exit_time, "isoformat") else str(exit_time)
             # Normalize
             exit_str_z = exit_str.replace("+00:00", "Z").rstrip("Z") + "Z"
             exit_str_no_z = exit_str.rstrip("Z").replace("+00:00", "")
@@ -164,12 +150,8 @@ def build_equity_curve_response(
     if not exit_indices:
         return {
             "timestamps": [
-                timestamps[0].isoformat()
-                if hasattr(timestamps[0], "isoformat")
-                else str(timestamps[0]),
-                timestamps[-1].isoformat()
-                if hasattr(timestamps[-1], "isoformat")
-                else str(timestamps[-1]),
+                timestamps[0].isoformat() if hasattr(timestamps[0], "isoformat") else str(timestamps[0]),
+                timestamps[-1].isoformat() if hasattr(timestamps[-1], "isoformat") else str(timestamps[-1]),
             ],
             "equity": [float(equity[0]), float(equity[-1])] if equity else [],
             "drawdown": [float(drawdown[0]), float(drawdown[-1])] if drawdown else [],
@@ -182,20 +164,14 @@ def build_equity_curve_response(
 
     return {
         "timestamps": [
-            timestamps[i].isoformat()
-            if hasattr(timestamps[i], "isoformat")
-            else str(timestamps[i])
+            timestamps[i].isoformat() if hasattr(timestamps[i], "isoformat") else str(timestamps[i])
             for i in indices
             if i < len(timestamps)
         ],
         "equity": [float(equity[i]) for i in indices if i < len(equity)],
         "drawdown": [float(drawdown[i]) for i in indices if i < len(drawdown)],
-        "bh_equity": [float(bh_equity[i]) for i in indices if i < len(bh_equity)]
-        if bh_equity
-        else [],
-        "bh_drawdown": [float(bh_drawdown[i]) for i in indices if i < len(bh_drawdown)]
-        if bh_drawdown
-        else [],
+        "bh_equity": [float(bh_equity[i]) for i in indices if i < len(bh_equity)] if bh_equity else [],
+        "bh_drawdown": [float(bh_drawdown[i]) for i in indices if i < len(bh_drawdown)] if bh_drawdown else [],
     }
 
 
@@ -233,23 +209,13 @@ async def list_available_engines():
 class RunFromStrategyRequest(BaseModel):
     """Request to run backtest from a saved strategy"""
 
-    symbol: Optional[str] = Field(
-        default=None, description="Override strategy's symbol"
-    )
-    interval: Optional[str] = Field(
-        default=None, description="Override strategy's timeframe"
-    )
+    symbol: str | None = Field(default=None, description="Override strategy's symbol")
+    interval: str | None = Field(default=None, description="Override strategy's timeframe")
     start_date: datetime = Field(..., description="Backtest start date")
     end_date: datetime = Field(..., description="Backtest end date")
-    initial_capital: Optional[float] = Field(
-        default=None, ge=100, description="Override strategy's initial capital"
-    )
-    position_size: Optional[float] = Field(
-        default=None, ge=0.01, le=1.0, description="Override position size"
-    )
-    save_result: bool = Field(
-        default=True, description="Save result to database and update strategy metrics"
-    )
+    initial_capital: float | None = Field(default=None, ge=100, description="Override strategy's initial capital")
+    position_size: float | None = Field(default=None, ge=0.01, le=1.0, description="Override position size")
+    save_result: bool = Field(default=True, description="Save result to database and update strategy metrics")
 
 
 class RunFromStrategyResponse(BaseModel):
@@ -259,8 +225,8 @@ class RunFromStrategyResponse(BaseModel):
     strategy_id: str
     strategy_name: str
     status: str
-    metrics: Optional[dict] = None
-    error_message: Optional[str] = None
+    metrics: dict | None = None
+    error_message: str | None = None
     saved_to_db: bool = False
 
 
@@ -292,15 +258,16 @@ async def create_backtest(request: BacktestCreateRequest):
     - `macd`: MACD Strategy (fast_period, slow_period, signal_period)
     - `bollinger_bands`: Bollinger Bands (period, std_dev)
     """
-    logger.info(
-        f"Creating backtest: {request.symbol} {request.interval} "
-        f"strategy={request.strategy_type}"
-    )
+    logger.info(f"Creating backtest: {request.symbol} {request.interval} strategy={request.strategy_type}")
 
     # Extract commission/slippage from strategy_params if provided
     params = request.strategy_params or {}
-    commission = float(params.get("_commission", 0.0004))  # Default Bybit taker fee
+    commission = float(params.get("_commission", 0.0007))  # 0.07% TradingView parity
     slippage = float(params.get("_slippage", 0.0005))  # Default 0.05%
+
+    # Extract no_trade_days from strategy_params (UI sends as _no_trade_days)
+    no_trade_days_raw = params.get("_no_trade_days", [])
+    no_trade_days = tuple(no_trade_days_raw) if no_trade_days_raw else ()
 
     # Get direction from strategy_params if not explicitly set in request
     # This allows strategy-defined direction to be used automatically
@@ -309,6 +276,24 @@ async def create_backtest(request: BacktestCreateRequest):
         # If direction is default "long" but strategy has _direction, use strategy's
         direction = params.get("_direction", "long")
         logger.info(f"Using direction from strategy_params: {direction}")
+
+    # Handle position size based on type (percent, fixed_amount, contracts)
+    position_size_type = params.get("_position_size_type", "percent")
+    order_amount = params.get("_order_amount")  # Fixed $ amount or contracts
+
+    position_size: float = request.position_size
+    if position_size_type == "fixed_amount" and order_amount:
+        # Convert fixed $ amount to fraction of capital (with leverage)
+        effective_order = float(order_amount) * float(request.leverage)
+        position_size = min(effective_order / float(request.initial_capital), 1.0)
+        logger.info(
+            f"Using fixed order amount: ${order_amount} x {request.leverage}x = "
+            f"${effective_order} = {position_size * 100:.1f}% of ${request.initial_capital}"
+        )
+    elif position_size_type == "contracts" and order_amount:
+        # For contracts mode, pass through (engine will handle)
+        position_size = float(order_amount)
+        logger.info(f"Using fixed contracts: {order_amount}")
 
     # Build config with validation error handling
     try:
@@ -320,7 +305,7 @@ async def create_backtest(request: BacktestCreateRequest):
             strategy_type=request.strategy_type,
             strategy_params=request.strategy_params,
             initial_capital=request.initial_capital,
-            position_size=request.position_size,
+            position_size=position_size,
             leverage=request.leverage,
             direction=direction,
             stop_loss=request.stop_loss,
@@ -328,6 +313,7 @@ async def create_backtest(request: BacktestCreateRequest):
             taker_fee=commission,
             maker_fee=commission,
             slippage=slippage,
+            no_trade_days=no_trade_days,
         )
     except (ValidationError, PydanticCoreValidationError) as e:
         # Return 422 for validation errors (standard FastAPI behavior)
@@ -417,14 +403,11 @@ async def create_backtest(request: BacktestCreateRequest):
             }
             # Normalize trades source: engines may return trades under different names
             trades_source = (
-                result.trades
-                or getattr(result, "all_trades", None)
-                or getattr(result, "trade_list", None)
-                or []
+                result.trades or getattr(result, "all_trades", None) or getattr(result, "trade_list", None) or []
             )
 
             # Normalize trades into dicts suitable for DB storage
-            trades_list: List[Dict[str, Any]] = []
+            trades_list: list[dict[str, Any]] = []
             for t in (trades_source or [])[:500]:
                 if hasattr(t, "__dict__") and not isinstance(t, dict):
                     # object-like trade
@@ -433,9 +416,7 @@ async def create_backtest(request: BacktestCreateRequest):
                     side = getattr(t, "side", None)
                     trades_list.append(
                         {
-                            "entry_time": entry_time.isoformat()
-                            if entry_time
-                            else None,
+                            "entry_time": entry_time.isoformat() if entry_time else None,
                             "exit_time": exit_time.isoformat() if exit_time else None,
                             "side": _get_side_value(side),
                             "entry_price": float(getattr(t, "entry_price", 0) or 0),
@@ -475,10 +456,7 @@ async def create_backtest(request: BacktestCreateRequest):
 
             # Normalize trades source: engines may return trades under different names
             trades_source = (
-                result.trades
-                or getattr(result, "all_trades", None)
-                or getattr(result, "trade_list", None)
-                or []
+                result.trades or getattr(result, "all_trades", None) or getattr(result, "trade_list", None) or []
             )
 
             # Normalize trades into dicts suitable for DB storage
@@ -491,9 +469,7 @@ async def create_backtest(request: BacktestCreateRequest):
                     side = getattr(t, "side", None)
                     trades_list.append(
                         {
-                            "entry_time": entry_time.isoformat()
-                            if entry_time
-                            else None,
+                            "entry_time": entry_time.isoformat() if entry_time else None,
                             "exit_time": exit_time.isoformat() if exit_time else None,
                             "side": _get_side_value(side),
                             "entry_price": float(getattr(t, "entry_price", 0) or 0),
@@ -544,9 +520,7 @@ async def create_backtest(request: BacktestCreateRequest):
                     "optimization_metrics": optimization_metrics,
                 },
                 status=DBBacktestStatus.COMPLETED,
-                metrics_json=m.model_dump(mode="json")
-                if hasattr(m, "model_dump")
-                else None,  # Full metrics JSON
+                metrics_json=m.model_dump(mode="json") if hasattr(m, "model_dump") else None,  # Full metrics JSON
                 # Basic metrics
                 total_return=m.total_return,
                 annual_return=m.annual_return,
@@ -603,9 +577,7 @@ async def create_backtest(request: BacktestCreateRequest):
 
             result.equity_curve = EquityCurve(
                 timestamps=[
-                    datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                    if isinstance(ts, str)
-                    else ts
+                    datetime.fromisoformat(ts.replace("Z", "+00:00")) if isinstance(ts, str) else ts
                     for ts in downsampled_ec["timestamps"]
                 ],
                 equity=downsampled_ec["equity"],
@@ -638,12 +610,7 @@ async def list_backtests(
     db.expire_all()
 
     # Get database results (includes optimization results)
-    db_backtests = (
-        db.query(BacktestModel)
-        .order_by(BacktestModel.created_at.desc())
-        .limit(1000)
-        .all()
-    )
+    db_backtests = db.query(BacktestModel).order_by(BacktestModel.created_at.desc()).limit(1000).all()
 
     # Convert DB records to BacktestResult format
     db_results = []
@@ -654,48 +621,38 @@ async def list_backtests(
         # Convert DB model to BacktestResult
         try:
             # Parse dates - they may be strings or datetime objects
-            start_dt: Optional[datetime] = cast(Optional[datetime], bt.start_date)
-            end_dt: Optional[datetime] = cast(Optional[datetime], bt.end_date)
+            start_dt: datetime | None = cast(datetime | None, bt.start_date)
+            end_dt: datetime | None = cast(datetime | None, bt.end_date)
             if isinstance(start_dt, str):
                 start_dt = datetime.fromisoformat(start_dt.replace("Z", "+00:00"))
             if isinstance(end_dt, str):
                 end_dt = datetime.fromisoformat(end_dt.replace("Z", "+00:00"))
             if start_dt and start_dt.tzinfo is None:
-                start_dt = start_dt.replace(tzinfo=timezone.utc)
+                start_dt = start_dt.replace(tzinfo=UTC)
             if end_dt and end_dt.tzinfo is None:
-                end_dt = end_dt.replace(tzinfo=timezone.utc)
+                end_dt = end_dt.replace(tzinfo=UTC)
 
             config = BacktestConfig(
                 symbol=str(bt.symbol or "BTCUSDT"),
                 interval=str(bt.timeframe or "30"),
-                start_date=start_dt or datetime.now(timezone.utc),
-                end_date=end_dt or datetime.now(timezone.utc),
+                start_date=start_dt or datetime.now(UTC),
+                end_date=end_dt or datetime.now(UTC),
                 initial_capital=float(bt.initial_capital or 10000.0),
                 strategy_type=StrategyType(str(bt.strategy_type or "rsi")),
-                strategy_params=bt.parameters.get("strategy_params", {})
-                if bt.parameters
-                else {},
+                strategy_params=bt.parameters.get("strategy_params", {}) if bt.parameters else {},
                 stop_loss=bt.parameters.get("stop_loss_pct") if bt.parameters else None,
-                take_profit=bt.parameters.get("take_profit_pct")
-                if bt.parameters
-                else None,
+                take_profit=bt.parameters.get("take_profit_pct") if bt.parameters else None,
                 leverage=bt.parameters.get("leverage", 10) if bt.parameters else 10,
                 # Extract direction from parameters._direction (DCA strategies store it there)
-                direction=bt.parameters.get("_direction", "both")
-                if bt.parameters
-                else "both",
+                direction=bt.parameters.get("_direction", "both") if bt.parameters else "both",
             )
 
             # Build PerformanceMetrics from DB fields + stored optimization_metrics
-            net_profit = (
-                bt.final_capital - bt.initial_capital
-                if bt.final_capital and bt.initial_capital
-                else 0
-            )
+            net_profit = bt.final_capital - bt.initial_capital if bt.final_capital and bt.initial_capital else 0
 
             # Get stored metrics - prioritize metrics_json (full data), fallback to parameters.optimization_metrics
             # metrics_json is the Single Source of Truth (SSoT) for all detailed metrics
-            opt_metrics: Dict[str, Any] = {}
+            opt_metrics: dict[str, Any] = {}
 
             # First, try metrics_json (contains complete metrics snapshot)
             if bt.metrics_json and isinstance(bt.metrics_json, dict):
@@ -713,57 +670,35 @@ async def list_backtests(
             # Calculate max_drawdown_value in $ from percentage
             initial_cap = bt.initial_capital or 10000.0
             max_dd_pct = bt.max_drawdown or 0
-            max_dd_value = opt_metrics.get(
-                "max_drawdown_value", abs(max_dd_pct) * initial_cap / 100.0
-            )
+            max_dd_value = opt_metrics.get("max_drawdown_value", abs(max_dd_pct) * initial_cap / 100.0)
 
             # Calculate winning/losing trades from win_rate if not stored
             # Try DB fields first, then opt_metrics from parameters JSON
             total_trades_count = bt.total_trades or opt_metrics.get("total_trades", 0)
-            winning_trades_count = bt.winning_trades or opt_metrics.get(
-                "winning_trades", 0
-            )
-            losing_trades_count = bt.losing_trades or opt_metrics.get(
-                "losing_trades", 0
-            )
+            winning_trades_count = bt.winning_trades or opt_metrics.get("winning_trades", 0)
+            losing_trades_count = bt.losing_trades or opt_metrics.get("losing_trades", 0)
             win_rate_val = bt.win_rate or opt_metrics.get("win_rate", 0)
 
             # If winning_trades is 0 but we have trades and win_rate, calculate it
-            if (
-                winning_trades_count == 0
-                and total_trades_count > 0
-                and win_rate_val > 0
-            ):
+            if winning_trades_count == 0 and total_trades_count > 0 and win_rate_val > 0:
                 # Determine if win_rate is in percentage (>1) or decimal (<1) format
-                win_rate_decimal = (
-                    win_rate_val / 100.0 if win_rate_val > 1 else win_rate_val
-                )
+                win_rate_decimal = win_rate_val / 100.0 if win_rate_val > 1 else win_rate_val
                 winning_trades_count = int(round(total_trades_count * win_rate_decimal))
                 losing_trades_count = total_trades_count - winning_trades_count
 
             metrics = PerformanceMetrics(
                 net_profit=_safe_float(opt_metrics.get("net_profit", net_profit)),
-                net_profit_pct=_safe_float(
-                    opt_metrics.get("net_profit_pct", bt.total_return or 0)
-                ),
+                net_profit_pct=_safe_float(opt_metrics.get("net_profit_pct", bt.total_return or 0)),
                 total_return=_safe_float(bt.total_return or 0),
-                annual_return=_safe_float(
-                    bt.annual_return or opt_metrics.get("annual_return", 0)
-                ),
+                annual_return=_safe_float(bt.annual_return or opt_metrics.get("annual_return", 0)),
                 sharpe_ratio=_safe_float(bt.sharpe_ratio or 0),
                 sortino_ratio=_safe_float(bt.sortino_ratio or 0),
-                calmar_ratio=_safe_float(
-                    bt.calmar_ratio or opt_metrics.get("calmar_ratio", 0)
-                ),
+                calmar_ratio=_safe_float(bt.calmar_ratio or opt_metrics.get("calmar_ratio", 0)),
                 max_drawdown=_safe_float(bt.max_drawdown or 0),
                 max_drawdown_value=_safe_float(max_dd_value),
                 avg_drawdown=_safe_float(opt_metrics.get("avg_drawdown", 0)),
-                avg_drawdown_value=_safe_float(
-                    opt_metrics.get("avg_drawdown_value", 0)
-                ),
-                max_drawdown_duration_days=_safe_float(
-                    opt_metrics.get("max_drawdown_duration_days", 0)
-                ),
+                avg_drawdown_value=_safe_float(opt_metrics.get("avg_drawdown_value", 0)),
+                max_drawdown_duration_days=_safe_float(opt_metrics.get("max_drawdown_duration_days", 0)),
                 total_trades=_safe_int(total_trades_count),
                 winning_trades=_safe_int(winning_trades_count),
                 losing_trades=_safe_int(losing_trades_count),
@@ -775,28 +710,18 @@ async def list_backtests(
                 avg_win_value=_safe_float(opt_metrics.get("avg_win", 0)),
                 avg_loss_value=_safe_float(opt_metrics.get("avg_loss", 0)),
                 exposure_time=_safe_float(
-                    bt.exposure_time
-                    if bt.exposure_time is not None
-                    else opt_metrics.get("exposure_time", 0)
+                    bt.exposure_time if bt.exposure_time is not None else opt_metrics.get("exposure_time", 0)
                 ),
-                avg_trade_duration_hours=_safe_float(
-                    opt_metrics.get("avg_trade_duration_hours", 0)
-                ),
+                avg_trade_duration_hours=_safe_float(opt_metrics.get("avg_trade_duration_hours", 0)),
                 # Extended metrics - DB columns first, then opt_metrics fallback
                 gross_profit=_safe_float(
-                    bt.gross_profit
-                    if bt.gross_profit is not None
-                    else opt_metrics.get("gross_profit", 0)
+                    bt.gross_profit if bt.gross_profit is not None else opt_metrics.get("gross_profit", 0)
                 ),
                 gross_loss=_safe_float(
-                    bt.gross_loss
-                    if bt.gross_loss is not None
-                    else opt_metrics.get("gross_loss", 0)
+                    bt.gross_loss if bt.gross_loss is not None else opt_metrics.get("gross_loss", 0)
                 ),
                 expectancy=_safe_float(
-                    bt.expectancy
-                    if bt.expectancy is not None
-                    else opt_metrics.get("expectancy", 0)
+                    bt.expectancy if bt.expectancy is not None else opt_metrics.get("expectancy", 0)
                 ),
                 max_consecutive_wins=_safe_int(
                     bt.max_consecutive_wins
@@ -809,9 +734,7 @@ async def list_backtests(
                     else opt_metrics.get("max_consecutive_losses", 0)
                 ),
                 recovery_factor=_safe_float(
-                    bt.recovery_factor
-                    if bt.recovery_factor is not None
-                    else opt_metrics.get("recovery_factor", 0)
+                    bt.recovery_factor if bt.recovery_factor is not None else opt_metrics.get("recovery_factor", 0)
                 ),
                 largest_win=_safe_float(opt_metrics.get("best_trade", 0)),
                 largest_loss=_safe_float(opt_metrics.get("worst_trade", 0)),
@@ -819,162 +742,90 @@ async def list_backtests(
                 largest_loss_value=_safe_float(opt_metrics.get("worst_trade", 0)),
                 # Long/Short statistics - DB columns first, then opt_metrics fallback
                 long_trades=_safe_int(
-                    bt.long_trades
-                    if bt.long_trades is not None
-                    else opt_metrics.get("long_trades", 0)
+                    bt.long_trades if bt.long_trades is not None else opt_metrics.get("long_trades", 0)
                 ),
-                long_winning_trades=_safe_int(
-                    opt_metrics.get("long_winning_trades", 0)
-                ),
+                long_winning_trades=_safe_int(opt_metrics.get("long_winning_trades", 0)),
                 long_losing_trades=_safe_int(opt_metrics.get("long_losing_trades", 0)),
                 long_win_rate=_safe_float(
-                    bt.long_win_rate
-                    if bt.long_win_rate is not None
-                    else opt_metrics.get("long_win_rate", 0)
+                    bt.long_win_rate if bt.long_win_rate is not None else opt_metrics.get("long_win_rate", 0)
                 ),
                 long_gross_profit=_safe_float(opt_metrics.get("long_gross_profit", 0)),
-                long_gross_profit_pct=_safe_float(
-                    opt_metrics.get("long_gross_profit_pct", 0)
-                ),
+                long_gross_profit_pct=_safe_float(opt_metrics.get("long_gross_profit_pct", 0)),
                 long_gross_loss=_safe_float(opt_metrics.get("long_gross_loss", 0)),
-                long_gross_loss_pct=_safe_float(
-                    opt_metrics.get("long_gross_loss_pct", 0)
-                ),
+                long_gross_loss_pct=_safe_float(opt_metrics.get("long_gross_loss_pct", 0)),
                 long_net_profit=_safe_float(
-                    bt.long_pnl
-                    if bt.long_pnl is not None
-                    else opt_metrics.get("long_net_profit", 0)
+                    bt.long_pnl if bt.long_pnl is not None else opt_metrics.get("long_net_profit", 0)
                 ),
-                long_profit_factor=_safe_float(
-                    opt_metrics.get("long_profit_factor", 0)
-                ),
+                long_profit_factor=_safe_float(opt_metrics.get("long_profit_factor", 0)),
                 long_avg_win=_safe_float(opt_metrics.get("long_avg_win", 0)),
                 long_avg_loss=_safe_float(opt_metrics.get("long_avg_loss", 0)),
                 short_trades=_safe_int(
-                    bt.short_trades
-                    if bt.short_trades is not None
-                    else opt_metrics.get("short_trades", 0)
+                    bt.short_trades if bt.short_trades is not None else opt_metrics.get("short_trades", 0)
                 ),
-                short_winning_trades=_safe_int(
-                    opt_metrics.get("short_winning_trades", 0)
-                ),
-                short_losing_trades=_safe_int(
-                    opt_metrics.get("short_losing_trades", 0)
-                ),
+                short_winning_trades=_safe_int(opt_metrics.get("short_winning_trades", 0)),
+                short_losing_trades=_safe_int(opt_metrics.get("short_losing_trades", 0)),
                 short_win_rate=_safe_float(
-                    bt.short_win_rate
-                    if bt.short_win_rate is not None
-                    else opt_metrics.get("short_win_rate", 0)
+                    bt.short_win_rate if bt.short_win_rate is not None else opt_metrics.get("short_win_rate", 0)
                 ),
-                short_gross_profit=_safe_float(
-                    opt_metrics.get("short_gross_profit", 0)
-                ),
-                short_gross_profit_pct=_safe_float(
-                    opt_metrics.get("short_gross_profit_pct", 0)
-                ),
+                short_gross_profit=_safe_float(opt_metrics.get("short_gross_profit", 0)),
+                short_gross_profit_pct=_safe_float(opt_metrics.get("short_gross_profit_pct", 0)),
                 short_gross_loss=_safe_float(opt_metrics.get("short_gross_loss", 0)),
-                short_gross_loss_pct=_safe_float(
-                    opt_metrics.get("short_gross_loss_pct", 0)
-                ),
+                short_gross_loss_pct=_safe_float(opt_metrics.get("short_gross_loss_pct", 0)),
                 short_net_profit=_safe_float(
-                    bt.short_pnl
-                    if bt.short_pnl is not None
-                    else opt_metrics.get("short_net_profit", 0)
+                    bt.short_pnl if bt.short_pnl is not None else opt_metrics.get("short_net_profit", 0)
                 ),
-                short_profit_factor=_safe_float(
-                    opt_metrics.get("short_profit_factor", 0)
-                ),
+                short_profit_factor=_safe_float(opt_metrics.get("short_profit_factor", 0)),
                 short_avg_win=_safe_float(opt_metrics.get("short_avg_win", 0)),
                 short_avg_loss=_safe_float(opt_metrics.get("short_avg_loss", 0)),
                 # Additional metrics
                 avg_bars_in_trade=_safe_float(opt_metrics.get("avg_bars_in_trade", 0)),
-                avg_bars_in_winning=_safe_float(
-                    opt_metrics.get("avg_bars_in_winning", 0)
-                ),
-                avg_bars_in_losing=_safe_float(
-                    opt_metrics.get("avg_bars_in_losing", 0)
-                ),
+                avg_bars_in_winning=_safe_float(opt_metrics.get("avg_bars_in_winning", 0)),
+                avg_bars_in_losing=_safe_float(opt_metrics.get("avg_bars_in_losing", 0)),
                 avg_bars_in_long=_safe_float(opt_metrics.get("avg_bars_in_long", 0)),
                 avg_bars_in_short=_safe_float(opt_metrics.get("avg_bars_in_short", 0)),
-                avg_bars_in_winning_long=_safe_float(
-                    opt_metrics.get("avg_bars_in_winning_long", 0)
-                ),
-                avg_bars_in_losing_long=_safe_float(
-                    opt_metrics.get("avg_bars_in_losing_long", 0)
-                ),
-                avg_bars_in_winning_short=_safe_float(
-                    opt_metrics.get("avg_bars_in_winning_short", 0)
-                ),
-                avg_bars_in_losing_short=_safe_float(
-                    opt_metrics.get("avg_bars_in_losing_short", 0)
-                ),
+                avg_bars_in_winning_long=_safe_float(opt_metrics.get("avg_bars_in_winning_long", 0)),
+                avg_bars_in_losing_long=_safe_float(opt_metrics.get("avg_bars_in_losing_long", 0)),
+                avg_bars_in_winning_short=_safe_float(opt_metrics.get("avg_bars_in_winning_short", 0)),
+                avg_bars_in_losing_short=_safe_float(opt_metrics.get("avg_bars_in_losing_short", 0)),
                 recovery_long=_safe_float(opt_metrics.get("recovery_long", 0)),
                 recovery_short=_safe_float(opt_metrics.get("recovery_short", 0)),
                 # Long/Short consecutive and payoff metrics (TradingView)
-                long_max_consec_wins=_safe_int(
-                    opt_metrics.get("long_max_consec_wins", 0)
-                ),
-                long_max_consec_losses=_safe_int(
-                    opt_metrics.get("long_max_consec_losses", 0)
-                ),
-                short_max_consec_wins=_safe_int(
-                    opt_metrics.get("short_max_consec_wins", 0)
-                ),
-                short_max_consec_losses=_safe_int(
-                    opt_metrics.get("short_max_consec_losses", 0)
-                ),
+                long_max_consec_wins=_safe_int(opt_metrics.get("long_max_consec_wins", 0)),
+                long_max_consec_losses=_safe_int(opt_metrics.get("long_max_consec_losses", 0)),
+                short_max_consec_wins=_safe_int(opt_metrics.get("short_max_consec_wins", 0)),
+                short_max_consec_losses=_safe_int(opt_metrics.get("short_max_consec_losses", 0)),
                 long_payoff_ratio=_safe_float(opt_metrics.get("long_payoff_ratio", 0)),
-                short_payoff_ratio=_safe_float(
-                    opt_metrics.get("short_payoff_ratio", 0)
-                ),
+                short_payoff_ratio=_safe_float(opt_metrics.get("short_payoff_ratio", 0)),
                 long_expectancy=_safe_float(opt_metrics.get("long_expectancy", 0)),
                 short_expectancy=_safe_float(opt_metrics.get("short_expectancy", 0)),
                 # Use DB columns first, fallback to opt_metrics
                 total_commission=_safe_float(
-                    bt.total_commission
-                    if bt.total_commission is not None
-                    else opt_metrics.get("total_commission", 0)
+                    bt.total_commission if bt.total_commission is not None else opt_metrics.get("total_commission", 0)
                 ),
                 buy_hold_return=_safe_float(
-                    bt.buy_hold_return
-                    if bt.buy_hold_return is not None
-                    else opt_metrics.get("buy_hold_return", 0)
+                    bt.buy_hold_return if bt.buy_hold_return is not None else opt_metrics.get("buy_hold_return", 0)
                 ),
                 buy_hold_return_pct=_safe_float(
                     bt.buy_hold_return_pct
                     if bt.buy_hold_return_pct is not None
                     else opt_metrics.get("buy_hold_return_pct", 0)
                 ),
-                strategy_outperformance=_safe_float(
-                    opt_metrics.get("strategy_outperformance", 0)
-                ),
-                cagr=_safe_float(
-                    bt.cagr if bt.cagr is not None else opt_metrics.get("cagr", 0)
-                ),
-                cagr_long=_safe_float(
-                    bt.cagr_long
-                    if bt.cagr_long is not None
-                    else opt_metrics.get("cagr_long", 0)
-                ),
+                strategy_outperformance=_safe_float(opt_metrics.get("strategy_outperformance", 0)),
+                cagr=_safe_float(bt.cagr if bt.cagr is not None else opt_metrics.get("cagr", 0)),
+                cagr_long=_safe_float(bt.cagr_long if bt.cagr_long is not None else opt_metrics.get("cagr_long", 0)),
                 cagr_short=_safe_float(
-                    bt.cagr_short
-                    if bt.cagr_short is not None
-                    else opt_metrics.get("cagr_short", 0)
+                    bt.cagr_short if bt.cagr_short is not None else opt_metrics.get("cagr_short", 0)
                 ),
                 max_runup=_safe_float(opt_metrics.get("max_runup", 0)),
                 max_runup_value=_safe_float(opt_metrics.get("max_runup_value", 0)),
-                avg_runup_duration_bars=_safe_float(
-                    opt_metrics.get("avg_runup_duration_bars", 0)
-                ),
-                avg_drawdown_duration_bars=_safe_float(
-                    opt_metrics.get("avg_drawdown_duration_bars", 0)
-                ),
+                avg_runup_duration_bars=_safe_float(opt_metrics.get("avg_runup_duration_bars", 0)),
+                avg_drawdown_duration_bars=_safe_float(opt_metrics.get("avg_drawdown_duration_bars", 0)),
                 best_trade=_safe_float(opt_metrics.get("best_trade", 0)),
                 worst_trade=_safe_float(opt_metrics.get("worst_trade", 0)),
             )
 
             # Get trades and equity curve from DB if available
-            trades_data: List[Any] = list(bt.trades) if bt.trades else []  # type: ignore[arg-type]
+            trades_data: list[Any] = list(bt.trades) if bt.trades else []  # type: ignore[arg-type]
 
             # Convert equity_curve from list format to EquityCurve model
             equity_curve_data = None
@@ -993,7 +844,7 @@ async def list_backtests(
                         ts = point.get("timestamp", 0)
                         # Convert ms timestamp to datetime
                         if isinstance(ts, (int, float)):
-                            ts = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+                            ts = datetime.fromtimestamp(ts / 1000, tz=UTC)
                         elif isinstance(ts, str):
                             ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                         timestamps.append(ts)
@@ -1009,17 +860,11 @@ async def list_backtests(
 
             result = BacktestResult(
                 id=str(bt.id) if bt.id else "",
-                status=BacktestStatus.COMPLETED
-                if bt.status == DBBacktestStatus.COMPLETED
-                else BacktestStatus.FAILED,
-                created_at=cast(datetime, bt.created_at)
-                if bt.created_at
-                else datetime.now(timezone.utc),
+                status=BacktestStatus.COMPLETED if bt.status == DBBacktestStatus.COMPLETED else BacktestStatus.FAILED,
+                created_at=cast(datetime, bt.created_at) if bt.created_at else datetime.now(UTC),
                 config=config,
                 metrics=metrics,
-                trades=cast(List[TradeRecord], list(trades_data))
-                if trades_data
-                else [],
+                trades=cast(list[TradeRecord], list(trades_data)) if trades_data else [],
                 equity_curve=equity_curve_data,
                 final_equity=float(bt.final_capital) if bt.final_capital else None,
                 final_pnl=float(net_profit) if net_profit else None,
@@ -1095,44 +940,36 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
     # Convert DB model to BacktestResult
     try:
         # Parse dates - they may be strings or datetime objects
-        start_dt: Optional[datetime] = cast(Optional[datetime], bt.start_date)
-        end_dt: Optional[datetime] = cast(Optional[datetime], bt.end_date)
+        start_dt: datetime | None = cast(datetime | None, bt.start_date)
+        end_dt: datetime | None = cast(datetime | None, bt.end_date)
         if isinstance(start_dt, str):
             start_dt = datetime.fromisoformat(start_dt.replace("Z", "+00:00"))
         if isinstance(end_dt, str):
             end_dt = datetime.fromisoformat(end_dt.replace("Z", "+00:00"))
         if start_dt and start_dt.tzinfo is None:
-            start_dt = start_dt.replace(tzinfo=timezone.utc)
+            start_dt = start_dt.replace(tzinfo=UTC)
         if end_dt and end_dt.tzinfo is None:
-            end_dt = end_dt.replace(tzinfo=timezone.utc)
+            end_dt = end_dt.replace(tzinfo=UTC)
 
         config = BacktestConfig(
             symbol=str(bt.symbol or "BTCUSDT"),
             interval=str(bt.timeframe or "30"),
-            start_date=cast(datetime, start_dt)
-            if start_dt
-            else datetime.now(timezone.utc),
-            end_date=cast(datetime, end_dt) if end_dt else datetime.now(timezone.utc),
+            start_date=cast(datetime, start_dt) if start_dt else datetime.now(UTC),
+            end_date=cast(datetime, end_dt) if end_dt else datetime.now(UTC),
             initial_capital=float(bt.initial_capital or 10000.0),
             strategy_type=StrategyType(str(bt.strategy_type or "rsi")),
-            strategy_params=bt.parameters.get("strategy_params", {})
-            if bt.parameters
-            else {},
+            strategy_params=bt.parameters.get("strategy_params", {}) if bt.parameters else {},
             stop_loss=bt.parameters.get("stop_loss_pct") if bt.parameters else None,
             take_profit=bt.parameters.get("take_profit_pct") if bt.parameters else None,
             leverage=bt.parameters.get("leverage", 10) if bt.parameters else 10,
         )
 
         # Build PerformanceMetrics from DB fields + stored optimization_metrics
-        net_profit = (
-            bt.final_capital - bt.initial_capital
-            if bt.final_capital and bt.initial_capital
-            else 0
-        )
+        net_profit = bt.final_capital - bt.initial_capital if bt.final_capital and bt.initial_capital else 0
 
         # Get stored metrics - prioritize metrics_json (full data), fallback to parameters.optimization_metrics
         # metrics_json is the Single Source of Truth (SSoT) for all detailed metrics
-        opt_metrics: Dict[str, Any] = {}
+        opt_metrics: dict[str, Any] = {}
 
         # First, try metrics_json (contains complete metrics snapshot)
         if bt.metrics_json and isinstance(bt.metrics_json, dict):
@@ -1157,9 +994,7 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
         # Calculate max_drawdown_value in $ from percentage
         initial_cap = bt.initial_capital or 10000.0
         max_dd_pct = bt.max_drawdown or 0
-        max_dd_value = opt_metrics.get(
-            "max_drawdown_value", abs(max_dd_pct) * initial_cap / 100.0
-        )
+        max_dd_value = opt_metrics.get("max_drawdown_value", abs(max_dd_pct) * initial_cap / 100.0)
 
         # Calculate winning/losing trades from win_rate if not stored
         # Use opt_metrics as fallback for optimization results
@@ -1171,33 +1006,23 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
         win_rate_val = bt.win_rate or 0
         if winning_trades_count == 0 and total_trades_count > 0 and win_rate_val > 0:
             # Determine if win_rate is in percentage (>1) or decimal (<1) format
-            win_rate_decimal = (
-                win_rate_val / 100.0 if win_rate_val > 1 else win_rate_val
-            )
+            win_rate_decimal = win_rate_val / 100.0 if win_rate_val > 1 else win_rate_val
             winning_trades_count = int(round(total_trades_count * win_rate_decimal))
             losing_trades_count = total_trades_count - winning_trades_count
 
         metrics = PerformanceMetrics(
             net_profit=_safe_float(opt_metrics.get("net_profit", net_profit)),
-            net_profit_pct=_safe_float(
-                opt_metrics.get("net_profit_pct", bt.total_return or 0)
-            ),
+            net_profit_pct=_safe_float(opt_metrics.get("net_profit_pct", bt.total_return or 0)),
             total_return=_safe_float(bt.total_return or 0),
-            annual_return=_safe_float(
-                bt.annual_return or opt_metrics.get("annual_return", 0)
-            ),
+            annual_return=_safe_float(bt.annual_return or opt_metrics.get("annual_return", 0)),
             sharpe_ratio=_safe_float(bt.sharpe_ratio or 0),
             sortino_ratio=_safe_float(bt.sortino_ratio or 0),
-            calmar_ratio=_safe_float(
-                bt.calmar_ratio or opt_metrics.get("calmar_ratio", 0)
-            ),
+            calmar_ratio=_safe_float(bt.calmar_ratio or opt_metrics.get("calmar_ratio", 0)),
             max_drawdown=_safe_float(bt.max_drawdown or 0),
             max_drawdown_value=_safe_float(max_dd_value),
             avg_drawdown=_safe_float(opt_metrics.get("avg_drawdown", 0)),
             avg_drawdown_value=_safe_float(opt_metrics.get("avg_drawdown_value", 0)),
-            max_drawdown_duration_days=_safe_float(
-                opt_metrics.get("max_drawdown_duration_days", 0)
-            ),
+            max_drawdown_duration_days=_safe_float(opt_metrics.get("max_drawdown_duration_days", 0)),
             total_trades=_safe_int(total_trades_count),
             winning_trades=_safe_int(winning_trades_count),
             losing_trades=_safe_int(losing_trades_count),
@@ -1206,36 +1031,18 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
             avg_win=_safe_float(opt_metrics.get("avg_win", 0)),
             avg_loss=_safe_float(opt_metrics.get("avg_loss", 0)),
             avg_trade=_safe_float(opt_metrics.get("avg_trade", 0)),
-            avg_win_value=_safe_float(
-                opt_metrics.get("avg_win_value", opt_metrics.get("avg_win", 0))
-            ),
-            avg_loss_value=_safe_float(
-                opt_metrics.get("avg_loss_value", opt_metrics.get("avg_loss", 0))
-            ),
+            avg_win_value=_safe_float(opt_metrics.get("avg_win_value", opt_metrics.get("avg_win", 0))),
+            avg_loss_value=_safe_float(opt_metrics.get("avg_loss_value", opt_metrics.get("avg_loss", 0))),
             avg_trade_value=_safe_float(opt_metrics.get("avg_trade_value", 0)),
             exposure_time=_safe_float(
-                bt.exposure_time
-                if bt.exposure_time is not None
-                else opt_metrics.get("exposure_time", 0)
+                bt.exposure_time if bt.exposure_time is not None else opt_metrics.get("exposure_time", 0)
             ),
-            avg_trade_duration_hours=_safe_float(
-                opt_metrics.get("avg_trade_duration_hours", 0)
-            ),
+            avg_trade_duration_hours=_safe_float(opt_metrics.get("avg_trade_duration_hours", 0)),
             gross_profit=_safe_float(
-                bt.gross_profit
-                if bt.gross_profit is not None
-                else opt_metrics.get("gross_profit", 0)
+                bt.gross_profit if bt.gross_profit is not None else opt_metrics.get("gross_profit", 0)
             ),
-            gross_loss=_safe_float(
-                bt.gross_loss
-                if bt.gross_loss is not None
-                else opt_metrics.get("gross_loss", 0)
-            ),
-            expectancy=_safe_float(
-                bt.expectancy
-                if bt.expectancy is not None
-                else opt_metrics.get("expectancy", 0)
-            ),
+            gross_loss=_safe_float(bt.gross_loss if bt.gross_loss is not None else opt_metrics.get("gross_loss", 0)),
+            expectancy=_safe_float(bt.expectancy if bt.expectancy is not None else opt_metrics.get("expectancy", 0)),
             max_consecutive_wins=_safe_int(
                 bt.max_consecutive_wins
                 if bt.max_consecutive_wins is not None
@@ -1247,64 +1054,42 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 else opt_metrics.get("max_consecutive_losses", 0)
             ),
             recovery_factor=_safe_float(
-                bt.recovery_factor
-                if bt.recovery_factor is not None
-                else opt_metrics.get("recovery_factor", 0)
+                bt.recovery_factor if bt.recovery_factor is not None else opt_metrics.get("recovery_factor", 0)
             ),
             largest_win=_safe_float(opt_metrics.get("largest_win", 0)),
             largest_loss=_safe_float(opt_metrics.get("largest_loss", 0)),
             largest_win_value=_safe_float(opt_metrics.get("largest_win_value", 0)),
             largest_loss_value=_safe_float(opt_metrics.get("largest_loss_value", 0)),
-            long_trades=_safe_int(
-                bt.long_trades
-                if bt.long_trades is not None
-                else opt_metrics.get("long_trades", 0)
-            ),
+            long_trades=_safe_int(bt.long_trades if bt.long_trades is not None else opt_metrics.get("long_trades", 0)),
             long_winning_trades=_safe_int(opt_metrics.get("long_winning_trades", 0)),
             long_losing_trades=_safe_int(opt_metrics.get("long_losing_trades", 0)),
             long_win_rate=_safe_float(
-                bt.long_win_rate
-                if bt.long_win_rate is not None
-                else opt_metrics.get("long_win_rate", 0)
+                bt.long_win_rate if bt.long_win_rate is not None else opt_metrics.get("long_win_rate", 0)
             ),
             long_gross_profit=_safe_float(opt_metrics.get("long_gross_profit", 0)),
-            long_gross_profit_pct=_safe_float(
-                opt_metrics.get("long_gross_profit_pct", 0)
-            ),
+            long_gross_profit_pct=_safe_float(opt_metrics.get("long_gross_profit_pct", 0)),
             long_gross_loss=_safe_float(opt_metrics.get("long_gross_loss", 0)),
             long_gross_loss_pct=_safe_float(opt_metrics.get("long_gross_loss_pct", 0)),
             long_net_profit=_safe_float(
-                bt.long_pnl
-                if bt.long_pnl is not None
-                else opt_metrics.get("long_net_profit", 0)
+                bt.long_pnl if bt.long_pnl is not None else opt_metrics.get("long_net_profit", 0)
             ),
             long_profit_factor=_safe_float(opt_metrics.get("long_profit_factor", 0)),
             long_avg_win=_safe_float(opt_metrics.get("long_avg_win_pct", 0)),
             long_avg_loss=_safe_float(opt_metrics.get("long_avg_loss_pct", 0)),
             short_trades=_safe_int(
-                bt.short_trades
-                if bt.short_trades is not None
-                else opt_metrics.get("short_trades", 0)
+                bt.short_trades if bt.short_trades is not None else opt_metrics.get("short_trades", 0)
             ),
             short_winning_trades=_safe_int(opt_metrics.get("short_winning_trades", 0)),
             short_losing_trades=_safe_int(opt_metrics.get("short_losing_trades", 0)),
             short_win_rate=_safe_float(
-                bt.short_win_rate
-                if bt.short_win_rate is not None
-                else opt_metrics.get("short_win_rate", 0)
+                bt.short_win_rate if bt.short_win_rate is not None else opt_metrics.get("short_win_rate", 0)
             ),
             short_gross_profit=_safe_float(opt_metrics.get("short_gross_profit", 0)),
-            short_gross_profit_pct=_safe_float(
-                opt_metrics.get("short_gross_profit_pct", 0)
-            ),
+            short_gross_profit_pct=_safe_float(opt_metrics.get("short_gross_profit_pct", 0)),
             short_gross_loss=_safe_float(opt_metrics.get("short_gross_loss", 0)),
-            short_gross_loss_pct=_safe_float(
-                opt_metrics.get("short_gross_loss_pct", 0)
-            ),
+            short_gross_loss_pct=_safe_float(opt_metrics.get("short_gross_loss_pct", 0)),
             short_net_profit=_safe_float(
-                bt.short_pnl
-                if bt.short_pnl is not None
-                else opt_metrics.get("short_net_profit", 0)
+                bt.short_pnl if bt.short_pnl is not None else opt_metrics.get("short_net_profit", 0)
             ),
             short_profit_factor=_safe_float(opt_metrics.get("short_profit_factor", 0)),
             short_avg_win=_safe_float(opt_metrics.get("short_avg_win_pct", 0)),
@@ -1320,83 +1105,47 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
             short_largest_win=_safe_float(opt_metrics.get("short_largest_win", 0)),
             short_largest_loss=_safe_float(opt_metrics.get("short_largest_loss", 0)),
             long_max_consec_wins=_safe_int(opt_metrics.get("long_max_consec_wins", 0)),
-            long_max_consec_losses=_safe_int(
-                opt_metrics.get("long_max_consec_losses", 0)
-            ),
-            short_max_consec_wins=_safe_int(
-                opt_metrics.get("short_max_consec_wins", 0)
-            ),
-            short_max_consec_losses=_safe_int(
-                opt_metrics.get("short_max_consec_losses", 0)
-            ),
+            long_max_consec_losses=_safe_int(opt_metrics.get("long_max_consec_losses", 0)),
+            short_max_consec_wins=_safe_int(opt_metrics.get("short_max_consec_wins", 0)),
+            short_max_consec_losses=_safe_int(opt_metrics.get("short_max_consec_losses", 0)),
             long_payoff_ratio=_safe_float(opt_metrics.get("long_payoff_ratio", 0)),
             short_payoff_ratio=_safe_float(opt_metrics.get("short_payoff_ratio", 0)),
             long_expectancy=_safe_float(opt_metrics.get("long_expectancy", 0)),
             short_expectancy=_safe_float(opt_metrics.get("short_expectancy", 0)),
             total_commission=_safe_float(
-                bt.total_commission
-                if bt.total_commission is not None
-                else opt_metrics.get("total_commission", 0)
+                bt.total_commission if bt.total_commission is not None else opt_metrics.get("total_commission", 0)
             ),
             buy_hold_return=_safe_float(
-                bt.buy_hold_return
-                if bt.buy_hold_return is not None
-                else opt_metrics.get("buy_hold_return", 0)
+                bt.buy_hold_return if bt.buy_hold_return is not None else opt_metrics.get("buy_hold_return", 0)
             ),
             buy_hold_return_pct=_safe_float(
                 bt.buy_hold_return_pct
                 if bt.buy_hold_return_pct is not None
                 else opt_metrics.get("buy_hold_return_pct", 0)
             ),
-            strategy_outperformance=_safe_float(
-                opt_metrics.get("strategy_outperformance", 0)
-            ),
-            cagr=_safe_float(
-                bt.cagr if bt.cagr is not None else opt_metrics.get("cagr", 0)
-            ),
-            cagr_long=_safe_float(
-                bt.cagr_long
-                if bt.cagr_long is not None
-                else opt_metrics.get("cagr_long", 0)
-            ),
-            cagr_short=_safe_float(
-                bt.cagr_short
-                if bt.cagr_short is not None
-                else opt_metrics.get("cagr_short", 0)
-            ),
+            strategy_outperformance=_safe_float(opt_metrics.get("strategy_outperformance", 0)),
+            cagr=_safe_float(bt.cagr if bt.cagr is not None else opt_metrics.get("cagr", 0)),
+            cagr_long=_safe_float(bt.cagr_long if bt.cagr_long is not None else opt_metrics.get("cagr_long", 0)),
+            cagr_short=_safe_float(bt.cagr_short if bt.cagr_short is not None else opt_metrics.get("cagr_short", 0)),
             max_runup=_safe_float(opt_metrics.get("max_runup", 0)),
             max_runup_value=_safe_float(opt_metrics.get("max_runup_value", 0)),
-            avg_runup_duration_bars=_safe_float(
-                opt_metrics.get("avg_runup_duration_bars", 0)
-            ),
-            avg_drawdown_duration_bars=_safe_float(
-                opt_metrics.get("avg_drawdown_duration_bars", 0)
-            ),
+            avg_runup_duration_bars=_safe_float(opt_metrics.get("avg_runup_duration_bars", 0)),
+            avg_drawdown_duration_bars=_safe_float(opt_metrics.get("avg_drawdown_duration_bars", 0)),
             avg_bars_in_trade=_safe_float(
-                bt.avg_bars_in_trade
-                if bt.avg_bars_in_trade is not None
-                else opt_metrics.get("avg_bars_in_trade", 0)
+                bt.avg_bars_in_trade if bt.avg_bars_in_trade is not None else opt_metrics.get("avg_bars_in_trade", 0)
             ),
             avg_bars_in_winning=_safe_float(opt_metrics.get("avg_bars_in_winning", 0)),
             avg_bars_in_losing=_safe_float(opt_metrics.get("avg_bars_in_losing", 0)),
             avg_bars_in_long=_safe_float(opt_metrics.get("avg_bars_in_long", 0)),
             avg_bars_in_short=_safe_float(opt_metrics.get("avg_bars_in_short", 0)),
-            avg_bars_in_winning_long=_safe_float(
-                opt_metrics.get("avg_bars_in_winning_long", 0)
-            ),
-            avg_bars_in_winning_short=_safe_float(
-                opt_metrics.get("avg_bars_in_winning_short", 0)
-            ),
-            avg_bars_in_losing_long=_safe_float(
-                opt_metrics.get("avg_bars_in_losing_long", 0)
-            ),
-            avg_bars_in_losing_short=_safe_float(
-                opt_metrics.get("avg_bars_in_losing_short", 0)
-            ),
+            avg_bars_in_winning_long=_safe_float(opt_metrics.get("avg_bars_in_winning_long", 0)),
+            avg_bars_in_winning_short=_safe_float(opt_metrics.get("avg_bars_in_winning_short", 0)),
+            avg_bars_in_losing_long=_safe_float(opt_metrics.get("avg_bars_in_losing_long", 0)),
+            avg_bars_in_losing_short=_safe_float(opt_metrics.get("avg_bars_in_losing_short", 0)),
         )
 
         # Get trades and equity curve from DB if available
-        trades_data: List[Any] = []
+        trades_data: list[Any] = []
         trades_list = list(bt.trades) if bt.trades else []  # type: ignore[arg-type]
         if trades_list:
             for t in trades_list:
@@ -1405,18 +1154,12 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 exit_time = t.get("exit_time")
 
                 if isinstance(entry_time, (int, float)):
-                    entry_time = datetime.fromtimestamp(
-                        entry_time / 1000, tz=timezone.utc
-                    )
+                    entry_time = datetime.fromtimestamp(entry_time / 1000, tz=UTC)
                 elif isinstance(entry_time, str):
-                    entry_time = datetime.fromisoformat(
-                        entry_time.replace("Z", "+00:00")
-                    )
+                    entry_time = datetime.fromisoformat(entry_time.replace("Z", "+00:00"))
 
                 if isinstance(exit_time, (int, float)):
-                    exit_time = datetime.fromtimestamp(
-                        exit_time / 1000, tz=timezone.utc
-                    )
+                    exit_time = datetime.fromtimestamp(exit_time / 1000, tz=UTC)
                 elif isinstance(exit_time, str):
                     exit_time = datetime.fromisoformat(exit_time.replace("Z", "+00:00"))
 
@@ -1443,9 +1186,7 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 )
 
         equity_curve_data = None
-        logger.info(
-            f"[DEBUG] bt.equity_curve type: {type(bt.equity_curve)}, truthy: {bool(bt.equity_curve)}"
-        )
+        logger.info(f"[DEBUG] bt.equity_curve type: {type(bt.equity_curve)}, truthy: {bool(bt.equity_curve)}")
         if bt.equity_curve:
             logger.info(
                 f"[DEBUG] equity_curve is dict: {isinstance(bt.equity_curve, dict)}, has equity: {'equity' in bt.equity_curve if isinstance(bt.equity_curve, dict) else 'N/A'}"
@@ -1459,7 +1200,7 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 timestamps = []
                 for ts in timestamps_raw:
                     if isinstance(ts, (int, float)):
-                        ts = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+                        ts = datetime.fromtimestamp(ts / 1000, tz=UTC)
                     elif isinstance(ts, str):
                         ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                     timestamps.append(ts)
@@ -1480,7 +1221,7 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 for point in bt.equity_curve:
                     ts = point.get("timestamp")
                     if isinstance(ts, (int, float)):
-                        ts = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+                        ts = datetime.fromtimestamp(ts / 1000, tz=UTC)
                     elif isinstance(ts, str):
                         ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                     timestamps.append(ts)
@@ -1495,15 +1236,11 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
 
         return BacktestResult(
             id=str(bt.id) if bt.id else "",
-            status=BacktestStatus.COMPLETED
-            if bt.status == DBBacktestStatus.COMPLETED
-            else BacktestStatus.FAILED,
-            created_at=cast(datetime, bt.created_at)
-            if bt.created_at
-            else datetime.now(timezone.utc),
+            status=BacktestStatus.COMPLETED if bt.status == DBBacktestStatus.COMPLETED else BacktestStatus.FAILED,
+            created_at=cast(datetime, bt.created_at) if bt.created_at else datetime.now(UTC),
             config=config,
             metrics=metrics,
-            trades=cast(List[TradeRecord], trades_data) if trades_data else [],
+            trades=cast(list[TradeRecord], trades_data) if trades_data else [],
             equity_curve=equity_curve_data,
             final_equity=float(bt.final_capital) if bt.final_capital else None,
             final_pnl=float(net_profit) if net_profit else None,
@@ -1513,7 +1250,7 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
         logger.warning(f"Failed to convert DB backtest {bt.id}: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to convert backtest: {str(e)}",
+            detail=f"Failed to convert backtest: {e!s}",
         )
 
 
@@ -1667,22 +1404,16 @@ async def run_backtest_from_strategy(
     # Build backtest config from strategy
     symbol = request.symbol or str(strategy.symbol or "BTCUSDT")
     interval = request.interval or str(strategy.timeframe or "1h")
-    initial_capital = float(
-        request.initial_capital or strategy.initial_capital or 10000.0
-    )
+    initial_capital = float(request.initial_capital or strategy.initial_capital or 10000.0)
 
     # Extract trading parameters from strategy.parameters (stored with _ prefix)
     # Note: commission and slippage are already stored as decimals (e.g., 0.001 for 0.1%)
-    params: Dict[str, Any] = dict(strategy.parameters) if strategy.parameters else {}
+    params: dict[str, Any] = dict(strategy.parameters) if strategy.parameters else {}
     leverage = float(params.get("_leverage", 1))
     direction = params.get("_direction", "both")
     pyramiding = int(params.get("_pyramiding", 1))
-    commission = float(
-        params.get("_commission", 0.001)
-    )  # Already decimal (0.001 = 0.1%)
-    slippage = float(
-        params.get("_slippage", 0.0005)
-    )  # Already decimal (0.0005 = 0.05%)
+    commission = float(params.get("_commission", 0.001))  # Already decimal (0.001 = 0.1%)
+    slippage = float(params.get("_slippage", 0.0005))  # Already decimal (0.0005 = 0.05%)
 
     # Handle position size based on type
     position_size_type = params.get("_position_size_type", "percent")
@@ -1704,11 +1435,7 @@ async def run_backtest_from_strategy(
         logger.info(f"Using fixed contracts: {order_amount}")
     else:
         # Percent mode - use strategy.position_size (already as fraction)
-        position_size = (
-            _safe_float(request.position_size)
-            or _safe_float(strategy.position_size)
-            or 1.0
-        )
+        position_size = _safe_float(request.position_size) or _safe_float(strategy.position_size) or 1.0
 
     # Build config with validation error handling
     try:
@@ -1733,12 +1460,8 @@ async def run_backtest_from_strategy(
             taker_fee=commission,
             maker_fee=commission,
             slippage=slippage,
-            stop_loss=_safe_float(strategy.stop_loss_pct) / 100
-            if strategy.stop_loss_pct
-            else None,
-            take_profit=_safe_float(strategy.take_profit_pct) / 100
-            if strategy.take_profit_pct
-            else None,
+            stop_loss=_safe_float(strategy.stop_loss_pct) / 100 if strategy.stop_loss_pct else None,
+            take_profit=_safe_float(strategy.take_profit_pct) / 100 if strategy.take_profit_pct else None,
         )
     except (ValidationError, PydanticCoreValidationError) as e:
         # Return 422 for validation errors
@@ -1760,9 +1483,7 @@ async def run_backtest_from_strategy(
     result = await service.run_backtest(config)
 
     if result.status == BacktestStatus.FAILED:
-        logger.error(
-            f"Backtest from strategy {strategy_id} failed: {result.error_message}"
-        )
+        logger.error(f"Backtest from strategy {strategy_id} failed: {result.error_message}")
         return RunFromStrategyResponse(
             backtest_id=result.id or "",
             strategy_id=strategy_id,
@@ -1787,9 +1508,7 @@ async def run_backtest_from_strategy(
             m = result.metrics  # shortcut
             db_backtest = BacktestModel(
                 strategy_id=strategy.id,
-                metrics_json=m.model_dump(mode="json")
-                if m
-                else None,  # Save full metrics JSON
+                metrics_json=m.model_dump(mode="json") if m else None,  # Save full metrics JSON
                 strategy_type=strategy.strategy_type.value,
                 symbol=symbol,
                 timeframe=interval,
@@ -1838,22 +1557,16 @@ async def run_backtest_from_strategy(
                 # Trades and Equity Curve (with MFE/MAE)
                 trades=[
                     {
-                        "entry_time": t.entry_time.isoformat()
-                        if t.entry_time
-                        else None,
+                        "entry_time": t.entry_time.isoformat() if t.entry_time else None,
                         "exit_time": t.exit_time.isoformat() if t.exit_time else None,
-                        "side": t.side.value
-                        if hasattr(t.side, "value")
-                        else str(t.side),
+                        "side": t.side.value if hasattr(t.side, "value") else str(t.side),
                         "entry_price": float(t.entry_price) if t.entry_price else 0,
                         "exit_price": float(t.exit_price) if t.exit_price else 0,
                         "size": float(t.size) if t.size else 0,
                         "pnl": float(t.pnl) if t.pnl else 0,
                         "pnl_pct": float(t.pnl_pct) if t.pnl_pct else 0,
                         "fees": float(t.fees) if t.fees else 0,
-                        "duration_hours": float(t.duration_hours)
-                        if t.duration_hours
-                        else 0,
+                        "duration_hours": float(t.duration_hours) if t.duration_hours else 0,
                         "mfe": float(t.mfe) if hasattr(t, "mfe") and t.mfe else 0,
                         "mae": float(t.mae) if hasattr(t, "mae") and t.mae else 0,
                         "mfe_pct": float(t.mfe) if hasattr(t, "mfe") and t.mfe else 0,
@@ -1861,9 +1574,7 @@ async def run_backtest_from_strategy(
                     }
                     for t in (result.trades or [])[:500]
                 ],
-                equity_curve=build_equity_curve_response(
-                    result.equity_curve, result.trades
-                )
+                equity_curve=build_equity_curve_response(result.equity_curve, result.trades)
                 if result.equity_curve
                 else None,
             )
@@ -1876,7 +1587,7 @@ async def run_backtest_from_strategy(
                 strategy.win_rate = result.metrics.win_rate  # type: ignore[assignment]
                 strategy.total_trades = result.metrics.total_trades  # type: ignore[assignment]
                 strategy.backtest_count = _safe_int(strategy.backtest_count) + 1  # type: ignore[assignment]
-                strategy.last_backtest_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+                strategy.last_backtest_at = datetime.now(UTC)  # type: ignore[assignment]
 
             db.commit()
             saved_to_db = True
@@ -1951,13 +1662,11 @@ class SaveOptimizationResultRequest(BaseModel):
     """Request to save optimization result as a backtest"""
 
     name: str = Field(..., description="Name for the backtest")
-    strategy_id: Optional[str] = Field(
-        default=None, description="Link to parent strategy for metrics update"
-    )
+    strategy_id: str | None = Field(default=None, description="Link to parent strategy for metrics update")
     config: dict = Field(..., description="Backtest configuration")
     results: dict = Field(..., description="Performance metrics")
     status: str = Field(default="completed")
-    metadata: Optional[dict] = Field(default=None, description="Additional metadata")
+    metadata: dict | None = Field(default=None, description="Additional metadata")
 
 
 class SaveOptimizationResultResponse(BaseModel):
@@ -2024,6 +1733,7 @@ async def save_optimization_result(
                 # IMPORTANT: Normalize interval format to match database format
                 # Frontend may send "15m", "1h", "4h", "1d" but DB stores "15", "60", "240", "D"
                 raw_interval = config.get("interval", "30")
+                # Bybit API v5: 1,3,5,15,30,60,120,240,360,720,D,W,M
                 interval_map = {
                     "1m": "1",
                     "3m": "3",
@@ -2037,11 +1747,11 @@ async def save_optimization_result(
                     "12h": "720",
                     "1d": "D",
                     "1w": "W",
+                    "1M": "M",
+                    "M": "M",
                 }
                 db_interval = interval_map.get(raw_interval, raw_interval)
-                logger.info(
-                    f"[save_optimization_result] Normalized interval: {raw_interval} -> {db_interval}"
-                )
+                logger.info(f"[save_optimization_result] Normalized interval: {raw_interval} -> {db_interval}")
 
                 data_service = DataService(db)
                 candle_records = data_service.get_market_data(
@@ -2059,9 +1769,7 @@ async def save_optimization_result(
                     candles = pd.DataFrame(
                         [
                             {
-                                "timestamp": pd.to_datetime(
-                                    c.open_time, unit="ms", utc=True
-                                ),
+                                "timestamp": pd.to_datetime(c.open_time, unit="ms", utc=True),
                                 "open": float(c.open_price) if c.open_price else 0,
                                 "high": float(c.high_price) if c.high_price else 0,
                                 "low": float(c.low_price) if c.low_price else 0,
@@ -2083,12 +1791,8 @@ async def save_optimization_result(
                     # Build BacktestConfig
                     # IMPORTANT: Use best_params from optimization results, NOT config.strategy_params!
                     # config.strategy_params contains default/original params, not optimized ones.
-                    best_params = results.get(
-                        "best_params", config.get("strategy_params", {})
-                    )
-                    logger.info(
-                        f"Running full backtest with best_params: {best_params}"
-                    )
+                    best_params = results.get("best_params", config.get("strategy_params", {}))
+                    logger.info(f"Running full backtest with best_params: {best_params}")
 
                     backtest_config = BacktestConfig(
                         symbol=config.get("symbol", "BTCUSDT"),
@@ -2100,12 +1804,8 @@ async def save_optimization_result(
                         initial_capital=config.get("initial_capital", 10000.0),
                         leverage=config.get("leverage", 10),
                         direction=config.get("direction", "both"),
-                        stop_loss=config.get("stop_loss_pct", 0) / 100
-                        if config.get("stop_loss_pct")
-                        else None,
-                        take_profit=config.get("take_profit_pct", 0) / 100
-                        if config.get("take_profit_pct")
-                        else None,
+                        stop_loss=config.get("stop_loss_pct", 0) / 100 if config.get("stop_loss_pct") else None,
+                        take_profit=config.get("take_profit_pct", 0) / 100 if config.get("take_profit_pct") else None,
                         taker_fee=config.get("commission", 0.0006),
                         maker_fee=config.get("commission", 0.0006),
                     )
@@ -2126,10 +1826,7 @@ async def save_optimization_result(
                             logger.warning(
                                 f"Too many trades ({len(full_result.trades)}), truncating to {MAX_TRADES_TO_SAVE}"
                             )
-                            trades_list = [
-                                t.model_dump()
-                                for t in full_result.trades[:MAX_TRADES_TO_SAVE]
-                            ]
+                            trades_list = [t.model_dump() for t in full_result.trades[:MAX_TRADES_TO_SAVE]]
                         else:
                             trades_list = [t.model_dump() for t in full_result.trades]
 
@@ -2147,19 +1844,13 @@ async def save_optimization_result(
                         trades_list = [serialize_trade(t) for t in trades_list]
                         logger.info(f"Got {len(trades_list)} trades from full backtest")
                         # Update total_trades metric from full result if present
-                        if full_result.metrics and hasattr(
-                            full_result.metrics, "total_trades"
-                        ):
-                            results["total_trades"] = getattr(
-                                full_result.metrics, "total_trades", len(trades_list)
-                            )
+                        if full_result.metrics and hasattr(full_result.metrics, "total_trades"):
+                            results["total_trades"] = getattr(full_result.metrics, "total_trades", len(trades_list))
                         # Truncate trades to match total_trades metric (avoid excess entries)
                         metric_total = results.get("total_trades", len(trades_list))
                         if len(trades_list) > metric_total:
                             trades_list = trades_list[:metric_total]
-                            logger.info(
-                                f"Truncated trades to metric total_trades={metric_total}"
-                            )
+                            logger.info(f"Truncated trades to metric total_trades={metric_total}")
 
                         # CRITICAL: Update ALL summary metrics from full_result.metrics
                         # This ensures "ВСЕ" column matches "ДЛИННАЯ/КОРОТКАЯ" columns
@@ -2182,9 +1873,7 @@ async def save_optimization_result(
                             results["net_profit_pct"] = getattr(m, "net_profit_pct", 0)
                             results["gross_profit"] = getattr(m, "gross_profit", 0)
                             results["gross_loss"] = getattr(m, "gross_loss", 0)
-                            results["total_commission"] = getattr(
-                                m, "total_commission", 0
-                            )
+                            results["total_commission"] = getattr(m, "total_commission", 0)
 
                             # Average trade metrics
                             # Average trade metrics
@@ -2195,9 +1884,7 @@ async def save_optimization_result(
                             results["worst_trade"] = getattr(m, "worst_trade", 0)  # USD
 
                             # Currency ($) metrics - CRITICAL for frontend display
-                            results["avg_trade_value"] = getattr(
-                                m, "avg_trade_value", 0
-                            )
+                            results["avg_trade_value"] = getattr(m, "avg_trade_value", 0)
                             results["avg_win_value"] = getattr(m, "avg_win_value", 0)
                             results["avg_loss_value"] = getattr(m, "avg_loss_value", 0)
 
@@ -2206,43 +1893,27 @@ async def save_optimization_result(
                             )
 
                             results["best_trade_pct"] = getattr(m, "best_trade_pct", 0)
-                            results["worst_trade_pct"] = getattr(
-                                m, "worst_trade_pct", 0
-                            )
+                            results["worst_trade_pct"] = getattr(m, "worst_trade_pct", 0)
 
                             # Duration metrics
-                            results["avg_bars_in_trade"] = getattr(
-                                m, "avg_bars_in_trade", 0
-                            )
-                            results["avg_bars_in_winning"] = getattr(
-                                m, "avg_bars_in_winning", 0
-                            )
-                            results["avg_bars_in_losing"] = getattr(
-                                m, "avg_bars_in_losing", 0
-                            )
+                            results["avg_bars_in_trade"] = getattr(m, "avg_bars_in_trade", 0)
+                            results["avg_bars_in_winning"] = getattr(m, "avg_bars_in_winning", 0)
+                            results["avg_bars_in_losing"] = getattr(m, "avg_bars_in_losing", 0)
 
                             # Drawdown and risk metrics
                             results["max_drawdown"] = getattr(m, "max_drawdown", 0)
-                            results["max_drawdown_pct"] = getattr(
-                                m, "max_drawdown_pct", 0
-                            )
+                            results["max_drawdown_pct"] = getattr(m, "max_drawdown_pct", 0)
                             results["sharpe_ratio"] = getattr(m, "sharpe_ratio", 0)
                             results["sortino_ratio"] = getattr(m, "sortino_ratio", 0)
                             results["calmar_ratio"] = getattr(m, "calmar_ratio", 0)
 
                             # Consecutive wins/losses
-                            results["max_consecutive_wins"] = getattr(
-                                m, "max_consecutive_wins", 0
-                            )
-                            results["max_consecutive_losses"] = getattr(
-                                m, "max_consecutive_losses", 0
-                            )
+                            results["max_consecutive_wins"] = getattr(m, "max_consecutive_wins", 0)
+                            results["max_consecutive_losses"] = getattr(m, "max_consecutive_losses", 0)
 
                             # Final capital from full result
                             if hasattr(m, "final_capital"):
-                                results["final_capital"] = getattr(
-                                    m, "final_capital", 0
-                                )
+                                results["final_capital"] = getattr(m, "final_capital", 0)
 
                             logger.info(
                                 f"[save_optimization_result] Updated summary metrics from full backtest: total_trades={results.get('total_trades')}, winning={results.get('winning_trades')}, losing={results.get('losing_trades')}, net_profit={results.get('net_profit')}"
@@ -2252,115 +1923,61 @@ async def save_optimization_result(
                         if full_result.metrics:
                             m = full_result.metrics
                             results["long_trades"] = getattr(m, "long_trades", 0)
-                            results["long_winning_trades"] = getattr(
-                                m, "long_winning_trades", 0
-                            )
-                            results["long_losing_trades"] = getattr(
-                                m, "long_losing_trades", 0
-                            )
+                            results["long_winning_trades"] = getattr(m, "long_winning_trades", 0)
+                            results["long_losing_trades"] = getattr(m, "long_losing_trades", 0)
                             results["long_win_rate"] = getattr(m, "long_win_rate", 0)
-                            results["long_gross_profit"] = getattr(
-                                m, "long_gross_profit", 0
-                            )
-                            results["long_gross_loss"] = getattr(
-                                m, "long_gross_loss", 0
-                            )
-                            results["long_net_profit"] = getattr(
-                                m, "long_net_profit", 0
-                            )
-                            results["long_profit_factor"] = getattr(
-                                m, "long_profit_factor", 0
-                            )
+                            results["long_gross_profit"] = getattr(m, "long_gross_profit", 0)
+                            results["long_gross_loss"] = getattr(m, "long_gross_loss", 0)
+                            results["long_net_profit"] = getattr(m, "long_net_profit", 0)
+                            results["long_profit_factor"] = getattr(m, "long_profit_factor", 0)
                             results["long_avg_win"] = getattr(m, "long_avg_win", 0)
                             results["long_avg_loss"] = getattr(m, "long_avg_loss", 0)
                             results["short_trades"] = getattr(m, "short_trades", 0)
-                            results["short_winning_trades"] = getattr(
-                                m, "short_winning_trades", 0
-                            )
-                            results["short_losing_trades"] = getattr(
-                                m, "short_losing_trades", 0
-                            )
+                            results["short_winning_trades"] = getattr(m, "short_winning_trades", 0)
+                            results["short_losing_trades"] = getattr(m, "short_losing_trades", 0)
                             results["short_win_rate"] = getattr(m, "short_win_rate", 0)
-                            results["short_gross_profit"] = getattr(
-                                m, "short_gross_profit", 0
-                            )
-                            results["short_gross_loss"] = getattr(
-                                m, "short_gross_loss", 0
-                            )
-                            results["short_net_profit"] = getattr(
-                                m, "short_net_profit", 0
-                            )
-                            results["short_profit_factor"] = getattr(
-                                m, "short_profit_factor", 0
-                            )
+                            results["short_gross_profit"] = getattr(m, "short_gross_profit", 0)
+                            results["short_gross_loss"] = getattr(m, "short_gross_loss", 0)
+                            results["short_net_profit"] = getattr(m, "short_net_profit", 0)
+                            results["short_profit_factor"] = getattr(m, "short_profit_factor", 0)
                             results["short_avg_win"] = getattr(m, "short_avg_win", 0)
                             results["short_avg_loss"] = getattr(m, "short_avg_loss", 0)
 
                             # Add avg_trade metrics for Long/Short
                             results["long_avg_trade"] = getattr(m, "long_avg_trade", 0)
-                            results["long_avg_trade_value"] = getattr(
-                                m, "long_avg_trade_value", 0
-                            )
-                            results["long_avg_trade_pct"] = getattr(
-                                m, "long_avg_trade_pct", 0
-                            )
-                            results["short_avg_trade"] = getattr(
-                                m, "short_avg_trade", 0
-                            )
-                            results["short_avg_trade_value"] = getattr(
-                                m, "short_avg_trade_value", 0
-                            )
-                            results["short_avg_trade_pct"] = getattr(
-                                m, "short_avg_trade_pct", 0
-                            )
+                            results["long_avg_trade_value"] = getattr(m, "long_avg_trade_value", 0)
+                            results["long_avg_trade_pct"] = getattr(m, "long_avg_trade_pct", 0)
+                            results["short_avg_trade"] = getattr(m, "short_avg_trade", 0)
+                            results["short_avg_trade_value"] = getattr(m, "short_avg_trade_value", 0)
+                            results["short_avg_trade_pct"] = getattr(m, "short_avg_trade_pct", 0)
 
                             # Add _value and _pct variants for long/short avg_win and avg_loss
                             results["long_avg_win_value"] = getattr(
                                 m, "long_avg_win_value", getattr(m, "long_avg_win", 0)
                             )
-                            results["long_avg_win_pct"] = getattr(
-                                m, "long_avg_win_pct", 0
-                            )
+                            results["long_avg_win_pct"] = getattr(m, "long_avg_win_pct", 0)
                             results["long_avg_loss_value"] = getattr(
                                 m, "long_avg_loss_value", getattr(m, "long_avg_loss", 0)
                             )
-                            results["long_avg_loss_pct"] = getattr(
-                                m, "long_avg_loss_pct", 0
-                            )
+                            results["long_avg_loss_pct"] = getattr(m, "long_avg_loss_pct", 0)
                             results["short_avg_win_value"] = getattr(
                                 m, "short_avg_win_value", getattr(m, "short_avg_win", 0)
                             )
-                            results["short_avg_win_pct"] = getattr(
-                                m, "short_avg_win_pct", 0
-                            )
+                            results["short_avg_win_pct"] = getattr(m, "short_avg_win_pct", 0)
                             results["short_avg_loss_value"] = getattr(
                                 m,
                                 "short_avg_loss_value",
                                 getattr(m, "short_avg_loss", 0),
                             )
-                            results["short_avg_loss_pct"] = getattr(
-                                m, "short_avg_loss_pct", 0
-                            )
+                            results["short_avg_loss_pct"] = getattr(m, "short_avg_loss_pct", 0)
 
                             # Add missing bars metrics for Long/Short
-                            results["avg_bars_in_long"] = getattr(
-                                m, "avg_bars_in_long", 0
-                            )
-                            results["avg_bars_in_short"] = getattr(
-                                m, "avg_bars_in_short", 0
-                            )
-                            results["avg_bars_in_winning_long"] = getattr(
-                                m, "avg_bars_in_winning_long", 0
-                            )
-                            results["avg_bars_in_winning_short"] = getattr(
-                                m, "avg_bars_in_winning_short", 0
-                            )
-                            results["avg_bars_in_losing_long"] = getattr(
-                                m, "avg_bars_in_losing_long", 0
-                            )
-                            results["avg_bars_in_losing_short"] = getattr(
-                                m, "avg_bars_in_losing_short", 0
-                            )
+                            results["avg_bars_in_long"] = getattr(m, "avg_bars_in_long", 0)
+                            results["avg_bars_in_short"] = getattr(m, "avg_bars_in_short", 0)
+                            results["avg_bars_in_winning_long"] = getattr(m, "avg_bars_in_winning_long", 0)
+                            results["avg_bars_in_winning_short"] = getattr(m, "avg_bars_in_winning_short", 0)
+                            results["avg_bars_in_losing_long"] = getattr(m, "avg_bars_in_losing_long", 0)
+                            results["avg_bars_in_losing_short"] = getattr(m, "avg_bars_in_losing_short", 0)
 
                             # CAGR metrics
                             results["cagr"] = getattr(m, "cagr", 0)
@@ -2368,27 +1985,17 @@ async def save_optimization_result(
                             results["cagr_short"] = getattr(m, "cagr_short", 0)
 
                             # Recovery metrics
-                            results["recovery_factor"] = getattr(
-                                m, "recovery_factor", 0
-                            )
+                            results["recovery_factor"] = getattr(m, "recovery_factor", 0)
                             results["recovery_long"] = getattr(m, "recovery_long", 0)
                             results["recovery_short"] = getattr(m, "recovery_short", 0)
 
                             # Buy & Hold and outperformance
-                            results["buy_hold_return"] = getattr(
-                                m, "buy_hold_return", 0
-                            )
-                            results["buy_hold_return_pct"] = getattr(
-                                m, "buy_hold_return_pct", 0
-                            )
-                            results["strategy_outperformance"] = getattr(
-                                m, "strategy_outperformance", 0
-                            )
+                            results["buy_hold_return"] = getattr(m, "buy_hold_return", 0)
+                            results["buy_hold_return_pct"] = getattr(m, "buy_hold_return_pct", 0)
+                            results["strategy_outperformance"] = getattr(m, "strategy_outperformance", 0)
 
                             # Drawdown value metrics
-                            results["max_drawdown_value"] = getattr(
-                                m, "max_drawdown_value", 0
-                            )
+                            results["max_drawdown_value"] = getattr(m, "max_drawdown_value", 0)
                             results["max_drawdown_pct"] = getattr(m, "max_drawdown", 0)
 
                             # Best/worst trade and expectancy
@@ -2396,87 +2003,47 @@ async def save_optimization_result(
                             results["largest_win"] = getattr(m, "largest_win", 0)
                             results["largest_loss"] = getattr(m, "largest_loss", 0)
                             results["best_trade_pct"] = (
-                                getattr(m, "best_trade", 0)
-                                if getattr(m, "best_trade", 0)
-                                else 0
+                                getattr(m, "best_trade", 0) if getattr(m, "best_trade", 0) else 0
                             )
                             results["worst_trade_pct"] = (
-                                getattr(m, "worst_trade", 0)
-                                if getattr(m, "worst_trade", 0)
-                                else 0
+                                getattr(m, "worst_trade", 0) if getattr(m, "worst_trade", 0) else 0
                             )
 
                             # IMPORTANT: Long/Short advanced metrics (consecutive wins/losses, payoff ratio, expectancy)
                             # These are calculated by MetricsCalculator but were missing from results extraction
-                            results["long_max_consec_wins"] = getattr(
-                                m, "long_max_consec_wins", 0
-                            )
-                            results["long_max_consec_losses"] = getattr(
-                                m, "long_max_consec_losses", 0
-                            )
-                            results["short_max_consec_wins"] = getattr(
-                                m, "short_max_consec_wins", 0
-                            )
-                            results["short_max_consec_losses"] = getattr(
-                                m, "short_max_consec_losses", 0
-                            )
-                            results["long_payoff_ratio"] = getattr(
-                                m, "long_payoff_ratio", 0
-                            )
-                            results["short_payoff_ratio"] = getattr(
-                                m, "short_payoff_ratio", 0
-                            )
-                            results["long_expectancy"] = getattr(
-                                m, "long_expectancy", 0
-                            )
-                            results["short_expectancy"] = getattr(
-                                m, "short_expectancy", 0
-                            )
-                            results["long_largest_win"] = getattr(
-                                m, "long_largest_win", 0
-                            )
-                            results["long_largest_loss"] = getattr(
-                                m, "long_largest_loss", 0
-                            )
-                            results["short_largest_win"] = getattr(
-                                m, "short_largest_win", 0
-                            )
-                            results["short_largest_loss"] = getattr(
-                                m, "short_largest_loss", 0
-                            )
+                            results["long_max_consec_wins"] = getattr(m, "long_max_consec_wins", 0)
+                            results["long_max_consec_losses"] = getattr(m, "long_max_consec_losses", 0)
+                            results["short_max_consec_wins"] = getattr(m, "short_max_consec_wins", 0)
+                            results["short_max_consec_losses"] = getattr(m, "short_max_consec_losses", 0)
+                            results["long_payoff_ratio"] = getattr(m, "long_payoff_ratio", 0)
+                            results["short_payoff_ratio"] = getattr(m, "short_payoff_ratio", 0)
+                            results["long_expectancy"] = getattr(m, "long_expectancy", 0)
+                            results["short_expectancy"] = getattr(m, "short_expectancy", 0)
+                            results["long_largest_win"] = getattr(m, "long_largest_win", 0)
+                            results["long_largest_loss"] = getattr(m, "long_largest_loss", 0)
+                            results["short_largest_win"] = getattr(m, "short_largest_win", 0)
+                            results["short_largest_loss"] = getattr(m, "short_largest_loss", 0)
 
                     if full_result and full_result.equity_curve:
                         ec = full_result.equity_curve
                         if hasattr(ec, "timestamps") and hasattr(ec, "equity"):
-                            drawdowns = (
-                                ec.drawdown
-                                if hasattr(ec, "drawdown") and ec.drawdown
-                                else [0] * len(ec.equity)
-                            )
+                            drawdowns = ec.drawdown if hasattr(ec, "drawdown") and ec.drawdown else [0] * len(ec.equity)
                             equity_curve_data = [
                                 {
-                                    "timestamp": t.isoformat()
-                                    if hasattr(t, "isoformat")
-                                    else str(t),
+                                    "timestamp": t.isoformat() if hasattr(t, "isoformat") else str(t),
                                     "equity": v,
                                     "drawdown": d,
                                 }
                                 for t, v, d in zip(ec.timestamps, ec.equity, drawdowns)
                             ]
-                            logger.info(
-                                "Got %s equity curve points", len(equity_curve_data)
-                            )
+                            logger.info("Got %s equity curve points", len(equity_curve_data))
                         else:
-                            logger.warning(
-                                "Equity curve missing timestamps or equity attributes"
-                            )
+                            logger.warning("Equity curve missing timestamps or equity attributes")
                     else:
                         logger.warning("Full backtest result missing equity_curve")
 
             except Exception as backtest_err:
-                logger.warning(
-                    "Failed to run full backtest for trades: %s", backtest_err
-                )
+                logger.warning("Failed to run full backtest for trades: %s", backtest_err)
                 # Continue with empty trades/equity curve
 
         # ============================================
@@ -2488,15 +2055,11 @@ async def save_optimization_result(
         # Otherwise calculate from total_return (backwards compatibility)
         net_profit = results.get("net_profit")
         if net_profit is None:
-            total_return_pct = results.get(
-                "total_return_pct", results.get("total_return", 0)
-            )
+            total_return_pct = results.get("total_return_pct", results.get("total_return", 0))
             net_profit = initial_capital * total_return_pct / 100
 
         final_capital = initial_capital + net_profit
-        total_return_pct = (
-            (net_profit / initial_capital * 100) if initial_capital > 0 else 0
-        )
+        total_return_pct = (net_profit / initial_capital * 100) if initial_capital > 0 else 0
 
         # Store ALL metrics in parameters for full restoration
         full_metrics = {
@@ -2514,9 +2077,7 @@ async def save_optimization_result(
                 "annual_return": results.get("annual_return", 0),
                 "calmar_ratio": results.get("calmar_ratio", 0),
                 "avg_drawdown": results.get("avg_drawdown", 0),
-                "max_drawdown_duration_days": results.get(
-                    "max_drawdown_duration_days", 0
-                ),
+                "max_drawdown_duration_days": results.get("max_drawdown_duration_days", 0),
                 "avg_win": results.get("avg_win", 0),
                 "avg_loss": results.get("avg_loss", 0),
                 "avg_trade": results.get("avg_trade", 0),
@@ -2540,16 +2101,12 @@ async def save_optimization_result(
                 "worst_trade_pct": results.get("worst_trade_pct", 0),
                 # best/worst trade in USD (from largest_win/loss or best_trade)
                 "best_trade": results.get("best_trade", results.get("largest_win", 0)),
-                "worst_trade": results.get(
-                    "worst_trade", results.get("largest_loss", 0)
-                ),
+                "worst_trade": results.get("worst_trade", results.get("largest_loss", 0)),
                 "recovery_factor": results.get("recovery_factor", 0),
                 "expectancy": results.get("expectancy", 0),
                 "buy_hold_return": results.get("buy_hold_return", 0),
                 # Core trade statistics
-                "total_trades": results.get(
-                    "total_trades", len(trades_list) if trades_list else 0
-                ),
+                "total_trades": results.get("total_trades", len(trades_list) if trades_list else 0),
                 "winning_trades": results.get("winning_trades", 0),
                 "losing_trades": results.get("losing_trades", 0),
                 "win_rate": results.get("win_rate", 0),
@@ -2564,12 +2121,8 @@ async def save_optimization_result(
                 "long_profit_factor": results.get("long_profit_factor", 0),
                 "long_avg_win": results.get("long_avg_win", 0),
                 "long_avg_loss": results.get("long_avg_loss", 0),
-                "long_avg_win_pct": results.get(
-                    "long_avg_win_pct", results.get("long_avg_win", 0)
-                ),
-                "long_avg_loss_pct": results.get(
-                    "long_avg_loss_pct", results.get("long_avg_loss", 0)
-                ),
+                "long_avg_win_pct": results.get("long_avg_win_pct", results.get("long_avg_win", 0)),
+                "long_avg_loss_pct": results.get("long_avg_loss_pct", results.get("long_avg_loss", 0)),
                 "long_largest_win": results.get("long_largest_win", 0),
                 "long_largest_loss": results.get("long_largest_loss", 0),
                 "short_trades": results.get("short_trades", 0),
@@ -2582,12 +2135,8 @@ async def save_optimization_result(
                 "short_profit_factor": results.get("short_profit_factor", 0),
                 "short_avg_win": results.get("short_avg_win", 0),
                 "short_avg_loss": results.get("short_avg_loss", 0),
-                "short_avg_win_pct": results.get(
-                    "short_avg_win_pct", results.get("short_avg_win", 0)
-                ),
-                "short_avg_loss_pct": results.get(
-                    "short_avg_loss_pct", results.get("short_avg_loss", 0)
-                ),
+                "short_avg_win_pct": results.get("short_avg_win_pct", results.get("short_avg_win", 0)),
+                "short_avg_loss_pct": results.get("short_avg_loss_pct", results.get("short_avg_loss", 0)),
                 "short_largest_win": results.get("short_largest_win", 0),
                 "short_largest_loss": results.get("short_largest_loss", 0),
                 # Average bars in trade by Long/Short
@@ -2595,9 +2144,7 @@ async def save_optimization_result(
                 "avg_bars_in_short": results.get("avg_bars_in_short", 0),
                 "avg_bars_in_winning_long": results.get("avg_bars_in_winning_long", 0),
                 "avg_bars_in_losing_long": results.get("avg_bars_in_losing_long", 0),
-                "avg_bars_in_winning_short": results.get(
-                    "avg_bars_in_winning_short", 0
-                ),
+                "avg_bars_in_winning_short": results.get("avg_bars_in_winning_short", 0),
                 "avg_bars_in_losing_short": results.get("avg_bars_in_losing_short", 0),
                 # Long/Short consecutive wins/losses (TradingView)
                 "long_max_consec_wins": results.get("long_max_consec_wins", 0),
@@ -2619,9 +2166,7 @@ async def save_optimization_result(
         # Lookup strategy if strategy_id is provided
         strategy = None
         if request.strategy_id:
-            strategy = (
-                db.query(Strategy).filter(Strategy.id == request.strategy_id).first()
-            )
+            strategy = db.query(Strategy).filter(Strategy.id == request.strategy_id).first()
 
         # Create backtest record with ALL available fields
         db_backtest = BacktestModel(
@@ -2629,12 +2174,8 @@ async def save_optimization_result(
             strategy_type=config.get("strategy_type", "rsi"),
             symbol=config.get("symbol", "BTCUSDT"),
             timeframe=config.get("interval", "30"),
-            start_date=datetime.fromisoformat(
-                config.get("start_date", datetime.now().isoformat())
-            ),
-            end_date=datetime.fromisoformat(
-                config.get("end_date", datetime.now().isoformat())
-            ),
+            start_date=datetime.fromisoformat(config.get("start_date", datetime.now().isoformat())),
+            end_date=datetime.fromisoformat(config.get("end_date", datetime.now().isoformat())),
             initial_capital=initial_capital,
             parameters=full_metrics,
             status=DBBacktestStatus.COMPLETED,
@@ -2644,9 +2185,7 @@ async def save_optimization_result(
             sharpe_ratio=results.get("sharpe_ratio", 0),
             sortino_ratio=results.get("sortino_ratio", 0),
             calmar_ratio=results.get("calmar_ratio", 0),
-            max_drawdown=results.get(
-                "max_drawdown_pct", results.get("max_drawdown", 0)
-            ),
+            max_drawdown=results.get("max_drawdown_pct", results.get("max_drawdown", 0)),
             win_rate=results.get("win_rate", 0),
             profit_factor=results.get("profit_factor", 0),
             # Trade statistics
@@ -2674,7 +2213,7 @@ async def save_optimization_result(
             strategy.win_rate = results.get("win_rate", 0)  # type: ignore[assignment]
             strategy.total_trades = results.get("total_trades", 0)  # type: ignore[assignment]
             strategy.backtest_count = _safe_int(strategy.backtest_count) + 1  # type: ignore[assignment]
-            strategy.last_backtest_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+            strategy.last_backtest_at = datetime.now(UTC)  # type: ignore[assignment]
             logger.info(f"Updated strategy {strategy.id} metrics from optimization")
 
         db.commit()
@@ -2717,9 +2256,7 @@ class MTFBacktestRequest(BaseModel):
     take_profit: float = Field(default=0.03, ge=0.001, le=1.0)
 
     # Strategy params
-    strategy_type: str = Field(
-        default="rsi", description="Strategy: rsi, sma_crossover"
-    )
+    strategy_type: str = Field(default="rsi", description="Strategy: rsi, sma_crossover")
     strategy_params: dict = Field(default_factory=dict)
 
     # MTF params
@@ -2768,15 +2305,15 @@ class MTFBacktestResponse(BaseModel):
     short_signals_filtered: int
 
     # Comparison (MTF vs no MTF)
-    baseline_trades: Optional[int] = None
-    baseline_pnl: Optional[float] = None
-    mtf_improvement_pct: Optional[float] = None
+    baseline_trades: int | None = None
+    baseline_pnl: float | None = None
+    mtf_improvement_pct: float | None = None
 
     # Trades (limited)
-    trades: List[dict] = Field(default_factory=list)
+    trades: list[dict] = Field(default_factory=list)
 
     # Equity curve
-    equity_curve: Optional[dict] = None
+    equity_curve: dict | None = None
 
 
 @router.post("/mtf", response_model=MTFBacktestResponse)
@@ -2908,46 +2445,40 @@ async def run_mtf_backtest(request: MTFBacktestRequest):
         strategy_params = request.strategy_params.copy()
 
         if request.use_btc_filter and btc_df is not None and btc_index_map is not None:
-            long_entries, long_exits, short_entries, short_exits = (
-                generate_mtf_signals_with_btc(
-                    ltf_candles=ltf_df,
-                    htf_candles=htf_df,
-                    htf_index_map=htf_index_map,
-                    btc_candles=btc_df,
-                    btc_index_map=btc_index_map,
-                    strategy_type=request.strategy_type,
-                    strategy_params=strategy_params,
-                    htf_filter_type=request.htf_filter_type,
-                    htf_filter_period=request.htf_filter_period,
-                    btc_filter_period=request.btc_sma_period,
-                    direction=request.direction,
-                )
+            long_entries, long_exits, short_entries, short_exits = generate_mtf_signals_with_btc(
+                ltf_candles=ltf_df,
+                htf_candles=htf_df,
+                htf_index_map=htf_index_map,
+                btc_candles=btc_df,
+                btc_index_map=btc_index_map,
+                strategy_type=request.strategy_type,
+                strategy_params=strategy_params,
+                htf_filter_type=request.htf_filter_type,
+                htf_filter_period=request.htf_filter_period,
+                btc_filter_period=request.btc_sma_period,
+                direction=request.direction,
             )
         elif request.strategy_type == "rsi":
-            long_entries, long_exits, short_entries, short_exits = (
-                generate_mtf_rsi_signals(
-                    ltf_candles=ltf_df,
-                    htf_candles=htf_df,
-                    htf_index_map=htf_index_map,
-                    htf_filter_type=request.htf_filter_type,
-                    htf_filter_period=request.htf_filter_period,
-                    neutral_zone_pct=request.mtf_neutral_zone_pct,
-                    direction=request.direction,
-                    **strategy_params,
-                )
+            long_entries, long_exits, short_entries, short_exits = generate_mtf_rsi_signals(
+                ltf_candles=ltf_df,
+                htf_candles=htf_df,
+                htf_index_map=htf_index_map,
+                htf_filter_type=request.htf_filter_type,
+                htf_filter_period=request.htf_filter_period,
+                neutral_zone_pct=request.mtf_neutral_zone_pct,
+                direction=request.direction,
+                **strategy_params,
             )
         elif request.strategy_type == "sma_crossover":
-            long_entries, long_exits, short_entries, short_exits = (
-                generate_mtf_sma_crossover_signals(
-                    ltf_candles=ltf_df,
-                    htf_candles=htf_df,
-                    htf_index_map=htf_index_map,
-                    htf_filter_type=request.htf_filter_type,
-                    htf_filter_period=request.htf_filter_period,
-                    neutral_zone_pct=request.mtf_neutral_zone_pct,
-                    direction=request.direction,
-                    **strategy_params,
-                )
+            long_entries, long_exits, short_entries, short_exits = generate_mtf_sma_crossover_signals(
+                ltf_candles=ltf_df,
+                htf_candles=htf_df,
+                htf_index_map=htf_index_map,
+                htf_filter_type=request.htf_filter_type,
+                htf_filter_period=request.htf_filter_period,
+                neutral_zone_pct=request.mtf_neutral_zone_pct,
+                direction=request.direction,
+                **strategy_params,
             )
         else:
             raise HTTPException(

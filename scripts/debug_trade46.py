@@ -1,14 +1,14 @@
-# -*- coding: utf-8 -*-
 """Debug Trade 46 entry_price discrepancy."""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # Monkey-patch PyramidingManager to trace close_position
-from backend.backtesting.pyramiding import PyramidingManager, PyramidPosition
+from backend.backtesting.pyramiding import PyramidPosition
 
 original_close_all = PyramidPosition.close_all
 
@@ -29,8 +29,8 @@ ohlc['timestamp'] = pd.to_datetime(ohlc['timestamp'], utc=True).dt.tz_localize(N
 long_signals = np.load('d:/TV/long_signals.npy')
 short_signals = np.load('d:/TV/short_signals.npy')
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 candles = ohlc.reset_index(drop=True)
 input_data = BacktestInput(

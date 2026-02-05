@@ -9,10 +9,9 @@ E2E тест для Strategy Builder - полный flow (pytest версия)
     py -3.14 -m pytest tests/e2e/test_strategy_builder_full_flow.py -v
 """
 
-import sys
 import pathlib
-from datetime import datetime, timezone
-from typing import Dict, Any
+import sys
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -68,7 +67,7 @@ def override_get_db():
         db.close()
 
 
-def build_rsi_strategy() -> Dict[str, Any]:
+def build_rsi_strategy() -> dict[str, Any]:
     """Создать простую RSI стратегию для тестирования"""
     return {
         "name": "E2E Test RSI Strategy",

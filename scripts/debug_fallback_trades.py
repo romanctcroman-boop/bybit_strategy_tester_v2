@@ -3,11 +3,12 @@ Check if Fallback opens a position after trade 20
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
+
+import pandas as pd
 
 from backend.backtesting.engine import get_engine
 from backend.backtesting.models import BacktestConfig
@@ -59,6 +60,6 @@ print(f"Net PnL: {result.metrics.net_profit:.2f}")
 print(f"Expected (10000 + pnl): {10000 + result.metrics.net_profit:.2f}")
 
 # Last trades
-print(f"\nLast 3 trades:")
+print("\nLast 3 trades:")
 for i, t in enumerate(result.trades[-3:]):
     print(f"  Trade {len(result.trades)-2+i}: entry_bar={t.entry_bar_index}, exit_bar={t.exit_bar_index}, side={t.side}, pnl={t.pnl:.2f}")

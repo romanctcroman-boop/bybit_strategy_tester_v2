@@ -10,12 +10,13 @@ Advanced market data endpoints from Bybit V5 API:
 Created: January 21, 2026
 """
 
-import requests
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-from dataclasses import dataclass
-from enum import Enum
 import logging
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +95,10 @@ class MarketAnalyticsService:
         symbol: str,
         category: str = "linear",
         interval: str = "1h",
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 50,
-    ) -> List[OpenInterestData]:
+    ) -> list[OpenInterestData]:
         """
         📊 Get Open Interest history.
 
@@ -157,7 +158,7 @@ class MarketAnalyticsService:
 
     def get_open_interest_change(
         self, symbol: str, category: str = "linear", hours: int = 24
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         📊 Calculate Open Interest change over period.
 
@@ -219,7 +220,7 @@ class MarketAnalyticsService:
 
     def get_long_short_ratio(
         self, symbol: str, category: str = "linear", period: str = "1h", limit: int = 50
-    ) -> List[LongShortRatioData]:
+    ) -> list[LongShortRatioData]:
         """
         📈 Get Long/Short Ratio history.
 
@@ -272,7 +273,7 @@ class MarketAnalyticsService:
 
     def get_contrarian_signal(
         self, symbol: str, category: str = "linear"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         📈 Get contrarian trading signal based on Long/Short ratio.
 
@@ -333,10 +334,10 @@ class MarketAnalyticsService:
         self,
         symbol: str,
         category: str = "linear",
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 200,
-    ) -> List[FundingRateData]:
+    ) -> list[FundingRateData]:
         """
         💰 Get Funding Rate history.
 
@@ -394,7 +395,7 @@ class MarketAnalyticsService:
 
     def get_funding_analysis(
         self, symbol: str, category: str = "linear", days: int = 7
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         💰 Analyze funding rates for trading signals.
 
@@ -468,7 +469,7 @@ class MarketAnalyticsService:
 
     def get_full_market_analysis(
         self, symbol: str, category: str = "linear"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         🎯 Get comprehensive market analysis combining all indicators.
 
@@ -513,7 +514,7 @@ class MarketAnalyticsService:
             ),
         }
 
-    def _generate_recommendations(self, oi: Dict, ls: Dict, fr: Dict) -> List[str]:
+    def _generate_recommendations(self, oi: dict, ls: dict, fr: dict) -> list[str]:
         """Generate trading recommendations"""
         recommendations = []
 

@@ -15,7 +15,7 @@ Features:
 
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -52,7 +52,7 @@ class BayesianOptimizer:
         commission: float = 0.001,
         n_trials: int = 100,
         n_jobs: int = 1,
-        random_state: Optional[int] = None,
+        random_state: int | None = None,
     ):
         """
         Initialize Bayesian Optimizer.
@@ -75,9 +75,9 @@ class BayesianOptimizer:
         self.n_jobs = n_jobs
         self.random_state = random_state
 
-        self.study: Optional[optuna.Study] = None
-        self._best_params: Optional[Dict[str, Any]] = None
-        self._best_value: Optional[float] = None
+        self.study: optuna.Study | None = None
+        self._best_params: dict[str, Any] | None = None
+        self._best_value: float | None = None
 
         # Thread safety lock for concurrent access
         self._lock = threading.RLock()
@@ -94,7 +94,7 @@ class BayesianOptimizer:
             multivariate=True,  # Consider parameter correlations
         )
 
-    def _suggest_param(self, trial: "optuna.Trial", param_name: str, param_spec: Dict[str, Any]) -> Any:
+    def _suggest_param(self, trial: "optuna.Trial", param_name: str, param_spec: dict[str, Any]) -> Any:
         """
         Suggest a parameter value based on specification.
 
@@ -165,12 +165,12 @@ class BayesianOptimizer:
 
     async def optimize_async(
         self,
-        strategy_config: Dict[str, Any],
-        param_space: Dict[str, Dict[str, Any]],
+        strategy_config: dict[str, Any],
+        param_space: dict[str, dict[str, Any]],
         metric: str = "sharpe_ratio",
         direction: str = "maximize",
         show_progress: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run Bayesian optimization asynchronously.
 
@@ -314,7 +314,7 @@ class BayesianOptimizer:
             with self._lock:
                 self._is_running = False
 
-    def get_importance(self) -> Dict[str, float]:
+    def get_importance(self) -> dict[str, float]:
         """
         Calculate parameter importance using Optuna's built-in evaluator.
 
@@ -332,12 +332,12 @@ class BayesianOptimizer:
             return {}
 
     @property
-    def best_params(self) -> Optional[Dict[str, Any]]:
+    def best_params(self) -> dict[str, Any] | None:
         """Get best parameters found."""
         return self._best_params
 
     @property
-    def best_value(self) -> Optional[float]:
+    def best_value(self) -> float | None:
         """Get best metric value found."""
         return self._best_value
 
@@ -347,8 +347,8 @@ def generate_param_range(
     high: float,
     step: float = 0.01,
     param_type: str = "float",
-    precision: Optional[int] = None,
-) -> List[Any]:
+    precision: int | None = None,
+) -> list[Any]:
     """
     Generate parameter values for grid search.
 

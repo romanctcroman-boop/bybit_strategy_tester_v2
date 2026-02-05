@@ -16,12 +16,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import os
 import sqlite3
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from itertools import product
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -157,7 +155,7 @@ def run_single_backtest(params):
             "profit_factor": m.profit_factor,
             "net_profit": m.net_profit,
         }
-    except Exception as e:
+    except Exception:
         return None
 
 

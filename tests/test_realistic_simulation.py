@@ -11,7 +11,6 @@ Tests cover:
 """
 
 import numpy as np
-import pytest
 
 from backend.backtesting.universal_engine import (
     # Bar Simulator
@@ -747,21 +746,11 @@ class TestRealisticSimulationIntegration:
         """Test that all v2.1 classes can be imported."""
         from backend.backtesting.universal_engine import (
             BarPathType,
-            BarSimulatorConfig,
-            DynamicFundingConfig,
             DynamicFundingManager,
-            FeatureEngineering,
-            FillResult,
-            FundingRateEntry,
-            LiquidationConfig,
             LiquidationEngine,
-            LiquidationResult,
-            MLStrategyConfig,
             MLStrategyInterface,
-            PartialFillConfig,
             PartialFillSimulator,
             RealisticBarSimulator,
-            VolumeSlippageConfig,
             VolumeSlippageModel,
         )
 

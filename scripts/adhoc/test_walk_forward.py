@@ -235,7 +235,7 @@ def test_robustness_metrics():
         "Metrics should be non-zero"
     )
 
-    print(f"\n✅ Robustness metrics test PASSED")
+    print("\n✅ Robustness metrics test PASSED")
 
 
 def main():

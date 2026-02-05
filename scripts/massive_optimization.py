@@ -4,20 +4,22 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
 import time
 from datetime import datetime
+
+import pandas as pd
 
 print("=" * 80)
 print("🚀 МАСШТАБНАЯ GPU ОПТИМИЗАЦИЯ RSI v2 (Реалистичные SL/TP)")
 print("=" * 80)
 print(f"Время: {datetime.now()}")
 
-from backend.backtesting.gpu_optimizer import GPUGridOptimizer, GPU_NAME
+from backend.backtesting.gpu_optimizer import GPU_NAME, GPUGridOptimizer
+
 print(f"\n📊 GPU Status: {GPU_NAME}")
 
 # Load data
@@ -49,7 +51,7 @@ rsi_oversold_range = list(range(15, 36, 3))       # 15,18,21,24,27,30,33 -> 7 va
 stop_loss_range = [0.01, 0.015, 0.02, 0.025, 0.03, 0.04, 0.05, 0.06]  # 8 values
 take_profit_range = [0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.10, 0.12]  # 8 values
 
-total_combos = (len(rsi_period_range) * len(rsi_overbought_range) * 
+total_combos = (len(rsi_period_range) * len(rsi_overbought_range) *
                 len(rsi_oversold_range) * len(stop_loss_range) * len(take_profit_range))
 
 print(f"   RSI Period:     {len(rsi_period_range):>3} values ({min(rsi_period_range)}-{max(rsi_period_range)})")
@@ -87,7 +89,7 @@ time_long = time.time() - start
 print(f"   ✅ Done in {time_long:.2f}s ({total_combos/time_long:,.0f} comb/sec)")
 
 # ============================================================================
-# SHORT OPTIMIZATION  
+# SHORT OPTIMIZATION
 # ============================================================================
 print("\n⚡ OPTIMIZING SHORT...")
 start = time.time()
@@ -147,7 +149,7 @@ print("=" * 80)
 if result_long.top_results:
     best = result_long.top_results[0]
     p = best.get('params', {})
-    print(f"\n🟢 BEST LONG:")
+    print("\n🟢 BEST LONG:")
     print(f"   Sharpe:   {best.get('sharpe_ratio', 0):.2f}")
     print(f"   Return:   {best.get('total_return', 0):.2f}%")
     print(f"   Max DD:   {best.get('max_drawdown', 0):.2f}%")
@@ -159,7 +161,7 @@ if result_long.top_results:
 if result_short.top_results:
     best = result_short.top_results[0]
     p = best.get('params', {})
-    print(f"\n🔴 BEST SHORT:")
+    print("\n🔴 BEST SHORT:")
     print(f"   Sharpe:   {best.get('sharpe_ratio', 0):.2f}")
     print(f"   Return:   {best.get('total_return', 0):.2f}%")
     print(f"   Max DD:   {best.get('max_drawdown', 0):.2f}%")

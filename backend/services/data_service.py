@@ -6,8 +6,8 @@ DataService - Repository Pattern для работы с базой данных
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, TypedDict
+from datetime import UTC, datetime
+from typing import Any, TypedDict
 
 from sqlalchemy import and_, asc, desc, func
 from sqlalchemy.orm import Session
@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 class ClaimResult(TypedDict):
     status: str  # 'claimed' | 'running' | 'completed' | 'not_found' | 'error'
-    backtest: Optional[Any]
-    message: Optional[str]
+    backtest: Any | None
+    message: str | None
 
 
 class DataService:
@@ -70,7 +70,7 @@ class DataService:
         name: str,
         description: str,
         strategy_type: str,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         is_active: bool = True,
     ) -> Strategy:
         """
@@ -98,17 +98,17 @@ class DataService:
         self.db.refresh(strategy)
         return strategy
 
-    def get_strategy(self, strategy_id: int) -> Optional[Strategy]:
+    def get_strategy(self, strategy_id: int) -> Strategy | None:
         """Получить стратегию по ID"""
         return self.db.query(Strategy).filter(Strategy.id == strategy_id).first()
 
     def get_strategies(
         self,
-        is_active: Optional[bool] = None,
-        strategy_type: Optional[str] = None,
+        is_active: bool | None = None,
+        strategy_type: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Strategy]:
+    ) -> list[Strategy]:
         """
         Получить список стратегий с фильтрацией
 
@@ -131,7 +131,7 @@ class DataService:
 
         return query.offset(offset).limit(limit).all()
 
-    def update_strategy(self, strategy_id: int, **kwargs) -> Optional[Strategy]:
+    def update_strategy(self, strategy_id: int, **kwargs) -> Strategy | None:
         """
         Обновить стратегию
 
@@ -150,7 +150,7 @@ class DataService:
             if hasattr(strategy, key):
                 setattr(strategy, key, value)
 
-        strategy.updated_at = datetime.now(timezone.utc)
+        strategy.updated_at = datetime.now(UTC)
         self.db.commit()
         self.db.refresh(strategy)
         return strategy
@@ -186,8 +186,8 @@ class DataService:
         end_date: datetime,
         initial_capital: float,
         leverage: int = 1,
-        commission: float = 0.0006,
-        config: Optional[Dict[str, Any]] = None,
+        commission: float = 0.0007,  # 0.07% TradingView parity
+        config: dict[str, Any] | None = None,
         status: str = "pending",
     ) -> Backtest:
         """
@@ -201,7 +201,7 @@ class DataService:
             end_date: Дата окончания
             initial_capital: Начальный капитал (USDT)
             leverage: Плечо (1-100)
-            commission: Комиссия (0.0006 = 0.06%)
+            commission: Комиссия (0.0007 = 0.07% TradingView parity)
             config: Дополнительная конфигурация
             status: Статус (pending, running, completed, failed)
 
@@ -225,20 +225,20 @@ class DataService:
         self.db.refresh(backtest)
         return backtest
 
-    def get_backtest(self, backtest_id: int) -> Optional[Backtest]:
+    def get_backtest(self, backtest_id: int) -> Backtest | None:
         """Получить бэктест по ID"""
         return self.db.query(Backtest).filter(Backtest.id == backtest_id).first()
 
     def get_backtests(
         self,
-        strategy_id: Optional[int] = None,
-        symbol: Optional[str] = None,
-        status: Optional[str] = None,
+        strategy_id: int | None = None,
+        symbol: str | None = None,
+        status: str | None = None,
         limit: int = 100,
         offset: int = 0,
         order_by: str = "created_at",
         order_dir: str = "desc",
-    ) -> List[Backtest]:
+    ) -> list[Backtest]:
         """
         Получить список бэктестов с фильтрацией
 
@@ -274,7 +274,7 @@ class DataService:
 
         return query.offset(offset).limit(limit).all()
 
-    def update_backtest(self, backtest_id: int, **kwargs) -> Optional[Backtest]:
+    def update_backtest(self, backtest_id: int, **kwargs) -> Backtest | None:
         """
         Обновить бэктест
 
@@ -340,7 +340,7 @@ class DataService:
             # normalize started_at if naive
             if getattr(started_at, "tzinfo", None) is None:
                 # assume UTC for legacy rows
-                started_at = started_at.replace(tzinfo=timezone.utc)
+                started_at = started_at.replace(tzinfo=UTC)
             delta = (now - started_at).total_seconds()
             if delta < stale_seconds:
                 return ClaimResult(
@@ -382,7 +382,7 @@ class DataService:
         sharpe_ratio: float,
         max_drawdown: float,
         **other_metrics,
-    ) -> Optional[Backtest]:
+    ) -> Backtest | None:
         """
         Обновить результаты бэктеста
 
@@ -411,7 +411,7 @@ class DataService:
             "sharpe_ratio": sharpe_ratio,
             "max_drawdown": max_drawdown,
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc),
+            "completed_at": datetime.now(UTC),
             **other_metrics,
         }
 
@@ -534,13 +534,13 @@ class DataService:
         entry_price: float,
         quantity: float,
         position_size: float,
-        exit_time: Optional[datetime] = None,
-        exit_price: Optional[float] = None,
-        pnl: Optional[float] = None,
-        pnl_pct: Optional[float] = None,
-        commission: Optional[float] = None,
-        exit_reason: Optional[str] = None,
-        meta: Optional[Dict[str, Any]] = None,
+        exit_time: datetime | None = None,
+        exit_price: float | None = None,
+        pnl: float | None = None,
+        pnl_pct: float | None = None,
+        commission: float | None = None,
+        exit_reason: str | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> Trade:
         """
         Создать новый трейд
@@ -583,7 +583,7 @@ class DataService:
         self.db.refresh(trade)
         return trade
 
-    def create_trades_batch(self, trades: List[Dict[str, Any]]) -> int:
+    def create_trades_batch(self, trades: list[dict[str, Any]]) -> int:
         """
         Создать несколько трейдов одним запросом (batch insert)
 
@@ -598,17 +598,17 @@ class DataService:
         self.db.commit()
         return len(trade_objects)
 
-    def get_trade(self, trade_id: int) -> Optional[Trade]:
+    def get_trade(self, trade_id: int) -> Trade | None:
         """Получить трейд по ID"""
         return self.db.query(Trade).filter(Trade.id == trade_id).first()
 
     def get_trades(
         self,
         backtest_id: int,
-        side: Optional[str] = None,
+        side: str | None = None,
         limit: int = 1000,
         offset: int = 0,
-    ) -> List[Trade]:
+    ) -> list[Trade]:
         """
         Получить трейды бэктеста
 
@@ -654,11 +654,11 @@ class DataService:
         timeframe: str,
         start_date: datetime,
         end_date: datetime,
-        param_ranges: Dict[str, Any],
+        param_ranges: dict[str, Any],
         metric: str,
         initial_capital: float,
         total_combinations: int,
-        config: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
         status: str = "pending",
     ) -> Optimization:
         """
@@ -700,7 +700,7 @@ class DataService:
         self.db.refresh(optimization)
         return optimization
 
-    def get_optimization(self, optimization_id: int) -> Optional[Optimization]:
+    def get_optimization(self, optimization_id: int) -> Optimization | None:
         """Получить оптимизацию по ID"""
         return (
             self.db.query(Optimization)
@@ -710,11 +710,11 @@ class DataService:
 
     def get_optimizations(
         self,
-        strategy_id: Optional[int] = None,
-        status: Optional[str] = None,
+        strategy_id: int | None = None,
+        status: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Optimization]:
+    ) -> list[Optimization]:
         """Получить список оптимизаций"""
         query = self.db.query(Optimization)
 
@@ -733,7 +733,7 @@ class DataService:
 
     def update_optimization(
         self, optimization_id: int, **kwargs
-    ) -> Optional[Optimization]:
+    ) -> Optimization | None:
         """Обновить оптимизацию"""
         optimization = self.get_optimization(optimization_id)
         if not optimization:
@@ -754,14 +754,14 @@ class DataService:
     def create_optimization_result(
         self,
         optimization_id: int,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         score: float,
-        total_return: Optional[float] = None,
-        sharpe_ratio: Optional[float] = None,
-        max_drawdown: Optional[float] = None,
-        win_rate: Optional[float] = None,
-        total_trades: Optional[int] = None,
-        metrics: Optional[Dict[str, Any]] = None,
+        total_return: float | None = None,
+        sharpe_ratio: float | None = None,
+        max_drawdown: float | None = None,
+        win_rate: float | None = None,
+        total_trades: int | None = None,
+        metrics: dict[str, Any] | None = None,
     ) -> OptimizationResult:
         """Создать результат оптимизации"""
         result = OptimizationResult(
@@ -780,7 +780,7 @@ class DataService:
         self.db.refresh(result)
         return result
 
-    def create_optimization_results_batch(self, results: List[Dict[str, Any]]) -> int:
+    def create_optimization_results_batch(self, results: list[dict[str, Any]]) -> int:
         """Создать несколько результатов оптимизации (batch)"""
         result_objects = [OptimizationResult(**result_data) for result_data in results]
         self.db.bulk_save_objects(result_objects)
@@ -793,7 +793,7 @@ class DataService:
         limit: int = 1000,
         offset: int = 0,
         order_by_score: bool = True,
-    ) -> List[OptimizationResult]:
+    ) -> list[OptimizationResult]:
         """Получить результаты оптимизации"""
         query = self.db.query(OptimizationResult).filter(
             OptimizationResult.optimization_id == optimization_id
@@ -806,7 +806,7 @@ class DataService:
 
     def get_best_optimization_result(
         self, optimization_id: int
-    ) -> Optional[OptimizationResult]:
+    ) -> OptimizationResult | None:
         """Получить лучший результат оптимизации"""
         return (
             self.db.query(OptimizationResult)
@@ -829,8 +829,8 @@ class DataService:
         low: float,  # Maps to low_price
         close: float,  # Maps to close_price
         volume: float,
-        quote_volume: Optional[float] = None,  # Maps to turnover
-        trades_count: Optional[int] = None,  # Not used, kept for compatibility
+        quote_volume: float | None = None,  # Maps to turnover
+        trades_count: int | None = None,  # Not used, kept for compatibility
     ) -> MarketData:
         """Создать свечу в bybit_kline_audit"""
         import json
@@ -864,7 +864,7 @@ class DataService:
         self.db.refresh(candle)
         return candle
 
-    def create_market_data_batch(self, candles: List[Dict[str, Any]]) -> int:
+    def create_market_data_batch(self, candles: list[dict[str, Any]]) -> int:
         """
         Создать несколько свечей (batch insert) в bybit_kline_audit
 
@@ -886,8 +886,8 @@ class DataService:
         start_time: datetime,
         end_time: datetime,
         limit: int = 10000,
-        market_type: Optional[str] = None,
-    ) -> List[MarketData]:
+        market_type: str | None = None,
+    ) -> list[MarketData]:
         """
         Получить исторические свечи из bybit_kline_audit
 
@@ -931,7 +931,7 @@ class DataService:
             .all()
         )
 
-    def get_latest_candle(self, symbol: str, timeframe: str) -> Optional[MarketData]:
+    def get_latest_candle(self, symbol: str, timeframe: str) -> MarketData | None:
         """Получить последнюю свечу из bybit_kline_audit"""
         return (
             self.db.query(MarketData)
@@ -941,7 +941,7 @@ class DataService:
         )
 
     def delete_market_data(
-        self, symbol: str, timeframe: str, before_date: Optional[datetime] = None
+        self, symbol: str, timeframe: str, before_date: datetime | None = None
     ) -> int:
         """Удалить старые свечи из bybit_kline_audit"""
         query = self.db.query(MarketData).filter(

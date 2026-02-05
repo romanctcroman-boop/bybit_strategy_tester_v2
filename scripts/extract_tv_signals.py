@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
 """Extract TV entry signals from trade CSV and map to OHLC bars."""
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # Load OHLC - use full data file
 ohlc = pd.read_csv('d:/TV/BYBIT_BTCUSDT.P_15m_full.csv')
@@ -17,7 +16,7 @@ trades = pd.read_csv('d:/TV/RSI_Strategy_with_TP_SL_(FIXED)_BYBIT_BTCUSDT.P_2026
 entries = trades[trades['Тип'].str.contains('Вход')]
 print(f'\nTotal entries: {len(entries)}')
 
-# Get long/short entry times  
+# Get long/short entry times
 long_entries = entries[entries['Тип'].str.contains('длинную')]
 short_entries = entries[entries['Тип'].str.contains('короткую')]
 print(f'Long entries: {len(long_entries)}')

@@ -11,6 +11,7 @@ from backend.database.models.optimization import (
     OptimizationType,
 )
 from backend.database.models.strategy import Strategy, StrategyStatus, StrategyType
+from backend.database.models.strategy_version import StrategyVersion
 from backend.database.models.trade import Trade, TradeSide, TradeStatus
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "Trade",
     "TradeSide",
     "TradeStatus",
+    "StrategyVersion",
 ]

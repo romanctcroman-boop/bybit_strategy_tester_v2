@@ -1201,6 +1201,10 @@
     background: linear-gradient(90deg, #26a69a 50%, #ef5350 50%);
 }
 
+.tv-legend-color-regime {
+    background: linear-gradient(90deg, #26a69a 33%, #78909c 33% 66%, #ffa726 66%);
+}
+
 /* Mode Toggle Buttons (Absolute / Percentage) */
 .tv-chart-mode-toggle {
     display: flex;

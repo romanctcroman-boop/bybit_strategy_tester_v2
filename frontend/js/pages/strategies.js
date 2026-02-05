@@ -931,29 +931,25 @@ function updateTicksPerBar() {
 
   if (tfSelect) {
     const tfValue = tfSelect.value;
-    // Parse timeframe to minutes
-    if (tfValue.endsWith("m")) {
-      minutesInBar = parseInt(tfValue);
-      tfLabel = tfValue;
-    } else if (tfValue.endsWith("h") || !isNaN(parseInt(tfValue))) {
-      // Could be "60" for 1h or "1h"
-      const num = parseInt(tfValue);
-      if (num <= 60) {
-        minutesInBar = num; // Assume it's minutes directly
-        tfLabel = num === 60 ? "1h" : num + "m";
-      } else if (num === 240) {
-        minutesInBar = 240;
-        tfLabel = "4h";
-      } else {
-        minutesInBar = num;
-        tfLabel = num + "m";
-      }
-    } else if (tfValue === "D" || tfValue === "1D") {
+    // Bybit intervals: 1,3,5,15,30,60,120,240,360,720,D,W,M
+    if (tfValue === "D" || tfValue === "1D") {
       minutesInBar = 1440;
       tfLabel = "1D";
     } else if (tfValue === "W" || tfValue === "1W") {
       minutesInBar = 10080;
       tfLabel = "1W";
+    } else if (tfValue === "M" || tfValue === "1M") {
+      minutesInBar = 43200;
+      tfLabel = "1M";
+    } else if (!isNaN(parseInt(tfValue))) {
+      const num = parseInt(tfValue);
+      minutesInBar = num <= 60 ? num : num; // 1-60 minutes, else 120/240/360/720
+      if (num === 60) tfLabel = "1h";
+      else if (num === 120) tfLabel = "2h";
+      else if (num === 240) tfLabel = "4h";
+      else if (num === 360) tfLabel = "6h";
+      else if (num === 720) tfLabel = "12h";
+      else tfLabel = num <= 60 ? num + "m" : num + "m";
     }
   }
 

@@ -5,6 +5,7 @@ import os
 os.chdir(str(Path(__file__).resolve().parents[1]))
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pathlib import Path
@@ -60,7 +61,7 @@ for i in range(entry_bar_46, len(data)):
             print(
                 f"    → LONG signal! Entry would be at next bar open = {next_open:.2f}"
             )
-            print(f"    → This is Trade 47 in Numba (entry=90810.90)")
+            print("    → This is Trade 47 in Numba (entry=90810.90)")
 
         # Check signals around this bar
         print(f"\n  Signals in bars {i - 5} to {i + 10}:")

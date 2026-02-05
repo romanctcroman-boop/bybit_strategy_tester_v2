@@ -100,56 +100,48 @@
 ### ATR-based SL/TP
 
 - [x] `atr_sl_enable` - ATR Stop Loss
-- [ ] `atr_sl_wicks` - Consider wicks
-- [ ] `atr_sl_method` - Smoothing method
-- [ ] `atr_sl_period` - ATR period
-- [ ] `atr_sl_multiplier` - ATR multiplier
-- [ ] `atr_tp_enable` - ATR Take Profit
-- [ ] `atr_tp_wicks` - Consider wicks
-- [ ] `atr_tp_method` - Smoothing method
-- [ ] `atr_tp_period` - ATR period
-- [ ] `atr_tp_multiplier` - ATR multiplier
+- [x] `atr_sl_wicks` - Consider wicks (UI + validation)
+- [x] `atr_sl_method` / `atr_sl_period` / `atr_sl_multiplier` - ATR SL params
+- [x] `atr_tp_enable` / `atr_tp_*` - ATR Take Profit (UI + validation)
 
 ### Indent Order
 
-- [ ] `indent_enable` - Enable indent order
-- [ ] `indent_percent` - Indent percentage
-- [ ] `indent_cancel_bars` - Cancel after X bars
+- [x] `indent_enable` - Enable indent order
+- [x] `indent_percent` - Indent percentage
+- [x] `indent_cancel_bars` - Cancel after X bars (backend DCAEngine + UI)
 
-### Signal Memory
+### Signal Memory ✅ (2026-01-30)
 
-- [ ] `signal_memory_enable` - Keep signal in memory
-- [ ] `signal_memory_bars` - Memory duration (bars)
+- [x] `signal_memory_enable` / `use_signal_memory` - Keep signal in memory (RSI Filter)
+- [x] `signal_memory_bars` - Memory duration (bars)
+- [x] RSI Filter, Stochastic (cross/kd_cross), Two MA, MACD — расширение сигнала на N баров в StrategyBuilderAdapter; противоположный сигнал отменяет память.
 
 ### Multi-Timeframe
 
-- [ ] `mtf_supertrend_2` - SuperTrend TF2
-- [ ] `mtf_supertrend_3` - SuperTrend TF3
-- [ ] `mtf_rsi_2` - RSI TF2
-- [ ] `mtf_rsi_3` - RSI TF3
+- [x] `mtf_supertrend_2` / `mtf_supertrend_3` - SuperTrend TF2/TF3 (UI + mtf_utils)
+- [x] `mtf_rsi_2` / `mtf_rsi_3` - RSI TF2/TF3 (UI + mtf_utils)
 
 ---
 
-## 🔄 Phase 4: Close Conditions
+## ✅ Phase 4: Close Conditions (COMPLETED - Session 5.5)
 
 ### RSI Close
 
-- [ ] `rsi_close_reach` - Close on RSI reach level
-- [ ] `rsi_close_cross` - Close on RSI cross level
+- [x] `rsi_close_reach` - Close on RSI reach level
+- [x] `rsi_close_cross` - Close on RSI cross level (DCAEngine + UI)
 
 ### Stochastic Close
 
-- [ ] `stoch_close_reach` - Close on Stoch reach level
-- [ ] `stoch_close_cross` - Close on Stoch cross level
+- [x] `stoch_close_reach` / `stoch_close_cross` (DCAEngine + UI)
 
 ### Channel Close
 
-- [ ] `channel_close_enable` - Close on channel breakout
-- [ ] `channel_close_type` - Keltner/Bollinger
+- [x] `channel_close_enable` - Close on channel breakout
+- [x] `channel_close_type` - Keltner/Bollinger (DCAEngine + UI)
 
 ### PSAR Close
 
-- [ ] `psar_close_enable` - Close on PSAR signal
+- [x] `psar_close_enable` - Close on PSAR signal (DCAEngine + UI)
 
 ---
 
@@ -247,23 +239,29 @@
 
 ## 🎯 Next Steps
 
-> **См. полный план:** [`docs/FULL_IMPLEMENTATION_PLAN.md`](../FULL_IMPLEMENTATION_PLAN.md)
+> **См. полный план:** [`docs/FULL_IMPLEMENTATION_PLAN.md`](../FULL_IMPLEMENTATION_PLAN.md)  
+> **Оставшиеся и новые задачи:** [`docs/REMAINING_AND_NEW_TASKS.md`](../REMAINING_AND_NEW_TASKS.md)
 
-### Immediate (Phase 1-2)
-1. [ ] WebSocket Integration in UI (код готов, нужна интеграция)
-2. [ ] Close Conditions (7 новых типов)
-3. [ ] Price Action UI (47 паттернов в backend → UI)
+### Immediate (Phase 1-2) — Session 5.5 выполнено
+1. [x] WebSocket Integration in UI (интегрировано в strategy_builder.js)
+2. [x] Close Conditions (6 типов: rsi_close, stoch_close, channel_close, ma_close, psar_close, time_bars_close)
+3. [x] Price Action UI (47 паттернов в customLayouts)
 
-### Short-term (Phase 3-5)
-4. [ ] MTF Expansion (SuperTrend x3, RSI x3)
-5. [ ] New Indicators (RVI, LRC, Levels Break, Accumulation)
-6. [ ] Signal Memory System (для всех сигналов)
-7. [ ] Indent Order
-8. [ ] ATR SL/TP full params
+### Short-term (Phase 3-5) — Session 5.5 выполнено
+4. [x] MTF Expansion (SuperTrend TF1/TF2/TF3, RSI TF1/TF2/TF3 в UI + backend mtf_utils)
+5. [x] New Indicators (RVI, LinReg, Levels Break, Accumulation в extended_indicators.py)
+6. [x] Signal Memory System (RSI, Stoch, Two MA, MACD в StrategyBuilderAdapter) — 2026-01-30
+7. [x] Indent Order (backend + UI)
+8. [x] ATR SL/TP full params (UI + validation rules)
 
 ### Testing
-9. [ ] Unit tests for all new blocks
+9. [x] Unit tests for new blocks (47 тестов: test_extended_indicators, test_dca_close_conditions, test_validation_rules_session55)
 10. [ ] E2E tests for DCA scenarios
+
+### Дальше (см. REMAINING_AND_NEW_TASKS.md)
+- [x] Маппинг Strategy Builder → DCAEngine (close_conditions, indent_order) — выполнено 2026-01-30
+- [x] Дефолт комиссии 0.07% (BacktestConfig, API, optimizations, data_service, optimizer, gpu_optimizer и др.) — выполнено 2026-01-30
+- Замена оставшихся `except Exception` на логирование (по мере правок; критичные файлы уже с логированием)
 
 ---
 

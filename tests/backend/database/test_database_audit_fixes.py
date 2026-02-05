@@ -7,10 +7,7 @@ Verifies:
 3. Development environment uses SQLite fallback
 """
 
-import os
-from unittest.mock import patch
 
-import pytest
 
 
 class TestSessionReExports:
@@ -60,7 +57,7 @@ class TestProductionEnvironmentCheck:
         import backend.database as db_module
 
         source = inspect.getsourcefile(db_module)
-        with open(source, "r") as f:
+        with open(source) as f:
             content = f.read()
 
         # Verify production check is in the code

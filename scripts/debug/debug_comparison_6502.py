@@ -5,6 +5,7 @@ import os
 os.chdir(str(Path(__file__).resolve().parents[1]))
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pathlib import Path
@@ -33,7 +34,7 @@ t46_entry_bar = 6320
 t46_entry_price = data[t46_entry_bar, 0]  # 89596.40
 t46_tp = t46_entry_price * 1.015  # 90940.35
 
-print(f"Trade 46: LONG")
+print("Trade 46: LONG")
 print(f"  Signal bar: {t46_signal_bar}")
 print(f"  Entry bar: {t46_entry_bar}")
 print(f"  Entry price: {t46_entry_price:.2f}")

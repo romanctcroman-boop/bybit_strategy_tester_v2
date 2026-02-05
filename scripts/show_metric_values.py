@@ -1,11 +1,13 @@
 """Check non-zero values for 46 core metrics"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import numpy as np
-import pandas as pd
 import sqlite3
 from dataclasses import fields
+
+import numpy as np
+import pandas as pd
 
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df = pd.read_sql("""SELECT open_time, open_price as open, high_price as high, 
@@ -16,7 +18,7 @@ df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
 df.set_index('open_time', inplace=True)
 conn.close()
 
-# RSI + EMA strategy 
+# RSI + EMA strategy
 close = df['close']
 delta = close.diff()
 gain = delta.where(delta > 0, 0).rolling(7).mean()
@@ -29,8 +31,8 @@ long_exits = (rsi > 75).values
 short_entries = ((rsi > 75) & (close < ema20)).values
 short_exits = (rsi < 25).values
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection, BacktestMetrics
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
+from backend.backtesting.interfaces import BacktestInput, BacktestMetrics, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator, ExtendedMetricsResult
 
 input_data = BacktestInput(
@@ -61,7 +63,7 @@ for f in fields(BacktestMetrics):
         else:
             print(f'  {f.name}: None')
 
-print(f'\n=== ExtendedMetrics (14) ===')
+print('\n=== ExtendedMetrics (14) ===')
 for f in fields(ExtendedMetricsResult):
     if not f.name.startswith('_'):
         v = getattr(ext, f.name)
@@ -71,5 +73,5 @@ for f in fields(ExtendedMetricsResult):
         else:
             print(f'  {f.name}: None')
 
-print(f'\n=== ИТОГО ===')
+print('\n=== ИТОГО ===')
 print(f'Ненулевых метрик: {non_zero}/46')

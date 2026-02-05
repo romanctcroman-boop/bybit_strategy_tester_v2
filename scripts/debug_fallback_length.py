@@ -3,11 +3,12 @@ Check data length in Fallback
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
+
+import pandas as pd
 
 from backend.backtesting.engine import get_engine
 from backend.backtesting.models import BacktestConfig
@@ -62,7 +63,7 @@ print(f"Last equity: {result.equity_curve.equity[-1]:.2f}")
 
 # Check trade 20 details
 t20 = result.trades[-1]
-print(f"\nTrade 20:")
+print("\nTrade 20:")
 print(f"  entry_bar_index: {t20.entry_bar_index}")
 print(f"  exit_bar_index: {t20.exit_bar_index}")
 print(f"  exit_time: {t20.exit_time}")

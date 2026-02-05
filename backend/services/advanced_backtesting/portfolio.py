@@ -49,6 +49,7 @@ class AllocationMethod(Enum):
     RISK_PARITY = "risk_parity"
     MIN_VARIANCE = "min_variance"
     MAX_SHARPE = "max_sharpe"
+    CVXPORTFOLIO = "cvxportfolio"  # Cvxportfolio convex optimization (optional)
     MOMENTUM = "momentum"
     CUSTOM = "custom"
 
@@ -136,7 +137,7 @@ class CorrelationAnalysis:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
-        return {
+        out: dict[str, Any] = {
             "correlation_matrix": self.correlation_matrix,
             "statistics": {
                 "avg_correlation": round(self.avg_correlation, 4),
@@ -148,6 +149,9 @@ class CorrelationAnalysis:
                 "least_correlated": list(self.least_correlated_pair),
             },
         }
+        if self.rolling_correlations:
+            out["rolling_correlations"] = self.rolling_correlations
+        return out
 
 
 @dataclass
@@ -222,7 +226,7 @@ class PortfolioBacktester:
         self,
         assets: list[str],
         initial_capital: float = 10000.0,
-        commission: float = 0.0006,
+        commission: float = 0.0007,  # 0.07% TradingView parity
     ):
         """
         Initialize portfolio backtester.
@@ -330,8 +334,8 @@ class PortfolioBacktester:
         # Correlation analysis
         correlation = self.analyze_correlations(data)
 
-        # Portfolio metrics
-        metrics = self._calculate_metrics(returns)
+        # Portfolio metrics (pass data for diversification ratio)
+        metrics = self._calculate_metrics(returns, data)
 
         return {
             "status": "completed",
@@ -394,6 +398,15 @@ class PortfolioBacktester:
                 for asset, vol in volatilities.items()
             }
 
+        elif method == AllocationMethod.MIN_VARIANCE:
+            allocation = self._min_variance_allocation(data, allocation)
+
+        elif method == AllocationMethod.MAX_SHARPE:
+            allocation = self._max_sharpe_allocation(data, allocation)
+
+        elif method == AllocationMethod.CVXPORTFOLIO:
+            allocation = self._cvxportfolio_allocation(data, allocation)
+
         elif method == AllocationMethod.MOMENTUM:
             # Calculate momentum scores
             momentum_scores = {}
@@ -424,6 +437,166 @@ class PortfolioBacktester:
             allocation.weights = {asset: weight for asset in self.assets}
 
         return allocation
+
+    def _min_variance_allocation(
+        self,
+        data: dict[str, list[dict]],
+        allocation: AssetAllocation,
+    ) -> AssetAllocation:
+        """Calculate minimum-variance portfolio weights."""
+        returns_matrix, assets_list = self._build_returns_matrix(data)
+        if returns_matrix is None or len(assets_list) < 2:
+            weight = 1.0 / len(self.assets)
+            allocation.weights = {asset: weight for asset in self.assets}
+            return allocation
+
+        cov = np.cov(returns_matrix.T)
+        cov = np.nan_to_num(cov, nan=0.0, posinf=0.0, neginf=0.0)
+        n = len(assets_list)
+
+        try:
+            from scipy.optimize import minimize
+
+            def objective(w: np.ndarray) -> float:
+                return float(w @ cov @ w)
+
+            constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1}]
+            bounds = [(allocation.min_weight, allocation.max_weight)] * n
+            x0 = np.ones(n) / n
+
+            res = minimize(
+                objective,
+                x0,
+                method="SLSQP",
+                bounds=bounds,
+                constraints=constraints,
+            )
+            if res.success:
+                allocation.weights = dict(zip(assets_list, res.x))
+        except Exception:
+            weight = 1.0 / n
+            allocation.weights = {a: weight for a in assets_list}
+        return allocation
+
+    def _max_sharpe_allocation(
+        self,
+        data: dict[str, list[dict]],
+        allocation: AssetAllocation,
+    ) -> AssetAllocation:
+        """Calculate maximum-Sharpe portfolio weights (mean-variance)."""
+        returns_matrix, assets_list = self._build_returns_matrix(data)
+        if returns_matrix is None or len(assets_list) < 2:
+            weight = 1.0 / len(self.assets)
+            allocation.weights = {asset: weight for asset in self.assets}
+            return allocation
+
+        mean_returns = np.mean(returns_matrix, axis=0)
+        cov = np.cov(returns_matrix.T)
+        cov = np.nan_to_num(cov, nan=0.01, posinf=0.01, neginf=0.01)
+        np.fill_diagonal(cov, np.maximum(np.diag(cov), 1e-8))
+        n = len(assets_list)
+
+        try:
+            from scipy.optimize import minimize
+
+            def neg_sharpe(w: np.ndarray) -> float:
+                port_ret = float(w @ mean_returns)
+                port_vol = float(np.sqrt(w @ cov @ w))
+                if port_vol < 1e-10:
+                    return 0.0
+                return -port_ret / port_vol
+
+            constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1}]
+            bounds = [(allocation.min_weight, allocation.max_weight)] * n
+            x0 = np.ones(n) / n
+
+            res = minimize(
+                neg_sharpe,
+                x0,
+                method="SLSQP",
+                bounds=bounds,
+                constraints=constraints,
+            )
+            if res.success:
+                allocation.weights = dict(zip(assets_list, res.x))
+            else:
+                weight = 1.0 / n
+                allocation.weights = {a: weight for a in assets_list}
+        except Exception:
+            weight = 1.0 / n
+            allocation.weights = {a: weight for a in assets_list}
+        return allocation
+
+    def _cvxportfolio_allocation(
+        self,
+        data: dict[str, list[dict]],
+        allocation: AssetAllocation,
+    ) -> AssetAllocation:
+        """
+        Max-Sharpe via cvxpy (convex reformulation). Falls back to scipy if cvxpy unavailable.
+        """
+        returns_matrix, assets_list = self._build_returns_matrix(data)
+        if returns_matrix is None or len(assets_list) < 2:
+            weight = 1.0 / len(self.assets)
+            allocation.weights = {asset: weight for asset in self.assets}
+            return allocation
+
+        mean_returns = np.mean(returns_matrix, axis=0)
+        cov = np.cov(returns_matrix.T)
+        cov = np.nan_to_num(cov, nan=0.01, posinf=0.01, neginf=0.01)
+        np.fill_diagonal(cov, np.maximum(np.diag(cov), 1e-8))
+        n = len(assets_list)
+        mu = np.asarray(mean_returns, dtype=float)
+
+        try:
+            import cvxpy as cp
+
+            # Convex reformulation: min y'Sigma y s.t. mu'y=1, y>=0; then w = y/sum(y)
+            y = cp.Variable(n)
+            prob = cp.Problem(
+                cp.Minimize(cp.quad_form(y, cov)),
+                [
+                    mu @ y == 1,
+                    y >= allocation.min_weight,
+                    y <= allocation.max_weight * 10,  # Relax upper for y
+                ],
+            )
+            prob.solve(solver=cp.ECOS, verbose=False)
+            if prob.status in ("optimal", "optimal_inaccurate") and y.value is not None:
+                x = np.maximum(0, np.asarray(y.value).flatten())
+                if np.sum(x) > 1e-10:
+                    x = x / np.sum(x)
+                    x = np.clip(x, allocation.min_weight, allocation.max_weight)
+                    x = x / np.sum(x)
+                    allocation.weights = dict(zip(assets_list, x))
+                    return allocation
+        except ImportError:
+            pass
+        except Exception:
+            logger.debug("Cvxpy optimization failed, using scipy fallback")
+
+        return self._max_sharpe_allocation(data, allocation)
+
+    def _build_returns_matrix(
+        self,
+        data: dict[str, list[dict]],
+    ) -> tuple[np.ndarray | None, list[str]]:
+        """Build returns matrix (T x N) and asset list for optimization."""
+        asset_returns = {}
+        min_length = float("inf")
+        for asset in self.assets:
+            if asset not in data:
+                continue
+            rets = self._calculate_asset_returns(data[asset])
+            asset_returns[asset] = rets
+            min_length = min(min_length, len(rets))
+
+        if min_length < 2 or len(asset_returns) < 2:
+            return None, list(self.assets)
+
+        assets_list = list(asset_returns.keys())
+        truncated = [asset_returns[a][: int(min_length)] for a in assets_list]
+        return np.column_stack(truncated), assets_list
 
     def _calculate_asset_returns(self, candles: list[dict]) -> list[float]:
         """Calculate returns from candles."""
@@ -566,6 +739,27 @@ class PortfolioBacktester:
 
         self.weights = target.weights.copy()
 
+    def _compute_diversification_ratio(
+        self,
+        data: dict[str, list[dict]],
+        portfolio_returns: np.ndarray,
+    ) -> float:
+        """Diversification ratio = weighted_avg_vol / portfolio_vol."""
+        returns_matrix, assets_list = self._build_returns_matrix(data)
+        if returns_matrix is None or len(assets_list) < 2:
+            return 1.0
+        cov = np.cov(returns_matrix.T)
+        cov = np.nan_to_num(cov, nan=0.01, posinf=0.01, neginf=0.01)
+        np.fill_diagonal(cov, np.maximum(np.diag(cov), 1e-8))
+        vols = np.sqrt(np.diag(cov))
+        w = np.array([self.weights.get(a, 0) for a in assets_list])
+        w = w / (w.sum() or 1.0)
+        weighted_vol = float(w @ vols)
+        port_vol = float(np.sqrt(w @ cov @ w))
+        if port_vol < 1e-10:
+            return 1.0
+        return weighted_vol / port_vol
+
     def _calculate_returns(self) -> list[float]:
         """Calculate portfolio returns."""
         if len(self.equity_curve) < 2:
@@ -581,7 +775,11 @@ class PortfolioBacktester:
 
         return returns
 
-    def _calculate_metrics(self, returns: list[float]) -> PortfolioMetrics:
+    def _calculate_metrics(
+        self,
+        returns: list[float],
+        data: dict[str, list[dict]] | None = None,
+    ) -> PortfolioMetrics:
         """Calculate portfolio metrics."""
         metrics = PortfolioMetrics()
 
@@ -630,6 +828,12 @@ class PortfolioBacktester:
         # Concentration (Herfindahl index)
         weights = list(self.weights.values())
         metrics.concentration_ratio = sum(w**2 for w in weights)
+
+        # Diversification ratio: weighted_avg_vol / portfolio_vol
+        if data and len(self.assets) >= 2:
+            metrics.diversification_ratio = self._compute_diversification_ratio(
+                data, returns_arr
+            )
 
         # Turnover (simplified)
         if self.rebalance_events:
@@ -715,7 +919,52 @@ class PortfolioBacktester:
                             min_corr = corr
                             analysis.least_correlated_pair = (asset1, asset2)
 
+        # Rolling correlations (window=20, first pair)
+        if len(assets_list) >= 2 and min_length >= 25:
+            r1 = np.array(asset_returns[assets_list[0]])
+            r2 = np.array(asset_returns[assets_list[1]])
+            window = 20
+            rolling = []
+            for i in range(window, len(r1)):
+                c = np.corrcoef(r1[i - window : i], r2[i - window : i])[0, 1]
+                rolling.append(float(c) if not np.isnan(c) else 0.0)
+            pair_key = f"{assets_list[0]}_{assets_list[1]}"
+            analysis.rolling_correlations[pair_key] = [
+                round(x, 4) for x in rolling[-100:]
+            ]
+
         return analysis
+
+
+def aggregate_multi_symbol_equity(
+    equity_curves: dict[str, list[float]],
+) -> list[float]:
+    """
+    Aggregate per-symbol equity curves into a combined portfolio equity.
+
+    Handles misaligned lengths by using the last known value when a symbol
+    has no data for a given bar index. Useful for combining backtest results
+    from multiple symbols with different bar counts.
+
+    Args:
+        equity_curves: Mapping symbol -> list of equity values
+
+    Returns:
+        Combined equity curve (length = max of all input lengths)
+    """
+    if not equity_curves:
+        return []
+    max_len = max(len(ec) for ec in equity_curves.values())
+    portfolio_equity = []
+    for i in range(max_len):
+        total = 0.0
+        for symbol, curve in equity_curves.items():
+            if i < len(curve):
+                total += curve[i]
+            else:
+                total += curve[-1] if curve else 0.0
+        portfolio_equity.append(total)
+    return portfolio_equity
 
 
 def run_portfolio_backtest(

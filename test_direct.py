@@ -1,6 +1,5 @@
 """Test API endpoints directly via TestClient."""
 
-import json
 
 from fastapi.testclient import TestClient
 

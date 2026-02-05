@@ -4,11 +4,13 @@ Fallback Sharpe=5.13 vs Numba Sharpe=-4.15
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
 
 import numpy as np
 import pandas as pd
-import sqlite3
 
 print("=" * 100)
 print("🔍 ДИАГНОСТИКА EQUITY CURVE")
@@ -50,9 +52,9 @@ short_exits = (rsi < 30).values
 # ============================================================================
 # ЗАПУСК ДВИЖКОВ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 input_data = BacktestInput(
     candles=df_1h,
@@ -104,7 +106,7 @@ print(f"Numba NaN: {np.isnan(nb_eq).sum()}, Inf: {np.isinf(nb_eq).sum()}")
 
 # Сравнение
 diff = fb_eq - nb_eq
-print(f"\nРазница Equity:")
+print("\nРазница Equity:")
 print(f"  Mean: ${diff.mean():,.2f}")
 print(f"  Max:  ${diff.max():,.2f}")
 print(f"  Min:  ${diff.min():,.2f}")
@@ -134,12 +136,12 @@ def calc_sharpe(equity):
 fb_sharpe, fb_returns = calc_sharpe(fb_eq)
 nb_sharpe, nb_returns = calc_sharpe(nb_eq)
 
-print(f"\nFallback Returns:")
+print("\nFallback Returns:")
 print(f"  Mean: {fb_returns.mean():.6f}")
 print(f"  Std:  {fb_returns.std():.6f}")
 print(f"  Sharpe: {fb_sharpe:.2f}")
 
-print(f"\nNumba Returns:")
+print("\nNumba Returns:")
 print(f"  Mean: {nb_returns.mean():.6f}")
 print(f"  Std:  {nb_returns.std():.6f}")
 print(f"  Sharpe: {nb_sharpe:.2f}")

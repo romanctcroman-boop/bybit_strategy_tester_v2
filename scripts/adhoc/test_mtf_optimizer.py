@@ -8,7 +8,6 @@ import sys
 import time
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -95,12 +94,12 @@ def test_mtf_optimizer_basic():
         top_k=10,
     )
 
-    print(f"\n📊 Results:")
+    print("\n📊 Results:")
     print(f"  Total combinations: {result.total_combinations}")
     print(f"  Tested: {result.tested_combinations}")
     print(f"  Time: {result.execution_time_seconds:.2f}s")
     print(f"  Speed: {result.performance_stats['combinations_per_second']:.1f} comb/s")
-    print(f"\n🏆 Best result:")
+    print("\n🏆 Best result:")
     print(f"  Score: {result.best_score:.4f}")
     print(f"  Params: {result.best_params}")
     print(f"  Trades: {result.best_metrics.get('total_trades', 0)}")
@@ -157,7 +156,7 @@ def test_mtf_optimizer_all_filters():
         top_k=10,
     )
 
-    print(f"\n📊 Results by filter type:")
+    print("\n📊 Results by filter type:")
 
     # Group results by filter type
     filter_results = {}

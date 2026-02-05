@@ -172,7 +172,7 @@ def extract_css_from_file(filepath: Path, dry_run: bool = False) -> dict:
     print(f"\n📄 Processing: {filepath.name}")
 
     # Read file
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         html = f.read()
 
     # Extract style blocks
@@ -235,7 +235,7 @@ def update_html_with_css_link(
 
     Returns True if modified.
     """
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         html = f.read()
 
     # Check if already linked

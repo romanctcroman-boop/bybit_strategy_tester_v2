@@ -5,20 +5,22 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
 import time
 from datetime import datetime
+
+import pandas as pd
 
 print("=" * 100)
 print("🚀 МАСШТАБНАЯ ОПТИМИЗАЦИЯ RSI (параметры из UI)")
 print("=" * 100)
 print(f"Время запуска: {datetime.now()}")
 
-from backend.backtesting.gpu_optimizer import GPUGridOptimizer, GPU_NAME
+from backend.backtesting.gpu_optimizer import GPU_NAME, GPUGridOptimizer
+
 print(f"GPU: {GPU_NAME}")
 
 # ============================================================================
@@ -30,12 +32,12 @@ print("=" * 100)
 
 # RSI Parameters
 period_range = list(range(7, 26, 1))           # 7-25, шаг 1 -> 19 values
-overbought_range = list(range(45, 81, 1))      # 45-80, шаг 1 -> 36 values  
+overbought_range = list(range(45, 81, 1))      # 45-80, шаг 1 -> 36 values
 oversold_range = list(range(10, 46, 1))        # 10-45, шаг 1 -> 36 values
 
 # SL/TP Parameters (конвертируем в десятичные)
 sl_range = [x/100 for x in range(1, 11)]       # 1-10%, шаг 0.5 -> но API принимает целые, поэтому шаг 1
-sl_range = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 
+sl_range = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05,
             0.055, 0.06, 0.065, 0.07, 0.075, 0.08, 0.085, 0.09, 0.095, 0.10]  # 19 values
 tp_range = [0.01, 0.015, 0.02, 0.025, 0.03]    # 1-3%, шаг 0.5 -> 5 values
 
@@ -140,9 +142,9 @@ for direction in ["long", "short", "both"]:
     emoji = "🟢" if direction == "long" else ("🔴" if direction == "short" else "🟣")
     print(f"{emoji} ОПТИМИЗАЦИЯ: {direction.upper()}")
     print("=" * 100)
-    
+
     start = time.time()
-    
+
     result = optimizer.optimize(
         candles=df,
         rsi_period_range=period_range,
@@ -158,13 +160,13 @@ for direction in ["long", "short", "both"]:
         top_k=20,
         optimize_metric="sharpe_ratio"
     )
-    
+
     elapsed = time.time() - start
     results[direction] = {"result": result, "time": elapsed}
-    
+
     print(f"  ✅ Завершено за {elapsed:.2f}s ({total_combos/elapsed:,.0f} комб/сек)")
     print(f"  Режим: {result.execution_mode}")
-    
+
     if result.top_results:
         print(f"\n  🏆 ТОП-5 {direction.upper()}:")
         for i, r in enumerate(result.top_results[:5]):
@@ -207,7 +209,7 @@ for d in ["long", "short", "both"]:
 if all_best:
     winner = max(all_best, key=lambda x: x[1])
     p = winner[2].get('params', {})
-    
+
     print("\n" + "=" * 100)
     print(f"🏆 ЛУЧШАЯ СТРАТЕГИЯ: {winner[0].upper()}")
     print("=" * 100)

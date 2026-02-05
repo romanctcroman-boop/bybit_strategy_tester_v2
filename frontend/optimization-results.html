@@ -553,23 +553,52 @@
         </div>
 
         <!-- Sensitivity View (hidden by default) -->
-        <div class="opt-charts-row d-none" id="viewSensitivity">
-          <div class="opt-chart-card">
-            <div class="opt-chart-title">
-              <i class="bi bi-activity me-1"></i>
-              RSI Period vs Sharpe Ratio
+        <div class="d-none" id="viewSensitivity">
+          <div class="opt-charts-row">
+            <div class="opt-chart-card">
+              <div class="opt-chart-title">
+                <i class="bi bi-activity me-1"></i>
+                RSI Period vs Sharpe Ratio
+              </div>
+              <div class="opt-chart-wrapper">
+                <canvas id="sensitivityChart1"></canvas>
+              </div>
             </div>
-            <div class="opt-chart-wrapper">
-              <canvas id="sensitivityChart1"></canvas>
+            <div class="opt-chart-card">
+              <div class="opt-chart-title">
+                <i class="bi bi-activity me-1"></i>
+                Overbought/Oversold vs Return
+              </div>
+              <div class="opt-chart-wrapper">
+                <canvas id="sensitivityChart2"></canvas>
+              </div>
             </div>
           </div>
-          <div class="opt-chart-card">
+          <div class="opt-chart-card mt-2">
             <div class="opt-chart-title">
-              <i class="bi bi-activity me-1"></i>
-              Overbought/Oversold vs Return
+              <i class="bi bi-grid-3x3-gap me-1"></i>
+              Parameter Heatmap <span class="text-secondary">(param1 × param2 → metric)</span>
             </div>
-            <div class="opt-chart-wrapper">
-              <canvas id="sensitivityChart2"></canvas>
+            <div class="opt-chart-wrapper" style="min-height: 200px;">
+              <div id="paramHeatmapContainer" class="overflow-auto"></div>
+            </div>
+            <div class="d-flex gap-3 mt-2 flex-wrap">
+              <label class="d-flex align-items-center gap-1">
+                <span class="text-secondary small">Param X:</span>
+                <select id="heatmapParamX" class="form-select form-select-sm" style="width: auto;"></select>
+              </label>
+              <label class="d-flex align-items-center gap-1">
+                <span class="text-secondary small">Param Y:</span>
+                <select id="heatmapParamY" class="form-select form-select-sm" style="width: auto;"></select>
+              </label>
+              <label class="d-flex align-items-center gap-1">
+                <span class="text-secondary small">Metric:</span>
+                <select id="heatmapMetric" class="form-select form-select-sm" style="width: auto;">
+                  <option value="sharpe_ratio">Sharpe</option>
+                  <option value="total_return">Return %</option>
+                  <option value="win_rate">Win Rate</option>
+                </select>
+              </label>
             </div>
           </div>
         </div>
@@ -630,415 +659,95 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Optimization Results Module -->
+    <script src="./js/pages/optimization_results.js"></script>
 
     <script>
       // ============================================
-      // State
+      // Legacy Compatibility Layer
+      // (Kept for inline onclick handlers - will be handled by module)
       // ============================================
-      let optimizationId = null;
-      let results = [];
-      let currentPage = 1;
-      let pageSize = 20;
-      let sortBy = "rank";
-      let sortDirection = "asc";
-      let filters = {
-        minSharpe: 0,
-        maxDD: 100,
-        minWinRate: 0,
-      };
 
-      // ============================================
-      // Initialization
-      // ============================================
-      document.addEventListener("DOMContentLoaded", () => {
-        // Get optimization ID from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        optimizationId = urlParams.get("optimization_id");
-
-        if (optimizationId) {
-          loadOptimizationResults(optimizationId);
-        } else {
-          loadDemoData();
-        }
-      });
-
-      // ============================================
-      // Data Loading
-      // ============================================
-      async function loadOptimizationResults(id) {
-        try {
-          const response = await fetch(`/api/v1/optimizations/${id}/results`);
-          if (!response.ok) throw new Error("Failed to load results");
-
-          const data = await response.json();
-          updateUI(data);
-        } catch (error) {
-          console.error("Error loading optimization results:", error);
-          loadDemoData();
-        }
-      }
-
-      function loadDemoData() {
-        // Generate demo data for UI development
-        results = [];
-        for (let i = 0; i < 156; i++) {
-          results.push({
-            rank: i + 1,
-            rsi_period: 10 + Math.floor(Math.random() * 21),
-            overbought: 65 + Math.floor(Math.random() * 16),
-            oversold: 20 + Math.floor(Math.random() * 16),
-            sharpe_ratio: (Math.random() * 2.5 - 0.5).toFixed(2),
-            total_return: (Math.random() * 60 - 10).toFixed(1),
-            win_rate: (40 + Math.random() * 30).toFixed(1),
-            max_drawdown: (5 + Math.random() * 20).toFixed(1),
-            total_trades: 50 + Math.floor(Math.random() * 100),
-            profit_factor: (0.5 + Math.random() * 2).toFixed(2),
-          });
-        }
-
-        // Sort by sharpe ratio and assign ranks
-        results.sort(
-          (a, b) => parseFloat(b.sharpe_ratio) - parseFloat(a.sharpe_ratio),
-        );
-        results.forEach((r, i) => (r.rank = i + 1));
-
-        renderTable();
-        initCharts();
-      }
-
-      function updateUI(data) {
-        // Update summary cards
-        document.getElementById("summaryTotalTrials").textContent =
-          data.total_combinations || 0;
-        document.getElementById("summaryBestSharpe").textContent = (
-          data.best_score || 0
-        ).toFixed(2);
-
-        // Update best parameters
-        if (data.best_params) {
-          const grid = document.getElementById("bestParamsGrid");
-          grid.innerHTML = "";
-          for (const [key, value] of Object.entries(data.best_params)) {
-            grid.innerHTML += `
-                        <div class="opt-param-item">
-                            <span class="opt-param-name">${formatParamName(key)}</span>
-                            <span class="opt-param-value">${value}</span>
-                        </div>
-                    `;
-          }
-        }
-
-        // Update results
-        results = data.all_results || [];
-        renderTable();
-        initCharts();
-      }
-
-      // ============================================
-      // Table Rendering
-      // ============================================
-      function renderTable() {
-        const tbody = document.getElementById("resultsTableBody");
-        const start = (currentPage - 1) * pageSize;
-        const end = Math.min(start + pageSize, results.length);
-        const pageResults = results.slice(start, end);
-
-        tbody.innerHTML = pageResults
-          .map(
-            (r) => `
-                <tr class="${r.rank === 1 ? "best" : ""}" data-rank="${r.rank}">
-                    <td>
-                        <span class="opt-rank-badge rank-${r.rank <= 3 ? r.rank : "other"}">
-                            ${r.rank <= 3 ? ["🥇", "🥈", "🥉"][r.rank - 1] : r.rank}
-                        </span>
-                    </td>
-                    <td>${r.rsi_period}</td>
-                    <td>${r.overbought}</td>
-                    <td>${r.oversold}</td>
-                    <td class="opt-metric-value ${parseFloat(r.sharpe_ratio) > 0 ? "positive" : "negative"}">
-                        ${r.sharpe_ratio}
-                    </td>
-                    <td class="opt-metric-value ${parseFloat(r.total_return) > 0 ? "positive" : "negative"}">
-                        ${parseFloat(r.total_return) > 0 ? "+" : ""}${r.total_return}%
-                    </td>
-                    <td class="opt-metric-value">${r.win_rate}%</td>
-                    <td class="opt-metric-value negative">-${r.max_drawdown}%</td>
-                    <td>${r.total_trades}</td>
-                    <td class="opt-metric-value ${parseFloat(r.profit_factor) > 1 ? "positive" : "negative"}">
-                        ${r.profit_factor}
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="viewDetails(${r.rank})" title="View details">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-success" onclick="runBacktest(${r.rank})" title="Run backtest">
-                            <i class="bi bi-play"></i>
-                        </button>
-                    </td>
-                </tr>
-            `,
-          )
-          .join("");
-
-        // Update pagination info
-        document.getElementById("showingFrom").textContent = start + 1;
-        document.getElementById("showingTo").textContent = end;
-        document.getElementById("totalResults").textContent = results.length;
-      }
-
-      // ============================================
-      // Charts
-      // ============================================
-      let convergenceChart = null;
-      let importanceChart = null;
-
-      function initCharts() {
-        // Convergence chart
-        const convergenceCtx = document
-          .getElementById("convergenceChart")
-          .getContext("2d");
-        if (convergenceChart) convergenceChart.destroy();
-
-        const convergenceData = [];
-        let bestSoFar = -Infinity;
-        for (let i = 0; i < results.length; i++) {
-          const score = parseFloat(results[i].sharpe_ratio);
-          if (score > bestSoFar) bestSoFar = score;
-          convergenceData.push(bestSoFar);
-        }
-
-        convergenceChart = new Chart(convergenceCtx, {
-          type: "line",
-          data: {
-            labels: Array.from({ length: results.length }, (_, i) => i + 1),
-            datasets: [
-              {
-                label: "Best Sharpe",
-                data: convergenceData,
-                borderColor: "#58a6ff",
-                backgroundColor: "rgba(88, 166, 255, 0.1)",
-                fill: true,
-                tension: 0.4,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-            },
-            scales: {
-              x: {
-                title: { display: true, text: "Trial", color: "#8b949e" },
-                grid: { color: "rgba(48, 54, 61, 0.5)" },
-                ticks: { color: "#8b949e" },
-              },
-              y: {
-                title: {
-                  display: true,
-                  text: "Sharpe Ratio",
-                  color: "#8b949e",
-                },
-                grid: { color: "rgba(48, 54, 61, 0.5)" },
-                ticks: { color: "#8b949e" },
-              },
-            },
-          },
-        });
-
-        // Parameter importance chart
-        const importanceCtx = document
-          .getElementById("importanceChart")
-          .getContext("2d");
-        if (importanceChart) importanceChart.destroy();
-
-        importanceChart = new Chart(importanceCtx, {
-          type: "bar",
-          data: {
-            labels: ["RSI Period", "Overbought", "Oversold", "Stop Loss"],
-            datasets: [
-              {
-                label: "Importance",
-                data: [0.35, 0.28, 0.22, 0.15],
-                backgroundColor: ["#58a6ff", "#3fb950", "#d29922", "#a371f7"],
-              },
-            ],
-          },
-          options: {
-            indexAxis: "y",
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-            },
-            scales: {
-              x: {
-                grid: { color: "rgba(48, 54, 61, 0.5)" },
-                ticks: { color: "#8b949e" },
-              },
-              y: {
-                grid: { display: false },
-                ticks: { color: "#8b949e" },
-              },
-            },
-          },
-        });
-      }
-
-      // ============================================
-      // View Switching
-      // ============================================
-      function switchView(view) {
-        // Update tabs
-        document.querySelectorAll(".opt-view-tab").forEach((tab) => {
-          tab.classList.toggle("active", tab.dataset.view === view);
-        });
-
-        // Show/hide views
-        document
-          .getElementById("viewTable")
-          .classList.toggle("d-none", view !== "table");
-        document
-          .getElementById("viewCharts")
-          .classList.toggle("d-none", view !== "charts");
-        document
-          .getElementById("viewSensitivity")
-          .classList.toggle("d-none", view !== "sensitivity");
-      }
-
-      // ============================================
-      // Actions
-      // ============================================
-      function applyBestParams() {
-        const bestResult = results[0];
-        if (!bestResult) return;
-
-        // Navigate to strategy builder with params
-        const params = new URLSearchParams({
-          rsi_period: bestResult.rsi_period,
-          overbought: bestResult.overbought,
-          oversold: bestResult.oversold,
-        });
-        window.location.href = `strategy-builder.html?apply_params=${params.toString()}`;
-      }
-
-      function runSecondaryBacktest() {
-        const bestResult = results[0];
-        if (!bestResult) return;
-
-        // Open backtest modal or navigate
-        alert("Running backtest with best parameters...");
-      }
-
-      function compareSelected() {
-        const selected = document.querySelectorAll(
-          ".opt-results-table tr.selected",
-        );
-        if (selected.length < 2) {
-          alert("Select at least 2 results to compare");
-          return;
-        }
-        // Open comparison modal
-      }
-
-      function viewDetails(rank) {
-        const result = results.find((r) => r.rank === rank);
-        if (result) {
-          console.log("View details for:", result);
-          // Open details modal
-        }
-      }
-
-      function runBacktest(rank) {
-        const result = results.find((r) => r.rank === rank);
-        if (result) {
-          console.log("Run backtest with:", result);
-          // Navigate to backtest
+      // These functions delegate to the module instance
+      function refreshResults() {
+        if (window.optResultsViewer) {
+          optResultsViewer.loadOptimizationData();
         }
       }
 
       function exportResults() {
-        // Generate CSV
-        const headers = [
-          "Rank",
-          "RSI Period",
-          "Overbought",
-          "Oversold",
-          "Sharpe",
-          "Return %",
-          "Win Rate",
-          "Max DD",
-          "Trades",
-          "PF",
-        ];
-        const rows = results.map((r) => [
-          r.rank,
-          r.rsi_period,
-          r.overbought,
-          r.oversold,
-          r.sharpe_ratio,
-          r.total_return,
-          r.win_rate,
-          r.max_drawdown,
-          r.total_trades,
-          r.profit_factor,
-        ]);
-
-        const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join(
-          "\n",
-        );
-        const blob = new Blob([csv], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `optimization_results_${optimizationId || "demo"}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+        if (window.optResultsViewer) {
+          optResultsViewer.exportResults("csv");
+        }
       }
 
-      function refreshResults() {
-        if (optimizationId) {
-          loadOptimizationResults(optimizationId);
-        } else {
-          loadDemoData();
+      function applyBestParams() {
+        if (window.optResultsViewer) {
+          optResultsViewer.applyBestParams();
+        }
+      }
+
+      function runSecondaryBacktest() {
+        if (window.optResultsViewer) {
+          optResultsViewer.runBacktestWithBest();
+        }
+      }
+
+      function compareSelected() {
+        if (window.optResultsViewer) {
+          optResultsViewer.compareSelected();
         }
       }
 
       function applyFilters() {
-        filters.minSharpe =
-          parseFloat(document.getElementById("filterMinSharpe").value) || 0;
-        filters.maxDD =
-          parseFloat(document.getElementById("filterMaxDD").value) || 100;
-        filters.minWinRate =
-          parseFloat(document.getElementById("filterMinWinRate").value) || 0;
+        if (window.optResultsViewer) {
+          optResultsViewer.applyFilters();
+        }
+      }
 
-        // Filter and re-render
-        renderTable();
+      function switchView(view) {
+        if (window.optResultsViewer) {
+          optResultsViewer.switchView(view);
+        }
       }
 
       function sortResults() {
-        sortBy = document.getElementById("sortMetric").value;
-        // Sort results
-        results.sort((a, b) => {
-          const aVal = parseFloat(a[sortBy]) || 0;
-          const bVal = parseFloat(b[sortBy]) || 0;
-          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
-        });
-        renderTable();
+        if (window.optResultsViewer) {
+          optResultsViewer.applySortAndFilter();
+        }
       }
 
       function toggleSortDirection() {
-        sortDirection = sortDirection === "asc" ? "desc" : "asc";
-        document.getElementById("sortDirectionIcon").className =
-          sortDirection === "asc" ? "bi bi-sort-up" : "bi bi-sort-down";
-        sortResults();
+        if (window.optResultsViewer) {
+          optResultsViewer.toggleSortDirection();
+        }
       }
 
-      // ============================================
-      // Helpers
-      // ============================================
+      function viewDetails(rank) {
+        if (window.optResultsViewer) {
+          optResultsViewer.viewDetails(rank);
+        }
+      }
+
+      function runBacktest(rank) {
+        if (window.optResultsViewer) {
+          optResultsViewer.runBacktest(rank);
+        }
+      }
+
+      function prevPage() {
+        if (window.optResultsViewer) {
+          optResultsViewer.goToPage(optResultsViewer.currentPage - 1);
+        }
+      }
+
+      function nextPage() {
+        if (window.optResultsViewer) {
+          optResultsViewer.goToPage(optResultsViewer.currentPage + 1);
+        }
+      }
+
+      // Helper for backward compatibility
       function formatParamName(key) {
         return key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
       }

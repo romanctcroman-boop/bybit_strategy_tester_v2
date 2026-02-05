@@ -321,14 +321,19 @@ function setStorage(key, value) {
  * Debounce function calls
  * @param {Function} fn - Function to debounce
  * @param {number} delay - Delay in ms
- * @returns {Function} Debounced function
+ * @returns {Function} Debounced function with optional .cancel()
  */
 function debounce(fn, delay = 300) {
     let timeoutId;
-    return function (...args) {
+    const debounced = function (...args) {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => fn.apply(this, args), delay);
     };
+    debounced.cancel = function () {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+    };
+    return debounced;
 }
 
 /**

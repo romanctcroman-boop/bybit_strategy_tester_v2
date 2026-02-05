@@ -53,7 +53,7 @@ def main():
     imported = 0
     skipped = 0
 
-    with open(TV_CSV_PATH, "r", encoding="utf-8") as f:
+    with open(TV_CSV_PATH, encoding="utf-8") as f:
         reader = csv.DictReader(f)
 
         for row in reader:

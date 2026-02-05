@@ -123,7 +123,7 @@ def run_backtest_task(
             None,
             data_service=ds,
             initial_capital=initial_capital,
-            commission=0.0006,
+            commission=0.0007,  # 0.07% TradingView parity
             slippage=0.0001,
         )
         results = engine.run(data=candles, strategy_config=strategy_config)

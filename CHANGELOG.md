@@ -7,9 +7,275 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Optimization `engine_type: "optimization"` 500 Error:** исправлен баг, при котором `engine_type="optimization"` вызывал 500 Internal Server Error в `/api/v1/optimizations/sync/grid-search`. Причина: `"optimization"` не был включён в условие single-process режима (строка 2316 в `optimizations.py`). Теперь `engine_type="optimization"` корректно обрабатывается как single-process Numba-движок.
+
+### Added
+
+- **MCP DeepSeek (Node.js) для Cursor:** папка `mcp-deepseek/` — MCP-сервер на Node.js с инструментами `deepseek_chat` и `deepseek_code_completion`. В `.cursor/mcp.json` добавлен сервер `deepseek-node` (запуск через `cmd /c cd /d ...\mcp-deepseek && node server.js`). API-ключ задаётся в env или в `mcp-deepseek/.env` (не в репозитории). См. `mcp-deepseek/README.md`.
+
+### Changed
+
+- **DeepSeek proxy (Base URL http://localhost:5000):** в `scripts/run_deepseek_proxy.ps1` исправлен расчёт корня проекта (один уровень вверх от `scripts/`), добавлена проверка наличия `.env` и использование `py -3.14` (как в проекте). В `docs/ai/CURSOR_DEEPSEEK_MODEL.md` — пошаговая диагностика «прокси не запускается»: создание `.env`, ключ, команда `python`/`py`, порт, запуск из корня.
+- **Strategy Builder UI/UX (2026-02):** выбор тикера — немедленная синхронизация `runCheckSymbolDataForProperties()` (без debounce), blur вместо focus после выбора; База данных — эмодзи 🔒 заблокирован / 🔓 разблокирован, grid 3×2 (6 тикеров), `refreshDunnahBasePanel()` после sync, API_BASE для fetch; блок/разблок — `finally loadAndRender()` для обновления списка; удалённые тикеры исчезают.
+- **Регрессия и калибровка (2026-02):** Установлены numba, vectorbt, torch. calibrate_166_metrics — 51/51 метрик ✅. compare_vectorbt_vs_fallback — sys.path + DATABASE_PATH. REMAINING_AND_NEW_TASKS обновлён: инструкции по калибровке (TV_DATA_DIR, PYTHONIOENCODING на Windows).
+- **Зависимости:** добавлена опциональная группа `dev-full` (numba, vectorbt, torch) в pyproject.toml для полного покрытия тестов.
+- **calibrate_166_metrics.py:** TV_DATA_DIR env для пути к TradingView экспорту; fix Unicode на Windows.
+- **compare_vectorbt_vs_fallback.py:** sys.path + DATABASE_PATH env.
+- **L2 Order Book (experimental):** WebSocket real-time collector, CGAN (PyTorch) для генерации стакана, обучение на NDJSON, скрипты `l2_lob_collect_ws.py` и `l2_lob_train_cgan.py`. модуль `backend/experimental/l2_lob/` — Bybit orderbook API, сбор снимков в NDJSON, replay в OrderBookSimulator, скелет Generative LOB.
+- **ExecutionHandler:** SimulationExecutionHandler с slippage, latency, partial fills, rejection. Интеграция в EventDrivenEngine.
+- **Cvxportfolio allocation:** Метод cvxportfolio (cvxpy convex optimization) для multi-asset портфеля.
+- **EventDrivenEngine + StrategyBuilderAdapter:** create_on_bar_from_adapter(), run_event_driven_with_adapter() — запуск Strategy Builder стратегий в event-driven режиме.
+- **Strategy Versions UI:** кнопка Versions в Strategy Builder, модалка с историей версий, Restore.
+- **Strategy Builder — Export/Import шаблонов:** кнопки Export и Import в модалке Templates. Сохранение текущей стратегии в JSON и загрузка из файла.
+- **Undo/Redo в Strategy Builder:** Ctrl+Z / Ctrl+Y, история 50 шагов. Охват: блоки, связи, drag, шаблоны, загрузка.
+- **Regime overlay на equity:** чекбокс «Режим рынка» в backtest-results, загрузка `/market-regime/history`, box-аннотации (trending/ranging/volatile) на графике капитала.
+- **Перепроверка roadmap:** EventDrivenEngine — тесты tests/test_event_driven_engine.py. ROADMAP_REMAINING_TASKS обновлён: Event-driven скелет ✅, Multi-asset portfolio ✅, §12 Heatmap и Trade distribution ✅, версионирование БД+API ✅. Regime overlay на equity — осталось.
+- **Multi-asset portfolio (P2):** MIN_VARIANCE и MAX_SHARPE allocation (scipy.optimize), diversification_ratio, rolling_correlations, aggregate_multi_symbol_equity(). Тесты: tests/test_portfolio_allocation.py, API /advanced-backtest/portfolio.
+- **Unified Trading API:** `backend/services/unified_trading/` — LiveDataProvider, StrategyRunner (завершение TODO из BACKTEST_PAPER_LIVE_API). — DataProvider, OrderExecutorInterface, HistoricalDataProvider, SimulatedExecutor (docs/architecture/BACKTEST_PAPER_LIVE_API.md).
+- **Monte Carlo robustness API:** `POST /monte-carlo/robustness` — slippage_stress, price_randomization.
+- **P2 RL environment:** calmar, drawdown_penalty reward, REWARD_FUNCTIONS, docs/architecture/RL_ENVIRONMENT.md
+- **Backtest→Live API design:** docs/architecture/BACKTEST_PAPER_LIVE_API.md
+- **P1 Regime integration:** `market_regime_enabled`, `market_regime_filter`, `market_regime_lookback` в SyncOptimizationRequest. При включении regime используется FallbackV4. UI в strategies.html (чекбокс, селект, окно).
+- **Реализация рекомендаций ENGINE_OPTIMIZER_MODERNIZATION:** Optuna Bayesian оптимизация — `POST /sync/optuna-search` (TPE, n_trials, sampler_type). Monte Carlo robustness — добавлены SLIPPAGE_STRESS, PRICE_RANDOMIZATION. ExecutionSimulator — `backend/backtesting/execution_simulator.py` (latency, slippage, partial fills, rejections). Walk-Forward — режим `expanding`, `param_stability_report`, `get_param_stability_report()`. Roadmap: `docs/ROADMAP_ADVANCED_IDEAS.md`.
+- **Гибридная двухфазная архитектура:** формализован pipeline Research → Validation → Paper → Live. Документ `docs/architecture/HYBRID_TWO_PHASE_PIPELINE.md` — точность и паритет (Numba↔FallbackV4 100%, VBT↔Fallback 10–60% drift). В `/sync/grid-search` добавлен параметр `validate_best_with_fallback` — опциональная перепроверка best_params на FallbackV4.
+- **Предложения по модернизации движков и оптимизаторов:** создан `docs/ENGINE_OPTIMIZER_MODERNIZATION_PROPOSALS.md` — обзор мировых практик (event-driven, Monte Carlo robustness, Bayesian/Optuna, L2 order book, RL environments, backtest→live), приоритизированные идеи для roadmap.
+- **Расширенный аудит проекта:** создан `docs/AUDIT_PROJECT_EXTENDED.md` — карта систем, аудит backend (API, backtesting, database, services), frontend, инфраструктуры, скриптов и тестов; кросс-срез, риски, рекомендации.
+- **Выполнены рекомендации аудита:** удалён router_registry.py; API инвентаризация (docs/API_INVENTORY.md, legacy markers); консолидация docs + план декомпозиции strategy_builder.js (STRATEGY_BUILDER_INDEX.md); тесты test_fast_optimizer.py, test_live_trading_services.py; план API v2 (STATE_MANAGEMENT_AND_API_VERSIONING.md).
+- **sync-all-tf:** блокирующие операции БД (чтение audit, persist) перенесены в thread pool (`asyncio.to_thread`), чтобы не блокировать event loop. Синхронизация 9 таймфреймов теперь выполняется параллельно и быстрее.
+- **Окно Параметры (audit):** восстановление commission при загрузке; \_commission в buildStrategyPayload; убрана ссылка на initialCapital. Backend: CreateStrategyRequest/StrategyResponse расширены (leverage, position_size, parameters) — полная end-to-end поддержка сохранения/восстановления параметров. Документация: `docs/AUDIT_PARAMETERS_WINDOW.md`, тесты: `tests/test_e2e_parameters_window.py`.
+- **Блок «Библиотека» (audit):** исправлена передача category; mapBlocksToBackendParams включает close_conditions. **Унификация параметров:** функция `_param()` в strategy_builder_adapter — fallback snake_case/camelCase для macd, bollinger, stochastic, qqe, stoch_rsi, ichimoku, parabolic_sar, keltner, filters. Документация: `docs/AUDIT_LIBRARY_BLOCK.md`.
+
+### База Даннах (Dunnah Base) — управление тикерами в БД (2026-01-31)
+
+- **Новая секция Properties «🗄️ База Даннах»:** отображает группы тикеров в БД (Symbol + Market Type + интервалы).
+- **Удаление:** кнопка «Удалить» — удаляет все свечи тикера из БД.
+- **Блокировка догрузки:** кнопки «Блокировать» / «Разблокировать» — тикеры в списке блокировки не догружаются при start_all (update_market_data), в DB Maintenance и при выборе в Properties.
+- **Хранение блокировки:** `data/blocked_tickers.json`.
+- **API:** GET/POST/DELETE `/symbols/blocked`, GET `/symbols/db-groups`, DELETE `/symbols/db-groups`.
+- **Значок 🔒** в списке тикеров (Symbol) для заблокированных.
+
+### Контроль устаревания БД — точный порог 2 года (2026-01-31)
+
+- **Система уже была:** `db_maintenance_server.py` → `retention_cleanup`, задача `retention_cleanup` по расписанию (раз в 30 дней).
+- **Исправление:** Расчёт порога заменён на точные 2 года (730 дней от текущей даты) вместо границ года; используется `RETENTION_YEARS` из `database_policy.py`.
+
+### Нахлёст свечей при догрузке (2026-01-31)
+
+- **Задача:** При проверке актуальности БД (start_all → update_market_data, DB Maintenance, Properties sync) догружать с нахлёстом нескольких свечей, чтобы избежать gaps на границе.
+- **Реализация:** Переменный нахлёст по TF: 5 для 1m–60m, 4 для 4h, 3 для D, 2 для W/M.
+- **Где:** `marketdata.py` (sync-all-tf, refresh), `update_market_data.py`, `db_maintenance_server.py` (\_update_stale_data).
+- **DB maintenance:** INSERT OR REPLACE для перезаписи граничных свечей в зоне нахлёста.
+
+### Единый набор таймфреймов: 1m, 5m, 15m, 30m, 60m, 4h, 1D, 1W, 1M (2026-01-31)
+
+- Ограничен набор таймфреймов для всех систем.
+- Backend: ALL_TIMEFRAMES, interval_ms_map, freshness_thresholds, tf_timeouts — добавлен M, обновлены.
+- Frontend: Strategy Builder и Strategies — выпадающие списки только с этим набором; BYBIT_TF_OPTS, BYBIT_INTERVALS.
+- DB maintenance, show_db, sync_missing_data — обновлены intervals.
+- Устаревшие TF (3m, 2h, 6h, 12h) при загрузке стратегий маппятся на ближайший: 3→5, 120→60, 360→240, 720→D.
+
+### Strategy Builder: зависание при быстром переключении тикеров (2026-01-31)
+
+- **Проблема:** При переключении на другой тикер сразу после загрузки предыдущего новая загрузка зависала.
+- **Причина:** Две синхронизации (старая и новая) выполнялись параллельно и конкурировали за ресурсы.
+- **Исправление:** При старте синхронизации нового тикера отменяется предыдущий fetch (AbortController). Отменённая синхронизация не обновляет UI.
+
+### Strategy Builder: таймаут синхронизации и сообщение об ошибке (2026-01-31)
+
+- **Проблема:** Для некоторых тикеров (напр. 1000000BABYDOGEUSDT) показывалось «Синхронизация в фоне», но загрузка фактически прерывалась — данные не загружались.
+- **Причина:** Таймаут 15 с был слишком мал; синхронизация 8 TF (включая 1m) занимает 1–2 мин. При отмене запроса бэкенд также прерывался.
+- **Исправления:** Таймаут увеличен до 120 с; при таймауте показывается явное сообщение об ошибке; клик по блоку статуса при ошибке запускает повторную попытку.
+
+### Strategy Builder: Properties — сворачивание при выборе тикера и вкладки (2026-01-31)
+
+- **Проблема:** При выборе тикера панель Properties закрывалась; после повторного открытия секции (ОСНОВНЫЕ ПАРАМЕТРЫ, EVALUATION CRITERIA и др.) не раскрывались.
+- **Причины:** (1) Клик по выпадающему списку тикеров (он в body) воспринимался как «вне панели» и вызывал сворачивание. (2) При открытии sidebar не раскрывалась первая секция. (3) Два обработчика на заголовки секций (sidebar-toggle и strategy_builder) приводили к двойному toggle.
+- **Исправления:** Исключение `#backtestSymbolDropdown` из логики «клик вне панели»; событие `properties-symbol-selected` для сброса таймера сворачивания при выборе тикера; при открытии sidebar раскрывается первая секция; удалён дублирующий обработчик в strategy_builder, остаётся только sidebar-toggle.js.
+
+### Strategy Builder: загрузка/догрузка тикера и автоактуализация (2026-01-31)
+
+- **Выбор тикера:** При выборе тикера из выпадающего списка (Symbol) выполняется синхронизация: если тикер не в БД — полная загрузка на всех TF (1m, 5m, 15m, 30m, 1h, 4h, D, W); если есть — догрузка актуальных свечей.
+- **Тип рынка:** При смене SPOT/LINEAR (бессрочные фьючерсы) для выбранного тикера запускается синхронизация данных.
+- **Backend:** В `/symbols/sync-all-tf` добавлен фильтр `market_type` в запросах к БД (корректное разделение spot/linear). В список синхронизируемых TF включён 1m.
+- **Автоактуализация:** После успешной синхронизации запускается таймер обновления: 1m/5m — каждые 5 мин; 15m — каждые 15 мин; 30m — каждые 30 мин; 1h — 1 ч; 4h — 4 ч; D — 1 день; W — 1 неделя. При смене TF или тикера таймер перезапускается.
+
+### Список тикеров Bybit в Strategy Builder (2026-01-31)
+
+- **Проблема:** В поле Symbol (Properties) отображалось только 3 тикера вместо полного списка (~500). Список не открывался/не закрывался, не прокручивался; при обновлении тикеров загружался один тип рынка; при сбое сети кэш затирался пустым списком.
+- **Причины:** (1) Два обработчика на GET `/api/v1/marketdata/symbols-list` (marketdata + tickers_api) — срабатывал первый, без полной пагинации Bybit. (2) Bybit API instruments-info отдаёт данные постранично (limit/cursor) — загружалась только первая страница. (3) Фронт ограничивал список до 100/80 пунктов; выпадающий список открывался при загрузке страницы и перекрывался соседними элементами (z-index, overflow). (4) refresh-tickers при падении одной категории перезаписывал кэш пустым списком.
+- **Исправления:** Единственный обработчик symbols-list — tickers_api (дубликат в marketdata удалён). В `BybitAdapter.get_symbols_list()` добавлена полная пагинация (limit=1000, cursor/nextPageCursor), проверка retCode в ответе Bybit, таймаут ≥30 с, логирование количества тикеров. Регистрация маршрутов symbols-list и refresh-tickers на уровне app через `add_api_route`. На фронте: выпадающий список открывается только по focus/click; закрытие по клику вне и через `closeSymbolDropdown()`; z-index 100000, max-height 220px, overflow-y auto; отображается до 500 тикеров (без обрезки до 100). В refresh-tickers кэш обновляется только при непустом ответе (при сбое одной категории вторая не затирается). Пороги slow_requests для путей symbols и refresh-tickers увеличены (long_running_paths).
+- **Документация:** Добавлен `docs/TICKERS_SYMBOLS_LIST.md` с описанием проблемы, потока данных и проверки. Скрипт `scripts/test_bybit_symbols_direct.py` для прямой проверки Bybit API.
+
+### Strategy Builder: Properties — работоспособность и все настройки (2026-01-30)
+
+- **Разделение панели Properties:** Поля стратегии (Основные: тип рынка, направление; Data & Timeframe: timeframe, symbol, capital) вынесены в отдельный контейнер `#strategyBasicProps` и больше не перезаписываются при выборе блока. Параметры блока выводятся в отдельной секции «Параметры блока» (`#blockProperties`) — при выборе блока там отображаются Name/Type/Category и параметры из customLayouts или fallback.
+- **Backtest Settings:** Добавлено редактируемое поле Commission % (`#backtestCommission`, по умолчанию 0.07); значение передаётся в `buildBacktestRequest()` (в API уходит commission / 100, например 0.0007). При загрузке стратегии поля Backtest Settings синхронизируются с данными стратегии: symbol, initial_capital, leverage, direction.
+- **Тексты:** Заглушка при отсутствии выбранного блока приведена к русскому: «Выберите блок на холсте, чтобы редактировать его параметры.»
+
+### Strategy Builder: исправления по аудиту Properties и Библиотека (2026-01-30)
+
+- **Properties панель:** При выборе блока в правой панели параметры выводятся через `renderGroupedParams(block, false)` (customLayouts) — те же checkbox/select/number, что и в popup. Для блоков без layout сохранён fallback с текстовыми полями. Обработка изменений — делегированная в `setupEventListeners()` на `#propertiesPanel` (change/input по полям с `data-param-key`, используется `selectedBlockId`). Добавлена `escapeHtml()` для безопасного вывода.
+- **Библиотека:** В `renderBlockLibrary()` добавлены 10 категорий: Correlation & Multi-Symbol, Alerts, Visualization, DCA Grid, Multiple Take Profits, ATR Exit, Signal Memory, Close Conditions (TradingView), Price Action Patterns, Divergence. Для отсутствующих ключей — проверка `if (!blocks || !Array.isArray(blocks)) return`.
+- **UI:** Секция Properties «Закладка-2» переименована в «Data & Timeframe». Документ аудита `docs/STRATEGY_BUILDER_PROPERTIES_LIBRARY_AUDIT.md` обновлён (рекомендации отмечены выполненными).
+
+### Signal Memory в рантайме (2026-01-30)
+
+- **StrategyBuilderAdapter:** Добавлен хелпер `apply_signal_memory(buy_events, sell_events, memory_bars)` — расширение buy/sell на N баров после события; противоположный сигнал отменяет память. Применён в фильтрах: **rsi_filter** (use_signal_memory / signal_memory_bars), **stochastic_filter** (activate_stoch_cross_memory / stoch_cross_memory_bars, activate_stoch_kd_memory / stoch_kd_memory_bars), **two_ma_filter** (ma_cross_memory_bars), **macd_filter** (macd_signal_memory_bars, disable_macd_signal_memory=False).
+- **Исправления:** В `_execute_filter` для stochastic_filter и macd_filter исправлена распаковка результата: `calculate_stochastic` и `calculate_macd` возвращают кортежи, не словари. Порядок аргументов `calculate_stochastic(high, low, close, ...)` приведён к сигнатуре.
+- **Тесты:** Добавлен `tests/test_signal_memory_adapter.py` (5 тестов: RSI memory extend, RSI no memory, Stochastic cross memory, Two MA memory, MACD memory).
+
+### План REMAINING: комиссия 0.07%, Python, документация (2026-01-30)
+
+- **Дефолт комиссии 0.07% (TradingView parity):** Во всех сценариях бэктеста и оптимизации по умолчанию установлено 0.0007: `backend/backtesting/models.py` (commission_value), `backend/api/routers/optimizations.py` (4 места), `backend/tasks/backtest_tasks.py`, `backend/services/data_service.py`, `backend/services/advanced_backtesting/portfolio.py`, `backend/backtesting/optimizer.py`, `backend/backtesting/gpu_optimizer.py`, `backend/backtesting/gpu_batch_optimizer.py`, `backend/backtesting/fast_optimizer.py`, `backend/backtesting/vectorbt_optimizer.py`.
+- **Версия Python в правилах:** В `.cursor/rules/project.mdc` — «3.11+ (рекомендуется 3.14)»; в `AGENTS.MD` — «Python 3.11+ required (3.14 recommended)»; в `README.md` — «3.11+ (3.12/3.13/3.14 supported; 3.14 recommended for dev)».
+- **Документация:** Обновлены `docs/tradingview_dca_import/IMPLEMENTATION_STATUS.md` (Phase 3–4 чеклисты, Next Steps), `docs/SESSION_5_4_AUDIT_REPORT.md` (WebSocket UI — Done, итоговая таблица), `docs/FULL_IMPLEMENTATION_PLAN.md` (Phase 1.1–1.2 [x], WS интегрирован), `docs/REMAINING_AND_NEW_TASKS.md` (комиссия и Python отмечены выполненными, секция документации — выполнено).
+
+### Синхронизация документации и задачи (2026-01-30)
+
+- **Маппинг Strategy Builder → DCAEngine:** В `StrategyBuilderAdapter.extract_dca_config()` добавлен сбор блоков close_conditions и indent_order; в `strategy_builder.py` в `strategy_params` передаются `close_conditions` и `indent_order`; в `DCAEngine._configure_from_config()` — чтение и применение. В `run_from_config` добавлены `_precompute_close_condition_indicators`, логика indent_order при входе.
+- **DCAEngine:** Исправлен `EquityCurve` в результате бэктеста: поле `equity` вместо `values`, timestamps как datetime.
+- **E2E:** Добавлен `tests/test_e2e_dca_close_condition.py` (3 теста: time_bars_close, indent_order config, rsi_close config).
+- **Signal Memory:** В `docs/REMAINING_AND_NEW_TASKS.md` зафиксировано назначение и место применения.
+- **except Exception: pass:** Заменены на логирование в `backend/services/adapters/bybit.py` и `backend/database/sqlite_pool.py`.
+- **Документация:** Обновлены SESSION_5_4_AUDIT_REPORT.md, REMAINING_AND_NEW_TASKS.md.
+
+### P0: Evaluation Criteria & Optimization Config Panels (2026-01-30 - Session 5.7)
+
+**Complete implementation of strategy builder panels for optimization configuration.**
+
+#### Evaluation Criteria Panel ✅
+
+- Created `frontend/js/pages/evaluation_criteria_panel.js` (~750 lines)
+    - `EvaluationCriteriaPanel` class with full functionality
+    - Primary metric selection with grouped categories
+    - Secondary metrics grid with category organization
+    - Metric weights sliders for composite scoring
+    - Dynamic constraints list (add/remove/enable)
+    - Multi-level sort order with drag & drop reordering
+    - Quick presets: Conservative, Aggressive, Balanced, Frequency
+    - localStorage state persistence
+    - Event emission for integration
+
+#### Optimization Config Panel ✅
+
+- Created `frontend/js/pages/optimization_config_panel.js` (~800 lines)
+    - `OptimizationConfigPanel` class with complete UI
+    - Method selector: Bayesian, Grid Search, Random, Walk-Forward
+    - Visual dual-range sliders for parameter ranges
+    - Auto-detection of parameters from strategy blocks
+    - Data period with train/test split slider
+    - Walk-forward configuration (train/test/step windows)
+    - Resource limits (trials, timeout, workers)
+    - Advanced options: early stopping, pruning, warm start
+    - Estimated time calculation
+    - Mode indicator (Single Backtest vs Optimization)
+
+#### CSS Styles ✅
+
+- Extended `frontend/css/strategy_builder.css` (+600 lines)
+    - Toggle switch component
+    - Metric categories grid
+    - Metric weights sliders
+    - Sort order list with drag handles
+    - Quick presets buttons
+    - Method selector cards
+    - Dual-range slider styling
+    - Train/test split visualization
+    - Walk-forward preview
+    - Limits grid
+    - Advanced options accordion
+    - Estimated time display
+
+#### Backend API Endpoints ✅
+
+Extended `backend/api/routers/strategy_builder.py`:
+
+- Pydantic models: `MetricConstraint`, `SortSpec`, `EvaluationCriteria`
+- Pydantic models: `ParamRangeSpec`, `DataPeriod`, `OptimizationLimits`, `AdvancedOptions`, `OptimizationConfig`
+- `POST /strategies/{id}/criteria` - Set evaluation criteria
+- `GET /strategies/{id}/criteria` - Get evaluation criteria
+- `POST /strategies/{id}/optimization-config` - Set optimization config
+- `GET /strategies/{id}/optimization-config` - Get optimization config
+- `GET /metrics/available` - Get all available metrics with presets
+
+#### Tests ✅
+
+- Created `tests/test_evaluation_optimization_panels.py` (~330 lines)
+    - `TestEvaluationCriteriaModels` - 4 tests
+    - `TestOptimizationConfigModels` - 4 tests
+    - `TestEvaluationCriteriaEndpoints` - 3 tests
+    - `TestOptimizationConfigEndpoints` - 2 tests
+    - `TestAvailableMetrics` - 1 test
+    - `TestConstraintValidation` - 2 tests
+    - `TestCompositeScoring` - 2 tests
+    - **Total: 18 tests, all passing**
+
+---
+
+### P0: Optimization Results Viewer (2026-01-30 - Session 5.6)
+
+**Full implementation of interactive optimization results viewer with filtering, sorting, charts, and comparison.**
+
+#### Frontend Module ✅
+
+- Created `frontend/js/pages/optimization_results.js` (~1250 lines)
+    - `OptimizationResultsViewer` class with full lifecycle management
+    - Dynamic table columns based on optimization parameters
+    - Real-time filtering: minSharpe, maxDD, minWinRate, minPF, minTrades
+    - Multi-column sorting with direction toggle
+    - Pagination with configurable page size (10, 25, 50, 100)
+    - Convergence chart (best_score over trials via Chart.js)
+    - Sensitivity chart per parameter
+    - Details modal for individual result inspection
+    - Comparison modal for side-by-side result analysis
+    - Apply params to strategy functionality
+    - CSV/JSON export with all filters applied
+    - Demo data fallback when no optimization_id provided
+
+#### HTML Updates ✅
+
+- Updated `frontend/optimization-results.html`
+    - Removed ~350 lines of inline JavaScript
+    - Added modular script import
+    - Legacy compatibility functions delegating to module instance
+
+#### CSS Extensions ✅
+
+- Extended `frontend/css/optimization_components.css` (+150 lines)
+    - `.opt-results-table` - sticky headers, sortable columns
+    - `.opt-rank-badge` - gold/silver/bronze rank badges with gradients
+    - `.opt-metric-value.positive/.negative` - color-coded metrics
+    - `.opt-loading-overlay`, `.opt-empty-state` - loading/empty states
+    - `.opt-comparison-table` - comparison modal styling
+    - Dark theme support
+
+#### Backend API Endpoints ✅
+
+Extended `backend/api/routers/optimizations.py` (+220 lines):
+
+- `GET /{id}/charts/convergence` - Returns convergence chart data (trials, best_scores, all_scores, metric)
+- `GET /{id}/charts/sensitivity/{param}` - Returns sensitivity data per parameter (param_name, values, scores)
+- `POST /{id}/apply/{rank}` - Applies selected result params to strategy config
+- `GET /{id}/results/paginated` - Paginated filtered results with sort support
+
+#### Tests ✅
+
+- Created `tests/test_optimization_results_viewer.py` (~250 lines)
+    - `TestConvergenceEndpoint` - 2 tests
+    - `TestSensitivityEndpoint` - 2 tests
+    - `TestApplyEndpoint` - 2 tests
+    - `TestPaginatedEndpoint` - 3 tests
+    - `TestResultsViewerIntegration` - 3 tests
+    - `TestEdgeCases` - 4 tests
+    - **Total: 16 tests, all passing**
+
+---
+
 ### Cursor Rules — требуемые исправления (2026-01-30)
 
-- **Пути:** Устранён хардкод в tests/test_auto_event_binding.py, tests/test_safedom.py, test_frontend_security.py, scripts/adhoc/test_btc_correlation.py, test_autofix_constraints.py, test_v4_quick.py — используется PROJECT_ROOT / Path(__file__).resolve().parents[N], DATABASE_PATH из env.
+- **Пути:** Устранён хардкод в tests/test_auto_event_binding.py, tests/test_safedom.py, test_frontend_security.py, scripts/adhoc/test_btc_correlation.py, test_autofix_constraints.py, test_v4_quick.py — используется PROJECT_ROOT / Path(**file**).resolve().parents[N], DATABASE_PATH из env.
 - **dev.ps1:** Создан заново (run, lint, format, test, test-cov, clean, mypy, help).
 - **Документация:** Созданы .agent/docs/ARCHITECTURE.md, .agent/docs/DECISIONS.md (ссылки на docs/), docs/DECISIONS.md (ADR-001 — ADR-005).
 - **except Exception: pass:** Заменены на логирование в backend/api/app.py, backend/backtesting/engines/dca_engine.py, backend/api/lifespan.py, backend/backtesting/engine.py, backend/api/routers/optimizations.py.
@@ -27,6 +293,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Backend Validation Rules ✅
 
 Extended `BLOCK_VALIDATION_RULES` in `strategy_validation_ws.py`:
+
 - 6 Close Condition blocks: `rsi_close`, `stoch_close`, `channel_close`, `ma_close`, `psar_close`, `time_bars_close`
 - New filters: `rvi_filter`, `indent_order`, `atr_stop` (extended)
 - Updated exit block types for strategy validation
@@ -34,6 +301,7 @@ Extended `BLOCK_VALIDATION_RULES` in `strategy_validation_ws.py`:
 #### DCAEngine Close Conditions ✅
 
 New `CloseConditionsConfig` dataclass and methods in `dca_engine.py`:
+
 - `_check_close_conditions()` - main dispatcher for all close conditions
 - `_check_rsi_close()` - RSI reach/cross detection
 - `_check_stoch_close()` - Stochastic reach detection
@@ -45,6 +313,7 @@ New `CloseConditionsConfig` dataclass and methods in `dca_engine.py`:
 #### MTF Utilities ✅
 
 New `backend/core/indicators/mtf_utils.py`:
+
 - `resample_ohlcv()` - timeframe resampling
 - `map_higher_tf_to_base()` - value mapping
 - `calculate_supertrend_mtf()` - SuperTrend calculation
@@ -55,6 +324,7 @@ New `backend/core/indicators/mtf_utils.py`:
 #### Extended Indicators ✅
 
 New `backend/core/indicators/extended_indicators.py`:
+
 - `calculate_rvi()` - Relative Volatility Index
 - `calculate_linear_regression_channel()` - Linear Regression with slope
 - `find_pivot_points()` - S/R level detection
@@ -64,6 +334,7 @@ New `backend/core/indicators/extended_indicators.py`:
 #### Indent Order ✅
 
 New `IndentOrderConfig` and `PendingIndentOrder` dataclasses:
+
 - `_create_indent_order()` - create pending limit order
 - `_check_indent_order_fill()` - check fill or expiration
 - Integration in main DCAEngine run loop
@@ -95,6 +366,7 @@ New `IndentOrderConfig` and `PendingIndentOrder` dataclasses:
 #### Phase 1.2: Price Action UI (47 Patterns) ✅
 
 Expanded `price_action_filter` from 22 to 47 patterns:
+
 - **Bullish Exotic**: Pin Bar, Three Line Strike, Kicker, Abandoned Baby, Belt Hold, Counterattack, Ladder Bottom, Stick Sandwich, Homing Pigeon, Matching Low
 - **Bearish Exotic**: Pin Bar, Three Line Strike, Kicker, Abandoned Baby, Belt Hold, Counterattack, Ladder Top, Stick Sandwich, Matching High
 - **Neutral/Structure**: Inside Bar, Outside Bar
@@ -103,6 +375,7 @@ Expanded `price_action_filter` from 22 to 47 patterns:
 #### Phase 2: Close Conditions (6 Types) ✅
 
 New exit blocks in `blockLibrary.exits`:
+
 - `rsi_close` - RSI Reach/Cross level close
 - `stoch_close` - Stochastic Reach/Cross level close
 - `channel_close` - Keltner/Bollinger channel breakout close
@@ -113,6 +386,7 @@ New exit blocks in `blockLibrary.exits`:
 #### Phase 3: MTF Expansion (3 Timeframes) ✅
 
 Extended `supertrend_filter` and `rsi_filter` for multi-timeframe analysis:
+
 - SuperTrend TF1/TF2/TF3 with separate ATR period, multiplier, BTC source
 - RSI TF1/TF2/TF3 with separate period, range conditions
 

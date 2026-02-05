@@ -1,4 +1,4 @@
-from typing import Any, Dict, Protocol, TypedDict
+from typing import Any, Protocol, TypedDict
 
 from backend.backtesting.engine import BacktestEngine
 
@@ -13,7 +13,7 @@ class EngineResult(TypedDict, total=False):
     sharpe_ratio: float
     max_drawdown: float
     trades: list
-    metrics: Dict[str, Any]
+    metrics: dict[str, Any]
     error: str
 
 

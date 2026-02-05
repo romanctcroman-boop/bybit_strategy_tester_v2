@@ -23,8 +23,9 @@ except ImportError:
     psutil = None
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from backend.utils.time import utc_now
+
 from backend.monitoring.breaker_telemetry import get_agent_breaker_snapshot
+from backend.utils.time import utc_now
 
 router = APIRouter(prefix="/health", tags=["health-monitoring"])
 

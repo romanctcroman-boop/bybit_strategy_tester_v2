@@ -10,11 +10,9 @@ Includes:
 Session 5.5 Implementation.
 """
 
-import numpy as np
-import pandas as pd
-from typing import Tuple, Optional
 from dataclasses import dataclass
 
+import numpy as np
 
 # =============================================================================
 # RVI - RELATIVE VOLATILITY INDEX
@@ -44,11 +42,11 @@ def calculate_rvi(close: np.ndarray, high: np.ndarray, low: np.ndarray,
     std_dev = np.zeros_like(close)
     for i in range(length - 1, len(close)):
         std_dev[i] = np.std(close[i - length + 1:i + 1])
-    
+
     # Calculate up and down volatility
     up_vol = np.zeros_like(close)
     down_vol = np.zeros_like(close)
-    
+
     for i in range(1, len(close)):
         if close[i] > close[i - 1]:
             up_vol[i] = std_dev[i]
@@ -59,7 +57,7 @@ def calculate_rvi(close: np.ndarray, high: np.ndarray, low: np.ndarray,
         else:
             up_vol[i] = 0
             down_vol[i] = 0
-    
+
     # Smooth with selected MA
     if ma_type == "WMA":
         up_smooth = _wma(up_vol, ma_length)
@@ -73,11 +71,11 @@ def calculate_rvi(close: np.ndarray, high: np.ndarray, low: np.ndarray,
     else:  # EMA
         up_smooth = _ema(up_vol, ma_length)
         down_smooth = _ema(down_vol, ma_length)
-    
+
     # Calculate RVI
     total = up_smooth + down_smooth
     rvi = np.where(total != 0, 100 * up_smooth / total, 50)
-    
+
     return rvi
 
 
@@ -86,7 +84,7 @@ def calculate_rvi(close: np.ndarray, high: np.ndarray, low: np.ndarray,
 # =============================================================================
 
 def calculate_linear_regression_channel(close: np.ndarray, length: int = 100,
-                                         deviation: float = 2.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                                         deviation: float = 2.0) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Calculate Linear Regression Channel.
     
@@ -103,42 +101,42 @@ def calculate_linear_regression_channel(close: np.ndarray, length: int = 100,
     upper = np.zeros(n)
     lower = np.zeros(n)
     slope = np.zeros(n)
-    
+
     for i in range(length - 1, n):
         # Get window
         y = close[i - length + 1:i + 1]
         x = np.arange(length)
-        
+
         # Linear regression
         x_mean = np.mean(x)
         y_mean = np.mean(y)
-        
+
         numerator = np.sum((x - x_mean) * (y - y_mean))
         denominator = np.sum((x - x_mean) ** 2)
-        
+
         if denominator != 0:
             m = numerator / denominator
             b = y_mean - m * x_mean
-            
+
             # Calculate regression value at current point
             middle[i] = m * (length - 1) + b
             slope[i] = m
-            
+
             # Calculate standard deviation from regression line
             predicted = m * x + b
             std = np.std(y - predicted)
-            
+
             upper[i] = middle[i] + deviation * std
             lower[i] = middle[i] - deviation * std
         else:
             middle[i] = close[i]
             upper[i] = close[i]
             lower[i] = close[i]
-    
+
     return middle, upper, lower, slope
 
 
-def linear_regression_filter(close: np.ndarray, config: dict) -> Tuple[np.ndarray, np.ndarray]:
+def linear_regression_filter(close: np.ndarray, config: dict) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply Linear Regression Channel filter.
     
@@ -153,13 +151,13 @@ def linear_regression_filter(close: np.ndarray, config: dict) -> Tuple[np.ndarra
     deviation = config.get('channel_mult', 2.0)
     breakout_rebound = config.get('linreg_breakout_rebound', 'Breakout')
     slope_direction = config.get('linreg_slope_direction', 'Allow_Any')
-    
+
     middle, upper, lower, slope = calculate_linear_regression_channel(close, length, deviation)
-    
+
     n = len(close)
     long_signals = np.zeros(n, dtype=bool)
     short_signals = np.zeros(n, dtype=bool)
-    
+
     for i in range(length, n):
         # Slope filter
         if slope_direction == 'Follow':
@@ -168,7 +166,7 @@ def linear_regression_filter(close: np.ndarray, config: dict) -> Tuple[np.ndarra
         elif slope_direction == 'Opposite':
             if slope[i] >= 0:
                 continue
-        
+
         # Breakout or Rebound
         if breakout_rebound == 'Breakout':
             if close[i] > upper[i]:
@@ -180,7 +178,7 @@ def linear_regression_filter(close: np.ndarray, config: dict) -> Tuple[np.ndarra
                 long_signals[i] = True
             elif close[i] > upper[i]:
                 short_signals[i] = True
-    
+
     return long_signals, short_signals
 
 
@@ -198,7 +196,7 @@ class PivotLevel:
 
 
 def find_pivot_points(high: np.ndarray, low: np.ndarray, close: np.ndarray,
-                       pivot_bars: int = 10) -> Tuple[np.ndarray, np.ndarray]:
+                       pivot_bars: int = 10) -> tuple[np.ndarray, np.ndarray]:
     """
     Find pivot highs and lows.
     
@@ -214,7 +212,7 @@ def find_pivot_points(high: np.ndarray, low: np.ndarray, close: np.ndarray,
     n = len(high)
     pivot_highs = np.zeros(n)
     pivot_lows = np.zeros(n)
-    
+
     for i in range(pivot_bars, n - pivot_bars):
         # Check pivot high
         is_pivot_high = True
@@ -222,25 +220,25 @@ def find_pivot_points(high: np.ndarray, low: np.ndarray, close: np.ndarray,
             if j != i and high[j] >= high[i]:
                 is_pivot_high = False
                 break
-        
+
         if is_pivot_high:
             pivot_highs[i] = high[i]
-        
+
         # Check pivot low
         is_pivot_low = True
         for j in range(i - pivot_bars, i + pivot_bars + 1):
             if j != i and low[j] <= low[i]:
                 is_pivot_low = False
                 break
-        
+
         if is_pivot_low:
             pivot_lows[i] = low[i]
-    
+
     return pivot_highs, pivot_lows
 
 
 def levels_break_filter(high: np.ndarray, low: np.ndarray, close: np.ndarray,
-                        config: dict) -> Tuple[np.ndarray, np.ndarray]:
+                        config: dict) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply Levels Break filter for S/R breakouts.
     
@@ -255,46 +253,46 @@ def levels_break_filter(high: np.ndarray, low: np.ndarray, close: np.ndarray,
     search_period = config.get('levels_search_period', 100)
     channel_width = config.get('levels_channel_width', 0.5) / 100  # Convert to decimal
     test_count = config.get('levels_test_count', 2)
-    
+
     n = len(close)
     long_signals = np.zeros(n, dtype=bool)
     short_signals = np.zeros(n, dtype=bool)
-    
+
     pivot_highs, pivot_lows = find_pivot_points(high, low, close, pivot_bars)
-    
+
     for i in range(search_period, n):
         # Find resistance levels in the search window
         for j in range(i - search_period, i):
             if pivot_highs[j] > 0:
                 level = pivot_highs[j]
                 level_range = level * channel_width
-                
+
                 # Count tests
                 tests = 0
                 for k in range(j, i):
                     if abs(high[k] - level) <= level_range:
                         tests += 1
-                
+
                 # Check breakout
                 if tests >= test_count and close[i] > level + level_range:
                     long_signals[i] = True
                     break
-        
+
         # Find support levels
         for j in range(i - search_period, i):
             if pivot_lows[j] > 0:
                 level = pivot_lows[j]
                 level_range = level * channel_width
-                
+
                 tests = 0
                 for k in range(j, i):
                     if abs(low[k] - level) <= level_range:
                         tests += 1
-                
+
                 if tests >= test_count and close[i] < level - level_range:
                     short_signals[i] = True
                     break
-    
+
     return long_signals, short_signals
 
 
@@ -303,7 +301,7 @@ def levels_break_filter(high: np.ndarray, low: np.ndarray, close: np.ndarray,
 # =============================================================================
 
 def find_accumulation_areas(close: np.ndarray, volume: np.ndarray,
-                             config: dict) -> Tuple[np.ndarray, np.ndarray]:
+                             config: dict) -> tuple[np.ndarray, np.ndarray]:
     """
     Find accumulation/distribution areas.
     
@@ -322,34 +320,34 @@ def find_accumulation_areas(close: np.ndarray, volume: np.ndarray,
     min_bars = config.get('acc_min_bars', 3)
     volume_threshold = config.get('volume_threshold', 2.0)
     price_range_pct = config.get('price_range_percent', 1.0) / 100
-    
+
     n = len(close)
     long_signals = np.zeros(n, dtype=bool)
     short_signals = np.zeros(n, dtype=bool)
-    
+
     # Calculate average volume
     avg_volume = np.zeros(n)
     for i in range(20, n):
         avg_volume[i] = np.mean(volume[i - 20:i])
-    
+
     for i in range(backtrack, n):
         # Look for consolidation with high volume
         window_close = close[i - backtrack:i]
         window_volume = volume[i - backtrack:i]
-        
+
         # Check for consolidation (price in range)
         high_price = np.max(window_close)
         low_price = np.min(window_close)
         mid_price = (high_price + low_price) / 2
-        
+
         if mid_price == 0:
             continue
-        
+
         range_pct = (high_price - low_price) / mid_price
-        
+
         # Check for high volume
         high_vol_bars = np.sum(window_volume > volume_threshold * avg_volume[i - backtrack:i])
-        
+
         # If consolidation with high volume, check for breakout
         if range_pct <= price_range_pct and high_vol_bars >= min_bars:
             # Breakout detection
@@ -357,7 +355,7 @@ def find_accumulation_areas(close: np.ndarray, volume: np.ndarray,
                 long_signals[i] = True
             elif close[i] < low_price:
                 short_signals[i] = True
-    
+
     return long_signals, short_signals
 
 

@@ -140,15 +140,15 @@ def main():
     print(f"\nV2 Max Drawdown: {result_v2.metrics.max_drawdown:.4f}")
     print(f"V3 Max Drawdown: {result_v3.metrics.max_drawdown:.4f}")
 
-    print(f"\nEquity curve lengths:")
+    print("\nEquity curve lengths:")
     print(f"  V2: {len(result_v2.equity_curve)}")
     print(f"  V3: {len(result_v3.equity_curve)}")
 
-    print(f"\nEquity curve first 5 values:")
+    print("\nEquity curve first 5 values:")
     print(f"  V2: {result_v2.equity_curve[:5]}")
     print(f"  V3: {result_v3.equity_curve[:5]}")
 
-    print(f"\nEquity curve last 5 values:")
+    print("\nEquity curve last 5 values:")
     print(f"  V2: {result_v2.equity_curve[-5:]}")
     print(f"  V3: {result_v3.equity_curve[-5:]}")
 

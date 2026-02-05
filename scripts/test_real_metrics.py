@@ -4,13 +4,14 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import sqlite3
-from datetime import datetime
-from dataclasses import fields, asdict
 
 print("=" * 100)
 print("🔬 РЕАЛЬНЫЙ ТЕСТ: 147 МЕТРИК НА ИСТОРИЧЕСКИХ ДАННЫХ")
@@ -76,18 +77,17 @@ long_exits = (rsi > 70).values
 short_entries = ((rsi > 70) & bearish_trend).values
 short_exits = (rsi < 30).values
 
-print(f"\n📊 СИГНАЛЫ:")
+print("\n📊 СИГНАЛЫ:")
 print(f"   Long entries:  {long_entries.sum()}")
 print(f"   Short entries: {short_entries.sum()}")
 
 # ============================================================================
 # ЗАПУСК ДВИЖКОВ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator
-from backend.core.metrics_calculator import TradeMetrics, RiskMetrics, LongShortMetrics, MetricsCalculator
 
 input_data = BacktestInput(
     candles=df_1h,

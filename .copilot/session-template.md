@@ -25,7 +25,7 @@ Before starting work:
 
 ### Session Plan
 
-#### Tasks for this session:
+#### Tasks for This Session
 
 1. [ ] Task 1: [description] (Est: X min)
 2. [ ] Task 2: [description] (Est: Y min)
@@ -34,7 +34,7 @@ Before starting work:
 **Total estimated time:** [total] minutes
 **Priority order:** [1, 2, 3 or different]
 
-#### If time permits (stretch goals):
+#### If Time Permits (Stretch Goals)
 
 - [ ] Stretch 1: [description]
 - [ ] Stretch 2: [description]

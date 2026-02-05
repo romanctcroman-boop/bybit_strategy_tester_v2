@@ -8,7 +8,7 @@ Extracted from app.py lifespan for better modularity.
 import asyncio
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ async def refresh_daily_data_background(
                 api_secret=os.environ.get("BYBIT_API_SECRET"),
             )
 
-            now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+            now_ms = int(datetime.now(UTC).timestamp() * 1000)
             one_day_ms = 24 * 60 * 60 * 1000
             updated = 0
 

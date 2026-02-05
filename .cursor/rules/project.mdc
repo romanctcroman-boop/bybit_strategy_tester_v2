@@ -39,4 +39,4 @@ alwaysApply: true
 ## Запуск и линтинг
 
 - `.\dev.ps1 run` — приложение; `.\dev.ps1 lint`, `.\dev.ps1 format` — ruff; `.\dev.ps1 test` — pytest.
-- Python: `py -3.14` или интерпретатор из `pyproject.toml`.
+- Python: 3.11+ (рекомендуется 3.14). Команда: `py -3.14` или интерпретатор из `pyproject.toml`/venv.

@@ -3,7 +3,6 @@ Reads logs/compare_vectorbt_vs_fallback.json and outputs logs/matched_trades.jso
 """
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]

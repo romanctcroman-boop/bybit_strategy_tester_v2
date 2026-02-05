@@ -122,7 +122,7 @@ def test_run_backtest(strategy_id: str):
 
         if response.ok:
             data = response.json()
-            print(f"✅ Backtest completed!")
+            print("✅ Backtest completed!")
 
             if "backtest_id" in data:
                 print(f"   Backtest ID: {data['backtest_id']}")
@@ -176,7 +176,7 @@ def test_direct_backtest():
 
         if response.ok:
             data = response.json()
-            print(f"✅ Direct backtest completed!")
+            print("✅ Direct backtest completed!")
 
             metrics = data.get("metrics", {})
             print(f"   Total Return: {metrics.get('total_return', data.get('total_return', 'N/A'))}%")

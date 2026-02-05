@@ -17,7 +17,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -39,8 +39,8 @@ class TestResult:
     name: str
     category: str
     passed: bool
-    details: Dict[str, Any]
-    error: Optional[str] = None
+    details: dict[str, Any]
+    error: str | None = None
 
 
 class MegaDCATest:
@@ -59,9 +59,9 @@ class MegaDCATest:
         self.start_date = self.end_date - timedelta(days=240)
 
         # Results
-        self.results: List[TestResult] = []
-        self.categories_passed: Dict[str, int] = {}
-        self.categories_total: Dict[str, int] = {}
+        self.results: list[TestResult] = []
+        self.categories_passed: dict[str, int] = {}
+        self.categories_total: dict[str, int] = {}
 
     def load_data(self) -> tuple:
         """Load market data from database."""

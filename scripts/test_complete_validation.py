@@ -9,15 +9,14 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
-import time
-from datetime import datetime
 from dataclasses import fields
-from itertools import product
+from datetime import datetime
+
+import pandas as pd
 
 print("=" * 120)
 print("🔬 ПОЛНЫЙ ТЕСТ ВАЛИДАЦИИ: 147 МЕТРИК × ВСЕ ПАРАМЕТРЫ")
@@ -248,11 +247,10 @@ def calculate_rsi(close, period=14):
 # ============================================================================
 # ИМПОРТЫ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection, BacktestMetrics
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, BacktestMetrics, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator, ExtendedMetricsResult
-from backend.core.metrics_calculator import TradeMetrics, RiskMetrics, LongShortMetrics
 
 fallback = FallbackEngineV2()
 numba_engine = NumbaEngineV2()
@@ -287,7 +285,7 @@ for i, cfg in enumerate(TEST_CONFIGS):
     print(f"\n{'='*80}")
     print(f"[{i+1}/{len(TEST_CONFIGS)}] {cfg['name']}")
     print(f"{'='*80}")
-    
+
     # Создание input
     input_data = BacktestInput(
         candles=df_1h,
@@ -310,7 +308,7 @@ for i, cfg in enumerate(TEST_CONFIGS):
         max_drawdown_limit=cfg['max_drawdown_limit'],
         pyramiding=cfg['pyramiding'],
     )
-    
+
     # Запуск обоих движков
     try:
         fb_result = fallback.run(input_data)
@@ -318,34 +316,34 @@ for i, cfg in enumerate(TEST_CONFIGS):
     except Exception as e:
         print(f"   ❌ ОШИБКА: {e}")
         continue
-    
+
     # Extended Metrics
     fb_ext = ext_calc.calculate_all(fb_result.equity_curve, fb_result.trades)
     nb_ext = ext_calc.calculate_all(nb_result.equity_curve, nb_result.trades)
-    
+
     # Сравнение ВСЕХ метрик
     fb_m = fb_result.metrics
     nb_m = nb_result.metrics
-    
+
     # Категории метрик
     all_categories = [
         ("BacktestMetrics", [f.name for f in fields(BacktestMetrics) if not f.name.startswith('_')], fb_m, nb_m),
         ("ExtendedMetrics", [f.name for f in fields(ExtendedMetricsResult) if not f.name.startswith('_')], fb_ext, nb_ext),
     ]
-    
+
     config_matches = 0
     config_total = 0
-    
-    print(f"\n   📊 СРАВНЕНИЕ МЕТРИК:")
-    
+
+    print("\n   📊 СРАВНЕНИЕ МЕТРИК:")
+
     for cat_name, cat_fields, fb_obj, nb_obj in all_categories:
         cat_matches = 0
         cat_total = 0
-        
+
         for field_name in cat_fields:
             fb_val = getattr(fb_obj, field_name, 0)
             nb_val = getattr(nb_obj, field_name, 0)
-            
+
             # Проверка совпадения
             if fb_val is None and nb_val is None:
                 match = True
@@ -354,31 +352,29 @@ for i, cfg in enumerate(TEST_CONFIGS):
             else:
                 fb_f = float(fb_val) if fb_val is not None else 0.0
                 nb_f = float(nb_val) if nb_val is not None else 0.0
-                
-                if abs(fb_f) < 1e-10 and abs(nb_f) < 1e-10:
-                    match = True
-                elif abs(fb_f - nb_f) < 1e-6:
+
+                if (abs(fb_f) < 1e-10 and abs(nb_f) < 1e-10) or abs(fb_f - nb_f) < 1e-6:
                     match = True
                 elif abs(fb_f) > 1e-10:
                     pct_diff = abs(fb_f - nb_f) / abs(fb_f) * 100
                     match = pct_diff < 0.01
                 else:
                     match = fb_f == nb_f
-            
+
             cat_matches += 1 if match else 0
             cat_total += 1
-            
+
             if not match:
                 problems.append((cfg['name'], cat_name, field_name, fb_val, nb_val))
-        
+
         config_matches += cat_matches
         config_total += cat_total
         status = "✅" if cat_matches == cat_total else "⚠️"
         print(f"   {status} {cat_name}: {cat_matches}/{cat_total}")
-    
+
     total_metrics += config_total
     total_matches += config_matches
-    
+
     pct = config_matches / config_total * 100 if config_total > 0 else 0
     bm_icon = "🔬" if cfg['bar_magnifier'] else "📊"
     print(f"\n   {bm_icon} Bar Magnifier: {'ON' if cfg['bar_magnifier'] else 'OFF'}")
@@ -409,7 +405,7 @@ if problems:
     for name, cat, field, fb, nb in problems[:10]:
         print(f"      - {name} / {cat}.{field}: FB={fb}, NB={nb}")
 else:
-    print(f"""
+    print("""
    ████████╗███████╗███████╗████████╗    ██████╗  █████╗ ███████╗███████╗███████╗██████╗ 
    ╚══██╔══╝██╔════╝██╔════╝╚══██╔══╝    ██╔══██╗██╔══██╗██╔════╝██╔════╝██╔════╝██╔══██╗
       ██║   █████╗  ███████╗   ██║       ██████╔╝███████║███████╗███████╗█████╗  ██║  ██║

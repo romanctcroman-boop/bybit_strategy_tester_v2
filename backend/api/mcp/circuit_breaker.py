@@ -8,7 +8,6 @@ Provides fault tolerance for MCP tool execution.
 import asyncio
 import os
 import time
-from typing import Dict
 
 
 class CircuitBreaker:
@@ -43,7 +42,7 @@ CB_TIMEOUT = int(os.getenv("MCP_CB_TIMEOUT_SECONDS", "60"))
 MAX_CONCURRENCY = int(os.getenv("MCP_MAX_CONCURRENT", "10"))
 
 # Per-tool circuit breakers
-circuit_breakers: Dict[str, CircuitBreaker] = {}
+circuit_breakers: dict[str, CircuitBreaker] = {}
 
 # Semaphore for concurrency control
 mcp_semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
@@ -57,11 +56,11 @@ def get_circuit_breaker(tool_name: str) -> CircuitBreaker:
 
 
 __all__ = [
-    "CircuitBreaker",
-    "circuit_breakers",
-    "mcp_semaphore",
-    "get_circuit_breaker",
     "CB_THRESHOLD",
     "CB_TIMEOUT",
     "MAX_CONCURRENCY",
+    "CircuitBreaker",
+    "circuit_breakers",
+    "get_circuit_breaker",
+    "mcp_semaphore",
 ]

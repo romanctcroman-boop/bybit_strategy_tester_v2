@@ -1,9 +1,8 @@
-import redis
-import pytest
-
-from testcontainers.redis import RedisContainer
-from testcontainers.postgres import PostgresContainer
 import docker
+import pytest
+import redis
+from testcontainers.postgres import PostgresContainer
+from testcontainers.redis import RedisContainer
 
 
 def _normalize_psycopg2_dsn(dsn: str) -> str:

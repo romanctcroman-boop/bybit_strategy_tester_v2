@@ -3,12 +3,13 @@ Test TwoStageOptimizer with Numba JIT Integration
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import time
-import pandas as pd
 import sqlite3
-from loguru import logger
+import time
+
+import pandas as pd
 
 print("=" * 70)
 print("🚀 TESTING NUMBA-ACCELERATED TWO-STAGE OPTIMIZER")
@@ -62,7 +63,7 @@ result_fast = optimizer_fast.optimize(
 )
 fast_time = time.time() - start_fast
 
-print(f"\n📊 Fast Mode Results:")
+print("\n📊 Fast Mode Results:")
 print(f"   Total time: {fast_time:.2f}s")
 print(f"   Stage 1: {result_fast.stage1_execution_time:.2f}s ({result_fast.stage1_tested} combinations)")
 print(f"   Stage 2: {result_fast.stage2_execution_time:.2f}s ({result_fast.stage2_validated} validated)")
@@ -103,7 +104,7 @@ result_precision = optimizer_precision.optimize(
 )
 precision_time = time.time() - start_precision
 
-print(f"\n📊 Precision Mode Results:")
+print("\n📊 Precision Mode Results:")
 print(f"   Total time: {precision_time:.2f}s")
 print(f"   Stage 2: {result_precision.stage2_execution_time:.2f}s ({result_precision.stage2_validated} validated)")
 print(f"   Best Sharpe: {result_precision.best_validated_sharpe:.3f}")

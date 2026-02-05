@@ -4,12 +4,13 @@ Trade-by-trade анализ внутри-баровых вычислений
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
 from datetime import datetime
+
+import pandas as pd
 
 print("=" * 120)
 print("🔬 ДЕТАЛЬНОЕ СРАВНЕНИЕ INTRABAR: FallbackEngineV2 vs NumbaEngineV2")
@@ -70,9 +71,9 @@ short_exits = (rsi < 30).values
 # ============================================================================
 # ИМПОРТЫ И ДВИЖКИ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection, ExitReason
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, ExitReason, TradeDirection
 
 fallback = FallbackEngineV2()
 numba_engine = NumbaEngineV2()
@@ -127,7 +128,7 @@ def count_exit_reasons(trades):
 fb_exits = count_exit_reasons(fb_no_bm.trades)
 nb_exits = count_exit_reasons(nb_no_bm.trades)
 
-print(f"\n   Exit Reasons:")
+print("\n   Exit Reasons:")
 print(f"   {'':30} {'Fallback':>20} {'Numba':>20} {'Match':>10}")
 print(f"   {'-'*80}")
 for reason in ["SL", "TP", "Signal", "EOD"]:
@@ -162,7 +163,7 @@ print(f"   {'Max Drawdown (%)':30} {fb_with_bm.metrics.max_drawdown:>20.4f} {nb_
 fb_bm_exits = count_exit_reasons(fb_with_bm.trades)
 nb_bm_exits = count_exit_reasons(nb_with_bm.trades)
 
-print(f"\n   Exit Reasons (с Bar Magnifier):")
+print("\n   Exit Reasons (с Bar Magnifier):")
 print(f"   {'':30} {'Fallback':>20} {'Numba':>20} {'Match':>10}")
 print(f"   {'-'*80}")
 for reason in ["SL", "TP", "Signal", "EOD"]:
@@ -176,7 +177,7 @@ print("\n" + "=" * 120)
 print("📊 TRADE-BY-TRADE СРАВНЕНИЕ (Bar Magnifier)")
 print("=" * 120)
 
-print(f"\n   Первые 10 сделок:")
+print("\n   Первые 10 сделок:")
 print(f"   {'#':>3} {'Entry Time':>22} {'Dir':>6} {'FB Entry':>12} {'NB Entry':>12} {'FB Exit':>12} {'NB Exit':>12} {'FB PnL':>12} {'NB PnL':>12} {'Match':>6}")
 print(f"   {'-'*120}")
 
@@ -184,17 +185,17 @@ mismatches = 0
 for i in range(min(10, len(fb_with_bm.trades), len(nb_with_bm.trades))):
     fb_t = fb_with_bm.trades[i]
     nb_t = nb_with_bm.trades[i]
-    
+
     entry_match = abs(fb_t.entry_price - nb_t.entry_price) < 0.01
     exit_match = abs(fb_t.exit_price - nb_t.exit_price) < 0.01
     pnl_match = abs(fb_t.pnl - nb_t.pnl) < 0.01
     all_match = entry_match and exit_match and pnl_match
-    
+
     if not all_match:
         mismatches += 1
-    
+
     status = "✅" if all_match else "❌"
-    
+
     print(f"   {i+1:>3} {str(fb_t.entry_time)[:19]:>22} {fb_t.direction:>6} {fb_t.entry_price:>12.2f} {nb_t.entry_price:>12.2f} {fb_t.exit_price:>12.2f} {nb_t.exit_price:>12.2f} {fb_t.pnl:>12.2f} {nb_t.pnl:>12.2f} {status:>6}")
 
 # Check all trades
@@ -234,7 +235,7 @@ for attr, label in metrics_diff:
     no_bm = getattr(fb_no_bm.metrics, attr, 0) or 0
     with_bm = getattr(fb_with_bm.metrics, attr, 0) or 0
     diff = with_bm - no_bm
-    
+
     # Эффект
     if attr in ["net_profit", "win_rate", "profit_factor", "sharpe_ratio", "avg_win"]:
         effect = "🟢 Лучше" if diff > 0 else ("🔴 Хуже" if diff < 0 else "➖")
@@ -242,7 +243,7 @@ for attr, label in metrics_diff:
         effect = "🔴 Хуже" if diff > 0 else ("🟢 Лучше" if diff < 0 else "➖")
     else:
         effect = "➖"
-    
+
     if isinstance(no_bm, int):
         print(f"   {label:30} {no_bm:>15} {with_bm:>15} {diff:>+15} {effect:>15}")
     else:

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 🔍 Agent Configuration Verification Script
 
@@ -7,8 +6,8 @@ Verifies that all agent autonomy configuration files are in place.
 Run after setting up agent configuration to ensure everything is correct.
 """
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
 AGENT_DIR = PROJECT_ROOT / ".agent"
@@ -50,9 +49,9 @@ def verify_configuration():
     print("=" * 60)
     print("🔍 AGENT CONFIGURATION VERIFICATION")
     print("=" * 60)
-    
+
     all_ok = True
-    
+
     # Check directories
     print("\n📁 Directories:")
     for name, path in REQUIRED_DIRS.items():
@@ -61,7 +60,7 @@ def verify_configuration():
         else:
             print(f"   ❌ {name}: {path}")
             all_ok = False
-    
+
     # Check files
     print("\n📄 Configuration Files:")
     for name, path in REQUIRED_FILES.items():
@@ -71,7 +70,7 @@ def verify_configuration():
         else:
             print(f"   ❌ {name}: {path}")
             all_ok = False
-    
+
     # Count skills
     print("\n🎯 Agent Skills:")
     skills_dir = AGENT_DIR / "skills" / "skills"
@@ -81,7 +80,7 @@ def verify_configuration():
     else:
         print("   ❌ Skills directory not found")
         all_ok = False
-    
+
     # Summary
     print("\n" + "=" * 60)
     if all_ok:
@@ -89,7 +88,7 @@ def verify_configuration():
     else:
         print("⚠️ SOME CONFIGURATION MISSING - Review above errors")
     print("=" * 60)
-    
+
     return all_ok
 
 

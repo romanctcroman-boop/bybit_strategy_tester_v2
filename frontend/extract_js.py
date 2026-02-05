@@ -181,7 +181,7 @@ def extract_js_from_file(filepath: Path, dry_run: bool = False) -> dict:
     print(f"\n📄 Processing: {filepath.name}")
 
     # Read file
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         html = f.read()
 
     # Extract script blocks
@@ -250,7 +250,7 @@ def update_html_with_js_link(
 
     Returns True if modified.
     """
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         html = f.read()
 
     # Check if already linked
@@ -282,7 +282,7 @@ def remove_inline_scripts(filepath: Path, dry_run: bool = False) -> tuple[bool, 
 
     Returns (was_modified, bytes_removed)
     """
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         original_html = f.read()
 
     # Pattern to match inline scripts (not external with src)

@@ -9,7 +9,6 @@ import logging
 import subprocess
 import time
 from pathlib import Path
-from typing import List
 
 # Try to import metrics
 try:
@@ -265,7 +264,7 @@ async def list_project_structure(
         }
 
 
-async def analyze_code_quality(file_path: str, tools: List[str] = None) -> dict:
+async def analyze_code_quality(file_path: str, tools: list[str] = None) -> dict:
     """
     Analyze code quality using Ruff, Black, Bandit.
 
@@ -431,8 +430,8 @@ def register_file_tools(mcp):
 
 
 __all__ = [
-    "read_project_file",
-    "list_project_structure",
     "analyze_code_quality",
+    "list_project_structure",
+    "read_project_file",
     "register_file_tools",
 ]

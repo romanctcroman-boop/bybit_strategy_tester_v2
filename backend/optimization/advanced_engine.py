@@ -3,12 +3,12 @@
 Integrates all new optimization modules into a unified interface
 """
 
-import numpy as np
-import pandas as pd
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
+import numpy as np
+import pandas as pd
 from loguru import logger
 
 # Import new modules
@@ -16,23 +16,19 @@ from backend.core.extended_metrics import (
     ExtendedMetricsCalculator,
     ExtendedMetricsResult,
 )
-
-from backend.optimization.optuna_optimizer import (
-    OptunaOptimizer,
-    OptunaOptimizationResult,
-    OPTUNA_AVAILABLE,
-)
-
-from backend.optimization.ray_optimizer import (
-    RayParallelOptimizer,
-    MultiprocessingOptimizer,
-    get_parallel_optimizer,
-    RAY_AVAILABLE,
-)
-
-from backend.validation.walk_forward import WalkForwardValidator, WalkForwardResult
-
 from backend.ml.regime_detection import RegimeDetectionResult, get_regime_detector
+from backend.optimization.optuna_optimizer import (
+    OPTUNA_AVAILABLE,
+    OptunaOptimizationResult,
+    OptunaOptimizer,
+)
+from backend.optimization.ray_optimizer import (
+    RAY_AVAILABLE,
+    MultiprocessingOptimizer,
+    RayParallelOptimizer,
+    get_parallel_optimizer,
+)
+from backend.validation.walk_forward import WalkForwardResult, WalkForwardValidator
 
 
 @dataclass
@@ -40,7 +36,7 @@ class AdvancedOptimizationResult:
     """Complete result from advanced optimization"""
 
     # Basic optimization results
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_sharpe: float
     best_sortino: float
     best_calmar: float
@@ -49,12 +45,12 @@ class AdvancedOptimizationResult:
     extended_metrics: ExtendedMetricsResult
 
     # Walk-forward validation (if performed)
-    walk_forward_result: Optional[WalkForwardResult] = None
+    walk_forward_result: WalkForwardResult | None = None
     is_robust: bool = False
     robustness_score: float = 0.0
 
     # Regime analysis (if performed)
-    regime_result: Optional[RegimeDetectionResult] = None
+    regime_result: RegimeDetectionResult | None = None
     current_regime: str = "Unknown"
 
     # Optimization statistics
@@ -63,9 +59,9 @@ class AdvancedOptimizationResult:
     optimization_method: str = "grid"
 
     # Top N results
-    top_results: List[Dict[str, Any]] = field(default_factory=list)
+    top_results: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "best_params": self.best_params,
             "best_sharpe": round(self.best_sharpe, 4),
@@ -152,8 +148,8 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        param_space: Dict[str, Any],
-        base_config: Dict[str, Any],
+        param_space: dict[str, Any],
+        base_config: dict[str, Any],
         n_trials: int = 100,
         metric: str = "sharpe_ratio",
         validate: bool = True,
@@ -272,8 +268,8 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        param_space: Dict[str, Any],
-        base_config: Dict[str, Any],
+        param_space: dict[str, Any],
+        base_config: dict[str, Any],
         n_trials: int,
         metric: str,
     ) -> OptunaOptimizationResult:
@@ -294,10 +290,10 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        param_space: Dict[str, Any],
-        base_config: Dict[str, Any],
+        param_space: dict[str, Any],
+        base_config: dict[str, Any],
         metric: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run grid search optimization"""
         from itertools import product
 
@@ -342,8 +338,8 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        params: Dict[str, Any],
-        base_config: Dict[str, Any],
+        params: dict[str, Any],
+        base_config: dict[str, Any],
     ):
         """Run single backtest"""
         from backend.backtesting.models import BacktestConfig
@@ -377,8 +373,8 @@ class AdvancedOptimizationEngine:
         self,
         data: pd.DataFrame,
         strategy_class,
-        param_space: Dict[str, Any],
-        base_config: Dict[str, Any],
+        param_space: dict[str, Any],
+        base_config: dict[str, Any],
     ) -> WalkForwardResult:
         """Run walk-forward validation"""
 

@@ -188,8 +188,8 @@ class SQLiteConnectionPool:
                 logger.warning(f"Thread {thread_id} connection invalid, recreating")
                 try:
                     conn.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Close invalid connection: %s", e)
 
         # Create new connection for this thread
         conn = self._create_connection(for_thread_local=True)
@@ -229,8 +229,8 @@ class SQLiteConnectionPool:
                 logger.warning("Connection invalid, creating new one")
                 try:
                     conn.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Close invalid pool connection: %s", e)
                 conn = self._create_connection(for_thread_local=False)
 
             self._checkouts += 1

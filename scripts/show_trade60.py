@@ -1,10 +1,11 @@
 """Show trade #60 from Numba"""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import numpy as np
-import pandas as pd
 import sqlite3
+
+import pandas as pd
 
 conn = sqlite3.connect(str(Path(__file__).resolve().parents[1] / "data.sqlite3"))
 df_1h = pd.read_sql("""SELECT open_time, open_price as open, high_price as high, low_price as low, close_price as close 
@@ -34,8 +35,8 @@ long_exits = (rsi > 70).values
 short_entries = (rsi > 70).values
 short_exits = (rsi < 30).values
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 input_data = BacktestInput(
     candles=df_1h, candles_1m=df_1m,

@@ -13,24 +13,24 @@ Categories:
 7. Helper Methods (8 tests)
 """
 
-import pytest
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from backend.agents.agent_to_agent_communicator import (
-    MessageType,
-    AgentType,
-    CommunicationPattern,
     AgentMessage,
     AgentToAgentCommunicator,
+    AgentType,
+    CommunicationPattern,
+    MessageType,
     get_communicator,
 )
 from backend.agents.unified_agent_interface import (
-    AgentResponse,
     AgentChannel,
+    AgentResponse,
 )
-
 
 # =============================================================================
 # CATEGORY 1: Enums and Data Classes (12 tests)
@@ -178,7 +178,7 @@ class TestAgentMessage:
         # Should be recent
         timestamp_dt = datetime.fromisoformat(msg.timestamp)
         assert timestamp_dt.tzinfo is not None
-        delta = datetime.now(timezone.utc) - timestamp_dt
+        delta = datetime.now(UTC) - timestamp_dt
         assert delta.total_seconds() < 5
 
     def test_agent_message_post_init_metadata(self):

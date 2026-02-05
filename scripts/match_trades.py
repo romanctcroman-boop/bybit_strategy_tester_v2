@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
 """Match trades between V2 and V3 by exit_price/exit_time."""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # Load data
 ohlc = pd.read_csv('d:/TV/BYBIT_BTCUSDT.P_15m_full.csv')
@@ -13,9 +13,9 @@ ohlc['timestamp'] = pd.to_datetime(ohlc['timestamp'], utc=True).dt.tz_localize(N
 long_signals = np.load('d:/TV/long_signals.npy')
 short_signals = np.load('d:/TV/short_signals.npy')
 
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 candles = ohlc.reset_index(drop=True)
 input_data = BacktestInput(

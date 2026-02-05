@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Compare TV OHLC with downloaded OHLC."""
 import pandas as pd
 
@@ -23,16 +22,16 @@ tv['time_utc'] = pd.to_datetime(tv['time']).dt.tz_convert('UTC').dt.tz_localize(
 our['timestamp_naive'] = our['timestamp'].dt.tz_localize(None)
 merged = pd.merge(tv, our, left_on='time_utc', right_on='timestamp_naive', suffixes=('_tv', '_our'))
 
-print(f'\n=== Overlap ===')
+print('\n=== Overlap ===')
 print(f'Common bars: {len(merged)}')
 
 if len(merged) > 0:
     # Compare open prices
     merged['open_diff'] = abs(merged['open_tv'] - merged['open_our'])
     mismatches = merged[merged['open_diff'] > 0.01]
-    
+
     print(f'Open price mismatches (>0.01): {len(mismatches)}')
-    
+
     if len(mismatches) > 0:
         print('\nFirst 10 mismatches:')
         for i, row in mismatches.head(10).iterrows():

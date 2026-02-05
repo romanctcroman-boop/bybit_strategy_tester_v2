@@ -8,11 +8,10 @@ Tests for critical fixes identified in the services system audit:
 - P0 #4: Graceful shutdown for live trading
 """
 
-import asyncio
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

@@ -29,8 +29,8 @@
       "description": "Custom Bybit trading API integration"
     },
     "docker": {
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-docker"],
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-docker"],
       "description": "Docker container management for isolated testing"
     },
     "filesystem": {
@@ -41,6 +41,15 @@
         "D:\\bybit_strategy_tester_v2"
       ],
       "description": "Enhanced filesystem access for the project"
+    },
+    "deepseek-node": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "cd /d D:\\bybit_strategy_tester_v2\\mcp-deepseek && node server.js"
+      ],
+      "env": {},
+      "description": "DeepSeek API via Node.js MCP (set DEEPSEEK_API_KEY in env or in mcp-deepseek/.env)"
     }
   }
 }

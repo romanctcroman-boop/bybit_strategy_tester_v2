@@ -9,14 +9,13 @@ Tests:
 """
 
 import numpy as np
-import pytest
 
 from backend.core.indicators.extended_indicators import (
-    calculate_rvi,
     calculate_linear_regression_channel,
+    calculate_rvi,
+    find_accumulation_areas,
     find_pivot_points,
     levels_break_filter,
-    find_accumulation_areas,
     linear_regression_filter,
 )
 
@@ -154,7 +153,7 @@ class TestPivotPoints:
         """Test levels break filter."""
         np.random.seed(42)
         n = 200
-        
+
         # Create price data with S/R levels
         base_price = 100 + np.cumsum(np.random.randn(n) * 0.3)
         high = base_price + np.abs(np.random.randn(n) * 0.5)
@@ -180,11 +179,11 @@ class TestAccumulationAreas:
     def test_accumulation_basic(self):
         """Test basic accumulation detection."""
         n = 200
-        
+
         # Create consolidation followed by breakout
         close = np.full(n, 100.0)
         close[-20:] = 105  # Breakout
-        
+
         volume = np.full(n, 1000.0)
         volume[80:120] = 3000  # High volume during consolidation
 

@@ -4,12 +4,14 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 import sqlite3
 import time
 from datetime import datetime
+
+import pandas as pd
 
 print("=" * 80)
 print("🔬 ЧЕСТНЫЙ ТЕСТ БЭКТЕСТА (Production Code)")
@@ -88,7 +90,7 @@ print(f"  Slippage:   {config.slippage*100:.2f}%")
 print(f"  Stop Loss:  {config.stop_loss*100:.1f}%")
 print(f"  Take Profit:{config.take_profit*100:.1f}%")
 print(f"  Direction:  {config.direction}")
-print(f"  Strategy:   RSI(14, 70, 30)")
+print("  Strategy:   RSI(14, 70, 30)")
 
 # ============================================================================
 # 3. Запускаем РЕАЛЬНЫЙ бэктест через Fallback Engine
@@ -106,7 +108,7 @@ engine = get_engine()
 strategy = RSIStrategy(params={"period": 14, "overbought": 70, "oversold": 30})
 signals = strategy.generate_signals(df)
 
-print(f"\n📊 Сигналы стратегии:")
+print("\n📊 Сигналы стратегии:")
 print(f"   Long entries:  {signals.entries.sum()}")
 print(f"   Long exits:    {signals.exits.sum()}")
 print(f"   Short entries: {signals.short_entries.sum()}")
@@ -127,17 +129,17 @@ print("📈 РЕЗУЛЬТАТЫ БЭКТЕСТА")
 print("=" * 80)
 
 metrics = result.metrics
-print(f"\n💰 Финансовые результаты:")
+print("\n💰 Финансовые результаты:")
 print(f"   Net Profit:    ${metrics.net_profit:,.2f}")
 print(f"   Total Return:  {metrics.total_return:.2f}%")
 print(f"   Max Drawdown:  {metrics.max_drawdown:.2f}%")
 
-print(f"\n📊 Метрики риска:")
+print("\n📊 Метрики риска:")
 print(f"   Sharpe Ratio:  {metrics.sharpe_ratio:.2f}")
 print(f"   Profit Factor: {metrics.profit_factor:.2f}")
 print(f"   Win Rate:      {metrics.win_rate:.1f}%")
 
-print(f"\n📉 Статистика сделок:")
+print("\n📉 Статистика сделок:")
 print(f"   Total Trades:  {metrics.total_trades}")
 print(f"   Long Trades:   {metrics.long_trades}")
 print(f"   Short Trades:  {metrics.short_trades}")

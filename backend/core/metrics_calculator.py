@@ -24,7 +24,6 @@ TradingView Compliance:
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -439,7 +438,7 @@ def calculate_calmar(
     return float(np.clip(cagr / abs(max_drawdown_pct), -100, 100))
 
 
-def calculate_max_drawdown(equity: np.ndarray) -> Tuple[float, float, int]:
+def calculate_max_drawdown(equity: np.ndarray) -> tuple[float, float, int]:
     """
     Calculate Maximum Drawdown.
 
@@ -522,7 +521,7 @@ def calculate_expectancy(
     win_rate: float,  # As fraction (0-1)
     avg_win: float,
     avg_loss: float,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Calculate Mathematical Expectancy.
 
@@ -540,7 +539,7 @@ def calculate_expectancy(
     return (expectancy, expectancy_ratio)
 
 
-def calculate_consecutive_streaks(pnl_list: List[float]) -> Tuple[int, int]:
+def calculate_consecutive_streaks(pnl_list: list[float]) -> tuple[int, int]:
     """
     Calculate max consecutive wins and losses.
 
@@ -641,7 +640,7 @@ def calculate_metrics_numba(
     equity_array: np.ndarray,
     daily_returns: np.ndarray,
     initial_capital: float,
-) -> Tuple[float, float, float, float, int, float, float]:
+) -> tuple[float, float, float, float, int, float, float]:
     """
     Numba-optimized metrics calculation.
 
@@ -745,7 +744,7 @@ class MetricsCalculator:
 
     @staticmethod
     def calculate_trade_metrics(
-        trades: List[dict],
+        trades: list[dict],
         include_commission: bool = True,
     ) -> TradeMetrics:
         """Calculate all trade-related metrics from a list of trades."""
@@ -982,7 +981,7 @@ class MetricsCalculator:
 
     @staticmethod
     def calculate_long_short_metrics(
-        trades: List[dict],
+        trades: list[dict],
         initial_capital: float,
         years: float = 1.0,
     ) -> LongShortMetrics:
@@ -1145,13 +1144,13 @@ class MetricsCalculator:
 
     @staticmethod
     def calculate_all(
-        trades: List[dict],
+        trades: list[dict],
         equity: np.ndarray,
         initial_capital: float,
         years: float = 1.0,
         frequency: TimeFrequency = TimeFrequency.HOURLY,
         margin_rate: float = 1.0,  # 1.0 = 1x leverage (100% margin), 0.5 for 2x, etc.
-    ) -> Dict:
+    ) -> dict:
         """
         Calculate ALL metrics in one call.
 

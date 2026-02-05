@@ -8,7 +8,6 @@ All functions accept numpy arrays and return numpy arrays.
 Optimized for performance with optional Numba JIT compilation.
 """
 
-from typing import Optional, Tuple
 
 import numpy as np
 
@@ -180,7 +179,7 @@ def calculate_stochastic(
     k_period: int = 14,
     d_period: int = 3,
     smooth_k: int = 3,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Calculate Stochastic Oscillator (%K and %D).
 
@@ -228,7 +227,7 @@ def calculate_stoch_rsi(
     stoch_period: int = 14,
     k_period: int = 3,
     d_period: int = 3,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Calculate Stochastic RSI.
 

@@ -4,16 +4,18 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import sqlite3
+from dataclasses import fields
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import sqlite3
-from datetime import datetime
-from dataclasses import fields
 
 print("=" * 120)
-print("🔬 ПОЛНЫЙ ТЕСТ ВАЛИДАЦИИ: 147 МЕТРИК")  
+print("🔬 ПОЛНЫЙ ТЕСТ ВАЛИДАЦИИ: 147 МЕТРИК")
 print("=" * 120)
 print(f"Время: {datetime.now()}")
 
@@ -71,11 +73,11 @@ def calculate_rsi(close, period=14):
 # ============================================================================
 # ИМПОРТЫ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection, BacktestMetrics
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, BacktestMetrics, TradeDirection
 from backend.core.extended_metrics import ExtendedMetricsCalculator, ExtendedMetricsResult
-from backend.core.metrics_calculator import TradeMetrics, RiskMetrics, LongShortMetrics, MetricsCalculator
+from backend.core.metrics_calculator import LongShortMetrics, MetricsCalculator, RiskMetrics, TradeMetrics
 
 # ============================================================================
 # КОНФИГУРАЦИИ
@@ -265,7 +267,7 @@ for cfg in CONFIGS:
     print(f"\n{'='*100}")
     print(f"📋 {cfg['name']}")
     print(f"{'='*100}")
-    
+
     # Параметры
     print(f"""
    ├─ Название стратегии:      {cfg['name']}
@@ -292,14 +294,14 @@ for cfg in CONFIGS:
    ├─ Subticks:                {cfg['subticks']}
    └─ Two-Stage Optimization:  {'✅' if cfg['two_stage_opt'] else '❌'}
     """)
-    
+
     # Сигналы
     rsi = calculate_rsi(df_1h['close'], period=cfg['rsi_period'])
     long_entries = (rsi < cfg['rsi_oversold']).values
     long_exits = (rsi > cfg['rsi_overbought']).values
     short_entries = (rsi > cfg['rsi_overbought']).values
     short_exits = (rsi < cfg['rsi_oversold']).values
-    
+
     input_data = BacktestInput(
         candles=df_1h,
         candles_1m=df_1m if cfg['bar_magnifier'] else None,
@@ -319,15 +321,15 @@ for cfg in CONFIGS:
         slippage=cfg['slippage'],
         use_bar_magnifier=cfg['bar_magnifier'],
     )
-    
+
     # Запуск
     fb_result = fallback.run(input_data)
     nb_result = numba_engine.run(input_data)
-    
+
     # Extended metrics
     fb_ext = ext_calc.calculate_all(fb_result.equity_curve, fb_result.trades)
     nb_ext = ext_calc.calculate_all(nb_result.equity_curve, nb_result.trades)
-    
+
     # Trade/Risk/LongShort
     fb_trade = metrics_calc.calculate_trade_metrics(fb_result.trades)
     nb_trade = metrics_calc.calculate_trade_metrics(nb_result.trades)
@@ -337,10 +339,10 @@ for cfg in CONFIGS:
     nb_risk = metrics_calc.calculate_risk_metrics(nb_result.equity_curve, nb_returns, cfg['initial_capital'])
     fb_ls = metrics_calc.calculate_long_short_metrics(fb_result.trades, cfg['initial_capital'])
     nb_ls = metrics_calc.calculate_long_short_metrics(nb_result.trades, cfg['initial_capital'])
-    
+
     fb_all = get_all_metrics(fb_result, fb_ext, fb_trade, fb_risk, fb_ls)
     nb_all = get_all_metrics(nb_result, nb_ext, nb_trade, nb_risk, nb_ls)
-    
+
     # Подсчёт отдельно для core и extended
     core_matches = 0
     core_count = 0
@@ -348,14 +350,14 @@ for cfg in CONFIGS:
     ext_count = 0
     non_zero = 0
     mismatches = []
-    
+
     for metric_name in fb_all:
         fb_val = fb_all[metric_name]
         nb_val = nb_all.get(metric_name)
-        
+
         is_core = metric_name.startswith("backtest.") or metric_name.startswith("extended.")
         is_fee_dep = metric_name in FEE_DEPENDENT_METRICS
-        
+
         if is_core:
             core_count += 1
             core_total += 1
@@ -370,26 +372,26 @@ for cfg in CONFIGS:
                 extended_match += 1
             elif not is_fee_dep:
                 mismatches.append((metric_name, fb_val, nb_val))
-        
+
         if fb_val is not None and isinstance(fb_val, (int, float, np.number)):
             if abs(float(fb_val)) > 1e-10:
                 non_zero += 1
-    
+
     total_core = core_matches
     total_ext = ext_matches
-    
-    print(f"   📊 Результаты:")
+
+    print("   📊 Результаты:")
     print(f"   ├─ Trades: {len(fb_result.trades)}")
     print(f"   ├─ Net Profit: ${fb_result.metrics.net_profit:,.2f}")
     print(f"   ├─ Ненулевых метрик: {non_zero}/147")
     print(f"   ├─ Core метрики (46): {core_matches}/{core_count} ({'100%' if core_matches == core_count else f'{core_matches/core_count*100:.1f}%'})")
     print(f"   └─ Extended метрики (101): {ext_matches}/{ext_count} ({ext_matches/ext_count*100:.1f}%)")
-    
+
     if mismatches and len(mismatches) <= 5:
-        print(f"\n   ⚠️ Неожиданные расхождения:")
+        print("\n   ⚠️ Неожиданные расхождения:")
         for name, fb_v, nb_v in mismatches[:5]:
             print(f"      - {name}")
-    
+
     all_results.append({
         "name": cfg['name'],
         "core": core_matches,

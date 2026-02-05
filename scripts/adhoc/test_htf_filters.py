@@ -168,7 +168,7 @@ def test_filters_with_real_data():
     print("=" * 60)
 
     import pandas as pd
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import create_engine
 
     # Load real data
     PROJECT_ROOT = Path(__file__).resolve().parents[2]

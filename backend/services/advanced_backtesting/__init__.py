@@ -37,6 +37,8 @@ from .metrics import (
     RollingMetrics,
 )
 from .portfolio import (
+    aggregate_multi_symbol_equity,
+    AllocationMethod,
     AssetAllocation,
     CorrelationAnalysis,
     PortfolioBacktester,
@@ -67,6 +69,8 @@ __all__ = [
     "RegimeAnalysis",
     "DrawdownAnalysis",
     # Portfolio
+    "aggregate_multi_symbol_equity",
+    "AllocationMethod",
     "PortfolioBacktester",
     "AssetAllocation",
     "CorrelationAnalysis",

@@ -1,5 +1,6 @@
 """Find exact timestamp offset between DB and TV data"""
 import sqlite3
+
 import pandas as pd
 
 # Load DB SPOT data (overlapping period only)
@@ -35,7 +36,7 @@ print('='*60)
 for db_idx, db_row in db.head(20).iterrows():
     db_price = db_row['open_price']
     db_time = db_row['datetime']
-    
+
     # Find in TV
     matches = tv[abs(tv['open'] - db_price) < 0.1]
     if len(matches) > 0:

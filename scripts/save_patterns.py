@@ -2,7 +2,7 @@
 
 import re
 
-with open('frontend/js/pages/backtest_results.js', 'r', encoding='utf-8') as f:
+with open('frontend/js/pages/backtest_results.js', encoding='utf-8') as f:
     text = f.read()
 
 # Find all string literals containing potential mojibake

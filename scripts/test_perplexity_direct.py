@@ -1,9 +1,10 @@
 """
 Direct Perplexity test with new API key
 """
+import os
+
 import httpx
 from dotenv import load_dotenv
-import os
 
 # Force reload .env
 load_dotenv(override=True)
@@ -36,11 +37,11 @@ def main():
     print("=" * 70)
     print("PERPLEXITY DIRECT TEST")
     print("=" * 70)
-    
+
     # Get key from environment
     api_key = os.getenv("PERPLEXITY_API_KEY")
     print(f"API Key: {api_key[:25]}...")
-    
+
     payload = {
         "model": "sonar",
         "messages": [
@@ -49,9 +50,9 @@ def main():
         ],
         "max_tokens": 2000,
     }
-    
-    print(f"\n📤 Sending request...")
-    
+
+    print("\n📤 Sending request...")
+
     try:
         with httpx.Client(timeout=120.0) as client:
             response = client.post(
@@ -62,14 +63,14 @@ def main():
                     "Content-Type": "application/json"
                 }
             )
-        
+
         print(f"📥 Status: {response.status_code}")
-        
+
         if response.status_code == 200:
             data = response.json()
             content = data["choices"][0]["message"]["content"]
             citations = data.get("citations", [])
-            
+
             # Save
             with open("perplexity_vectorbt_consultation.md", "w", encoding="utf-8") as f:
                 f.write("# Perplexity VectorBT Consultation\n\n")
@@ -79,21 +80,21 @@ def main():
                     f.write("\n\n---\n\n## Citations\n\n")
                     for i, c in enumerate(citations, 1):
                         f.write(f"{i}. {c}\n")
-            
+
             print("\n" + "=" * 70)
             print("PERPLEXITY RESPONSE")
             print("=" * 70)
             print(content)
-            
+
             if citations:
                 print(f"\n--- CITATIONS ({len(citations)}) ---")
                 for c in citations[:5]:
                     print(f"  • {c[:70]}...")
-            
+
             print("\n📄 Saved to: perplexity_vectorbt_consultation.md")
         else:
             print(f"❌ Error: {response.text[:500]}")
-            
+
     except Exception as e:
         print(f"❌ Exception: {e}")
         import traceback

@@ -1,14 +1,15 @@
-# -*- coding: utf-8 -*-
 """
 Detailed DCA Grid Strategy Test
 Shows how RSI entries, TP, and SL work step by step
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 import pandas as pd
+
 from backend.backtesting.strategies import get_strategy
 
 print("=" * 70)
@@ -26,7 +27,7 @@ trend = np.cumsum(np.random.randn(n) * 100)  # Random walk
 
 # Add some strong dips for RSI oversold signals
 trend[30:35] -= 3000   # First dip
-trend[60:65] -= 2500   # Second dip  
+trend[60:65] -= 2500   # Second dip
 trend[90:95] -= 2000   # Third dip
 trend[130:140] += 5000 # Recovery spike (TP trigger)
 
@@ -66,7 +67,7 @@ signals = dca.generate_signals(candles)
 # Show RSI values and signals
 rsi = dca._calculate_rsi(candles['close'])
 
-print(f"\nParameters:")
+print("\nParameters:")
 print(f"  Entry interval: {dca.entry_interval} bars")
 print(f"  Max entries: {dca.max_entries}")
 print(f"  Take Profit: {dca.take_profit*100}% from average")
@@ -77,7 +78,7 @@ print(f"  RSI oversold: {dca.rsi_oversold}")
 entry_bars = np.where(signals.entries)[0]
 exit_bars = np.where(signals.exits)[0]
 
-print(f"\n--- Signal Analysis ---")
+print("\n--- Signal Analysis ---")
 print(f"Total Entry signals: {len(entry_bars)}")
 print(f"Total Exit signals: {len(exit_bars)}")
 
@@ -115,10 +116,10 @@ signals_avg = dca_avg.generate_signals(candles)
 entry_bars_avg = np.where(signals_avg.entries)[0]
 exit_bars_avg = np.where(signals_avg.exits)[0]
 
-print(f"\nParameters:")
+print("\nParameters:")
 print(f"  Stop Loss: {dca_avg.stop_loss*100}% from AVERAGE price")
 
-print(f"\n--- Signal Analysis ---")
+print("\n--- Signal Analysis ---")
 print(f"Total Entry signals: {len(entry_bars_avg)}")
 print(f"Total Exit signals: {len(exit_bars_avg)}")
 
@@ -154,7 +155,7 @@ print(f"\n  TP (3% from average): ${tp_price:,.2f}")
 print(f"  SL (5% from average): ${sl_from_avg:,.2f}")
 print(f"  SL (5% from last order): ${sl_from_last:,.2f}")
 
-print(f"\n  Difference in SL:")
+print("\n  Difference in SL:")
 print(f"    sl_mode='average':    SL at ${sl_from_avg:,.2f}")
 print(f"    sl_mode='last_order': SL at ${sl_from_last:,.2f}")
 print(f"    Last order mode is ${sl_from_avg - sl_from_last:,.2f} LOWER (more conservative)")

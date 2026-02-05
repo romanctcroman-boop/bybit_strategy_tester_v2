@@ -1,14 +1,15 @@
-# -*- coding: utf-8 -*-
 """Debug which trades V3 is skipping."""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 import numpy as np
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
+import pandas as pd
+
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.fallback_engine_v3 import FallbackEngineV3
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 # Load and filter data
 ohlc = pd.read_csv('d:/TV/BYBIT_BTCUSDT.P_15m_full.csv')

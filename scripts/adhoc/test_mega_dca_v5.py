@@ -25,15 +25,12 @@ import sys
 import time
 import traceback
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
 
 # Add project to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import numpy as np
 import pandas as pd
-from loguru import logger
 
 
 # ============================================================================
@@ -46,7 +43,7 @@ class TestResult:
     passed: bool
     details: str
     execution_time: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 test_results: list[TestResult] = []
@@ -732,7 +729,7 @@ print("=" * 70)
 
 @run_test("GPU Availability Check", "GPU_Tests")
 def test_gpu_availability():
-    from backend.backtesting.gpu_optimizer import GPU_AVAILABLE, GPUGridOptimizer
+    from backend.backtesting.gpu_optimizer import GPU_AVAILABLE
 
     if GPU_AVAILABLE:
         import cupy as cp
@@ -743,7 +740,7 @@ def test_gpu_availability():
             mem_gb = props["totalGlobalMem"] / (1024**3)
             print(f"    [INFO] GPU {i}: {mem_gb:.1f}GB")
     else:
-        print(f"    [INFO] GPU not available, tests will use CPU fallback")
+        print("    [INFO] GPU not available, tests will use CPU fallback")
     return True
 
 
@@ -892,7 +889,7 @@ def test_universal_force_gpu():
     candles = generate_test_ohlcv(500)
 
     if not GPU_AVAILABLE:
-        print(f"    [INFO] GPU not available, skipped")
+        print("    [INFO] GPU not available, skipped")
         return True
 
     try:
@@ -1265,7 +1262,7 @@ def test_single_params():
     assert result.tested_combinations == 1, (
         f"Expected 1 combination, got {result.tested_combinations}"
     )
-    print(f"    [INFO] Single params: 1 combination tested")
+    print("    [INFO] Single params: 1 combination tested")
     return True
 
 

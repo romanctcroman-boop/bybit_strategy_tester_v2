@@ -5,7 +5,7 @@ from backend.database import SessionLocal
 from backend.database.models.backtest import Backtest, BacktestStatus
 
 # Load the saved advanced result
-with open("advanced_result.json", "r", encoding="utf-8") as f:
+with open("advanced_result.json", encoding="utf-8") as f:
     data = json.load(f)
 
 # Build Backtest model fields

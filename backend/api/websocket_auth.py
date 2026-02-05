@@ -21,7 +21,6 @@ import os
 import secrets
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 from fastapi import Query, WebSocket
 
@@ -54,9 +53,9 @@ class WSAuthResult:
     """Result of WebSocket authentication."""
 
     authenticated: bool
-    user_id: Optional[str] = None
+    user_id: str | None = None
     is_anonymous: bool = False
-    error: Optional[str] = None
+    error: str | None = None
     token_type: str = "none"  # none, session, api_key
 
 
@@ -120,7 +119,7 @@ class WSAuthenticator:
         token_data = f"{payload}:{signature}"
         return base64.urlsafe_b64encode(token_data.encode()).decode()
 
-    def verify_session_token(self, token: str) -> tuple[bool, Optional[str], str]:
+    def verify_session_token(self, token: str) -> tuple[bool, str | None, str]:
         """
         Verify session token.
 
@@ -154,7 +153,7 @@ class WSAuthenticator:
         except Exception as e:
             return False, None, f"Token verification failed: {e}"
 
-    def verify_api_key(self, api_key: str) -> tuple[bool, Optional[str], str]:
+    def verify_api_key(self, api_key: str) -> tuple[bool, str | None, str]:
         """
         Verify API key.
 
@@ -230,7 +229,7 @@ class WSAuthenticator:
 
 
 # Singleton authenticator
-_authenticator: Optional[WSAuthenticator] = None
+_authenticator: WSAuthenticator | None = None
 
 
 def get_ws_authenticator() -> WSAuthenticator:

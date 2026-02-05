@@ -5,8 +5,7 @@ Full CRUD endpoints for managing trading strategies.
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -62,9 +61,9 @@ def _strategy_to_response(strategy: Strategy) -> StrategyResponse:
 async def list_strategies(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    strategy_type: Optional[str] = Query(None, description="Filter by strategy type"),
-    search: Optional[str] = Query(None, description="Search by name"),
+    status: str | None = Query(None, description="Filter by status"),
+    strategy_type: str | None = Query(None, description="Filter by strategy type"),
+    search: str | None = Query(None, description="Search by name"),
     db: Session = Depends(get_db),
 ):
     """
@@ -123,7 +122,7 @@ async def list_strategies(
         logger.error(f"Error listing strategies: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list strategies: {str(e)}",
+            detail=f"Failed to list strategies: {e!s}",
         )
 
 
@@ -381,8 +380,8 @@ async def create_strategy(
             take_profit_pct=strategy_data.take_profit_pct,
             max_drawdown_pct=strategy_data.max_drawdown_pct,
             tags=strategy_data.tags or [],
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         db.add(strategy)
@@ -397,7 +396,7 @@ async def create_strategy(
         logger.error(f"Error creating strategy: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create strategy: {str(e)}",
+            detail=f"Failed to create strategy: {e!s}",
         )
 
 
@@ -467,7 +466,7 @@ async def update_strategy(
                     detail="Стратегия DCA работает только в одном направлении. Выберите 'long' или 'short'.",
                 )
 
-        strategy.updated_at = datetime.now(timezone.utc)
+        strategy.updated_at = datetime.now(UTC)
         strategy.version += 1
 
         db.commit()
@@ -481,7 +480,7 @@ async def update_strategy(
         logger.error(f"Error updating strategy: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update strategy: {str(e)}",
+            detail=f"Failed to update strategy: {e!s}",
         )
 
 
@@ -512,7 +511,7 @@ async def delete_strategy(
             logger.info(f"Permanently deleted strategy: {strategy_id}")
         else:
             strategy.is_deleted = True
-            strategy.deleted_at = datetime.now(timezone.utc)
+            strategy.deleted_at = datetime.now(UTC)
             strategy.status = StrategyStatus.ARCHIVED
             logger.info(f"Soft deleted strategy: {strategy_id}")
 
@@ -524,7 +523,7 @@ async def delete_strategy(
         logger.error(f"Error deleting strategy: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete strategy: {str(e)}",
+            detail=f"Failed to delete strategy: {e!s}",
         )
 
 
@@ -535,7 +534,7 @@ async def delete_strategy(
 )
 async def duplicate_strategy(
     strategy_id: str,
-    new_name: Optional[str] = Query(
+    new_name: str | None = Query(
         None, description="Name for the duplicated strategy"
     ),
     db: Session = Depends(get_db),
@@ -575,8 +574,8 @@ async def duplicate_strategy(
             max_drawdown_pct=original.max_drawdown_pct,
             tags=original.tags.copy() if original.tags else [],
             user_id=original.user_id,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         db.add(duplicate)
@@ -591,7 +590,7 @@ async def duplicate_strategy(
         logger.error(f"Error duplicating strategy: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to duplicate strategy: {str(e)}",
+            detail=f"Failed to duplicate strategy: {e!s}",
         )
 
 
@@ -616,7 +615,7 @@ async def activate_strategy(
         )
 
     strategy.status = StrategyStatus.ACTIVE
-    strategy.updated_at = datetime.now(timezone.utc)
+    strategy.updated_at = datetime.now(UTC)
 
     db.commit()
     db.refresh(strategy)
@@ -646,7 +645,7 @@ async def pause_strategy(
         )
 
     strategy.status = StrategyStatus.PAUSED
-    strategy.updated_at = datetime.now(timezone.utc)
+    strategy.updated_at = datetime.now(UTC)
 
     db.commit()
     db.refresh(strategy)

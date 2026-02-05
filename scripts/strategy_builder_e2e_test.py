@@ -13,10 +13,10 @@ E2E тест для Strategy Builder - полный flow
     py -3.14 scripts/strategy_builder_e2e_test.py
 """
 
-import sys
 import pathlib
-from datetime import datetime, timezone
-from typing import Dict, Any
+import sys
+from datetime import UTC, datetime
+from typing import Any
 
 # Добавить корневую директорию в путь
 project_root = pathlib.Path(__file__).resolve().parent.parent
@@ -59,7 +59,7 @@ Base.metadata.create_all(bind=engine)
 client = TestClient(app)
 
 
-def build_rsi_strategy() -> Dict[str, Any]:
+def build_rsi_strategy() -> dict[str, Any]:
     """Создать простую RSI стратегию для тестирования"""
     return {
         "name": "E2E Test RSI Strategy",
@@ -245,10 +245,10 @@ def test_generate_code(strategy_id: str):
     assert "strategy_name" in data, "Ответ должен содержать имя класса стратегии"
     assert len(data["code"]) > 0, "Код не должен быть пустым"
 
-    print(f"✅ Код сгенерирован успешно")
+    print("✅ Код сгенерирован успешно")
     print(f"   Имя класса: {data['strategy_name']}")
     print(f"   Длина кода: {len(data['code'])} символов")
-    print(f"   Первые 100 символов:")
+    print("   Первые 100 символов:")
     print(f"   {data['code'][:100]}...")
 
 
@@ -280,12 +280,12 @@ def test_backtest(strategy_id: str):
     if response.status_code == 200:
         data = response.json()
         if "backtest_id" in data:
-            print(f"✅ Бэктест запущен успешно")
+            print("✅ Бэктест запущен успешно")
             print(f"   Backtest ID: {data['backtest_id']}")
             if "redirect_url" in data:
                 print(f"   Redirect URL: {data['redirect_url']}")
         else:
-            print(f"⚠️  Бэктест запущен, но backtest_id не возвращен")
+            print("⚠️  Бэктест запущен, но backtest_id не возвращен")
     else:
         print(f"⚠️  Бэктест вернул статус {response.status_code}")
 
@@ -304,7 +304,7 @@ def test_list_strategies():
     assert "items" in data, "Ответ должен содержать items"
     assert "total" in data, "Ответ должен содержать total"
 
-    print(f"✅ Список стратегий получен")
+    print("✅ Список стратегий получен")
     print(f"   Всего стратегий: {data['total']}")
     print(f"   Возвращено: {len(data['items'])}")
 
@@ -338,7 +338,7 @@ def main():
     print("\n" + "=" * 60)
     print("STRATEGY BUILDER E2E ТЕСТЫ")
     print("=" * 60)
-    print(f"Время начала: {datetime.now(timezone.utc).isoformat()}")
+    print(f"Время начала: {datetime.now(UTC).isoformat()}")
 
     try:
         # Тест 1: Создание стратегии
@@ -365,7 +365,7 @@ def main():
         print("\n" + "=" * 60)
         print("✅ ВСЕ E2E ТЕСТЫ ПРОШЛИ УСПЕШНО!")
         print("=" * 60)
-        print(f"Время завершения: {datetime.now(timezone.utc).isoformat()}")
+        print(f"Время завершения: {datetime.now(UTC).isoformat()}")
 
     except AssertionError as e:
         print(f"\n❌ ОШИБКА В ТЕСТЕ: {e}")

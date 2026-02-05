@@ -4,15 +4,16 @@ Implements Bayesian hyperparameter optimization using Optuna (state-of-the-art)
 Based on world best practices 2024-2026
 """
 
-from typing import Dict, Any, Optional, Callable, List, Tuple
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Optional
 
 # Optuna is optional dependency
 try:
     import optuna
-    from optuna.samplers import TPESampler, RandomSampler, CmaEsSampler
-    from optuna.pruners import MedianPruner, HyperbandPruner
+    from optuna.pruners import HyperbandPruner, MedianPruner
+    from optuna.samplers import CmaEsSampler, RandomSampler, TPESampler
 
     OPTUNA_AVAILABLE = True
 except ImportError:
@@ -26,7 +27,7 @@ from loguru import logger
 class OptunaOptimizationResult:
     """Result container for Optuna optimization"""
 
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_value: float
     best_trial_number: int
     n_trials: int
@@ -34,16 +35,16 @@ class OptunaOptimizationResult:
     study_name: str
 
     # Detailed results
-    all_trials: List[Dict[str, Any]] = field(default_factory=list)
-    pareto_front: List[Dict[str, Any]] = field(
+    all_trials: list[dict[str, Any]] = field(default_factory=list)
+    pareto_front: list[dict[str, Any]] = field(
         default_factory=list
     )  # For multi-objective
 
     # Convergence info
-    value_history: List[float] = field(default_factory=list)
-    best_value_history: List[float] = field(default_factory=list)
+    value_history: list[float] = field(default_factory=list)
+    best_value_history: list[float] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "best_params": self.best_params,
             "best_value": round(self.best_value, 6),
@@ -132,11 +133,11 @@ class OptunaOptimizer:
     def optimize_strategy(
         self,
         objective_fn: Callable,
-        param_space: Dict[str, Any],
+        param_space: dict[str, Any],
         n_trials: int = 100,
         n_jobs: int = 1,
-        timeout: Optional[float] = None,
-        study_name: Optional[str] = None,
+        timeout: float | None = None,
+        study_name: str | None = None,
         direction: str = "maximize",
         show_progress: bool = True,
     ) -> OptunaOptimizationResult:
@@ -244,12 +245,12 @@ class OptunaOptimizer:
     def optimize_multi_objective(
         self,
         objective_fn: Callable,
-        param_space: Dict[str, Any],
+        param_space: dict[str, Any],
         n_trials: int = 100,
         n_jobs: int = 1,
-        directions: List[str] = ["maximize", "maximize"],
-        metric_names: List[str] = ["sharpe", "return"],
-        study_name: Optional[str] = None,
+        directions: list[str] = ["maximize", "maximize"],
+        metric_names: list[str] = ["sharpe", "return"],
+        study_name: str | None = None,
     ) -> OptunaOptimizationResult:
         """
         Multi-objective optimization (e.g., maximize Sharpe AND minimize DrawDown).
@@ -276,7 +277,7 @@ class OptunaOptimizer:
             study_name=study_name, directions=directions, sampler=self._create_sampler()
         )
 
-        def objective(trial: "optuna.Trial") -> Tuple:
+        def objective(trial: "optuna.Trial") -> tuple:
             params = self._sample_params(trial, param_space)
             try:
                 values = objective_fn(params)
@@ -329,8 +330,8 @@ class OptunaOptimizer:
         )
 
     def _sample_params(
-        self, trial: "optuna.Trial", param_space: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, trial: "optuna.Trial", param_space: dict[str, Any]
+    ) -> dict[str, Any]:
         """Sample parameters from the search space"""
         params = {}
 
@@ -385,10 +386,10 @@ class TradingStrategyOptimizer:
         self,
         data,
         strategy_class,
-        param_space: Dict[str, Any],
+        param_space: dict[str, Any],
         n_trials: int = 100,
         n_jobs: int = 1,
-        config_base: Optional[Dict] = None,
+        config_base: dict | None = None,
     ) -> OptunaOptimizationResult:
         """
         Optimize strategy parameters.
@@ -429,7 +430,7 @@ class TradingStrategyOptimizer:
 
 
 # Example usage factory function
-def create_rsi_param_space() -> Dict[str, Any]:
+def create_rsi_param_space() -> dict[str, Any]:
     """Create parameter space for RSI strategy optimization"""
     return {
         "period": {"type": "int", "low": 5, "high": 30, "step": 1},
@@ -438,7 +439,7 @@ def create_rsi_param_space() -> Dict[str, Any]:
     }
 
 
-def create_sltp_param_space() -> Dict[str, Any]:
+def create_sltp_param_space() -> dict[str, Any]:
     """Create parameter space for SL/TP optimization"""
     return {
         "stop_loss": {"type": "float", "low": 0.01, "high": 0.10, "step": 0.005},
@@ -446,7 +447,7 @@ def create_sltp_param_space() -> Dict[str, Any]:
     }
 
 
-def create_full_strategy_param_space() -> Dict[str, Any]:
+def create_full_strategy_param_space() -> dict[str, Any]:
     """Full strategy parameter space"""
     return {
         # Strategy params

@@ -204,7 +204,7 @@ async def frontend_redirect():
 # Strategy Builder redirect for convenience
 @app.get("/strategy-builder", include_in_schema=False)
 async def strategy_builder_redirect():
-    return RedirectResponse(url="/frontend/strategy_builder.html", status_code=307)
+    return RedirectResponse(url="/frontend/strategy-builder.html", status_code=307)
 
 
 # =============================================================================
@@ -410,7 +410,24 @@ if _os.environ.get("USE_MOCK_BACKTESTS", "0").lower() in ("1", "true", "yes"):
 else:
     app.include_router(backtests.router, prefix="/api/v1/backtests", tags=["backtests"])
 app.include_router(marketdata.router, prefix="/api/v1/marketdata", tags=["marketdata"])
+# Tickers API (symbols-list, refresh-tickers) — register on app so paths are guaranteed
+from backend.api.routers.tickers_api import get_symbols_list as tickers_get_symbols_list
+from backend.api.routers.tickers_api import refresh_tickers as tickers_refresh_tickers
 
+app.add_api_route(
+    "/api/v1/marketdata/symbols-list",
+    tickers_get_symbols_list,
+    methods=["GET"],
+    tags=["tickers"],
+    include_in_schema=False,
+)
+app.add_api_route(
+    "/api/v1/refresh-tickers",
+    tickers_refresh_tickers,
+    methods=["POST"],
+    tags=["tickers"],
+    include_in_schema=False,
+)
 # Tick Charts - Real-time tick-based candlestick charts
 app.include_router(tick_charts_router.router, prefix="/api/v1/marketdata", tags=["tick-charts"])
 

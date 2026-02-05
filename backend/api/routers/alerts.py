@@ -8,8 +8,8 @@ Provides endpoints for:
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
@@ -44,7 +44,7 @@ class AlertResponse(BaseModel):
 
     success: bool
     message: str
-    alert_id: Optional[str] = None
+    alert_id: str | None = None
     channels_notified: list[str] = []
 
 
@@ -67,9 +67,9 @@ class TestAlertResponse(BaseModel):
     """Response for test alert endpoint."""
 
     test_sent: bool
-    slack_result: Optional[bool] = None
-    telegram_result: Optional[bool] = None
-    email_result: Optional[bool] = None
+    slack_result: bool | None = None
+    telegram_result: bool | None = None
+    email_result: bool | None = None
     message: str
 
 
@@ -179,7 +179,7 @@ async def test_alerting() -> TestAlertResponse:
         source="alerting_api_test",
         metadata={
             "test": True,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "environment": "production",
         },
     )

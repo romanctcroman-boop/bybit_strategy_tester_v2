@@ -66,7 +66,7 @@ class GPUBatchOptimizer:
         param_combinations: List[Tuple],  # (period, overbought, oversold, sl, tp)
         initial_capital: float = 10000.0,
         leverage: int = 10,
-        commission: float = 0.0006,
+        commission: float = 0.0007,  # 0.07% TradingView parity
         direction: str = "both",
     ) -> List[BatchOptimizationResult]:
         """

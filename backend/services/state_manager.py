@@ -20,10 +20,11 @@ import hashlib
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -102,17 +103,17 @@ class Order:
     side: str  # "buy" or "sell"
     order_type: str  # "market", "limit", etc.
     quantity: float
-    price: Optional[float] = None
+    price: float | None = None
     status: OrderStatus = OrderStatus.PENDING
     filled_quantity: float = 0.0
     average_price: float = 0.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    exchange_order_id: Optional[str] = None
-    client_order_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    exchange_order_id: str | None = None
+    client_order_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "order_id": self.order_id,
@@ -132,7 +133,7 @@ class Order:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Order":
+    def from_dict(cls, data: dict[str, Any]) -> "Order":
         """Create from dictionary."""
         data = data.copy()
         if "status" in data and isinstance(data["status"], str):
@@ -158,13 +159,13 @@ class Position:
     realized_pnl: float = 0.0
     leverage: float = 1.0
     margin_used: float = 0.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "position_id": self.position_id,
@@ -185,7 +186,7 @@ class Position:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Position":
+    def from_dict(cls, data: dict[str, Any]) -> "Position":
         """Create from dictionary."""
         data = data.copy()
         if "side" in data and isinstance(data["side"], str):
@@ -206,13 +207,13 @@ class StateEvent:
     entity_type: str  # "order", "position", "balance"
     entity_id: str
     timestamp: datetime
-    data: Dict[str, Any]
+    data: dict[str, Any]
     source: StateSource
     processed: bool = False
     retry_count: int = 0
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "event_id": self.event_id,
@@ -235,14 +236,14 @@ class StateConflict:
     conflict_id: str
     entity_type: str
     entity_id: str
-    redis_state: Dict[str, Any]
-    postgres_state: Dict[str, Any]
+    redis_state: dict[str, Any]
+    postgres_state: dict[str, Any]
     redis_timestamp: datetime
     postgres_timestamp: datetime
     resolved: bool = False
-    resolution: Optional[ConflictResolution] = None
-    resolved_at: Optional[datetime] = None
-    resolved_by: Optional[str] = None
+    resolution: ConflictResolution | None = None
+    resolved_at: datetime | None = None
+    resolved_by: str | None = None
 
 
 @dataclass
@@ -258,7 +259,7 @@ class StateMetrics:
     failed_events: int = 0
     conflicts_detected: int = 0
     conflicts_resolved: int = 0
-    last_sync: Optional[datetime] = None
+    last_sync: datetime | None = None
     sync_latency_ms: float = 0.0
     redis_latency_ms: float = 0.0
     postgres_latency_ms: float = 0.0
@@ -279,9 +280,9 @@ class EventQueue:
     def __init__(self, max_size: int = 10000):
         """Initialize event queue."""
         self.max_size = max_size
-        self._queue: List[StateEvent] = []
-        self._dead_letter: List[StateEvent] = []
-        self._handlers: Dict[EventType, List[Callable]] = {}
+        self._queue: list[StateEvent] = []
+        self._dead_letter: list[StateEvent] = []
+        self._handlers: dict[EventType, list[Callable]] = {}
         self._lock = asyncio.Lock()
         self._processing = False
 
@@ -296,7 +297,7 @@ class EventQueue:
             logger.debug(f"Event published: {event.event_type.value} - {event.entity_id}")
             return True
 
-    async def consume(self, batch_size: int = 10) -> List[StateEvent]:
+    async def consume(self, batch_size: int = 10) -> list[StateEvent]:
         """Consume events from queue."""
         async with self._lock:
             events = self._queue[:batch_size]
@@ -357,7 +358,7 @@ class EventQueue:
 class StateStore:
     """Abstract state store interface."""
 
-    async def get_order(self, order_id: str) -> Optional[Order]:
+    async def get_order(self, order_id: str) -> Order | None:
         """Get order by ID."""
         raise NotImplementedError
 
@@ -369,7 +370,7 @@ class StateStore:
         """Delete order."""
         raise NotImplementedError
 
-    async def get_position(self, position_id: str) -> Optional[Position]:
+    async def get_position(self, position_id: str) -> Position | None:
         """Get position by ID."""
         raise NotImplementedError
 
@@ -381,11 +382,11 @@ class StateStore:
         """Delete position."""
         raise NotImplementedError
 
-    async def list_orders(self, symbol: Optional[str] = None) -> List[Order]:
+    async def list_orders(self, symbol: str | None = None) -> list[Order]:
         """List orders."""
         raise NotImplementedError
 
-    async def list_positions(self, symbol: Optional[str] = None) -> List[Position]:
+    async def list_positions(self, symbol: str | None = None) -> list[Position]:
         """List positions."""
         raise NotImplementedError
 
@@ -400,18 +401,18 @@ class InMemoryStateStore(StateStore):
 
     def __init__(self):
         """Initialize store."""
-        self._orders: Dict[str, Order] = {}
-        self._positions: Dict[str, Position] = {}
+        self._orders: dict[str, Order] = {}
+        self._positions: dict[str, Position] = {}
         self._lock = asyncio.Lock()
 
-    async def get_order(self, order_id: str) -> Optional[Order]:
+    async def get_order(self, order_id: str) -> Order | None:
         """Get order by ID."""
         return self._orders.get(order_id)
 
     async def set_order(self, order: Order) -> bool:
         """Set/update order."""
         async with self._lock:
-            order.updated_at = datetime.now(timezone.utc)
+            order.updated_at = datetime.now(UTC)
             self._orders[order.order_id] = order
             return True
 
@@ -423,14 +424,14 @@ class InMemoryStateStore(StateStore):
                 return True
             return False
 
-    async def get_position(self, position_id: str) -> Optional[Position]:
+    async def get_position(self, position_id: str) -> Position | None:
         """Get position by ID."""
         return self._positions.get(position_id)
 
     async def set_position(self, position: Position) -> bool:
         """Set/update position."""
         async with self._lock:
-            position.updated_at = datetime.now(timezone.utc)
+            position.updated_at = datetime.now(UTC)
             self._positions[position.position_id] = position
             return True
 
@@ -442,14 +443,14 @@ class InMemoryStateStore(StateStore):
                 return True
             return False
 
-    async def list_orders(self, symbol: Optional[str] = None) -> List[Order]:
+    async def list_orders(self, symbol: str | None = None) -> list[Order]:
         """List orders."""
         orders = list(self._orders.values())
         if symbol:
             orders = [o for o in orders if o.symbol == symbol]
         return orders
 
-    async def list_positions(self, symbol: Optional[str] = None) -> List[Position]:
+    async def list_positions(self, symbol: str | None = None) -> list[Position]:
         """List positions."""
         positions = list(self._positions.values())
         if symbol:
@@ -474,8 +475,8 @@ class UnifiedStateManager:
 
     def __init__(
         self,
-        redis_store: Optional[StateStore] = None,
-        postgres_store: Optional[StateStore] = None,
+        redis_store: StateStore | None = None,
+        postgres_store: StateStore | None = None,
         conflict_resolution: ConflictResolution = ConflictResolution.LATEST_WINS,
         sync_interval_seconds: int = 30,
     ):
@@ -493,15 +494,15 @@ class UnifiedStateManager:
         self.metrics = StateMetrics()
 
         # Conflict tracking
-        self._conflicts: Dict[str, StateConflict] = {}
+        self._conflicts: dict[str, StateConflict] = {}
 
         # Sync task
-        self._sync_task: Optional[asyncio.Task] = None
-        self._event_processor_task: Optional[asyncio.Task] = None
+        self._sync_task: asyncio.Task | None = None
+        self._event_processor_task: asyncio.Task | None = None
         self._running = False
 
         # Audit log
-        self._audit_log: List[Dict[str, Any]] = []
+        self._audit_log: list[dict[str, Any]] = []
 
         logger.info("UnifiedStateManager initialized")
 
@@ -548,8 +549,8 @@ class UnifiedStateManager:
         if not order.order_id:
             order.order_id = str(uuid.uuid4())
 
-        order.created_at = datetime.now(timezone.utc)
-        order.updated_at = datetime.now(timezone.utc)
+        order.created_at = datetime.now(UTC)
+        order.updated_at = datetime.now(UTC)
 
         # Write to Redis first (fast path)
         await self.redis_store.set_order(order)
@@ -561,7 +562,7 @@ class UnifiedStateManager:
             event_type=EventType.ORDER_CREATED,
             entity_type="order",
             entity_id=order.order_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             data=order.to_dict(),
             source=StateSource.REDIS,
         )
@@ -576,7 +577,7 @@ class UnifiedStateManager:
     async def update_order(self, order: Order) -> Order:
         """Update existing order."""
         start = time.time()
-        order.updated_at = datetime.now(timezone.utc)
+        order.updated_at = datetime.now(UTC)
 
         # Update Redis
         await self.redis_store.set_order(order)
@@ -588,7 +589,7 @@ class UnifiedStateManager:
             event_type=EventType.ORDER_UPDATED,
             entity_type="order",
             entity_id=order.order_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             data=order.to_dict(),
             source=StateSource.REDIS,
         )
@@ -597,7 +598,7 @@ class UnifiedStateManager:
         self._log_audit("order_updated", order.order_id, order.to_dict())
         return order
 
-    async def get_order(self, order_id: str, source: StateSource = StateSource.REDIS) -> Optional[Order]:
+    async def get_order(self, order_id: str, source: StateSource = StateSource.REDIS) -> Order | None:
         """
         Get order by ID.
 
@@ -617,22 +618,22 @@ class UnifiedStateManager:
 
     async def list_orders(
         self,
-        symbol: Optional[str] = None,
+        symbol: str | None = None,
         source: StateSource = StateSource.REDIS,
-    ) -> List[Order]:
+    ) -> list[Order]:
         """List orders."""
         if source == StateSource.REDIS:
             return await self.redis_store.list_orders(symbol)
         return await self.postgres_store.list_orders(symbol)
 
-    async def cancel_order(self, order_id: str) -> Optional[Order]:
+    async def cancel_order(self, order_id: str) -> Order | None:
         """Cancel order."""
         order = await self.get_order(order_id)
         if not order:
             return None
 
         order.status = OrderStatus.CANCELLED
-        order.updated_at = datetime.now(timezone.utc)
+        order.updated_at = datetime.now(UTC)
 
         await self.redis_store.set_order(order)
 
@@ -641,7 +642,7 @@ class UnifiedStateManager:
             event_type=EventType.ORDER_CANCELLED,
             entity_type="order",
             entity_id=order.order_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             data=order.to_dict(),
             source=StateSource.REDIS,
         )
@@ -659,8 +660,8 @@ class UnifiedStateManager:
         if not position.position_id:
             position.position_id = str(uuid.uuid4())
 
-        position.created_at = datetime.now(timezone.utc)
-        position.updated_at = datetime.now(timezone.utc)
+        position.created_at = datetime.now(UTC)
+        position.updated_at = datetime.now(UTC)
 
         await self.redis_store.set_position(position)
 
@@ -669,7 +670,7 @@ class UnifiedStateManager:
             event_type=EventType.POSITION_OPENED,
             entity_type="position",
             entity_id=position.position_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             data=position.to_dict(),
             source=StateSource.REDIS,
         )
@@ -680,7 +681,7 @@ class UnifiedStateManager:
 
     async def update_position(self, position: Position) -> Position:
         """Update position."""
-        position.updated_at = datetime.now(timezone.utc)
+        position.updated_at = datetime.now(UTC)
 
         # Calculate unrealized PnL
         if position.side == PositionSide.LONG:
@@ -695,7 +696,7 @@ class UnifiedStateManager:
             event_type=EventType.POSITION_UPDATED,
             entity_type="position",
             entity_id=position.position_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             data=position.to_dict(),
             source=StateSource.REDIS,
         )
@@ -703,7 +704,7 @@ class UnifiedStateManager:
 
         return position
 
-    async def close_position(self, position_id: str, close_price: float) -> Optional[Position]:
+    async def close_position(self, position_id: str, close_price: float) -> Position | None:
         """Close position."""
         position = await self.redis_store.get_position(position_id)
         if not position:
@@ -718,7 +719,7 @@ class UnifiedStateManager:
         position.current_price = close_price
         position.quantity = 0
         position.side = PositionSide.FLAT
-        position.updated_at = datetime.now(timezone.utc)
+        position.updated_at = datetime.now(UTC)
 
         await self.redis_store.set_position(position)
 
@@ -727,7 +728,7 @@ class UnifiedStateManager:
             event_type=EventType.POSITION_CLOSED,
             entity_type="position",
             entity_id=position.position_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             data=position.to_dict(),
             source=StateSource.REDIS,
         )
@@ -736,7 +737,7 @@ class UnifiedStateManager:
         self._log_audit("position_closed", position.position_id, position.to_dict())
         return position
 
-    async def get_position(self, position_id: str, source: StateSource = StateSource.REDIS) -> Optional[Position]:
+    async def get_position(self, position_id: str, source: StateSource = StateSource.REDIS) -> Position | None:
         """Get position by ID."""
         if source == StateSource.REDIS:
             return await self.redis_store.get_position(position_id)
@@ -744,9 +745,9 @@ class UnifiedStateManager:
 
     async def list_positions(
         self,
-        symbol: Optional[str] = None,
+        symbol: str | None = None,
         source: StateSource = StateSource.REDIS,
-    ) -> List[Position]:
+    ) -> list[Position]:
         """List positions."""
         if source == StateSource.REDIS:
             return await self.redis_store.list_positions(symbol)
@@ -756,7 +757,7 @@ class UnifiedStateManager:
     # Synchronization
     # ========================================================================
 
-    async def sync_state(self) -> Dict[str, Any]:
+    async def sync_state(self) -> dict[str, Any]:
         """
         Synchronize state between Redis and PostgreSQL.
 
@@ -802,7 +803,7 @@ class UnifiedStateManager:
                                 await self.postgres_store.set_order(order)
                                 results["synced_orders"] += 1
                 except Exception as e:
-                    results["errors"].append(f"Order {order.order_id}: {str(e)}")
+                    results["errors"].append(f"Order {order.order_id}: {e!s}")
 
             # Sync positions
             redis_positions = await self.redis_store.list_positions()
@@ -825,10 +826,10 @@ class UnifiedStateManager:
                                 await self.postgres_store.set_position(position)
                                 results["synced_positions"] += 1
                 except Exception as e:
-                    results["errors"].append(f"Position {position.position_id}: {str(e)}")
+                    results["errors"].append(f"Position {position.position_id}: {e!s}")
 
             # Update metrics
-            self.metrics.last_sync = datetime.now(timezone.utc)
+            self.metrics.last_sync = datetime.now(UTC)
             self.metrics.sync_latency_ms = (time.time() - start) * 1000
             self.metrics.orders_in_redis = len(redis_orders)
             self.metrics.orders_in_postgres = len(await self.postgres_store.list_orders())
@@ -844,7 +845,7 @@ class UnifiedStateManager:
 
         return results
 
-    async def _check_order_conflict(self, redis_order: Order, postgres_order: Order) -> Optional[StateConflict]:
+    async def _check_order_conflict(self, redis_order: Order, postgres_order: Order) -> StateConflict | None:
         """Check for order conflict."""
         # Generate state hash for comparison
         redis_hash = self._hash_order(redis_order)
@@ -870,7 +871,7 @@ class UnifiedStateManager:
                     return conflict
         return None
 
-    async def _check_position_conflict(self, redis_pos: Position, postgres_pos: Position) -> Optional[StateConflict]:
+    async def _check_position_conflict(self, redis_pos: Position, postgres_pos: Position) -> StateConflict | None:
         """Check for position conflict."""
         redis_hash = self._hash_position(redis_pos)
         postgres_hash = self._hash_position(postgres_pos)
@@ -920,7 +921,7 @@ class UnifiedStateManager:
 
             conflict.resolved = True
             conflict.resolution = self.conflict_resolution
-            conflict.resolved_at = datetime.now(timezone.utc)
+            conflict.resolved_at = datetime.now(UTC)
 
             self._log_audit(
                 "conflict_resolved",
@@ -977,10 +978,10 @@ class UnifiedStateManager:
     # Audit and Metrics
     # ========================================================================
 
-    def _log_audit(self, action: str, entity_id: str, data: Dict[str, Any]):
+    def _log_audit(self, action: str, entity_id: str, data: dict[str, Any]):
         """Log audit entry."""
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "action": action,
             "entity_id": entity_id,
             "data": data,
@@ -995,18 +996,18 @@ class UnifiedStateManager:
         """Get current metrics."""
         return self.metrics
 
-    def get_audit_log(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_audit_log(self, limit: int = 100) -> list[dict[str, Any]]:
         """Get audit log entries."""
         return self._audit_log[-limit:]
 
-    def get_conflicts(self, resolved: Optional[bool] = None) -> List[StateConflict]:
+    def get_conflicts(self, resolved: bool | None = None) -> list[StateConflict]:
         """Get conflict list."""
         conflicts = list(self._conflicts.values())
         if resolved is not None:
             conflicts = [c for c in conflicts if c.resolved == resolved]
         return conflicts
 
-    def get_health(self) -> Dict[str, Any]:
+    def get_health(self) -> dict[str, Any]:
         """Get service health status."""
         return {
             "status": "healthy" if self._running else "stopped",
@@ -1032,7 +1033,7 @@ class UnifiedStateManager:
     # Snapshot & Recovery (Data Integrity)
     # ========================================================================
 
-    async def create_snapshot(self, snapshot_id: Optional[str] = None) -> Dict[str, Any]:
+    async def create_snapshot(self, snapshot_id: str | None = None) -> dict[str, Any]:
         """
         Create a full state snapshot for disaster recovery.
 
@@ -1047,7 +1048,7 @@ class UnifiedStateManager:
             Snapshot dictionary with all state data
         """
         snapshot_id = snapshot_id or str(uuid.uuid4())
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
 
         logger.info(f"Creating state snapshot: {snapshot_id}")
 
@@ -1124,7 +1125,7 @@ class UnifiedStateManager:
             logger.error(f"Failed to create snapshot: {e}")
             raise
 
-    async def restore_from_snapshot(self, snapshot: Dict[str, Any], target: str = "redis") -> bool:
+    async def restore_from_snapshot(self, snapshot: dict[str, Any], target: str = "redis") -> bool:
         """
         Restore state from a snapshot.
 
@@ -1181,14 +1182,14 @@ class UnifiedStateManager:
             logger.error(f"Failed to restore snapshot: {e}")
             return False
 
-    def _calculate_checksum(self, orders: List[Dict], positions: List[Dict]) -> str:
+    def _calculate_checksum(self, orders: list[dict], positions: list[dict]) -> str:
         """Calculate checksum for data integrity verification."""
         import json
 
         data = json.dumps({"orders": orders, "positions": positions}, sort_keys=True)
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
-    async def verify_data_integrity(self) -> Dict[str, Any]:
+    async def verify_data_integrity(self) -> dict[str, Any]:
         """
         Verify data integrity between Redis and PostgreSQL.
 
@@ -1225,7 +1226,7 @@ class UnifiedStateManager:
         )
 
         report = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "is_consistent": is_consistent,
             "summary": {
                 "redis_orders": len(redis_orders),

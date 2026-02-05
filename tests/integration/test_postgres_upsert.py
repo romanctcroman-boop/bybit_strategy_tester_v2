@@ -1,26 +1,24 @@
-import os
 import json
-import sys
+import os
 import pathlib
+import sys
 
 # Ensure repo root is on sys.path so `backend` package imports work during pytest runs
 repo_root = pathlib.Path(__file__).resolve().parents[2]
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
+import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-
-import pytest
-
 
 DB_URL = os.environ.get('DATABASE_URL')
 
 
 def pytest_configure(config):
     # make sure tests can import backend package from repo root when run by CI
-    import sys
     import pathlib
+    import sys
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))

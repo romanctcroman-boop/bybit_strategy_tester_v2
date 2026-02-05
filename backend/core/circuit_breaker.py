@@ -22,9 +22,10 @@ import functools
 import statistics
 import time
 from collections import deque
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Coroutine, TypeVar
+from typing import Any, TypeVar
 
 from loguru import logger
 
@@ -250,6 +251,10 @@ class CircuitBreaker:
     @property
     def is_half_open(self) -> bool:
         return self.state == CircuitState.HALF_OPEN
+
+    def can_execute(self) -> bool:
+        """Synchronous check for sync callers (e.g. Bybit adapter). Returns False when OPEN."""
+        return not self.is_open
 
     async def _can_execute(self) -> bool:
         """Check if call can proceed."""

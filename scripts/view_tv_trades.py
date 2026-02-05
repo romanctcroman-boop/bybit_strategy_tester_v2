@@ -1,8 +1,8 @@
 """
 Compare Our Engine Trades with TradingView Trades
 """
+
 import pandas as pd
-from datetime import datetime
 
 # Load TV export
 tv_df = pd.read_csv(r'd:\TV\RSI_Strategy_with_TP_SL_(FIXED)_BYBIT_BTCUSDT_2026-01-21 (1).csv')
@@ -33,18 +33,18 @@ if len(entries) >= 24:
     print("\n" + "="*70)
     print("🎯 TRADINGVIEW TRADE #24 DETAILS")
     print("="*70)
-    print(f"  Index:     23 (0-based) / #24")
+    print("  Index:     23 (0-based) / #24")
     print(f"  Type:      {trade_24['Type']}")
     print(f"  Signal:    {trade_24['Signal']}")
     print(f"  DateTime:  {trade_24['datetime']}")
     print(f"  Price:     ${trade_24['Price USDT']:.2f}")
-    
+
     # Now find corresponding exit
     trade_num = trade_24['Trade #']
     exit_row = tv_df[(tv_df['Trade #'] == trade_num) & (tv_df['Type'].str.contains('Exit', na=False))]
     if not exit_row.empty:
         exit_info = exit_row.iloc[0]
-        print(f"\n  Exit Info:")
+        print("\n  Exit Info:")
         print(f"    Exit Signal: {exit_info['Signal']}")
         print(f"    Exit Time:   {exit_info['Date and time']}")
         print(f"    Exit Price:  ${exit_info['Price USDT']:.2f}")

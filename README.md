@@ -28,7 +28,7 @@ AI-powered strategy analysis and GPU acceleration.
 
 ### Prerequisites
 
-- Python 3.11+ (3.12/3.13 supported)
+- Python 3.11+ (3.12/3.13/3.14 supported; 3.14 recommended for dev)
 - CUDA Toolkit 11.8+ (optional, for GPU acceleration)
 - Redis (optional, for caching)
 
@@ -50,6 +50,9 @@ pip install -r backend/requirements.txt
 pip install cupy-cuda11x  # For CUDA 11.x
 # or
 pip install cupy-cuda12x  # For CUDA 12.x
+
+# Optional: Full dev deps (numba, vectorbt, torch) — for all tests & L2/CGAN
+pip install .[dev-full]
 
 # Copy environment configuration
 Copy-Item .env.example .env

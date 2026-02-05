@@ -19,7 +19,6 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -455,7 +454,7 @@ def test_mtf_with_atr() -> TestResult:
 
     try:
         from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
-        from backend.backtesting.interfaces import BacktestInput, TpMode, SlMode
+        from backend.backtesting.interfaces import BacktestInput, SlMode, TpMode
 
         start_date = "2025-07-01"
         end_date = "2026-01-26"
@@ -949,7 +948,8 @@ def test_full_feature_combination() -> TestResult:
 
     try:
         from backend.backtesting.engines.fallback_engine_v4 import FallbackEngineV4
-        from backend.backtesting.interfaces import BacktestInput, TpMode as TpModeEnum
+        from backend.backtesting.interfaces import BacktestInput
+        from backend.backtesting.interfaces import TpMode as TpModeEnum
 
         start_date = "2025-07-01"
         end_date = "2026-01-26"

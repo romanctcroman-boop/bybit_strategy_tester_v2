@@ -60,6 +60,8 @@ class WalkForwardResult:
     combined_oos_equity: List[float] = field(default_factory=list)
     combined_oos_sharpe: float = 0.0
     combined_oos_return: float = 0.0
+    # Per-parameter stability (param -> {mean, std, cv_pct, stability_pct})
+    param_stability_report: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
 
 class WalkForwardOptimizer:
@@ -79,7 +81,7 @@ class WalkForwardOptimizer:
         self,
         in_sample_ratio: float = 0.7,  # 70% in-sample, 30% out-of-sample
         n_windows: int = 5,  # Number of walk-forward windows
-        mode: str = "rolling",  # "rolling" or "anchored"
+        mode: str = "rolling",  # "rolling", "anchored", or "expanding"
         min_trades_per_window: int = 10,  # Minimum trades for valid window
     ):
         """
@@ -170,6 +172,53 @@ class WalkForwardOptimizer:
                 oos_data = data.iloc[oos_start_idx:oos_end_idx].copy()
 
                 # Get timestamps
+                is_start = (
+                    is_data[timestamp_col].iloc[0]
+                    if timestamp_col in is_data.columns
+                    else datetime.now()
+                )
+                is_end = (
+                    is_data[timestamp_col].iloc[-1]
+                    if timestamp_col in is_data.columns
+                    else datetime.now()
+                )
+                oos_start = (
+                    oos_data[timestamp_col].iloc[0]
+                    if timestamp_col in oos_data.columns
+                    else datetime.now()
+                )
+                oos_end = (
+                    oos_data[timestamp_col].iloc[-1]
+                    if timestamp_col in oos_data.columns
+                    else datetime.now()
+                )
+
+                windows.append(
+                    (is_data, oos_data, is_start, is_end, oos_start, oos_end)
+                )
+
+        elif self.mode == "expanding":
+            # Expanding: IS grows, OOS is fixed-size at end of each window
+            base_is_ratio = 0.5
+            min_is_size = max(100, int(n * 0.2))
+
+            for i in range(self.n_windows):
+                # IS grows: 50%, 60%, 70%, 80%, 90% of data up to oos_start
+                growth = (i + 1) / self.n_windows
+                is_end_ratio = base_is_ratio + growth * (1.0 - base_is_ratio - 0.1)
+                is_end_idx = int(n * is_end_ratio)
+                is_end_idx = max(min_is_size, min(is_end_idx, n - 100))
+
+                oos_size = min(200, (n - is_end_idx) // 2) or (n - is_end_idx)
+                oos_start_idx = is_end_idx
+                oos_end_idx = min(oos_start_idx + oos_size, n)
+
+                if oos_end_idx <= oos_start_idx or is_end_idx < min_is_size:
+                    continue
+
+                is_data = data.iloc[0:is_end_idx].copy()
+                oos_data = data.iloc[oos_start_idx:oos_end_idx].copy()
+
                 is_start = (
                     is_data[timestamp_col].iloc[0]
                     if timestamp_col in is_data.columns
@@ -327,6 +376,7 @@ class WalkForwardOptimizer:
 
         # Parameter stability (how much do optimal params vary?)
         param_stability = self._calculate_param_stability(all_params_used)
+        param_report = self.get_param_stability_report(all_params_used)
 
         return WalkForwardResult(
             strategy_name=strategy_name,
@@ -342,6 +392,7 @@ class WalkForwardOptimizer:
             total_oos_trades=total_oos_trades,
             oos_win_rate=oos_win_rate,
             parameter_stability=param_stability,
+            param_stability_report=param_report,
             combined_oos_sharpe=avg_oos_sharpe,
             combined_oos_return=sum([w.out_sample_return for w in results]),
         )
@@ -399,6 +450,49 @@ class WalkForwardOptimizer:
         stability = max(0, min(100, (1 - avg_cv) * 100))
 
         return stability
+
+    def get_param_stability_report(
+        self, all_params: List[Dict[str, Any]]
+    ) -> Dict[str, Dict[str, float]]:
+        """
+        Per-parameter stability report across windows.
+
+        Returns dict: param_name -> {mean, std, cv_pct, stability_pct}
+        """
+        if len(all_params) <= 1:
+            return {}
+
+        all_keys: set[str] = set()
+        for p in all_params:
+            all_keys.update(p.keys())
+
+        report = {}
+        for key in sorted(all_keys):
+            values = [p.get(key) for p in all_params if key in p]
+            if len(values) < 2:
+                report[key] = {"mean": values[0], "std": 0, "cv_pct": 0, "stability_pct": 100}
+                continue
+            try:
+                vals = [float(v) for v in values]
+                mean_val = float(np.mean(vals))
+                std_val = float(np.std(vals))
+                cv = (std_val / abs(mean_val) * 100) if mean_val != 0 else 0
+                stability = max(0, min(100, 100 - cv))
+                report[key] = {
+                    "mean": round(mean_val, 4),
+                    "std": round(std_val, 4),
+                    "cv_pct": round(cv, 2),
+                    "stability_pct": round(stability, 2),
+                }
+            except (ValueError, TypeError):
+                unique = len(set(str(v) for v in values))
+                report[key] = {
+                    "mean": str(values[0]),
+                    "std": "N/A",
+                    "cv_pct": 0 if unique == 1 else 100,
+                    "stability_pct": 100 if unique == 1 else 0,
+                }
+        return report
 
     def print_report(self, result: WalkForwardResult) -> str:
         """Generate human-readable report."""

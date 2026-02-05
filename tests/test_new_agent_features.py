@@ -11,14 +11,12 @@ Tests all newly implemented components:
 """
 
 import asyncio
-import os
 import sys
 from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from loguru import logger
 
 # ============================================================
 # Test Results Tracking
@@ -59,8 +57,6 @@ async def test_mcp():
 
     try:
         from backend.agents.mcp.protocol import (
-            InMemoryTransport,
-            MCPClient,
             MCPMessage,
             MCPPrompt,
             MCPResource,
@@ -114,7 +110,7 @@ async def test_tool_registry():
     category = "MCP"
 
     try:
-        from backend.agents.mcp.tool_registry import ParameterType, Tool, ToolParameter, ToolRegistry
+        from backend.agents.mcp.tool_registry import ToolRegistry
 
         registry = ToolRegistry()
 
@@ -174,7 +170,7 @@ async def test_context_manager():
     category = "MCP"
 
     try:
-        from backend.agents.mcp.context_manager import Context, ContextManager, ContextScope
+        from backend.agents.mcp.context_manager import ContextManager, ContextScope
 
         manager = ContextManager()
 
@@ -208,7 +204,6 @@ async def test_llm_connections():
 
     try:
         from backend.agents.llm.connections import (
-            LLMClientPool,
             LLMConfig,
             LLMMessage,
             LLMProvider,
@@ -263,7 +258,7 @@ async def test_shared_memory():
     category = "SharedMemory"
 
     try:
-        from backend.agents.memory.shared_memory import ConflictResolution, SharedMemory, Transaction
+        from backend.agents.memory.shared_memory import SharedMemory
 
         memory = SharedMemory()
 
@@ -320,7 +315,6 @@ async def test_ml_anomaly():
         import numpy as np
 
         from backend.agents.monitoring.ml_anomaly import (
-            AnomalySeverity,
             EnsembleDetector,
             IQRDetector,
             MLAnomalyDetector,
@@ -384,12 +378,9 @@ async def test_communication():
 
     try:
         from backend.agents.communication.protocol import (
-            AgentCommunicator,
             AgentInfo,
             Message,
             MessageBroker,
-            MessagePriority,
-            MessageType,
         )
 
         # Test Message
@@ -462,7 +453,6 @@ async def test_prometheus_grafana():
             GrafanaConfig,
             GrafanaDashboard,
             PrometheusConfig,
-            PrometheusExporter,
             create_ai_agent_dashboard,
         )
 

@@ -44,6 +44,9 @@ class SimulationMethod(Enum):
     BOOTSTRAP = "bootstrap"  # Sample with replacement
     BLOCK_BOOTSTRAP = "block_bootstrap"  # Preserve some serial correlation
     PARAMETRIC = "parametric"  # Assume normal distribution
+    # Robustness scenarios (StrategyQuant-style)
+    SLIPPAGE_STRESS = "slippage_stress"  # Random slippage + missed fills
+    PRICE_RANDOMIZATION = "price_randomization"  # Synthetic price noise (curve-fitting)
 
 
 @dataclass
@@ -216,6 +219,14 @@ class MonteCarloSimulator:
             final_equities, max_drawdowns, sharpes = self._simulate_parametric(
                 n_simulations
             )
+        elif method == SimulationMethod.SLIPPAGE_STRESS:
+            final_equities, max_drawdowns, sharpes = self._simulate_slippage_stress(
+                n_simulations
+            )
+        elif method == SimulationMethod.PRICE_RANDOMIZATION:
+            final_equities, max_drawdowns, sharpes = self._simulate_price_randomization(
+                n_simulations
+            )
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -345,6 +356,67 @@ class MonteCarloSimulator:
             final_equities[i] = equity_curve[-1]
             max_drawdowns[i] = self._calculate_max_drawdown(equity_curve)
             sharpes[i] = self._calculate_sharpe(random_pnl)
+
+        return final_equities, max_drawdowns, sharpes
+
+    def _simulate_slippage_stress(
+        self,
+        n_simulations: int,
+        miss_fill_prob: float = 0.05,
+        slippage_pct: float = 0.001,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Stress test: random missed fills + slippage on PnL.
+        Simulates real-world execution friction.
+        """
+        final_equities = np.zeros(n_simulations)
+        max_drawdowns = np.zeros(n_simulations)
+        sharpes = np.zeros(n_simulations)
+
+        for i in range(n_simulations):
+            stressed_pnl = np.zeros(self.n_trades)
+            for j in range(self.n_trades):
+                if np.random.random() < miss_fill_prob:
+                    stressed_pnl[j] = 0  # Missed fill
+                else:
+                    slip = np.random.uniform(0, slippage_pct)
+                    stressed_pnl[j] = self.pnl_values[j] * (1.0 - slip)
+                    if self.pnl_values[j] < 0:
+                        stressed_pnl[j] = self.pnl_values[j] * (1.0 + slip)
+
+            equity_curve = self.initial_capital + np.cumsum(stressed_pnl)
+            equity_curve = np.insert(equity_curve, 0, self.initial_capital)
+
+            final_equities[i] = equity_curve[-1]
+            max_drawdowns[i] = self._calculate_max_drawdown(equity_curve)
+            sharpes[i] = self._calculate_sharpe(stressed_pnl)
+
+        return final_equities, max_drawdowns, sharpes
+
+    def _simulate_price_randomization(
+        self,
+        n_simulations: int,
+        noise_std: float = 0.15,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Add Gaussian noise to PnL to detect curve-fitting.
+        Simulates 'what if prices had been slightly different'.
+        """
+        final_equities = np.zeros(n_simulations)
+        max_drawdowns = np.zeros(n_simulations)
+        sharpes = np.zeros(n_simulations)
+        pnl_std = np.std(self.pnl_values) if np.std(self.pnl_values) > 0 else 1.0
+
+        for i in range(n_simulations):
+            noise = np.random.normal(0, noise_std, size=self.n_trades)
+            noisy_pnl = self.pnl_values + noise * pnl_std
+
+            equity_curve = self.initial_capital + np.cumsum(noisy_pnl)
+            equity_curve = np.insert(equity_curve, 0, self.initial_capital)
+
+            final_equities[i] = equity_curve[-1]
+            max_drawdowns[i] = self._calculate_max_drawdown(equity_curve)
+            sharpes[i] = self._calculate_sharpe(noisy_pnl)
 
         return final_equities, max_drawdowns, sharpes
 

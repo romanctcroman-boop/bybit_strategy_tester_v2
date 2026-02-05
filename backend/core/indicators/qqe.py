@@ -14,7 +14,6 @@ The indicator provides:
 Based on TradingView's QQE indicator implementation.
 """
 
-from typing import Optional
 
 import numpy as np
 

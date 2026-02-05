@@ -92,7 +92,7 @@ async def export_backtest_pdf(backtest_id: str):
         raise
     except Exception as e:
         logger.exception(f"Failed to generate PDF report: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {e!s}")
 
 
 @router.get("/backtest/{backtest_id}/excel")
@@ -165,7 +165,7 @@ async def export_backtest_excel(backtest_id: str):
     except Exception as e:
         logger.exception(f"Failed to generate Excel report: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to generate Excel: {str(e)}"
+            status_code=500, detail=f"Failed to generate Excel: {e!s}"
         )
 
 
@@ -236,7 +236,7 @@ async def export_backtest_csv(backtest_id: str):
         raise
     except Exception as e:
         logger.exception(f"Failed to generate CSV: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate CSV: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate CSV: {e!s}")
 
 
 @router.get("/formats")

@@ -4,11 +4,12 @@ Aggressive Scalper: 50x leverage, 1% SL, 2% TP + Bar Magnifier
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
+
+import pandas as pd
 
 print("=" * 80)
 print("🔍 ДЕТАЛЬНАЯ ДИАГНОСТИКА Bar Magnifier расхождения")
@@ -58,9 +59,9 @@ short_entries = (rsi > 70).values
 short_exits = (rsi < 30).values
 
 # Импорты
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.fallback_engine_v2 import FallbackEngineV2
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 config = {
     "initial_capital": 5000,
@@ -99,12 +100,12 @@ nb = NumbaEngineV2()
 fb_result = fb.run(input_data)
 nb_result = nb.run(input_data)
 
-print(f"\n📊 РЕЗУЛЬТАТЫ:")
+print("\n📊 РЕЗУЛЬТАТЫ:")
 print(f"   Fallback: {len(fb_result.trades)} trades, ${fb_result.metrics.net_profit:,.2f}")
 print(f"   Numba:    {len(nb_result.trades)} trades, ${nb_result.metrics.net_profit:,.2f}")
 
 # Сравнение trade by trade
-print(f"\n📋 ДЕТАЛЬНОЕ СРАВНЕНИЕ:")
+print("\n📋 ДЕТАЛЬНОЕ СРАВНЕНИЕ:")
 
 fb_trades = fb_result.trades
 nb_trades = nb_result.trades
@@ -114,19 +115,19 @@ divergence_found = False
 for i in range(max(len(fb_trades), len(nb_trades))):
     fb_t = fb_trades[i] if i < len(fb_trades) else None
     nb_t = nb_trades[i] if i < len(nb_trades) else None
-    
+
     if fb_t and nb_t:
         # Сравниваем ключевые поля
         entry_match = abs(fb_t.entry_price - nb_t.entry_price) < 0.01
         exit_match = abs(fb_t.exit_price - nb_t.exit_price) < 0.01
         dir_match = fb_t.direction == nb_t.direction
-        
+
         if not (entry_match and exit_match and dir_match):
             print(f"\n🔴 FIRST DIVERGENCE at trade #{i+1}:")
             print(f"   FB: {fb_t.direction} entry={fb_t.entry_price:.2f} exit={fb_t.exit_price:.2f} pnl={fb_t.pnl:.2f} entry_time={fb_t.entry_time}")
             print(f"   NB: {nb_t.direction} entry={nb_t.entry_price:.2f} exit={nb_t.exit_price:.2f} pnl={nb_t.pnl:.2f} entry_time={nb_t.entry_time}")
             divergence_found = True
-            
+
             # Покажем предыдущие trades для контекста
             if i > 0:
                 print(f"\n   Previous trade #{i}:")

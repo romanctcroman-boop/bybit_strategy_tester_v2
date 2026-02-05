@@ -4,14 +4,15 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import numpy as np
-import pandas as pd
 import sqlite3
 import time
 from datetime import datetime
 from itertools import product
+
+import pandas as pd
 
 print("=" * 100)
 print("🔧 ОПТИМИЗАЦИЯ ПАРАМЕТРОВ СТРАТЕГИИ")
@@ -51,8 +52,8 @@ ema_fast = [20, 50]
 ema_slow = [100, 200]
 directions = ["both", "long", "short"]
 
-total_combos = (len(rsi_periods) * len(rsi_oversold) * len(rsi_overbought) * 
-                len(stop_losses) * len(take_profits) * len(ema_fast) * 
+total_combos = (len(rsi_periods) * len(rsi_oversold) * len(rsi_overbought) *
+                len(stop_losses) * len(take_profits) * len(ema_fast) *
                 len(ema_slow) * len(directions))
 
 print(f"   RSI Period:    {rsi_periods}")
@@ -84,8 +85,8 @@ def calculate_rsi(close, period=14):
 # ============================================================================
 # ИМПОРТЫ
 # ============================================================================
-from backend.backtesting.interfaces import BacktestInput, TradeDirection
 from backend.backtesting.engines.numba_engine_v2 import NumbaEngineV2
+from backend.backtesting.interfaces import BacktestInput, TradeDirection
 
 engine = NumbaEngineV2()
 
@@ -107,26 +108,26 @@ start_time = time.time()
 
 # Генерируем все комбинации
 all_combos = list(product(
-    rsi_periods, rsi_oversold, rsi_overbought, 
+    rsi_periods, rsi_oversold, rsi_overbought,
     stop_losses, take_profits, ema_fast, ema_slow, directions
 ))[:MAX_COMBOS]
 
 for i, (rsi_p, rsi_os, rsi_ob, sl, tp, ema_f, ema_s, direction) in enumerate(all_combos):
-    
+
     # Расчёт индикаторов
     rsi = calculate_rsi(df_1h['close'], period=rsi_p)
     ema_fast_line = df_1h['close'].ewm(span=ema_f).mean()
     ema_slow_line = df_1h['close'].ewm(span=ema_s).mean()
-    
+
     # Сигналы с EMA фильтром
     bullish = ema_fast_line > ema_slow_line
     bearish = ema_fast_line < ema_slow_line
-    
+
     long_entries = ((rsi < rsi_os) & bullish).values
     long_exits = (rsi > rsi_ob).values
     short_entries = ((rsi > rsi_ob) & bearish).values
     short_exits = (rsi < rsi_os).values
-    
+
     # Запуск
     input_data = BacktestInput(
         candles=df_1h,
@@ -147,10 +148,10 @@ for i, (rsi_p, rsi_os, rsi_ob, sl, tp, ema_f, ema_s, direction) in enumerate(all
         slippage=0.0005,
         use_bar_magnifier=False,
     )
-    
+
     result = engine.run(input_data)
     m = result.metrics
-    
+
     if m.total_trades >= 10:  # Минимум 10 сделок
         results.append({
             "rsi_period": rsi_p,
@@ -172,7 +173,7 @@ for i, (rsi_p, rsi_os, rsi_ob, sl, tp, ema_f, ema_s, direction) in enumerate(all
             "expectancy": m.expectancy,
             "recovery_factor": m.recovery_factor,
         })
-    
+
     # Прогресс
     if (i + 1) % 100 == 0:
         elapsed = time.time() - start_time
@@ -194,40 +195,40 @@ print("=" * 100)
 
 if len(df) > 0:
     df_sorted = df.sort_values("net_profit", ascending=False)
-    
+
     print(f"\n{'#':<3} {'RSI':<12} {'SL/TP':<12} {'EMA':<10} {'Dir':<6} {'Net Profit':>12} {'Return':>8} {'MaxDD':>8} {'Sharpe':>8} {'WR':>6} {'PF':>6} {'Trades':>6}")
     print("-" * 110)
-    
+
     for i, (_, row) in enumerate(df_sorted.head(10).iterrows()):
         rsi_str = f"{row['rsi_period']}/{row['rsi_os']}/{row['rsi_ob']}"
         sltp_str = f"{row['sl']*100:.1f}/{row['tp']*100:.1f}"
         ema_str = f"{row['ema_fast']}/{row['ema_slow']}"
         print(f"{i+1:<3} {rsi_str:<12} {sltp_str:<12} {ema_str:<10} {row['direction']:<6} ${row['net_profit']:>10,.2f} {row['total_return']:>7.1f}% {row['max_drawdown']:>7.1f}% {row['sharpe']:>7.2f} {row['win_rate']*100:>5.1f}% {row['profit_factor']:>5.2f} {int(row['total_trades']):>6}")
-    
+
     # ТОП по Sharpe
     print("\n" + "=" * 100)
     print("🏆 ТОП-10 ПО SHARPE RATIO")
     print("=" * 100)
-    
+
     df_sorted = df.sort_values("sharpe", ascending=False)
     print(f"\n{'#':<3} {'RSI':<12} {'SL/TP':<12} {'EMA':<10} {'Dir':<6} {'Net Profit':>12} {'Return':>8} {'MaxDD':>8} {'Sharpe':>8} {'WR':>6} {'PF':>6} {'Trades':>6}")
     print("-" * 110)
-    
+
     for i, (_, row) in enumerate(df_sorted.head(10).iterrows()):
         rsi_str = f"{row['rsi_period']}/{row['rsi_os']}/{row['rsi_ob']}"
         sltp_str = f"{row['sl']*100:.1f}/{row['tp']*100:.1f}"
         ema_str = f"{row['ema_fast']}/{row['ema_slow']}"
         print(f"{i+1:<3} {rsi_str:<12} {sltp_str:<12} {ema_str:<10} {row['direction']:<6} ${row['net_profit']:>10,.2f} {row['total_return']:>7.1f}% {row['max_drawdown']:>7.1f}% {row['sharpe']:>7.2f} {row['win_rate']*100:>5.1f}% {row['profit_factor']:>5.2f} {int(row['total_trades']):>6}")
-    
+
     # ТОП с положительным profit
     profitable = df[df['net_profit'] > 0]
     print(f"\n✅ Прибыльных стратегий: {len(profitable)} из {len(df)} ({len(profitable)/len(df)*100:.1f}%)")
-    
+
     if len(profitable) > 0:
         print("\n" + "=" * 100)
         print("🏆 ЛУЧШАЯ ПРИБЫЛЬНАЯ СТРАТЕГИЯ")
         print("=" * 100)
-        
+
         best = profitable.sort_values("sharpe", ascending=False).iloc[0]
         print(f"""
    📈 ПАРАМЕТРЫ:

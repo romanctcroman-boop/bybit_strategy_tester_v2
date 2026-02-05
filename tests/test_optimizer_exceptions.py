@@ -4,23 +4,22 @@ Tests for Optimizer Exceptions and Error Handling
 Tests custom exceptions and validation functions.
 """
 
-import pytest
 import numpy as np
-from loguru import logger
+import pytest
 
 from backend.backtesting.optimizer_exceptions import (
-    OptimizerError,
-    GPUNotAvailableError,
     CUDAError,
-    GPUMemoryError,
-    ParameterGridError,
-    GridSizeExceededError,
     DataValidationError,
+    GPUMemoryError,
+    GPUNotAvailableError,
+    GridSizeExceededError,
     InsufficientDataError,
-    OptimizationTimeoutError,
     NumbaCompilationError,
-    WorkerError,
+    OptimizationTimeoutError,
+    OptimizerError,
+    ParameterGridError,
     SharedMemoryError,
+    WorkerError,
     validate_parameter_grid,
     validate_price_data,
 )

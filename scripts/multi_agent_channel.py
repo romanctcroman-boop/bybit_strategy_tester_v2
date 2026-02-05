@@ -4,13 +4,12 @@ Multi-Agent Communication Channel: DeepSeek ↔ Perplexity
 Быстрый канал связи для совместной работы AI агентов
 """
 
-import sys
 import json
-import requests
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+import sys
 from datetime import datetime
+from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
 
 # Add parent directory to path for imports
@@ -26,11 +25,11 @@ from backend.security.key_manager import get_decrypted_key
 
 def load_tz_context(
     directory: Path,
-    keywords: Optional[List[str]] = None,
+    keywords: list[str] | None = None,
     max_files: int = 6,
     max_chars_per_file: int = 3500,
     max_total_chars: int = 15000,
-) -> Tuple[str, List[Path]]:
+) -> tuple[str, list[Path]]:
     """Load relevant TZ documents and return aggregated context + file list."""
 
     if keywords is None:
@@ -46,7 +45,7 @@ def load_tz_context(
     if not directory.exists():
         raise FileNotFoundError(f"📁 Каталог с ТЗ не найден: {directory}")
 
-    candidates: List[Path] = []
+    candidates: list[Path] = []
 
     for pattern in ("*.md", "*.txt"):
         for path in sorted(directory.glob(pattern)):
@@ -61,8 +60,8 @@ def load_tz_context(
     if not candidates:
         raise ValueError("В каталоге нет Markdown файлов для анализа ТЗ")
 
-    aggregated_parts: List[str] = []
-    used_files: List[Path] = []
+    aggregated_parts: list[str] = []
+    used_files: list[Path] = []
     total_chars = 0
 
     for path in candidates:
@@ -96,7 +95,7 @@ def load_tz_context(
     return aggregated_text, used_files
 
 
-def load_latest_corrected_spec(tz_corrected_dir: Path, max_chars: int = 18000) -> Tuple[Optional[str], Optional[Path]]:
+def load_latest_corrected_spec(tz_corrected_dir: Path, max_chars: int = 18000) -> tuple[str | None, Path | None]:
     """Load the most recent corrected TZ file if available."""
 
     if not tz_corrected_dir.exists():
@@ -111,10 +110,10 @@ def load_latest_corrected_spec(tz_corrected_dir: Path, max_chars: int = 18000) -
     return content[:max_chars], latest_path
 
 
-def summarize_results(results: List[Dict], max_chars: int = 12000) -> str:
+def summarize_results(results: list[dict], max_chars: int = 12000) -> str:
     """Create a compact summary of collaboration results for downstream prompts."""
 
-    chunks: List[str] = []
+    chunks: list[str] = []
     total = 0
 
     for result in results:
@@ -145,7 +144,7 @@ class MultiAgentChannel:
         self.conversation_history = []
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    def deepseek_call(self, prompt: str, context: Optional[str] = None) -> Dict:
+    def deepseek_call(self, prompt: str, context: str | None = None) -> dict:
         """Вызов DeepSeek с контекстом"""
         messages = [
             {
@@ -205,7 +204,7 @@ class MultiAgentChannel:
                 "agent": "DeepSeek"
             }
 
-    def perplexity_call(self, prompt: str, context: Optional[str] = None) -> Dict:
+    def perplexity_call(self, prompt: str, context: str | None = None) -> dict:
         """Вызов Perplexity с контекстом"""
         messages = [
             {
@@ -273,8 +272,8 @@ class MultiAgentChannel:
         deepseek_task: str,
         perplexity_task: str,
         iterations: int = 2,
-        shared_context: Optional[str] = None,
-    ) -> List[Dict]:
+        shared_context: str | None = None,
+    ) -> list[dict]:
         """
         Совместный анализ с обменом контекстом
 
@@ -367,7 +366,7 @@ class MultiAgentChannel:
 
         return results
 
-    def save_session(self, results: List[Dict], filename: str):
+    def save_session(self, results: list[dict], filename: str):
         """Сохранение сессии совместной работы"""
         report = {
             "session_id": self.session_id,
@@ -399,7 +398,7 @@ class MultiAgentChannel:
                 f.write(content)
                 f.write("\n\n")
 
-                if "citations" in result and result["citations"]:
+                if result.get("citations"):
                     f.write("### Citations\n\n")
                     for j, citation in enumerate(result["citations"], 1):
                         f.write(f"{j}. {citation}\n")
@@ -413,8 +412,8 @@ class MultiAgentChannel:
         self,
         tz_context: str,
         collaboration_summary: str,
-        focus_notes: Optional[str] = None,
-    ) -> Dict:
+        focus_notes: str | None = None,
+    ) -> dict:
         """Сформировать обновлённое ТЗ на основе контекста и совместного анализа."""
 
         guidance = focus_notes or (
@@ -457,16 +456,16 @@ class MultiAgentChannel:
 
     def comparative_review(
         self,
-        previous_spec: Optional[str],
-        new_spec: Optional[str],
+        previous_spec: str | None,
+        new_spec: str | None,
         previous_session_summary: str,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Run a comparative review loop so agents can self-evaluate progress."""
 
         if not previous_spec or not new_spec:
             return []
 
-        comparison_results: List[Dict] = []
+        comparison_results: list[dict] = []
 
         perplexity_prompt = f"""Сравни две версии технического задания.
 

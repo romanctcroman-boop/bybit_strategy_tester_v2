@@ -1,15 +1,19 @@
 """Full emulation of list_backtests with detailed logging"""
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from backend.backtesting.models import (
+    BacktestConfig,
+    BacktestListResponse,
+    BacktestResult,
+    BacktestStatus,
+    EquityCurve,
+    PerformanceMetrics,
+)
+from backend.backtesting.service import get_backtest_service
 from backend.database import SessionLocal
 from backend.database.models import Backtest as BacktestModel
 from backend.database.models import BacktestStatus as DBBacktestStatus
-from backend.backtesting.models import (
-    BacktestConfig, PerformanceMetrics, EquityCurve, 
-    BacktestResult, BacktestStatus, BacktestListResponse
-)
-from backend.backtesting.service import get_backtest_service
 
 db = SessionLocal()
 
@@ -19,7 +23,7 @@ try:
     memory_results = service.list_results(limit=1000)
     memory_ids = {r.id for r in memory_results}
     print(f"  Memory: {len(memory_results)}")
-    
+
     print("\nStep 2: Get DB backtests")
     db.expire_all()
     db_backtests = (
@@ -29,14 +33,14 @@ try:
         .all()
     )
     print(f"  DB: {len(db_backtests)}")
-    
+
     print("\nStep 3: Convert each backtest")
     db_results = []
-    
+
     for i, bt in enumerate(db_backtests):
         if bt.id in memory_ids:
             continue
-            
+
         try:
             # Date parsing
             start_dt = bt.start_date
@@ -46,15 +50,15 @@ try:
             if isinstance(end_dt, str):
                 end_dt = datetime.fromisoformat(end_dt.replace("Z", "+00:00"))
             if start_dt and start_dt.tzinfo is None:
-                start_dt = start_dt.replace(tzinfo=timezone.utc)
+                start_dt = start_dt.replace(tzinfo=UTC)
             if end_dt and end_dt.tzinfo is None:
-                end_dt = end_dt.replace(tzinfo=timezone.utc)
+                end_dt = end_dt.replace(tzinfo=UTC)
 
             config = BacktestConfig(
                 symbol=bt.symbol or "BTCUSDT",
                 interval=bt.timeframe or "30",
-                start_date=start_dt or datetime.now(timezone.utc),
-                end_date=end_dt or datetime.now(timezone.utc),
+                start_date=start_dt or datetime.now(UTC),
+                end_date=end_dt or datetime.now(UTC),
                 initial_capital=bt.initial_capital or 10000.0,
                 strategy_type=bt.strategy_type or "rsi",
                 strategy_params=bt.parameters.get("strategy_params", {}) if bt.parameters else {},
@@ -62,7 +66,7 @@ try:
 
             opt_metrics = bt.parameters.get("optimization_metrics", {}) if bt.parameters else {}
             net_profit = (bt.final_capital - bt.initial_capital) if bt.final_capital and bt.initial_capital else 0
-            
+
             # Simplified metrics (key fields only)
             metrics = PerformanceMetrics(
                 net_profit=opt_metrics.get("net_profit", net_profit),
@@ -92,7 +96,7 @@ try:
 
             # CRITICAL: trades_data and equity_curve_data
             trades_data = bt.trades if bt.trades else []
-            
+
             equity_curve_data = None
             if bt.equity_curve:
                 raw_ec = bt.equity_curve
@@ -107,7 +111,7 @@ try:
                     for point in raw_ec:
                         ts = point.get("timestamp", 0)
                         if isinstance(ts, (int, float)):
-                            ts = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+                            ts = datetime.fromtimestamp(ts / 1000, tz=UTC)
                         elif isinstance(ts, str):
                             ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                         timestamps.append(ts)
@@ -124,7 +128,7 @@ try:
             result = BacktestResult(
                 id=bt.id,
                 status=BacktestStatus.COMPLETED if bt.status == DBBacktestStatus.COMPLETED else BacktestStatus.FAILED,
-                created_at=bt.created_at or datetime.now(timezone.utc),
+                created_at=bt.created_at or datetime.now(UTC),
                 config=config,
                 metrics=metrics,
                 trades=trades_data,
@@ -134,26 +138,26 @@ try:
                 final_pnl_pct=bt.total_return or 0,
             )
             db_results.append(result)
-            
+
         except Exception as e:
             print(f"  ERROR at backtest {i} ({bt.id[:8]}...): {e}")
             traceback.print_exc()
             continue
-    
+
     print(f"  Converted: {len(db_results)}")
-    
+
     print("\nStep 4: Combine and sort")
     all_results = memory_results + db_results
     all_results.sort(key=lambda x: x.created_at, reverse=True)
     print(f"  Total: {len(all_results)}")
-    
+
     print("\nStep 5: Build response")
     page = 1
     limit = 20
     start_idx = (page - 1) * limit
     end_idx = start_idx + limit
     items = all_results[start_idx:end_idx]
-    
+
     response = BacktestListResponse(
         total=len(all_results),
         items=items,
@@ -161,11 +165,11 @@ try:
         page_size=limit,
     )
     print(f"  Response OK: {len(items)} items")
-    
+
     print("\n=== SUCCESS ===")
-    
+
 except Exception as e:
-    print(f"\n=== FAILED ===")
+    print("\n=== FAILED ===")
     print(f"Error: {e}")
     traceback.print_exc()
 finally:

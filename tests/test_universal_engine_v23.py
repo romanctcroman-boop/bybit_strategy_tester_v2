@@ -7,7 +7,6 @@ Tests:
 3. Advanced ML Signals
 """
 
-import asyncio
 
 import numpy as np
 import pytest

@@ -263,8 +263,8 @@ print(f"Max DD: {forward_result['max_drawdown']*100:.1f}%")
 | Avg Train Sharpe | X.XX  |
 | Avg Test Sharpe  | X.XX  |
 | Degradation      | XX%   |
-| Best Window      | #X    |
-| Worst Window     | #X    |
+| Best Window      | N     |
+| Worst Window     | N     |
 
 ### Optimal Parameters
 

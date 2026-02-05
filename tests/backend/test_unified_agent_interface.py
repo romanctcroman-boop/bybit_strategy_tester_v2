@@ -461,7 +461,7 @@ class TestAPIKeyManager:
 
         # First key succeeds, second raises exception
         def mock_get_key(key_name):
-            if "DEEPSEEK_API_KEY" == key_name:  # First key
+            if key_name == "DEEPSEEK_API_KEY":  # First key
                 return "valid_key"
             raise Exception("Decryption failed")
 
@@ -476,9 +476,8 @@ class TestAPIKeyManager:
     def test_load_keys_import_error(self, mock_km_class):
         """_load_keys raises on ImportError"""
         # Make KeyManager import fail
-        with patch.dict("sys.modules", {"backend.security.key_manager": None}):
-            with pytest.raises(ImportError):
-                APIKeyManager()
+        with patch.dict("sys.modules", {"backend.security.key_manager": None}), pytest.raises(ImportError):
+            APIKeyManager()
 
 
 # =============================================================================
@@ -665,31 +664,30 @@ class TestUnifiedAgentInterfaceRequests:
             agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
         )
 
-        with patch.object(interface, "_try_mcp", new_callable=AsyncMock) as mock_mcp:
-            with patch.object(
-                interface, "_try_direct_api", new_callable=AsyncMock
-            ) as mock_direct:
-                mock_mcp.return_value = AgentResponse(
-                    success=False,
-                    content="",
-                    channel=AgentChannel.MCP_SERVER,
-                    error="MCP failed",
-                )
-                mock_direct.return_value = AgentResponse(
-                    success=True,
-                    content="Direct API result",
-                    channel=AgentChannel.DIRECT_API,
-                )
+        with patch.object(interface, "_try_mcp", new_callable=AsyncMock) as mock_mcp, patch.object(
+            interface, "_try_direct_api", new_callable=AsyncMock
+        ) as mock_direct:
+            mock_mcp.return_value = AgentResponse(
+                success=False,
+                content="",
+                channel=AgentChannel.MCP_SERVER,
+                error="MCP failed",
+            )
+            mock_direct.return_value = AgentResponse(
+                success=True,
+                content="Direct API result",
+                channel=AgentChannel.DIRECT_API,
+            )
 
-                response = await interface.send_request(
-                    request, AgentChannel.MCP_SERVER
-                )
+            response = await interface.send_request(
+                request, AgentChannel.MCP_SERVER
+            )
 
-                assert mock_mcp.called
-                assert mock_direct.called
-                assert response.channel == AgentChannel.DIRECT_API
-                assert interface.stats["mcp_failed"] == 1
-                assert interface.stats["direct_api_success"] == 1
+            assert mock_mcp.called
+            assert mock_direct.called
+            assert response.channel == AgentChannel.DIRECT_API
+            assert interface.stats["mcp_failed"] == 1
+            assert interface.stats["direct_api_success"] == 1
 
     @pytest.mark.asyncio
     @patch("backend.agents.unified_agent_interface.MCP_DISABLED", False)
@@ -707,22 +705,21 @@ class TestUnifiedAgentInterfaceRequests:
             agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
         )
 
-        with patch.object(interface, "_try_mcp", side_effect=Exception("MCP crash")):
-            with patch.object(
-                interface,
-                "_try_direct_api",
-                new_callable=AsyncMock,
-                return_value=AgentResponse(
-                    success=True,
-                    content="Fallback success",
-                    channel=AgentChannel.DIRECT_API,
-                ),
-            ):
-                response = await interface.send_request(request)
+        with patch.object(interface, "_try_mcp", side_effect=Exception("MCP crash")), patch.object(
+            interface,
+            "_try_direct_api",
+            new_callable=AsyncMock,
+            return_value=AgentResponse(
+                success=True,
+                content="Fallback success",
+                channel=AgentChannel.DIRECT_API,
+            ),
+        ):
+            response = await interface.send_request(request)
 
-                assert response.success is True
-                assert response.content == "Fallback success"
-                assert interface.stats["mcp_failed"] == 1
+            assert response.success is True
+            assert response.content == "Fallback success"
+            assert interface.stats["mcp_failed"] == 1
 
     @pytest.mark.asyncio
     @patch("backend.security.key_manager.KeyManager")

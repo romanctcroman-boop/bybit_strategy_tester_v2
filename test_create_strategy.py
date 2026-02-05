@@ -125,7 +125,7 @@ if response.status_code == 200:
     print(f"Backtest Status: {response.status_code}")
     if response.status_code == 200:
         result = response.json()
-        print(f"Backtest completed!")
+        print("Backtest completed!")
         print(f"Total trades: {result.get('total_trades', 'N/A')}")
     else:
         print(f"Response: {response.text[:500]}")

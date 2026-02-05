@@ -4,12 +4,14 @@
 """
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pandas as pd
 import sqlite3
 import time
 from datetime import datetime
+
+import pandas as pd
 
 print("=" * 100)
 print("🔬 ТРИ ТЕСТА: LONG / SHORT / LONG&SHORT")
@@ -27,7 +29,7 @@ BASE_CONFIG = {
     "initial_capital": 10000.0,
     "position_size": 0.10,          # 10% от капитала
     "stop_loss": 0.035,             # 3.5% SL
-    "take_profit": 0.015,           # 1.5% TP  
+    "take_profit": 0.015,           # 1.5% TP
     "commission": 0.001,            # 0.1%
     "slippage": 0.0005,             # 0.05%
     "leverage": 10,
@@ -85,15 +87,15 @@ print(f"  Загружено {len(df):,} баров ({df.index.min().date()} - {
 # ============================================================================
 # ФУНКЦИЯ БЭКТЕСТА
 # ============================================================================
-from backend.backtesting.models import BacktestConfig
 from backend.backtesting.engine import get_engine
+from backend.backtesting.models import BacktestConfig
 from backend.backtesting.strategies import RSIStrategy
 
 engine = get_engine()
 strategy = RSIStrategy(params=BASE_CONFIG['strategy_params'])
 signals = strategy.generate_signals(df)
 
-print(f"\n📊 Сигналы RSI(14, 70, 30):")
+print("\n📊 Сигналы RSI(14, 70, 30):")
 print(f"   Long entries:  {signals.entries.sum()}")
 print(f"   Long exits:    {signals.exits.sum()}")
 print(f"   Short entries: {signals.short_entries.sum()}")
@@ -117,11 +119,11 @@ def run_backtest(direction: str) -> dict:
         strategy_params=BASE_CONFIG['strategy_params'],
         position_size=BASE_CONFIG['position_size'],
     )
-    
+
     start = time.time()
     result = engine._run_fallback(config, df, signals)
     elapsed = time.time() - start
-    
+
     m = result.metrics
     return {
         "direction": direction.upper(),

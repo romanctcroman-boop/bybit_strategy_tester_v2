@@ -1,5 +1,4 @@
 {
-  "java.jdt.ls.java.home": "",
   "editor.formatOnSave": true,
   "prettier.requireConfig": true,
   "eslint.validate": [
@@ -13,7 +12,9 @@
       "mode": "auto"
     }
   ],
-  "python.sortImports.path": ["isort"],
+  "python.sortImports.path": [
+    "isort"
+  ],
   "python.sortImports.args": [
     "--settings-path",
     "${workspaceFolder}\\.isort.cfg"
@@ -67,7 +68,9 @@
     ]
   },
   // Hide nested Git repo (mcp-server) from the parent workspace Git view
-  "git.ignoredRepositories": ["${workspaceFolder}/mcp-server"],
+  "git.ignoredRepositories": [
+    "${workspaceFolder}/mcp-server"
+  ],
   // Exclude nested repo from file watching and search to reduce noise
   "files.watcherExclude": {
     "mcp-server/**": true
@@ -80,5 +83,7 @@
   // Python testing configuration
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestArgs": ["tests"]
+  "python.testing.pytestArgs": [
+    "tests"
+  ]
 }

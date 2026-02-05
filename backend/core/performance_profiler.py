@@ -19,10 +19,10 @@ import cProfile
 import io
 import pstats
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -37,7 +37,7 @@ class TimingResult:
     avg_time: float = 0.0
     min_time: float = 0.0
     max_time: float = 0.0
-    times: List[float] = field(default_factory=list)
+    times: list[float] = field(default_factory=list)
 
     def add_time(self, t: float) -> None:
         """Add a timing measurement."""
@@ -54,11 +54,11 @@ class ProfileReport:
     """Complete profiling report."""
 
     total_time: float
-    sections: Dict[str, TimingResult]
+    sections: dict[str, TimingResult]
     memory_peak_mb: float = 0.0
     trades_per_second: float = 0.0
     bars_per_second: float = 0.0
-    bottlenecks: List[str] = field(default_factory=list)
+    bottlenecks: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -103,8 +103,8 @@ class BacktestProfiler:
             enable_cprofile: Enable detailed cProfile (slower but more info)
         """
         self.enable_cprofile = enable_cprofile
-        self._profiler: Optional[cProfile.Profile] = None
-        self._sections: Dict[str, TimingResult] = {}
+        self._profiler: cProfile.Profile | None = None
+        self._sections: dict[str, TimingResult] = {}
         self._start_time: float = 0.0
         self._total_time: float = 0.0
         self._memory_peak: float = 0.0
@@ -282,7 +282,7 @@ def benchmark_backtest_engine(
     input_data,
     n_runs: int = 5,
     warmup_runs: int = 1,
-) -> Dict:
+) -> dict:
     """
     Benchmark a backtest engine with multiple runs.
 

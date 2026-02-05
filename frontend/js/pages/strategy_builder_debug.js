@@ -31,12 +31,13 @@ document.addEventListener("DOMContentLoaded", function() {
   const propertiesPanel = document.getElementById("propertiesPanel");
   console.log(`Properties Panel: ${propertiesPanel ? "✅ Found" : "❌ Missing"}`);
   
-  const sections = document.querySelectorAll(".properties-section");
-  console.log(`Properties Sections: ${sections.length}`);
-  sections.forEach((section, index) => {
-    const title = section.querySelector(".properties-section-title")?.textContent || `Section ${index + 1}`;
-    const isCollapsed = section.classList.contains("collapsed");
-    console.log(`  ${index + 1}. ${title}: ${isCollapsed ? "Collapsed" : "Expanded"}`);
+  const panes = document.querySelectorAll(".properties-tab-pane");
+  const spines = document.querySelectorAll(".properties-tab-spine");
+  console.log(`Properties Tabs: ${spines.length} spines, ${panes.length} panes`);
+  spines.forEach((spine, index) => {
+    const title = spine.title || spine.textContent?.trim() || `Tab ${index + 1}`;
+    const isActive = spine.classList.contains("active");
+    console.log(`  ${index + 1}. ${title}: ${isActive ? "Active" : "Inactive"}`);
   });
   
   // Проверка Block Library
