@@ -7,7 +7,6 @@ with proper authentication and audit logging.
 
 import base64
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -62,8 +61,8 @@ class KeyInfoResponse(BaseModel):
     key_type: str
     algorithm: str
     created_at: datetime
-    expires_at: Optional[datetime] = None
-    rotated_at: Optional[datetime] = None
+    expires_at: datetime | None = None
+    rotated_at: datetime | None = None
     version: int
     is_enabled: bool
     metadata: dict
@@ -96,10 +95,10 @@ class AuditLogEntryResponse(BaseModel):
     timestamp: datetime
     action: str
     key_id: str
-    user_id: Optional[str] = None
-    ip_address: Optional[str] = None
+    user_id: str | None = None
+    ip_address: str | None = None
     success: bool
-    error_message: Optional[str] = None
+    error_message: str | None = None
     details: dict
 
 
@@ -107,7 +106,7 @@ class ServiceStatusResponse(BaseModel):
     """Response for service status."""
 
     initialized: bool
-    provider: Optional[str] = None
+    provider: str | None = None
     cache_size: int
     audit_log_size: int
     cache_ttl_seconds: int
@@ -194,7 +193,7 @@ async def create_key(request: CreateKeyRequest):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create key: {str(e)}",
+            detail=f"Failed to create key: {e!s}",
         )
 
 
@@ -210,7 +209,7 @@ async def list_keys():
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list keys: {str(e)}",
+            detail=f"Failed to list keys: {e!s}",
         )
 
 
@@ -235,7 +234,7 @@ async def get_key(key_id: str):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get key: {str(e)}",
+            detail=f"Failed to get key: {e!s}",
         )
 
 
@@ -256,7 +255,7 @@ async def rotate_key(key_id: str):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to rotate key: {str(e)}",
+            detail=f"Failed to rotate key: {e!s}",
         )
 
 
@@ -281,7 +280,7 @@ async def delete_key(key_id: str):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete key: {str(e)}",
+            detail=f"Failed to delete key: {e!s}",
         )
 
 
@@ -311,7 +310,7 @@ async def encrypt_data(request: EncryptRequest):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Encryption failed: {str(e)}",
+            detail=f"Encryption failed: {e!s}",
         )
 
 
@@ -334,7 +333,7 @@ async def decrypt_data(request: DecryptRequest):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Decryption failed: {str(e)}",
+            detail=f"Decryption failed: {e!s}",
         )
 
 
@@ -356,7 +355,7 @@ async def encrypt_api_key(request: EncryptApiKeyRequest):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to encrypt API key: {str(e)}",
+            detail=f"Failed to encrypt API key: {e!s}",
         )
 
 
@@ -385,16 +384,16 @@ async def decrypt_api_key(key_id: str, encrypted_key: str):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to decrypt API key: {str(e)}",
+            detail=f"Failed to decrypt API key: {e!s}",
         )
 
 
 @router.get("/audit-log", response_model=list[AuditLogEntryResponse])
 async def get_audit_log(
-    key_id: Optional[str] = Query(None, description="Filter by key ID"),
-    action: Optional[str] = Query(None, description="Filter by action"),
-    start_time: Optional[datetime] = Query(None, description="Filter from this time"),
-    end_time: Optional[datetime] = Query(None, description="Filter until this time"),
+    key_id: str | None = Query(None, description="Filter by key ID"),
+    action: str | None = Query(None, description="Filter by action"),
+    start_time: datetime | None = Query(None, description="Filter from this time"),
+    end_time: datetime | None = Query(None, description="Filter until this time"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum entries to return"),
 ):
     """Get audit log entries."""

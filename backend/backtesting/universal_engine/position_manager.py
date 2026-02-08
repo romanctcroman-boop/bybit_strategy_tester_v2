@@ -15,11 +15,8 @@ Universal Position Manager - Управление позициями для ВС
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-import pandas as pd
-from loguru import logger
 
 try:
     from numba import njit
@@ -205,7 +202,7 @@ def calculate_dca_levels(
     safety_order_size: float,
     capital: float,
     leverage: int,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Calculate DCA (Dollar Cost Averaging) entry levels.
 
@@ -259,7 +256,7 @@ def calculate_scale_in_levels(
     scale_in_portions: np.ndarray,  # e.g., [0.33, 0.33, 0.34]
     total_position_size: float,
     price: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Calculate scale-in (partial entry) levels.
 
@@ -322,7 +319,7 @@ class Position:
     """
 
     direction: str  # "long" or "short"
-    entries: List[PositionEntry] = field(default_factory=list)
+    entries: list[PositionEntry] = field(default_factory=list)
     avg_entry_price: float = 0.0
     total_size: float = 0.0
     unrealized_pnl: float = 0.0
@@ -330,7 +327,7 @@ class Position:
     max_adverse: float = 0.0  # MAE tracking
 
     # DCA state
-    pending_dca_levels: List[Tuple[float, float]] = field(
+    pending_dca_levels: list[tuple[float, float]] = field(
         default_factory=list
     )  # (price, size)
     dca_orders_filled: int = 0
@@ -344,7 +341,7 @@ class Position:
     trailing_stop_price: float = 0.0
 
     # TP tracking for multi-level
-    tp_levels_hit: List[int] = field(default_factory=list)
+    tp_levels_hit: list[int] = field(default_factory=list)
 
     def add_entry(self, entry: PositionEntry):
         """Add an entry to the position."""
@@ -428,8 +425,8 @@ class PositionConfig:
 
     # Scale-in
     scale_in_enabled: bool = False
-    scale_in_levels: Tuple[float, ...] = (0.0,)
-    scale_in_portions: Tuple[float, ...] = (1.0,)
+    scale_in_levels: tuple[float, ...] = (0.0,)
+    scale_in_portions: tuple[float, ...] = (1.0,)
 
     # Pyramiding
     pyramiding: int = 1  # Max simultaneous positions
@@ -457,8 +454,8 @@ class UniversalPositionManager:
 
     def __init__(self, config: PositionConfig):
         self.config = config
-        self.active_positions: List[Position] = []
-        self._atr_values: Optional[np.ndarray] = None
+        self.active_positions: list[Position] = []
+        self._atr_values: np.ndarray | None = None
 
     def calculate_position_size(
         self, capital: float, price: float, direction: str, atr_value: float = 0.0
@@ -551,7 +548,7 @@ class UniversalPositionManager:
         direction: str,
         capital: float,
         atr_value: float = 0.0,
-    ) -> Optional[Position]:
+    ) -> Position | None:
         """
         Open a new position with optional DCA/scale-in setup.
 
@@ -647,7 +644,7 @@ class UniversalPositionManager:
 
     def check_dca_fills(
         self, position: Position, low: float, high: float, bar_index: int
-    ) -> List[PositionEntry]:
+    ) -> list[PositionEntry]:
         """
         Check and fill DCA orders based on price action.
 

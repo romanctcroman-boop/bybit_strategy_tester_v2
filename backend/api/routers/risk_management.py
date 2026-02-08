@@ -10,7 +10,7 @@ Extended API endpoints for the new risk management module including:
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Risk Management V2"])
 
 # Global risk engine instance (will be initialized on startup)
-_risk_engine: Optional[RiskEngine] = None
+_risk_engine: RiskEngine | None = None
 
 
 def get_risk_engine() -> RiskEngine:
@@ -52,13 +52,13 @@ class PositionSizeRequest(BaseModel):
 
     equity: float = Field(..., gt=0, description="Current account equity")
     entry_price: float = Field(..., gt=0, description="Entry price")
-    stop_loss: Optional[float] = Field(None, description="Stop loss price")
+    stop_loss: float | None = Field(None, description="Stop loss price")
     method: str = Field("fixed_percent", description="Sizing method")
     risk_per_trade_pct: float = Field(
         1.0, ge=0.1, le=10.0, description="Risk per trade %"
     )
-    volatility: Optional[float] = Field(None, description="Symbol volatility")
-    atr: Optional[float] = Field(None, description="ATR value")
+    volatility: float | None = Field(None, description="Symbol volatility")
+    atr: float | None = Field(None, description="ATR value")
     win_rate: float = Field(0.5, ge=0, le=1, description="Historical win rate")
     avg_win: float = Field(1.0, gt=0, description="Average win amount")
     avg_loss: float = Field(1.0, gt=0, description="Average loss amount")
@@ -73,7 +73,7 @@ class PositionSizeResponse(BaseModel):
     risk_pct: float
     method_used: str
     leverage_applied: float
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
 
 class TradeValidationRequest(BaseModel):
@@ -83,11 +83,11 @@ class TradeValidationRequest(BaseModel):
     side: str = Field(..., pattern="^(buy|sell)$", description="Trade side")
     order_type: str = Field("market", description="Order type")
     quantity: float = Field(..., gt=0, description="Order quantity")
-    price: Optional[float] = Field(None, description="Limit price")
-    stop_loss: Optional[float] = Field(None, description="Stop loss price")
-    take_profit: Optional[float] = Field(None, description="Take profit price")
+    price: float | None = Field(None, description="Limit price")
+    stop_loss: float | None = Field(None, description="Stop loss price")
+    take_profit: float | None = Field(None, description="Take profit price")
     leverage: float = Field(1.0, ge=1, le=100, description="Leverage")
-    strategy_id: Optional[str] = Field(None, description="Strategy ID")
+    strategy_id: str | None = Field(None, description="Strategy ID")
 
 
 class TradeValidationResponse(BaseModel):
@@ -95,11 +95,11 @@ class TradeValidationResponse(BaseModel):
 
     approved: bool
     result: str
-    rejection_reasons: List[str]
-    warnings: List[str]
-    modifications: Dict[str, Any]
+    rejection_reasons: list[str]
+    warnings: list[str]
+    modifications: dict[str, Any]
     validation_time_ms: float
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
 
 class RiskAssessmentRequest(BaseModel):
@@ -108,10 +108,10 @@ class RiskAssessmentRequest(BaseModel):
     symbol: str = Field(..., description="Trading symbol")
     side: str = Field(..., pattern="^(buy|sell)$", description="Trade side")
     entry_price: float = Field(..., gt=0, description="Entry price")
-    stop_loss: Optional[float] = Field(None, description="Stop loss price")
-    take_profit: Optional[float] = Field(None, description="Take profit price")
-    volatility: Optional[float] = Field(None, description="Symbol volatility")
-    atr: Optional[float] = Field(None, description="ATR value")
+    stop_loss: float | None = Field(None, description="Stop loss price")
+    take_profit: float | None = Field(None, description="Take profit price")
+    volatility: float | None = Field(None, description="Symbol volatility")
+    atr: float | None = Field(None, description="ATR value")
     win_rate: float = Field(0.5, ge=0, le=1, description="Historical win rate")
     avg_win: float = Field(1.0, gt=0, description="Average win")
     avg_loss: float = Field(1.0, gt=0, description="Average loss")
@@ -123,14 +123,14 @@ class RiskAssessmentResponse(BaseModel):
     approved: bool
     risk_level: str
     position_size: float
-    recommended_stop_loss: Optional[float]
-    recommended_take_profit: Optional[float]
+    recommended_stop_loss: float | None
+    recommended_take_profit: float | None
     max_allowed_size: float
     current_exposure_pct: float
     available_capacity_pct: float
-    warnings: List[str]
-    rejection_reasons: List[str]
-    details: Dict[str, Any]
+    warnings: list[str]
+    rejection_reasons: list[str]
+    details: dict[str, Any]
 
 
 class ExposureStatusResponse(BaseModel):
@@ -144,7 +144,7 @@ class ExposureStatusResponse(BaseModel):
     positions_count: int
     active_stops_count: int
     is_trading_allowed: bool
-    violations: List[Dict[str, Any]]
+    violations: list[dict[str, Any]]
 
 
 class RiskEngineStatusResponse(BaseModel):
@@ -153,10 +153,10 @@ class RiskEngineStatusResponse(BaseModel):
     status: str
     trading_allowed: bool
     trading_paused: bool
-    pause_reason: Optional[str]
-    current_snapshot: Dict[str, Any]
-    config: Dict[str, Any]
-    components: Dict[str, Any]
+    pause_reason: str | None
+    current_snapshot: dict[str, Any]
+    config: dict[str, Any]
+    components: dict[str, Any]
 
 
 class UpdateEquityRequest(BaseModel):
@@ -173,7 +173,7 @@ class RegisterTradeRequest(BaseModel):
     size: float = Field(..., gt=0)
     entry_price: float = Field(..., gt=0)
     leverage: float = Field(1.0, ge=1)
-    stop_loss: Optional[float] = None
+    stop_loss: float | None = None
 
 
 class UpdatePriceRequest(BaseModel):
@@ -343,7 +343,7 @@ async def validate_trade(request: TradeValidationRequest):
             total_pnl=engine.exposure_controller.total_pnl,
             daily_pnl=engine.exposure_controller.daily_pnl,
             open_positions_count=len(engine.exposure_controller.positions),
-            positions_by_symbol={s: 1 for s in engine.exposure_controller.positions},
+            positions_by_symbol=dict.fromkeys(engine.exposure_controller.positions, 1),
             trades_today=0,
             trades_this_hour=0,
             last_trade_time=None,

@@ -1,5 +1,4 @@
 """Unit tests for OrderExecutor (AUDIT_PROJECT_EXTENDED)."""
-import pytest
 
 from backend.services.live_trading.order_executor import (
     OrderRequest,

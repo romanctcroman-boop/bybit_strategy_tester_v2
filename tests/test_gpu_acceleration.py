@@ -18,6 +18,10 @@ try:
         GPUGridOptimizer,
         cp,
     )
+
+    # Ensure GPU_AVAILABLE is a bool (may be None if not yet initialized)
+    if GPU_AVAILABLE is None:
+        GPU_AVAILABLE = False
 except ImportError:
     GPU_AVAILABLE = False
     GPU_NAME = "Not available"
@@ -58,9 +62,7 @@ class TestGPUAvailability:
         device = cp.cuda.Device()
         free_mem, total_mem = device.mem_info
 
-        logger.info(
-            f"GPU Memory: {free_mem / 1024**3:.2f}GB free / {total_mem / 1024**3:.2f}GB total"
-        )
+        logger.info(f"GPU Memory: {free_mem / 1024**3:.2f}GB free / {total_mem / 1024**3:.2f}GB total")
 
         assert total_mem > 0
         assert free_mem > 0
@@ -124,9 +126,7 @@ class TestGPUPerformance:
                 avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gain[i - 1]) / period
                 avg_loss[i] = (avg_loss[i - 1] * (period - 1) + loss[i - 1]) / period
 
-            rs = np.divide(
-                avg_gain, avg_loss, where=avg_loss != 0, out=np.zeros_like(avg_gain)
-            )
+            rs = np.divide(avg_gain, avg_loss, where=avg_loss != 0, out=np.zeros_like(avg_gain))
             rsi = 100 - (100 / (1 + rs))
             rsi[:period] = 50  # Fill initial values
             return rsi
@@ -202,9 +202,7 @@ class TestGPUOptimizer:
         assert optimizer is not None
 
         # Check GPU status
-        logger.info(
-            f"Optimizer GPU enabled: {optimizer.use_gpu if hasattr(optimizer, 'use_gpu') else 'N/A'}"
-        )
+        logger.info(f"Optimizer GPU enabled: {optimizer.use_gpu if hasattr(optimizer, 'use_gpu') else 'N/A'}")
 
     @pytest.mark.skipif(not GPU_AVAILABLE, reason="GPU not available")
     def test_small_grid_optimization(self, sample_data):
@@ -250,9 +248,7 @@ class TestCPUFallback:
         """Test CPU RSI calculation works."""
 
         # Simple RSI test
-        prices = np.array(
-            [44, 44.34, 44.09, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08]
-        )
+        prices = np.array([44, 44.34, 44.09, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08])
 
         # Basic RSI calculation (simplified)
         delta = np.diff(prices)

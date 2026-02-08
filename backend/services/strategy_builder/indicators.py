@@ -12,9 +12,10 @@ Supports:
 
 import logging
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -85,10 +86,10 @@ class IndicatorParameter:
     param_type: str  # "int", "float", "bool", "string", "choice"
     default: Any
     description: str = ""
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    choices: Optional[List[Any]] = None
-    step: Optional[float] = None
+    min_value: float | None = None
+    max_value: float | None = None
+    choices: list[Any] | None = None
+    step: float | None = None
 
     def validate(self, value: Any) -> bool:
         """Validate parameter value"""
@@ -156,14 +157,14 @@ class CustomIndicator:
     name: str
     indicator_type: IndicatorType
     code: str
-    parameters: List[IndicatorParameter] = field(default_factory=list)
-    outputs: List[IndicatorOutput] = field(default_factory=list)
+    parameters: list[IndicatorParameter] = field(default_factory=list)
+    outputs: list[IndicatorOutput] = field(default_factory=list)
     description: str = ""
     author: str = ""
     version: str = "1.0"
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "id": self.id,
@@ -201,8 +202,8 @@ class IndicatorLibrary:
     """
 
     def __init__(self):
-        self.custom_indicators: Dict[str, CustomIndicator] = {}
-        self._calculators: Dict[IndicatorType, Callable] = {
+        self.custom_indicators: dict[str, CustomIndicator] = {}
+        self._calculators: dict[IndicatorType, Callable] = {
             IndicatorType.SMA: self._calc_sma,
             IndicatorType.EMA: self._calc_ema,
             IndicatorType.WMA: self._calc_wma,
@@ -234,9 +235,9 @@ class IndicatorLibrary:
     def calculate(
         self,
         indicator_type: IndicatorType,
-        data: Dict[str, np.ndarray],
-        parameters: Dict[str, Any],
-    ) -> Dict[str, np.ndarray]:
+        data: dict[str, np.ndarray],
+        parameters: dict[str, Any],
+    ) -> dict[str, np.ndarray]:
         """
         Calculate indicator values
 
@@ -257,7 +258,7 @@ class IndicatorLibrary:
 
         return calculator(data, parameters)
 
-    def get_indicator_info(self, indicator_type: IndicatorType) -> Dict[str, Any]:
+    def get_indicator_info(self, indicator_type: IndicatorType) -> dict[str, Any]:
         """Get indicator information"""
         info = INDICATOR_DEFINITIONS.get(indicator_type, {})
         return {
@@ -270,7 +271,7 @@ class IndicatorLibrary:
             "inputs": info.get("inputs", ["close"]),
         }
 
-    def get_all_indicators(self) -> List[Dict[str, Any]]:
+    def get_all_indicators(self) -> list[dict[str, Any]]:
         """Get all available indicators"""
         result = []
         for ind_type in IndicatorType:
@@ -314,8 +315,8 @@ class IndicatorLibrary:
     # === Indicator Calculations ===
 
     def _calc_sma(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Simple Moving Average"""
         source = data.get("close", data.get("source", np.array([])))
         period = params.get("period", 20)
@@ -329,8 +330,8 @@ class IndicatorLibrary:
         return {"sma": sma}
 
     def _calc_ema(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Exponential Moving Average"""
         source = data.get("close", data.get("source", np.array([])))
         period = params.get("period", 20)
@@ -348,8 +349,8 @@ class IndicatorLibrary:
         return {"ema": ema}
 
     def _calc_wma(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Weighted Moving Average"""
         source = data.get("close", data.get("source", np.array([])))
         period = params.get("period", 20)
@@ -366,8 +367,8 @@ class IndicatorLibrary:
         return {"wma": wma}
 
     def _calc_dema(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Double Exponential Moving Average"""
         ema1 = self._calc_ema(data, params)["ema"]
         ema2 = self._calc_ema({"close": ema1}, params)["ema"]
@@ -375,8 +376,8 @@ class IndicatorLibrary:
         return {"dema": dema}
 
     def _calc_tema(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Triple Exponential Moving Average"""
         ema1 = self._calc_ema(data, params)["ema"]
         ema2 = self._calc_ema({"close": ema1}, params)["ema"]
@@ -385,8 +386,8 @@ class IndicatorLibrary:
         return {"tema": tema}
 
     def _calc_hull_ma(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Hull Moving Average"""
         period = params.get("period", 20)
         half_period = max(1, period // 2)
@@ -401,8 +402,8 @@ class IndicatorLibrary:
         return {"hull_ma": hma}
 
     def _calc_rsi(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Relative Strength Index"""
         source = data.get("close", data.get("source", np.array([])))
         period = params.get("period", 14)
@@ -435,8 +436,8 @@ class IndicatorLibrary:
         return {"rsi": rsi}
 
     def _calc_stoch_rsi(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Stochastic RSI"""
         rsi_period = params.get("rsi_period", 14)
         stoch_period = params.get("stoch_period", 14)
@@ -459,8 +460,8 @@ class IndicatorLibrary:
         return {"stoch_rsi": stoch_rsi, "k": k, "d": d}
 
     def _calc_cmo(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Chande Momentum Oscillator"""
         source = data.get("close", np.array([]))
         period = params.get("period", 14)
@@ -481,8 +482,8 @@ class IndicatorLibrary:
         return {"cmo": cmo}
 
     def _calc_macd(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Moving Average Convergence Divergence"""
         fast_period = params.get("fast_period", 12)
         slow_period = params.get("slow_period", 26)
@@ -504,8 +505,8 @@ class IndicatorLibrary:
         }
 
     def _calc_bollinger(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Bollinger Bands"""
         source = data.get("close", data.get("source", np.array([])))
         period = params.get("period", 20)
@@ -541,8 +542,8 @@ class IndicatorLibrary:
         }
 
     def _calc_atr(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Average True Range"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -566,8 +567,8 @@ class IndicatorLibrary:
         return {"atr": atr, "tr": tr}
 
     def _calc_stochastic(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Stochastic Oscillator"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -594,8 +595,8 @@ class IndicatorLibrary:
         return {"k": k, "d": d}
 
     def _calc_cci(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Commodity Channel Index"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -615,8 +616,8 @@ class IndicatorLibrary:
         return {"cci": cci}
 
     def _calc_williams_r(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Williams %R"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -634,8 +635,8 @@ class IndicatorLibrary:
         return {"williams_r": williams_r}
 
     def _calc_roc(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Rate of Change"""
         source = data.get("close", np.array([]))
         period = params.get("period", 12)
@@ -649,8 +650,8 @@ class IndicatorLibrary:
         return {"roc": roc}
 
     def _calc_mfi(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Money Flow Index"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -674,8 +675,8 @@ class IndicatorLibrary:
         return {"mfi": mfi}
 
     def _calc_obv(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """On Balance Volume"""
         close = data.get("close", np.array([]))
         volume = data.get("volume", np.array([]))
@@ -693,8 +694,8 @@ class IndicatorLibrary:
         return {"obv": obv}
 
     def _calc_pvt(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Price Volume Trend"""
         close = data.get("close", np.array([]))
         volume = data.get("volume", np.array([]))
@@ -710,8 +711,8 @@ class IndicatorLibrary:
         return {"pvt": pvt}
 
     def _calc_ad_line(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Accumulation/Distribution Line"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -724,8 +725,8 @@ class IndicatorLibrary:
         return {"ad_line": ad}
 
     def _calc_cmf(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Chaikin Money Flow"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -747,8 +748,8 @@ class IndicatorLibrary:
         return {"cmf": cmf}
 
     def _calc_vwap(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Volume Weighted Average Price"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -764,8 +765,8 @@ class IndicatorLibrary:
         return {"vwap": vwap}
 
     def _calc_keltner(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Keltner Channels"""
         period = params.get("period", 20)
         multiplier = params.get("multiplier", 2.0)
@@ -783,8 +784,8 @@ class IndicatorLibrary:
         }
 
     def _calc_donchian(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Donchian Channels"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -802,8 +803,8 @@ class IndicatorLibrary:
         return {"upper": upper, "middle": middle, "lower": lower}
 
     def _calc_supertrend(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Supertrend Indicator"""
         high = data.get("high", np.array([]))
         low = data.get("low", np.array([]))
@@ -862,8 +863,8 @@ class IndicatorLibrary:
         return {"supertrend": supertrend, "direction": direction.astype(float)}
 
     def _calc_stddev(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Standard Deviation"""
         source = data.get("close", np.array([]))
         period = params.get("period", 20)
@@ -876,8 +877,8 @@ class IndicatorLibrary:
         return {"stddev": std}
 
     def _calc_custom(
-        self, data: Dict[str, np.ndarray], params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, data: dict[str, np.ndarray], params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """Calculate custom indicator"""
         indicator_id = params.get("indicator_id")
         if not indicator_id or indicator_id not in self.custom_indicators:
@@ -906,7 +907,7 @@ class IndicatorLibrary:
 
 
 # Indicator definitions for UI
-INDICATOR_DEFINITIONS: Dict[IndicatorType, Dict[str, Any]] = {
+INDICATOR_DEFINITIONS: dict[IndicatorType, dict[str, Any]] = {
     IndicatorType.SMA: {
         "name": "Simple Moving Average",
         "description": "Average of closing prices over a period",

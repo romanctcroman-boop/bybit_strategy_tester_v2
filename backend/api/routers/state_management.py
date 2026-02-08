@@ -6,7 +6,7 @@ Provides REST API endpoints for unified state management.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
@@ -48,13 +48,13 @@ class CreateOrderRequest(BaseModel):
     side: str = Field(..., description="Order side: buy or sell")
     order_type: str = Field(..., description="Order type: market, limit, etc.")
     quantity: float = Field(..., gt=0, le=1_000_000, description="Order quantity")
-    price: Optional[float] = Field(
+    price: float | None = Field(
         None, gt=0, description="Limit price (for limit orders)"
     )
-    client_order_id: Optional[str] = Field(
+    client_order_id: str | None = Field(
         None, max_length=64, description="Client order ID"
     )
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    metadata: dict[str, Any] | None = Field(default_factory=dict)
 
     @field_validator("symbol")
     @classmethod
@@ -103,11 +103,11 @@ class CreateOrderRequest(BaseModel):
 class UpdateOrderRequest(BaseModel):
     """Update order request."""
 
-    status: Optional[str] = None
-    filled_quantity: Optional[float] = None
-    average_price: Optional[float] = None
-    exchange_order_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    status: str | None = None
+    filled_quantity: float | None = None
+    average_price: float | None = None
+    exchange_order_id: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class OrderResponse(BaseModel):
@@ -118,15 +118,15 @@ class OrderResponse(BaseModel):
     side: str
     order_type: str
     quantity: float
-    price: Optional[float]
+    price: float | None
     status: str
     filled_quantity: float
     average_price: float
     created_at: str
     updated_at: str
-    exchange_order_id: Optional[str]
-    client_order_id: Optional[str]
-    metadata: Dict[str, Any]
+    exchange_order_id: str | None
+    client_order_id: str | None
+    metadata: dict[str, Any]
 
 
 class OpenPositionRequest(BaseModel):
@@ -137,18 +137,18 @@ class OpenPositionRequest(BaseModel):
     quantity: float = Field(..., gt=0, description="Position quantity")
     entry_price: float = Field(..., gt=0, description="Entry price")
     leverage: float = Field(1.0, ge=1, description="Leverage")
-    stop_loss: Optional[float] = Field(None, description="Stop loss price")
-    take_profit: Optional[float] = Field(None, description="Take profit price")
-    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    stop_loss: float | None = Field(None, description="Stop loss price")
+    take_profit: float | None = Field(None, description="Take profit price")
+    metadata: dict[str, Any] | None = Field(default_factory=dict)
 
 
 class UpdatePositionRequest(BaseModel):
     """Update position request."""
 
-    current_price: Optional[float] = None
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
-    metadata: Optional[Dict[str, Any]] = None
+    current_price: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class ClosePositionRequest(BaseModel):
@@ -172,9 +172,9 @@ class PositionResponse(BaseModel):
     margin_used: float
     created_at: str
     updated_at: str
-    stop_loss: Optional[float]
-    take_profit: Optional[float]
-    metadata: Dict[str, Any]
+    stop_loss: float | None
+    take_profit: float | None
+    metadata: dict[str, Any]
 
 
 class StateMetricsResponse(BaseModel):
@@ -189,7 +189,7 @@ class StateMetricsResponse(BaseModel):
     failed_events: int
     conflicts_detected: int
     conflicts_resolved: int
-    last_sync: Optional[str]
+    last_sync: str | None
     sync_latency_ms: float
     redis_latency_ms: float
     postgres_latency_ms: float
@@ -204,8 +204,8 @@ class ConflictResponse(BaseModel):
     redis_timestamp: str
     postgres_timestamp: str
     resolved: bool
-    resolution: Optional[str]
-    resolved_at: Optional[str]
+    resolution: str | None
+    resolved_at: str | None
 
 
 class SyncResponse(BaseModel):
@@ -215,7 +215,7 @@ class SyncResponse(BaseModel):
     synced_positions: int
     conflicts_detected: int
     conflicts_resolved: int
-    errors: List[str]
+    errors: list[str]
 
 
 class HealthResponse(BaseModel):
@@ -223,8 +223,8 @@ class HealthResponse(BaseModel):
 
     status: str
     running: bool
-    metrics: Dict[str, Any]
-    event_queue: Dict[str, int]
+    metrics: dict[str, Any]
+    event_queue: dict[str, int]
 
 
 # ============================================================================
@@ -357,9 +357,9 @@ async def create_order(request: CreateOrderRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/orders", response_model=List[OrderResponse])
+@router.get("/orders", response_model=list[OrderResponse])
 async def list_orders(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    symbol: str | None = Query(None, description="Filter by symbol"),
     source: str = Query("redis", description="Data source: redis or postgres"),
 ):
     """List orders."""
@@ -478,9 +478,9 @@ async def open_position(request: OpenPositionRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/positions", response_model=List[PositionResponse])
+@router.get("/positions", response_model=list[PositionResponse])
 async def list_positions(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    symbol: str | None = Query(None, description="Filter by symbol"),
     source: str = Query("redis", description="Data source: redis or postgres"),
 ):
     """List positions."""
@@ -615,9 +615,9 @@ async def get_metrics():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/conflicts", response_model=List[ConflictResponse])
+@router.get("/conflicts", response_model=list[ConflictResponse])
 async def get_conflicts(
-    resolved: Optional[bool] = Query(None, description="Filter by resolved status"),
+    resolved: bool | None = Query(None, description="Filter by resolved status"),
 ):
     """Get state conflicts."""
     try:

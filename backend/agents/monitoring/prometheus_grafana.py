@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import aiohttp
 from loguru import logger
@@ -28,7 +28,7 @@ class PrometheusConfig:
     port: int = 9090
     namespace: str = "ai_agent"
     subsystem: str = ""
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -36,7 +36,7 @@ class GrafanaConfig:
     """Grafana configuration"""
 
     url: str = "http://localhost:3000"
-    api_key: Optional[str] = None
+    api_key: str | None = None
     org_id: int = 1
     datasource_name: str = "Prometheus"
 
@@ -63,7 +63,7 @@ class PrometheusExporter:
     def __init__(
         self,
         metrics_collector: Any,  # MetricsCollector instance
-        config: Optional[PrometheusConfig] = None,
+        config: PrometheusConfig | None = None,
     ):
         self.collector = metrics_collector
         self.config = config or PrometheusConfig()
@@ -168,10 +168,10 @@ class PrometheusRemoteWriter:
         self.batch_size = batch_size
         self.flush_interval = flush_interval_seconds
 
-        self._buffer: List[Dict[str, Any]] = []
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._buffer: list[dict[str, Any]] = []
+        self._session: aiohttp.ClientSession | None = None
         self._running = False
-        self._flush_task: Optional[asyncio.Task] = None
+        self._flush_task: asyncio.Task | None = None
 
         logger.info(f"📤 PrometheusRemoteWriter initialized: {remote_url}")
 
@@ -201,11 +201,11 @@ class PrometheusRemoteWriter:
         self,
         metric_name: str,
         value: float,
-        labels: Optional[Dict[str, str]] = None,
-        timestamp: Optional[datetime] = None,
+        labels: dict[str, str] | None = None,
+        timestamp: datetime | None = None,
     ) -> None:
         """Add metric to buffer"""
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
 
         self._buffer.append(
             {
@@ -276,13 +276,13 @@ class GrafanaDashboard:
 
     uid: str
     title: str
-    panels: List[Dict[str, Any]] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    panels: list[dict[str, Any]] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     refresh: str = "5s"
     time_from: str = "now-1h"
     time_to: str = "now"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to Grafana dashboard JSON"""
         return {
             "uid": self.uid,
@@ -322,7 +322,7 @@ class GrafanaClient:
 
     def __init__(self, config: GrafanaConfig):
         self.config = config
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create session"""
@@ -351,9 +351,9 @@ class GrafanaClient:
     async def create_dashboard(
         self,
         dashboard: GrafanaDashboard,
-        folder_uid: Optional[str] = None,
+        folder_uid: str | None = None,
         overwrite: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create or update dashboard"""
         session = await self._get_session()
 
@@ -377,7 +377,7 @@ class GrafanaClient:
 
             return result
 
-    async def get_dashboard(self, uid: str) -> Optional[Dict[str, Any]]:
+    async def get_dashboard(self, uid: str) -> dict[str, Any] | None:
         """Get dashboard by UID"""
         session = await self._get_session()
 
@@ -395,7 +395,7 @@ class GrafanaClient:
         ) as resp:
             return resp.status == 200
 
-    async def list_datasources(self) -> List[Dict[str, Any]]:
+    async def list_datasources(self) -> list[dict[str, Any]]:
         """List all datasources"""
         session = await self._get_session()
 
@@ -411,7 +411,7 @@ class GrafanaClient:
         url: str = "http://localhost:9090",
         access: str = "proxy",
         is_default: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create datasource"""
         session = await self._get_session()
 
@@ -568,7 +568,7 @@ class PrometheusAlertManager:
 
     def __init__(self, alertmanager_url: str = "http://localhost:9093"):
         self.url = alertmanager_url
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create session"""
@@ -587,8 +587,8 @@ class PrometheusAlertManager:
         severity: str = "warning",
         summary: str = "",
         description: str = "",
-        labels: Optional[Dict[str, str]] = None,
-        annotations: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
+        annotations: dict[str, str] | None = None,
     ) -> bool:
         """Send alert to AlertManager"""
         session = await self._get_session()
@@ -604,7 +604,7 @@ class PrometheusAlertManager:
                 "description": description,
                 **(annotations or {}),
             },
-            "startsAt": datetime.now(timezone.utc).isoformat(),
+            "startsAt": datetime.now(UTC).isoformat(),
         }
 
         try:
@@ -626,12 +626,12 @@ class PrometheusAlertManager:
     async def resolve_alert(
         self,
         alert_name: str,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
     ) -> bool:
         """Resolve an alert"""
         session = await self._get_session()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         alert = {
             "labels": {
@@ -652,7 +652,7 @@ class PrometheusAlertManager:
             logger.error(f"AlertManager error: {e}")
             return False
 
-    async def get_alerts(self) -> List[Dict[str, Any]]:
+    async def get_alerts(self) -> list[dict[str, Any]]:
         """Get current alerts"""
         session = await self._get_session()
 
@@ -667,12 +667,12 @@ class PrometheusAlertManager:
 
 
 __all__ = [
-    "PrometheusConfig",
+    "GrafanaClient",
     "GrafanaConfig",
+    "GrafanaDashboard",
+    "PrometheusAlertManager",
+    "PrometheusConfig",
     "PrometheusExporter",
     "PrometheusRemoteWriter",
-    "GrafanaDashboard",
-    "GrafanaClient",
     "create_ai_agent_dashboard",
-    "PrometheusAlertManager",
 ]

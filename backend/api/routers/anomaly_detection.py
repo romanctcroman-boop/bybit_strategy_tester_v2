@@ -32,7 +32,7 @@ class DataPointRequest(BaseModel):
     value: float = Field(..., description="The value to check")
     symbol: str = Field(default="", description="Trading symbol")
     metric_type: str = Field(default="price", description="Type of metric")
-    timestamp: Optional[float] = Field(
+    timestamp: float | None = Field(
         default=None, description="Unix timestamp (defaults to now)"
     )
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -91,7 +91,7 @@ class AnomalyStatsResponse(BaseModel):
     by_type: dict[str, int]
     by_severity: dict[str, int]
     by_symbol: dict[str, int]
-    last_detection: Optional[datetime]
+    last_detection: datetime | None
     detection_rate_per_hour: float
 
 
@@ -129,10 +129,10 @@ class MultivariateCheckResponse(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     """Request to update detector configuration."""
 
-    z_score_threshold: Optional[float] = Field(
+    z_score_threshold: float | None = Field(
         default=None, ge=1.0, le=10.0, description="Z-score threshold"
     )
-    window_size: Optional[int] = Field(
+    window_size: int | None = Field(
         default=None, ge=10, le=1000, description="Rolling window size"
     )
 
@@ -262,9 +262,9 @@ async def check_multivariate_anomaly(request: MultivariateCheckRequest):
 @router.get("/anomalies", response_model=list[AnomalyEventResponse])
 async def get_recent_anomalies(
     limit: int = 100,
-    severity: Optional[str] = None,
-    anomaly_type: Optional[str] = None,
-    symbol: Optional[str] = None,
+    severity: str | None = None,
+    anomaly_type: str | None = None,
+    symbol: str | None = None,
 ):
     """
     Get recent detected anomalies.

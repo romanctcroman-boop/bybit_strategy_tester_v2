@@ -21,7 +21,6 @@ if _project_root not in sys.path:
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -39,7 +38,7 @@ class EngineResult:
     max_drawdown: float
     win_rate: float
     execution_time_ms: float
-    trades_list: List = field(default_factory=list)
+    trades_list: list = field(default_factory=list)
 
 
 @dataclass
@@ -56,7 +55,7 @@ class ComparisonResult:
     sharpe_diff_pct: float
     max_dd_diff: float
     is_acceptable: bool
-    tolerance_used: Dict[str, float] = field(default_factory=dict)
+    tolerance_used: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -69,19 +68,19 @@ class ValidationReport:
     n_candles: int
 
     # Engine results
-    vectorbt_result: Optional[EngineResult] = None
-    fallback_result: Optional[EngineResult] = None
-    numba_result: Optional[EngineResult] = None
+    vectorbt_result: EngineResult | None = None
+    fallback_result: EngineResult | None = None
+    numba_result: EngineResult | None = None
 
     # Comparisons
-    vbt_vs_fallback: Optional[ComparisonResult] = None
-    vbt_vs_numba: Optional[ComparisonResult] = None
-    fallback_vs_numba: Optional[ComparisonResult] = None
+    vbt_vs_fallback: ComparisonResult | None = None
+    vbt_vs_numba: ComparisonResult | None = None
+    fallback_vs_numba: ComparisonResult | None = None
 
     # Overall status
     all_pass: bool = False
-    warnings: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class ValidationSuite:
@@ -100,10 +99,10 @@ class ValidationSuite:
         "max_dd_pct": 0.03,  # 3% tolerance for max drawdown
     }
 
-    def __init__(self, tolerances: Dict[str, float] = None):
+    def __init__(self, tolerances: dict[str, float] = None):
         """Initialize with optional custom tolerances."""
         self.tolerances = tolerances or self.DEFAULT_TOLERANCES.copy()
-        self.reports: List[ValidationReport] = []
+        self.reports: list[ValidationReport] = []
 
         # Try to import engines
         self._init_engines()
@@ -133,7 +132,7 @@ class ValidationSuite:
     def run_validation(
         self,
         candles: pd.DataFrame,
-        strategy_params: Dict,
+        strategy_params: dict,
         strategy_name: str = "RSI",
         initial_capital: float = 10000.0,
         leverage: float = 1.0,
@@ -221,7 +220,7 @@ class ValidationSuite:
         self.reports.append(report)
         return report
 
-    def _generate_signals(self, candles: pd.DataFrame, params: Dict):
+    def _generate_signals(self, candles: pd.DataFrame, params: dict):
         """Generate trading signals using RSI strategy."""
         from backend.backtesting.strategies import RSIStrategy
 
@@ -602,7 +601,7 @@ class ValidationSuite:
         print(f"OVERALL: {overall}")
         print("=" * 70)
 
-    def run_benchmark_suite(self, candles: pd.DataFrame) -> List[ValidationReport]:
+    def run_benchmark_suite(self, candles: pd.DataFrame) -> list[ValidationReport]:
         """
         Run a comprehensive benchmark suite with multiple strategies.
         """

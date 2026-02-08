@@ -13,14 +13,13 @@ Version: 2.3.0
 """
 
 import asyncio
-import json
 import time
 from abc import ABC, abstractmethod
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -117,12 +116,12 @@ class OrderBookUpdate:
     sequence: int = 0
 
     @property
-    def best_bid(self) -> Optional[OrderBookLevel]:
+    def best_bid(self) -> OrderBookLevel | None:
         """Get best bid."""
         return self.bids[0] if self.bids else None
 
     @property
-    def best_ask(self) -> Optional[OrderBookLevel]:
+    def best_ask(self) -> OrderBookLevel | None:
         """Get best ask."""
         return self.asks[0] if self.asks else None
 
@@ -186,7 +185,7 @@ class MarketDataStream(ABC):
     - Callback-based updates
     """
 
-    def __init__(self, config: Optional[StreamConfig] = None):
+    def __init__(self, config: StreamConfig | None = None):
         """Initialize market data stream."""
         self.config = config or StreamConfig()
         self._status = StreamStatus.DISCONNECTED
@@ -275,7 +274,7 @@ class TickerStream(MarketDataStream):
     - Snapshot + incremental updates
     """
 
-    def __init__(self, config: Optional[StreamConfig] = None):
+    def __init__(self, config: StreamConfig | None = None):
         """Initialize ticker stream."""
         super().__init__(config)
         self._subscriptions: set[str] = set()
@@ -305,7 +304,7 @@ class TickerStream(MarketDataStream):
         self._subscriptions.difference_update(symbols)
         return True
 
-    def get_ticker(self, symbol: str) -> Optional[TickerUpdate]:
+    def get_ticker(self, symbol: str) -> TickerUpdate | None:
         """Get latest ticker for a symbol."""
         return self._latest_tickers.get(symbol)
 
@@ -366,7 +365,7 @@ class OrderBookStream(MarketDataStream):
     def __init__(
         self,
         depth: int = 25,
-        config: Optional[StreamConfig] = None,
+        config: StreamConfig | None = None,
     ):
         """Initialize orderbook stream."""
         super().__init__(config)
@@ -397,7 +396,7 @@ class OrderBookStream(MarketDataStream):
         self._subscriptions.difference_update(symbols)
         return True
 
-    def get_orderbook(self, symbol: str) -> Optional[OrderBookUpdate]:
+    def get_orderbook(self, symbol: str) -> OrderBookUpdate | None:
         """Get current orderbook for a symbol."""
         return self._orderbooks.get(symbol)
 
@@ -465,7 +464,7 @@ class TradeStream(MarketDataStream):
     - Volume analysis
     """
 
-    def __init__(self, config: Optional[StreamConfig] = None):
+    def __init__(self, config: StreamConfig | None = None):
         """Initialize trade stream."""
         super().__init__(config)
         self._subscriptions: set[str] = set()
@@ -600,7 +599,7 @@ class CandleAggregator:
 
     def __init__(
         self,
-        intervals: Optional[list[str]] = None,
+        intervals: list[str] | None = None,
         max_candles: int = 1000,
     ):
         """Initialize candle aggregator."""
@@ -697,7 +696,7 @@ class CandleAggregator:
         self,
         symbol: str,
         interval: str,
-    ) -> Optional[KlineUpdate]:
+    ) -> KlineUpdate | None:
         """Get current (building) candle."""
         return self._current.get(symbol, {}).get(interval)
 
@@ -765,14 +764,14 @@ class StreamManager:
     - Cross-stream coordination
     """
 
-    def __init__(self, config: Optional[StreamManagerConfig] = None):
+    def __init__(self, config: StreamManagerConfig | None = None):
         """Initialize stream manager."""
         self.config = config or StreamManagerConfig()
 
         # Initialize streams
-        self.ticker_stream: Optional[TickerStream] = None
-        self.orderbook_stream: Optional[OrderBookStream] = None
-        self.trade_stream: Optional[TradeStream] = None
+        self.ticker_stream: TickerStream | None = None
+        self.orderbook_stream: OrderBookStream | None = None
+        self.trade_stream: TradeStream | None = None
 
         # Candle aggregator
         self.candle_aggregator = CandleAggregator(

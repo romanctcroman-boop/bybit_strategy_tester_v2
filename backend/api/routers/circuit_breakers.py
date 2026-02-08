@@ -4,8 +4,8 @@ Provides API endpoints for monitoring and managing circuit breakers.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -35,7 +35,7 @@ class CircuitBreakerStatus(BaseModel):
     total_calls: int
     success_rate: float
     is_healthy: bool
-    last_failure: Optional[str] = None
+    last_failure: str | None = None
 
 
 class AdaptiveMetricsResponse(BaseModel):
@@ -59,7 +59,7 @@ class CircuitBreakersSummary(BaseModel):
     total_breakers: int
     healthy_count: int
     unhealthy_count: int
-    breakers: List[CircuitBreakerStatus]
+    breakers: list[CircuitBreakerStatus]
     overall_health: str
     timestamp: str
 
@@ -67,7 +67,7 @@ class CircuitBreakersSummary(BaseModel):
 class CircuitBreakerMetrics(BaseModel):
     """Prometheus-style metrics for circuit breakers."""
 
-    metrics: Dict[str, Any]
+    metrics: dict[str, Any]
     prometheus_format: str
 
 
@@ -91,15 +91,15 @@ class ExtendedCircuitBreakerStatus(BaseModel):
     total_calls: int
     success_rate: float
     is_healthy: bool
-    last_failure: Optional[str] = None
+    last_failure: str | None = None
     # Adaptive metrics
-    avg_latency_ms: Optional[float] = None
-    p95_latency_ms: Optional[float] = None
-    p99_latency_ms: Optional[float] = None
+    avg_latency_ms: float | None = None
+    p95_latency_ms: float | None = None
+    p99_latency_ms: float | None = None
     is_adaptive: bool = False
     current_threshold: int = 5
     threshold_adjustments: int = 0
-    last_threshold_change: Optional[str] = None
+    last_threshold_change: str | None = None
     fallback_available: bool = False
 
 
@@ -175,7 +175,7 @@ async def get_circuit_breakers_status():
             unhealthy_count=unhealthy,
             breakers=breakers,
             overall_health=overall_health,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
     except Exception as e:
         logger.error(f"Error getting circuit breaker status: {e}")
@@ -266,7 +266,7 @@ async def get_circuit_breaker_metrics():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/extended-status", response_model=List[ExtendedCircuitBreakerStatus])
+@router.get("/extended-status", response_model=list[ExtendedCircuitBreakerStatus])
 async def get_extended_circuit_breaker_status():
     """
     Get extended status for all circuit breakers with adaptive metrics.
@@ -447,7 +447,7 @@ async def reset_circuit_breaker(name: str):
 # ============================================================================
 
 
-def get_circuit_breakers_health() -> Dict[str, Any]:
+def get_circuit_breakers_health() -> dict[str, Any]:
     """
     Get circuit breakers health for integration with main health endpoint.
 

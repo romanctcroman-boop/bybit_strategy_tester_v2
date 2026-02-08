@@ -15,9 +15,9 @@ from __future__ import annotations
 import asyncio
 import statistics
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 from loguru import logger
@@ -53,13 +53,13 @@ class PredictionResult:
     probability: float  # Probability of positive return
     expected_return: float
     uncertainty: float  # Model uncertainty
-    model_votes: Dict[str, SignalType]
-    model_confidences: Dict[str, float]
-    features_importance: Dict[str, float]
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    model_votes: dict[str, SignalType]
+    model_confidences: dict[str, float]
+    features_importance: dict[str, float]
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "signal": self.signal.value,
             "confidence": self.confidence,
@@ -126,11 +126,11 @@ class PredictionEngine:
         self.min_confidence = min_confidence
         self.voting_threshold = voting_threshold
 
-        self.models: Dict[str, ModelWrapper] = {}
-        self.prediction_history: List[PredictionResult] = []
+        self.models: dict[str, ModelWrapper] = {}
+        self.prediction_history: list[PredictionResult] = []
 
         # Feature importance tracking
-        self.feature_importance: Dict[str, float] = {}
+        self.feature_importance: dict[str, float] = {}
 
         # Statistics
         self.stats = {
@@ -175,7 +175,7 @@ class PredictionEngine:
     async def predict(
         self,
         features: np.ndarray,
-        feature_names: Optional[List[str]] = None,
+        feature_names: list[str] | None = None,
     ) -> PredictionResult:
         """
         Generate ensemble prediction
@@ -199,10 +199,10 @@ class PredictionEngine:
                 features_importance={},
             )
 
-        model_votes: Dict[str, SignalType] = {}
-        model_confidences: Dict[str, float] = {}
-        model_probabilities: List[float] = []
-        model_returns: List[float] = []
+        model_votes: dict[str, SignalType] = {}
+        model_confidences: dict[str, float] = {}
+        model_probabilities: list[float] = []
+        model_returns: list[float] = []
 
         # Get predictions from all models
         for name, wrapper in self.models.items():
@@ -273,7 +273,7 @@ class PredictionEngine:
         self,
         wrapper: ModelWrapper,
         features: np.ndarray,
-    ) -> Tuple[SignalType, float, float, float]:
+    ) -> tuple[SignalType, float, float, float]:
         """Get prediction from single model"""
         model = wrapper.model
 
@@ -323,15 +323,15 @@ class PredictionEngine:
 
     def _aggregate_votes(
         self,
-        votes: Dict[str, SignalType],
-        confidences: Dict[str, float],
-    ) -> Tuple[SignalType, float]:
+        votes: dict[str, SignalType],
+        confidences: dict[str, float],
+    ) -> tuple[SignalType, float]:
         """Aggregate model votes using weighted voting"""
         if not votes:
             return SignalType.NEUTRAL, 0.0
 
         # Count weighted votes
-        signal_weights: Dict[SignalType, float] = {s: 0.0 for s in SignalType}
+        signal_weights: dict[SignalType, float] = dict.fromkeys(SignalType, 0.0)
 
         for name, vote in votes.items():
             weight = self.models[name].weight * confidences.get(name, 0.5)
@@ -354,7 +354,7 @@ class PredictionEngine:
 
         return best_signal, confidence
 
-    def _calculate_uncertainty(self, confidences: Dict[str, float]) -> float:
+    def _calculate_uncertainty(self, confidences: dict[str, float]) -> float:
         """Calculate prediction uncertainty based on model disagreement"""
         if len(confidences) < 2:
             return 0.5
@@ -374,13 +374,13 @@ class PredictionEngine:
 
     def _aggregate_feature_importance(
         self,
-        feature_names: Optional[List[str]],
-    ) -> Dict[str, float]:
+        feature_names: list[str] | None,
+    ) -> dict[str, float]:
         """Aggregate feature importance across models"""
         if not feature_names:
             return {}
 
-        importance: Dict[str, float] = {name: 0.0 for name in feature_names}
+        importance: dict[str, float] = dict.fromkeys(feature_names, 0.0)
         weight_sum = 0.0
 
         for wrapper in self.models.values():
@@ -465,7 +465,7 @@ class PredictionEngine:
                     0.2, model.accuracy / total_accuracy * len(self.models)
                 )
 
-    def get_model_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_model_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for each model"""
         return {
             name: {
@@ -477,7 +477,7 @@ class PredictionEngine:
             for name, wrapper in self.models.items()
         }
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get engine statistics"""
         return {
             **self.stats,
@@ -533,11 +533,11 @@ class SimpleMomentumModel:
 
 
 __all__ = [
+    "ModelType",
+    "ModelWrapper",
     "PredictionEngine",
     "PredictionResult",
     "SignalType",
-    "ModelType",
-    "ModelWrapper",
-    "SimpleMovingAverageModel",
     "SimpleMomentumModel",
+    "SimpleMovingAverageModel",
 ]

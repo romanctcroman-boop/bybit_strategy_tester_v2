@@ -13,16 +13,16 @@ Based on cognitive science research and 2025 AI agent best practices.
 
 from backend.agents.memory.hierarchical_memory import (
     HierarchicalMemory,
+    MemoryConsolidator,
     MemoryItem,
     MemoryTier,
-    MemoryConsolidator,
 )
 from backend.agents.memory.vector_store import VectorMemoryStore
 
 __all__ = [
     "HierarchicalMemory",
+    "MemoryConsolidator",
     "MemoryItem",
     "MemoryTier",
-    "MemoryConsolidator",
     "VectorMemoryStore",
 ]

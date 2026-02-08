@@ -10,7 +10,7 @@ from typing import Any, Dict
 class ConfigNamespace:
     """Configuration namespace"""
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
 
     def __getattr__(self, name: str) -> Any:
@@ -57,7 +57,7 @@ CONFIG = _build_config()
 SETTINGS = CONFIG
 
 # Re-export database policy constants for convenience
-from backend.config.database_policy import (  # noqa: E402
+from backend.config.database_policy import (
     DAILY_INTERVAL,
     DATA_START_DATE,
     DATA_START_TIMESTAMP_MS,

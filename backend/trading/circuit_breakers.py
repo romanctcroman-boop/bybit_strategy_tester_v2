@@ -11,10 +11,10 @@ Features:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +63,8 @@ class TradingMetrics:
     volume_last_hour: float = 0.0
 
     # Timestamps
-    last_trade_time: Optional[datetime] = None
-    circuit_opened_at: Optional[datetime] = None
+    last_trade_time: datetime | None = None
+    circuit_opened_at: datetime | None = None
 
 
 class TradingCircuitBreaker:
@@ -245,7 +245,7 @@ class TradingCircuitBreaker:
         success: bool,
         profit_loss: float,
         volume: float,
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
     ):
         """
         Record trade execution
@@ -293,7 +293,7 @@ class TradingCircuitBreaker:
         # Send critical alerts
         self._send_alert(reason, severity="critical")
 
-    def get_status(self) -> Dict:
+    def get_status(self) -> dict:
         """Get current circuit breaker status"""
         loss_percent = self._calculate_loss_percent()
 
@@ -322,7 +322,7 @@ class TradingCircuitBreaker:
 
 
 # Global circuit breaker instance
-_circuit_breaker: Optional[TradingCircuitBreaker] = None
+_circuit_breaker: TradingCircuitBreaker | None = None
 
 
 def get_trading_circuit_breaker() -> TradingCircuitBreaker:

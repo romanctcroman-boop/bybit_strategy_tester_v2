@@ -883,21 +883,29 @@ class OptimizationPanels {
     handleOptimizationComplete(data) {
         this.setRunningState(false);
 
-        // Extract results from sync response
+        // Extract results from sync response - map to displayQuickResults format
+        const bestMetrics = data.best_metrics || (data.top_results?.[0] || {});
         const results = {
             top_results: data.top_results || [],
             best_params: data.best_params || {},
             best_score: data.best_score || 0,
             total_combinations: data.total_combinations || 0,
+            tested_combinations: data.tested_combinations || data.total_combinations || 0,
             execution_time: data.execution_time_seconds || 0,
-            smart_recommendations: data.smart_recommendations || null
+            smart_recommendations: data.smart_recommendations || null,
+            // Map for displayQuickResults compatibility
+            best: {
+                params: data.best_params || {},
+                metrics: bestMetrics
+            },
+            total_trials: data.tested_combinations || data.total_combinations || 0
         };
 
         this.state.lastResults = results;
         this.saveState();
         this.displayQuickResults(results);
 
-        const msg = `Optimization completed! ${results.total_combinations} combinations in ${results.execution_time.toFixed(1)}s`;
+        const msg = `Optimization completed! ${results.tested_combinations} combinations in ${results.execution_time.toFixed(1)}s`;
         this.showNotification(msg, 'success');
 
         // Show view results button
@@ -1066,32 +1074,55 @@ class OptimizationPanels {
      */
     displayQuickResults(results) {
         const summary = document.getElementById('resultsQuickSummary');
-        if (!summary || !results?.best) return;
+        if (!summary) return;
 
-        const best = results.best;
-        const metrics = best.metrics || {};
+        // Handle both API formats: results.best.metrics OR results.top_results[0]
+        let metrics = {};
+        if (results?.best?.metrics) {
+            metrics = results.best.metrics;
+        } else if (results?.top_results?.[0]) {
+            metrics = results.top_results[0];
+        } else if (results?.best_metrics) {
+            metrics = results.best_metrics;
+        }
+
+        if (!metrics || Object.keys(metrics).length === 0) {
+            summary.innerHTML = `
+                <p class="text-muted text-sm text-center">
+                    <i class="bi bi-exclamation-circle"></i>
+                    No results available
+                </p>
+            `;
+            return;
+        }
+
+        const totalTrials = results.total_trials || results.tested_combinations || results.total_combinations || 0;
+        const sharpe = metrics.sharpe_ratio ?? 0;
+        const totalReturn = metrics.total_return ?? 0;
+        const maxDD = metrics.max_drawdown ?? 0;
+        const winRate = metrics.win_rate ?? 0;
 
         summary.innerHTML = `
             <div class="results-metric-grid">
                 <div class="result-metric-card">
                     <span class="result-metric-label">Sharpe</span>
-                    <span class="result-metric-value ${metrics.sharpe_ratio >= 1 ? 'positive' : ''}">${(metrics.sharpe_ratio || 0).toFixed(2)}</span>
+                    <span class="result-metric-value ${sharpe >= 1 ? 'positive' : sharpe < 0 ? 'negative' : ''}">${sharpe.toFixed(2)}</span>
                 </div>
                 <div class="result-metric-card">
                     <span class="result-metric-label">Return</span>
-                    <span class="result-metric-value ${metrics.total_return >= 0 ? 'positive' : 'negative'}">${(metrics.total_return || 0).toFixed(1)}%</span>
+                    <span class="result-metric-value ${totalReturn >= 0 ? 'positive' : 'negative'}">${totalReturn.toFixed(2)}%</span>
                 </div>
                 <div class="result-metric-card">
                     <span class="result-metric-label">Max DD</span>
-                    <span class="result-metric-value negative">${(metrics.max_drawdown || 0).toFixed(1)}%</span>
+                    <span class="result-metric-value negative">${(maxDD * 100).toFixed(1)}%</span>
                 </div>
                 <div class="result-metric-card">
                     <span class="result-metric-label">Win Rate</span>
-                    <span class="result-metric-value">${(metrics.win_rate || 0).toFixed(1)}%</span>
+                    <span class="result-metric-value">${winRate.toFixed(1)}%</span>
                 </div>
             </div>
             <p class="text-muted text-sm mt-2 text-center">
-                <i class="bi bi-trophy"></i> Best of ${results.total_trials || 0} trials
+                <i class="bi bi-trophy"></i> Best of ${totalTrials} trials
             </p>
         `;
     }

@@ -13,8 +13,8 @@ Signal Logic:
 - Short Exit: RSI < 30 OR fast EMA crosses above slow EMA
 """
 
+
 import numpy as np
-from typing import Dict
 
 
 def momentum_strategy(
@@ -29,7 +29,7 @@ def momentum_strategy(
     take_profit_multiplier: float = 2.5,
     rsi_oversold: float = 30.0,
     rsi_overbought: float = 70.0
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """
     Momentum-based trading strategy using RSI and EMA crossovers with ATR-based risk management.
     
@@ -69,14 +69,14 @@ def momentum_strategy(
         - 'stop_loss': Array of stop-loss prices for each position
         - 'take_profit': Array of take-profit prices for each position
     """
-    
+
     # Validate input arrays
     if not all(isinstance(arr, np.ndarray) for arr in [close, high, low]):
         raise TypeError("All price arrays must be numpy arrays")
-    
+
     if len(close) != len(high) or len(close) != len(low):
         raise ValueError("All price arrays must have the same length")
-    
+
     # Initialize arrays
     n = len(close)
     long_entries = np.zeros(n, dtype=bool)
@@ -85,7 +85,7 @@ def momentum_strategy(
     short_exits = np.zeros(n, dtype=bool)
     stop_loss = np.full(n, np.nan, dtype=np.float64)
     take_profit = np.full(n, np.nan, dtype=np.float64)
-    
+
     # Calculate RSI
     def calculate_rsi(prices: np.ndarray, period: int) -> np.ndarray:
         """Calculate Relative Strength Index (RSI) using Wilder's smoothing"""
@@ -96,7 +96,7 @@ def momentum_strategy(
         rs = up / down if down != 0 else 0
         rsi = np.zeros_like(prices)
         rsi[:period] = 100.0 - 100.0 / (1.0 + rs)
-        
+
         for i in range(period, len(prices)):
             delta = deltas[i - 1]
             if delta > 0:
@@ -105,98 +105,98 @@ def momentum_strategy(
             else:
                 upval = 0.0
                 downval = -delta
-            
+
             up = (up * (period - 1) + upval) / period
             down = (down * (period - 1) + downval) / period
             rs = up / down if down != 0 else 0
             rsi[i] = 100.0 - 100.0 / (1.0 + rs)
-        
+
         return rsi
-    
+
     # Calculate EMA
     def calculate_ema(prices: np.ndarray, period: int) -> np.ndarray:
         """Calculate Exponential Moving Average (EMA)"""
         ema = np.zeros_like(prices)
         alpha = 2.0 / (period + 1.0)
-        
+
         # Simple MA for first value
         ema[period - 1] = np.mean(prices[:period])
-        
+
         # EMA for subsequent values
         for i in range(period, len(prices)):
             ema[i] = alpha * prices[i] + (1 - alpha) * ema[i - 1]
-        
+
         return ema
-    
+
     # Calculate ATR
     def calculate_atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> np.ndarray:
         """Calculate Average True Range (ATR) using Wilder's smoothing"""
         n = len(close)
         tr = np.zeros(n)
-        
+
         # Calculate True Range
         for i in range(1, n):
             hl = high[i] - low[i]
             hc = abs(high[i] - close[i - 1])
             lc = abs(low[i] - close[i - 1])
             tr[i] = max(hl, hc, lc)
-        
+
         # Calculate ATR
         atr = np.zeros(n)
         atr[period] = np.mean(tr[1:period + 1])
-        
+
         for i in range(period + 1, n):
             atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
-        
+
         return atr
-    
+
     # Calculate indicators
     rsi = calculate_rsi(close, rsi_period)
     fast_ema = calculate_ema(close, fast_ema_period)
     slow_ema = calculate_ema(close, slow_ema_period)
     atr = calculate_atr(high, low, close, atr_period)
-    
+
     # Generate signals
     for i in range(1, n):
         # EMA crossover conditions
         fast_above_slow = fast_ema[i] > slow_ema[i] and fast_ema[i - 1] <= slow_ema[i - 1]
         fast_below_slow = fast_ema[i] < slow_ema[i] and fast_ema[i - 1] >= slow_ema[i - 1]
-        
+
         # RSI conditions
         rsi_oversold_condition = rsi[i] < rsi_oversold
         rsi_overbought_condition = rsi[i] > rsi_overbought
-        
+
         # Generate long entry signals (RSI oversold + EMA bullish crossover)
         if rsi_oversold_condition and fast_above_slow:
             long_entries[i] = True
-            
+
             # Set stop-loss and take-profit for long positions
             if not np.isnan(atr[i]):
                 stop_loss[i] = close[i] - (atr[i] * stop_loss_multiplier)
                 take_profit[i] = close[i] + (atr[i] * take_profit_multiplier)
-        
+
         # Generate short entry signals (RSI overbought + EMA bearish crossover)
         elif rsi_overbought_condition and fast_below_slow:
             short_entries[i] = True
-            
+
             # Set stop-loss and take-profit for short positions
             if not np.isnan(atr[i]):
                 stop_loss[i] = close[i] + (atr[i] * stop_loss_multiplier)
                 take_profit[i] = close[i] - (atr[i] * take_profit_multiplier)
-        
+
         # Generate exit signals (opposite conditions)
         # Long exit: RSI becomes overbought OR EMA bearish crossover
         if rsi_overbought_condition or fast_below_slow:
             long_exits[i] = True
-        
+
         # Short exit: RSI becomes oversold OR EMA bullish crossover
         if rsi_oversold_condition or fast_above_slow:
             short_exits[i] = True
-    
+
     # Ensure we don't have entry and exit signals on the same bar
     long_entries = long_entries & ~long_exits
     short_entries = short_entries & ~short_exits
-    
+
     return {
         'long_entries': long_entries,
         'short_entries': short_entries,
@@ -233,9 +233,9 @@ if __name__ == "__main__":
     close = 50000 + np.cumsum(np.random.randn(n_samples) * 100)
     high = close + np.random.rand(n_samples) * 200
     low = close - np.random.rand(n_samples) * 200
-    
+
     signals = momentum_strategy(close, high, low)
-    
+
     print("Strategy Summary:")
     print(f"Long entries: {signals['long_entries'].sum()}")
     print(f"Short entries: {signals['short_entries'].sum()}")

@@ -89,6 +89,7 @@ from backend.core.indicators.trend import (
 )
 from backend.core.indicators.volatility import (
     calculate_atr,
+    calculate_atr_smoothed,
     calculate_bollinger,
     calculate_donchian,
     calculate_keltner,
@@ -124,6 +125,7 @@ __all__ = [
     "calculate_aroon",
     # Volatility
     "calculate_atr",
+    "calculate_atr_smoothed",
     "calculate_atrp",
     "calculate_bollinger",
     "calculate_cci",

@@ -24,10 +24,11 @@ from __future__ import annotations
 import json
 import statistics
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -60,12 +61,12 @@ class AgentVote:
     position: str  # The agent's answer/position
     confidence: float  # 0.0 to 1.0
     reasoning: str  # Explanation of the position
-    evidence: List[str] = field(default_factory=list)  # Supporting evidence
-    dissent_points: List[str] = field(default_factory=list)  # Points of disagreement
-    rank: Optional[int] = None  # For ranked choice voting
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    evidence: list[str] = field(default_factory=list)  # Supporting evidence
+    dissent_points: list[str] = field(default_factory=list)  # Points of disagreement
+    rank: int | None = None  # For ranked choice voting
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "agent_type": self.agent_type,
@@ -85,12 +86,12 @@ class Critique:
     critic_agent: str
     target_agent: str
     agrees: bool
-    agreement_points: List[str]
-    disagreement_points: List[str]
-    suggested_improvements: List[str]
+    agreement_points: list[str]
+    disagreement_points: list[str]
+    suggested_improvements: list[str]
     confidence_adjustment: float  # -0.5 to +0.5 suggested adjustment
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "critic_agent": self.critic_agent,
             "target_agent": self.target_agent,
@@ -108,13 +109,13 @@ class DeliberationRound:
 
     round_number: int
     phase: DebatePhase
-    opinions: List[AgentVote]
-    critiques: List[Critique]
+    opinions: list[AgentVote]
+    critiques: list[Critique]
     consensus_emerging: bool
     convergence_score: float  # 0.0 to 1.0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "round_number": self.round_number,
             "phase": self.phase.value,
@@ -135,15 +136,15 @@ class DeliberationResult:
     decision: str
     confidence: float
     voting_strategy: VotingStrategy
-    rounds: List[DeliberationRound]
-    final_votes: List[AgentVote]
-    dissenting_opinions: List[AgentVote]
-    evidence_chain: List[Dict[str, Any]]
+    rounds: list[DeliberationRound]
+    final_votes: list[AgentVote]
+    dissenting_opinions: list[AgentVote]
+    evidence_chain: list[dict[str, Any]]
     duration_seconds: float
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "question": self.question,
@@ -249,8 +250,8 @@ MAINTAINED_POINTS: [Points you stand by]
 
     def __init__(
         self,
-        agent_interface: Optional[Any] = None,
-        ask_fn: Optional[Callable[[str, str], str]] = None,
+        agent_interface: Any | None = None,
+        ask_fn: Callable[[str, str], str] | None = None,
         enable_parallel_calls: bool = True,
         enable_confidence_calibration: bool = True,
     ):
@@ -268,7 +269,7 @@ MAINTAINED_POINTS: [Points you stand by]
         self.enable_parallel_calls = enable_parallel_calls
         self.enable_confidence_calibration = enable_confidence_calibration
 
-        self.deliberation_history: List[DeliberationResult] = []
+        self.deliberation_history: list[DeliberationResult] = []
 
         # Statistics
         self.stats = {
@@ -281,7 +282,7 @@ MAINTAINED_POINTS: [Points you stand by]
         # Confidence calibration parameters (Platt scaling)
         self.calibration_a = 1.0  # Scale
         self.calibration_b = 0.0  # Shift
-        self.calibration_samples: List[Tuple[float, bool]] = []  # (predicted_conf, was_correct)
+        self.calibration_samples: list[tuple[float, bool]] = []  # (predicted_conf, was_correct)
 
         # Evidence weight factors by type
         self.evidence_weights = {
@@ -301,8 +302,8 @@ MAINTAINED_POINTS: [Points you stand by]
     async def deliberate(
         self,
         question: str,
-        agents: List[str],
-        context: Optional[Dict[str, Any]] = None,
+        agents: list[str],
+        context: dict[str, Any] | None = None,
         voting_strategy: VotingStrategy = VotingStrategy.WEIGHTED,
         max_rounds: int = 3,
         min_confidence: float = 0.7,
@@ -331,8 +332,8 @@ MAINTAINED_POINTS: [Points you stand by]
         context = context or {}
         context_str = json.dumps(context, indent=2) if context else "None"
 
-        rounds: List[DeliberationRound] = []
-        current_opinions: List[AgentVote] = []
+        rounds: list[DeliberationRound] = []
+        current_opinions: list[AgentVote] = []
 
         logger.info(f"🎭 Starting deliberation: {question[:50]}... ({len(agents)} agents)")
 
@@ -407,9 +408,9 @@ MAINTAINED_POINTS: [Points you stand by]
     async def _collect_initial_opinions(
         self,
         question: str,
-        agents: List[str],
+        agents: list[str],
         context_str: str,
-    ) -> List[AgentVote]:
+    ) -> list[AgentVote]:
         """Collect initial opinions from all agents (parallel if enabled)"""
         import asyncio
 
@@ -438,9 +439,9 @@ MAINTAINED_POINTS: [Points you stand by]
     async def _collect_refined_opinions(
         self,
         question: str,
-        previous_opinions: List[AgentVote],
-        critiques: List[Critique],
-    ) -> List[AgentVote]:
+        previous_opinions: list[AgentVote],
+        critiques: list[Critique],
+    ) -> list[AgentVote]:
         """Collect refined opinions after critique phase"""
         refined = []
 
@@ -477,8 +478,8 @@ MAINTAINED_POINTS: [Points you stand by]
     async def _cross_examine(
         self,
         question: str,
-        opinions: List[AgentVote],
-    ) -> List[Critique]:
+        opinions: list[AgentVote],
+    ) -> list[Critique]:
         """Each agent critiques others' positions (parallel if enabled)"""
         import asyncio
 
@@ -525,9 +526,9 @@ MAINTAINED_POINTS: [Points you stand by]
     async def _final_vote(
         self,
         question: str,
-        opinions: List[AgentVote],
+        opinions: list[AgentVote],
         strategy: VotingStrategy,
-    ) -> Tuple[str, float, List[AgentVote]]:
+    ) -> tuple[str, float, list[AgentVote]]:
         """Conduct final vote based on strategy"""
         if not opinions:
             return "No consensus", 0.0, []
@@ -545,11 +546,11 @@ MAINTAINED_POINTS: [Points you stand by]
 
     def _majority_vote(
         self,
-        opinions: List[AgentVote],
-    ) -> Tuple[str, float, List[AgentVote]]:
+        opinions: list[AgentVote],
+    ) -> tuple[str, float, list[AgentVote]]:
         """Simple majority voting"""
         # Group by position (normalized)
-        position_counts: Dict[str, List[AgentVote]] = {}
+        position_counts: dict[str, list[AgentVote]] = {}
         for op in opinions:
             key = op.position.lower().strip()[:100]
             if key not in position_counts:
@@ -567,8 +568,8 @@ MAINTAINED_POINTS: [Points you stand by]
 
     def _weighted_vote(
         self,
-        opinions: List[AgentVote],
-    ) -> Tuple[str, float, List[AgentVote]]:
+        opinions: list[AgentVote],
+    ) -> tuple[str, float, list[AgentVote]]:
         """
         Confidence-weighted voting with evidence scoring.
 
@@ -578,8 +579,8 @@ MAINTAINED_POINTS: [Points you stand by]
         - Number of supporting agents
         """
         # Group by position with confidence + evidence weighting
-        position_weights: Dict[str, float] = {}
-        position_examples: Dict[str, str] = {}
+        position_weights: dict[str, float] = {}
+        position_examples: dict[str, str] = {}
 
         # Get evidence scores for all positions
         evidence_scores = self.compute_weighted_evidence_score(opinions)
@@ -611,8 +612,8 @@ MAINTAINED_POINTS: [Points you stand by]
 
     def _unanimous_vote(
         self,
-        opinions: List[AgentVote],
-    ) -> Tuple[str, float, List[AgentVote]]:
+        opinions: list[AgentVote],
+    ) -> tuple[str, float, list[AgentVote]]:
         """Unanimous voting - all must agree"""
         positions = set(op.position.lower().strip()[:100] for op in opinions)
 
@@ -626,10 +627,10 @@ MAINTAINED_POINTS: [Points you stand by]
 
     def _supermajority_vote(
         self,
-        opinions: List[AgentVote],
-    ) -> Tuple[str, float, List[AgentVote]]:
+        opinions: list[AgentVote],
+    ) -> tuple[str, float, list[AgentVote]]:
         """Supermajority (2/3) voting"""
-        position_counts: Dict[str, List[AgentVote]] = {}
+        position_counts: dict[str, list[AgentVote]] = {}
         for op in opinions:
             key = op.position.lower().strip()[:100]
             if key not in position_counts:
@@ -646,13 +647,13 @@ MAINTAINED_POINTS: [Points you stand by]
 
         return "No supermajority", 0.0, opinions
 
-    def _calculate_convergence(self, opinions: List[AgentVote]) -> float:
+    def _calculate_convergence(self, opinions: list[AgentVote]) -> float:
         """Calculate convergence score (0-1)"""
         if len(opinions) < 2:
             return 1.0
 
         # Group positions
-        position_groups: Dict[str, int] = {}
+        position_groups: dict[str, int] = {}
         for op in opinions:
             key = op.position.lower().strip()[:50]
             position_groups[key] = position_groups.get(key, 0) + 1
@@ -668,9 +669,9 @@ MAINTAINED_POINTS: [Points you stand by]
 
     def _build_evidence_chain(
         self,
-        rounds: List[DeliberationRound],
-        final_votes: List[AgentVote],
-    ) -> List[Dict[str, Any]]:
+        rounds: list[DeliberationRound],
+        final_votes: list[AgentVote],
+    ) -> list[dict[str, Any]]:
         """Build traceable evidence chain"""
         chain = []
 
@@ -951,7 +952,7 @@ MAINTAINED_POINTS: Trailing mechanism is superior for trend capture
 
         return "default"
 
-    def compute_weighted_evidence_score(self, votes: List[AgentVote]) -> Dict[str, float]:
+    def compute_weighted_evidence_score(self, votes: list[AgentVote]) -> dict[str, float]:
         """
         Compute weighted evidence scores for each position.
 
@@ -963,8 +964,8 @@ MAINTAINED_POINTS: Trailing mechanism is superior for trend capture
         Returns:
             Dict mapping position to weighted evidence score
         """
-        position_scores: Dict[str, float] = {}
-        position_examples: Dict[str, str] = {}
+        position_scores: dict[str, float] = {}
+        position_examples: dict[str, str] = {}
 
         for vote in votes:
             key = vote.position.lower().strip()[:100]
@@ -983,7 +984,7 @@ MAINTAINED_POINTS: Trailing mechanism is superior for trend capture
 
         return position_scores
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get deliberation statistics"""
         return {
             **self.stats,
@@ -993,11 +994,11 @@ MAINTAINED_POINTS: Trailing mechanism is superior for trend capture
 
 
 __all__ = [
-    "MultiAgentDeliberation",
     "AgentVote",
-    "VotingStrategy",
-    "DeliberationResult",
-    "DeliberationRound",
     "Critique",
     "DebatePhase",
+    "DeliberationResult",
+    "DeliberationRound",
+    "MultiAgentDeliberation",
+    "VotingStrategy",
 ]

@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +32,14 @@ class DLQMessage:
     message_id: str
     agent_type: str
     content: str
-    context: Dict[str, Any]
+    context: dict[str, Any]
     error: str
     priority: DLQPriority = DLQPriority.NORMAL
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class _DLQ:
-    def __init__(self, storage: Optional[Path] = None):
+    def __init__(self, storage: Path | None = None):
         self._storage = storage or (Path.cwd() / "logs" / "dlq.jsonl")
         self._storage.parent.mkdir(parents=True, exist_ok=True)
         self._lock = asyncio.Lock()
@@ -68,7 +68,7 @@ class _DLQ:
                 return False
 
 
-_dlq_instance: Optional[_DLQ] = None
+_dlq_instance: _DLQ | None = None
 
 
 def get_dlq() -> _DLQ:

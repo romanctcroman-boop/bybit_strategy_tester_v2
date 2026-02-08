@@ -280,8 +280,8 @@ async def close_all_clients() -> None:
 
 __all__ = [
     "ResilientClient",
+    "close_all_clients",
     "get_bybit_client",
     "get_deepseek_client",
     "get_perplexity_client",
-    "close_all_clients",
 ]

@@ -24,10 +24,11 @@ import json
 import os
 import time
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, TypeVar
+from typing import Any, TypeVar
 
 import aiohttp
 from loguru import logger
@@ -65,9 +66,9 @@ class LLMMessage:
 
     role: str  # "system", "user", "assistant"
     content: str
-    name: Optional[str] = None
+    name: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to API format"""
         data = {"role": self.role, "content": self.content}
         if self.name:
@@ -82,12 +83,12 @@ class LLMResponse:
     content: str
     model: str
     provider: LLMProvider
-    finish_reason: Optional[str] = None
+    finish_reason: str | None = None
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
     latency_ms: float = 0.0
-    raw_response: Optional[Dict[str, Any]] = None
+    raw_response: dict[str, Any] | None = None
 
     @property
     def estimated_cost(self) -> float:
@@ -113,8 +114,8 @@ class LLMConfig:
     """LLM connection configuration"""
 
     provider: LLMProvider
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
+    api_key: str | None = None
+    base_url: str | None = None
     model: str = "default"
     temperature: float = 0.7
     max_tokens: int = 4096
@@ -195,7 +196,7 @@ class LLMClient(ABC):
     @abstractmethod
     async def chat(
         self,
-        messages: List[LLMMessage],
+        messages: list[LLMMessage],
         **kwargs,
     ) -> LLMResponse:
         """Send chat completion request"""
@@ -204,9 +205,9 @@ class LLMClient(ABC):
     @abstractmethod
     async def chat_stream(
         self,
-        messages: List[LLMMessage],
+        messages: list[LLMMessage],
         **kwargs,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Stream chat completion"""
         pass
 
@@ -226,7 +227,7 @@ class DeepSeekClient(LLMClient):
         self.config = config
         self.base_url = config.base_url or self.DEFAULT_BASE_URL
         self.model = config.model if config.model != "default" else self.DEFAULT_MODEL
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.session: aiohttp.ClientSession | None = None
         self.rate_limiter = RateLimiter(config.rate_limit_rpm)
 
         # Stats
@@ -252,7 +253,7 @@ class DeepSeekClient(LLMClient):
 
     async def chat(
         self,
-        messages: List[LLMMessage],
+        messages: list[LLMMessage],
         **kwargs,
     ) -> LLMResponse:
         """Send chat completion"""
@@ -318,9 +319,9 @@ class DeepSeekClient(LLMClient):
 
     async def chat_stream(
         self,
-        messages: List[LLMMessage],
+        messages: list[LLMMessage],
         **kwargs,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Stream chat completion"""
         await self.rate_limiter.acquire()
 
@@ -372,7 +373,7 @@ class PerplexityClient(LLMClient):
         self.config = config
         self.base_url = config.base_url or self.DEFAULT_BASE_URL
         self.model = config.model if config.model != "default" else self.DEFAULT_MODEL
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.session: aiohttp.ClientSession | None = None
         self.rate_limiter = RateLimiter(config.rate_limit_rpm)
 
         self.total_requests = 0
@@ -396,7 +397,7 @@ class PerplexityClient(LLMClient):
 
     async def chat(
         self,
-        messages: List[LLMMessage],
+        messages: list[LLMMessage],
         **kwargs,
     ) -> LLMResponse:
         """Send chat completion"""
@@ -458,9 +459,9 @@ class PerplexityClient(LLMClient):
 
     async def chat_stream(
         self,
-        messages: List[LLMMessage],
+        messages: list[LLMMessage],
         **kwargs,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Stream chat completion"""
         await self.rate_limiter.acquire()
 
@@ -510,7 +511,7 @@ class OllamaClient(LLMClient):
         self.config = config
         self.base_url = config.base_url or self.DEFAULT_BASE_URL
         self.model = config.model if config.model != "default" else self.DEFAULT_MODEL
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.session: aiohttp.ClientSession | None = None
 
         logger.info(f"🦙 Ollama client initialized: {self.model}")
 
@@ -523,7 +524,7 @@ class OllamaClient(LLMClient):
 
     async def chat(
         self,
-        messages: List[LLMMessage],
+        messages: list[LLMMessage],
         **kwargs,
     ) -> LLMResponse:
         """Send chat completion"""
@@ -568,9 +569,9 @@ class OllamaClient(LLMClient):
 
     async def chat_stream(
         self,
-        messages: List[LLMMessage],
+        messages: list[LLMMessage],
         **kwargs,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """Stream chat completion"""
         session = await self._get_session()
 
@@ -655,10 +656,10 @@ class LLMClientPool:
     """
 
     def __init__(self):
-        self.clients: List[LLMClient] = []
+        self.clients: list[LLMClient] = []
         self._current_index = 0
         self._lock = asyncio.Lock()
-        self._failed_clients: Dict[int, datetime] = {}
+        self._failed_clients: dict[int, datetime] = {}
         self._fail_timeout_seconds = 60
 
         logger.info("🔄 LLMClientPool initialized")
@@ -668,10 +669,10 @@ class LLMClientPool:
         self.clients.append(client)
         logger.debug(f"Added client to pool: {type(client).__name__}")
 
-    async def _get_healthy_client(self) -> Optional[LLMClient]:
+    async def _get_healthy_client(self) -> LLMClient | None:
         """Get next healthy client"""
         async with self._lock:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             for _ in range(len(self.clients)):
                 idx = self._current_index
@@ -694,13 +695,13 @@ class LLMClientPool:
         """Mark client as failed"""
         try:
             idx = self.clients.index(client)
-            self._failed_clients[idx] = datetime.now(timezone.utc)
+            self._failed_clients[idx] = datetime.now(UTC)
         except ValueError:
             pass
 
     async def chat(
         self,
-        messages: List[LLMMessage],
+        messages: list[LLMMessage],
         **kwargs,
     ) -> LLMResponse:
         """Send chat to available client"""
@@ -731,15 +732,15 @@ class LLMClientPool:
 
 
 __all__ = [
-    "LLMProvider",
-    "LLMMessage",
-    "LLMResponse",
-    "LLMConfig",
-    "RateLimiter",
-    "LLMClient",
     "DeepSeekClient",
-    "PerplexityClient",
-    "OllamaClient",
+    "LLMClient",
     "LLMClientFactory",
     "LLMClientPool",
+    "LLMConfig",
+    "LLMMessage",
+    "LLMProvider",
+    "LLMResponse",
+    "OllamaClient",
+    "PerplexityClient",
+    "RateLimiter",
 ]

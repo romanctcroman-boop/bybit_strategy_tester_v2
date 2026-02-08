@@ -10,9 +10,9 @@ DeepSeek/Perplexity Recommendation:
 - Pre-allocate all output arrays
 """
 
+
 import numpy as np
 from numba import njit, prange
-from typing import Tuple
 
 # Trade result structure for Numba
 # Each trade is a tuple of: (entry_idx, exit_idx, is_long, entry_price, exit_price,
@@ -37,7 +37,7 @@ def simulate_trades_numba(
     take_profit: float,
     leverage: float,
     direction: int,  # 0=long, 1=short, 2=both
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
     """
     Numba JIT-compiled trading simulation.
 
@@ -186,11 +186,7 @@ def simulate_trades_numba(
 
             # Check signal exit
             if not should_exit:
-                if is_long and long_exits[i]:
-                    should_exit = True
-                    exit_reason = 0  # signal
-                    exit_price = price
-                elif not is_long and short_exits[i]:
+                if (is_long and long_exits[i]) or (not is_long and short_exits[i]):
                     should_exit = True
                     exit_reason = 0  # signal
                     exit_price = price

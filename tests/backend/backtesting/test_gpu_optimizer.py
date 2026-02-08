@@ -1,5 +1,4 @@
 """Tests for GPU optimizer (AUDIT_PROJECT_EXTENDED)."""
-import pytest
 
 
 def test_gpu_optimizer_module_imports():

@@ -13,15 +13,15 @@ import os
 import re
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import requests
 
 logger = logging.getLogger(__name__)
 
 # Simple in-memory cache for tickers (reduces API calls from 4s to ~0ms)
-_tickers_cache: Dict[str, Any] = {"data": None, "timestamp": 0, "ttl": 30}  # 30 sec TTL
+_tickers_cache: dict[str, Any] = {"data": None, "timestamp": 0, "ttl": 30}  # 30 sec TTL
 
 # Circuit breaker for API resilience
 try:
@@ -58,7 +58,7 @@ def _with_circuit_breaker(name: str = "bybit_api"):
                 result = func(*args, **kwargs)
                 breaker.record_success()
                 return result
-            except Exception as e:
+            except Exception:
                 breaker.record_failure()
                 raise
 
@@ -72,8 +72,8 @@ class BybitAdapter:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        api_secret: Optional[str] = None,
+        api_key: str | None = None,
+        api_secret: str | None = None,
         timeout: int = 10,
     ):
         self.api_key = api_key
@@ -90,8 +90,8 @@ class BybitAdapter:
 
         # Thread-safe cache for instruments
         self._cache_lock = threading.RLock()
-        self._instruments_cache: Dict[str, Dict] = {}
-        self._instruments_cache_at: Optional[float] = None
+        self._instruments_cache: dict[str, dict] = {}
+        self._instruments_cache_at: float | None = None
         # cache TTL in seconds
         self._instruments_cache_ttl = 60 * 5
 
@@ -100,7 +100,7 @@ class BybitAdapter:
         if _HAS_CIRCUIT_BREAKER and _circuit_registry:
             self._circuit_breaker = _circuit_registry.get_or_create("bybit_api")
 
-    def _api_get(self, url: str, params: dict, timeout: Optional[int] = None) -> requests.Response:
+    def _api_get(self, url: str, params: dict, timeout: int | None = None) -> requests.Response:
         """Make GET request with circuit breaker protection."""
         if self._circuit_breaker and not self._circuit_breaker.can_execute():
             raise ConnectionError("Circuit breaker OPEN - Bybit API temporarily unavailable")
@@ -111,12 +111,12 @@ class BybitAdapter:
             if self._circuit_breaker:
                 self._circuit_breaker.record_success()
             return r
-        except Exception as e:
+        except Exception:
             if self._circuit_breaker:
                 self._circuit_breaker.record_failure()
             raise
 
-    def get_klines(self, symbol: str, interval: str = "1", limit: int = 200) -> List[Dict]:
+    def get_klines(self, symbol: str, interval: str = "1", limit: int = 200) -> list[dict]:
         """Fetch kline/candle data. interval is minutes as string in Bybit public API mapping.
 
         Returns list of dicts with keys: open_time, open, high, low, close, volume
@@ -150,7 +150,7 @@ class BybitAdapter:
         symbol_upper = symbol.upper()
         if symbol_upper.endswith("USDT") and len(symbol_upper) >= 6:
             v5_kline_url = "https://api.bybit.com/v5/market/kline"
-            params: Dict[str, str | int] = {
+            params: dict[str, str | int] = {
                 "category": "linear",
                 "symbol": symbol_upper,
                 "interval": interval_norm,
@@ -393,9 +393,9 @@ class BybitAdapter:
         self,
         symbol: str,
         interval: str = "60",
-        end_time: Optional[int] = None,
+        end_time: int | None = None,
         limit: int = 200,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Fetch historical klines BEFORE a specific timestamp.
         Used for infinite scroll / loading more history.
@@ -464,9 +464,9 @@ class BybitAdapter:
         symbol: str,
         interval: str = "60",
         total_candles: int = 2000,
-        end_time: Optional[int] = None,
+        end_time: int | None = None,
         market_type: str = "linear",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Load historical candles in chunks of 1000 (Bybit API limit per request).
         Sync version for SmartKlineService background loading.
@@ -502,7 +502,7 @@ class BybitAdapter:
         category = "spot" if market_type == "spot" else "linear"
         v5_kline_url = "https://api.bybit.com/v5/market/kline"
         batch_size = 1000  # Bybit max per request
-        all_candles: List[Dict] = []
+        all_candles: list[dict] = []
         current_end = end_time or int(time.time() * 1000)
         max_iterations = (total_candles // batch_size) + 2
         iteration = 0
@@ -554,11 +554,11 @@ class BybitAdapter:
         self,
         symbol: str,
         interval: str = "60",
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         limit: int = 1000,
         market_type: str = "linear",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Fetch historical klines between start_time and end_time.
         Uses pagination to fetch more than 1000 candles.
@@ -696,29 +696,29 @@ class BybitAdapter:
 
         return unique_candles
 
-    def _normalize_kline_row(self, row: Dict) -> Dict:
+    def _normalize_kline_row(self, row: dict) -> dict:
         # Accept both list-style and dict-style rows
         # Always preserve the original data under 'raw' to avoid any data loss
         if isinstance(row, list):
             raw: Any = list(row)
             # Bybit v5 list format documented: [startTime, openPrice, highPrice, lowPrice, closePrice, volume, turnover?]
-            parsed: Dict[str, Any] = {"raw": raw}
+            parsed: dict[str, Any] = {"raw": raw}
             try:
                 start_ms = int(raw[0])
                 parsed["open_time"] = start_ms
-                parsed["open_time_dt"] = datetime.fromtimestamp(start_ms / 1000.0, tz=timezone.utc)
+                parsed["open_time_dt"] = datetime.fromtimestamp(start_ms / 1000.0, tz=UTC)
             except Exception:
                 parsed["open_time"] = None
                 parsed["open_time_dt"] = None
 
             # map string fields and keep originals
-            def _as_str(idx: int) -> Optional[str]:
+            def _as_str(idx: int) -> str | None:
                 try:
                     return str(raw[idx])
                 except Exception:
                     return None
 
-            def _as_float(val: Optional[str]) -> Optional[float]:
+            def _as_float(val: str | None) -> float | None:
                 try:
                     return float(val) if val is not None and val != "" else None
                 except Exception:
@@ -740,7 +740,7 @@ class BybitAdapter:
             return parsed
         elif isinstance(row, dict):
             raw = dict(row)
-            parsed: Dict[str, Any] = {"raw": raw}
+            parsed: dict[str, Any] = {"raw": raw}
             # Common key aliases used across Bybit responses
             start_candidates = [
                 raw.get("startTime"),
@@ -764,10 +764,10 @@ class BybitAdapter:
                         continue
             parsed["open_time"] = start_ms
             parsed["open_time_dt"] = (
-                datetime.fromtimestamp(start_ms / 1000.0, tz=timezone.utc) if start_ms is not None else None
+                datetime.fromtimestamp(start_ms / 1000.0, tz=UTC) if start_ms is not None else None
             )
 
-            def get_str(*keys) -> Optional[str]:
+            def get_str(*keys) -> str | None:
                 for k in keys:
                     v = raw.get(k)
                     if v is not None:
@@ -793,9 +793,9 @@ class BybitAdapter:
     def _persist_klines_to_db(
         self,
         symbol: str,
-        normalized_rows: List[Dict],
-        db: Optional[object] = None,
-        engine: Optional[object] = None,
+        normalized_rows: list[dict],
+        db: object | None = None,
+        engine: object | None = None,
         market_type: str = "linear",
     ):
         """Persist normalized klines (list of dicts as returned by _normalize_kline_row) into audit table.
@@ -1141,8 +1141,8 @@ class BybitAdapter:
         raise ValueError(f"symbol {symbol} not found in instruments-info")
 
     def get_tickers(
-        self, symbols: Optional[List[str]] = None, category: str = "linear"
-    ) -> List[Dict[str, Any]]:
+        self, symbols: list[str] | None = None, category: str = "linear"
+    ) -> list[dict[str, Any]]:
         """Fetch real-time ticker data from Bybit V5 API.
 
         Args:
@@ -1216,7 +1216,7 @@ class BybitAdapter:
             logger.error(f"Failed to fetch tickers from Bybit: {e}")
             return []
 
-    def get_ticker(self, symbol: str) -> Optional[Dict[str, Any]]:
+    def get_ticker(self, symbol: str) -> dict[str, Any] | None:
         """Fetch ticker for a single symbol.
 
         Args:
@@ -1233,7 +1233,7 @@ class BybitAdapter:
         symbol: str,
         category: str = "linear",
         limit: int = 25,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Fetch L2 order book snapshot from Bybit.
 
         Args:
@@ -1264,7 +1264,7 @@ class BybitAdapter:
 
     def get_symbols_list(
         self, category: str = "linear", trading_only: bool = True
-    ) -> List[str]:
+    ) -> list[str]:
         """Fetch full list of symbols from Bybit instruments-info (all pages).
 
         Args:
@@ -1275,14 +1275,14 @@ class BybitAdapter:
             List of symbol strings (e.g. ['BTCUSDT', 'ETHUSDT', ...])
         """
         v5_url = "https://api.bybit.com/v5/market/instruments-info"
-        result: List[str] = []
-        cursor: Optional[str] = None
+        result: list[str] = []
+        cursor: str | None = None
         limit = 1000  # max per request
         max_pages = 50  # safety
         timeout_sec = max(self.timeout, 30)  # instruments-info can be slow (many pages)
         try:
             for page in range(max_pages):
-                params: Dict[str, Any] = {"category": category, "limit": limit}
+                params: dict[str, Any] = {"category": category, "limit": limit}
                 if cursor:
                     params["cursor"] = cursor
                 r = requests.get(v5_url, params=params, timeout=timeout_sec)
@@ -1332,7 +1332,7 @@ class BybitAdapter:
         symbol: str,
         interval: str = "15",
         limit: int = 200,
-    ) -> Dict[str, List[Dict]]:
+    ) -> dict[str, list[dict]]:
         """
         Fetch klines from BOTH SPOT and LINEAR markets in parallel.
 
@@ -1351,7 +1351,7 @@ class BybitAdapter:
 
         results = {"spot": [], "linear": []}
 
-        def fetch_market(market_type: str) -> List[Dict]:
+        def fetch_market(market_type: str) -> list[dict]:
             """Fetch klines for a specific market type."""
             v5_kline_url = "https://api.bybit.com/v5/market/kline"
             symbol_upper = symbol.upper()
@@ -1414,7 +1414,7 @@ class BybitAdapter:
         self,
         symbol: str,
         market_type: str,
-        normalized_rows: List[Dict],
+        normalized_rows: list[dict],
     ) -> int:
         """
         Persist klines with explicit market_type (spot/linear).
@@ -1502,15 +1502,15 @@ class BybitAdapter:
         return inserted
 
 
-def _safe_float(val: Optional[str]) -> Optional[float]:
+def _safe_float(val: str | None) -> float | None:
     try:
         return float(val) if val is not None and val != "" else None
     except Exception:
         return None
 
 
-def _to_dt(ms: Optional[int]):
+def _to_dt(ms: int | None):
     try:
-        return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc) if ms is not None else None
+        return datetime.fromtimestamp(ms / 1000.0, tz=UTC) if ms is not None else None
     except Exception:
         return None

@@ -9,8 +9,9 @@ All database operations should go through repositories to ensure:
 - Proper exception handling and logging
 """
 
+import builtins
 import logging
-from typing import Generic, List, Optional, Type, TypeVar
+from typing import Generic, TypeVar
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -40,7 +41,7 @@ class BaseRepository(Generic[T]):
                 super().__init__(session, User)
     """
 
-    def __init__(self, session: Session, model_class: Type[T]):
+    def __init__(self, session: Session, model_class: type[T]):
         self.session = session
         self.model_class = model_class
         self._entity_name = model_class.__name__
@@ -55,7 +56,7 @@ class BaseRepository(Generic[T]):
             logger.error(f"Failed to add {self._entity_name}: {e}")
             raise classify_sqlalchemy_error(e, "add", self._entity_name) from e
 
-    def add_all(self, entities: List[T]) -> List[T]:
+    def add_all(self, entities: list[T]) -> list[T]:
         """Add multiple entities to the session."""
         try:
             self.session.add_all(entities)
@@ -65,7 +66,7 @@ class BaseRepository(Generic[T]):
             logger.error(f"Failed to add_all {self._entity_name}: {e}")
             raise classify_sqlalchemy_error(e, "add_all", self._entity_name) from e
 
-    def get(self, id: int) -> Optional[T]:
+    def get(self, id: int) -> T | None:
         """Get entity by primary key."""
         try:
             result = self.session.get(self.model_class, id)
@@ -87,7 +88,7 @@ class BaseRepository(Generic[T]):
             )
         return entity
 
-    def get_by(self, **kwargs) -> Optional[T]:
+    def get_by(self, **kwargs) -> T | None:
         """Get first entity matching filter criteria."""
         try:
             result = self.session.query(self.model_class).filter_by(**kwargs).first()
@@ -96,7 +97,7 @@ class BaseRepository(Generic[T]):
             logger.error(f"Failed to get_by {self._entity_name} with {kwargs}: {e}")
             raise classify_sqlalchemy_error(e, "get_by", self._entity_name) from e
 
-    def list(self, limit: int = 100, offset: int = 0) -> List[T]:
+    def list(self, limit: int = 100, offset: int = 0) -> list[T]:
         """List entities with pagination."""
         try:
             result = (
@@ -108,7 +109,7 @@ class BaseRepository(Generic[T]):
             logger.error(f"Failed to list {self._entity_name}: {e}")
             raise classify_sqlalchemy_error(e, "list", self._entity_name) from e
 
-    def list_by(self, limit: int = 100, offset: int = 0, **kwargs) -> List[T]:
+    def list_by(self, limit: int = 100, offset: int = 0, **kwargs) -> builtins.list[T]:
         """List entities matching filter criteria."""
         try:
             result = (
@@ -123,7 +124,7 @@ class BaseRepository(Generic[T]):
             logger.error(f"Failed to list_by {self._entity_name} with {kwargs}: {e}")
             raise classify_sqlalchemy_error(e, "list_by", self._entity_name) from e
 
-    def filter(self, *criterion) -> List[T]:
+    def filter(self, *criterion) -> builtins.list[T]:
         """
         Filter entities using SQLAlchemy criterion expressions.
 

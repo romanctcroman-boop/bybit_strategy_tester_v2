@@ -12,9 +12,9 @@ Validation Categories:
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from .builder import (
     BlockType,
@@ -39,11 +39,11 @@ class ValidationError:
     code: str
     message: str
     severity: ValidationSeverity
-    block_id: Optional[str] = None
-    block_name: Optional[str] = None
-    suggestion: Optional[str] = None
+    block_id: str | None = None
+    block_name: str | None = None
+    suggestion: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "code": self.code,
@@ -61,11 +61,11 @@ class ValidationWarning:
 
     code: str
     message: str
-    block_id: Optional[str] = None
-    block_name: Optional[str] = None
-    suggestion: Optional[str] = None
+    block_id: str | None = None
+    block_name: str | None = None
+    suggestion: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "code": self.code,
@@ -81,9 +81,9 @@ class ValidationResult:
     """Result of strategy validation"""
 
     is_valid: bool
-    errors: List[ValidationError] = field(default_factory=list)
-    warnings: List[ValidationWarning] = field(default_factory=list)
-    info: List[str] = field(default_factory=list)
+    errors: list[ValidationError] = field(default_factory=list)
+    warnings: list[ValidationWarning] = field(default_factory=list)
+    info: list[str] = field(default_factory=list)
 
     # Metrics
     block_count: int = 0
@@ -92,9 +92,9 @@ class ValidationResult:
     estimated_lookback: int = 0
 
     # Timestamp
-    validated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    validated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "is_valid": self.is_valid,
@@ -142,7 +142,7 @@ class StrategyValidator:
         }
 
         # Parameter validation rules
-        self.parameter_rules: Dict[str, Dict[str, Any]] = {
+        self.parameter_rules: dict[str, dict[str, Any]] = {
             "period": {"min": 1, "max": 1000, "type": int},
             "fast_period": {"min": 1, "max": 500, "type": int},
             "slow_period": {"min": 2, "max": 1000, "type": int},
@@ -176,9 +176,9 @@ class StrategyValidator:
         Returns:
             ValidationResult with errors, warnings, and metrics
         """
-        errors: List[ValidationError] = []
-        warnings: List[ValidationWarning] = []
-        info: List[str] = []
+        errors: list[ValidationError] = []
+        warnings: list[ValidationWarning] = []
+        info: list[str] = []
 
         # Structural validation
         errors.extend(self._validate_structure(graph))
@@ -223,7 +223,7 @@ class StrategyValidator:
             estimated_lookback=lookback,
         )
 
-    def _validate_structure(self, graph: StrategyGraph) -> List[ValidationError]:
+    def _validate_structure(self, graph: StrategyGraph) -> list[ValidationError]:
         """Validate graph structure"""
         errors = []
 
@@ -284,14 +284,14 @@ class StrategyValidator:
             # OR check if main node has custom inputs (entry_long, etc.)
             main_block = graph.blocks[main_node]
             main_inputs = [inp.name for inp in main_block.inputs]
-            
+
             # Check for connections to main node
             main_connections = [
                 conn
                 for conn in graph.connections
                 if conn.target_block_id == main_node
             ]
-            
+
             # If main node has entry_long/entry_short inputs, require them
             if "entry_long" in main_inputs or "entry_short" in main_inputs:
                 entry_connections = [
@@ -340,12 +340,12 @@ class StrategyValidator:
 
         return errors
 
-    def _validate_connections(self, graph: StrategyGraph) -> List[ValidationError]:
+    def _validate_connections(self, graph: StrategyGraph) -> list[ValidationError]:
         """Validate connections between blocks"""
         errors = []
 
         # Track connected inputs
-        connected_inputs: Dict[str, Set[str]] = {bid: set() for bid in graph.blocks}
+        connected_inputs: dict[str, set[str]] = {bid: set() for bid in graph.blocks}
 
         for conn in graph.connections:
             # Check source block exists
@@ -539,7 +539,7 @@ class StrategyValidator:
 
         return errors, warnings
 
-    def _detect_cycles(self, graph: StrategyGraph) -> List[ValidationError]:
+    def _detect_cycles(self, graph: StrategyGraph) -> list[ValidationError]:
         """Detect cycles in the graph"""
         errors = []
 
@@ -557,7 +557,7 @@ class StrategyValidator:
 
         return errors
 
-    def _validate_risk(self, graph: StrategyGraph) -> List[ValidationWarning]:
+    def _validate_risk(self, graph: StrategyGraph) -> list[ValidationWarning]:
         """Validate risk management"""
         warnings = []
 
@@ -732,7 +732,7 @@ class StrategyValidator:
 
         return max_lookback
 
-    def _get_connected_blocks(self, graph: StrategyGraph) -> Set[str]:
+    def _get_connected_blocks(self, graph: StrategyGraph) -> set[str]:
         """Get all blocks that are connected"""
         connected = set()
 

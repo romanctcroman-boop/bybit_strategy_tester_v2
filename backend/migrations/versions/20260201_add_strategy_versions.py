@@ -7,8 +7,8 @@ Create Date: 2026-02-01
 Stores version history of Strategy Builder strategies.
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "20260201_strategy_versions"
 down_revision = "20260129_strategy_builder"

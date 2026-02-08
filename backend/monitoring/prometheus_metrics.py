@@ -10,8 +10,8 @@ Exports all system metrics to Prometheus format:
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 from prometheus_client import (
     CollectorRegistry,
@@ -407,11 +407,11 @@ class MetricsCollector:
         """Export metrics in Prometheus text format"""
         return generate_latest(self.registry).decode("utf-8")
 
-    def get_metrics_dict(self) -> Dict[str, Any]:
+    def get_metrics_dict(self) -> dict[str, Any]:
         """Export metrics as dictionary"""
         metrics_text = self.get_metrics_text()
 
-        result = {"timestamp": datetime.now(timezone.utc).isoformat(), "metrics": {}}
+        result = {"timestamp": datetime.now(UTC).isoformat(), "metrics": {}}
 
         for line in metrics_text.split("\n"):
             if line and not line.startswith("#"):

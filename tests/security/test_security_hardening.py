@@ -149,12 +149,11 @@ class TestInputValidation:
 
     def test_price_validation(self):
         """Price should only accept positive numbers."""
-        from typing import Optional
 
         from pydantic import BaseModel, Field
 
         class PriceInput(BaseModel):
-            price: Optional[float] = Field(None, gt=0)
+            price: float | None = Field(None, gt=0)
 
         # Valid
         valid = PriceInput(price=50000.0)

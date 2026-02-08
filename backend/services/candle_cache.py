@@ -6,7 +6,7 @@ loading from Bybit API and persistence to database.
 """
 
 import logging
-from typing import Dict, List, Optional
+from datetime import UTC
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class CandleCache:
 
     def __init__(self):
         """Initialize empty cache store."""
-        self._store: Dict[str, List[Dict]] = {}
+        self._store: dict[str, list[dict]] = {}
         logger.info(
             "CandleCache initialized (LOAD_LIMIT=%d, RAM_LIMIT=%d)",
             self.LOAD_LIMIT,
@@ -46,7 +46,7 @@ class CandleCache:
 
     def get_working_set(
         self, symbol: str, interval: str, ensure_loaded: bool = True
-    ) -> Optional[List[Dict]]:
+    ) -> list[dict] | None:
         """
         Get working set of candles from cache.
 
@@ -79,9 +79,9 @@ class CandleCache:
         self,
         symbol: str,
         interval: str,
-        load_limit: Optional[int] = None,
+        load_limit: int | None = None,
         persist: bool = False,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Load initial candle data from Bybit API.
 
@@ -160,7 +160,7 @@ class CandleCache:
 
     def reset(
         self, symbol: str, interval: str, reload: bool = False
-    ) -> Optional[List[Dict]]:
+    ) -> list[dict] | None:
         """
         Clear cache for symbol+interval.
 
@@ -184,7 +184,7 @@ class CandleCache:
 
         return None
 
-    def _persist_candles(self, symbol: str, interval: str, candles: List[Dict]):
+    def _persist_candles(self, symbol: str, interval: str, candles: list[dict]):
         """
         Persist candles to database.
 
@@ -235,7 +235,7 @@ class CandleCache:
                         symbol=symbol,
                         open_time=open_time,
                         open_time_dt=datetime.fromtimestamp(
-                            open_time / 1000, tz=timezone.utc
+                            open_time / 1000, tz=UTC
                         ),
                         open_price=float(candle.get("open", 0)),
                         high_price=float(candle.get("high", 0)),

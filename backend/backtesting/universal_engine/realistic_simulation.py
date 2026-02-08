@@ -15,7 +15,7 @@ Version: 2.1.0
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -54,7 +54,7 @@ class BarSimulatorConfig:
     stop_hunt_depth: float = 0.002
 
     # Random seed for reproducibility
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 class RealisticBarSimulator:
@@ -71,7 +71,7 @@ class RealisticBarSimulator:
     - Multiple path types (trending, mean-reverting)
     """
 
-    def __init__(self, config: Optional[BarSimulatorConfig] = None):
+    def __init__(self, config: BarSimulatorConfig | None = None):
         """Initialize the bar simulator."""
         self.config = config or BarSimulatorConfig()
         self.rng = np.random.default_rng(self.config.seed)
@@ -343,7 +343,7 @@ class VolumeSlippageModel:
     - Configurable bounds
     """
 
-    def __init__(self, config: Optional[VolumeSlippageConfig] = None):
+    def __init__(self, config: VolumeSlippageConfig | None = None):
         """Initialize the volume slippage model."""
         self.config = config or VolumeSlippageConfig()
 
@@ -498,7 +498,7 @@ class DynamicFundingManager:
     - Support for multiple symbols
     """
 
-    def __init__(self, config: Optional[DynamicFundingConfig] = None):
+    def __init__(self, config: DynamicFundingConfig | None = None):
         """Initialize the funding manager."""
         self.config = config or DynamicFundingConfig()
         self.funding_history: dict[str, list[FundingRateEntry]] = {}
@@ -672,7 +672,7 @@ class DynamicFundingManager:
             "std_rate": float(np.std(period_rates)),
             "min_rate": float(np.min(period_rates)),
             "max_rate": float(np.max(period_rates)),
-            "n_fundings": int(len(period_rates)),
+            "n_fundings": len(period_rates),
         }
 
 
@@ -726,7 +726,7 @@ class PartialFillSimulator:
     - Realistic fill distribution
     """
 
-    def __init__(self, config: Optional[PartialFillConfig] = None):
+    def __init__(self, config: PartialFillConfig | None = None):
         """Initialize the partial fill simulator."""
         self.config = config or PartialFillConfig()
         self.rng = np.random.default_rng()
@@ -933,7 +933,7 @@ class LiquidationConfig:
 
     # Initial margin rate (1/leverage)
     # Will be calculated from leverage if not set
-    initial_margin_rate: Optional[float] = None
+    initial_margin_rate: float | None = None
 
     # Taker fee rate for liquidation
     liquidation_fee_rate: float = 0.0006  # 0.06%
@@ -975,7 +975,7 @@ class LiquidationEngine:
     - Short Liquidation Price = Entry Price * (1 + Initial Margin Rate - Maintenance Margin Rate)
     """
 
-    def __init__(self, config: Optional[LiquidationConfig] = None):
+    def __init__(self, config: LiquidationConfig | None = None):
         """Initialize the liquidation engine."""
         self.config = config or LiquidationConfig()
 
@@ -1308,8 +1308,8 @@ class MLStrategyInterface:
 
     def __init__(
         self,
-        model: Optional[Any] = None,
-        config: Optional[MLStrategyConfig] = None,
+        model: Any | None = None,
+        config: MLStrategyConfig | None = None,
     ):
         """
         Initialize ML strategy interface.
@@ -1320,7 +1320,7 @@ class MLStrategyInterface:
         """
         self.model = model
         self.config = config or MLStrategyConfig()
-        self.scaler_params: Optional[dict[str, tuple[float, float]]] = None
+        self.scaler_params: dict[str, tuple[float, float]] | None = None
         self.feature_engineer = FeatureEngineering()
 
     def set_model(self, model: Any) -> None:
@@ -1392,9 +1392,7 @@ class MLStrategyInterface:
         X_scaled = X.copy()
         for i in range(X.shape[1]):
             param1, param2 = self.scaler_params[i]
-            if self.config.scaling_method == "standard":
-                X_scaled[:, i] = (X[:, i] - param1) / param2
-            elif self.config.scaling_method == "minmax":
+            if self.config.scaling_method == "standard" or self.config.scaling_method == "minmax":
                 X_scaled[:, i] = (X[:, i] - param1) / param2
             else:  # robust
                 X_scaled[:, i] = (X[:, i] - param1) / param2

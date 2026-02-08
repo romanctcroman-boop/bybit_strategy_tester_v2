@@ -47,7 +47,7 @@ Usage (deprecated):
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal
+from typing import Any, Literal
 
 import pandas as pd
 from loguru import logger
@@ -93,22 +93,22 @@ class OptimizationResult:
     total_combinations: int
     tested_combinations: int
     execution_time_seconds: float
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_score: float
-    best_metrics: Dict[str, Any]
-    top_results: List[Dict[str, Any]]  # Unified name (was best_results/top_results)
-    performance_stats: Dict[str, Any]
+    best_metrics: dict[str, Any]
+    top_results: list[dict[str, Any]]  # Unified name (was best_results/top_results)
+    performance_stats: dict[str, Any]
     backend_used: str  # "gpu" or "cpu"
     combinations_per_second: float = 0.0
 
     # Aliases for backwards compatibility
     @property
-    def best_results(self) -> List[Dict[str, Any]]:
+    def best_results(self) -> list[dict[str, Any]]:
         """Alias for top_results (FastOptimizer compatibility)"""
         return self.top_results
 
     @property
-    def results(self) -> List[Dict[str, Any]]:
+    def results(self) -> list[dict[str, Any]]:
         """Alias for top_results"""
         return self.top_results
 
@@ -187,11 +187,11 @@ class UniversalOptimizer:
     def optimize(
         self,
         candles: pd.DataFrame,
-        rsi_period_range: List[int],
-        rsi_overbought_range: List[int],
-        rsi_oversold_range: List[int],
-        stop_loss_range: List[float],
-        take_profit_range: List[float],
+        rsi_period_range: list[int],
+        rsi_overbought_range: list[int],
+        rsi_oversold_range: list[int],
+        stop_loss_range: list[float],
+        take_profit_range: list[float],
         initial_capital: float = 10000.0,
         leverage: int = 10,
         commission: float = 0.0007,  # 0.07% TradingView parity
@@ -300,11 +300,11 @@ class UniversalOptimizer:
 
 def optimize(
     candles: pd.DataFrame,
-    rsi_period_range: List[int],
-    rsi_overbought_range: List[int],
-    rsi_oversold_range: List[int],
-    stop_loss_range: List[float],
-    take_profit_range: List[float],
+    rsi_period_range: list[int],
+    rsi_overbought_range: list[int],
+    rsi_oversold_range: list[int],
+    stop_loss_range: list[float],
+    take_profit_range: list[float],
     backend: Literal["auto", "gpu", "cpu"] = "auto",
     **kwargs,
 ) -> OptimizationResult:
@@ -339,7 +339,7 @@ def optimize(
 
 
 # Module-level info
-def get_available_backends() -> Dict[str, bool]:
+def get_available_backends() -> dict[str, bool]:
     """Return which backends are available"""
     return {
         "gpu": _GPU_OPTIMIZER_AVAILABLE and GPU_AVAILABLE,

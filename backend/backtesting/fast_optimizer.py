@@ -56,7 +56,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -118,7 +118,7 @@ class CandleDataCache:
 
     _instance = None
     _instance_lock = threading.Lock()  # Lock for singleton creation
-    _cache: Dict[str, Tuple[np.ndarray, float]] = {}  # key -> (data, timestamp)
+    _cache: dict[str, tuple[np.ndarray, float]] = {}  # key -> (data, timestamp)
     _max_size: int = 50  # Max cached datasets
     _ttl_seconds: float = 300.0  # 5 minutes TTL
     _lock: threading.RLock  # Lock for cache operations
@@ -135,7 +135,7 @@ class CandleDataCache:
     def _make_key(symbol: str, interval: str, start_date: str, end_date: str) -> str:
         return f"{symbol}_{interval}_{start_date}_{end_date}"
 
-    def get(self, symbol: str, interval: str, start_date: str, end_date: str) -> Optional[np.ndarray]:
+    def get(self, symbol: str, interval: str, start_date: str, end_date: str) -> np.ndarray | None:
         """Get cached candle data if exists and not expired (thread-safe)"""
         key = self._make_key(symbol, interval, start_date, end_date)
         with self._lock:
@@ -175,7 +175,7 @@ class CandleDataCache:
             self._cache.clear()
         logger.info("📦 Candle cache cleared")
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Get cache statistics (thread-safe)"""
         with self._lock:
             return {
@@ -202,7 +202,7 @@ def load_candles_fast(
     start_date: datetime,
     end_date: datetime,
     use_cache: bool = True,
-) -> Optional[np.ndarray]:
+) -> np.ndarray | None:
     """
     Load candle data directly via SQL (bypasses ORM for speed).
     Uses Polars for 3-5x faster loading when available.
@@ -407,7 +407,7 @@ def generate_detailed_trades(
     commission: float = 0.0007,  # 0.07% TradingView parity
     slippage: float = 0.0005,
     direction: int = 0,
-) -> Tuple[List[Dict], List[Dict]]:
+) -> tuple[list[dict], list[dict]]:
     """
     Generate detailed trades and equity curve for best result visualization.
     Includes MFE/MAE calculation (TradingView compatible).
@@ -497,10 +497,7 @@ def generate_detailed_trades(
 
             # RSI reversal
             if not should_exit:
-                if is_long and rsi[i - 1] <= rsi_overbought and rsi[i] > rsi_overbought:
-                    should_exit = True
-                    exit_reason = "signal"
-                elif not is_long and rsi[i - 1] >= rsi_oversold and rsi[i] < rsi_oversold:
+                if (is_long and rsi[i - 1] <= rsi_overbought and rsi[i] > rsi_overbought) or (not is_long and rsi[i - 1] >= rsi_oversold and rsi[i] < rsi_oversold):
                     should_exit = True
                     exit_reason = "signal"
 
@@ -589,11 +586,11 @@ class FastOptimizationResult:
     total_combinations: int
     tested_combinations: int
     execution_time_seconds: float
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_score: float
-    best_metrics: Dict[str, Any]
-    top_results: List[Dict[str, Any]]
-    performance_stats: Dict[str, Any]
+    best_metrics: dict[str, Any]
+    top_results: list[dict[str, Any]]
+    performance_stats: dict[str, Any]
 
 
 # =============================================================================
@@ -670,7 +667,7 @@ if NUMBA_AVAILABLE:
         commission: float,
         slippage: float,
         direction: int,  # 0=long, 1=short, 2=both
-    ) -> Tuple[float, float, float, float, int, float, float, float, float, float]:
+    ) -> tuple[float, float, float, float, int, float, float, float, float, float]:
         """
         Ultra-fast trade simulation with Numba JIT.
 
@@ -745,9 +742,7 @@ if NUMBA_AVAILABLE:
                         exit_price = entry_price * (1 - take_profit_pct / 100 / leverage)
 
                 # RSI exit signal
-                if is_long and rsi[i] > overbought:
-                    should_exit = True
-                elif not is_long and rsi[i] < oversold:
+                if (is_long and rsi[i] > overbought) or (not is_long and rsi[i] < oversold):
                     should_exit = True
 
                 if should_exit:
@@ -1117,19 +1112,19 @@ class FastGridOptimizer:
     def optimize(
         self,
         candles: pd.DataFrame,
-        rsi_period_range: List[int],
-        rsi_overbought_range: List[int],
-        rsi_oversold_range: List[int],
-        stop_loss_range: List[float],
-        take_profit_range: List[float],
+        rsi_period_range: list[int],
+        rsi_overbought_range: list[int],
+        rsi_oversold_range: list[int],
+        stop_loss_range: list[float],
+        take_profit_range: list[float],
         initial_capital: float = 10000.0,
         leverage: int = 1,
         commission: float = 0.0007,  # 0.07% TradingView parity
         slippage: float = 0.0005,
         optimize_metric: str = "sharpe_ratio",
         direction: str = "long",
-        weights: Optional[Dict[str, float]] = None,
-        filters: Optional[Dict[str, float]] = None,
+        weights: dict[str, float] | None = None,
+        filters: dict[str, float] | None = None,
     ) -> FastOptimizationResult:
         """
         Run ultra-fast grid search optimization.
@@ -1830,10 +1825,10 @@ class FastGridOptimizer:
 
     def _calculate_scores(
         self,
-        results: List[Dict],
+        results: list[dict],
         metric: str,
-        weights: Optional[Dict[str, float]] = None,
-    ) -> List[Dict]:
+        weights: dict[str, float] | None = None,
+    ) -> list[dict]:
         """Calculate optimization scores"""
         for r in results:
             if metric == "sharpe_ratio":

@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -88,7 +88,7 @@ class ChartStyle:
     figure_width: int = 1200
     figure_height: int = 800
 
-    def to_plotly_template(self) -> Dict[str, Any]:
+    def to_plotly_template(self) -> dict[str, Any]:
         """Convert to Plotly template configuration."""
         return {
             "layout": {
@@ -112,7 +112,7 @@ class ChartStyle:
             }
         }
 
-    def to_matplotlib_style(self) -> Dict[str, Any]:
+    def to_matplotlib_style(self) -> dict[str, Any]:
         """Convert to Matplotlib style configuration."""
         return {
             "figure.facecolor": self.background_color,
@@ -190,7 +190,7 @@ class EquityData:
 class BaseChart(ABC):
     """Abstract base class for all charts."""
 
-    def __init__(self, style: Optional[ChartStyle] = None):
+    def __init__(self, style: ChartStyle | None = None):
         """
         Initialize chart.
 
@@ -198,7 +198,7 @@ class BaseChart(ABC):
             style: Chart styling configuration
         """
         self.style = style or ChartStyle()
-        self._data: Dict[str, Any] = {}
+        self._data: dict[str, Any] = {}
         self._title: str = ""
         self._xlabel: str = ""
         self._ylabel: str = ""
@@ -236,10 +236,10 @@ from abc import abstractmethod
 class PlotlyChart(BaseChart):
     """Base class for Plotly-based charts."""
 
-    def __init__(self, style: Optional[ChartStyle] = None):
+    def __init__(self, style: ChartStyle | None = None):
         """Initialize Plotly chart."""
         super().__init__(style)
-        self._fig: Optional[go.Figure] = None
+        self._fig: go.Figure | None = None
 
     def render(self) -> go.Figure:
         """Render and return Plotly figure."""
@@ -270,11 +270,11 @@ class PlotlyChart(BaseChart):
 class MatplotlibChart(BaseChart):
     """Base class for Matplotlib-based charts."""
 
-    def __init__(self, style: Optional[ChartStyle] = None):
+    def __init__(self, style: ChartStyle | None = None):
         """Initialize Matplotlib chart."""
         super().__init__(style)
-        self._fig: Optional[Figure] = None
-        self._axes: Optional[Axes] = None
+        self._fig: Figure | None = None
+        self._axes: Axes | None = None
 
     def render(self) -> Figure:
         """Render and return Matplotlib figure."""
@@ -312,8 +312,8 @@ class EquityCurveChart(PlotlyChart):
     def __init__(
         self,
         equity_data: EquityData,
-        benchmark_equity: Optional[np.ndarray] = None,
-        style: Optional[ChartStyle] = None,
+        benchmark_equity: np.ndarray | None = None,
+        style: ChartStyle | None = None,
     ):
         """
         Initialize equity curve chart.
@@ -423,10 +423,10 @@ class TradeScatterChart(PlotlyChart):
 
     def __init__(
         self,
-        trades: List[TradeVisualization],
+        trades: list[TradeVisualization],
         prices: np.ndarray,
         timestamps: np.ndarray,
-        style: Optional[ChartStyle] = None,
+        style: ChartStyle | None = None,
     ):
         """
         Initialize trade scatter chart.
@@ -540,7 +540,7 @@ class PerformanceHeatmap(PlotlyChart):
         x_label: str = "Parameter 1",
         y_label: str = "Parameter 2",
         z_label: str = "Performance",
-        style: Optional[ChartStyle] = None,
+        style: ChartStyle | None = None,
     ):
         """
         Initialize performance heatmap.
@@ -634,7 +634,7 @@ class Surface3DChart(PlotlyChart):
         x_label: str = "Parameter 1",
         y_label: str = "Parameter 2",
         z_label: str = "Performance",
-        style: Optional[ChartStyle] = None,
+        style: ChartStyle | None = None,
     ):
         """
         Initialize 3D surface chart.
@@ -715,8 +715,8 @@ class CorrelationMatrixChart(PlotlyChart):
     def __init__(
         self,
         correlation_matrix: np.ndarray,
-        labels: List[str],
-        style: Optional[ChartStyle] = None,
+        labels: list[str],
+        style: ChartStyle | None = None,
     ):
         """
         Initialize correlation matrix chart.
@@ -767,7 +767,7 @@ class CorrelationMatrixChart(PlotlyChart):
 class TradeDistributionChart(PlotlyChart):
     """Trade P&L distribution visualization."""
 
-    def __init__(self, pnl_values: np.ndarray, style: Optional[ChartStyle] = None):
+    def __init__(self, pnl_values: np.ndarray, style: ChartStyle | None = None):
         """
         Initialize trade distribution chart.
 
@@ -905,7 +905,7 @@ class MonthlyReturnsHeatmap(PlotlyChart):
         self,
         returns: np.ndarray,
         timestamps: np.ndarray,
-        style: Optional[ChartStyle] = None,
+        style: ChartStyle | None = None,
     ):
         """
         Initialize monthly returns heatmap.
@@ -926,7 +926,7 @@ class MonthlyReturnsHeatmap(PlotlyChart):
             return
 
         # Convert to monthly returns
-        monthly_data: Dict[Tuple[int, int], float] = {}
+        monthly_data: dict[tuple[int, int], float] = {}
 
         for ret, ts in zip(self.returns, self.timestamps):
             if isinstance(ts, (int, float)):
@@ -948,7 +948,7 @@ class MonthlyReturnsHeatmap(PlotlyChart):
             return
 
         # Get unique years and months
-        years = sorted(set(k[0] for k in monthly_data.keys()))
+        years = sorted(set(k[0] for k in monthly_data))
         months = list(range(1, 13))
         month_names = [
             "Jan",
@@ -1037,7 +1037,7 @@ class TradingDashboard:
     """Comprehensive trading dashboard builder."""
 
     def __init__(
-        self, title: str = "Trading Dashboard", style: Optional[ChartStyle] = None
+        self, title: str = "Trading Dashboard", style: ChartStyle | None = None
     ):
         """
         Initialize trading dashboard.
@@ -1048,7 +1048,7 @@ class TradingDashboard:
         """
         self.title = title
         self.style = style or ChartStyle()
-        self._panels: List[DashboardPanel] = []
+        self._panels: list[DashboardPanel] = []
         self._rows = 1
         self._cols = 1
 
@@ -1244,7 +1244,7 @@ def plot_trade_distribution(
 
 def plot_correlation_matrix(
     data: np.ndarray,
-    labels: List[str],
+    labels: list[str],
     title: str = "Correlation Matrix",
     show: bool = True,
 ) -> CorrelationMatrixChart:
@@ -1275,7 +1275,7 @@ def plot_correlation_matrix(
 def create_backtest_report(
     equity: np.ndarray,
     timestamps: np.ndarray,
-    trades: List[TradeVisualization],
+    trades: list[TradeVisualization],
     prices: np.ndarray,
     title: str = "Backtest Report",
 ) -> TradingDashboard:
@@ -1319,7 +1319,7 @@ def create_backtest_report(
 
 
 def export_charts_to_html(
-    charts: List[BaseChart], filepath: str, title: str = "Trading Charts"
+    charts: list[BaseChart], filepath: str, title: str = "Trading Charts"
 ) -> None:
     """
     Export multiple charts to a single HTML file.

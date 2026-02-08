@@ -14,10 +14,11 @@ import asyncio
 import json
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -48,13 +49,13 @@ class AgentInfo:
 
     agent_id: str
     agent_type: str
-    capabilities: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    registered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_seen: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    capabilities: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    registered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_seen: datetime = field(default_factory=lambda: datetime.now(UTC))
     status: str = "active"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "agent_id": self.agent_id,
@@ -74,16 +75,16 @@ class Message:
     id: str = field(default_factory=lambda: f"msg_{uuid.uuid4().hex[:12]}")
     type: MessageType = MessageType.REQUEST
     sender_id: str = ""
-    receiver_id: Optional[str] = None  # None for broadcast
+    receiver_id: str | None = None  # None for broadcast
     topic: str = ""
     payload: Any = None
     priority: MessagePriority = MessagePriority.NORMAL
-    correlation_id: Optional[str] = None  # For request/response matching
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    ttl_seconds: Optional[int] = None  # Time to live
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    correlation_id: str | None = None  # For request/response matching
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    ttl_seconds: int | None = None  # Time to live
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "id": self.id,
@@ -104,7 +105,7 @@ class Message:
         return json.dumps(self.to_dict(), default=str)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Message":
+    def from_dict(cls, data: dict[str, Any]) -> Message:
         """Create from dictionary"""
         return cls(
             id=data.get("id", f"msg_{uuid.uuid4().hex[:12]}"),
@@ -117,7 +118,7 @@ class Message:
             correlation_id=data.get("correlation_id"),
             timestamp=datetime.fromisoformat(data["timestamp"])
             if data.get("timestamp")
-            else datetime.now(timezone.utc),
+            else datetime.now(UTC),
             ttl_seconds=data.get("ttl_seconds"),
             metadata=data.get("metadata", {}),
         )
@@ -126,10 +127,10 @@ class Message:
         """Check if message has expired"""
         if self.ttl_seconds is None:
             return False
-        age = (datetime.now(timezone.utc) - self.timestamp).total_seconds()
+        age = (datetime.now(UTC) - self.timestamp).total_seconds()
         return age > self.ttl_seconds
 
-    def create_response(self, payload: Any, error: bool = False) -> "Message":
+    def create_response(self, payload: Any, error: bool = False) -> Message:
         """Create response message"""
         return Message(
             type=MessageType.ERROR if error else MessageType.RESPONSE,
@@ -145,7 +146,7 @@ class MessageHandler(ABC):
     """Abstract message handler"""
 
     @abstractmethod
-    async def handle(self, message: Message) -> Optional[Any]:
+    async def handle(self, message: Message) -> Any | None:
         """Handle incoming message"""
         pass
 
@@ -156,9 +157,9 @@ class Subscription:
 
     id: str = field(default_factory=lambda: f"sub_{uuid.uuid4().hex[:8]}")
     topic: str = ""
-    handler: Optional[Callable[[Message], Any]] = None
-    filter_fn: Optional[Callable[[Message], bool]] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    handler: Callable[[Message], Any] | None = None
+    filter_fn: Callable[[Message], bool] | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class MessageBroker:
@@ -197,15 +198,15 @@ class MessageBroker:
     """
 
     def __init__(self, max_queue_size: int = 10000):
-        self._subscriptions: Dict[str, List[Subscription]] = {}
-        self._agents: Dict[str, AgentInfo] = {}
-        self._queues: Dict[str, asyncio.PriorityQueue] = {}
-        self._pending_requests: Dict[str, asyncio.Future] = {}
-        self._message_history: List[Message] = []
+        self._subscriptions: dict[str, list[Subscription]] = {}
+        self._agents: dict[str, AgentInfo] = {}
+        self._queues: dict[str, asyncio.PriorityQueue] = {}
+        self._pending_requests: dict[str, asyncio.Future] = {}
+        self._message_history: list[Message] = []
         self._max_queue_size = max_queue_size
         self._max_history_size = 1000
         self._running = False
-        self._processor_task: Optional[asyncio.Task] = None
+        self._processor_task: asyncio.Task | None = None
 
         # Statistics
         self._stats = {
@@ -251,18 +252,18 @@ class MessageBroker:
             del self._queues[agent_id]
         logger.info(f"📤 Unregistered agent: {agent_id}")
 
-    def get_agent(self, agent_id: str) -> Optional[AgentInfo]:
+    def get_agent(self, agent_id: str) -> AgentInfo | None:
         """Get agent by ID"""
         return self._agents.get(agent_id)
 
-    def list_agents(self, agent_type: Optional[str] = None) -> List[AgentInfo]:
+    def list_agents(self, agent_type: str | None = None) -> list[AgentInfo]:
         """List registered agents"""
         agents = list(self._agents.values())
         if agent_type:
             agents = [a for a in agents if a.agent_type == agent_type]
         return agents
 
-    def find_agents_by_capability(self, capability: str) -> List[AgentInfo]:
+    def find_agents_by_capability(self, capability: str) -> list[AgentInfo]:
         """Find agents with specific capability"""
         return [
             agent for agent in self._agents.values() if capability in agent.capabilities
@@ -272,7 +273,7 @@ class MessageBroker:
         self,
         topic: str,
         handler: Callable[[Message], Any],
-        filter_fn: Optional[Callable[[Message], bool]] = None,
+        filter_fn: Callable[[Message], bool] | None = None,
     ) -> str:
         """Subscribe to topic"""
         sub = Subscription(
@@ -396,7 +397,7 @@ class MessageBroker:
             result = await asyncio.wait_for(future, timeout=timeout_seconds)
             self._stats["requests_completed"] += 1
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._pending_requests.pop(message.id, None)
             raise TimeoutError(f"Request to {receiver_id} timed out")
 
@@ -415,8 +416,8 @@ class MessageBroker:
     async def receive(
         self,
         agent_id: str,
-        timeout_seconds: Optional[float] = None,
-    ) -> Optional[Message]:
+        timeout_seconds: float | None = None,
+    ) -> Message | None:
         """Receive next message for agent"""
         if agent_id not in self._queues:
             raise KeyError(f"Unknown agent: {agent_id}")
@@ -438,12 +439,12 @@ class MessageBroker:
 
             # Update agent last seen
             if agent_id in self._agents:
-                self._agents[agent_id].last_seen = datetime.now(timezone.utc)
+                self._agents[agent_id].last_seen = datetime.now(UTC)
 
             self._stats["messages_delivered"] += 1
             return message
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
     async def _process_queues(self) -> None:
@@ -456,7 +457,7 @@ class MessageBroker:
                 if future.done():
                     self._pending_requests.pop(msg_id, None)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get broker statistics"""
         return {
             **self._stats,
@@ -495,16 +496,16 @@ class AgentCommunicator:
         broker: MessageBroker,
         agent_id: str,
         agent_type: str = "generic",
-        capabilities: Optional[List[str]] = None,
+        capabilities: list[str] | None = None,
     ):
         self.broker = broker
         self.agent_id = agent_id
         self.agent_type = agent_type
         self.capabilities = capabilities or []
 
-        self._handlers: Dict[str, Callable] = {}
+        self._handlers: dict[str, Callable] = {}
         self._running = False
-        self._listener_task: Optional[asyncio.Task] = None
+        self._listener_task: asyncio.Task | None = None
 
         # Register with broker
         self.broker.register_agent(
@@ -632,7 +633,7 @@ class AgentCommunicator:
 
 
 # Global broker instance
-_global_broker: Optional[MessageBroker] = None
+_global_broker: MessageBroker | None = None
 
 
 def get_message_broker() -> MessageBroker:
@@ -644,13 +645,13 @@ def get_message_broker() -> MessageBroker:
 
 
 __all__ = [
-    "MessageType",
-    "MessagePriority",
+    "AgentCommunicator",
     "AgentInfo",
     "Message",
-    "MessageHandler",
-    "Subscription",
     "MessageBroker",
-    "AgentCommunicator",
+    "MessageHandler",
+    "MessagePriority",
+    "MessageType",
+    "Subscription",
     "get_message_broker",
 ]

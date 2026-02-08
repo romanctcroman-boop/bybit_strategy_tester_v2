@@ -14,9 +14,10 @@ import logging
 import os
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +90,10 @@ class AgentConfig:
     rate_limit: RateLimitConfig = field(default_factory=RateLimitConfig)
 
     # Raw data for custom keys
-    _raw: Dict[str, Any] = field(default_factory=dict)
+    _raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "AgentConfig":
         """Create AgentConfig from dictionary (parsed YAML)"""
         meta_data = data.get("meta", {})
         prompt_data = data.get("prompt", {})
@@ -140,10 +141,10 @@ class AgentConfig:
 # Global State & Callbacks
 # ═══════════════════════════════════════════════════════════════════════════════════
 
-_config: Optional[AgentConfig] = None
+_config: AgentConfig | None = None
 _config_lock = threading.Lock()
-_reload_callbacks: List[Callable[[AgentConfig], None]] = []
-_config_file_path: Optional[Path] = None
+_reload_callbacks: list[Callable[[AgentConfig], None]] = []
+_config_file_path: Path | None = None
 
 
 def _get_default_config_path() -> Path:
@@ -171,7 +172,7 @@ def _load_config_from_file(path: Path) -> AgentConfig:
         return AgentConfig()
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         config = AgentConfig.from_dict(data)
@@ -267,7 +268,7 @@ class ConfigWatcher:
         self.config_path = config_path
         self.poll_interval = poll_interval
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._last_mtime: float = 0
 
     def start(self) -> None:
@@ -310,7 +311,7 @@ class ConfigWatcher:
             time.sleep(self.poll_interval)
 
 
-_watcher: Optional[ConfigWatcher] = None
+_watcher: ConfigWatcher | None = None
 
 
 def start_config_watcher() -> ConfigWatcher:
@@ -349,15 +350,15 @@ def stop_config_watcher() -> None:
 
 __all__ = [
     "AgentConfig",
+    "CircuitBreakerConfig",
+    "ConfigWatcher",
     "MetaConfig",
     "PromptConfig",
-    "CircuitBreakerConfig",
     "RateLimitConfig",
     "get_agent_config",
-    "reload_config",
     "register_reload_callback",
-    "unregister_reload_callback",
+    "reload_config",
     "start_config_watcher",
     "stop_config_watcher",
-    "ConfigWatcher",
+    "unregister_reload_callback",
 ]

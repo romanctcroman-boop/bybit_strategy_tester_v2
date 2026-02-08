@@ -11,7 +11,7 @@ Handles:
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -51,11 +51,11 @@ class MTFData:
     ltf_candles: pd.DataFrame
     htf_candles: pd.DataFrame
     htf_index_map: np.ndarray
-    reference_symbol: Optional[str] = None
-    reference_candles: Optional[pd.DataFrame] = None
-    reference_index_map: Optional[np.ndarray] = None
+    reference_symbol: str | None = None
+    reference_candles: pd.DataFrame | None = None
+    reference_index_map: np.ndarray | None = None
     lookahead_mode: str = "none"
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """Validate data after initialization."""
@@ -84,7 +84,7 @@ class MTFData:
             return htf_min // ltf_min
         return 1
 
-    def get_htf_at_ltf(self, ltf_idx: int) -> Optional[pd.Series]:
+    def get_htf_at_ltf(self, ltf_idx: int) -> pd.Series | None:
         """
         Get HTF candle visible at a specific LTF bar index.
 
@@ -103,7 +103,7 @@ class MTFData:
 
         return self.htf_candles.iloc[htf_idx]
 
-    def get_reference_at_ltf(self, ltf_idx: int) -> Optional[pd.Series]:
+    def get_reference_at_ltf(self, ltf_idx: int) -> pd.Series | None:
         """
         Get reference symbol candle visible at a specific LTF bar index.
 
@@ -149,12 +149,12 @@ class MTFDataLoader:
         symbol: str,
         ltf_interval: str,
         htf_interval: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         load_limit: int = 5000,
         lookahead_mode: str = "none",
-        reference_symbol: Optional[str] = None,
-        reference_interval: Optional[str] = None,
+        reference_symbol: str | None = None,
+        reference_interval: str | None = None,
     ) -> MTFData:
         """
         Load multi-timeframe data with proper alignment.
@@ -265,8 +265,8 @@ class MTFDataLoader:
         self,
         symbol: str,
         interval: str,
-        start_date: Optional[str],
-        end_date: Optional[str],
+        start_date: str | None,
+        end_date: str | None,
         load_limit: int,
     ) -> pd.DataFrame:
         """
@@ -316,7 +316,7 @@ class MTFDataLoader:
 
         return pd.DataFrame()
 
-    def _candles_to_df(self, candles: List[Dict]) -> pd.DataFrame:
+    def _candles_to_df(self, candles: list[dict]) -> pd.DataFrame:
         """Convert list of candle dicts to DataFrame."""
         if not candles:
             return pd.DataFrame()
@@ -352,7 +352,7 @@ class MTFDataLoader:
         return df
 
     def _filter_by_date(
-        self, df: pd.DataFrame, start_date: Optional[str], end_date: Optional[str]
+        self, df: pd.DataFrame, start_date: str | None, end_date: str | None
     ) -> pd.DataFrame:
         """Filter DataFrame by date range."""
         if df.empty or "time" not in df.columns:

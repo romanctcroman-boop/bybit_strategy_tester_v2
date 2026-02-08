@@ -17,11 +17,12 @@ Part of autonomous multi-agent self-improvement initiative.
 import asyncio
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import httpx
 from loguru import logger
@@ -70,9 +71,9 @@ class HealthCheckResult:
     component: str
     status: HealthStatus
     message: str
-    checked_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    details: Dict[str, Any] = field(default_factory=dict)
-    recovery_suggested: Optional[RecoveryActionType] = None
+    checked_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    details: dict[str, Any] = field(default_factory=dict)
+    recovery_suggested: RecoveryActionType | None = None
 
 
 @dataclass
@@ -82,9 +83,9 @@ class RecoveryAction:
     action_type: RecoveryActionType
     component: str
     reason: str
-    executed_at: Optional[datetime] = None
+    executed_at: datetime | None = None
     success: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class FileOperationStrategy(str, Enum):
@@ -106,7 +107,7 @@ class FileOperationDecision:
     fallback_mode: bool
     timestamp: str
     degraded: bool = False
-    context: Optional[str] = None
+    context: str | None = None
 
 
 class HealthMonitor:
@@ -135,15 +136,15 @@ class HealthMonitor:
 
     def __init__(
         self,
-        project_root: Optional[Path] = None,
-        mcp_base_url: Optional[str] = None,
-        mcp_disabled: Optional[bool] = None,
+        project_root: Path | None = None,
+        mcp_base_url: str | None = None,
+        mcp_disabled: bool | None = None,
     ):
-        self._health_checks: Dict[str, Callable] = {}
-        self._recovery_actions: Dict[str, Callable] = {}
-        self._health_status: Dict[str, HealthCheckResult] = {}
-        self._recovery_history: List[RecoveryAction] = []
-        self._monitoring_task: Optional[asyncio.Task] = None
+        self._health_checks: dict[str, Callable] = {}
+        self._recovery_actions: dict[str, Callable] = {}
+        self._health_status: dict[str, HealthCheckResult] = {}
+        self._recovery_history: list[RecoveryAction] = []
+        self._monitoring_task: asyncio.Task | None = None
         self._is_monitoring = False
         self.project_root = Path(project_root) if project_root else PROJECT_ROOT
         base_url = (mcp_base_url or DEFAULT_MCP_TRANSPORT_URL).rstrip("/")
@@ -155,11 +156,11 @@ class HealthMonitor:
             self._mcp_health_url = f"{base_url}/health"
         self._mcp_probe_timeout = 5.0
         self._probe_ttl_seconds = FILE_STRATEGY_PROBE_TTL_SECONDS
-        self._last_probe_result: Optional[HealthCheckResult] = None
+        self._last_probe_result: HealthCheckResult | None = None
         self._fallback_mode = False
-        self._degraded_periods: List[Dict[str, Any]] = []
+        self._degraded_periods: list[dict[str, Any]] = []
         self._restart_lock = asyncio.Lock()
-        self._last_restart_attempt: Optional[datetime] = None
+        self._last_restart_attempt: datetime | None = None
         self._mcp_disabled = MCP_DISABLED if mcp_disabled is None else mcp_disabled
         self._auto_restart_enabled = not self._mcp_disabled
         self._mcp_entrypoint = "mcp-server/server.py"
@@ -172,7 +173,7 @@ class HealthMonitor:
         self,
         component: str,
         health_check_func: Callable,
-        recovery_func: Optional[Callable] = None,
+        recovery_func: Callable | None = None,
     ) -> None:
         """
         Register a health check for a component.
@@ -239,7 +240,7 @@ class HealthMonitor:
             result = HealthCheckResult(
                 component=component,
                 status=HealthStatus.UNHEALTHY,
-                message=f"Health check error: {str(e)}",
+                message=f"Health check error: {e!s}",
             )
             self._health_status[component] = result
             return result
@@ -260,7 +261,7 @@ class HealthMonitor:
             action_type=action_type,
             component=component,
             reason="Automated recovery triggered by health monitor",
-            executed_at=datetime.now(timezone.utc),
+            executed_at=datetime.now(UTC),
         )
 
         if component not in self._recovery_actions:
@@ -361,15 +362,15 @@ class HealthMonitor:
                 pass
         logger.info("Health monitoring stopped")
 
-    def get_component_health(self, component: str) -> Optional[HealthCheckResult]:
+    def get_component_health(self, component: str) -> HealthCheckResult | None:
         """Get current health status for a component"""
         return self._health_status.get(component)
 
-    def get_all_health(self) -> Dict[str, HealthCheckResult]:
+    def get_all_health(self) -> dict[str, HealthCheckResult]:
         """Get health status for all components"""
         return self._health_status.copy()
 
-    def get_recovery_history(self, limit: int = 10) -> List[RecoveryAction]:
+    def get_recovery_history(self, limit: int = 10) -> list[RecoveryAction]:
         """Get recent recovery actions"""
         return self._recovery_history[-limit:]
 
@@ -427,8 +428,8 @@ class HealthMonitor:
     # ------------------------------------------------------------------
     # MCP-specific monitoring helpers
     # ------------------------------------------------------------------
-    async def _http_probe(self) -> tuple[bool, Dict[str, Any]]:
-        details: Dict[str, Any] = {}
+    async def _http_probe(self) -> tuple[bool, dict[str, Any]]:
+        details: dict[str, Any] = {}
         try:
             async with httpx.AsyncClient(timeout=self._mcp_probe_timeout) as client:
                 response = await client.get(self._mcp_health_url)
@@ -446,7 +447,7 @@ class HealthMonitor:
             details["error"] = str(exc)
             return False, details
 
-    async def _client_ping(self) -> tuple[bool, Optional[str]]:
+    async def _client_ping(self) -> tuple[bool, str | None]:
         if not FastMcpClient or not StreamableHttpTransport:
             return False, "fastmcp_unavailable"
         try:
@@ -460,9 +461,9 @@ class HealthMonitor:
             return False, str(exc)
 
     def _build_decommissioned_result(
-        self, context: Optional[str] = None
+        self, context: str | None = None
     ) -> HealthCheckResult:
-        details: Dict[str, Any] = {"disabled": True}
+        details: dict[str, Any] = {"disabled": True}
         if context:
             details["context"] = context
         result = HealthCheckResult(
@@ -477,7 +478,7 @@ class HealthMonitor:
         return result
 
     def _update_fallback_state(
-        self, status: HealthStatus, reason: str, context: Optional[str] = None
+        self, status: HealthStatus, reason: str, context: str | None = None
     ) -> None:
         degraded = status in {HealthStatus.DEGRADED, HealthStatus.UNHEALTHY}
         if degraded and not self._fallback_mode:
@@ -488,10 +489,10 @@ class HealthMonitor:
             self._end_degraded_period(reason)
 
     def _start_degraded_period(
-        self, reason: str, context: Optional[str] = None
+        self, reason: str, context: str | None = None
     ) -> None:
         entry = {
-            "start": datetime.now(timezone.utc).isoformat(),
+            "start": datetime.now(UTC).isoformat(),
             "reason": reason,
         }
         if context:
@@ -507,18 +508,18 @@ class HealthMonitor:
         entry = self._degraded_periods[-1]
         if "end" in entry:
             return
-        entry["end"] = datetime.now(timezone.utc).isoformat()
+        entry["end"] = datetime.now(UTC).isoformat()
         entry["resolution"] = resolution
         logger.info(f"📈 MCP returned to healthy mode: {resolution}")
 
     async def probe_mcp_server(
-        self, context: Optional[str] = None
+        self, context: str | None = None
     ) -> HealthCheckResult:
         if self._mcp_disabled:
             return self._build_decommissioned_result(context)
         http_ok, http_details = await self._http_probe()
         client_ok = False
-        client_error: Optional[str] = None
+        client_error: str | None = None
         if http_ok:
             client_ok, client_error = await self._client_ping()
         else:
@@ -552,7 +553,7 @@ class HealthMonitor:
     async def _maybe_restart_mcp(self) -> None:
         if self._mcp_disabled or not self._auto_restart_enabled:
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if (
             self._last_restart_attempt
             and (now - self._last_restart_attempt).total_seconds()
@@ -582,9 +583,9 @@ class HealthMonitor:
     async def get_file_operation_strategy(
         self,
         mcp_available: bool,
-        context: Optional[str] = None,
+        context: str | None = None,
     ) -> FileOperationDecision:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         status = self._health_status.get("mcp_server")
 
         if self._mcp_disabled:
@@ -633,7 +634,7 @@ class HealthMonitor:
             decision.degraded = False
         return decision
 
-    def get_degraded_periods(self) -> List[Dict[str, Any]]:
+    def get_degraded_periods(self) -> list[dict[str, Any]]:
         return list(self._degraded_periods)
 
     def get_fallback_mode(self) -> bool:
@@ -641,7 +642,7 @@ class HealthMonitor:
 
 
 # Global singleton instance
-_health_monitor: Optional[HealthMonitor] = None
+_health_monitor: HealthMonitor | None = None
 
 
 def get_health_monitor() -> HealthMonitor:

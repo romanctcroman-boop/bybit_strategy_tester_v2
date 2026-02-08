@@ -14,9 +14,8 @@ Version: 2.3.0
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -74,7 +73,7 @@ class FeatureEngine:
     - Pattern features (candlestick patterns, support/resistance)
     """
 
-    def __init__(self, config: Optional[FeatureConfig] = None):
+    def __init__(self, config: FeatureConfig | None = None):
         """Initialize feature engine."""
         self.config = config or FeatureConfig()
 
@@ -692,7 +691,7 @@ class SignalClassifier(ABC):
     - Feature importance
     """
 
-    def __init__(self, config: Optional[ClassifierConfig] = None):
+    def __init__(self, config: ClassifierConfig | None = None):
         """Initialize classifier."""
         self.config = config or ClassifierConfig()
         self._is_trained = False
@@ -728,7 +727,7 @@ class SimpleMLPClassifier(SignalClassifier):
     Uses NumPy-only implementation for portability.
     """
 
-    def __init__(self, config: Optional[ClassifierConfig] = None):
+    def __init__(self, config: ClassifierConfig | None = None):
         """Initialize MLP classifier."""
         super().__init__(config)
         self._weights: list[NDArray] = []
@@ -933,7 +932,7 @@ class EnsemblePredictor:
     def __init__(
         self,
         base_classifier: type = SimpleMLPClassifier,
-        config: Optional[EnsembleConfig] = None,
+        config: EnsembleConfig | None = None,
     ):
         """Initialize ensemble predictor."""
         self.base_classifier = base_classifier
@@ -1062,7 +1061,7 @@ class AdaptiveSignalGenerator:
         self,
         feature_engine: FeatureEngine,
         classifier: SignalClassifier,
-        config: Optional[AdaptiveConfig] = None,
+        config: AdaptiveConfig | None = None,
     ):
         """Initialize adaptive signal generator."""
         self.feature_engine = feature_engine
@@ -1076,7 +1075,7 @@ class AdaptiveSignalGenerator:
     def generate_signal(
         self,
         ohlcv: dict[str, NDArray[np.float64]],
-    ) -> Optional[SignalPrediction]:
+    ) -> SignalPrediction | None:
         """
         Generate signal for the latest bar.
 

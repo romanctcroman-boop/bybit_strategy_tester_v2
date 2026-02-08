@@ -1,44 +1,127 @@
+"""Tests for backtest task error handling.
+
+Uses module-level stubs (identical to test_backtest_task.py) to avoid real
+DB/Celery/engine dependencies.  Stubs are restored after import.
+"""
+
 import sys
 import types
 from types import SimpleNamespace
-import pytest
+
 import pandas as pd
+import pytest
 
-# --- shims so test imports the task module without real DB/Celery/engine ---
-mod = types.ModuleType("backend.celery_app")
-mod.celery_app = SimpleNamespace(task=lambda *a, **k: (lambda f: f))
-sys.modules["backend.celery_app"] = mod
+# ---------------------------------------------------------------------------
+# Stub modules (same comprehensive set as test_backtest_task.py)
+# ---------------------------------------------------------------------------
 
-mod_db = types.ModuleType("backend.database")
-def _session_local():
-    return SimpleNamespace(close=lambda: None)
-mod_db.SessionLocal = _session_local
-class _Backtest:
-    pass
-mod_db.Backtest = _Backtest
-sys.modules["backend.database"] = mod_db
+_STUB_KEYS = [
+    "backend.celery_app",
+    "backend.database",
+    "backend.database.models",
+    "backend.database.models.backtest",
+    "backend.database.models.strategy",
+    "backend.database.models.optimization",
+    "backend.database.models.trade",
+    "backend.database.models.chat_conversation",
+    "backend.database.models.strategy_version",
+    "backend.models",
+    "backend.models.bybit_kline_audit",
+    "backend.core.backtest_engine",
+    "backend.core.engine_adapter",
+    "backend.services.data_service",
+]
+_originals = {k: sys.modules.get(k) for k in _STUB_KEYS}
 
-mod_be = types.ModuleType("backend.core.backtest_engine")
+_celery_mod = types.ModuleType("backend.celery_app")
+_celery_mod.celery_app = SimpleNamespace(task=lambda *a, **k: (lambda f: f))
+sys.modules["backend.celery_app"] = _celery_mod
+
+_db_mod = types.ModuleType("backend.database")
+_db_mod.__path__ = []
+_db_mod.SessionLocal = lambda: SimpleNamespace(close=lambda: None)
+sys.modules["backend.database"] = _db_mod
+
+_Backtest = type("Backtest", (), {})
+_Strategy = type("Strategy", (), {})
+_Optimization = type("Optimization", (), {})
+_Trade = type("Trade", (), {})
+_StrategyVersion = type("StrategyVersion", (), {})
+_ChatConversation = type("ChatConversation", (), {})
+_BybitKlineAudit = type("BybitKlineAudit", (), {})
+
+_db_models = types.ModuleType("backend.database.models")
+_db_models.__path__ = []
+for _attr, _val in {
+    "Backtest": _Backtest, "BacktestStatus": SimpleNamespace(),
+    "Strategy": _Strategy, "StrategyType": SimpleNamespace(), "StrategyStatus": SimpleNamespace(),
+    "Optimization": _Optimization, "OptimizationStatus": SimpleNamespace(), "OptimizationType": SimpleNamespace(),
+    "Trade": _Trade, "TradeSide": SimpleNamespace(), "TradeStatus": SimpleNamespace(),
+    "ChatConversation": _ChatConversation, "StrategyVersion": _StrategyVersion,
+}.items():
+    setattr(_db_models, _attr, _val)
+sys.modules["backend.database.models"] = _db_models
+
+_leaf_exports = {
+    "backend.database.models.backtest": {"Backtest": _Backtest, "BacktestStatus": SimpleNamespace()},
+    "backend.database.models.strategy": {"Strategy": _Strategy, "StrategyType": SimpleNamespace(), "StrategyStatus": SimpleNamespace()},
+    "backend.database.models.optimization": {"Optimization": _Optimization, "OptimizationStatus": SimpleNamespace(), "OptimizationType": SimpleNamespace()},
+    "backend.database.models.trade": {"Trade": _Trade, "TradeSide": SimpleNamespace(), "TradeStatus": SimpleNamespace()},
+    "backend.database.models.chat_conversation": {"ChatConversation": _ChatConversation},
+    "backend.database.models.strategy_version": {"StrategyVersion": _StrategyVersion},
+}
+for _modname, _exports in _leaf_exports.items():
+    _m = types.ModuleType(_modname)
+    for _a, _v in _exports.items():
+        setattr(_m, _a, _v)
+    sys.modules[_modname] = _m
+
+_models_mod = types.ModuleType("backend.models")
+_models_mod.__path__ = []
+for _a, _v in {
+    "Backtest": _Backtest, "BacktestStatus": SimpleNamespace(),
+    "Strategy": _Strategy, "StrategyType": SimpleNamespace(), "StrategyStatus": SimpleNamespace(),
+    "Optimization": _Optimization, "OptimizationStatus": SimpleNamespace(), "OptimizationType": SimpleNamespace(),
+    "Trade": _Trade, "TradeSide": SimpleNamespace(), "TradeStatus": SimpleNamespace(),
+    "ChatConversation": _ChatConversation, "StrategyVersion": _StrategyVersion,
+    "BybitKlineAudit": _BybitKlineAudit, "MarketData": _BybitKlineAudit,
+    "OptimizationResult": _Optimization,
+}.items():
+    setattr(_models_mod, _a, _v)
+sys.modules["backend.models"] = _models_mod
+
+_bka_mod = types.ModuleType("backend.models.bybit_kline_audit")
+_bka_mod.BybitKlineAudit = _BybitKlineAudit
+sys.modules["backend.models.bybit_kline_audit"] = _bka_mod
+
+_be_mod = types.ModuleType("backend.core.backtest_engine")
+
+
 class _BE:
     def __init__(self, **kwargs):
         pass
-mod_be.BacktestEngine = _BE
-sys.modules["backend.core.backtest_engine"] = mod_be
 
-mod_ea = types.ModuleType("backend.core.engine_adapter")
-def _get_engine(name=None, **kwargs):
-    return _BE()
-mod_ea.get_engine = _get_engine
-sys.modules["backend.core.engine_adapter"] = mod_ea
 
-mod_ds = types.ModuleType("backend.services.data_service")
-class _DS:
-    def __init__(self, db=None):
-        pass
-mod_ds.DataService = _DS
-sys.modules["backend.services.data_service"] = mod_ds
+_be_mod.BacktestEngine = _BE
+sys.modules["backend.core.backtest_engine"] = _be_mod
 
+_ea_mod = types.ModuleType("backend.core.engine_adapter")
+_ea_mod.get_engine = lambda name=None, **kwargs: _BE()
+sys.modules["backend.core.engine_adapter"] = _ea_mod
+
+_ds_mod = types.ModuleType("backend.services.data_service")
+_ds_mod.DataService = type("DataService", (), {"__init__": lambda self, db=None: None})
+sys.modules["backend.services.data_service"] = _ds_mod
+
+# ---------------------------------------------------------------------------
 from backend.tasks.backtest_tasks import run_backtest_task
+
+for _key in _STUB_KEYS:
+    if _originals[_key] is not None:
+        sys.modules[_key] = _originals[_key]
+    else:
+        sys.modules.pop(_key, None)
+# ---------------------------------------------------------------------------
 
 
 class DummyDataService:
@@ -70,13 +153,19 @@ class EngineRaiser:
 
 @pytest.fixture(autouse=True)
 def default_shims(monkeypatch):
-    # Default DataService used by import time in tasks will be replaced per-test
-    monkeypatch.setattr("backend.tasks.backtest_tasks.DataService", lambda db: DummyDataService({"id": 1, "status": "pending"}))
-    monkeypatch.setattr("backend.tasks.backtest_tasks.get_engine", lambda name, **k: EngineRaiser())
+    monkeypatch.setattr(
+        "backend.tasks.backtest_tasks.DataService",
+        lambda db: DummyDataService({"id": 1, "status": "pending"}),
+    )
+    monkeypatch.setattr(
+        "backend.tasks.backtest_tasks.get_engine",
+        lambda name, **k: EngineRaiser(),
+    )
 
 
 def make_self(retries, max_retries, raise_on_retry=False):
     req = SimpleNamespace(retries=retries)
+
     def retry(exc=None):
         if raise_on_retry:
             raise RuntimeError("retry-called")
@@ -86,13 +175,11 @@ def make_self(retries, max_retries, raise_on_retry=False):
 
 
 def test_engine_exception_no_retry(monkeypatch):
-    # DataService will record updates
     backtest = {"id": 10, "status": "pending"}
     ds = DummyDataService(backtest)
     monkeypatch.setattr("backend.tasks.backtest_tasks.DataService", lambda db: ds)
     monkeypatch.setattr("backend.tasks.backtest_tasks.get_engine", lambda name, **k: EngineRaiser())
 
-    # self with retries == max_retries -> no retry branch
     self = make_self(retries=1, max_retries=1)
 
     with pytest.raises(RuntimeError):
@@ -107,7 +194,6 @@ def test_engine_exception_no_retry(monkeypatch):
             initial_capital=10000.0,
         )
 
-    # DataService should have updated status to failed
     assert backtest.get("status") == "failed"
     assert "error_message" in backtest
 
@@ -118,7 +204,6 @@ def test_engine_exception_triggers_retry(monkeypatch):
     monkeypatch.setattr("backend.tasks.backtest_tasks.DataService", lambda db: ds)
     monkeypatch.setattr("backend.tasks.backtest_tasks.get_engine", lambda name, **k: EngineRaiser())
 
-    # self with retries < max_retries -> should call retry()
     self = make_self(retries=0, max_retries=1, raise_on_retry=True)
 
     with pytest.raises(RuntimeError) as excinfo:
@@ -134,5 +219,4 @@ def test_engine_exception_triggers_retry(monkeypatch):
         )
 
     assert "retry-called" in str(excinfo.value)
-    # DataService still updated to failed before retry
     assert backtest.get("status") == "failed"

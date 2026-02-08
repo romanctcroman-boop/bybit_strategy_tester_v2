@@ -6,7 +6,6 @@ Provides REST API endpoints for scanning repository for leaked credentials.
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -67,9 +66,9 @@ class FindingResponse(BaseModel):
     line_number: int
     line_content: str
     pattern_name: str
-    commit_hash: Optional[str] = None
-    author: Optional[str] = None
-    commit_date: Optional[datetime] = None
+    commit_hash: str | None = None
+    author: str | None = None
+    commit_date: datetime | None = None
     is_false_positive: bool
     remediation: str
 
@@ -79,7 +78,7 @@ class ScanResultResponse(BaseModel):
 
     scan_id: str
     start_time: datetime
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     status: str
     files_scanned: int
     findings_count: int
@@ -320,7 +319,7 @@ async def add_pattern(request: AddPatternRequest):
     except re.error as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid regex pattern: {str(e)}",
+            detail=f"Invalid regex pattern: {e!s}",
         )
 
     pattern = SecretPattern(

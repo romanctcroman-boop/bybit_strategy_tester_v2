@@ -7,7 +7,7 @@ to validate MTF strategy robustness on out-of-sample data.
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -30,7 +30,7 @@ class WalkForwardWindow:
     test_end: str
 
     # Optimization results
-    best_params: Dict[str, Any] = field(default_factory=dict)
+    best_params: dict[str, Any] = field(default_factory=dict)
     train_score: float = 0.0
     train_trades: int = 0
 
@@ -64,10 +64,10 @@ class WalkForwardResult:
     profitable_pct: float = 0.0
 
     # Details
-    windows: List[WalkForwardWindow] = field(default_factory=list)
+    windows: list[WalkForwardWindow] = field(default_factory=list)
 
     # Performance
-    performance_stats: Dict[str, Any] = field(default_factory=dict)
+    performance_stats: dict[str, Any] = field(default_factory=dict)
 
 
 class MTFWalkForward:
@@ -96,13 +96,13 @@ class MTFWalkForward:
         n_windows: int = 5,  # Number of walk-forward windows
         overlap_pct: float = 0.5,  # Window overlap (anchored = 0)
         # Optimization params
-        rsi_period_range: List[int] = None,
-        rsi_overbought_range: List[int] = None,
-        rsi_oversold_range: List[int] = None,
-        stop_loss_range: List[float] = None,
-        take_profit_range: List[float] = None,
-        htf_filter_types: List[str] = None,
-        htf_filter_periods: List[int] = None,
+        rsi_period_range: list[int] = None,
+        rsi_overbought_range: list[int] = None,
+        rsi_oversold_range: list[int] = None,
+        stop_loss_range: list[float] = None,
+        take_profit_range: list[float] = None,
+        htf_filter_types: list[str] = None,
+        htf_filter_periods: list[int] = None,
         # Trading config
         initial_capital: float = 10000,
         leverage: int = 10,
@@ -380,7 +380,7 @@ class MTFWalkForward:
 
     def _create_windows(
         self, n_bars: int, train_pct: float, n_windows: int, overlap_pct: float
-    ) -> List[Tuple[int, int, int, int]]:
+    ) -> list[tuple[int, int, int, int]]:
         """Create rolling walk-forward windows."""
         windows = []
 
@@ -435,11 +435,11 @@ class MTFWalkForward:
         ltf_candles: pd.DataFrame,
         htf_candles: pd.DataFrame,
         htf_index_map: np.ndarray,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         initial_capital: float,
         leverage: int,
         direction: str,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Run out-of-sample test with given params."""
         try:
             # Generate signals with best params

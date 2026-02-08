@@ -4,7 +4,7 @@ Provides API endpoints for risk monitoring and management.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -34,8 +34,8 @@ class PositionRiskRequest(BaseModel):
     entry_price: float
     current_price: float
     leverage: float = 1.0
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
 
 class PositionRiskResponse(BaseModel):
@@ -52,8 +52,8 @@ class PositionRiskResponse(BaseModel):
     exposure_pct: float
     risk_score: float
     leverage: float
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
 
 class PortfolioRiskResponse(BaseModel):
@@ -88,7 +88,7 @@ class RiskAlertResponse(BaseModel):
     value: float
     threshold: float
     timestamp: str
-    strategy_id: Optional[str] = None
+    strategy_id: str | None = None
     acknowledged: bool
 
 
@@ -97,23 +97,23 @@ class RiskSummaryResponse(BaseModel):
 
     overall_risk_level: str
     risk_score: float
-    portfolio: Dict[str, Any]
+    portfolio: dict[str, Any]
     positions_count: int
     active_alerts: int
     critical_alerts: int
-    thresholds: Dict[str, float]
-    last_update: Optional[str] = None
+    thresholds: dict[str, float]
+    last_update: str | None = None
 
 
 class ThresholdsRequest(BaseModel):
     """Request to update risk thresholds."""
 
-    max_drawdown_pct: Optional[float] = Field(None, ge=0, le=100)
-    max_exposure_pct: Optional[float] = Field(None, ge=0, le=500)
-    max_position_size_pct: Optional[float] = Field(None, ge=0, le=100)
-    max_daily_loss_pct: Optional[float] = Field(None, ge=0, le=100)
-    max_correlation: Optional[float] = Field(None, ge=0, le=1)
-    min_liquidity_ratio: Optional[float] = Field(None, ge=0, le=1)
+    max_drawdown_pct: float | None = Field(None, ge=0, le=100)
+    max_exposure_pct: float | None = Field(None, ge=0, le=500)
+    max_position_size_pct: float | None = Field(None, ge=0, le=100)
+    max_daily_loss_pct: float | None = Field(None, ge=0, le=100)
+    max_correlation: float | None = Field(None, ge=0, le=1)
+    min_liquidity_ratio: float | None = Field(None, ge=0, le=1)
 
 
 class TradeRecordRequest(BaseModel):
@@ -186,7 +186,7 @@ async def get_portfolio_risk():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/positions", response_model=List[PositionRiskResponse])
+@router.get("/positions", response_model=list[PositionRiskResponse])
 async def get_positions():
     """
     Get risk metrics for all open positions.
@@ -370,10 +370,10 @@ async def record_trade(request: TradeRecordRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/alerts", response_model=List[RiskAlertResponse])
+@router.get("/alerts", response_model=list[RiskAlertResponse])
 async def get_alerts(
     unacknowledged: bool = Query(False, description="Only show unacknowledged alerts"),
-    level: Optional[str] = Query(None, description="Filter by risk level"),
+    level: str | None = Query(None, description="Filter by risk level"),
     limit: int = Query(50, ge=1, le=100),
 ):
     """

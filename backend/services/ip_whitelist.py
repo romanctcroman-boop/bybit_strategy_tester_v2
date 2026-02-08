@@ -63,8 +63,8 @@ class IPRule:
     action_types: list[ActionType] = field(default_factory=lambda: [ActionType.ALL])
     description: str = ""
     created_at: datetime = field(default_factory=datetime.now)
-    expires_at: Optional[datetime] = None
-    created_by: Optional[str] = None
+    expires_at: datetime | None = None
+    created_by: str | None = None
     is_enabled: bool = True
 
 
@@ -77,8 +77,8 @@ class BlockedRequest:
     ip_address: str
     reason: BlockReason
     action_type: ActionType
-    request_path: Optional[str] = None
-    user_agent: Optional[str] = None
+    request_path: str | None = None
+    user_agent: str | None = None
     details: dict = field(default_factory=dict)
 
 
@@ -90,8 +90,8 @@ class IPStats:
     total_requests: int = 0
     allowed_requests: int = 0
     blocked_requests: int = 0
-    last_seen: Optional[datetime] = None
-    first_seen: Optional[datetime] = None
+    last_seen: datetime | None = None
+    first_seen: datetime | None = None
     status: IPStatus = IPStatus.UNKNOWN
 
 
@@ -118,7 +118,7 @@ class IPWhitelistService:
 
     _instance: Optional["IPWhitelistService"] = None
 
-    def __init__(self, config: Optional[WhitelistConfig] = None):
+    def __init__(self, config: WhitelistConfig | None = None):
         self.config = config or WhitelistConfig()
         self._rules: dict[str, IPRule] = {}
         self._blocked_requests: list[BlockedRequest] = []
@@ -181,10 +181,10 @@ class IPWhitelistService:
         self,
         ip_pattern: str,
         is_whitelist: bool = True,
-        action_types: Optional[list[ActionType]] = None,
+        action_types: list[ActionType] | None = None,
         description: str = "",
-        expires_at: Optional[datetime] = None,
-        created_by: Optional[str] = None,
+        expires_at: datetime | None = None,
+        created_by: str | None = None,
     ) -> IPRule:
         """Add an IP rule."""
         # Validate IP pattern
@@ -280,7 +280,7 @@ class IPWhitelistService:
         self,
         ip_address: str,
         action_type: ActionType = ActionType.ALL,
-    ) -> tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Check if an IP is allowed for an action.
 
@@ -341,7 +341,7 @@ class IPWhitelistService:
         else:
             return False, "Not in whitelist"
 
-    def _check_rate_limit(self, ip_address: str) -> tuple[bool, Optional[str]]:
+    def _check_rate_limit(self, ip_address: str) -> tuple[bool, str | None]:
         """Check rate limit for an IP."""
         now = datetime.now()
         window_start = now - timedelta(seconds=self.config.rate_limit_window_seconds)
@@ -383,9 +383,9 @@ class IPWhitelistService:
         ip_address: str,
         reason: BlockReason,
         action_type: ActionType,
-        request_path: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        details: Optional[dict] = None,
+        request_path: str | None = None,
+        user_agent: str | None = None,
+        details: dict | None = None,
     ) -> BlockedRequest:
         """Record a blocked request."""
         self._request_count += 1
@@ -447,8 +447,8 @@ class IPWhitelistService:
 
     def get_rules(
         self,
-        is_whitelist: Optional[bool] = None,
-        action_type: Optional[ActionType] = None,
+        is_whitelist: bool | None = None,
+        action_type: ActionType | None = None,
         enabled_only: bool = False,
     ) -> list[IPRule]:
         """Get IP rules."""
@@ -471,9 +471,9 @@ class IPWhitelistService:
 
     def get_blocked_requests(
         self,
-        ip_address: Optional[str] = None,
-        reason: Optional[BlockReason] = None,
-        start_time: Optional[datetime] = None,
+        ip_address: str | None = None,
+        reason: BlockReason | None = None,
+        start_time: datetime | None = None,
         limit: int = 100,
     ) -> list[BlockedRequest]:
         """Get blocked request records."""
@@ -490,7 +490,7 @@ class IPWhitelistService:
 
         return records[-limit:]
 
-    def get_ip_stats(self, ip_address: str) -> Optional[IPStats]:
+    def get_ip_stats(self, ip_address: str) -> IPStats | None:
         """Get statistics for an IP."""
         return self._ip_stats.get(ip_address)
 

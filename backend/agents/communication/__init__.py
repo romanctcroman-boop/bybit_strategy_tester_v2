@@ -5,25 +5,25 @@ Provides inter-agent communication infrastructure.
 """
 
 from .protocol import (
-    MessageType,
-    MessagePriority,
+    AgentCommunicator,
     AgentInfo,
     Message,
-    MessageHandler,
-    Subscription,
     MessageBroker,
-    AgentCommunicator,
+    MessageHandler,
+    MessagePriority,
+    MessageType,
+    Subscription,
     get_message_broker,
 )
 
 __all__ = [
-    "MessageType",
-    "MessagePriority",
+    "AgentCommunicator",
     "AgentInfo",
     "Message",
-    "MessageHandler",
-    "Subscription",
     "MessageBroker",
-    "AgentCommunicator",
+    "MessageHandler",
+    "MessagePriority",
+    "MessageType",
+    "Subscription",
     "get_message_broker",
 ]

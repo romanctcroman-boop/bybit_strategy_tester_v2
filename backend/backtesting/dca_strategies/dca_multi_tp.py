@@ -15,7 +15,7 @@ Date: 2026-01-27
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -72,8 +72,8 @@ class DCAMultiTPConfig:
     fixed_tp_pct: float = 3.0  # Single TP at 3%
 
     # Multi-TP (tp_mode=MULTI)
-    tp_levels_pct: Tuple[float, ...] = (0.5, 1.0, 1.5, 2.5)  # TP1=0.5%, TP2=1%, etc.
-    tp_portions: Tuple[float, ...] = (0.25, 0.25, 0.25, 0.25)  # 25% each
+    tp_levels_pct: tuple[float, ...] = (0.5, 1.0, 1.5, 2.5)  # TP1=0.5%, TP2=1%, etc.
+    tp_portions: tuple[float, ...] = (0.25, 0.25, 0.25, 0.25)  # 25% each
 
     # ATR TP (tp_mode=ATR)
     atr_tp_multiplier: float = 2.0  # TP = Entry ± ATR × multiplier
@@ -118,7 +118,7 @@ class DCAMultiTPConfig:
     # === RISK MANAGEMENT ===
     max_position_size_pct: float = 100.0  # Max position as % of capital
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert config to dictionary."""
         return {
             "direction": self.direction.value,
@@ -156,7 +156,7 @@ class DCAMultiTPConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DCAMultiTPConfig":
+    def from_dict(cls, data: dict[str, Any]) -> "DCAMultiTPConfig":
         """Create config from dictionary."""
         direction = DCADirection(data.get("direction", "long"))
         tp_mode = TPMode(data.get("tp_mode", "multi"))
@@ -207,7 +207,7 @@ class DCADealState:
     """
 
     # Entry tracking
-    entries: List[Tuple[float, float, int]] = field(
+    entries: list[tuple[float, float, int]] = field(
         default_factory=list
     )  # (price, size, bar_idx)
     total_cost: float = 0.0
@@ -218,8 +218,8 @@ class DCADealState:
     entry_bar: int = 0  # Bar of first entry
 
     # Multi-TP state
-    tp_prices: List[float] = field(default_factory=list)
-    tp_hit: List[bool] = field(default_factory=list)
+    tp_prices: list[float] = field(default_factory=list)
+    tp_hit: list[bool] = field(default_factory=list)
     remaining_size: float = 0.0  # After partial closes
 
     # SL state
@@ -303,16 +303,16 @@ class SignalResult:
 
     entries: pd.Series  # Boolean series for entries
     exits: pd.Series  # Boolean series for exits
-    short_entries: Optional[pd.Series] = None
-    short_exits: Optional[pd.Series] = None
-    entry_sizes: Optional[pd.Series] = None  # Position size per entry
-    short_entry_sizes: Optional[pd.Series] = None
+    short_entries: pd.Series | None = None
+    short_exits: pd.Series | None = None
+    entry_sizes: pd.Series | None = None  # Position size per entry
+    short_entry_sizes: pd.Series | None = None
 
     # Multi-TP partial close signals
-    tp1_exits: Optional[pd.Series] = None
-    tp2_exits: Optional[pd.Series] = None
-    tp3_exits: Optional[pd.Series] = None
-    tp4_exits: Optional[pd.Series] = None
+    tp1_exits: pd.Series | None = None
+    tp2_exits: pd.Series | None = None
+    tp3_exits: pd.Series | None = None
+    tp4_exits: pd.Series | None = None
 
 
 class DCAMultiTPStrategy:
@@ -453,7 +453,7 @@ class DCAMultiTPStrategy:
 
     def _calculate_tp_prices(
         self, avg_entry: float, atr: float, direction: str
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Calculate take profit prices based on mode.
 
@@ -536,8 +536,8 @@ class DCAMultiTPStrategy:
     def generate_signals(
         self,
         ohlcv: pd.DataFrame,
-        htf_ohlcv: Optional[pd.DataFrame] = None,
-        htf_index_map: Optional[np.ndarray] = None,
+        htf_ohlcv: pd.DataFrame | None = None,
+        htf_index_map: np.ndarray | None = None,
     ) -> SignalResult:
         """
         Generate trading signals with DCA, Multi-TP, and MTF filtering.
@@ -874,7 +874,7 @@ class DCAMultiTPStrategy:
             )
 
     @classmethod
-    def get_default_params(cls) -> Dict[str, Any]:
+    def get_default_params(cls) -> dict[str, Any]:
         """Get default strategy parameters."""
         return DCAMultiTPConfig().to_dict()
 
@@ -884,7 +884,7 @@ class DCAMultiTPStrategy:
 
 def create_dca_long_multi_tp(
     max_safety_orders: int = 5,
-    tp_levels_pct: Tuple[float, ...] = (0.5, 1.0, 1.5, 2.5),
+    tp_levels_pct: tuple[float, ...] = (0.5, 1.0, 1.5, 2.5),
     mtf_enabled: bool = True,
     **kwargs,
 ) -> DCAMultiTPStrategy:
@@ -911,7 +911,7 @@ def create_dca_long_multi_tp(
 
 def create_dca_short_multi_tp(
     max_safety_orders: int = 5,
-    tp_levels_pct: Tuple[float, ...] = (0.5, 1.0, 1.5, 2.5),
+    tp_levels_pct: tuple[float, ...] = (0.5, 1.0, 1.5, 2.5),
     mtf_enabled: bool = True,
     **kwargs,
 ) -> DCAMultiTPStrategy:

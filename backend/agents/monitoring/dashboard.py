@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -53,12 +53,12 @@ class DashboardWidget:
     widget_type: WidgetType
     data_source: str  # Metric name or query
     refresh_seconds: int = 30
-    position: Dict[str, int] = field(
+    position: dict[str, int] = field(
         default_factory=lambda: {"x": 0, "y": 0, "w": 4, "h": 3}
     )
-    options: Dict[str, Any] = field(default_factory=dict)
+    options: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "title": self.title,
@@ -77,14 +77,14 @@ class Dashboard:
     id: str
     name: str
     description: str = ""
-    widgets: List[DashboardWidget] = field(default_factory=list)
+    widgets: list[DashboardWidget] = field(default_factory=list)
     refresh_seconds: int = 30
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def add_widget(self, widget: DashboardWidget) -> None:
         self.widgets.append(widget)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
@@ -100,10 +100,10 @@ class WidgetData:
 
     widget_id: str
     data: Any  # Type depends on widget type
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "widget_id": self.widget_id,
             "data": self.data,
@@ -202,9 +202,9 @@ class DashboardDataProvider:
 
     def __init__(
         self,
-        metrics_collector: Optional[Any] = None,
-        alert_manager: Optional[Any] = None,
-        tracer: Optional[Any] = None,
+        metrics_collector: Any | None = None,
+        alert_manager: Any | None = None,
+        tracer: Any | None = None,
     ):
         """
         Initialize dashboard data provider
@@ -218,7 +218,7 @@ class DashboardDataProvider:
         self.alert_manager = alert_manager
         self.tracer = tracer
 
-        self.dashboards: Dict[str, Dashboard] = {}
+        self.dashboards: dict[str, Dashboard] = {}
 
         # Create default dashboard
         self._create_default_dashboard()
@@ -239,11 +239,11 @@ class DashboardDataProvider:
 
         self.dashboards[dashboard.id] = dashboard
 
-    def get_dashboard(self, dashboard_id: str) -> Optional[Dashboard]:
+    def get_dashboard(self, dashboard_id: str) -> Dashboard | None:
         """Get dashboard by ID"""
         return self.dashboards.get(dashboard_id)
 
-    def list_dashboards(self) -> List[Dict[str, Any]]:
+    def list_dashboards(self) -> list[dict[str, Any]]:
         """List all dashboards"""
         return [
             {"id": d.id, "name": d.name, "widget_count": len(d.widgets)}
@@ -271,7 +271,7 @@ class DashboardDataProvider:
         self,
         dashboard_id: str,
         time_range: TimeRange = TimeRange.LAST_1H,
-    ) -> Dict[str, WidgetData]:
+    ) -> dict[str, WidgetData]:
         """Get data for all widgets in a dashboard"""
         dashboard = self.dashboards.get(dashboard_id)
         if not dashboard:
@@ -316,12 +316,7 @@ class DashboardDataProvider:
 
         data = None
 
-        if widget.widget_type == WidgetType.COUNTER:
-            data = self.metrics_collector.get(
-                widget.data_source,
-                window_seconds=window_seconds,
-            )
-        elif widget.widget_type == WidgetType.GAUGE:
+        if widget.widget_type == WidgetType.COUNTER or widget.widget_type == WidgetType.GAUGE:
             data = self.metrics_collector.get(
                 widget.data_source,
                 window_seconds=window_seconds,
@@ -338,13 +333,13 @@ class DashboardDataProvider:
         self,
         widget: DashboardWidget,
         window_seconds: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate time series data for charts"""
         # Mock time series data
         import random
 
         points = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         interval = max(window_seconds // 60, 1)
 
         for i in range(60):
@@ -370,7 +365,7 @@ class DashboardDataProvider:
         self,
         widget: DashboardWidget,
         window_seconds: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate bar chart data"""
         if "memory" in widget.data_source:
             return {
@@ -499,7 +494,7 @@ class DashboardDataProvider:
         """Add a custom dashboard"""
         self.dashboards[dashboard.id] = dashboard
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get provider statistics"""
         return {
             "dashboard_count": len(self.dashboards),
@@ -508,10 +503,10 @@ class DashboardDataProvider:
 
 
 __all__ = [
+    "Dashboard",
     "DashboardDataProvider",
     "DashboardWidget",
-    "Dashboard",
+    "TimeRange",
     "WidgetData",
     "WidgetType",
-    "TimeRange",
 ]

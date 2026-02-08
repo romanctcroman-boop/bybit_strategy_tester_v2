@@ -15,7 +15,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Deque, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class DataQualityIssue:
     timestamp: datetime
     severity: float  # 0-1, higher = more severe
     description: str
-    raw_data: Optional[dict[str, Any]] = None
+    raw_data: dict[str, Any] | None = None
     auto_corrected: bool = False
 
 
@@ -86,7 +86,7 @@ class DataQualityMetrics:
     gaps_detected: int = 0
     spikes_detected: int = 0
     quality_score: float = 100.0
-    last_update: Optional[datetime] = None
+    last_update: datetime | None = None
     avg_latency_ms: float = 0.0
     staleness_seconds: float = 0.0
 
@@ -98,7 +98,7 @@ class ValidationResult:
     is_valid: bool
     quality_score: float
     issues: list[DataQualityIssue]
-    corrected_data: Optional[CandleData] = None
+    corrected_data: CandleData | None = None
 
 
 class MarketDataValidator:
@@ -129,8 +129,8 @@ class MarketDataValidator:
         self.min_volume = min_volume
 
         # Historical data for comparison
-        self._price_history: dict[str, Deque[float]] = {}
-        self._volume_history: dict[str, Deque[float]] = {}
+        self._price_history: dict[str, deque[float]] = {}
+        self._volume_history: dict[str, deque[float]] = {}
         self._timestamp_history: dict[str, int] = {}
 
         self._history_size = 100
@@ -142,7 +142,7 @@ class MarketDataValidator:
     def validate_candle(
         self,
         candle: CandleData,
-        previous_candle: Optional[CandleData] = None,
+        previous_candle: CandleData | None = None,
     ) -> ValidationResult:
         """Validate a single candle."""
         issues = []
@@ -257,7 +257,7 @@ class MarketDataValidator:
 
     def _check_price_spike(
         self, candle: CandleData, previous: CandleData
-    ) -> Optional[DataQualityIssue]:
+    ) -> DataQualityIssue | None:
         """Check for abnormal price changes."""
         if previous.close == 0:
             return None
@@ -283,7 +283,7 @@ class MarketDataValidator:
 
     def _check_price_gap(
         self, candle: CandleData, previous: CandleData
-    ) -> Optional[DataQualityIssue]:
+    ) -> DataQualityIssue | None:
         """Check for gap between previous close and current open."""
         if previous.close == 0:
             return None
@@ -308,7 +308,7 @@ class MarketDataValidator:
 
         return None
 
-    def _check_volume(self, candle: CandleData) -> Optional[DataQualityIssue]:
+    def _check_volume(self, candle: CandleData) -> DataQualityIssue | None:
         """Check volume for anomalies."""
         # Zero volume check
         if candle.volume == 0:
@@ -343,7 +343,7 @@ class MarketDataValidator:
 
     def _check_timestamp_gap(
         self, candle: CandleData, previous: CandleData
-    ) -> Optional[DataQualityIssue]:
+    ) -> DataQualityIssue | None:
         """Check for timestamp gaps."""
         # Calculate expected interval in milliseconds
         interval_ms = self._interval_to_ms(candle.interval)
@@ -405,7 +405,7 @@ class MarketDataValidator:
 
     def _attempt_correction(
         self, candle: CandleData, issues: list[DataQualityIssue]
-    ) -> Optional[CandleData]:
+    ) -> CandleData | None:
         """Attempt to correct data issues."""
         # Only attempt correction for OHLC issues
         ohlc_issues = [i for i in issues if i.issue_type == DataIssueType.INVALID_OHLC]
@@ -428,7 +428,7 @@ class MarketDataValidator:
         logger.info(f"Auto-corrected OHLC for {candle.symbol}:{candle.interval}")
         return corrected
 
-    def check_staleness(self, symbol: str, interval: str) -> Optional[DataQualityIssue]:
+    def check_staleness(self, symbol: str, interval: str) -> DataQualityIssue | None:
         """Check if data for a symbol is stale."""
         key = self._get_key(symbol, interval)
 
@@ -462,14 +462,14 @@ class DataQualityMonitor:
     Aggregates quality metrics and provides reporting.
     """
 
-    def __init__(self, validator: Optional[MarketDataValidator] = None):
+    def __init__(self, validator: MarketDataValidator | None = None):
         self.validator = validator or MarketDataValidator()
 
         # Metrics per symbol/interval
         self._metrics: dict[str, DataQualityMetrics] = {}
 
         # Issue history
-        self._issues: Deque[DataQualityIssue] = deque(maxlen=1000)
+        self._issues: deque[DataQualityIssue] = deque(maxlen=1000)
 
         # Last candle per symbol/interval for comparison
         self._last_candle: dict[str, CandleData] = {}
@@ -563,7 +563,7 @@ class DataQualityMonitor:
 
         metrics.last_update = datetime.now()
 
-    def get_metrics(self, symbol: str, interval: str) -> Optional[DataQualityMetrics]:
+    def get_metrics(self, symbol: str, interval: str) -> DataQualityMetrics | None:
         """Get quality metrics for a symbol/interval."""
         key = self._get_key(symbol, interval)
         return self._metrics.get(key)
@@ -575,8 +575,8 @@ class DataQualityMonitor:
     def get_recent_issues(
         self,
         limit: int = 100,
-        symbol: Optional[str] = None,
-        issue_type: Optional[DataIssueType] = None,
+        symbol: str | None = None,
+        issue_type: DataIssueType | None = None,
     ) -> list[DataQualityIssue]:
         """Get recent quality issues."""
         issues = list(self._issues)
@@ -650,7 +650,7 @@ class DataQualityMonitor:
 
 
 # Global monitor instance
-_monitor: Optional[DataQualityMonitor] = None
+_monitor: DataQualityMonitor | None = None
 
 
 def get_data_quality_monitor() -> DataQualityMonitor:

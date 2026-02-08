@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 from .crypto import CryptoManager
 from .master_key_manager import get_master_key_manager
@@ -37,8 +37,8 @@ class KeyManager:
     def __init__(self):
         if not KeyManager._initialized:
             # Store encrypted secrets only; decrypt lazily per request
-            self._encrypted_secrets: Dict[str, str] = {}
-            self._crypto: Optional[CryptoManager] = None
+            self._encrypted_secrets: dict[str, str] = {}
+            self._crypto: CryptoManager | None = None
             self._load_crypto_manager()
             self._load_encrypted_secrets()
             KeyManager._initialized = True
@@ -77,7 +77,7 @@ class KeyManager:
             return
 
         try:
-            with open(encrypted_path, "r", encoding="utf-8") as f:
+            with open(encrypted_path, encoding="utf-8") as f:
                 encrypted_secrets = json.load(f)
 
             # Keep encrypted payloads in memory; decrypt lazily on demand
@@ -126,7 +126,7 @@ class KeyManager:
             f"  2. Or encrypted_secrets.json via Settings UI"
         )
 
-    def list_keys_masked(self) -> Dict[str, str]:
+    def list_keys_masked(self) -> dict[str, str]:
         """
         List all available keys with masked values.
 
@@ -165,7 +165,7 @@ class KeyManager:
 
         return masked
 
-    def save_encrypted_keys(self, keys: Dict[str, str]):
+    def save_encrypted_keys(self, keys: dict[str, str]):
         """
         Encrypt and save API keys to file.
 
@@ -219,7 +219,7 @@ class KeyManager:
 
 
 # Global singleton instance
-_key_manager: Optional[KeyManager] = None
+_key_manager: KeyManager | None = None
 
 
 def get_key_manager() -> KeyManager:

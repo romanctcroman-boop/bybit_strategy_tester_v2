@@ -77,13 +77,28 @@ document.addEventListener('DOMContentLoaded', function () {
             // Открыть это окно, закрыть другие
             closeOtherWindows(win.id);
             win.classList.remove('floating-window-collapsed');
+            // Add class to body to indicate a floating window is open
+            document.body.classList.add('floating-window-open');
         } else {
             // Закрыть это окно
             win.classList.add('floating-window-collapsed');
+            // Check if any window is still open
+            const anyOpen = windowIds.some(function (id) {
+                const w = document.getElementById(id);
+                return w && !w.classList.contains('floating-window-collapsed');
+            });
+            if (!anyOpen) {
+                document.body.classList.remove('floating-window-open');
+            }
         }
 
         // Обновить видимость закладок после изменения состояния
         updateSpinesVisibility();
+
+        // Dispatch custom event for other components to react
+        document.dispatchEvent(new CustomEvent('floatingWindowToggle', {
+            detail: { windowId: win.id, isOpen: !win.classList.contains('floating-window-collapsed') }
+        }));
     }
 
     // Навесить обработчики на все spine
@@ -144,6 +159,197 @@ document.addEventListener('DOMContentLoaded', function () {
                 zoomPanel.classList.remove('zoom-controls-dragging');
                 zoomDrag.active = false;
             }
+        });
+    }
+
+    // ========================================
+    // LEFT SIDEBAR (Library) Toggle
+    // ========================================
+    const sidebarLeft = document.getElementById('sidebarLeft');
+    const toggleLeftBtn = document.getElementById('toggleLeftSidebarBtn');
+
+    if (sidebarLeft && toggleLeftBtn) {
+        // Start collapsed by default
+        sidebarLeft.classList.add('collapsed');
+        const arrow = toggleLeftBtn.querySelector('.tab-arrow');
+        if (arrow) {
+            arrow.style.transform = 'rotate(180deg)';
+        }
+
+        toggleLeftBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            sidebarLeft.classList.toggle('collapsed');
+
+            // Rotate arrow icon
+            const arrowIcon = toggleLeftBtn.querySelector('.tab-arrow');
+            if (arrowIcon) {
+                if (sidebarLeft.classList.contains('collapsed')) {
+                    arrowIcon.style.transform = 'rotate(180deg)';
+                } else {
+                    arrowIcon.style.transform = 'rotate(0deg)';
+                }
+            }
+        });
+    }
+
+    // ========================================
+    // CATEGORY HEADERS Toggle (collapsible sections)
+    // ========================================
+    const blockCategories = document.getElementById('blockCategories');
+
+    if (blockCategories) {
+        // Event delegation for category headers
+        blockCategories.addEventListener('click', function (e) {
+            const header = e.target.closest('.category-header');
+            if (!header) return;
+
+            // Skip if inside a category group - handled separately
+            if (header.closest('.block-category-group')) {
+                return; // Let strategy_builder.js handle group subcategories
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const category = header.closest('.block-category');
+            if (!category) return;
+
+            const wasCollapsed = category.classList.contains('collapsed');
+            const blockList = category.querySelector('.block-list');
+            const icon = header.querySelector('i');
+
+            // Toggle collapsed state with animation
+            if (wasCollapsed) {
+                // Opening - expand
+                category.classList.remove('collapsed');
+                if (icon) {
+                    icon.classList.remove('bi-chevron-right');
+                    icon.classList.add('bi-chevron-down');
+                }
+
+                // Animate block list
+                if (blockList) {
+                    blockList.style.display = 'flex';
+                    blockList.style.maxHeight = '0';
+                    blockList.style.opacity = '0';
+
+                    // Force reflow
+                    blockList.offsetHeight;
+
+                    // Animate to full height
+                    blockList.style.maxHeight = blockList.scrollHeight + 'px';
+                    blockList.style.opacity = '1';
+
+                    // After animation, remove max-height constraint
+                    setTimeout(function () {
+                        blockList.style.maxHeight = 'none';
+                    }, 300);
+                }
+
+                // Scroll category into view
+                setTimeout(function () {
+                    const container = category.closest('.block-categories');
+                    if (container) {
+                        const categoryTop = category.offsetTop - container.offsetTop;
+                        container.scrollTo({
+                            top: categoryTop,
+                            behavior: 'smooth'
+                        });
+                    }
+                }, 50);
+            } else {
+                // Closing - collapse
+                if (icon) {
+                    icon.classList.remove('bi-chevron-down');
+                    icon.classList.add('bi-chevron-right');
+                }
+
+                // Animate block list
+                if (blockList) {
+                    blockList.style.maxHeight = blockList.scrollHeight + 'px';
+                    blockList.style.opacity = '1';
+
+                    // Force reflow
+                    blockList.offsetHeight;
+
+                    // Animate to zero
+                    blockList.style.maxHeight = '0';
+                    blockList.style.opacity = '0';
+
+                    // After animation, add collapsed class and hide
+                    setTimeout(function () {
+                        category.classList.add('collapsed');
+                        blockList.style.display = 'none';
+                    }, 300);
+                } else {
+                    category.classList.add('collapsed');
+                }
+            }
+        });
+
+        // Initialize ALL categories as collapsed by default
+        const categories = blockCategories.querySelectorAll('.block-category');
+        categories.forEach(function (cat) {
+            // All categories start collapsed
+            cat.classList.add('collapsed');
+            const icon = cat.querySelector('.category-header i');
+            if (icon) {
+                icon.classList.remove('bi-chevron-down');
+                icon.classList.add('bi-chevron-right');
+            }
+            const blockList = cat.querySelector('.block-list');
+            if (blockList) {
+                blockList.style.display = 'none';
+                blockList.style.maxHeight = '0';
+                blockList.style.opacity = '0';
+            }
+        });
+    }
+
+    // ========================================
+    // REFRESH LIBRARY BUTTON
+    // ========================================
+    const refreshLibraryBtn = document.getElementById('refreshLibraryBtn');
+    if (refreshLibraryBtn) {
+        refreshLibraryBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Add spinning animation
+            refreshLibraryBtn.classList.add('spinning');
+
+            // Re-render block library (if function exists in global scope)
+            if (typeof window.renderBlockLibrary === 'function') {
+                window.renderBlockLibrary();
+            }
+
+            // Remove spinning after animation
+            setTimeout(function () {
+                refreshLibraryBtn.classList.remove('spinning');
+
+                // Re-initialize ALL categories as collapsed
+                const blockCategories = document.getElementById('blockCategories');
+                if (blockCategories) {
+                    const categories = blockCategories.querySelectorAll('.block-category');
+                    categories.forEach(function (cat) {
+                        const blockList = cat.querySelector('.block-list');
+                        const icon = cat.querySelector('.category-header i');
+
+                        // All collapsed
+                        cat.classList.add('collapsed');
+                        if (icon) {
+                            icon.classList.remove('bi-chevron-down');
+                            icon.classList.add('bi-chevron-right');
+                        }
+                        if (blockList) {
+                            blockList.style.display = 'none';
+                            blockList.style.maxHeight = '0';
+                            blockList.style.opacity = '0';
+                        }
+                    });
+                }
+            }, 500);
         });
     }
 });

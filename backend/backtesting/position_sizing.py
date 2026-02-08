@@ -7,7 +7,6 @@ Includes:
 """
 
 from dataclasses import dataclass
-from typing import List, Optional
 
 import numpy as np
 
@@ -66,7 +65,7 @@ class KellyCalculator:
 
     def calculate(
         self,
-        trades: List[TradeResult],
+        trades: list[TradeResult],
         taker_fee: float = 0.0007,
         default_size: float = 0.1,
     ) -> float:
@@ -159,7 +158,7 @@ class KellyCalculator:
 
     def get_kelly_stats(
         self,
-        trades: List[TradeResult],
+        trades: list[TradeResult],
         taker_fee: float = 0.0007,
     ) -> dict:
         """
@@ -250,7 +249,7 @@ class MonteCarloAnalyzer:
         self,
         n_simulations: int = 1000,
         confidence_level: float = 0.95,
-        random_seed: Optional[int] = None,
+        random_seed: int | None = None,
     ):
         """
         Initialize Monte Carlo Analyzer.
@@ -269,7 +268,7 @@ class MonteCarloAnalyzer:
 
     def run_simulation(
         self,
-        trades: List[TradeResult],
+        trades: list[TradeResult],
         initial_capital: float = 10000.0,
         target_return: float = 0.5,  # 50% target return
         max_drawdown_limit: float = 0.3,  # 30% max drawdown limit
@@ -384,7 +383,7 @@ class MonteCarloAnalyzer:
 
     def run_path_simulation(
         self,
-        trades: List[TradeResult],
+        trades: list[TradeResult],
         initial_capital: float = 10000.0,
         n_paths: int = 100,
     ) -> dict:

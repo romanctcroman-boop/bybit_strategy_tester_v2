@@ -14,9 +14,8 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +59,7 @@ class RateLimitState:
     tokens: float
     last_update: float
     request_count: int = 0
-    blocked_until: Optional[float] = None
+    blocked_until: float | None = None
 
 
 @dataclass
@@ -70,7 +69,7 @@ class RateLimitResult:
     allowed: bool
     remaining: int
     reset_after: float
-    retry_after: Optional[float] = None
+    retry_after: float | None = None
     limit: int = 0
     scope: str = ""
     rule_name: str = ""
@@ -85,7 +84,7 @@ class RateLimitMetrics:
     blocked_requests: int = 0
     current_rate: float = 0.0
     peak_rate: float = 0.0
-    last_blocked: Optional[datetime] = None
+    last_blocked: datetime | None = None
 
 
 class RateLimiterService:
@@ -203,7 +202,7 @@ class RateLimiterService:
             return True
         return False
 
-    def get_rule(self, name: str) -> Optional[RateLimitConfig]:
+    def get_rule(self, name: str) -> RateLimitConfig | None:
         """Get a rate limiting rule by name."""
         return self._rules.get(name)
 
@@ -336,10 +335,10 @@ class RateLimiterService:
         """Record a blocked request."""
         self._global_metrics.total_requests += 1
         self._global_metrics.blocked_requests += 1
-        self._global_metrics.last_blocked = datetime.now(timezone.utc)
+        self._global_metrics.last_blocked = datetime.now(UTC)
         self._metrics[rule_name].total_requests += 1
         self._metrics[rule_name].blocked_requests += 1
-        self._metrics[rule_name].last_blocked = datetime.now(timezone.utc)
+        self._metrics[rule_name].last_blocked = datetime.now(UTC)
 
     # ============================================================
     # Endpoint Matching
@@ -431,7 +430,7 @@ class RateLimiterService:
     # Metrics & Status
     # ============================================================
 
-    def get_metrics(self, rule_name: Optional[str] = None) -> dict:
+    def get_metrics(self, rule_name: str | None = None) -> dict:
         """Get rate limiting metrics."""
         if rule_name:
             m = self._metrics.get(rule_name, RateLimitMetrics())
@@ -526,7 +525,7 @@ class RateLimiterService:
 
 
 # Singleton instance
-_rate_limiter_service: Optional[RateLimiterService] = None
+_rate_limiter_service: RateLimiterService | None = None
 
 
 def get_rate_limiter_service() -> RateLimiterService:

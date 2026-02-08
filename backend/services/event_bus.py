@@ -11,10 +11,11 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +58,10 @@ class Event:
     event_type: str
     payload: dict[str, Any]
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     category: EventCategory = EventCategory.SYSTEM
     priority: EventPriority = EventPriority.NORMAL
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     source_service: str = "main"
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -87,7 +88,7 @@ class Event:
             payload=data["payload"],
             timestamp=datetime.fromisoformat(data["timestamp"])
             if isinstance(data.get("timestamp"), str)
-            else datetime.now(timezone.utc),
+            else datetime.now(UTC),
             category=EventCategory(data.get("category", "system")),
             priority=EventPriority(data.get("priority", 5)),
             correlation_id=data.get("correlation_id"),
@@ -112,11 +113,11 @@ class EventSubscription:
     subscription_id: str
     event_pattern: str  # Supports wildcards: "trading.*", "*.created"
     handler: Callable[[Event], Coroutine[Any, Any, None]]
-    filter_fn: Optional[Callable[[Event], bool]] = None
+    filter_fn: Callable[[Event], bool] | None = None
     priority: EventPriority = EventPriority.NORMAL
     max_retries: int = 3
     timeout_seconds: float = 30.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # ============================================================================
@@ -214,7 +215,7 @@ class InMemoryEventBus(EventBusBackend):
             try:
                 await asyncio.wait_for(sub.handler(event), timeout=sub.timeout_seconds)
                 return
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 last_error = TimeoutError(
                     f"Handler timeout after {sub.timeout_seconds}s"
                 )
@@ -324,10 +325,10 @@ class RedisEventBus(EventBusBackend):
 
     def __init__(self, redis_url: str = "redis://localhost:6379/0"):
         self.redis_url = redis_url
-        self._redis: Optional[Any] = None
-        self._pubsub: Optional[Any] = None
+        self._redis: Any | None = None
+        self._pubsub: Any | None = None
         self._subscriptions: dict[str, EventSubscription] = {}
-        self._listener_task: Optional[asyncio.Task[None]] = None
+        self._listener_task: asyncio.Task[None] | None = None
         self._running = False
         self._stats = {
             "events_published": 0,
@@ -490,7 +491,7 @@ class EventBusService:
     Automatically selects backend based on configuration.
     """
 
-    def __init__(self, backend: Optional[EventBusBackend] = None):
+    def __init__(self, backend: EventBusBackend | None = None):
         self._backend = backend or InMemoryEventBus()
         self._event_handlers: dict[
             str, list[Callable[[Event], Coroutine[Any, Any, None]]]
@@ -522,7 +523,7 @@ class EventBusService:
         payload: dict[str, Any],
         category: EventCategory = EventCategory.SYSTEM,
         priority: EventPriority = EventPriority.NORMAL,
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
     ) -> Event:
         """Publish an event."""
         event = Event(
@@ -641,7 +642,7 @@ class TradingEvents:
 # ============================================================================
 
 # Singleton event bus instance
-_event_bus: Optional[EventBusService] = None
+_event_bus: EventBusService | None = None
 
 
 def get_event_bus() -> EventBusService:
@@ -652,7 +653,7 @@ def get_event_bus() -> EventBusService:
     return _event_bus
 
 
-async def init_event_bus(redis_url: Optional[str] = None) -> EventBusService:
+async def init_event_bus(redis_url: str | None = None) -> EventBusService:
     """Initialize the global event bus with optional Redis backend."""
     global _event_bus
     if redis_url:

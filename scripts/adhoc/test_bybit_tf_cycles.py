@@ -22,6 +22,7 @@ if str(root) not in sys.path:
 
 # Меньше шума от адаптера при ошибках (статистика важнее)
 import logging
+
 logging.getLogger("backend.services.adapters.bybit").setLevel(logging.WARNING)
 
 ALL_TIMEFRAMES = ["1", "5", "15", "30", "60", "240", "D", "W", "M"]
@@ -69,7 +70,7 @@ async def fetch_via_adapter(adapter, symbol: str, tf: str) -> tuple[int, float, 
         elapsed = time.perf_counter() - t0
         n = len(rows) if rows else 0
         return n, elapsed, ""
-    except asyncio.TimeoutError:
+    except TimeoutError:
         elapsed = time.perf_counter() - t0
         return 0, elapsed, f"timeout after {REQUEST_TIMEOUT}s"
     except Exception as e:

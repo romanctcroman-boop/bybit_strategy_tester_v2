@@ -22,7 +22,7 @@ Usage:
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -128,7 +128,7 @@ class StrategyPortfolioBacktester:
         self,
         data: dict[str, pd.DataFrame],
         strategy_config: BacktestInput,
-        allocation: Optional[AssetAllocation] = None,
+        allocation: AssetAllocation | None = None,
     ) -> StrategyPortfolioResult:
         """
         Run strategy backtest for all assets.
@@ -155,13 +155,13 @@ class StrategyPortfolioBacktester:
         if allocation is None:
             allocation = AssetAllocation(method=AllocationMethod.EQUAL_WEIGHT)
             weight = 1.0 / len(self.symbols)
-            allocation.weights = {s: weight for s in self.symbols}
+            allocation.weights = dict.fromkeys(self.symbols, weight)
 
         # Ensure allocation has weights for all symbols
         if not allocation.weights:
             if allocation.method == AllocationMethod.EQUAL_WEIGHT:
                 weight = 1.0 / len(self.symbols)
-                allocation.weights = {s: weight for s in self.symbols}
+                allocation.weights = dict.fromkeys(self.symbols, weight)
             else:
                 allocation.weights = self._calculate_allocation(data, allocation.method)
 
@@ -337,7 +337,7 @@ class StrategyPortfolioBacktester:
 
         if method == AllocationMethod.EQUAL_WEIGHT:
             weight = 1.0 / len(self.symbols)
-            weights = {s: weight for s in self.symbols}
+            weights = dict.fromkeys(self.symbols, weight)
 
         elif method == AllocationMethod.RISK_PARITY:
             # Inverse volatility
@@ -374,7 +374,7 @@ class StrategyPortfolioBacktester:
         else:
             # Default: equal weight
             weight = 1.0 / len(self.symbols)
-            weights = {s: weight for s in self.symbols}
+            weights = dict.fromkeys(self.symbols, weight)
 
         return weights
 

@@ -14,29 +14,29 @@ Based on research:
 """
 
 from backend.agents.consensus.deliberation import (
-    MultiAgentDeliberation,
     AgentVote,
-    VotingStrategy,
     DeliberationResult,
+    MultiAgentDeliberation,
+    VotingStrategy,
 )
 from backend.agents.consensus.domain_agents import (
-    DomainAgent,
-    TradingStrategyAgent,
-    RiskManagementAgent,
     CodeAuditAgent,
-    MarketResearchAgent,
+    DomainAgent,
     DomainAgentRegistry,
+    MarketResearchAgent,
+    RiskManagementAgent,
+    TradingStrategyAgent,
 )
 
 __all__ = [
-    "MultiAgentDeliberation",
     "AgentVote",
-    "VotingStrategy",
+    "CodeAuditAgent",
     "DeliberationResult",
     "DomainAgent",
-    "TradingStrategyAgent",
-    "RiskManagementAgent",
-    "CodeAuditAgent",
-    "MarketResearchAgent",
     "DomainAgentRegistry",
+    "MarketResearchAgent",
+    "MultiAgentDeliberation",
+    "RiskManagementAgent",
+    "TradingStrategyAgent",
+    "VotingStrategy",
 ]

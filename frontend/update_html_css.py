@@ -121,7 +121,7 @@ def process_html_file(filepath: Path, dry_run: bool = False) -> dict:
     print(f"\n📄 Processing: {filepath.name}")
 
     # Read file
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         original_html = f.read()
 
     html = original_html

@@ -7,7 +7,7 @@ Each strategy generates entry/exit signals based on technical analysis.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -31,16 +31,16 @@ class SignalResult:
         short_exits: Boolean series for short exit signals
         entry_sizes: Optional series of position sizes for each long entry (for Volume Scale)
         short_entry_sizes: Optional series of position sizes for each short entry
+        extra_data: Optional dict for passing additional data (ATR series, etc.) to engine
     """
 
     entries: pd.Series  # Boolean series for entry signals
     exits: pd.Series  # Boolean series for exit signals
-    short_entries: Optional[pd.Series] = None  # For short positions
-    short_exits: Optional[pd.Series] = None
-    entry_sizes: Optional[pd.Series] = (
-        None  # Position size per entry (for DCA Volume Scale)
-    )
-    short_entry_sizes: Optional[pd.Series] = None  # Position size per short entry
+    short_entries: pd.Series | None = None  # For short positions
+    short_exits: pd.Series | None = None
+    entry_sizes: pd.Series | None = None  # Position size per entry (for DCA Volume Scale)
+    short_entry_sizes: pd.Series | None = None  # Position size per short entry
+    extra_data: dict | None = None  # Additional data (ATR exit series, etc.)
 
 
 class BaseStrategy(ABC):
@@ -101,9 +101,7 @@ class SMAStrategy(BaseStrategy):
         self.slow_period = int(self.params.get("slow_period", 30))
 
         if self.fast_period >= self.slow_period:
-            raise ValueError(
-                f"fast_period ({self.fast_period}) must be < slow_period ({self.slow_period})"
-            )
+            raise ValueError(f"fast_period ({self.fast_period}) must be < slow_period ({self.slow_period})")
         if self.fast_period < 2:
             raise ValueError(f"fast_period must be >= 2, got {self.fast_period}")
 
@@ -175,9 +173,7 @@ class RSIStrategy(BaseStrategy):
         if self.period < 2:
             raise ValueError(f"period must be >= 2, got {self.period}")
         if not (0 < self.oversold < self.overbought < 100):
-            raise ValueError(
-                f"Invalid levels: oversold={self.oversold}, overbought={self.overbought}"
-            )
+            raise ValueError(f"Invalid levels: oversold={self.oversold}, overbought={self.overbought}")
 
     @classmethod
     def get_default_params(cls) -> dict[str, Any]:
@@ -288,17 +284,13 @@ class MACDStrategy(BaseStrategy):
         self.signal_period = int(self.params.get("signal_period", 9))
 
         if self.fast_period >= self.slow_period:
-            raise ValueError(
-                f"fast_period ({self.fast_period}) must be < slow_period ({self.slow_period})"
-            )
+            raise ValueError(f"fast_period ({self.fast_period}) must be < slow_period ({self.slow_period})")
 
     @classmethod
     def get_default_params(cls) -> dict[str, Any]:
         return {"fast_period": 12, "slow_period": 26, "signal_period": 9}
 
-    def _calculate_macd(
-        self, close: pd.Series
-    ) -> tuple[pd.Series, pd.Series, pd.Series]:
+    def _calculate_macd(self, close: pd.Series) -> tuple[pd.Series, pd.Series, pd.Series]:
         """Calculate MACD, Signal, and Histogram"""
         fast_ema = close.ewm(span=self.fast_period, adjust=False).mean()
         slow_ema = close.ewm(span=self.slow_period, adjust=False).mean()
@@ -316,15 +308,11 @@ class MACDStrategy(BaseStrategy):
 
         # Bullish crossover: MACD crosses above Signal
         # This is LONG entry and SHORT exit
-        bullish_cross = (macd_line > signal_line) & (
-            macd_line.shift(1) <= signal_line.shift(1)
-        )
+        bullish_cross = (macd_line > signal_line) & (macd_line.shift(1) <= signal_line.shift(1))
 
         # Bearish crossover: MACD crosses below Signal
         # This is SHORT entry and LONG exit
-        bearish_cross = (macd_line < signal_line) & (
-            macd_line.shift(1) >= signal_line.shift(1)
-        )
+        bearish_cross = (macd_line < signal_line) & (macd_line.shift(1) >= signal_line.shift(1))
 
         # TradingView-compatible: NO artificial warmup period
         # TradingView starts trading immediately when crossover occurs
@@ -377,9 +365,7 @@ class BollingerBandsStrategy(BaseStrategy):
     def get_default_params(cls) -> dict[str, Any]:
         return {"period": 20, "std_dev": 2.0}
 
-    def _calculate_bollinger_bands(
-        self, close: pd.Series
-    ) -> tuple[pd.Series, pd.Series, pd.Series]:
+    def _calculate_bollinger_bands(self, close: pd.Series) -> tuple[pd.Series, pd.Series, pd.Series]:
         """Calculate Bollinger Bands: middle, upper, lower"""
         middle = close.rolling(window=self.period).mean()
         std = close.rolling(window=self.period).std()
@@ -454,18 +440,14 @@ class GridStrategy(BaseStrategy):
 
     def _validate_params(self) -> None:
         self.grid_levels = int(self.params.get("grid_levels", 5))
-        self.grid_spacing = (
-            float(self.params.get("grid_spacing", 1.0)) / 100
-        )  # Convert to decimal
+        self.grid_spacing = float(self.params.get("grid_spacing", 1.0)) / 100  # Convert to decimal
         self.take_profit = float(self.params.get("take_profit", 1.5)) / 100
         self.direction = self.params.get("direction", "long")
 
         if self.grid_levels < 2:
             raise ValueError(f"grid_levels must be >= 2, got {self.grid_levels}")
         if self.grid_spacing <= 0:
-            raise ValueError(
-                f"grid_spacing must be > 0, got {self.grid_spacing * 100}%"
-            )
+            raise ValueError(f"grid_spacing must be > 0, got {self.grid_spacing * 100}%")
 
     @classmethod
     def get_default_params(cls) -> dict[str, Any]:
@@ -567,61 +549,41 @@ class DCAStrategy(BaseStrategy):
     def _validate_params(self) -> None:
         # === DEAL START ===
         self.direction = self.params.get("_direction", "long")
-        self.cooldown = int(
-            self.params.get("cooldown_between_deals", 4)
-        )  # Min bars between deals
+        self.cooldown = int(self.params.get("cooldown_between_deals", 4))  # Min bars between deals
 
         # RSI trigger (Trade Start Condition)
         self.rsi_period = int(self.params.get("rsi_period", 14))
-        self.rsi_trigger = float(
-            self.params.get("rsi_trigger", 30 if self.direction == "long" else 70)
-        )
+        self.rsi_trigger = float(self.params.get("rsi_trigger", 30 if self.direction == "long" else 70))
 
         # === BASE ORDER ===
-        self.base_order_size = (
-            float(self.params.get("base_order_size", 10.0)) / 100
-        )  # % of capital
+        self.base_order_size = float(self.params.get("base_order_size", 10.0)) / 100  # % of capital
 
         # === SAFETY ORDERS ===
         self.max_safety_orders = int(self.params.get("max_safety_orders", 5))
-        self.safety_order_size = (
-            float(self.params.get("safety_order_size", 10.0)) / 100
-        )  # % of capital
-        self.safety_order_volume_scale = float(
-            self.params.get("safety_order_volume_scale", 1.05)
-        )  # Martingale
+        self.safety_order_size = float(self.params.get("safety_order_size", 10.0)) / 100  # % of capital
+        self.safety_order_volume_scale = float(self.params.get("safety_order_volume_scale", 1.05))  # Martingale
 
         # Price deviation (% drop from entry to trigger SO)
         self.price_deviation = float(self.params.get("price_deviation", 1.0)) / 100
-        self.step_scale = float(
-            self.params.get("step_scale", 1.4)
-        )  # Logarithmic scaling
+        self.step_scale = float(self.params.get("step_scale", 1.4))  # Logarithmic scaling
 
         # === TAKE PROFIT ===
         self.target_profit = float(self.params.get("target_profit", 2.5)) / 100
-        self.trailing_deviation = (
-            float(self.params.get("trailing_deviation", 0.4)) / 100
-        )
+        self.trailing_deviation = float(self.params.get("trailing_deviation", 0.4)) / 100
 
         # === STOP LOSS ===
         self.stop_loss = float(self.params.get("stop_loss", 0.0)) / 100  # 0 = disabled
-        self.stop_loss_type = self.params.get(
-            "stop_loss_type", "last_order"
-        )  # 'average' or 'last_order'
+        self.stop_loss_type = self.params.get("stop_loss_type", "last_order")  # 'average' or 'last_order'
 
         # === VELES-STYLE PARAMETERS ===
         # Max Active Safety Orders (Veles: "Частичное выставление сетки")
         # 0 = disabled (all SOs active), >0 = limit to N active SOs
-        self.max_active_safety_orders = int(
-            self.params.get("max_active_safety_orders", 0)
-        )
+        self.max_active_safety_orders = int(self.params.get("max_active_safety_orders", 0))
 
         # Grid Trailing Deviation (Veles: "Подтяжка сетки")
         # If price moves away from entry by this %, cancel deal and wait for new entry
         # 0 = disabled
-        self.grid_trailing_deviation = (
-            float(self.params.get("grid_trailing_deviation", 0.0)) / 100
-        )
+        self.grid_trailing_deviation = float(self.params.get("grid_trailing_deviation", 0.0)) / 100
 
         # Max Deals (Veles: "Остановить бота после N сделок")
         # 0 = unlimited, >0 = stop after N completed deals
@@ -635,21 +597,13 @@ class DCAStrategy(BaseStrategy):
 
         # Validation
         if self.max_safety_orders < 0:
-            raise ValueError(
-                f"max_safety_orders must be >= 0, got {self.max_safety_orders}"
-            )
+            raise ValueError(f"max_safety_orders must be >= 0, got {self.max_safety_orders}")
         if self.target_profit <= 0:
-            raise ValueError(
-                f"target_profit must be > 0, got {self.target_profit * 100}%"
-            )
+            raise ValueError(f"target_profit must be > 0, got {self.target_profit * 100}%")
         if self.stop_loss_type not in ("average", "last_order"):
-            raise ValueError(
-                f"stop_loss_type must be 'average' or 'last_order', got {self.stop_loss_type}"
-            )
+            raise ValueError(f"stop_loss_type must be 'average' or 'last_order', got {self.stop_loss_type}")
         if self.direction not in ("long", "short"):
-            raise ValueError(
-                f"_direction must be 'long' or 'short', got {self.direction}"
-            )
+            raise ValueError(f"_direction must be 'long' or 'short', got {self.direction}")
 
         # Pre-calculate safety order deviation levels
         self._calculate_so_levels()
@@ -796,10 +750,7 @@ class DCAStrategy(BaseStrategy):
 
                     # === TP SIGNAL MODE: RSI-based exit (Veles: "Тейк-профит Сигнал") ===
                     # Exit when RSI goes overbought (for LONG), overriding trailing TP
-                    if (
-                        self.tp_signal_mode == "rsi"
-                        and rsi.iloc[i] > self.tp_signal_rsi_exit
-                    ):
+                    if self.tp_signal_mode == "rsi" and rsi.iloc[i] > self.tp_signal_rsi_exit:
                         long_exits.iloc[i] = True
                         entry_count = 0
                         last_deal_bar = i
@@ -836,9 +787,7 @@ class DCAStrategy(BaseStrategy):
                     # === GRID TRAILING (Подтяжка сетки Veles-style) ===
                     # If price moves UP away from entry, cancel deal and wait for new entry
                     if self.grid_trailing_deviation > 0:
-                        grid_trailing_price = base_entry_price * (
-                            1 + self.grid_trailing_deviation
-                        )
+                        grid_trailing_price = base_entry_price * (1 + self.grid_trailing_deviation)
                         if current_high >= grid_trailing_price:
                             # Cancel deal without exit signal (no position to close if just base order)
                             long_exits.iloc[i] = True
@@ -850,9 +799,7 @@ class DCAStrategy(BaseStrategy):
                             last_entry_price = 0.0
                             trailing_active = False
                             peak_high = 0.0
-                            completed_deals += (
-                                1  # Count as completed deal (grid trailing cancel)
-                            )
+                            completed_deals += 1  # Count as completed deal (grid trailing cancel)
                             continue
 
                 # === CHECK ENTRY CONDITIONS ===
@@ -868,9 +815,7 @@ class DCAStrategy(BaseStrategy):
                         rsi_signal = rsi.iloc[i] < self.rsi_trigger
                         if rsi_signal:
                             long_entries.iloc[i] = True
-                            entry_sizes.iloc[i] = (
-                                self.base_order_size
-                            )  # Volume Scale: base order size
+                            entry_sizes.iloc[i] = self.base_order_size  # Volume Scale: base order size
                             entry_count = 1
                             base_entry_price = close.iloc[i]
                             last_entry_price = close.iloc[i]
@@ -892,9 +837,7 @@ class DCAStrategy(BaseStrategy):
 
                             if low.iloc[i] <= so_trigger_price:
                                 long_entries.iloc[i] = True
-                                entry_sizes.iloc[i] = self.so_volumes[
-                                    so_index
-                                ]  # Volume Scale: scaled SO size
+                                entry_sizes.iloc[i] = self.so_volumes[so_index]  # Volume Scale: scaled SO size
                                 entry_count += 1
                                 last_entry_price = close.iloc[i]
                                 cumulative_cost += close.iloc[i]
@@ -1002,9 +945,7 @@ class DCAStrategy(BaseStrategy):
                         rsi_signal = rsi.iloc[i] > self.rsi_trigger
                         if rsi_signal:
                             short_entries.iloc[i] = True
-                            short_entry_sizes.iloc[i] = (
-                                self.base_order_size
-                            )  # Volume Scale
+                            short_entry_sizes.iloc[i] = self.base_order_size  # Volume Scale
                             entry_count = 1
                             base_entry_price = close.iloc[i]
                             last_entry_price = close.iloc[i]
@@ -1019,9 +960,7 @@ class DCAStrategy(BaseStrategy):
 
                             if high.iloc[i] >= so_trigger_price:
                                 short_entries.iloc[i] = True
-                                short_entry_sizes.iloc[i] = self.so_volumes[
-                                    so_index
-                                ]  # Volume Scale
+                                short_entry_sizes.iloc[i] = self.so_volumes[so_index]  # Volume Scale
                                 entry_count += 1
                                 last_entry_price = close.iloc[i]
                                 cumulative_cost += close.iloc[i]
@@ -1127,9 +1066,7 @@ class MartingaleStrategy(BaseStrategy):
                         long_entries.iloc[i] = True
                         entry_count += 1
                         # Update average (simplified - actual is weighted)
-                        avg_entry_price = (
-                            avg_entry_price * (entry_count - 1) + close.iloc[i]
-                        ) / entry_count
+                        avg_entry_price = (avg_entry_price * (entry_count - 1) + close.iloc[i]) / entry_count
                         last_entry_price = close.iloc[i]
 
                 # Check for exit on recovery
@@ -1158,9 +1095,7 @@ STRATEGY_REGISTRY: dict[str, type[BaseStrategy]] = {
 }
 
 
-def get_strategy(
-    strategy_type: str, params: dict[str, Any] | None = None
-) -> BaseStrategy:
+def get_strategy(strategy_type: str, params: dict[str, Any] | None = None) -> BaseStrategy:
     """
     Factory function to get a strategy instance.
 
@@ -1177,9 +1112,7 @@ def get_strategy(
     strategy_class = STRATEGY_REGISTRY.get(strategy_type)
     if strategy_class is None:
         available = list(STRATEGY_REGISTRY.keys())
-        raise ValueError(
-            f"Unknown strategy type: {strategy_type}. Available: {available}"
-        )
+        raise ValueError(f"Unknown strategy type: {strategy_type}. Available: {available}")
 
     return strategy_class(params)
 

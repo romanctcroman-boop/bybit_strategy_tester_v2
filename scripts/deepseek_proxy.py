@@ -34,7 +34,7 @@ if _ENV_FILE.exists():
                 os.environ[key] = value
                 break
 
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 PORT = int(os.environ.get("DEEPSEEK_PROXY_PORT", "5000"))
 DEEPSEEK_BASE = "https://api.deepseek.com"

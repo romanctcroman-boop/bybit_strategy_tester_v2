@@ -632,13 +632,12 @@ class TestMCPServerChecks:
             mock_client.__aenter__.return_value = mock_client
             mock_client.get.return_value = mock_response
 
-            with patch("backend.agents.agent_background_service.logger") as mock_logger:
-                with patch(
-                    "backend.agents.agent_background_service.httpx.AsyncClient",
-                    return_value=mock_client,
-                ):
-                    service = AIAgentBackgroundService()
-                    await service._check_mcp_server()
+            with patch("backend.agents.agent_background_service.logger") as mock_logger, patch(
+                "backend.agents.agent_background_service.httpx.AsyncClient",
+                return_value=mock_client,
+            ):
+                service = AIAgentBackgroundService()
+                await service._check_mcp_server()
 
             info_calls = " ".join(str(call) for call in mock_logger.info.call_args_list)
             assert "MCP Server" in info_calls

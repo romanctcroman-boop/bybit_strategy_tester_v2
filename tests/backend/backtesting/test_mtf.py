@@ -140,17 +140,13 @@ class TestHTFIndexMapping:
         htf_low = np.array([98.0, 103.0])
         htf_open = np.array([99.0, 104.0])
 
-        o, h, l, c = get_htf_bar_at_ltf(
-            2, htf_map, htf_close, htf_high, htf_low, htf_open
-        )
+        o, h, l, c = get_htf_bar_at_ltf(2, htf_map, htf_close, htf_high, htf_low, htf_open)
         assert c == 100.0
         assert h == 102.0
         assert l == 98.0
         assert o == 99.0
 
-        o, h, l, c = get_htf_bar_at_ltf(
-            4, htf_map, htf_close, htf_high, htf_low, htf_open
-        )
+        o, h, l, c = get_htf_bar_at_ltf(4, htf_map, htf_close, htf_high, htf_low, htf_open)
         assert c == 105.0
 
     def test_validate_htf_index_map(self):
@@ -226,14 +222,19 @@ class TestHTFFilters:
         assert sma[4] == pytest.approx(4.0)  # (3+4+5)/3
 
     def test_calculate_ema(self):
-        """Test EMA calculation."""
+        """Test EMA calculation.
+
+        Implementation seeds ema[0] = source[0] and uses alpha = 2/(period+1).
+        No NaN warmup — values are valid from index 0.
+        """
         values = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
         ema = calculate_ema(values, 3)
 
-        assert np.isnan(ema[0])
-        assert np.isnan(ema[1])
-        assert ema[2] == pytest.approx(2.0)  # Initial SMA(3)
-        # EMA continues from there
+        # alpha = 2/(3+1) = 0.5
+        assert ema[0] == pytest.approx(1.0)  # Seeded with first value
+        assert ema[1] == pytest.approx(1.5)  # 0.5*2 + 0.5*1
+        assert ema[2] == pytest.approx(2.25)  # 0.5*3 + 0.5*1.5
+        assert len(ema) == len(values)
 
 
 class TestMTFSignals:
@@ -290,9 +291,7 @@ class TestMTFSignals:
         htf_map = np.maximum(htf_map, -1)  # Ensure -1 minimum
         return htf_map
 
-    def test_generate_mtf_rsi_signals_basic(
-        self, sample_ltf_data, sample_htf_data, sample_htf_index_map
-    ):
+    def test_generate_mtf_rsi_signals_basic(self, sample_ltf_data, sample_htf_data, sample_htf_index_map):
         """Test basic MTF RSI signal generation."""
         long_entries, long_exits, short_entries, short_exits = generate_mtf_rsi_signals(
             ltf_candles=sample_ltf_data,
@@ -314,29 +313,23 @@ class TestMTFSignals:
         assert long_entries.dtype == bool
         assert short_entries.dtype == bool
 
-    def test_generate_mtf_sma_crossover_signals_basic(
-        self, sample_ltf_data, sample_htf_data, sample_htf_index_map
-    ):
+    def test_generate_mtf_sma_crossover_signals_basic(self, sample_ltf_data, sample_htf_data, sample_htf_index_map):
         """Test basic MTF SMA crossover signal generation."""
-        long_entries, long_exits, short_entries, short_exits = (
-            generate_mtf_sma_crossover_signals(
-                ltf_candles=sample_ltf_data,
-                htf_candles=sample_htf_data,
-                htf_index_map=sample_htf_index_map,
-                fast_period=5,
-                slow_period=10,
-                htf_filter_type="sma",
-                htf_filter_period=3,
-                direction="both",
-            )
+        long_entries, long_exits, short_entries, short_exits = generate_mtf_sma_crossover_signals(
+            ltf_candles=sample_ltf_data,
+            htf_candles=sample_htf_data,
+            htf_index_map=sample_htf_index_map,
+            fast_period=5,
+            slow_period=10,
+            htf_filter_type="sma",
+            htf_filter_period=3,
+            direction="both",
         )
 
         assert len(long_entries) == len(sample_ltf_data)
         assert len(short_entries) == len(sample_ltf_data)
 
-    def test_mtf_signals_long_only(
-        self, sample_ltf_data, sample_htf_data, sample_htf_index_map
-    ):
+    def test_mtf_signals_long_only(self, sample_ltf_data, sample_htf_data, sample_htf_index_map):
         """Test long-only direction."""
         long_entries, _, short_entries, _ = generate_mtf_rsi_signals(
             ltf_candles=sample_ltf_data,
@@ -348,9 +341,7 @@ class TestMTFSignals:
         # No short signals in long-only mode
         assert np.sum(short_entries) == 0
 
-    def test_mtf_signals_short_only(
-        self, sample_ltf_data, sample_htf_data, sample_htf_index_map
-    ):
+    def test_mtf_signals_short_only(self, sample_ltf_data, sample_htf_data, sample_htf_index_map):
         """Test short-only direction."""
         long_entries, _, short_entries, _ = generate_mtf_rsi_signals(
             ltf_candles=sample_ltf_data,

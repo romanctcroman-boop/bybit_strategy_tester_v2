@@ -16,7 +16,6 @@ Universal Filter Engine - Фильтрация сигналов по ВСЕМ у
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -220,7 +219,7 @@ def apply_htf_filter(
     htf_ma: np.ndarray,
     index_map: np.ndarray,
     neutral_zone_pct: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply HTF trend filter to signals.
 
@@ -271,7 +270,7 @@ def apply_btc_correlation_filter(
     btc_close: np.ndarray,
     btc_ma: np.ndarray,
     index_map: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply BTC correlation filter for altcoins.
     Long only when BTC is bullish, Short only when BTC is bearish.
@@ -302,7 +301,7 @@ def apply_volatility_filter(
     atr_percentile: np.ndarray,
     min_percentile: float,
     max_percentile: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply volatility filter: trade only within ATR percentile range.
     """
@@ -326,7 +325,7 @@ def apply_volume_filter(
     short_entries: np.ndarray,
     volume_percentile: np.ndarray,
     min_percentile: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply volume filter: trade only when volume is above min percentile.
     """
@@ -351,7 +350,7 @@ def apply_trend_filter(
     close: np.ndarray,
     trend_ma: np.ndarray,
     mode: int,  # 0 = with trend, 1 = against trend
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply trend filter.
     Mode 0 (with trend): Long when price > MA, Short when price < MA
@@ -385,7 +384,7 @@ def apply_momentum_filter(
     rsi: np.ndarray,
     oversold: float,
     overbought: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply momentum filter: avoid trading in extreme RSI zones.
     Long: not in overbought zone
@@ -410,7 +409,7 @@ def apply_market_regime_filter(
     short_entries: np.ndarray,
     hurst: np.ndarray,
     regime_filter: int,  # 0=all, 1=trending, 2=ranging, 3=volatile, 4=not_volatile
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply market regime filter based on Hurst exponent.
 
@@ -457,7 +456,7 @@ def apply_time_filter(
     session_end: int,
     no_trade_days: np.ndarray,
     no_trade_hours: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Apply time-based filter.
 
@@ -519,16 +518,16 @@ class FilterConfig:
 
     # MTF HTF Filter
     mtf_enabled: bool = False
-    mtf_htf_candles: Optional[pd.DataFrame] = None
-    mtf_htf_index_map: Optional[np.ndarray] = None
+    mtf_htf_candles: pd.DataFrame | None = None
+    mtf_htf_index_map: np.ndarray | None = None
     mtf_filter_type: str = "sma"  # "sma" or "ema"
     mtf_filter_period: int = 200
     mtf_neutral_zone_pct: float = 0.0
 
     # BTC Correlation Filter
     btc_filter_enabled: bool = False
-    btc_candles: Optional[pd.DataFrame] = None
-    btc_index_map: Optional[np.ndarray] = None
+    btc_candles: pd.DataFrame | None = None
+    btc_index_map: np.ndarray | None = None
     btc_filter_period: int = 50
 
     # Volatility Filter
@@ -564,8 +563,8 @@ class FilterConfig:
     time_filter_enabled: bool = False
     session_start_hour: int = 0
     session_end_hour: int = 24
-    no_trade_days: Tuple[int, ...] = ()
-    no_trade_hours: Tuple[int, ...] = ()
+    no_trade_days: tuple[int, ...] = ()
+    no_trade_hours: tuple[int, ...] = ()
 
 
 @dataclass
@@ -574,8 +573,8 @@ class FilterOutput:
 
     long_entries: np.ndarray
     short_entries: np.ndarray
-    filters_applied: List[str] = field(default_factory=list)
-    filter_stats: Dict[str, Dict] = field(default_factory=dict)
+    filters_applied: list[str] = field(default_factory=list)
+    filter_stats: dict[str, dict] = field(default_factory=dict)
 
 
 class UniversalFilterEngine:

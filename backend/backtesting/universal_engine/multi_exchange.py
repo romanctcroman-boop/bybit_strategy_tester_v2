@@ -19,13 +19,12 @@ Author: Universal Math Engine Team
 Version: 2.3.0
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
 
 # =============================================================================
 # 1. EXCHANGE CONNECTOR
@@ -147,7 +146,7 @@ class ExchangeConnector:
         """Disconnect from exchange."""
         self._connected = False
 
-    def get_ticker(self, symbol: str) -> Optional[ExchangeTicker]:
+    def get_ticker(self, symbol: str) -> ExchangeTicker | None:
         """
         Get current ticker for a symbol.
 
@@ -170,7 +169,7 @@ class ExchangeConnector:
             volume_24h=1000000.0,
         )
 
-    def get_balance(self, currency: str) -> Optional[ExchangeBalance]:
+    def get_balance(self, currency: str) -> ExchangeBalance | None:
         """Get balance for a currency."""
         return ExchangeBalance(
             exchange=self.config.exchange,
@@ -186,7 +185,7 @@ class ExchangeConnector:
         side: str,
         order_type: str,
         quantity: float,
-        price: Optional[float] = None,
+        price: float | None = None,
     ) -> dict[str, Any]:
         """Place an order on the exchange."""
         return {
@@ -225,8 +224,8 @@ class ArbitrageOpportunity:
 
     # Symbol(s) involved
     symbol: str
-    symbol_leg2: Optional[str] = None
-    symbol_leg3: Optional[str] = None
+    symbol_leg2: str | None = None
+    symbol_leg3: str | None = None
 
     # Prices
     buy_price: float = 0.0
@@ -291,7 +290,7 @@ class ArbitrageDetector:
     def __init__(
         self,
         connectors: list[ExchangeConnector],
-        config: Optional[ArbitrageConfig] = None,
+        config: ArbitrageConfig | None = None,
     ):
         """Initialize arbitrage detector."""
         self.connectors = {c.config.exchange: c for c in connectors}
@@ -341,7 +340,7 @@ class ArbitrageDetector:
         sell_ticker: ExchangeTicker,
         buy_ex: ExchangeName,
         sell_ex: ExchangeName,
-    ) -> Optional[ArbitrageOpportunity]:
+    ) -> ArbitrageOpportunity | None:
         """Check spatial arbitrage between two exchanges."""
         # Buy at ask, sell at bid
         buy_price = buy_ticker.ask
@@ -560,7 +559,7 @@ class ArbitrageExecution:
 
     # Status
     success: bool
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     # Timing
     execution_time_ms: int = 0
@@ -598,7 +597,7 @@ class CrossExchangeTrader:
     def __init__(
         self,
         connectors: dict[ExchangeName, ExchangeConnector],
-        config: Optional[TraderConfig] = None,
+        config: TraderConfig | None = None,
     ):
         """Initialize cross-exchange trader."""
         self.connectors = connectors
@@ -609,7 +608,7 @@ class CrossExchangeTrader:
     def execute(
         self,
         opportunity: ArbitrageOpportunity,
-        size: Optional[float] = None,
+        size: float | None = None,
     ) -> ArbitrageExecution:
         """
         Execute an arbitrage opportunity.
@@ -950,8 +949,8 @@ class LatencySimulator:
 
     def __init__(
         self,
-        profiles: Optional[dict[ExchangeName, LatencyProfile]] = None,
-        seed: Optional[int] = None,
+        profiles: dict[ExchangeName, LatencyProfile] | None = None,
+        seed: int | None = None,
     ):
         """Initialize latency simulator."""
         self.profiles = profiles or self._default_profiles()

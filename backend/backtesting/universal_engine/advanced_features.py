@@ -15,7 +15,6 @@ Advanced Features для Universal Math Engine.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from numba import njit
@@ -85,8 +84,8 @@ class ScaleInConfig:
     max_additions: int = 3  # Максимум добавлений
 
     # Fixed levels mode
-    profit_levels: List[float] = field(default_factory=lambda: [0.01, 0.02, 0.03])
-    size_multipliers: List[float] = field(default_factory=lambda: [0.5, 0.3, 0.2])
+    profit_levels: list[float] = field(default_factory=lambda: [0.01, 0.02, 0.03])
+    size_multipliers: list[float] = field(default_factory=lambda: [0.5, 0.3, 0.2])
 
     # ATR-based mode
     atr_multiplier: float = 1.0
@@ -105,8 +104,8 @@ class PartialCloseConfig:
     enabled: bool = False
 
     # Уровни TP и размеры закрытия
-    tp_levels: List[float] = field(default_factory=lambda: [0.01, 0.02, 0.03])
-    close_percentages: List[float] = field(default_factory=lambda: [0.25, 0.50, 0.25])
+    tp_levels: list[float] = field(default_factory=lambda: [0.01, 0.02, 0.03])
+    close_percentages: list[float] = field(default_factory=lambda: [0.25, 0.50, 0.25])
 
     # Trailing после первого TP
     enable_trailing_after_tp1: bool = True
@@ -131,7 +130,7 @@ class TimeExitConfig:
     friday_close_hour: int = 22
 
     # Force close if in loss after N bars
-    force_close_after_bars: Optional[int] = None
+    force_close_after_bars: int | None = None
     force_close_only_if_profit: bool = False
 
 
@@ -369,7 +368,7 @@ def simulate_scale_in_trade(
     scale_in_levels: np.ndarray,
     scale_in_sizes: np.ndarray,
     max_additions: int,
-) -> Tuple[int, float, float, int]:
+) -> tuple[int, float, float, int]:
     """
     Симулировать сделку с Scale-in.
 
@@ -463,7 +462,7 @@ def simulate_partial_close_trade(
     stop_loss: float,
     tp_levels: np.ndarray,
     close_percentages: np.ndarray,
-) -> Tuple[int, float, float, int]:
+) -> tuple[int, float, float, int]:
     """
     Симулировать сделку с частичным закрытием.
 
@@ -568,12 +567,12 @@ class AdvancedFeatures:
 
     def __init__(
         self,
-        scale_in_config: Optional[ScaleInConfig] = None,
-        partial_close_config: Optional[PartialCloseConfig] = None,
-        time_exit_config: Optional[TimeExitConfig] = None,
-        slippage_config: Optional[SlippageConfig] = None,
-        funding_config: Optional[FundingConfig] = None,
-        hedge_config: Optional[HedgeConfig] = None,
+        scale_in_config: ScaleInConfig | None = None,
+        partial_close_config: PartialCloseConfig | None = None,
+        time_exit_config: TimeExitConfig | None = None,
+        slippage_config: SlippageConfig | None = None,
+        funding_config: FundingConfig | None = None,
+        hedge_config: HedgeConfig | None = None,
     ):
         self.scale_in = scale_in_config or ScaleInConfig()
         self.partial_close = partial_close_config or PartialCloseConfig()
@@ -648,7 +647,7 @@ class AdvancedFeatures:
         self,
         entry_price: float,
         direction: int,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Получить уровни и размеры для scale-in."""
         if not self.scale_in.enabled:
             return np.array([]), np.array([])
@@ -667,7 +666,7 @@ class AdvancedFeatures:
         self,
         entry_price: float,
         direction: int,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Получить уровни и размеры для частичного закрытия."""
         if not self.partial_close.enabled:
             return np.array([]), np.array([])
@@ -759,7 +758,7 @@ class HedgeManager:
     Позволяет держать Long и Short одновременно.
     """
 
-    def __init__(self, config: Optional[HedgeConfig] = None):
+    def __init__(self, config: HedgeConfig | None = None):
         self.config = config or HedgeConfig()
         self.position = HedgePosition()
 

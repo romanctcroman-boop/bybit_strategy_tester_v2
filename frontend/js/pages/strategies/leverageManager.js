@@ -330,12 +330,26 @@ function updateRiskIndicator(indicator, leverage, volatility, positionValue = 10
 export async function updateLeverageRiskForElements(opts) {
     const { symbolEl, capitalEl, positionSizeTypeEl, positionSizeEl, leverageVal, riskIndicatorEl } = opts;
     if (!riskIndicatorEl || leverageVal == null) return;
-    const symbol = symbolEl?.value?.trim()?.toUpperCase() || 'BTCUSDT';
+
+    const rawSymbol = symbolEl?.value?.trim()?.toUpperCase() || '';
+
+    // If no symbol selected, hide risk indicator or show placeholder
+    if (!rawSymbol) {
+        riskIndicatorEl.textContent = '';
+        riskIndicatorEl.classList.remove('risk-low', 'risk-medium', 'risk-high', 'risk-extreme');
+        riskIndicatorEl.style.display = 'none';
+        return;
+    }
+
+    // Show indicator when symbol is selected
+    riskIndicatorEl.style.display = '';
+
+    const symbol = rawSymbol;
     const capital = parseFloat(capitalEl?.value) || 10000;
     const positionSizeType = positionSizeTypeEl?.value || 'percent';
     const positionSize = parseFloat(positionSizeEl?.value) || 100;
 
-    const [info, currentPrice, volatility] = await Promise.all([
+    const [_info, currentPrice, volatility] = await Promise.all([
         fetchInstrumentInfo(symbol),
         fetchCurrentPrice(symbol),
         fetchVolatility(symbol)

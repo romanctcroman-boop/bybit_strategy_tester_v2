@@ -5,7 +5,7 @@ SQLAlchemy model for storing optimization runs and results.
 """
 
 import enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -110,13 +110,13 @@ class Optimization(Base):
     # Timestamps
     created_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         nullable=False,
     )
     updated_at = Column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
     started_at = Column(DateTime(timezone=True), nullable=True)
@@ -174,13 +174,13 @@ class Optimization(Base):
         self.evaluated_combinations = evaluated
         if self.total_combinations > 0:
             self.progress = min(1.0, evaluated / self.total_combinations)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def mark_started(self) -> None:
         """Mark optimization as started."""
         self.status = OptimizationStatus.RUNNING
-        self.started_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
+        self.started_at = datetime.now(UTC)
+        self.updated_at = datetime.now(UTC)
 
     def mark_completed(
         self, best_params: dict[str, Any], best_score: float, results: dict[str, Any]
@@ -191,13 +191,13 @@ class Optimization(Base):
         self.best_score = best_score
         self.results = results
         self.progress = 1.0
-        self.completed_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
+        self.completed_at = datetime.now(UTC)
+        self.updated_at = datetime.now(UTC)
 
     def mark_failed(self, error: str, traceback: str | None = None) -> None:
         """Mark optimization as failed."""
         self.status = OptimizationStatus.FAILED
         self.error_message = error
         self.error_traceback = traceback
-        self.completed_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
+        self.completed_at = datetime.now(UTC)
+        self.updated_at = datetime.now(UTC)

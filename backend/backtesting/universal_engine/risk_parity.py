@@ -16,7 +16,6 @@ Version: 2.4.0
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -90,7 +89,7 @@ class PortfolioConstraints:
     max_turnover: float = 1.0  # Max turnover per rebalance
 
     # Sector constraints
-    sector_limits: Dict[str, Tuple[float, float]] = field(default_factory=dict)
+    sector_limits: dict[str, tuple[float, float]] = field(default_factory=dict)
 
     # Number of assets
     min_assets: int = 1
@@ -104,10 +103,10 @@ class PortfolioConstraints:
 class PortfolioWeights:
     """Portfolio weights result."""
 
-    weights: Dict[str, float]
+    weights: dict[str, float]
     timestamp: datetime = field(default_factory=datetime.now)
     objective_value: float = 0.0
-    risk_contributions: Dict[str, float] = field(default_factory=dict)
+    risk_contributions: dict[str, float] = field(default_factory=dict)
     expected_return: float = 0.0
     expected_risk: float = 0.0
     sharpe_ratio: float = 0.0
@@ -142,7 +141,7 @@ class BacktestResult:
     sortino_ratio: float
     turnover: float
     equity_curve: NDArray
-    weights_history: List[PortfolioWeights]
+    weights_history: list[PortfolioWeights]
 
 
 # ============================================================================
@@ -275,8 +274,8 @@ class RiskParityOptimizer:
     def __init__(self, cov_estimator: str = "ledoit_wolf", risk_free_rate: float = 0.0):
         self.cov_estimator = cov_estimator
         self.risk_free_rate = risk_free_rate
-        self._cov_matrix: Optional[NDArray] = None
-        self._returns: Optional[NDArray] = None
+        self._cov_matrix: NDArray | None = None
+        self._returns: NDArray | None = None
 
     def fit(self, returns: NDArray) -> "RiskParityOptimizer":
         """
@@ -301,8 +300,8 @@ class RiskParityOptimizer:
 
     def optimize(
         self,
-        risk_budgets: Optional[NDArray] = None,
-        constraints: Optional[PortfolioConstraints] = None,
+        risk_budgets: NDArray | None = None,
+        constraints: PortfolioConstraints | None = None,
     ) -> PortfolioWeights:
         """
         Find risk parity weights.
@@ -431,9 +430,9 @@ class HierarchicalRiskParity:
     ):
         self.cov_estimator = cov_estimator
         self.linkage_method = linkage_method
-        self._cov_matrix: Optional[NDArray] = None
-        self._corr_matrix: Optional[NDArray] = None
-        self._returns: Optional[NDArray] = None
+        self._cov_matrix: NDArray | None = None
+        self._corr_matrix: NDArray | None = None
+        self._returns: NDArray | None = None
 
     def fit(self, returns: NDArray) -> "HierarchicalRiskParity":
         """Fit with return data."""
@@ -452,7 +451,7 @@ class HierarchicalRiskParity:
 
         return self
 
-    def _get_cluster_order(self) -> List[int]:
+    def _get_cluster_order(self) -> list[int]:
         """Get quasi-diagonal reordering from hierarchical clustering."""
         if self._corr_matrix is None:
             return []
@@ -468,7 +467,7 @@ class HierarchicalRiskParity:
         # Get leaf order
         return list(hierarchy.leaves_list(link))
 
-    def _get_quasi_diag(self, link: NDArray) -> List[int]:
+    def _get_quasi_diag(self, link: NDArray) -> list[int]:
         """Recursively get quasi-diagonal order."""
         link = link.astype(int)
         sorted_items = [link[-1, 0], link[-1, 1]]
@@ -488,7 +487,7 @@ class HierarchicalRiskParity:
         return sorted_items
 
     def _get_recursive_bisection(
-        self, cov: NDArray, sorted_items: List[int]
+        self, cov: NDArray, sorted_items: list[int]
     ) -> NDArray:
         """Compute HRP allocation through recursive bisection."""
         n = len(sorted_items)
@@ -525,7 +524,7 @@ class HierarchicalRiskParity:
 
         return weights
 
-    def _get_cluster_variance(self, cov: NDArray, items: List[int]) -> float:
+    def _get_cluster_variance(self, cov: NDArray, items: list[int]) -> float:
         """Get cluster variance using inverse-variance portfolio."""
         cov_slice = cov[np.ix_(items, items)]
 
@@ -537,7 +536,7 @@ class HierarchicalRiskParity:
         return float(ivp @ cov_slice @ ivp)
 
     def optimize(
-        self, constraints: Optional[PortfolioConstraints] = None
+        self, constraints: PortfolioConstraints | None = None
     ) -> PortfolioWeights:
         """
         Find HRP weights.
@@ -606,11 +605,11 @@ class MeanVarianceOptimizer:
     def __init__(self, cov_estimator: str = "ledoit_wolf", risk_free_rate: float = 0.0):
         self.cov_estimator = cov_estimator
         self.risk_free_rate = risk_free_rate
-        self._cov_matrix: Optional[NDArray] = None
-        self._expected_returns: Optional[NDArray] = None
+        self._cov_matrix: NDArray | None = None
+        self._expected_returns: NDArray | None = None
 
     def fit(
-        self, returns: NDArray, expected_returns: Optional[NDArray] = None
+        self, returns: NDArray, expected_returns: NDArray | None = None
     ) -> "MeanVarianceOptimizer":
         """
         Fit with return data.
@@ -636,9 +635,9 @@ class MeanVarianceOptimizer:
     def optimize(
         self,
         objective: OptimizationObjective = OptimizationObjective.MAX_SHARPE,
-        target_return: Optional[float] = None,
-        target_risk: Optional[float] = None,
-        constraints: Optional[PortfolioConstraints] = None,
+        target_return: float | None = None,
+        target_risk: float | None = None,
+        constraints: PortfolioConstraints | None = None,
     ) -> PortfolioWeights:
         """
         Optimize portfolio.
@@ -737,8 +736,8 @@ class MeanVarianceOptimizer:
         )
 
     def efficient_frontier(
-        self, n_points: int = 50, constraints: Optional[PortfolioConstraints] = None
-    ) -> List[PortfolioWeights]:
+        self, n_points: int = 50, constraints: PortfolioConstraints | None = None
+    ) -> list[PortfolioWeights]:
         """Generate efficient frontier portfolios."""
         if self._expected_returns is None:
             return []
@@ -779,9 +778,9 @@ class BlackLittermanModel:
     def __init__(self, risk_aversion: float = 2.5, tau: float = 0.05):
         self.risk_aversion = risk_aversion  # δ
         self.tau = tau  # Uncertainty in prior
-        self._cov_matrix: Optional[NDArray] = None
-        self._market_weights: Optional[NDArray] = None
-        self._implied_returns: Optional[NDArray] = None
+        self._cov_matrix: NDArray | None = None
+        self._market_weights: NDArray | None = None
+        self._implied_returns: NDArray | None = None
 
     def fit(self, returns: NDArray, market_weights: NDArray) -> "BlackLittermanModel":
         """
@@ -804,7 +803,7 @@ class BlackLittermanModel:
         self,
         P: NDArray,  # View matrix (k x n)
         Q: NDArray,  # View returns (k,)
-        omega: Optional[NDArray] = None,  # View uncertainty (k x k)
+        omega: NDArray | None = None,  # View uncertainty (k x k)
     ) -> NDArray:
         """
         Incorporate investor views using Black-Litterman formula.
@@ -840,9 +839,9 @@ class BlackLittermanModel:
 
     def optimize(
         self,
-        views_P: Optional[NDArray] = None,
-        views_Q: Optional[NDArray] = None,
-        constraints: Optional[PortfolioConstraints] = None,
+        views_P: NDArray | None = None,
+        views_Q: NDArray | None = None,
+        constraints: PortfolioConstraints | None = None,
     ) -> PortfolioWeights:
         """
         Optimize portfolio with optional views.
@@ -885,7 +884,7 @@ class RiskBudgeting:
 
     def __init__(self, cov_estimator: str = "ledoit_wolf"):
         self.cov_estimator = cov_estimator
-        self._cov_matrix: Optional[NDArray] = None
+        self._cov_matrix: NDArray | None = None
 
     def fit(self, returns: NDArray) -> "RiskBudgeting":
         """Fit with return data."""
@@ -897,9 +896,9 @@ class RiskBudgeting:
 
     def optimize(
         self,
-        risk_budgets: Dict[str, float],
-        assets: List[str],
-        constraints: Optional[PortfolioConstraints] = None,
+        risk_budgets: dict[str, float],
+        assets: list[str],
+        constraints: PortfolioConstraints | None = None,
     ) -> PortfolioWeights:
         """
         Optimize with custom risk budgets.
@@ -955,15 +954,15 @@ class DynamicRebalancer:
         self.frequency = frequency
         self.threshold = threshold
         self.transaction_cost = transaction_cost
-        self._current_weights: Optional[NDArray] = None
-        self._rebalance_dates: List[datetime] = []
+        self._current_weights: NDArray | None = None
+        self._rebalance_dates: list[datetime] = []
 
     def should_rebalance(
         self,
         current_weights: NDArray,
         target_weights: NDArray,
         current_date: datetime,
-        last_rebalance: Optional[datetime] = None,
+        last_rebalance: datetime | None = None,
     ) -> bool:
         """Determine if rebalancing is needed."""
         # Threshold-based
@@ -992,8 +991,8 @@ class DynamicRebalancer:
         self,
         current_weights: NDArray,
         returns_window: NDArray,
-        constraints: Optional[PortfolioConstraints] = None,
-    ) -> Tuple[NDArray, float]:
+        constraints: PortfolioConstraints | None = None,
+    ) -> tuple[NDArray, float]:
         """
         Execute rebalancing.
 
@@ -1019,8 +1018,8 @@ class DynamicRebalancer:
         self,
         returns: NDArray,
         lookback_window: int = 252,
-        initial_weights: Optional[NDArray] = None,
-        constraints: Optional[PortfolioConstraints] = None,
+        initial_weights: NDArray | None = None,
+        constraints: PortfolioConstraints | None = None,
     ) -> BacktestResult:
         """
         Backtest rebalancing strategy.
@@ -1132,7 +1131,7 @@ class DynamicRebalancer:
 class PortfolioRiskCalculator:
     """Calculate comprehensive portfolio risk metrics."""
 
-    def __init__(self, confidence_levels: List[float] = None):
+    def __init__(self, confidence_levels: list[float] = None):
         if confidence_levels is None:
             self.confidence_levels = [0.95, 0.99]
         else:
@@ -1171,7 +1170,7 @@ class PortfolioRiskCalculator:
         self,
         returns: NDArray,
         weights: NDArray,
-        benchmark_returns: Optional[NDArray] = None,
+        benchmark_returns: NDArray | None = None,
     ) -> RiskMetrics:
         """Calculate all risk metrics."""
         portfolio_returns = returns @ weights
@@ -1262,7 +1261,7 @@ class PortfolioFactory:
             raise ValueError(f"Unknown optimization method: {method}")
 
     @staticmethod
-    def get_available_methods() -> List[str]:
+    def get_available_methods() -> list[str]:
         """Get list of available optimization methods."""
         return ["risk_parity", "hrp", "mean_variance", "black_litterman", "risk_budget"]
 
@@ -1274,8 +1273,8 @@ class PortfolioFactory:
 
 def create_risk_parity_portfolio(
     returns: NDArray,
-    asset_names: Optional[List[str]] = None,
-    constraints: Optional[PortfolioConstraints] = None,
+    asset_names: list[str] | None = None,
+    constraints: PortfolioConstraints | None = None,
 ) -> PortfolioWeights:
     """
     Quick function to create risk parity portfolio.
@@ -1303,8 +1302,8 @@ def create_risk_parity_portfolio(
 
 def create_hrp_portfolio(
     returns: NDArray,
-    asset_names: Optional[List[str]] = None,
-    constraints: Optional[PortfolioConstraints] = None,
+    asset_names: list[str] | None = None,
+    constraints: PortfolioConstraints | None = None,
 ) -> PortfolioWeights:
     """Quick function to create HRP portfolio."""
     optimizer = HierarchicalRiskParity()
@@ -1322,9 +1321,9 @@ def create_hrp_portfolio(
 
 def create_max_sharpe_portfolio(
     returns: NDArray,
-    asset_names: Optional[List[str]] = None,
+    asset_names: list[str] | None = None,
     risk_free_rate: float = 0.0,
-    constraints: Optional[PortfolioConstraints] = None,
+    constraints: PortfolioConstraints | None = None,
 ) -> PortfolioWeights:
     """Quick function to create maximum Sharpe ratio portfolio."""
     optimizer = MeanVarianceOptimizer(risk_free_rate=risk_free_rate)

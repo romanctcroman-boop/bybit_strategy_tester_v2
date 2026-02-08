@@ -4,7 +4,6 @@ Database Metrics API Router.
 Provides REST API for database performance monitoring.
 """
 
-from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -27,13 +26,13 @@ class QueryMetricResponse(BaseModel):
 
     query_id: str
     query_type: str
-    table: Optional[str]
+    table: str | None
     duration_ms: float
     status: str
     timestamp: str
     rows_affected: int
     rows_returned: int
-    caller: Optional[str]
+    caller: str | None
 
 
 class QueryPatternResponse(BaseModel):
@@ -42,7 +41,7 @@ class QueryPatternResponse(BaseModel):
     query_hash: str
     sample_query: str
     query_type: str
-    table: Optional[str]
+    table: str | None
     execution_count: int
     avg_duration_ms: float
     min_duration_ms: float
@@ -50,7 +49,7 @@ class QueryPatternResponse(BaseModel):
     total_duration_ms: float
     error_count: int
     error_rate_pct: float
-    last_executed: Optional[str]
+    last_executed: str | None
 
 
 class RecommendationResponse(BaseModel):
@@ -91,7 +90,7 @@ async def get_pool_metrics():
 @router.get("/slow-queries", response_model=list[QueryMetricResponse])
 async def get_slow_queries(
     limit: int = 50,
-    min_duration_ms: Optional[float] = None,
+    min_duration_ms: float | None = None,
 ):
     """Get recent slow queries."""
     service = get_db_metrics_service()

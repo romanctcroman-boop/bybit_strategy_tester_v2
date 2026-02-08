@@ -1,5 +1,6 @@
 import socket
 
+
 def probe(host, port, timeout=3):
     print(f"\n-- probing {host}:{port} --")
     try:

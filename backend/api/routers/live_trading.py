@@ -18,7 +18,6 @@ import asyncio
 import json
 import logging
 import os
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
@@ -48,10 +47,10 @@ class OrderRequest(BaseModel):
     side: str = Field(..., description="buy or sell")
     order_type: str = Field("market", description="market, limit, stop_market")
     qty: float = Field(..., gt=0, description="Order quantity")
-    price: Optional[float] = Field(None, description="Limit price")
-    trigger_price: Optional[float] = Field(None, description="Stop trigger price")
-    stop_loss: Optional[float] = Field(None, description="Stop loss price")
-    take_profit: Optional[float] = Field(None, description="Take profit price")
+    price: float | None = Field(None, description="Limit price")
+    trigger_price: float | None = Field(None, description="Stop trigger price")
+    stop_loss: float | None = Field(None, description="Stop loss price")
+    take_profit: float | None = Field(None, description="Take profit price")
     reduce_only: bool = Field(False, description="Reduce only flag")
     time_in_force: str = Field("GTC", description="GTC, IOC, FOK, PostOnly")
 
@@ -66,8 +65,8 @@ class StrategyStartRequest(BaseModel):
         5.0, ge=0.1, le=100, description="Position size %"
     )
     leverage: float = Field(1.0, ge=1, le=100, description="Leverage")
-    stop_loss_percent: Optional[float] = Field(2.0, description="Stop loss %")
-    take_profit_percent: Optional[float] = Field(4.0, description="Take profit %")
+    stop_loss_percent: float | None = Field(2.0, description="Stop loss %")
+    take_profit_percent: float | None = Field(4.0, description="Take profit %")
     paper_trading: bool = Field(True, description="Paper trading mode")
 
 
@@ -75,8 +74,8 @@ class SetSLTPRequest(BaseModel):
     """Set SL/TP request."""
 
     symbol: str
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
 
 
 class LeverageRequest(BaseModel):
@@ -92,9 +91,9 @@ class LeverageRequest(BaseModel):
 
 
 # Global instances (initialized on first use)
-_executor: Optional[OrderExecutor] = None
-_position_manager: Optional[PositionManager] = None
-_strategy_runner: Optional[LiveStrategyRunner] = None
+_executor: OrderExecutor | None = None
+_position_manager: PositionManager | None = None
+_strategy_runner: LiveStrategyRunner | None = None
 _ws_connections: list[WebSocket] = []
 
 
@@ -271,7 +270,7 @@ async def cancel_order(
 
 @router.delete("/orders")
 async def cancel_all_orders(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    symbol: str | None = Query(None, description="Filter by symbol"),
 ):
     """Cancel all open orders."""
     executor = await get_executor()
@@ -286,7 +285,7 @@ async def cancel_all_orders(
 
 @router.get("/orders")
 async def get_open_orders(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    symbol: str | None = Query(None, description="Filter by symbol"),
 ):
     """Get all open orders."""
     executor = await get_executor()
@@ -301,7 +300,7 @@ async def get_open_orders(
 
 @router.get("/orders/history")
 async def get_order_history(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    symbol: str | None = Query(None, description="Filter by symbol"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Get order history."""
@@ -322,7 +321,7 @@ async def get_order_history(
 
 @router.get("/positions")
 async def get_positions(
-    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    symbol: str | None = Query(None, description="Filter by symbol"),
 ):
     """Get all open positions."""
     executor = await get_executor()
@@ -338,7 +337,7 @@ async def get_positions(
 @router.post("/positions/close/{symbol}")
 async def close_position(
     symbol: str,
-    qty: Optional[float] = Query(None, description="Quantity to close (None = full)"),
+    qty: float | None = Query(None, description="Quantity to close (None = full)"),
 ):
     """Close a position."""
     manager = await get_position_manager()
@@ -573,7 +572,7 @@ async def live_trading_websocket(websocket: WebSocket):
                 except json.JSONDecodeError:
                     await websocket.send_json({"error": "Invalid JSON"})
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Send ping/keepalive
                 await websocket.send_json({"type": "ping"})
 

@@ -22,8 +22,8 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
@@ -206,7 +206,7 @@ class CustomMetrics:
     def __init__(
         self,
         equity_curve: list[float],
-        trades: Optional[list[dict]] = None,
+        trades: list[dict] | None = None,
         risk_free_rate: float = 0.0,
         periods_per_year: int = 365,
     ):
@@ -517,14 +517,14 @@ class CustomMetrics:
             "risk_adjusted": self.calculate_risk_adjusted().to_dict(),
             "rolling": self.calculate_rolling().to_dict(),
             "trade_metrics": self.calculate_trade_metrics(),
-            "calculated_at": datetime.now(timezone.utc).isoformat(),
+            "calculated_at": datetime.now(UTC).isoformat(),
         }
 
 
 def calculate_metrics(
     equity_curve: list[float],
-    trades: Optional[list[dict]] = None,
-    benchmark_returns: Optional[list[float]] = None,
+    trades: list[dict] | None = None,
+    benchmark_returns: list[float] | None = None,
     benchmark_name: str = "Benchmark",
 ) -> dict[str, Any]:
     """

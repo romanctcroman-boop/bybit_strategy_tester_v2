@@ -37,12 +37,12 @@ from .metrics import (
     RollingMetrics,
 )
 from .portfolio import (
-    aggregate_multi_symbol_equity,
     AllocationMethod,
     AssetAllocation,
     CorrelationAnalysis,
     PortfolioBacktester,
     RebalanceStrategy,
+    aggregate_multi_symbol_equity,
 )
 from .slippage import (
     OrderBookSlippage,

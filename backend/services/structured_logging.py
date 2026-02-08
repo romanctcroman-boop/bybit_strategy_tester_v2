@@ -16,14 +16,15 @@ import logging
 import sys
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 # Context variable for correlation ID
-correlation_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "correlation_id", default=None
 )
 
@@ -50,17 +51,17 @@ class LogEntry:
     timestamp: str
     level: str
     message: str
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     service: str = "bybit_strategy_tester"
-    component: Optional[str] = None
-    operation: Optional[str] = None
-    duration_ms: Optional[float] = None
-    user_id: Optional[str] = None
-    request_id: Optional[str] = None
+    component: str | None = None
+    operation: str | None = None
+    duration_ms: float | None = None
+    user_id: str | None = None
+    request_id: str | None = None
     extra: dict = field(default_factory=dict)
-    error: Optional[dict] = None
-    trace_id: Optional[str] = None
-    span_id: Optional[str] = None
+    error: dict | None = None
+    trace_id: str | None = None
+    span_id: str | None = None
 
 
 class StructuredFormatter(logging.Formatter):
@@ -87,7 +88,7 @@ class StructuredFormatter(logging.Formatter):
 
         # Build log entry
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "message": record.getMessage(),
             "logger": record.name,
@@ -174,10 +175,10 @@ class StructuredLoggingService:
 
     def configure_logging(
         self,
-        level: Optional[LogLevel] = None,
+        level: LogLevel | None = None,
         json_output: bool = True,
         console_output: bool = True,
-        file_output: Optional[str] = None,
+        file_output: str | None = None,
     ) -> None:
         """
         Configure structured logging.
@@ -229,7 +230,7 @@ class StructuredLoggingService:
         return str(uuid.uuid4())
 
     @staticmethod
-    def get_correlation_id() -> Optional[str]:
+    def get_correlation_id() -> str | None:
         """Get the current correlation ID."""
         return correlation_id_var.get()
 
@@ -280,9 +281,9 @@ class StructuredLoggingService:
         self,
         level: LogLevel,
         message: str,
-        component: Optional[str] = None,
-        operation: Optional[str] = None,
-        duration_ms: Optional[float] = None,
+        component: str | None = None,
+        operation: str | None = None,
+        duration_ms: float | None = None,
         **extra: Any,
     ) -> None:
         """
@@ -365,8 +366,8 @@ class StructuredLoggingService:
 
     def log_execution(
         self,
-        component: Optional[str] = None,
-        operation: Optional[str] = None,
+        component: str | None = None,
+        operation: str | None = None,
         log_args: bool = False,
         log_result: bool = False,
     ) -> Callable:
@@ -506,7 +507,7 @@ class StructuredLoggingService:
 
 
 # Singleton instance
-_structured_logging_service: Optional[StructuredLoggingService] = None
+_structured_logging_service: StructuredLoggingService | None = None
 
 
 def get_structured_logging_service() -> StructuredLoggingService:
@@ -524,7 +525,7 @@ def generate_correlation_id() -> str:
     return StructuredLoggingService.generate_correlation_id()
 
 
-def get_correlation_id() -> Optional[str]:
+def get_correlation_id() -> str | None:
     """Get current correlation ID."""
     return StructuredLoggingService.get_correlation_id()
 

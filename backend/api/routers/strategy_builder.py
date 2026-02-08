@@ -74,6 +74,7 @@ class CreateStrategyRequest(BaseModel):
     parameters: dict[str, Any] | None = Field(default=None)
     blocks: list[dict[str, Any]] = Field(default_factory=list)
     connections: list[dict[str, Any]] = Field(default_factory=list)
+    main_strategy: dict[str, Any] | None = Field(default=None, description="Main strategy node with entry/exit signals")
 
 
 class AddBlockRequest(BaseModel):
@@ -245,6 +246,7 @@ class StrategyResponse(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     blocks: list[dict[str, Any]] = Field(default_factory=list)
     connections: list[dict[str, Any]] = Field(default_factory=list)
+    builder_graph: dict[str, Any] | None = Field(default=None, description="Full builder graph including main_strategy")
     is_builder_strategy: bool = True
     version: int = 1
     created_at: str | None = None
@@ -307,9 +309,26 @@ async def refresh_symbols_cache(request: Request):
 async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(get_db)):
     """Create a new strategy builder strategy"""
     try:
+        # DEBUG LOG
+        logger.info(f"CREATE STRATEGY: main_strategy present in request: {request.main_strategy is not None}")
+        if request.main_strategy:
+            logger.info(f"CREATE STRATEGY: main_strategy = {request.main_strategy}")
+
         params = dict(request.parameters) if request.parameters else {}
         if request.leverage is not None:
             params["_leverage"] = request.leverage
+
+        # Build builder_graph with all fields including main_strategy
+        builder_graph_data = {
+            "blocks": request.blocks,
+            "connections": request.connections,
+            "market_type": request.market_type,
+            "direction": request.direction,
+        }
+        # Add main_strategy if provided
+        if request.main_strategy:
+            builder_graph_data["main_strategy"] = request.main_strategy
+            logger.info("CREATE STRATEGY: Added main_strategy to builder_graph_data")
 
         db_strategy = Strategy(
             name=request.name,
@@ -322,12 +341,7 @@ async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(
             position_size=request.position_size if request.position_size is not None else 1.0,
             parameters=params,
             is_builder_strategy=True,
-            builder_graph={
-                "blocks": request.blocks,
-                "connections": request.connections,
-                "market_type": request.market_type,
-                "direction": request.direction,
-            },
+            builder_graph=builder_graph_data,
             builder_blocks=request.blocks,
             builder_connections=request.connections,
         )
@@ -368,8 +382,8 @@ async def get_strategy(strategy_id: str, db: Session = Depends(get_db)):
         db.query(Strategy)
         .filter(
             Strategy.id == strategy_id,
-            Strategy.is_builder_strategy == True,
-            Strategy.is_deleted == False,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
         )
         .first()
     )
@@ -402,6 +416,7 @@ async def get_strategy(strategy_id: str, db: Session = Depends(get_db)):
         parameters=params,
         blocks=db_strategy.builder_blocks or [],
         connections=db_strategy.builder_connections or [],
+        builder_graph=db_strategy.builder_graph,
         is_builder_strategy=db_strategy.is_builder_strategy,
         version=db_strategy.version,
         created_at=db_strategy.created_at.isoformat() if db_strategy.created_at else None,
@@ -419,13 +434,20 @@ async def list_strategies(
     offset = (page - 1) * page_size
     strategies = (
         db.query(Strategy)
-        .filter(Strategy.is_builder_strategy == True, Strategy.is_deleted == False)
+        .filter(Strategy.is_builder_strategy == True, Strategy.is_deleted == False)  # noqa: E712
         .order_by(Strategy.updated_at.desc())
         .offset(offset)
         .limit(page_size)
         .all()
     )
-    total = db.query(Strategy).filter(Strategy.is_builder_strategy == True, Strategy.is_deleted == False).count()
+    total = (
+        db.query(Strategy)
+        .filter(
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
+        )
+        .count()
+    )
 
     return {
         "strategies": [
@@ -459,8 +481,8 @@ async def update_strategy(
         db.query(Strategy)
         .filter(
             Strategy.id == strategy_id,
-            Strategy.is_builder_strategy == True,
-            Strategy.is_deleted == False,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
         )
         .first()
     )
@@ -539,8 +561,8 @@ async def get_strategy_versions(strategy_id: str, db: Session = Depends(get_db))
         db.query(Strategy)
         .filter(
             Strategy.id == strategy_id,
-            Strategy.is_builder_strategy == True,
-            Strategy.is_deleted == False,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
         )
         .first()
     )
@@ -580,8 +602,8 @@ async def revert_strategy_version(
         db.query(Strategy)
         .filter(
             Strategy.id == strategy_id,
-            Strategy.is_builder_strategy == True,
-            Strategy.is_deleted == False,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
         )
         .first()
     )
@@ -618,8 +640,8 @@ async def delete_strategy(strategy_id: str, db: Session = Depends(get_db)):
         db.query(Strategy)
         .filter(
             Strategy.id == strategy_id,
-            Strategy.is_builder_strategy == True,
-            Strategy.is_deleted == False,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
         )
         .first()
     )
@@ -925,8 +947,8 @@ async def generate_code_from_db(
         db.query(Strategy)
         .filter(
             Strategy.id == strategy_id,
-            Strategy.is_builder_strategy == True,
-            Strategy.is_deleted == False,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
         )
         .first()
     )
@@ -1015,6 +1037,11 @@ async def generate_code_from_db(
             continue
 
         params = b.get("params", {}) or {}
+
+        # Inject operator for comparison blocks based on frontend type
+        if raw_type in ("less_than", "greater_than", "equals") and "operator" not in params:
+            operator_map = {"less_than": "<", "greater_than": ">", "equals": "=="}
+            params["operator"] = operator_map[raw_type]
 
         # Create StrategyBlock with IDs that match frontend graph
         strategy_block = StrategyBlock(
@@ -1515,6 +1542,9 @@ async def validate_block_config(block_config: dict[str, Any]):
 class BacktestRequest(BaseModel):
     """Request to run backtest from strategy builder"""
 
+    symbol: str = Field(default="BTCUSDT", description="Trading pair symbol")
+    interval: str = Field(default="15", description="Timeframe: 1, 5, 15, 30, 60, 240, D, W, M")
+    initial_capital: float = Field(default=10000.0, ge=100, description="Initial capital for backtest")
     start_date: datetime = Field(..., description="Backtest start date")
     end_date: datetime = Field(..., description="Backtest end date")
     market_type: str = Field(
@@ -1658,8 +1688,8 @@ async def run_backtest_from_builder(
         db.query(Strategy)
         .filter(
             Strategy.id == strategy_id,
-            Strategy.is_builder_strategy == True,
-            Strategy.is_deleted == False,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
         )
         .first()
     )
@@ -1695,6 +1725,9 @@ async def run_backtest_from_builder(
             "market_type": market_type,
             "direction": direction,
         }
+        # Add main_strategy from builder_graph if available
+        if db_strategy.builder_graph and db_strategy.builder_graph.get("main_strategy"):
+            strategy_graph["main_strategy"] = db_strategy.builder_graph["main_strategy"]
 
         # Create StrategyBuilderAdapter
         from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
@@ -1776,28 +1809,88 @@ async def run_backtest_from_builder(
             "indent_order": final_dca_config.get("indent_order", {}),
         }
 
+        # Extract SL/TP from static_sltp block (or legacy tp_percent/sl_percent) if not in request
+        block_stop_loss = request.stop_loss
+        block_take_profit = request.take_profit
+        # Breakeven params from static_sltp block
+        block_breakeven_enabled = False
+        block_breakeven_activation_pct = 0.005  # default 0.5%
+        block_breakeven_offset = 0.0
+        block_close_only_in_profit = False
+        block_sl_type = "average_price"  # default: SL from average entry price
+
+        # Trailing stop params from trailing_stop_exit block
+        block_trailing_activation: float | None = None
+        block_trailing_offset: float | None = None
+
+        for block in db_strategy.builder_blocks or []:
+            block_type = block.get("type", "")
+            block_params = block.get("params") or block.get("config") or {}
+            if block_type == "static_sltp":
+                if block_stop_loss is None:
+                    sl_val = block_params.get("stop_loss_percent", 1.5)
+                    # UI always sends percent values (1.5 = 1.5%, 0.5 = 0.5%)
+                    # Engine expects decimal fraction (0.015 for 1.5%)
+                    block_stop_loss = sl_val / 100
+                if block_take_profit is None:
+                    tp_val = block_params.get("take_profit_percent", 1.5)
+                    block_take_profit = tp_val / 100
+                # Extract breakeven params
+                block_breakeven_enabled = block_params.get("activate_breakeven", False)
+                if block_breakeven_enabled:
+                    be_activation = block_params.get("breakeven_activation_percent", 0.5)
+                    be_new_sl = block_params.get("new_breakeven_sl_percent", 0.1)
+                    block_breakeven_activation_pct = be_activation / 100
+                    block_breakeven_offset = be_new_sl / 100
+                # Extract close_only_in_profit
+                block_close_only_in_profit = block_params.get("close_only_in_profit", False)
+                # Extract sl_type (average_price or last_order)
+                block_sl_type = block_params.get("sl_type", "average_price")
+            elif block_type == "trailing_stop_exit":
+                # Trailing stop: activation = profit % to activate, trailing = distance %
+                activation_val = block_params.get("activation_percent", 1.0)
+                trailing_val = block_params.get("trailing_percent", 0.5)
+                # UI sends percent values (1.0 = 1%), engine expects decimal (0.01)
+                block_trailing_activation = activation_val / 100
+                block_trailing_offset = trailing_val / 100
+            elif block_type == "tp_percent" and block_take_profit is None:
+                tp_val = block_params.get("take_profit_percent", 3.0)
+                block_take_profit = tp_val / 100
+            elif block_type == "sl_percent" and block_stop_loss is None:
+                sl_val = block_params.get("stop_loss_percent", 1.5)
+                block_stop_loss = sl_val / 100
+
         no_trade_days_tuple = (
             tuple(request.no_trade_days) if request.no_trade_days is not None and len(request.no_trade_days) > 0 else ()
         )
         backtest_config = BacktestConfig(
-            symbol=db_strategy.symbol or "BTCUSDT",
-            interval=db_strategy.timeframe or "1h",
+            symbol=request.symbol,
+            interval=request.interval,
             start_date=request.start_date,
             end_date=request.end_date,
             strategy_type=StrategyType.CUSTOM,  # Placeholder, adapter will be used
             strategy_params=strategy_params_for_dca,
-            initial_capital=db_strategy.initial_capital or 10000.0,
+            initial_capital=request.initial_capital,
             position_size=1.0,
             leverage=request.leverage,
             direction=direction,
-            stop_loss=request.stop_loss,
-            take_profit=request.take_profit,
+            stop_loss=block_stop_loss,
+            take_profit=block_take_profit,
             taker_fee=request.commission,
             maker_fee=request.commission,
             slippage=request.slippage,
             pyramiding=request.pyramiding,
             market_type=market_type,
             no_trade_days=no_trade_days_tuple,
+            # Breakeven / close_only_in_profit from static_sltp block
+            breakeven_enabled=block_breakeven_enabled,
+            breakeven_activation_pct=block_breakeven_activation_pct,
+            breakeven_offset=block_breakeven_offset,
+            close_only_in_profit=block_close_only_in_profit,
+            sl_type=block_sl_type,
+            # Trailing stop from trailing_stop_exit block
+            trailing_stop_activation=block_trailing_activation,
+            trailing_stop_offset=block_trailing_offset,
             # DCA Grid settings (from merged config)
             dca_enabled=final_dca_config["dca_enabled"],
             dca_direction=final_dca_config["dca_direction"],
@@ -1809,6 +1902,9 @@ async def run_backtest_from_builder(
             dca_log_step_coef=final_dca_config["dca_log_step_coef"],
             dca_drawdown_threshold=final_dca_config["dca_drawdown_threshold"],
             dca_safety_close_enabled=final_dca_config["dca_safety_close_enabled"],
+            # DCA Manual Grid (custom orders from grid_orders block)
+            dca_custom_orders=final_dca_config.get("custom_orders"),
+            dca_grid_trailing_percent=final_dca_config.get("grid_trailing_percent", 0.0),
             # DCA Multi-TP settings
             dca_multi_tp_enabled=final_dca_config["dca_multi_tp_enabled"],
             dca_tp1_percent=final_dca_config["dca_tp1_percent"],

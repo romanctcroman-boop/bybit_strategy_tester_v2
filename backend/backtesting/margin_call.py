@@ -193,7 +193,7 @@ class MarginCallSimulator:
             else float("inf")
         )
         # used_margin_pct for logging/debugging
-        _ = (margin_required / current_equity) * 100  # noqa: F841
+        _ = (margin_required / current_equity) * 100
         available_margin = current_equity - margin_required
 
         # Step 5: Check for margin call
@@ -248,7 +248,7 @@ class MarginCallSimulator:
             Liquidation price
         """
         # margin_pct used to determine leverage context
-        _ = self.margin_long if is_long else self.margin_short  # noqa: F841
+        _ = self.margin_long if is_long else self.margin_short
         maintenance_ratio = self.maintenance / 100.0
 
         # At liquidation: equity = maintenance_margin × position_value

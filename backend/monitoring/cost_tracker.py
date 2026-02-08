@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Cost Tracker for AI API Usage
 

@@ -19,7 +19,6 @@ import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 from uuid import uuid4
 
 import httpx
@@ -59,17 +58,17 @@ class OrderRequest:
     side: OrderSide
     order_type: OrderType
     qty: float
-    price: Optional[float] = None
-    trigger_price: Optional[float] = None
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    price: float | None = None
+    trigger_price: float | None = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
     time_in_force: TimeInForce = TimeInForce.GTC
     reduce_only: bool = False
     close_on_trigger: bool = False
     position_idx: int = 0  # 0=one-way, 1=buy-side, 2=sell-side (hedge mode)
-    order_link_id: Optional[str] = None
-    leverage: Optional[float] = None
-    trigger_direction: Optional[TriggerDirection] = None
+    order_link_id: str | None = None
+    leverage: float | None = None
+    trigger_direction: TriggerDirection | None = None
 
 
 class OrderExecutor:
@@ -139,7 +138,7 @@ class OrderExecutor:
         self._active_orders: dict[str, Order] = {}
 
         # HTTP client (lazy initialization for safer resource management)
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._closed = False
 
         logger.info(f"OrderExecutor initialized (testnet={testnet}, category={category})")
@@ -203,9 +202,9 @@ class OrderExecutor:
         side: OrderSide,
         qty: float,
         reduce_only: bool = False,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        order_link_id: Optional[str] = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        order_link_id: str | None = None,
     ) -> TradeResult:
         """
         Place a market order.
@@ -239,9 +238,9 @@ class OrderExecutor:
         price: float,
         time_in_force: TimeInForce = TimeInForce.GTC,
         reduce_only: bool = False,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        order_link_id: Optional[str] = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        order_link_id: str | None = None,
     ) -> TradeResult:
         """
         Place a limit order.
@@ -279,7 +278,7 @@ class OrderExecutor:
         trigger_price: float,
         trigger_direction: TriggerDirection = TriggerDirection.FALL,
         reduce_only: bool = True,
-        order_link_id: Optional[str] = None,
+        order_link_id: str | None = None,
     ) -> TradeResult:
         """
         Place a stop market order (for stop loss).
@@ -314,7 +313,7 @@ class OrderExecutor:
         trigger_price: float,
         trigger_direction: TriggerDirection = TriggerDirection.FALL,
         reduce_only: bool = True,
-        order_link_id: Optional[str] = None,
+        order_link_id: str | None = None,
     ) -> TradeResult:
         """Place a stop limit order."""
         request = OrderRequest(
@@ -336,7 +335,7 @@ class OrderExecutor:
         side: OrderSide,
         qty: float,
         trigger_price: float,
-        order_link_id: Optional[str] = None,
+        order_link_id: str | None = None,
     ) -> TradeResult:
         """
         Place a take profit market order.
@@ -368,7 +367,7 @@ class OrderExecutor:
         symbol: str,
         side: OrderSide,
         qty: float,
-        entry_price: Optional[float] = None,  # None for market entry
+        entry_price: float | None = None,  # None for market entry
         stop_loss: float = None,
         take_profit: float = None,
     ) -> list[TradeResult]:
@@ -565,8 +564,8 @@ class OrderExecutor:
     async def cancel_order(
         self,
         symbol: str,
-        order_id: Optional[str] = None,
-        order_link_id: Optional[str] = None,
+        order_id: str | None = None,
+        order_link_id: str | None = None,
     ) -> TradeResult:
         """
         Cancel an order.
@@ -610,7 +609,7 @@ class OrderExecutor:
                 error_message=error_msg,
             )
 
-    async def cancel_all_orders(self, symbol: Optional[str] = None) -> TradeResult:
+    async def cancel_all_orders(self, symbol: str | None = None) -> TradeResult:
         """Cancel all open orders, optionally filtered by symbol."""
         payload = {"category": self.category}
 
@@ -634,13 +633,13 @@ class OrderExecutor:
     async def amend_order(
         self,
         symbol: str,
-        order_id: Optional[str] = None,
-        order_link_id: Optional[str] = None,
-        qty: Optional[float] = None,
-        price: Optional[float] = None,
-        trigger_price: Optional[float] = None,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
+        order_id: str | None = None,
+        order_link_id: str | None = None,
+        qty: float | None = None,
+        price: float | None = None,
+        trigger_price: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
     ) -> TradeResult:
         """
         Amend an existing order.
@@ -687,7 +686,7 @@ class OrderExecutor:
                 error_message=response.get("retMsg", "Unknown error"),
             )
 
-    async def get_open_orders(self, symbol: Optional[str] = None) -> list[Order]:
+    async def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """Get all open orders."""
         payload = {"category": self.category}
         if symbol:
@@ -707,7 +706,7 @@ class OrderExecutor:
 
     async def get_order_history(
         self,
-        symbol: Optional[str] = None,
+        symbol: str | None = None,
         limit: int = 50,
     ) -> list[Order]:
         """Get order history."""
@@ -773,7 +772,7 @@ class OrderExecutor:
         self,
         method: str,
         endpoint: str,
-        params: Optional[dict] = None,
+        params: dict | None = None,
     ) -> dict:
         """Make a signed API request."""
         params = params or {}
@@ -826,7 +825,7 @@ class OrderExecutor:
             logger.error(f"Failed to get balance: {response.get('retMsg')}")
             return {}
 
-    async def get_positions(self, symbol: Optional[str] = None) -> list[dict]:
+    async def get_positions(self, symbol: str | None = None) -> list[dict]:
         """Get positions."""
         params = {"category": self.category}
         if symbol:

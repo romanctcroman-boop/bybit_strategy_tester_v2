@@ -16,9 +16,10 @@ Author: Universal Math Engine Team
 Version: 2.3.0
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -62,7 +63,7 @@ class GPUInfo:
     device_name: str
     memory_total: int  # bytes
     memory_free: int  # bytes
-    compute_capability: Optional[str] = None
+    compute_capability: str | None = None
     n_cores: int = 0
 
 
@@ -100,7 +101,7 @@ class GPUBackend:
     - Device information
     """
 
-    def __init__(self, config: Optional[GPUConfig] = None):
+    def __init__(self, config: GPUConfig | None = None):
         """Initialize GPU backend."""
         self.config = config or GPUConfig()
         self.backend_type = self._detect_backend()
@@ -253,7 +254,7 @@ class BatchBacktestResult:
     processing_time: float
 
     # Equity curves (if stored)
-    equity_curves: Optional[NDArray[np.float64]] = None
+    equity_curves: NDArray[np.float64] | None = None
 
 
 class BatchBacktester:
@@ -270,7 +271,7 @@ class BatchBacktester:
     def __init__(
         self,
         gpu: GPUBackend,
-        config: Optional[BatchBacktestConfig] = None,
+        config: BatchBacktestConfig | None = None,
     ):
         """Initialize batch backtester."""
         self.gpu = gpu
@@ -773,7 +774,7 @@ class GPUOptimizer:
     def __init__(
         self,
         gpu: GPUBackend,
-        config: Optional[GPUOptimizerConfig] = None,
+        config: GPUOptimizerConfig | None = None,
     ):
         """Initialize GPU optimizer."""
         self.gpu = gpu
@@ -786,7 +787,7 @@ class GPUOptimizer:
         param_bounds: list[tuple[float, float]],
         strategy_fn: Callable,
         fitness_fn: Callable,
-        n_generations: Optional[int] = None,
+        n_generations: int | None = None,
     ) -> tuple[NDArray[np.float64], float]:
         """
         Run GPU-accelerated optimization.

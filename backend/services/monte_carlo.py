@@ -24,8 +24,8 @@ Usage:
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
@@ -49,8 +49,8 @@ class Trade:
     def from_dict(cls, d: dict) -> "Trade":
         """Create Trade from dictionary."""
         return cls(
-            entry_time=d.get("entry_time", datetime.now(timezone.utc)),
-            exit_time=d.get("exit_time", datetime.now(timezone.utc)),
+            entry_time=d.get("entry_time", datetime.now(UTC)),
+            exit_time=d.get("exit_time", datetime.now(UTC)),
             entry_price=float(d.get("entry_price", 0)),
             exit_price=float(d.get("exit_price", 0)),
             size=float(d.get("size", 0)),
@@ -181,7 +181,7 @@ class MonteCarloSimulator:
     def __init__(
         self,
         n_simulations: int = 10000,
-        random_seed: Optional[int] = None,
+        random_seed: int | None = None,
         block_size: int = 10,
     ):
         """
@@ -559,7 +559,7 @@ class MonteCarloSimulator:
 
 
 # Global instance
-_monte_carlo_simulator: Optional[MonteCarloSimulator] = None
+_monte_carlo_simulator: MonteCarloSimulator | None = None
 
 
 def get_monte_carlo_simulator() -> MonteCarloSimulator:

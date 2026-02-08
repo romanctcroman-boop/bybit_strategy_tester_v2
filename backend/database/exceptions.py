@@ -5,7 +5,6 @@ Custom exceptions for database operations with proper context
 and classification for error handling strategies.
 """
 
-from typing import Optional
 
 
 class DatabaseError(Exception):
@@ -21,9 +20,9 @@ class DatabaseError(Exception):
     def __init__(
         self,
         message: str,
-        operation: Optional[str] = None,
-        entity: Optional[str] = None,
-        cause: Optional[Exception] = None,
+        operation: str | None = None,
+        entity: str | None = None,
+        cause: Exception | None = None,
     ):
         self.message = message
         self.operation = operation

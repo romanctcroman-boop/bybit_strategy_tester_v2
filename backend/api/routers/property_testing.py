@@ -5,7 +5,6 @@ Provides REST API for property-based testing of trading strategies.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -30,7 +29,7 @@ class PropertyTestRequest(BaseModel):
 
     property_name: str
     test_data: dict
-    num_examples: Optional[int] = 100
+    num_examples: int | None = 100
 
 
 class StrategyTestRequest(BaseModel):
@@ -53,8 +52,8 @@ class TestResultResponse(BaseModel):
     property_name: str
     result: str
     examples_tested: int
-    failing_example: Optional[str] = None
-    error_message: Optional[str] = None
+    failing_example: str | None = None
+    error_message: str | None = None
     duration_ms: float
     timestamp: str
 
@@ -92,7 +91,7 @@ class ServiceStatusResponse(BaseModel):
     tests_passed: int
     tests_failed: int
     test_reports: int
-    last_test: Optional[str] = None
+    last_test: str | None = None
 
 
 # ============================================================
@@ -275,7 +274,7 @@ async def run_edge_case_tests(property_name: str):
 @router.get("/history", response_model=list[dict])
 async def get_test_history(
     limit: int = 10,
-    since: Optional[str] = None,
+    since: str | None = None,
 ):
     """Get test execution history."""
     service = get_property_testing_service()

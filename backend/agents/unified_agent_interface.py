@@ -19,11 +19,12 @@ import json
 import random
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import httpx
 from dotenv import load_dotenv
@@ -775,7 +776,7 @@ class APIKeyManager:
             key.last_error_time = time.time()
         except Exception:
             # Graceful fallback if underlying key object doesn't define field
-            key.last_error_time = time.time()  # noqa: B012
+            key.last_error_time = time.time()
         self._update_health_state(key)
         if hasattr(key, "health") and key.health == APIKeyHealth.DISABLED:
             agent = getattr(key, "agent_type", "?")
@@ -892,7 +893,7 @@ class UnifiedAgentInterface:
 
         # Start background health monitoring - lazy initialization
         # Will be started when first request is made (in ensure_monitoring_started)
-        self._monitoring_task: Optional[asyncio.Task] = None
+        self._monitoring_task: asyncio.Task | None = None
 
     def ensure_monitoring_started(self) -> None:
         """Start health monitoring if not already running (lazy initialization)"""
@@ -974,8 +975,8 @@ class UnifiedAgentInterface:
             try:
                 retry_dt = parsedate_to_datetime(header)
                 if retry_dt.tzinfo is None:
-                    retry_dt = retry_dt.replace(tzinfo=timezone.utc)
-                delta = retry_dt - datetime.now(timezone.utc)
+                    retry_dt = retry_dt.replace(tzinfo=UTC)
+                delta = retry_dt - datetime.now(UTC)
                 return max(0.0, delta.total_seconds())
             except Exception:
                 return None
@@ -1080,7 +1081,7 @@ class UnifiedAgentInterface:
             return HealthCheckResult(
                 component="mcp_server",
                 status=HealthStatus.UNHEALTHY,
-                message=f"MCP Server unreachable: {str(e)}",
+                message=f"MCP Server unreachable: {e!s}",
                 details={"error": str(e)},
                 recovery_suggested=RecoveryActionType.FORCE_HEALTH_CHECK,
             )
@@ -1113,7 +1114,7 @@ class UnifiedAgentInterface:
                 self._record_rate_limit_event(agent_type)
             else:
                 self.key_manager.mark_error(key)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.key_manager.mark_network_error(key)
         except httpx.HTTPError:
             self.key_manager.mark_network_error(key)
@@ -1356,7 +1357,7 @@ class UnifiedAgentInterface:
                 content="",
                 channel=AgentChannel.MCP_SERVER,
                 latency_ms=(time.time() - start_time) * 1000,
-                error=f"MCP circuit breaker open: {str(e)}",
+                error=f"MCP circuit breaker open: {e!s}",
             )
 
     async def _execute_mcp_call(self, request: AgentRequest, start_time: float) -> AgentResponse:
@@ -1416,7 +1417,7 @@ class UnifiedAgentInterface:
                 content="",
                 channel=AgentChannel.MCP_SERVER,
                 latency_ms=(time.time() - start_time) * 1000,
-                error=f"MCP bridge error: {str(e)}",
+                error=f"MCP bridge error: {e!s}",
             )
 
     async def _try_direct_api(self, request: AgentRequest) -> AgentResponse:
@@ -1453,7 +1454,7 @@ class UnifiedAgentInterface:
                 content="",
                 channel=AgentChannel.DIRECT_API,
                 latency_ms=(time.time() - start_time) * 1000,
-                error=f"Circuit breaker open: {str(e)}",
+                error=f"Circuit breaker open: {e!s}",
             )
 
     async def _execute_api_call(self, request: AgentRequest, start_time: float) -> AgentResponse:
@@ -1821,7 +1822,7 @@ class UnifiedAgentInterface:
                 content="",
                 channel=AgentChannel.BACKUP_API,
                 latency_ms=(time.time() - start_time) * 1000,
-                error=f"Backup API also failed: {str(e)}",
+                error=f"Backup API also failed: {e!s}",
             )
 
     async def _execute_tool_with_retry(self, tool_call: dict[str, Any], max_retries: int = 3) -> dict[str, Any]:
@@ -1926,7 +1927,7 @@ class UnifiedAgentInterface:
                     logger.error(f"   Raw arguments: {arguments_str}")
                     return {
                         "success": False,
-                        "error": f"Invalid tool arguments JSON: {str(e)}",
+                        "error": f"Invalid tool arguments JSON: {e!s}",
                     }
             else:
                 arguments = arguments_str
@@ -1953,7 +1954,7 @@ class UnifiedAgentInterface:
                 logger.error(f"❌ Failed to import MCP tools: {e}")
                 return {
                     "success": False,
-                    "error": f"Failed to import MCP tools: {str(e)}",
+                    "error": f"Failed to import MCP tools: {e!s}",
                 }
 
             tool_map = {
@@ -1995,7 +1996,7 @@ class UnifiedAgentInterface:
             import traceback
 
             logger.error(f"   Traceback:\n{traceback.format_exc()}")
-            return {"success": False, "error": f"Tool execution error: {str(e)}"}
+            return {"success": False, "error": f"Tool execution error: {e!s}"}
 
     async def _execute_local_tool(self, function_name: str | None, arguments: dict[str, Any]) -> dict[str, Any]:
         """Local emulation for MCP tools when autonomy mode disables MCP bridge.

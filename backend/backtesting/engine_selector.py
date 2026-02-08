@@ -176,7 +176,7 @@ def get_engine(
     if engine_type in ("optimization", "numba"):
         if numba_available and NumbaEngineV2 is not None:
             logger.info(
-                f"🚀 Using NumbaEngineV2 for OPTIMIZATION (JIT-compiled, ~20-40x faster, 100% parity with FallbackV4)"
+                "🚀 Using NumbaEngineV2 for OPTIMIZATION (JIT-compiled, ~20-40x faster, 100% parity with FallbackV4)"
             )
             return NumbaEngineV2()
         else:

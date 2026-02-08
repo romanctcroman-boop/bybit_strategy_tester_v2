@@ -6,7 +6,7 @@ Provides REST API endpoints for API key rotation management.
 """
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -52,10 +52,10 @@ class KeyMetadataResponse(BaseModel):
     provider: str
     created_at: datetime
     expires_at: datetime
-    last_used: Optional[datetime]
+    last_used: datetime | None
     usage_count: int
     status: str
-    rotated_from: Optional[str]
+    rotated_from: str | None
     description: str
     tags: list[str]
     days_until_expiry: int
@@ -72,7 +72,7 @@ class RotationEventResponse(BaseModel):
     rotated_at: datetime
     reason: str
     success: bool
-    error_message: Optional[str]
+    error_message: str | None
 
 
 class UsageStatsResponse(BaseModel):
@@ -82,8 +82,8 @@ class UsageStatsResponse(BaseModel):
     total_requests: int
     successful_requests: int
     failed_requests: int
-    last_success: Optional[datetime]
-    last_failure: Optional[datetime]
+    last_success: datetime | None
+    last_failure: datetime | None
     avg_latency_ms: float
     error_rate: float
 
@@ -164,7 +164,7 @@ async def register_key(request: RegisterKeyRequest):
 
 
 @router.get("/keys", response_model=list[KeyMetadataResponse])
-async def list_keys(provider: Optional[str] = None):
+async def list_keys(provider: str | None = None):
     """List all registered API keys."""
     service = get_rotation_service()
 
@@ -303,7 +303,7 @@ async def check_rotation_needed():
 
 
 @router.get("/history", response_model=list[RotationEventResponse])
-async def get_rotation_history(limit: int = 100, provider: Optional[str] = None):
+async def get_rotation_history(limit: int = 100, provider: str | None = None):
     """Get rotation history."""
     service = get_rotation_service()
 

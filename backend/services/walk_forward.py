@@ -24,9 +24,10 @@ Usage:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
@@ -465,8 +466,8 @@ class WalkForwardOptimizer:
             # Assume milliseconds if > 1e12
             if ts > 1e12:
                 ts = ts / 1000
-            return datetime.fromtimestamp(ts, tz=timezone.utc)
-        return datetime.now(timezone.utc)
+            return datetime.fromtimestamp(ts, tz=UTC)
+        return datetime.now(UTC)
 
 
 def simple_strategy_runner(
@@ -525,7 +526,7 @@ def simple_strategy_runner(
 
 
 # Global instance
-_walk_forward_optimizer: Optional[WalkForwardOptimizer] = None
+_walk_forward_optimizer: WalkForwardOptimizer | None = None
 
 
 def get_walk_forward_optimizer() -> WalkForwardOptimizer:

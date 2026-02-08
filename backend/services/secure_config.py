@@ -55,10 +55,10 @@ class ConfigVariable:
     name: str
     config_type: ConfigType
     required: bool = False
-    default_value: Optional[str] = None
+    default_value: str | None = None
     description: str = ""
     is_sensitive: bool = False
-    validation_pattern: Optional[str] = None
+    validation_pattern: str | None = None
 
 
 @dataclass
@@ -70,7 +70,7 @@ class ConfigIssue:
     variable: str
     message: str
     recommendation: str
-    file_path: Optional[str] = None
+    file_path: str | None = None
 
 
 @dataclass
@@ -322,7 +322,7 @@ class SecureConfigHandler:
             return values
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 for line_num, line in enumerate(f, 1):
                     line = line.strip()
 
@@ -337,9 +337,7 @@ class SecureConfigHandler:
                         value = value.strip()
 
                         # Remove quotes
-                        if value.startswith('"') and value.endswith('"'):
-                            value = value[1:-1]
-                        elif value.startswith("'") and value.endswith("'"):
+                        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
                             value = value[1:-1]
 
                         values[key] = value
@@ -355,8 +353,8 @@ class SecureConfigHandler:
 
     def validate_config(
         self,
-        config_values: Optional[dict[str, str]] = None,
-        file_path: Optional[Path] = None,
+        config_values: dict[str, str] | None = None,
+        file_path: Path | None = None,
     ) -> ConfigValidationResult:
         """Validate configuration values."""
         values = config_values or self._config_values
@@ -547,8 +545,8 @@ class SecureConfigHandler:
 
     def get_issues(
         self,
-        severity: Optional[ConfigSeverity] = None,
-        variable: Optional[str] = None,
+        severity: ConfigSeverity | None = None,
+        variable: str | None = None,
     ) -> list[ConfigIssue]:
         """Get configuration issues."""
         issues = self._issues
@@ -571,7 +569,7 @@ class SecureConfigHandler:
             "checksum": self.get_checksum(),
         }
 
-    def get_variable_info(self, name: str) -> Optional[dict]:
+    def get_variable_info(self, name: str) -> dict | None:
         """Get information about a variable."""
         if name not in self._variables:
             return None

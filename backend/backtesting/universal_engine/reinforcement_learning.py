@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -69,7 +69,7 @@ class Experience:
     reward: float
     next_state: NDArray
     done: bool
-    info: Dict[str, Any] = field(default_factory=dict)
+    info: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -95,7 +95,7 @@ class RLConfig:
     epsilon_decay: float = 0.995
 
     # Network
-    hidden_layers: List[int] = field(default_factory=lambda: [64, 64])
+    hidden_layers: list[int] = field(default_factory=lambda: [64, 64])
     activation: str = "relu"
 
     # PPO specific
@@ -126,7 +126,7 @@ class TradingEnvironment:
     """
 
     def __init__(
-        self, prices: NDArray, features: NDArray, config: Optional[RLConfig] = None
+        self, prices: NDArray, features: NDArray, config: RLConfig | None = None
     ):
         """
         Initialize environment.
@@ -149,14 +149,14 @@ class TradingEnvironment:
         self._position = 0
         self._entry_price = 0.0
         self._cash = self.config.initial_capital
-        self._equity_history: List[float] = []
-        self._trade_history: List[Dict] = []
+        self._equity_history: list[float] = []
+        self._trade_history: list[dict] = []
 
         # Reward calculation
         self._returns_buffer: deque = deque(maxlen=self.config.reward_window)
 
     @property
-    def observation_space(self) -> Tuple[int, ...]:
+    def observation_space(self) -> tuple[int, ...]:
         """Get observation space shape."""
         # Features + position + unrealized_pnl + cash_ratio
         return (self.n_features + 3,)
@@ -183,7 +183,7 @@ class TradingEnvironment:
 
         return self._get_observation()
 
-    def step(self, action: int) -> Tuple[NDArray, float, bool, Dict]:
+    def step(self, action: int) -> tuple[NDArray, float, bool, dict]:
         """
         Take action in environment.
 
@@ -201,7 +201,7 @@ class TradingEnvironment:
 
         # Execute action
         reward = 0.0
-        info: Dict[str, Any] = {"action": Action(action).name}
+        info: dict[str, Any] = {"action": Action(action).name}
 
         if action == Action.BUY.value and self._position <= 0:
             # Close short if exists, then go long
@@ -369,7 +369,7 @@ class TradingEnvironment:
 
         return step_return * 100
 
-    def get_metrics(self) -> Dict[str, float]:
+    def get_metrics(self) -> dict[str, float]:
         """Get performance metrics."""
         if len(self._equity_history) < 2:
             return {}
@@ -420,7 +420,7 @@ class ExperienceReplay:
         """Add experience to buffer."""
         self.buffer.append(experience)
 
-    def sample(self, batch_size: int) -> List[Experience]:
+    def sample(self, batch_size: int) -> list[Experience]:
         """Sample random batch from buffer."""
         indices = np.random.choice(len(self.buffer), batch_size, replace=False)
         return [self.buffer[i] for i in indices]
@@ -451,7 +451,7 @@ class PrioritizedReplay(ExperienceReplay):
         self.buffer.append(experience)
         self.priorities.append(self.max_priority)
 
-    def sample(self, batch_size: int) -> Tuple[List[Experience], NDArray, NDArray]:
+    def sample(self, batch_size: int) -> tuple[list[Experience], NDArray, NDArray]:
         """Sample batch with priority-based probabilities."""
         priorities = np.array(self.priorities)
         probs = priorities**self.alpha
@@ -491,11 +491,11 @@ class Layer(ABC):
         pass
 
     @abstractmethod
-    def get_params(self) -> List[NDArray]:
+    def get_params(self) -> list[NDArray]:
         pass
 
     @abstractmethod
-    def set_params(self, params: List[NDArray]) -> None:
+    def set_params(self, params: list[NDArray]) -> None:
         pass
 
 
@@ -508,9 +508,9 @@ class Dense(Layer):
         self.weights = np.random.randn(input_dim, output_dim) * scale
         self.bias = np.zeros(output_dim)
 
-        self._input: Optional[NDArray] = None
-        self._grad_weights: Optional[NDArray] = None
-        self._grad_bias: Optional[NDArray] = None
+        self._input: NDArray | None = None
+        self._grad_weights: NDArray | None = None
+        self._grad_bias: NDArray | None = None
 
     def forward(self, x: NDArray) -> NDArray:
         self._input = x
@@ -521,13 +521,13 @@ class Dense(Layer):
         self._grad_bias = np.sum(grad, axis=0)
         return grad @ self.weights.T
 
-    def get_params(self) -> List[NDArray]:
+    def get_params(self) -> list[NDArray]:
         return [self.weights, self.bias]
 
-    def set_params(self, params: List[NDArray]) -> None:
+    def set_params(self, params: list[NDArray]) -> None:
         self.weights, self.bias = params
 
-    def get_gradients(self) -> List[NDArray]:
+    def get_gradients(self) -> list[NDArray]:
         return [self._grad_weights, self._grad_bias]
 
 
@@ -535,7 +535,7 @@ class ReLU(Layer):
     """ReLU activation."""
 
     def __init__(self):
-        self._mask: Optional[NDArray] = None
+        self._mask: NDArray | None = None
 
     def forward(self, x: NDArray) -> NDArray:
         self._mask = x > 0
@@ -544,10 +544,10 @@ class ReLU(Layer):
     def backward(self, grad: NDArray) -> NDArray:
         return grad * self._mask
 
-    def get_params(self) -> List[NDArray]:
+    def get_params(self) -> list[NDArray]:
         return []
 
-    def set_params(self, params: List[NDArray]) -> None:
+    def set_params(self, params: list[NDArray]) -> None:
         pass
 
 
@@ -555,7 +555,7 @@ class Tanh(Layer):
     """Tanh activation."""
 
     def __init__(self):
-        self._output: Optional[NDArray] = None
+        self._output: NDArray | None = None
 
     def forward(self, x: NDArray) -> NDArray:
         self._output = np.tanh(x)
@@ -564,10 +564,10 @@ class Tanh(Layer):
     def backward(self, grad: NDArray) -> NDArray:
         return grad * (1 - self._output**2)
 
-    def get_params(self) -> List[NDArray]:
+    def get_params(self) -> list[NDArray]:
         return []
 
-    def set_params(self, params: List[NDArray]) -> None:
+    def set_params(self, params: list[NDArray]) -> None:
         pass
 
 
@@ -575,7 +575,7 @@ class Softmax(Layer):
     """Softmax activation."""
 
     def __init__(self):
-        self._output: Optional[NDArray] = None
+        self._output: NDArray | None = None
 
     def forward(self, x: NDArray) -> NDArray:
         exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
@@ -586,18 +586,18 @@ class Softmax(Layer):
         # Simplified: assumes cross-entropy loss handles softmax gradient
         return grad
 
-    def get_params(self) -> List[NDArray]:
+    def get_params(self) -> list[NDArray]:
         return []
 
-    def set_params(self, params: List[NDArray]) -> None:
+    def set_params(self, params: list[NDArray]) -> None:
         pass
 
 
 class NeuralNetwork:
     """Simple feed-forward neural network."""
 
-    def __init__(self, layer_sizes: List[int], activation: str = "relu"):
-        self.layers: List[Layer] = []
+    def __init__(self, layer_sizes: list[int], activation: str = "relu"):
+        self.layers: list[Layer] = []
 
         for i in range(len(layer_sizes) - 1):
             self.layers.append(Dense(layer_sizes[i], layer_sizes[i + 1]))
@@ -618,10 +618,10 @@ class NeuralNetwork:
         for layer in reversed(self.layers):
             grad = layer.backward(grad)
 
-    def get_params(self) -> List[List[NDArray]]:
+    def get_params(self) -> list[list[NDArray]]:
         return [layer.get_params() for layer in self.layers]
 
-    def set_params(self, params: List[List[NDArray]]) -> None:
+    def set_params(self, params: list[list[NDArray]]) -> None:
         for layer, p in zip(self.layers, params):
             if p:
                 layer.set_params(p)
@@ -660,11 +660,11 @@ class Adam:
         self.beta2 = beta2
         self.epsilon = epsilon
 
-        self.m: Dict[int, NDArray] = {}  # First moment
-        self.v: Dict[int, NDArray] = {}  # Second moment
+        self.m: dict[int, NDArray] = {}  # First moment
+        self.v: dict[int, NDArray] = {}  # Second moment
         self.t = 0
 
-    def step(self, params: List[NDArray], grads: List[NDArray]) -> List[NDArray]:
+    def step(self, params: list[NDArray], grads: list[NDArray]) -> list[NDArray]:
         """Update parameters."""
         self.t += 1
         updated = []
@@ -706,7 +706,7 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    def update(self, experience: Experience) -> Dict[str, float]:
+    def update(self, experience: Experience) -> dict[str, float]:
         pass
 
     @abstractmethod
@@ -731,7 +731,7 @@ class DQNAgent(BaseAgent):
     """
 
     def __init__(
-        self, state_dim: int, action_dim: int, config: Optional[RLConfig] = None
+        self, state_dim: int, action_dim: int, config: RLConfig | None = None
     ):
         config = config or RLConfig()
         super().__init__(config)
@@ -765,7 +765,7 @@ class DQNAgent(BaseAgent):
         q_values = self.q_network.forward(state)
         return int(np.argmax(q_values))
 
-    def update(self, experience: Experience) -> Dict[str, float]:
+    def update(self, experience: Experience) -> dict[str, float]:
         """Update agent from experience."""
         self.replay_buffer.push(experience)
 
@@ -866,7 +866,7 @@ class PPOAgent(BaseAgent):
     """
 
     def __init__(
-        self, state_dim: int, action_dim: int, config: Optional[RLConfig] = None
+        self, state_dim: int, action_dim: int, config: RLConfig | None = None
     ):
         config = config or RLConfig()
         super().__init__(config)
@@ -887,7 +887,7 @@ class PPOAgent(BaseAgent):
         self.critic_optimizer = Adam(config.learning_rate)
 
         # Trajectory buffer
-        self.trajectory: List[Experience] = []
+        self.trajectory: list[Experience] = []
 
     def select_action(self, state: NDArray, training: bool = True) -> int:
         """Select action using stochastic policy."""
@@ -919,7 +919,7 @@ class PPOAgent(BaseAgent):
         state = state.reshape(1, -1)
         return float(self.critic.forward(state)[0, 0])
 
-    def update(self, experience: Experience) -> Dict[str, float]:
+    def update(self, experience: Experience) -> dict[str, float]:
         """Store experience for later batch update."""
         self.trajectory.append(experience)
 
@@ -928,7 +928,7 @@ class PPOAgent(BaseAgent):
 
         return {}
 
-    def _update_from_trajectory(self) -> Dict[str, float]:
+    def _update_from_trajectory(self) -> dict[str, float]:
         """Update from collected trajectory."""
         if not self.trajectory:
             return {}
@@ -1046,7 +1046,7 @@ class A3CAgent(BaseAgent):
     """
 
     def __init__(
-        self, state_dim: int, action_dim: int, config: Optional[RLConfig] = None
+        self, state_dim: int, action_dim: int, config: RLConfig | None = None
     ):
         config = config or RLConfig()
         super().__init__(config)
@@ -1072,7 +1072,7 @@ class A3CAgent(BaseAgent):
 
         # N-step buffer
         self.n_step = 5
-        self.buffer: List[Experience] = []
+        self.buffer: list[Experience] = []
 
     def _get_features(self, state: NDArray) -> NDArray:
         """Extract features from state."""
@@ -1099,7 +1099,7 @@ class A3CAgent(BaseAgent):
         features = self._get_features(state)
         return float(self.value_head.forward(features)[0, 0])
 
-    def update(self, experience: Experience) -> Dict[str, float]:
+    def update(self, experience: Experience) -> dict[str, float]:
         """Update from experience."""
         self.buffer.append(experience)
 
@@ -1167,7 +1167,7 @@ class SACAgent(BaseAgent):
     """
 
     def __init__(
-        self, state_dim: int, action_dim: int, config: Optional[RLConfig] = None
+        self, state_dim: int, action_dim: int, config: RLConfig | None = None
     ):
         config = config or RLConfig()
         super().__init__(config)
@@ -1218,7 +1218,7 @@ class SACAgent(BaseAgent):
 
         return int(action)
 
-    def update(self, experience: Experience) -> Dict[str, float]:
+    def update(self, experience: Experience) -> dict[str, float]:
         """Update agent."""
         self.replay_buffer.push(experience)
 
@@ -1327,17 +1327,17 @@ class RLTrainer:
         self,
         agent: BaseAgent,
         env: TradingEnvironment,
-        config: Optional[RLConfig] = None,
+        config: RLConfig | None = None,
     ):
         self.agent = agent
         self.env = env
         self.config = config or RLConfig()
 
-        self.episode_rewards: List[float] = []
-        self.episode_lengths: List[int] = []
-        self.metrics_history: List[Dict] = []
+        self.episode_rewards: list[float] = []
+        self.episode_lengths: list[int] = []
+        self.metrics_history: list[dict] = []
 
-    def train(self, n_episodes: int, verbose: bool = True) -> Dict[str, List[float]]:
+    def train(self, n_episodes: int, verbose: bool = True) -> dict[str, list[float]]:
         """
         Train agent for specified number of episodes.
 
@@ -1395,7 +1395,7 @@ class RLTrainer:
             "metrics": self.metrics_history,
         }
 
-    def evaluate(self, n_episodes: int = 10) -> Dict[str, float]:
+    def evaluate(self, n_episodes: int = 10) -> dict[str, float]:
         """
         Evaluate agent without training.
 
@@ -1442,7 +1442,7 @@ class AgentFactory:
         agent_type: str,
         state_dim: int,
         action_dim: int,
-        config: Optional[RLConfig] = None,
+        config: RLConfig | None = None,
     ) -> BaseAgent:
         """
         Create RL agent.
@@ -1468,7 +1468,7 @@ class AgentFactory:
             raise ValueError(f"Unknown agent type: {agent_type}")
 
     @staticmethod
-    def get_available_agents() -> List[str]:
+    def get_available_agents() -> list[str]:
         """Get list of available agent types."""
         return ["dqn", "ppo", "a3c", "sac"]
 

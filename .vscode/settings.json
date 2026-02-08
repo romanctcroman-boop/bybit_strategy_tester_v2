@@ -85,5 +85,61 @@
   "python.testing.unittestEnabled": false,
   "python.testing.pytestArgs": [
     "tests"
-  ]
+  ],
+  // ═══════════════════════════════════════════════════════════
+  // GitHub Copilot — Maximum Agent Autonomy for Claude 4.5
+  // ═══════════════════════════════════════════════════════════
+  // Core Agent Mode
+  "github.copilot.chat.agent.enabled": true,
+  // Increase iteration limit for complex multi-step tasks
+  "chat.agent.maxRequests": 30,
+  // Allow agent to auto-run workspace tasks (build, test, lint)
+  "chat.agent.runTasks": true,
+  // ⚡ CRITICAL: Enable prompt files (.github/prompts/)
+  "chat.promptFiles": true,
+  // Enable organization-level custom agents (if any)
+  "github.copilot.chat.organizationCustomAgents.enabled": true,
+  // Additional search locations for custom agents
+  "chat.agentFilesLocations": [
+    ".github/agents",
+    ".agent"
+  ],
+  // Additional search locations for agent skills
+  "chat.agentSkillsLocations": [
+    ".github/skills",
+    ".agent/skills"
+  ],
+  // Copilot instructions location (auto-loaded)
+  "github.copilot.chat.codeGeneration.instructions": [
+    {
+      "file": ".github/copilot-instructions.md"
+    },
+    {
+      "file": ".agent/Claude.md"
+    }
+  ],
+  // Test generation instructions
+  "github.copilot.chat.testGeneration.instructions": [
+    {
+      "file": ".github/instructions/tests.instructions.md"
+    }
+  ],
+  // Code review instructions
+  "github.copilot.chat.reviewSelection.instructions": [
+    {
+      "file": ".github/prompts/code-review.prompt.md"
+    }
+  ],
+  // Copilot completions tuning
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": true,
+    "markdown": true,
+    "python": true,
+    "javascript": true,
+    "html": true,
+    "css": true,
+    "json": true,
+    "yaml": true
+  }
 }

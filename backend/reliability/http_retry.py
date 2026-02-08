@@ -3,7 +3,8 @@ This is a lightweight placeholder used in the developer/test environment.
 Production code should use a robust retry implementation (tenacity/httpx-retry/etc.).
 """
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 async def httpx_retry(name: str, call: Callable[..., Any], *args, **kwargs) -> Any:

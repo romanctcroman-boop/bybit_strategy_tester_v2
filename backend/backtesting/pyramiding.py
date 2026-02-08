@@ -13,7 +13,6 @@ TradingView Pyramiding Rules:
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -40,7 +39,7 @@ class PyramidPosition:
     """
 
     direction: str  # "long" или "short"
-    entries: List[PositionEntry] = field(default_factory=list)
+    entries: list[PositionEntry] = field(default_factory=list)
 
     @property
     def is_open(self) -> bool:
@@ -82,7 +81,7 @@ class PyramidPosition:
         return min(e.entry_bar_idx for e in self.entries)
 
     @property
-    def first_entry_time(self) -> Optional[datetime]:
+    def first_entry_time(self) -> datetime | None:
         """Время первого входа"""
         if not self.entries:
             return None
@@ -115,7 +114,7 @@ class PyramidPosition:
         )
         return True
 
-    def close_all(self) -> Tuple[float, float, float, int, datetime]:
+    def close_all(self) -> tuple[float, float, float, int, datetime]:
         """
         Закрыть ВСЕ входы (TV close_entries_rule = "ANY" или после TP/SL).
 
@@ -135,7 +134,7 @@ class PyramidPosition:
         self.entries.clear()
         return result
 
-    def close_fifo(self) -> Optional[PositionEntry]:
+    def close_fifo(self) -> PositionEntry | None:
         """
         Закрыть ПЕРВЫЙ вход (FIFO - First In First Out).
 
@@ -146,7 +145,7 @@ class PyramidPosition:
             return None
         return self.entries.pop(0)
 
-    def close_lifo(self) -> Optional[PositionEntry]:
+    def close_lifo(self) -> PositionEntry | None:
         """
         Закрыть ПОСЛЕДНИЙ вход (LIFO - Last In First Out).
 
@@ -157,7 +156,7 @@ class PyramidPosition:
             return None
         return self.entries.pop(-1)
 
-    def close_partial(self, portion: float) -> Tuple[float, float, float]:
+    def close_partial(self, portion: float) -> tuple[float, float, float]:
         """
         Частично закрыть позицию (для Multi-level TP).
 
@@ -382,7 +381,7 @@ class PyramidingManager:
         else:
             return avg_price + atr_value * multiplier
 
-    def get_multi_tp_prices(self, direction: str, base_tp: float, tp_levels: Tuple[float, ...]) -> List[float]:
+    def get_multi_tp_prices(self, direction: str, base_tp: float, tp_levels: tuple[float, ...]) -> list[float]:
         """
         Рассчитать несколько уровней TP (TP1, TP2, TP3, TP4).
 
@@ -408,8 +407,8 @@ class PyramidingManager:
         return prices
 
     def get_atr_multi_tp_prices(
-        self, direction: str, atr_value: float, tp_multipliers: Tuple[float, ...]
-    ) -> List[float]:
+        self, direction: str, atr_value: float, tp_multipliers: tuple[float, ...]
+    ) -> list[float]:
         """
         Рассчитать несколько уровней TP на основе ATR.
 
@@ -442,7 +441,7 @@ class PyramidingManager:
         exit_time: datetime,
         exit_reason: str,
         taker_fee: float = 0.0,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """
         Частично закрыть позицию (для Multi-level TP).
 
@@ -509,7 +508,7 @@ class PyramidingManager:
         exit_time: datetime,
         exit_reason: str,
         taker_fee: float = 0.0,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """
         Закрыть позицию по правилу close_rule.
 

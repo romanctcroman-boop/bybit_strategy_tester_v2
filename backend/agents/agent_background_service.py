@@ -33,30 +33,30 @@ if sys.platform == "win32":
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 # Load .env file BEFORE any other imports
-from dotenv import load_dotenv  # noqa: E402
-from loguru import logger  # noqa: E402
+from dotenv import load_dotenv
+from loguru import logger
 
 load_dotenv()
 
 # ✅ FIX: Now backend imports will work
-from backend.utils.time import utc_now  # noqa: E402
+from backend.utils.time import utc_now
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-import httpx  # noqa: E402
+import httpx
 
-from backend.agents.circuit_breaker_manager import (  # noqa: E402
+from backend.agents.circuit_breaker_manager import (
     CircuitBreakerError,
     CircuitState,
 )
-from backend.agents.unified_agent_interface import (  # noqa: E402
+from backend.agents.unified_agent_interface import (
     AgentRequest,
     AgentType,
     APIKeyHealth,
     get_agent_interface,
 )
-from backend.services.fallback_service import get_fallback_service  # noqa: E402
+from backend.services.fallback_service import get_fallback_service
 
 # =============================================================================
 # BACKGROUND SERVICE

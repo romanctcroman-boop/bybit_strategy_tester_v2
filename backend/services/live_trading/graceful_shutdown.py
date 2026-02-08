@@ -17,11 +17,12 @@ import atexit
 import logging
 import signal
 import sys
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Callable, Optional, TypeVar
+from typing import TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +44,8 @@ class ShutdownContext:
 
     state: ShutdownState = ShutdownState.RUNNING
     reason: str = ""
-    requested_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    requested_at: datetime | None = None
+    completed_at: datetime | None = None
     errors: list[str] = field(default_factory=list)
     closed_positions: list[str] = field(default_factory=list)
 
@@ -99,10 +100,10 @@ class GracefulShutdownManager:
 
         self._context = ShutdownContext()
         self._components: dict[str, Callable] = {}
-        self._position_closer: Optional[Callable] = None
+        self._position_closer: Callable | None = None
         self._callbacks: list[Callable] = []
         self._shutdown_event = asyncio.Event()
-        self._original_handlers: dict[signal.Signals, Optional[signal.Handlers]] = {}
+        self._original_handlers: dict[signal.Signals, signal.Handlers | None] = {}
 
         logger.info(
             f"GracefulShutdownManager initialized (timeout={timeout}s, close_positions={close_positions_on_shutdown})"
@@ -235,7 +236,7 @@ class GracefulShutdownManager:
         if self._context.state == ShutdownState.RUNNING:
             self._context.state = ShutdownState.SHUTDOWN_REQUESTED
             self._context.reason = reason
-            self._context.requested_at = datetime.now(timezone.utc)
+            self._context.requested_at = datetime.now(UTC)
             self._shutdown_event.set()
             logger.info(f"Shutdown requested: {reason}")
 
@@ -271,7 +272,7 @@ class GracefulShutdownManager:
             # Phase 3: Shutdown components in order
             await self._shutdown_components()
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             error = f"Shutdown timed out after {self.timeout}s"
             logger.error(error)
             self._context.errors.append(error)
@@ -281,7 +282,7 @@ class GracefulShutdownManager:
             self._context.errors.append(error)
         finally:
             self._context.state = ShutdownState.SHUTDOWN_COMPLETE
-            self._context.completed_at = datetime.now(timezone.utc)
+            self._context.completed_at = datetime.now(UTC)
 
             # Uninstall signal handlers
             self.uninstall_signal_handlers()
@@ -312,7 +313,7 @@ class GracefulShutdownManager:
                             self._context.errors.append(f"Failed to close position: {symbol}")
 
                 logger.info(f"Closed {len(self._context.closed_positions)} positions")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Position closing timed out")
             self._context.errors.append("Position closing timed out")
         except Exception as e:
@@ -351,7 +352,7 @@ class GracefulShutdownManager:
                     else:
                         shutdown_func()
                 logger.debug(f"Component {name} shutdown complete")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 error = f"Component {name} shutdown timed out"
                 logger.warning(error)
                 self._context.errors.append(error)
@@ -374,7 +375,7 @@ class GracefulShutdownManager:
 # Convenience function for quick setup
 def setup_graceful_shutdown(
     *components: tuple[str, Callable],
-    position_closer: Optional[Callable] = None,
+    position_closer: Callable | None = None,
     close_positions: bool = False,
     timeout: float = 30.0,
 ) -> GracefulShutdownManager:

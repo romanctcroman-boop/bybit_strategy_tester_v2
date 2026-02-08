@@ -10,7 +10,6 @@ TradingView behavior:
 - Auto-selects appropriate LTF based on chart TF
 """
 
-from typing import Optional
 
 import pandas as pd
 from loguru import logger
@@ -113,7 +112,7 @@ def calculate_bars_ratio(chart_tf: str, magnifier_tf: str) -> int:
 
 
 def get_intrabar_path(
-    ohlc_bar: dict, ltf_data: Optional[pd.DataFrame] = None
+    ohlc_bar: dict, ltf_data: pd.DataFrame | None = None
 ) -> list[float]:
     """
     Get the intrabar price path for precise order execution.
@@ -217,8 +216,8 @@ def check_order_fill_on_path(
 def check_sl_tp_on_path(
     position_side: str,  # 'long' or 'short'
     entry_price: float,
-    sl_price: Optional[float],
-    tp_price: Optional[float],
+    sl_price: float | None,
+    tp_price: float | None,
     intrabar_path: list[float],
     sl_priority: bool = True,
 ) -> tuple[str, float, int]:
@@ -297,7 +296,7 @@ class BarMagnifier:
     """
 
     def __init__(
-        self, chart_tf: str, magnifier_tf: Optional[str] = None, max_bars: int = 200000
+        self, chart_tf: str, magnifier_tf: str | None = None, max_bars: int = 200000
     ):
         """
         Initialize Bar Magnifier.
@@ -311,7 +310,7 @@ class BarMagnifier:
         self.magnifier_tf = magnifier_tf or get_magnifier_timeframe(chart_tf)
         self.max_bars = max_bars
         self.bars_ratio = calculate_bars_ratio(chart_tf, self.magnifier_tf)
-        self.ltf_data: Optional[pd.DataFrame] = None
+        self.ltf_data: pd.DataFrame | None = None
 
         logger.info(
             f"Bar Magnifier initialized: {chart_tf} → {self.magnifier_tf} "

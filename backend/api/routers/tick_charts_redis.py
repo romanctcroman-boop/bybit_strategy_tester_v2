@@ -14,8 +14,7 @@ import logging
 import os
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 
 import redis.asyncio as redis
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
@@ -122,7 +121,7 @@ class TickServiceStatus(BaseModel):
     candles_created: int
     reconnects: int
     last_trade_time: str | None
-    subscribed_symbols: List[str]
+    subscribed_symbols: list[str]
 
 
 # =============================================================================
@@ -130,7 +129,7 @@ class TickServiceStatus(BaseModel):
 # =============================================================================
 
 
-@router.get("/candles", response_model=List[TickCandleOut])
+@router.get("/candles", response_model=list[TickCandleOut])
 async def get_tick_candles(
     symbol: str = Query("BTCUSDT", description="Trading pair symbol"),
     ticks: int = Query(100, ge=10, le=10000, description="Ticks per candle (10-10000)"),
@@ -231,7 +230,7 @@ async def handle_legacy_websocket(
 
         current = service.get_current_candle(symbol, ticks)
         if current:
-            current["server_time"] = int(datetime.now(timezone.utc).timestamp() * 1000)
+            current["server_time"] = int(datetime.now(UTC).timestamp() * 1000)
             await websocket.send_json({"type": "current", "data": current})
 
         if pending_trades:
@@ -319,11 +318,11 @@ async def handle_redis_websocket(
                             if len(pending_trades) > 20:
                                 pending_trades.pop(0)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No message within 50ms - send current candle state
                 if current_candle_state:
                     current_candle_state["server_time"] = int(
-                        datetime.now(timezone.utc).timestamp() * 1000
+                        datetime.now(UTC).timestamp() * 1000
                     )
                     await websocket.send_json(
                         {"type": "current", "data": current_candle_state}

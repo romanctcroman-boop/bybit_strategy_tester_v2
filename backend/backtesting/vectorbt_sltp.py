@@ -187,7 +187,7 @@ def flex_order_func_nb(
 
     # Determine fill price based on fill_mode
     # fill_mode: 0 = bar_close, 1 = next_bar_open
-    fill_price = close_now  # noqa: F841
+    fill_price = close_now
     if fill_mode == 1 and i + 1 < len(open_arr):
         fill_price = open_arr[i + 1, 0]  # noqa: F841 - Use next bar's open
 

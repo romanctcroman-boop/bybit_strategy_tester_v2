@@ -12,8 +12,8 @@ All methods include exception handling with proper logging.
 
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -69,7 +69,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
         self,
         symbol: str,
         interval: str,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
     ) -> int:
         """
         Bulk insert/update candles using UPSERT pattern.
@@ -109,7 +109,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
                         "interval": interval,
                         "open_time": open_time,
                         "open_time_dt": datetime.fromtimestamp(
-                            open_time / 1000, tz=timezone.utc
+                            open_time / 1000, tz=UTC
                         ),
                         "open_price": float(c.get("open", 0)),
                         "high_price": float(c.get("high", 0)),
@@ -148,7 +148,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
 
     def bulk_upsert_raw(
         self,
-        candles: List[Dict[str, Any]],
+        candles: list[dict[str, Any]],
     ) -> int:
         """
         Bulk upsert candles that already contain symbol/interval.
@@ -160,7 +160,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
             return 0
 
         # Group by symbol+interval for efficiency
-        groups: Dict[str, List[Dict]] = {}
+        groups: dict[str, list[dict]] = {}
         for c in candles:
             key = f"{c.get('symbol')}:{c.get('interval')}"
             if key not in groups:
@@ -183,11 +183,11 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
         symbol: str,
         interval: str,
         limit: int = 500,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        start_time: int | None = None,
+        end_time: int | None = None,
         ascending: bool = False,
-        market_type: Optional[str] = None,
-    ) -> List[BybitKlineAudit]:
+        market_type: str | None = None,
+    ) -> list[BybitKlineAudit]:
         """
         Get klines for a symbol/interval with optional time filters.
 
@@ -237,9 +237,9 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
         symbol: str,
         interval: str,
         limit: int = 500,
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        start_time: int | None = None,
+        end_time: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get klines as dictionaries (for API responses).
         Results are ordered oldest-first for charting.
@@ -269,7 +269,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
         self,
         symbol: str,
         interval: str,
-    ) -> Optional[BybitKlineAudit]:
+    ) -> BybitKlineAudit | None:
         """Get the most recent candle for a symbol/interval."""
         return (
             self.session.query(BybitKlineAudit)
@@ -285,7 +285,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
         self,
         symbol: str,
         interval: str,
-    ) -> Optional[BybitKlineAudit]:
+    ) -> BybitKlineAudit | None:
         """Get the oldest candle for a symbol/interval."""
         return (
             self.session.query(BybitKlineAudit)
@@ -305,7 +305,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
         self,
         symbol: str,
         interval: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get data coverage statistics for a symbol/interval.
 
@@ -348,10 +348,10 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
                 "oldest": result.oldest,
                 "newest": result.newest,
                 "oldest_dt": datetime.fromtimestamp(
-                    result.oldest / 1000, tz=timezone.utc
+                    result.oldest / 1000, tz=UTC
                 ),
                 "newest_dt": datetime.fromtimestamp(
-                    result.newest / 1000, tz=timezone.utc
+                    result.newest / 1000, tz=UTC
                 ),
                 "expected": expected,
                 "completeness_pct": round(completeness, 2),
@@ -361,7 +361,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
             logger.error(f"get_coverage failed for {symbol}:{interval}: {e}")
             raise classify_sqlalchemy_error(e, "get_coverage", "BybitKlineAudit") from e
 
-    def get_all_symbols(self) -> List[str]:
+    def get_all_symbols(self) -> list[str]:
         """Get list of all unique symbols in database."""
         try:
             result = self.session.query(BybitKlineAudit.symbol).distinct().all()
@@ -372,7 +372,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
                 e, "get_all_symbols", "BybitKlineAudit"
             ) from e
 
-    def get_intervals_for_symbol(self, symbol: str) -> List[str]:
+    def get_intervals_for_symbol(self, symbol: str) -> list[str]:
         """Get list of intervals available for a symbol."""
         try:
             result = (
@@ -398,7 +398,7 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
         interval: str,
         max_gaps: int = 50,
         skip_weekends: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Find timestamp gaps in data using window functions.
 
@@ -455,10 +455,10 @@ class KlineRepository(BaseRepository[BybitKlineAudit]):
 
                 # Add datetime versions for readability
                 row_dict["gap_start_dt"] = datetime.fromtimestamp(
-                    row_dict["gap_start"] / 1000, tz=timezone.utc
+                    row_dict["gap_start"] / 1000, tz=UTC
                 )
                 row_dict["gap_end_dt"] = datetime.fromtimestamp(
-                    row_dict["gap_end"] / 1000, tz=timezone.utc
+                    row_dict["gap_end"] / 1000, tz=UTC
                 )
 
                 # Check if weekend gap

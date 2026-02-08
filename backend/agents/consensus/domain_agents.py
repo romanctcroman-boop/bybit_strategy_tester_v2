@@ -15,10 +15,11 @@ from __future__ import annotations
 import json
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -42,15 +43,15 @@ class AnalysisResult:
     agent_type: str
     expertise: AgentExpertise
     summary: str
-    findings: List[Dict[str, Any]]
-    recommendations: List[str]
+    findings: list[dict[str, Any]]
+    recommendations: list[str]
     confidence: float
-    risk_level: Optional[str] = None  # low, medium, high, critical
-    score: Optional[float] = None  # Domain-specific score
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    risk_level: str | None = None  # low, medium, high, critical
+    score: float | None = None  # Domain-specific score
+    metadata: dict[str, Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "agent_type": self.agent_type,
@@ -71,9 +72,9 @@ class ValidationResult:
     """Result from domain agent validation"""
 
     is_valid: bool
-    issues: List[Dict[str, Any]]
-    warnings: List[str]
-    suggestions: List[str]
+    issues: list[dict[str, Any]]
+    warnings: list[str]
+    suggestions: list[str]
     validation_score: float  # 0.0 to 1.0
 
 
@@ -91,9 +92,9 @@ class DomainAgent(ABC):
     def __init__(
         self,
         name: str,
-        expertise: List[AgentExpertise],
-        agent_interface: Optional[Any] = None,
-        ask_fn: Optional[Callable[[str], str]] = None,
+        expertise: list[AgentExpertise],
+        agent_interface: Any | None = None,
+        ask_fn: Callable[[str], str] | None = None,
     ):
         """
         Initialize domain agent
@@ -110,12 +111,12 @@ class DomainAgent(ABC):
         self.ask_fn = ask_fn
         self.agent_id = f"{name.lower().replace(' ', '_')}_{uuid.uuid4().hex[:8]}"
 
-        self.analysis_history: List[AnalysisResult] = []
+        self.analysis_history: list[AnalysisResult] = []
 
         logger.debug(f"🎯 Domain Agent initialized: {name}")
 
     @abstractmethod
-    async def analyze(self, context: Dict[str, Any]) -> AnalysisResult:
+    async def analyze(self, context: dict[str, Any]) -> AnalysisResult:
         """
         Analyze context with domain expertise
 
@@ -129,7 +130,7 @@ class DomainAgent(ABC):
 
     @abstractmethod
     async def validate(
-        self, proposal: str, context: Optional[Dict[str, Any]] = None
+        self, proposal: str, context: dict[str, Any] | None = None
     ) -> ValidationResult:
         """
         Validate a proposal against domain rules
@@ -150,8 +151,8 @@ class DomainAgent(ABC):
 
         if self.agent_interface:
             try:
-                from backend.agents.unified_agent_interface import AgentRequest
                 from backend.agents.models import AgentType
+                from backend.agents.unified_agent_interface import AgentRequest
 
                 at = (
                     AgentType.DEEPSEEK
@@ -177,7 +178,7 @@ class DomainAgent(ABC):
         """Simulate response for testing"""
         return f"Simulated analysis for: {prompt[:50]}..."
 
-    def _parse_findings(self, response: str) -> List[Dict[str, Any]]:
+    def _parse_findings(self, response: str) -> list[dict[str, Any]]:
         """Parse findings from response"""
         findings = []
         lines = response.split("\n")
@@ -201,7 +202,7 @@ class DomainAgent(ABC):
 
         return findings
 
-    def _parse_recommendations(self, response: str) -> List[str]:
+    def _parse_recommendations(self, response: str) -> list[str]:
         """Parse recommendations from response"""
         recommendations = []
         lines = response.split("\n")
@@ -284,7 +285,7 @@ VALIDATION_SCORE: [0.0-1.0]
 """
 
     def __init__(
-        self, agent_interface: Optional[Any] = None, ask_fn: Optional[Callable] = None
+        self, agent_interface: Any | None = None, ask_fn: Callable | None = None
     ):
         super().__init__(
             name="Trading Strategy Expert",
@@ -293,7 +294,7 @@ VALIDATION_SCORE: [0.0-1.0]
             ask_fn=ask_fn,
         )
 
-    async def analyze(self, context: Dict[str, Any]) -> AnalysisResult:
+    async def analyze(self, context: dict[str, Any]) -> AnalysisResult:
         """Analyze trading strategy"""
         strategy_config = json.dumps(context.get("strategy", {}), indent=2)
         backtest_results = json.dumps(context.get("results", {}), indent=2)
@@ -336,7 +337,7 @@ VALIDATION_SCORE: [0.0-1.0]
         return result
 
     async def validate(
-        self, proposal: str, context: Optional[Dict[str, Any]] = None
+        self, proposal: str, context: dict[str, Any] | None = None
     ) -> ValidationResult:
         """Validate strategy proposal"""
         context_str = json.dumps(context or {}, indent=2)
@@ -384,7 +385,7 @@ VALIDATION_SCORE: [0.0-1.0]
             validation_score=validation_score,
         )
 
-    def _calculate_strategy_score(self, results: Dict[str, Any]) -> float:
+    def _calculate_strategy_score(self, results: dict[str, Any]) -> float:
         """Calculate composite strategy score"""
         score = 50.0  # Base score
 
@@ -472,7 +473,7 @@ CONFIDENCE: [0.0-1.0]
 """
 
     def __init__(
-        self, agent_interface: Optional[Any] = None, ask_fn: Optional[Callable] = None
+        self, agent_interface: Any | None = None, ask_fn: Callable | None = None
     ):
         super().__init__(
             name="Risk Management Expert",
@@ -481,7 +482,7 @@ CONFIDENCE: [0.0-1.0]
             ask_fn=ask_fn,
         )
 
-    async def analyze(self, context: Dict[str, Any]) -> AnalysisResult:
+    async def analyze(self, context: dict[str, Any]) -> AnalysisResult:
         """Analyze risk factors"""
         prompt = self.ANALYSIS_PROMPT.format(
             portfolio_config=json.dumps(context.get("portfolio", {}), indent=2),
@@ -526,7 +527,7 @@ CONFIDENCE: [0.0-1.0]
         )
 
     async def validate(
-        self, proposal: str, context: Optional[Dict[str, Any]] = None
+        self, proposal: str, context: dict[str, Any] | None = None
     ) -> ValidationResult:
         """Validate risk parameters"""
         # Check against risk rules
@@ -625,7 +626,7 @@ CONFIDENCE: [0.0-1.0]
 """
 
     def __init__(
-        self, agent_interface: Optional[Any] = None, ask_fn: Optional[Callable] = None
+        self, agent_interface: Any | None = None, ask_fn: Callable | None = None
     ):
         super().__init__(
             name="Code Audit Expert",
@@ -637,7 +638,7 @@ CONFIDENCE: [0.0-1.0]
             ask_fn=ask_fn,
         )
 
-    async def analyze(self, context: Dict[str, Any]) -> AnalysisResult:
+    async def analyze(self, context: dict[str, Any]) -> AnalysisResult:
         """Analyze code for issues"""
         prompt = self.ANALYSIS_PROMPT.format(
             language=context.get("language", "python"),
@@ -671,7 +672,7 @@ CONFIDENCE: [0.0-1.0]
         )
 
     async def validate(
-        self, proposal: str, context: Optional[Dict[str, Any]] = None
+        self, proposal: str, context: dict[str, Any] | None = None
     ) -> ValidationResult:
         """Validate code changes"""
         issues = []
@@ -749,7 +750,7 @@ CONFIDENCE: [0.0-1.0]
 """
 
     def __init__(
-        self, agent_interface: Optional[Any] = None, ask_fn: Optional[Callable] = None
+        self, agent_interface: Any | None = None, ask_fn: Callable | None = None
     ):
         super().__init__(
             name="Market Research Expert",
@@ -758,7 +759,7 @@ CONFIDENCE: [0.0-1.0]
             ask_fn=ask_fn,
         )
 
-    async def analyze(self, context: Dict[str, Any]) -> AnalysisResult:
+    async def analyze(self, context: dict[str, Any]) -> AnalysisResult:
         """Research market conditions"""
         prompt = self.ANALYSIS_PROMPT.format(
             query=context.get("query", ""),
@@ -791,7 +792,7 @@ CONFIDENCE: [0.0-1.0]
         )
 
     async def validate(
-        self, proposal: str, context: Optional[Dict[str, Any]] = None
+        self, proposal: str, context: dict[str, Any] | None = None
     ) -> ValidationResult:
         """Validate market-based decision"""
         return ValidationResult(
@@ -816,9 +817,9 @@ class DomainAgentRegistry:
     Provides centralized access to specialized agents.
     """
 
-    def __init__(self, agent_interface: Optional[Any] = None):
+    def __init__(self, agent_interface: Any | None = None):
         self.agent_interface = agent_interface
-        self._agents: Dict[str, DomainAgent] = {}
+        self._agents: dict[str, DomainAgent] = {}
 
         # Register default agents
         self.register("trading", TradingStrategyAgent(agent_interface))
@@ -834,23 +835,23 @@ class DomainAgentRegistry:
         """Register a domain agent"""
         self._agents[name] = agent
 
-    def get(self, name: str) -> Optional[DomainAgent]:
+    def get(self, name: str) -> DomainAgent | None:
         """Get agent by name"""
         return self._agents.get(name)
 
-    def list_agents(self) -> List[str]:
+    def list_agents(self) -> list[str]:
         """List registered agent names"""
         return list(self._agents.keys())
 
-    def get_by_expertise(self, expertise: AgentExpertise) -> List[DomainAgent]:
+    def get_by_expertise(self, expertise: AgentExpertise) -> list[DomainAgent]:
         """Get agents with specific expertise"""
         return [
             agent for agent in self._agents.values() if expertise in agent.expertise
         ]
 
     async def analyze_with_all(
-        self, context: Dict[str, Any]
-    ) -> Dict[str, AnalysisResult]:
+        self, context: dict[str, Any]
+    ) -> dict[str, AnalysisResult]:
         """Run analysis with all relevant agents"""
         results = {}
 
@@ -865,13 +866,13 @@ class DomainAgentRegistry:
 
 
 __all__ = [
-    "DomainAgent",
-    "TradingStrategyAgent",
-    "RiskManagementAgent",
-    "CodeAuditAgent",
-    "MarketResearchAgent",
-    "DomainAgentRegistry",
     "AgentExpertise",
     "AnalysisResult",
+    "CodeAuditAgent",
+    "DomainAgent",
+    "DomainAgentRegistry",
+    "MarketResearchAgent",
+    "RiskManagementAgent",
+    "TradingStrategyAgent",
     "ValidationResult",
 ]

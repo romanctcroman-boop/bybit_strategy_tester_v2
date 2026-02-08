@@ -8,9 +8,10 @@ Provides tools for robust strategy validation using rolling window optimization:
 - Performance degradation analysis
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -25,7 +26,7 @@ class WalkForwardWindow:
     in_sample_end: datetime
     out_sample_start: datetime
     out_sample_end: datetime
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     in_sample_sharpe: float
     in_sample_return: float
     in_sample_trades: int
@@ -43,7 +44,7 @@ class WalkForwardResult:
 
     strategy_name: str
     total_windows: int
-    windows: List[WalkForwardWindow]
+    windows: list[WalkForwardWindow]
     # Aggregated metrics
     avg_is_sharpe: float = 0.0
     avg_oos_sharpe: float = 0.0
@@ -57,11 +58,11 @@ class WalkForwardResult:
     oos_win_rate: float = 0.0  # % of windows where OOS was profitable
     parameter_stability: float = 0.0  # How stable are optimal params across windows
     # Combined OOS equity curve
-    combined_oos_equity: List[float] = field(default_factory=list)
+    combined_oos_equity: list[float] = field(default_factory=list)
     combined_oos_sharpe: float = 0.0
     combined_oos_return: float = 0.0
     # Per-parameter stability (param -> {mean, std, cv_pct, stability_pct})
-    param_stability_report: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    param_stability_report: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 class WalkForwardOptimizer:
@@ -100,8 +101,8 @@ class WalkForwardOptimizer:
 
     def _create_windows(
         self, data: pd.DataFrame, timestamp_col: str = "timestamp"
-    ) -> List[
-        Tuple[pd.DataFrame, pd.DataFrame, datetime, datetime, datetime, datetime]
+    ) -> list[
+        tuple[pd.DataFrame, pd.DataFrame, datetime, datetime, datetime, datetime]
     ]:
         """
         Create walk-forward windows from data.
@@ -249,7 +250,7 @@ class WalkForwardOptimizer:
     def optimize(
         self,
         data: pd.DataFrame,
-        param_grid: Dict[str, List[Any]],
+        param_grid: dict[str, list[Any]],
         backtest_func: Callable,
         optimize_metric: str = "sharpe_ratio",
         timestamp_col: str = "timestamp",
@@ -398,8 +399,8 @@ class WalkForwardOptimizer:
         )
 
     def _generate_param_combinations(
-        self, param_grid: Dict[str, List[Any]]
-    ) -> List[Dict[str, Any]]:
+        self, param_grid: dict[str, list[Any]]
+    ) -> list[dict[str, Any]]:
         """Generate all combinations of parameters from grid."""
         import itertools
 
@@ -409,7 +410,7 @@ class WalkForwardOptimizer:
 
         return [dict(zip(keys, combo)) for combo in combinations]
 
-    def _calculate_param_stability(self, all_params: List[Dict[str, Any]]) -> float:
+    def _calculate_param_stability(self, all_params: list[dict[str, Any]]) -> float:
         """
         Calculate parameter stability across windows.
 
@@ -452,8 +453,8 @@ class WalkForwardOptimizer:
         return stability
 
     def get_param_stability_report(
-        self, all_params: List[Dict[str, Any]]
-    ) -> Dict[str, Dict[str, float]]:
+        self, all_params: list[dict[str, Any]]
+    ) -> dict[str, dict[str, float]]:
         """
         Per-parameter stability report across windows.
 

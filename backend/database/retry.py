@@ -24,8 +24,9 @@ import functools
 import logging
 import sqlite3
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Tuple, Type, TypeVar
+from typing import Any, TypeVar
 
 try:
     from tenacity import (
@@ -83,7 +84,7 @@ class RetryConfig:
     jitter: bool = True
 
     # Which exceptions to retry
-    retry_on: Tuple[Type[Exception], ...] = field(
+    retry_on: tuple[type[Exception], ...] = field(
         default_factory=lambda: (
             sqlite3.OperationalError,
             sqlite3.DatabaseError,
@@ -91,7 +92,7 @@ class RetryConfig:
     )
 
     # Custom error checker (optional)
-    should_retry_func: Optional[Callable[[Exception], bool]] = None
+    should_retry_func: Callable[[Exception], bool] | None = None
 
 
 class RetryMetrics:
@@ -168,8 +169,8 @@ def is_retryable_error(exc: Exception) -> bool:
 
 
 def with_db_retry(
-    config: Optional[RetryConfig] = None,
-    logger: Optional[logging.Logger] = None,
+    config: RetryConfig | None = None,
+    logger: logging.Logger | None = None,
 ) -> Callable[[F], F]:
     """
     Decorator for retrying database operations with exponential backoff.
@@ -315,11 +316,11 @@ class RetryableTransaction:
     def __init__(
         self,
         connection: sqlite3.Connection,
-        config: Optional[RetryConfig] = None,
+        config: RetryConfig | None = None,
     ):
         self.connection = connection
         self.config = config or RetryConfig()
-        self.cursor: Optional[sqlite3.Cursor] = None
+        self.cursor: sqlite3.Cursor | None = None
         self._in_transaction = False
 
     def __enter__(self):

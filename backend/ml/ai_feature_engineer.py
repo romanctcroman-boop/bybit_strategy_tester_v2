@@ -16,7 +16,7 @@ User: "I want to predict BTC price for next 4 hours"
 """
 
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 from backend.agents.unified_agent_interface import UnifiedAgentInterface
 from backend.core.logging_config import get_logger
@@ -33,7 +33,7 @@ class AIFeatureEngineer:
 
     def __init__(self):
         self.agent = UnifiedAgentInterface()
-        self.feature_history: List[Dict[str, Any]] = []
+        self.feature_history: list[dict[str, Any]] = []
 
     async def suggest_features(
         self,
@@ -41,7 +41,7 @@ class AIFeatureEngineer:
         asset: str = "BTC/USDT",
         timeframe: str = "1h",
         max_features: int = 10,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Ask AI to suggest technical indicators for trading strategy
 
@@ -137,7 +137,7 @@ Respond ONLY with valid JSON, no additional text."""
             logger.error(f"❌ Error getting feature suggestions: {e}")
             return self._fallback_suggestions(objective)
 
-    def _fallback_suggestions(self, objective: str) -> Dict[str, Any]:
+    def _fallback_suggestions(self, objective: str) -> dict[str, Any]:
         """Fallback suggestions if AI fails"""
         return {
             "features": [
@@ -176,9 +176,9 @@ Respond ONLY with valid JSON, no additional text."""
     async def generate_feature_code(
         self,
         feature_name: str,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         data_format: str = "pandas DataFrame with OHLCV columns",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Ask AI to generate Python code for calculating a feature
 
@@ -242,9 +242,9 @@ Return ONLY Python code, ready to execute. Start with imports."""
 
     async def validate_features(
         self,
-        features: List[str],
-        performance_metrics: Dict[str, float],
-    ) -> Dict[str, Any]:
+        features: list[str],
+        performance_metrics: dict[str, float],
+    ) -> dict[str, Any]:
         """
         Ask AI to analyze which features are most valuable
 
@@ -316,7 +316,7 @@ Provide analysis in JSON format:
         asset: str = "BTC/USDT",
         timeframe: str = "1h",
         risk_tolerance: str = "medium",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Ask AI to design a complete trading strategy
 
@@ -401,7 +401,7 @@ async def ask_ai_for_features(
     objective: str,
     asset: str = "BTC/USDT",
     timeframe: str = "1h",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Quick helper to get AI feature suggestions"""
     engineer = AIFeatureEngineer()
     return await engineer.suggest_features(objective, asset, timeframe)

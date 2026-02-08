@@ -431,7 +431,7 @@ class MLflowAdapter:
 class _DummyRunContext:
     """Dummy context manager when MLflow is unavailable."""
 
-    def __enter__(self) -> "_DummyRunContext":
+    def __enter__(self) -> _DummyRunContext:
         return self
 
     def __exit__(self, *args: Any) -> None:

@@ -15,8 +15,9 @@ from `backend.api.app` and exposes a safer surface. Task 8 will patch
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -46,10 +47,10 @@ class StructuredError:
     stage: str  # e.g., "validation", "invocation", "normalization"
     retryable: bool
     tool: str
-    correlation_id: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    correlation_id: str | None = None
+    details: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "success": False,
             "error_type": self.error_type,
@@ -68,7 +69,7 @@ class StructuredError:
 # =============================
 # Tool Argument Schema Registry
 # =============================
-TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
+TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "mcp_agent_to_agent_send_to_deepseek": {
         "required": ["content"],
         "optional": ["conversation_id", "context"],
@@ -124,8 +125,8 @@ TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
 
 
 def validate_tool_arguments(
-    tool_name: str, arguments: Dict[str, Any], correlation_id: Optional[str] = None
-) -> Optional[StructuredError]:
+    tool_name: str, arguments: dict[str, Any], correlation_id: str | None = None
+) -> StructuredError | None:
     """
     Validate tool arguments against schema registry.
 
@@ -153,7 +154,7 @@ def validate_tool_arguments(
 
     # Check for unknown arguments
     allowed = set(required) | set(schema.get("optional", []))
-    unknown = [arg for arg in arguments.keys() if arg not in allowed]
+    unknown = [arg for arg in arguments if arg not in allowed]
     if unknown:
         return StructuredError(
             error_type="ValidationError",
@@ -219,7 +220,7 @@ class MCPFastAPIBridge:
 
     def __init__(self) -> None:
         self._initialized = False
-        self._tools: Dict[str, McpToolInfo] = {}
+        self._tools: dict[str, McpToolInfo] = {}
         self._lock = asyncio.Lock()
         self.breaker_name = "mcp_server"
         self.circuit_manager = None
@@ -267,7 +268,7 @@ class MCPFastAPIBridge:
             except Exception as e:
                 logger.error(f"[ERROR] Failed to initialize MCP bridge: {e}")
 
-    async def list_tools(self) -> List[dict]:
+    async def list_tools(self) -> list[dict]:
         if not self._initialized:
             await self.initialize()
         return [
@@ -282,8 +283,8 @@ class MCPFastAPIBridge:
         return await self.circuit_manager.call_with_breaker(self.breaker_name, func)
 
     async def call_tool(
-        self, name: str, arguments: Dict[str, Any] | None = None
-    ) -> Dict[str, Any]:
+        self, name: str, arguments: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Call MCP tool with progressive retry strategy on timeout.
 
@@ -312,7 +313,7 @@ class MCPFastAPIBridge:
 
                 return await self._execute_with_breaker(_attempt_call)
 
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 last_exception = e
                 logger.warning(
                     f"⚠️ MCP tool '{name}' timeout after {timeout}s (attempt {attempt}/{len(PROGRESSIVE_TIMEOUTS)})"
@@ -366,8 +367,8 @@ class MCPFastAPIBridge:
         return error.to_dict()
 
     async def _execute_tool_call(
-        self, name: str, arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, name: str, arguments: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Internal method: actual tool execution logic (extracted for timeout wrapping).
         Original call_tool logic moved here.
@@ -469,13 +470,13 @@ class MCPFastAPIBridge:
                 return callable_obj(arguments)
 
             # 1. .call method
-            if hasattr(tool_obj, "call") and callable(getattr(tool_obj, "call")):
-                maybe = _invoke(getattr(tool_obj, "call"))
+            if hasattr(tool_obj, "call") and callable(tool_obj.call):
+                maybe = _invoke(tool_obj.call)
                 result = await maybe if asyncio.iscoroutine(maybe) else maybe
                 invoked = True
             # 2. .run method (fallback)
-            elif hasattr(tool_obj, "run") and callable(getattr(tool_obj, "run")):
-                maybe = _invoke(getattr(tool_obj, "run"))
+            elif hasattr(tool_obj, "run") and callable(tool_obj.run):
+                maybe = _invoke(tool_obj.run)
                 result = await maybe if asyncio.iscoroutine(maybe) else maybe
                 invoked = True
             # 3. Awaitable object directly (e.g., async def wrapper(*args))
@@ -533,15 +534,13 @@ class MCPFastAPIBridge:
 
             if isinstance(result, list):
                 # If list of TextContent or objects/dicts exposing 'text', join their text payloads
-                texts: List[str] = []
+                texts: list[str] = []
                 all_text_like = True
                 for item in result:
                     text_val = None
-                    if TextContentType and isinstance(
+                    if (TextContentType and isinstance(
                         item, TextContentType
-                    ):  # proper TextContent
-                        text_val = getattr(item, "text", None)
-                    elif hasattr(item, "text"):
+                    )) or hasattr(item, "text"):  # proper TextContent
                         text_val = getattr(item, "text", None)
                     elif isinstance(item, dict) and "text" in item:
                         text_val = item["text"]
@@ -553,7 +552,7 @@ class MCPFastAPIBridge:
                 if all_text_like and texts:
                     result = "\n".join(texts)
 
-            base: Dict[str, Any]
+            base: dict[str, Any]
             if isinstance(result, dict):
                 if "success" in result:
                     base = {"tool": name, **result}
@@ -622,4 +621,4 @@ async def ensure_mcp_bridge_initialized() -> None:
     await bridge.initialize()
 
 
-__all__ = ["get_mcp_bridge", "ensure_mcp_bridge_initialized", "MCPFastAPIBridge"]
+__all__ = ["MCPFastAPIBridge", "ensure_mcp_bridge_initialized", "get_mcp_bridge"]

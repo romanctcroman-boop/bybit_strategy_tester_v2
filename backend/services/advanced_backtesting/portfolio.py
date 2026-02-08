@@ -23,7 +23,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -67,10 +67,10 @@ class AssetAllocation:
     # Constraints
     min_weight: float = 0.0
     max_weight: float = 1.0
-    target_volatility: Optional[float] = None
+    target_volatility: float | None = None
 
     # Risk parity params
-    risk_budget: Optional[dict[str, float]] = None
+    risk_budget: dict[str, float] | None = None
 
     # Momentum params
     lookback_period: int = 30  # days
@@ -242,8 +242,8 @@ class PortfolioBacktester:
 
         # State
         self.capital = initial_capital
-        self.positions: dict[str, float] = {asset: 0.0 for asset in assets}
-        self.weights: dict[str, float] = {asset: 0.0 for asset in assets}
+        self.positions: dict[str, float] = dict.fromkeys(assets, 0.0)
+        self.weights: dict[str, float] = dict.fromkeys(assets, 0.0)
 
         # Tracking
         self.equity_curve: list[float] = []
@@ -256,8 +256,8 @@ class PortfolioBacktester:
     def reset(self):
         """Reset backtester state."""
         self.capital = self.initial_capital
-        self.positions = {asset: 0.0 for asset in self.assets}
-        self.weights = {asset: 0.0 for asset in self.assets}
+        self.positions = dict.fromkeys(self.assets, 0.0)
+        self.weights = dict.fromkeys(self.assets, 0.0)
         self.equity_curve.clear()
         self.weight_history.clear()
         self.rebalance_events.clear()
@@ -267,7 +267,7 @@ class PortfolioBacktester:
         self,
         data: dict[str, list[dict]],  # Asset -> candles
         allocation: AssetAllocation,
-        rebalance_strategy: Optional[RebalanceStrategy] = None,
+        rebalance_strategy: RebalanceStrategy | None = None,
     ) -> dict[str, Any]:
         """
         Run portfolio backtest.
@@ -382,7 +382,7 @@ class PortfolioBacktester:
 
         if method == AllocationMethod.EQUAL_WEIGHT:
             weight = 1.0 / len(self.assets)
-            allocation.weights = {asset: weight for asset in self.assets}
+            allocation.weights = dict.fromkeys(self.assets, weight)
 
         elif method == AllocationMethod.RISK_PARITY:
             # Calculate volatilities
@@ -429,12 +429,12 @@ class PortfolioBacktester:
             else:
                 # Fall back to equal weight
                 weight = 1.0 / len(self.assets)
-                allocation.weights = {asset: weight for asset in self.assets}
+                allocation.weights = dict.fromkeys(self.assets, weight)
 
         else:
             # Default to equal weight
             weight = 1.0 / len(self.assets)
-            allocation.weights = {asset: weight for asset in self.assets}
+            allocation.weights = dict.fromkeys(self.assets, weight)
 
         return allocation
 
@@ -447,7 +447,7 @@ class PortfolioBacktester:
         returns_matrix, assets_list = self._build_returns_matrix(data)
         if returns_matrix is None or len(assets_list) < 2:
             weight = 1.0 / len(self.assets)
-            allocation.weights = {asset: weight for asset in self.assets}
+            allocation.weights = dict.fromkeys(self.assets, weight)
             return allocation
 
         cov = np.cov(returns_matrix.T)
@@ -475,7 +475,7 @@ class PortfolioBacktester:
                 allocation.weights = dict(zip(assets_list, res.x))
         except Exception:
             weight = 1.0 / n
-            allocation.weights = {a: weight for a in assets_list}
+            allocation.weights = dict.fromkeys(assets_list, weight)
         return allocation
 
     def _max_sharpe_allocation(
@@ -487,7 +487,7 @@ class PortfolioBacktester:
         returns_matrix, assets_list = self._build_returns_matrix(data)
         if returns_matrix is None or len(assets_list) < 2:
             weight = 1.0 / len(self.assets)
-            allocation.weights = {asset: weight for asset in self.assets}
+            allocation.weights = dict.fromkeys(self.assets, weight)
             return allocation
 
         mean_returns = np.mean(returns_matrix, axis=0)
@@ -521,10 +521,10 @@ class PortfolioBacktester:
                 allocation.weights = dict(zip(assets_list, res.x))
             else:
                 weight = 1.0 / n
-                allocation.weights = {a: weight for a in assets_list}
+                allocation.weights = dict.fromkeys(assets_list, weight)
         except Exception:
             weight = 1.0 / n
-            allocation.weights = {a: weight for a in assets_list}
+            allocation.weights = dict.fromkeys(assets_list, weight)
         return allocation
 
     def _cvxportfolio_allocation(
@@ -538,7 +538,7 @@ class PortfolioBacktester:
         returns_matrix, assets_list = self._build_returns_matrix(data)
         if returns_matrix is None or len(assets_list) < 2:
             weight = 1.0 / len(self.assets)
-            allocation.weights = {asset: weight for asset in self.assets}
+            allocation.weights = dict.fromkeys(self.assets, weight)
             return allocation
 
         mean_returns = np.mean(returns_matrix, axis=0)

@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Массовое обновление зависимостей (2026-02-08):**
+    - **Фреймворк:** FastAPI 0.121.3 → 0.128.4, Uvicorn 0.38.0 → 0.40.0
+    - **ORM/DB:** SQLAlchemy 2.0.44 → 2.0.46, Alembic 1.17.1 → 1.18.3, Redis 6.4.0 → 7.1.0
+    - **Pydantic:** 2.12.3 → 2.12.5, pydantic-settings 2.11.0 → 2.12.0, pydantic-core 2.41.4 → 2.41.5
+    - **Сеть:** aiohttp 3.13.2 → 3.13.3, websockets 15.0.1 → 16.0
+    - **MCP/API:** mcp 1.19.0 → 1.26.0, pybit 5.13.0 → 5.14.0
+    - **Тестирование:** pytest 8.4.2 → 9.0.2
+    - **Утилиты:** orjson 3.9.10 → 3.11.7, cryptography 46.0.3 → 46.0.4, celery 5.5.3 → 5.6.2, kombu 5.5.4 → 5.6.2
+    - **Визуализация:** plotly 6.3.1 → 6.5.2, matplotlib 3.10.7 → 3.10.8
+    - **Научные:** scipy 1.16.3 → 1.17.0, joblib 1.5.2 → 1.5.3, tqdm 4.67.1 → 4.67.3
+    - **Системные:** psutil 7.1.3 → 7.2.2, structlog → 25.5.0, pip 25.3 → 26.0.1
+    - **river:** constraint обновлён >=0.22.0,<0.24.0 во всех 3 requirements файлах
+    - **docker SDK:** pin ослаблен ==7.0.0 → >=7.0.0
+
+- **pyproject.toml — обновление целей линтинга:**
+    - ruff target-version: py311 → py313
+    - mypy python_version: 3.11 → 3.13
+    - black target-version: [py311, py312] → [py313, py314]
+    - Добавлен classifier Python 3.14
+
+- **Dockerfile:** python:3.11-slim → python:3.14-slim (builder + runtime)
+
+- **Docker Compose образы:**
+    - PostgreSQL: 15-alpine → 17-alpine (prod + vault)
+    - Elasticsearch: 8.5.0 → 8.17.0 (prod + monitoring)
+    - Kibana: 8.5.0 → 8.17.0 (prod + monitoring)
+    - Logstash: 8.5.0 → 8.17.0 (monitoring)
+    - HashiCorp Vault: 1.15 → 1.19
+    - MLflow: v2.10.0 → v2.21.0
+
+### Added
+
+- **`.vscode/extensions.json`** — рекомендуемые расширения для проекта (Python, Ruff, Docker, Copilot, YAML, TOML и др.)
+
+### Known Issues
+
+- **pandas 3.0 несовместим** с mlflow (<3), river (<3.0.0), pandas-ta — остаётся на 2.3.3
+- **numpy ограничен 2.2.x** из-за numba 0.61.2 (требуется pandas-ta) — будет обновлён когда pandas-ta поддержит новый numba
+
 ### Fixed
 
 - **Optimization `engine_type: "optimization"` 500 Error:** исправлен баг, при котором `engine_type="optimization"` вызывал 500 Internal Server Error в `/api/v1/optimizations/sync/grid-search`. Причина: `"optimization"` не был включён в условие single-process режима (строка 2316 в `optimizations.py`). Теперь `engine_type="optimization"` корректно обрабатывается как single-process Numba-движок.

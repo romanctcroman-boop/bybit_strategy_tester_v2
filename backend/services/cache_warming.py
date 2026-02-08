@@ -19,10 +19,11 @@ Features:
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class WarmingTarget:
     symbol: str
     interval: str
     priority: WarmingPriority = WarmingPriority.MEDIUM
-    last_warmed: Optional[datetime] = None
+    last_warmed: datetime | None = None
     warm_count: int = 0
     failure_count: int = 0
     avg_warm_time_ms: float = 0.0
@@ -69,8 +70,8 @@ class WarmingResult:
     status: WarmingStatus
     candles_loaded: int = 0
     duration_ms: float = 0.0
-    error_message: Optional[str] = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    error_message: str | None = None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -84,7 +85,7 @@ class WarmingMetrics:
     total_candles_loaded: int = 0
     total_warm_time_ms: float = 0.0
     cache_hit_rate: float = 0.0
-    last_full_warm: Optional[datetime] = None
+    last_full_warm: datetime | None = None
     warm_queue_size: int = 0
     active_warming: bool = False
 
@@ -165,10 +166,10 @@ class CacheWarmingService:
         self.max_concurrent = max_concurrent_warms
 
         # Warming targets
-        self._targets: Dict[str, WarmingTarget] = {}
+        self._targets: dict[str, WarmingTarget] = {}
 
         # Results history
-        self._results: List[WarmingResult] = []
+        self._results: list[WarmingResult] = []
         self._max_results = 1000
 
         # Metrics
@@ -176,12 +177,12 @@ class CacheWarmingService:
         self._cache_stats = CacheStats()
 
         # Background task
-        self._warming_task: Optional[asyncio.Task] = None
+        self._warming_task: asyncio.Task | None = None
         self._running = False
-        self._semaphore: Optional[asyncio.Semaphore] = None
+        self._semaphore: asyncio.Semaphore | None = None
 
         # Callbacks
-        self._warm_callback: Optional[Callable] = None
+        self._warm_callback: Callable | None = None
 
         # Initialize default targets
         self._init_default_targets()
@@ -252,9 +253,9 @@ class CacheWarmingService:
 
     def get_targets(
         self,
-        priority: Optional[WarmingPriority] = None,
+        priority: WarmingPriority | None = None,
         enabled_only: bool = True,
-    ) -> List[WarmingTarget]:
+    ) -> list[WarmingTarget]:
         """Get warming targets."""
         targets = list(self._targets.values())
         if priority:
@@ -293,7 +294,7 @@ class CacheWarmingService:
         """Update cache hit rate in metrics."""
         self.metrics.cache_hit_rate = self._cache_stats.hit_rate
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         return {
             "hits": self._cache_stats.hits,
@@ -353,7 +354,7 @@ class CacheWarmingService:
             duration_ms = (time.time() - start_time) * 1000
 
             # Update target stats
-            target.last_warmed = datetime.now(timezone.utc)
+            target.last_warmed = datetime.now(UTC)
             target.warm_count += 1
             target.avg_warm_time_ms = (
                 target.avg_warm_time_ms * (target.warm_count - 1) + duration_ms
@@ -402,9 +403,9 @@ class CacheWarmingService:
 
     async def warm_all(
         self,
-        priority: Optional[WarmingPriority] = None,
+        priority: WarmingPriority | None = None,
         force: bool = False,
-    ) -> List[WarmingResult]:
+    ) -> list[WarmingResult]:
         """
         Warm all targets.
 
@@ -413,7 +414,7 @@ class CacheWarmingService:
             force: Warm even if recently warmed
         """
         targets = self.get_targets(priority=priority, enabled_only=True)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         results = []
 
         # Filter stale targets unless force
@@ -457,14 +458,14 @@ class CacheWarmingService:
                         results.append(r)
 
         self.metrics.active_warming = False
-        self.metrics.last_full_warm = datetime.now(timezone.utc)
+        self.metrics.last_full_warm = datetime.now(UTC)
 
         success_count = sum(1 for r in results if r.status == WarmingStatus.COMPLETED)
         logger.info(f"Warming complete: {success_count}/{len(results)} successful")
 
         return results
 
-    async def warm_critical(self) -> List[WarmingResult]:
+    async def warm_critical(self) -> list[WarmingResult]:
         """Warm only critical targets."""
         return await self.warm_all(priority=WarmingPriority.CRITICAL)
 
@@ -521,18 +522,18 @@ class CacheWarmingService:
                 if t.enabled
                 and (
                     t.last_warmed is None
-                    or (datetime.now(timezone.utc) - t.last_warmed)
+                    or (datetime.now(UTC) - t.last_warmed)
                     > self.stale_threshold
                 )
             ]
         )
         return self.metrics
 
-    def get_results(self, limit: int = 100) -> List[WarmingResult]:
+    def get_results(self, limit: int = 100) -> list[WarmingResult]:
         """Get recent warming results."""
         return self._results[-limit:]
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get service status."""
         metrics = self.get_metrics()
         return {
@@ -559,7 +560,7 @@ class CacheWarmingService:
             "cache_stats": self.get_cache_stats(),
         }
 
-    def get_health(self) -> Dict[str, Any]:
+    def get_health(self) -> dict[str, Any]:
         """Get service health."""
         metrics = self.get_metrics()
         hit_rate_ok = metrics.cache_hit_rate >= 85.0

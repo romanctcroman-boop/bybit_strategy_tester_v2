@@ -10,10 +10,11 @@ Features:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -36,22 +37,22 @@ class LearningStats:
 
     total_samples: int = 0
     update_count: int = 0
-    last_update: Optional[datetime] = None
+    last_update: datetime | None = None
 
     # Performance tracking
     cumulative_accuracy: float = 0.0
     recent_accuracy: float = 0.0
-    accuracy_history: List[float] = field(default_factory=list)
+    accuracy_history: list[float] = field(default_factory=list)
 
     # Learning dynamics
     learning_rate: float = 0.01
-    learning_rate_history: List[float] = field(default_factory=list)
+    learning_rate_history: list[float] = field(default_factory=list)
 
     # Drift metrics
     drift_detected_count: int = 0
-    last_drift: Optional[datetime] = None
+    last_drift: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "total_samples": self.total_samples,
@@ -73,7 +74,7 @@ class IncrementalModel:
     supports_partial_fit: bool
 
     # Configuration
-    classes: Optional[np.ndarray] = None  # For classifiers
+    classes: np.ndarray | None = None  # For classifiers
     warm_start: bool = True
 
     # State
@@ -81,7 +82,7 @@ class IncrementalModel:
     sample_count: int = 0
 
     def partial_fit(
-        self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None
+        self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None
     ) -> None:
         """Incrementally fit the model"""
         if self.supports_partial_fit:
@@ -148,7 +149,7 @@ class OnlineLearner:
         min_learning_rate: float = 0.001,
         drift_threshold: float = 0.1,
         accuracy_threshold: float = 0.6,
-        classes: Optional[np.ndarray] = None,
+        classes: np.ndarray | None = None,
     ):
         # Wrap model
         self.incremental_model = self._wrap_model(model, classes)
@@ -164,27 +165,27 @@ class OnlineLearner:
         self.accuracy_threshold = accuracy_threshold
 
         # Buffers
-        self.X_buffer: List[np.ndarray] = []
-        self.y_buffer: List[np.ndarray] = []
-        self.prediction_buffer: List[float] = []
-        self.actual_buffer: List[float] = []
+        self.X_buffer: list[np.ndarray] = []
+        self.y_buffer: list[np.ndarray] = []
+        self.prediction_buffer: list[float] = []
+        self.actual_buffer: list[float] = []
 
         # Rolling window for recent data
-        self.X_window: List[np.ndarray] = []
-        self.y_window: List[np.ndarray] = []
+        self.X_window: list[np.ndarray] = []
+        self.y_window: list[np.ndarray] = []
 
         # Statistics
         self.stats = LearningStats(learning_rate=learning_rate)
 
         # Callbacks
-        self.on_update: Optional[Callable] = None
-        self.on_drift: Optional[Callable] = None
+        self.on_update: Callable | None = None
+        self.on_drift: Callable | None = None
 
         # Drift detector (optional integration)
         self.drift_detector = None
 
     def _wrap_model(
-        self, model: Any, classes: Optional[np.ndarray]
+        self, model: Any, classes: np.ndarray | None
     ) -> IncrementalModel:
         """Wrap model for incremental learning"""
         # Check if model supports partial_fit
@@ -203,9 +204,9 @@ class OnlineLearner:
         self,
         X: np.ndarray,
         y: np.ndarray,
-        sample_weight: Optional[np.ndarray] = None,
+        sample_weight: np.ndarray | None = None,
         force: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Update model with new data
 
@@ -263,7 +264,7 @@ class OnlineLearner:
 
             # Update stats
             self.stats.update_count += 1
-            self.stats.last_update = datetime.now(timezone.utc)
+            self.stats.last_update = datetime.now(UTC)
             self.stats.learning_rate_history.append(self.stats.learning_rate)
 
             # Decay learning rate
@@ -312,7 +313,7 @@ class OnlineLearner:
         return buffer_size >= self.batch_size
 
     def _do_update(
-        self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None
+        self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None
     ) -> None:
         """Perform model update"""
         try:
@@ -345,7 +346,7 @@ class OnlineLearner:
 
         if drift_detected:
             self.stats.drift_detected_count += 1
-            self.stats.last_drift = datetime.now(timezone.utc)
+            self.stats.last_drift = datetime.now(UTC)
 
             if self.on_drift:
                 self.on_drift(
@@ -403,7 +404,7 @@ class OnlineLearner:
 
     def record_outcome(
         self, predictions: np.ndarray, actuals: np.ndarray
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Record prediction outcomes for accuracy tracking
 
@@ -471,7 +472,7 @@ class OnlineLearner:
 
         logger.info("Online learner reset")
 
-    def retrain_on_window(self) -> Dict[str, Any]:
+    def retrain_on_window(self) -> dict[str, Any]:
         """Retrain model on rolling window data"""
         if not self.X_window:
             return {"status": "no_data"}
@@ -497,7 +498,7 @@ class OnlineLearner:
         self.stats.learning_rate = boosted_lr
         logger.info(f"Learning rate boosted to {boosted_lr}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get current learning statistics"""
         return self.stats.to_dict()
 
@@ -535,7 +536,7 @@ class AdaptiveLearningRateScheduler:
         self.current_lr = initial_lr
         self.best_accuracy = 0.0
         self.wait = 0
-        self.history: List[float] = []
+        self.history: list[float] = []
 
     def step(self, accuracy: float) -> float:
         """

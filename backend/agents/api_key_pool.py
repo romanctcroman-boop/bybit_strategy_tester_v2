@@ -16,7 +16,8 @@ from __future__ import annotations
 import asyncio
 import random
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from loguru import logger
 
@@ -292,7 +293,7 @@ class APIKeyPoolManager:
         try:
             key.last_error_time = time.time()
         except Exception:
-            key.last_error_time = time.time()  # noqa: B012
+            key.last_error_time = time.time()
         self._update_health_state(key)
         if hasattr(key, "health") and key.health == APIKeyHealth.DISABLED:
             agent = getattr(key, "agent_type", "?")
@@ -353,6 +354,6 @@ APIKeyManager = APIKeyPoolManager
 
 
 __all__ = [
-    "APIKeyPoolManager",
     "APIKeyManager",  # Alias for backward compatibility
+    "APIKeyPoolManager",
 ]

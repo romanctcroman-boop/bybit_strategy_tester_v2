@@ -32,10 +32,10 @@ Architecture:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
 import json
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
 
 from loguru import logger
 
@@ -56,7 +56,7 @@ class AIBacktestResult:
     # AI Analysis
     ai_summary: str
     ai_risk_assessment: str
-    ai_recommendations: List[str]
+    ai_recommendations: list[str]
     ai_confidence: float
     overfitting_risk: str  # "low", "medium", "high"
     market_regime_fit: str  # Which market conditions suit this strategy
@@ -67,10 +67,10 @@ class AIBacktestResult:
     timeframe: str
     backtest_period: str
     analysis_timestamp: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
+        default_factory=lambda: datetime.now(UTC)
     )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "metrics": {
                 "net_pnl": self.net_pnl,
@@ -104,7 +104,7 @@ class AIOptimizationResult:
     """Optimization result with AI interpretation"""
 
     # Best parameters found
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_sharpe: float
     best_return: float
 
@@ -116,10 +116,10 @@ class AIOptimizationResult:
     ai_parameter_analysis: str
     ai_robustness_assessment: str
     ai_confidence: float
-    overfitting_warning: Optional[str]
-    suggested_adjustments: List[str]
+    overfitting_warning: str | None
+    suggested_adjustments: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "optimization": {
                 "best_params": self.best_params,
@@ -219,12 +219,12 @@ MARKET_REGIME: [trending/ranging/volatile/all conditions]
 
     async def analyze_backtest(
         self,
-        metrics: Dict[str, Any],
+        metrics: dict[str, Any],
         strategy_name: str,
         symbol: str,
         timeframe: str,
         period: str = "Unknown",
-        agents: List[str] = None,
+        agents: list[str] = None,
     ) -> AIBacktestResult:
         """
         Analyze backtest results with AI.
@@ -298,7 +298,7 @@ MARKET_REGIME: [trending/ranging/volatile/all conditions]
             logger.error(f"LLM call failed: {e}")
             return ""
 
-    def _parse_analysis(self, response: str) -> Dict[str, Any]:
+    def _parse_analysis(self, response: str) -> dict[str, Any]:
         """Parse AI response into structured data"""
         analysis = {
             "summary": "",
@@ -399,12 +399,12 @@ ADJUSTMENTS: [adj1], [adj2], [adj3]
 
     async def analyze_optimization(
         self,
-        best_params: Dict[str, Any],
+        best_params: dict[str, Any],
         best_sharpe: float,
         best_return: float,
         total_trials: int,
         convergence_score: float,
-        param_ranges: Dict[str, Any],
+        param_ranges: dict[str, Any],
         strategy_name: str,
         symbol: str,
         method: str = "Bayesian",
@@ -469,7 +469,7 @@ ADJUSTMENTS: [adj1], [adj2], [adj3]
             logger.error(f"LLM call failed: {e}")
             return ""
 
-    def _parse_optimization_analysis(self, response: str) -> Dict[str, Any]:
+    def _parse_optimization_analysis(self, response: str) -> dict[str, Any]:
         """Parse optimization analysis response"""
         analysis = {
             "parameter_analysis": "",
@@ -499,8 +499,8 @@ ADJUSTMENTS: [adj1], [adj2], [adj3]
 
 
 # Global instances
-_backtest_analyzer: Optional[AIBacktestAnalyzer] = None
-_optimization_analyzer: Optional[AIOptimizationAnalyzer] = None
+_backtest_analyzer: AIBacktestAnalyzer | None = None
+_optimization_analyzer: AIOptimizationAnalyzer | None = None
 
 
 def get_backtest_analyzer() -> AIBacktestAnalyzer:
@@ -520,10 +520,10 @@ def get_optimization_analyzer() -> AIOptimizationAnalyzer:
 
 
 __all__ = [
-    "AIBacktestResult",
-    "AIOptimizationResult",
     "AIBacktestAnalyzer",
+    "AIBacktestResult",
     "AIOptimizationAnalyzer",
+    "AIOptimizationResult",
     "get_backtest_analyzer",
     "get_optimization_analyzer",
 ]

@@ -4,7 +4,6 @@ Rate Limiting API Router.
 Provides REST API for rate limiting management and monitoring.
 """
 
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -49,7 +48,7 @@ class RateLimitCheckResponse(BaseModel):
     allowed: bool
     remaining: int
     reset_after: float
-    retry_after: Optional[float] = None
+    retry_after: float | None = None
     limit: int
     scope: str
     rule_name: str
@@ -266,7 +265,7 @@ async def is_ip_blocked(ip: str):
 
 
 @router.get("/metrics")
-async def get_metrics(rule_name: Optional[str] = None):
+async def get_metrics(rule_name: str | None = None):
     """Get rate limiting metrics."""
     service = get_rate_limiter_service()
     return service.get_metrics(rule_name)

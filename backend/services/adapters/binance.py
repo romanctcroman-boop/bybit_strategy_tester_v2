@@ -6,7 +6,6 @@ Behavior:
 """
 
 import logging
-from typing import Dict, List, Optional
 
 import requests
 
@@ -26,8 +25,8 @@ class BinanceAdapter:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        api_secret: Optional[str] = None,
+        api_key: str | None = None,
+        api_secret: str | None = None,
         timeout: int = 10,
     ):
         self.timeout = timeout
@@ -54,7 +53,7 @@ class BinanceAdapter:
 
     def get_klines(
         self, symbol: str, interval: str = "1m", limit: int = 500
-    ) -> List[Dict]:
+    ) -> list[dict]:
         # Using /api/v3/klines for spot
         if self._client:
             data = self._client.get_klines(
@@ -69,7 +68,7 @@ class BinanceAdapter:
         data = r.json()
         return [self._normalize_kline_row(d) for d in data]
 
-    def _normalize_kline_row(self, row: List) -> Dict:
+    def _normalize_kline_row(self, row: list) -> dict:
         # Binance returns list-based rows: [Open time, Open, High, Low, Close, Volume, ...]
         return {
             "open_time": int(row[0]),

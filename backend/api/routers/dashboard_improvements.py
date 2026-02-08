@@ -11,7 +11,7 @@ Additional endpoints for:
 import asyncio
 import random
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from loguru import logger
@@ -252,7 +252,7 @@ async def get_portfolio_history(
     except Exception as e:
         logger.error(f"Failed to get portfolio history: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve portfolio history: {str(e)}"
+            status_code=500, detail=f"Failed to retrieve portfolio history: {e!s}"
         )
     finally:
         db.close()
@@ -272,7 +272,7 @@ class AIRecommendation(BaseModel):
     description: str
     priority: str = Field(description="high, medium, low")
     confidence: float = Field(ge=0, le=1)
-    action: Optional[str] = None
+    action: str | None = None
     metadata: dict[str, Any] = {}
 
 
@@ -287,7 +287,7 @@ class AIRecommendationsResponse(BaseModel):
 @router.get("/ai/recommendations")
 async def get_ai_recommendations(
     limit: int = Query(5, ge=1, le=20, description="Number of recommendations"),
-    include_types: Optional[str] = Query(
+    include_types: str | None = Query(
         None, description="Filter by types: optimization,risk,opportunity,alert"
     ),
 ) -> AIRecommendationsResponse:
@@ -501,7 +501,7 @@ async def get_ai_recommendations(
     except Exception as e:
         logger.error(f"Failed to generate AI recommendations: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to generate recommendations: {str(e)}"
+            status_code=500, detail=f"Failed to generate recommendations: {e!s}"
         )
     finally:
         db.close()
@@ -518,14 +518,14 @@ class LeaderboardEntry(BaseModel):
     rank: int
     strategy_id: str  # UUID string
     strategy_name: str
-    strategy_type: Optional[str]
+    strategy_type: str | None
     total_backtests: int
     avg_return: float
     avg_sharpe: float
     avg_win_rate: float
     best_return: float
     worst_drawdown: float
-    last_run: Optional[datetime]
+    last_run: datetime | None
     trend: str = Field(description="up, down, stable")
 
 
@@ -660,7 +660,7 @@ async def get_strategy_leaderboard(
     except Exception as e:
         logger.error(f"Failed to get strategy leaderboard: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve leaderboard: {str(e)}"
+            status_code=500, detail=f"Failed to retrieve leaderboard: {e!s}"
         )
     finally:
         db.close()
@@ -830,7 +830,7 @@ async def _stream_pnl_updates(websocket: WebSocket):
 @router.get("/ai-recommendations")
 async def get_ai_recommendations_alias(
     limit: int = Query(5, ge=1, le=20, description="Number of recommendations"),
-    include_types: Optional[str] = Query(
+    include_types: str | None = Query(
         None, description="Filter by types: optimization,risk,opportunity,alert"
     ),
 ) -> AIRecommendationsResponse:

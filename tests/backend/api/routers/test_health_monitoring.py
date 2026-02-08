@@ -10,12 +10,12 @@ Tests cover:
 """
 
 import copy
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
-from backend.api.app import app
 
+from backend.api.app import app
 
 client = TestClient(app)
 

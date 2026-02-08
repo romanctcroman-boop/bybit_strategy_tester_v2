@@ -5,7 +5,6 @@ Handles fetching and aligning multi-timeframe candle data.
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 from backend.services.candle_cache import CANDLE_CACHE
 
@@ -17,8 +16,8 @@ class MtfResponse:
     """Multi-timeframe response data structure"""
 
     symbol: str
-    intervals: List[str]
-    data: Dict[str, List[Dict]]
+    intervals: list[str]
+    data: dict[str, list[dict]]
 
 
 class MtfManager:
@@ -36,7 +35,7 @@ class MtfManager:
         logger.info("MTF Manager initialized")
 
     def get_working_sets(
-        self, symbol: str, intervals: List[str], load_limit: int = 1000
+        self, symbol: str, intervals: list[str], load_limit: int = 1000
     ) -> MtfResponse:
         """
         Get working sets for multiple intervals (raw, unaligned).
@@ -74,8 +73,8 @@ class MtfManager:
     def get_aligned(
         self,
         symbol: str,
-        intervals: List[str],
-        base_interval: Optional[str] = None,
+        intervals: list[str],
+        base_interval: str | None = None,
         load_limit: int = 1000,
     ) -> MtfResponse:
         """
@@ -129,7 +128,7 @@ class MtfManager:
 
         return MtfResponse(symbol=symbol, intervals=intervals, data=data)
 
-    def _get_smallest_interval(self, intervals: List[str]) -> str:
+    def _get_smallest_interval(self, intervals: list[str]) -> str:
         """
         Determine the smallest interval from a list.
 
@@ -151,7 +150,7 @@ class MtfManager:
 
         return min(interval_minutes, key=interval_minutes.get)
 
-    def _interval_to_minutes(self, interval: str) -> Optional[int]:
+    def _interval_to_minutes(self, interval: str) -> int | None:
         """
         Convert interval string to minutes.
 
@@ -177,8 +176,8 @@ class MtfManager:
             return None
 
     def _resample_candles(
-        self, base_candles: List[Dict], base_interval: str, target_interval: str
-    ) -> List[Dict]:
+        self, base_candles: list[dict], base_interval: str, target_interval: str
+    ) -> list[dict]:
         """
         Resample base candles to target interval.
 

@@ -4,7 +4,7 @@ Endpoints for interacting with AI agents (DeepSeek and Perplexity).
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Initialize global instances
-_agent_interface: Optional[UnifiedAgentInterface] = None
-_circuit_breaker_manager: Optional[CircuitBreakerManager] = None
+_agent_interface: UnifiedAgentInterface | None = None
+_circuit_breaker_manager: CircuitBreakerManager | None = None
 
 
 def get_agent_interface() -> UnifiedAgentInterface:
@@ -41,11 +41,11 @@ class AgentQueryRequest(BaseModel):
     """Agent query request"""
 
     prompt: str = Field(..., description="The prompt/question for the AI agent")
-    model: Optional[str] = Field(None, description="Specific model to use (optional)")
-    temperature: Optional[float] = Field(
+    model: str | None = Field(None, description="Specific model to use (optional)")
+    temperature: float | None = Field(
         0.7, ge=0.0, le=2.0, description="Temperature for response generation"
     )
-    max_tokens: Optional[int] = Field(
+    max_tokens: int | None = Field(
         2000, ge=1, le=32000, description="Maximum tokens in response"
     )
 
@@ -66,16 +66,16 @@ class AgentQueryResponse(BaseModel):
 
     response: str = Field(..., description="The AI agent's response")
     model_used: str = Field(..., description="The model that was used")
-    tokens_used: Optional[int] = Field(
+    tokens_used: int | None = Field(
         None, description="Number of tokens used (if available)"
     )
-    latency_ms: Optional[float] = Field(
+    latency_ms: float | None = Field(
         None, description="Response latency in milliseconds"
     )
-    api_key_id: Optional[str] = Field(
+    api_key_id: str | None = Field(
         None, description="API key ID used (for debugging)"
     )
-    from_cache: Optional[bool] = Field(
+    from_cache: bool | None = Field(
         False, description="Whether the response came from cache"
     )
 
@@ -95,9 +95,9 @@ class AgentQueryResponse(BaseModel):
 class AgentStatsResponse(BaseModel):
     """Agent statistics response"""
 
-    deepseek: Dict[str, Any] = Field(..., description="DeepSeek agent statistics")
-    perplexity: Dict[str, Any] = Field(..., description="Perplexity agent statistics")
-    circuit_breakers: Dict[str, Any] = Field(..., description="Circuit breaker status")
+    deepseek: dict[str, Any] = Field(..., description="DeepSeek agent statistics")
+    perplexity: dict[str, Any] = Field(..., description="Perplexity agent statistics")
+    circuit_breakers: dict[str, Any] = Field(..., description="Circuit breaker status")
 
     model_config = {
         "json_schema_extra": {
@@ -157,7 +157,7 @@ async def get_agent_stats() -> AgentStatsResponse:
     except Exception as e:
         logger.error(f"Error getting agent stats: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to get agent stats: {str(e)}"
+            status_code=500, detail=f"Failed to get agent stats: {e!s}"
         )
 
 
@@ -196,7 +196,7 @@ async def query_deepseek(request: AgentQueryRequest) -> AgentQueryResponse:
     except Exception as e:
         logger.error(f"Error querying DeepSeek: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to query DeepSeek: {str(e)}"
+            status_code=500, detail=f"Failed to query DeepSeek: {e!s}"
         )
 
 
@@ -235,7 +235,7 @@ async def query_perplexity(request: AgentQueryRequest) -> AgentQueryResponse:
     except Exception as e:
         logger.error(f"Error querying Perplexity: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to query Perplexity: {str(e)}"
+            status_code=500, detail=f"Failed to query Perplexity: {e!s}"
         )
 
 
@@ -294,11 +294,11 @@ async def query_auto(request: AgentQueryRequest) -> AgentQueryResponse:
 
     except Exception as e:
         logger.error(f"Error in auto query: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"All agents failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"All agents failed: {e!s}")
 
 
-@router.get("/cache/stats", response_model=Dict[str, Any])
-async def get_cache_stats() -> Dict[str, Any]:
+@router.get("/cache/stats", response_model=dict[str, Any])
+async def get_cache_stats() -> dict[str, Any]:
     """
     Get AI cache statistics
 
@@ -321,12 +321,12 @@ async def get_cache_stats() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting cache stats: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to get cache stats: {str(e)}"
+            status_code=500, detail=f"Failed to get cache stats: {e!s}"
         )
 
 
 @router.post("/cache/clear")
-async def clear_cache() -> Dict[str, Any]:
+async def clear_cache() -> dict[str, Any]:
     """
     Clear all cached AI responses
 
@@ -347,7 +347,7 @@ async def clear_cache() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error clearing cache: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {e!s}")
 
 
 # ============================================================================
@@ -370,7 +370,7 @@ class FeatureCodeRequest(BaseModel):
     """Request for feature code generation"""
 
     feature_name: str = Field(..., description="Indicator name (e.g., 'RSI')")
-    parameters: Dict[str, Any] = Field(..., description="Indicator parameters")
+    parameters: dict[str, Any] = Field(..., description="Indicator parameters")
     data_format: str = Field(
         "pandas DataFrame with OHLCV columns",
         description="Input data format description",
@@ -410,7 +410,7 @@ async def suggest_features(request: FeatureSuggestionRequest):
     except Exception as e:
         logger.error(f"Error suggesting features: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to suggest features: {str(e)}"
+            status_code=500, detail=f"Failed to suggest features: {e!s}"
         )
 
 
@@ -437,7 +437,7 @@ async def generate_feature_code(request: FeatureCodeRequest):
     except Exception as e:
         logger.error(f"Error generating code: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to generate code: {str(e)}"
+            status_code=500, detail=f"Failed to generate code: {e!s}"
         )
 
 
@@ -465,7 +465,7 @@ async def design_strategy(request: StrategyRequest):
     except Exception as e:
         logger.error(f"Error designing strategy: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to design strategy: {str(e)}"
+            status_code=500, detail=f"Failed to design strategy: {e!s}"
         )
 
 
@@ -521,7 +521,7 @@ async def generate_backtest_strategy(request: StrategyRequest):
     except Exception as e:
         logger.error(f"Error generating backtest strategy: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to generate strategy: {str(e)}"
+            status_code=500, detail=f"Failed to generate strategy: {e!s}"
         )
 
 
@@ -557,12 +557,12 @@ async def execute_backtest_series(request: BacktestExecutorRequest):
     except Exception as e:
         logger.error(f"Error executing backtest series: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to execute backtest series: {str(e)}"
+            status_code=500, detail=f"Failed to execute backtest series: {e!s}"
         )
 
 
 @router.post("/backtest/ai-analyze", summary="AI Analyze Backtest Results")
-async def analyze_backtest_results_endpoint(results: List[Dict[str, Any]] = []):
+async def analyze_backtest_results_endpoint(results: list[dict[str, Any]] = []):
     """
     Ask AI to analyze backtest results and recommend best strategy
 
@@ -583,5 +583,5 @@ async def analyze_backtest_results_endpoint(results: List[Dict[str, Any]] = []):
     except Exception as e:
         logger.error(f"Error analyzing results: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to analyze results: {str(e)}"
+            status_code=500, detail=f"Failed to analyze results: {e!s}"
         )

@@ -6,7 +6,6 @@ Provides REST API endpoints for synthetic monitoring and SLA tracking.
 """
 
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -35,7 +34,7 @@ class ProbeResultResponse(BaseModel):
     latency_ms: float
     timestamp: datetime
     success: bool
-    error_message: Optional[str]
+    error_message: str | None
 
 
 class ProbeMetricsResponse(BaseModel):
@@ -52,9 +51,9 @@ class ProbeMetricsResponse(BaseModel):
     max_latency_ms: float
     current_status: str
     uptime_pct: float
-    last_run: Optional[datetime]
-    last_success: Optional[datetime]
-    last_failure: Optional[datetime]
+    last_run: datetime | None
+    last_success: datetime | None
+    last_failure: datetime | None
 
 
 class ProbeConfigResponse(BaseModel):

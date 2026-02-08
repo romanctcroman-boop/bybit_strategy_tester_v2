@@ -18,10 +18,10 @@ import logging
 import sqlite3
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class ComponentHealth:
     status: HealthStatus
     latency_ms: float
     message: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -60,10 +60,10 @@ class DatabaseHealth:
 
     status: HealthStatus
     timestamp: str
-    components: List[ComponentHealth]
-    summary: Dict[str, Any]
+    components: list[ComponentHealth]
+    summary: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "status": self.status.value,
@@ -112,8 +112,8 @@ class DatabaseMonitor:
             db_path: Path to SQLite database
         """
         self.db_path = Path(db_path)
-        self._last_health: Optional[DatabaseHealth] = None
-        self._metrics_cache: Dict[str, Any] = {}
+        self._last_health: DatabaseHealth | None = None
+        self._metrics_cache: dict[str, Any] = {}
         self._cache_time: float = 0
         self._cache_ttl: float = 5.0  # seconds
 
@@ -130,7 +130,7 @@ class DatabaseMonitor:
         Returns:
             DatabaseHealth with status of all components
         """
-        components: List[ComponentHealth] = []
+        components: list[ComponentHealth] = []
 
         # Check database connectivity
         components.append(self._check_connectivity())
@@ -158,7 +158,7 @@ class DatabaseMonitor:
 
         health = DatabaseHealth(
             status=overall_status,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             components=components,
             summary={
                 "total_components": len(components),
@@ -410,7 +410,7 @@ class DatabaseMonitor:
                 message=f"Size check failed: {e}",
             )
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """
         Get current metrics.
 
@@ -472,7 +472,7 @@ class DatabaseMonitor:
         except Exception as e:
             metrics["error"] = str(e)
 
-        metrics["timestamp"] = datetime.now(timezone.utc).isoformat()
+        metrics["timestamp"] = datetime.now(UTC).isoformat()
 
         self._metrics_cache = metrics
         self._cache_time = now
@@ -554,7 +554,7 @@ def create_health_router():
     async def liveness_check():
         """Kubernetes liveness probe."""
         # Simple check - just verify we can respond
-        return {"status": "alive", "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"status": "alive", "timestamp": datetime.now(UTC).isoformat()}
 
     @router.get("/metrics")
     async def get_metrics():

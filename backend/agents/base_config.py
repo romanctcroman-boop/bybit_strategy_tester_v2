@@ -68,14 +68,14 @@ DEBUG_AGENT_COMMUNICATION: Final[bool] = bool(
 # ═══════════════════════════════════════════════════════════════════════════
 
 __all__ = [
-    "FORCE_DIRECT_AGENT_API",
-    "MCP_DISABLED",
-    "DEEPSEEK_AVAILABLE",
-    "PERPLEXITY_AVAILABLE",
+    "AGENT_LOG_LEVEL",
     "AGENT_MEMORY_BACKEND",
     "AGENT_MEMORY_DIR",
     "AGENT_TIMEOUT_SECONDS",
-    "AGENT_LOG_LEVEL",
     "DEBUG_AGENTS",
     "DEBUG_AGENT_COMMUNICATION",
+    "DEEPSEEK_AVAILABLE",
+    "FORCE_DIRECT_AGENT_API",
+    "MCP_DISABLED",
+    "PERPLEXITY_AVAILABLE",
 ]

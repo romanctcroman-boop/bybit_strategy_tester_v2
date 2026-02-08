@@ -18,10 +18,10 @@ Universal Optimizer - Единый оптимизатор для ВСЕХ пар
 """
 
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import product
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -29,7 +29,6 @@ from loguru import logger
 
 from backend.backtesting.universal_engine.core import (
     EngineMetrics,
-    EngineOutput,
     UniversalMathEngine,
 )
 
@@ -40,13 +39,13 @@ class OptimizableParameter:
 
     name: str
     param_type: str  # "int", "float", "choice"
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    step: Optional[float] = None
-    choices: Optional[List[Any]] = None
-    depends_on: Optional[str] = None
+    min_value: float | None = None
+    max_value: float | None = None
+    step: float | None = None
+    choices: list[Any] | None = None
+    depends_on: str | None = None
 
-    def generate_values(self) -> List[Any]:
+    def generate_values(self) -> list[Any]:
         """Generate all possible values for this parameter."""
         if self.choices is not None:
             return self.choices
@@ -83,7 +82,7 @@ class OptimizableParameter:
 class OptimizationResult:
     """Result of a single optimization run."""
 
-    params: Dict[str, Any]
+    params: dict[str, Any]
     metrics: EngineMetrics
     score: float  # Primary optimization metric
     is_valid: bool = True
@@ -94,16 +93,16 @@ class OptimizationResult:
 class OptimizationOutput:
     """Output from optimization."""
 
-    results: List[OptimizationResult] = field(default_factory=list)
-    best_result: Optional[OptimizationResult] = None
+    results: list[OptimizationResult] = field(default_factory=list)
+    best_result: OptimizationResult | None = None
     total_combinations: int = 0
     completed_combinations: int = 0
     execution_time: float = 0.0
     method: str = "grid"
 
     # Statistics
-    top_n_results: List[OptimizationResult] = field(default_factory=list)
-    param_importance: Dict[str, float] = field(default_factory=dict)
+    top_n_results: list[OptimizationResult] = field(default_factory=list)
+    param_importance: dict[str, float] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -172,7 +171,7 @@ class UniversalOptimizer:
 
     def __init__(
         self,
-        engine: Optional[UniversalMathEngine] = None,
+        engine: UniversalMathEngine | None = None,
         n_workers: int = -1,
         use_numba: bool = True,
     ):
@@ -189,23 +188,23 @@ class UniversalOptimizer:
         self.use_numba = use_numba
 
         # Cache for candles
-        self._candles_cache: Optional[pd.DataFrame] = None
+        self._candles_cache: pd.DataFrame | None = None
 
     def optimize(
         self,
         candles: pd.DataFrame,
         strategy_type: str,
-        base_params: Dict[str, Any],
-        param_ranges: Dict[str, Union[List, Tuple[float, float, float]]],
+        base_params: dict[str, Any],
+        param_ranges: dict[str, list | tuple[float, float, float]],
         initial_capital: float = 10000.0,
         direction: str = "both",
         leverage: int = 10,
         optimize_metric: str = "sharpe_ratio",
-        filters: Optional[Dict[str, float]] = None,
+        filters: dict[str, float] | None = None,
         method: str = "grid",
         top_n: int = 10,
         max_combinations: int = 100000,
-        progress_callback: Optional[Callable[[int, int], None]] = None,
+        progress_callback: Callable[[int, int], None] | None = None,
     ) -> OptimizationOutput:
         """
         Run optimization.
@@ -332,15 +331,15 @@ class UniversalOptimizer:
         self,
         candles: pd.DataFrame,
         strategy_type: str,
-        base_params: Dict[str, Any],
-        param_values: Dict[str, List],
+        base_params: dict[str, Any],
+        param_values: dict[str, list],
         initial_capital: float,
         direction: str,
         leverage: int,
         optimize_metric: str,
-        filters: Optional[Dict[str, float]],
-        progress_callback: Optional[Callable[[int, int], None]],
-    ) -> List[OptimizationResult]:
+        filters: dict[str, float] | None,
+        progress_callback: Callable[[int, int], None] | None,
+    ) -> list[OptimizationResult]:
         """Run grid search optimization."""
         results = []
 
@@ -412,16 +411,16 @@ class UniversalOptimizer:
         self,
         candles: pd.DataFrame,
         strategy_type: str,
-        base_params: Dict[str, Any],
-        param_values: Dict[str, List],
+        base_params: dict[str, Any],
+        param_values: dict[str, list],
         initial_capital: float,
         direction: str,
         leverage: int,
         optimize_metric: str,
-        filters: Optional[Dict[str, float]],
+        filters: dict[str, float] | None,
         max_combinations: int,
-        progress_callback: Optional[Callable[[int, int], None]],
-    ) -> List[OptimizationResult]:
+        progress_callback: Callable[[int, int], None] | None,
+    ) -> list[OptimizationResult]:
         """Run random search optimization."""
         results = []
         param_names = list(param_values.keys())
@@ -500,7 +499,7 @@ class UniversalOptimizer:
         return results
 
     def _passes_filters(
-        self, metrics: EngineMetrics, filters: Optional[Dict[str, float]]
+        self, metrics: EngineMetrics, filters: dict[str, float] | None
     ) -> bool:
         """Check if metrics pass all filters."""
         if filters is None:

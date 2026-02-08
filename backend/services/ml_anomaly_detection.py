@@ -16,7 +16,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Deque, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class AnomalyStats:
     by_type: dict[str, int] = field(default_factory=dict)
     by_severity: dict[str, int] = field(default_factory=dict)
     by_symbol: dict[str, int] = field(default_factory=dict)
-    last_detection: Optional[datetime] = None
+    last_detection: datetime | None = None
     detection_rate_per_hour: float = 0.0
 
 
@@ -89,7 +89,7 @@ class RollingStatistics:
 
     def __init__(self, window_size: int = 100):
         self.window_size = window_size
-        self.values: Deque[float] = deque(maxlen=window_size)
+        self.values: deque[float] = deque(maxlen=window_size)
         self._sum: float = 0.0
         self._sum_sq: float = 0.0
 
@@ -149,10 +149,10 @@ class IsolationTree:
 
     def __init__(self, height_limit: int = 10):
         self.height_limit = height_limit
-        self.split_feature: Optional[int] = None
-        self.split_value: Optional[float] = None
-        self.left: Optional["IsolationTree"] = None
-        self.right: Optional["IsolationTree"] = None
+        self.split_feature: int | None = None
+        self.split_value: float | None = None
+        self.left: IsolationTree | None = None
+        self.right: IsolationTree | None = None
         self.size: int = 0
 
     def fit(self, data: list[list[float]], current_height: int = 0) -> "IsolationTree":
@@ -322,7 +322,7 @@ class MLAnomalyDetector:
         self._min_samples_for_iforest = 100
 
         # Detected anomalies
-        self._anomalies: Deque[AnomalyEvent] = deque(maxlen=history_limit)
+        self._anomalies: deque[AnomalyEvent] = deque(maxlen=history_limit)
         self._stats = AnomalyStats()
 
         # Callbacks
@@ -342,7 +342,7 @@ class MLAnomalyDetector:
             self._rolling_stats[key] = RollingStatistics(self.window_size)
         return self._rolling_stats[key]
 
-    def add_data_point(self, point: DataPoint) -> Optional[AnomalyEvent]:
+    def add_data_point(self, point: DataPoint) -> AnomalyEvent | None:
         """
         Add data point and check for anomalies.
 
@@ -523,9 +523,9 @@ class MLAnomalyDetector:
     def get_recent_anomalies(
         self,
         limit: int = 100,
-        severity: Optional[AnomalySeverity] = None,
-        anomaly_type: Optional[AnomalyType] = None,
-        symbol: Optional[str] = None,
+        severity: AnomalySeverity | None = None,
+        anomaly_type: AnomalyType | None = None,
+        symbol: str | None = None,
     ) -> list[AnomalyEvent]:
         """Get recent anomalies with optional filters."""
         anomalies = list(self._anomalies)
@@ -545,7 +545,7 @@ class MLAnomalyDetector:
 
     def get_rolling_stats(
         self, symbol: str, metric_type: str
-    ) -> Optional[dict[str, float]]:
+    ) -> dict[str, float] | None:
         """Get rolling statistics for a metric."""
         stats = self._rolling_stats.get(self._get_metric_key(symbol, metric_type))
         if not stats:
@@ -584,7 +584,7 @@ class MLAnomalyDetector:
 
 
 # Global detector instance
-_detector: Optional[MLAnomalyDetector] = None
+_detector: MLAnomalyDetector | None = None
 
 
 def get_anomaly_detector() -> MLAnomalyDetector:

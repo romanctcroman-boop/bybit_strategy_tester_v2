@@ -12,7 +12,6 @@ Provides various position sizing methods for risk management:
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +36,11 @@ class SizingResult:
     position_value: float  # In quote currency (e.g., USDT)
     risk_amount: float  # Amount at risk
     risk_percentage: float  # % of equity at risk
-    stop_loss_price: Optional[float]
+    stop_loss_price: float | None
     method_used: SizingMethod
-    details: Dict[str, float]
+    details: dict[str, float]
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "position_size": self.position_size,
             "position_value": self.position_value,
@@ -69,7 +68,7 @@ class TradingStats:
     expectancy: float = 0.0
 
     @classmethod
-    def from_trades(cls, trades: List[Dict]) -> "TradingStats":
+    def from_trades(cls, trades: list[dict]) -> "TradingStats":
         """Calculate stats from trade history."""
         if not trades:
             return cls()
@@ -145,10 +144,10 @@ class PositionSizer:
         self.min_position_size = min_position_size
 
         # Trading stats for Kelly
-        self.stats: Optional[TradingStats] = None
+        self.stats: TradingStats | None = None
 
         # Volatility data for ATR sizing
-        self.atr_values: Dict[str, float] = {}
+        self.atr_values: dict[str, float] = {}
 
         logger.info(
             f"PositionSizer initialized: equity=${equity:.2f}, "
@@ -159,7 +158,7 @@ class PositionSizer:
         """Update current equity."""
         self.equity = equity
 
-    def update_stats(self, trades: List[Dict]):
+    def update_stats(self, trades: list[dict]):
         """Update trading statistics from trade history."""
         self.stats = TradingStats.from_trades(trades)
         logger.debug(
@@ -174,10 +173,10 @@ class PositionSizer:
     def calculate_size(
         self,
         entry_price: float,
-        stop_loss_price: Optional[float] = None,
+        stop_loss_price: float | None = None,
         method: SizingMethod = SizingMethod.FIXED_PERCENTAGE,
-        risk_pct: Optional[float] = None,
-        symbol: Optional[str] = None,
+        risk_pct: float | None = None,
+        symbol: str | None = None,
         leverage: float = 1.0,
     ) -> SizingResult:
         """
@@ -235,7 +234,7 @@ class PositionSizer:
     def _fixed_percentage(
         self,
         entry_price: float,
-        stop_loss_price: Optional[float],
+        stop_loss_price: float | None,
         risk_pct: float,
         leverage: float,
     ) -> SizingResult:
@@ -277,7 +276,7 @@ class PositionSizer:
     def _kelly_criterion(
         self,
         entry_price: float,
-        stop_loss_price: Optional[float],
+        stop_loss_price: float | None,
         leverage: float,
         fraction: float = 1.0,
     ) -> SizingResult:
@@ -336,7 +335,7 @@ class PositionSizer:
     def _volatility_based(
         self,
         entry_price: float,
-        symbol: Optional[str],
+        symbol: str | None,
         risk_pct: float,
         leverage: float,
     ) -> SizingResult:
@@ -410,7 +409,7 @@ class PositionSizer:
     def _optimal_f(
         self,
         entry_price: float,
-        stop_loss_price: Optional[float],
+        stop_loss_price: float | None,
         leverage: float,
     ) -> SizingResult:
         """
@@ -513,10 +512,10 @@ class PositionSizer:
     def calculate_all_methods(
         self,
         entry_price: float,
-        stop_loss_price: Optional[float] = None,
-        symbol: Optional[str] = None,
+        stop_loss_price: float | None = None,
+        symbol: str | None = None,
         leverage: float = 1.0,
-    ) -> Dict[SizingMethod, SizingResult]:
+    ) -> dict[SizingMethod, SizingResult]:
         """
         Calculate position size using all methods for comparison.
 

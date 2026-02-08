@@ -14,9 +14,9 @@ TradingView behavior:
 - process_orders_on_close affects when orders are queued vs executed
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable
 
 from loguru import logger
 

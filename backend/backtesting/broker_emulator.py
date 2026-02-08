@@ -11,9 +11,9 @@ Broker Emulator: Tick-by-Tick Order Execution
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -97,10 +97,10 @@ class Position:
     realized_pnl: float = 0.0
 
     # Risk management
-    stop_loss_price: Optional[float] = None
-    take_profit_price: Optional[float] = None
-    trailing_stop_offset: Optional[float] = None
-    trailing_stop_price: Optional[float] = None
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
+    trailing_stop_offset: float | None = None
+    trailing_stop_price: float | None = None
 
     # MFE/MAE tracking
     max_favorable_price: float = 0.0
@@ -189,8 +189,8 @@ class BrokerEmulator:
         )
 
         # Callbacks для логирования событий
-        self.on_fill: Optional[Callable[[Fill], None]] = None
-        self.on_liquidation: Optional[Callable[[Position], None]] = None
+        self.on_fill: Callable[[Fill], None] | None = None
+        self.on_liquidation: Callable[[Position], None] | None = None
 
         logger.info(
             f"[BROKER_EMULATOR] Initialized with capital={initial_capital}, "
@@ -330,23 +330,17 @@ class BrokerEmulator:
 
             # Проверить SL
             if pos.stop_loss_price is not None:
-                if pos.side == PositionSide.LONG and price <= pos.stop_loss_price:
-                    sl_triggered = True
-                elif pos.side == PositionSide.SHORT and price >= pos.stop_loss_price:
+                if (pos.side == PositionSide.LONG and price <= pos.stop_loss_price) or (pos.side == PositionSide.SHORT and price >= pos.stop_loss_price):
                     sl_triggered = True
 
             # Проверить TP
             if pos.take_profit_price is not None:
-                if pos.side == PositionSide.LONG and price >= pos.take_profit_price:
-                    tp_triggered = True
-                elif pos.side == PositionSide.SHORT and price <= pos.take_profit_price:
+                if (pos.side == PositionSide.LONG and price >= pos.take_profit_price) or (pos.side == PositionSide.SHORT and price <= pos.take_profit_price):
                     tp_triggered = True
 
             # Проверить Trailing Stop
             if pos.trailing_stop_price is not None:
-                if pos.side == PositionSide.LONG and price <= pos.trailing_stop_price:
-                    sl_triggered = True
-                elif (
+                if (pos.side == PositionSide.LONG and price <= pos.trailing_stop_price) or (
                     pos.side == PositionSide.SHORT and price >= pos.trailing_stop_price
                 ):
                     sl_triggered = True
@@ -394,7 +388,7 @@ class BrokerEmulator:
 
     def _try_fill_order(
         self, order: Order, price: float, timestamp_ms: int
-    ) -> Optional[Fill]:
+    ) -> Fill | None:
         """Попытаться исполнить ордер."""
         should_fill = False
         fill_price = price
@@ -566,7 +560,7 @@ class BrokerEmulator:
 
     def _close_position(
         self, position_id: str, exit_price: float, reason: str
-    ) -> Optional[Fill]:
+    ) -> Fill | None:
         """Полностью закрыть позицию."""
         if position_id not in self.state.positions:
             return None
@@ -715,7 +709,7 @@ class BrokerEmulator:
     # GETTERS
     # =========================================================================
 
-    def get_position(self, side: PositionSide = None) -> Optional[Position]:
+    def get_position(self, side: PositionSide = None) -> Position | None:
         """Получить позицию."""
         for pos in self.state.positions.values():
             if side is None or pos.side == side:

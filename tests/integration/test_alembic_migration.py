@@ -1,7 +1,8 @@
-import psycopg2
-from testcontainers.postgres import PostgresContainer
 import importlib.util
 from pathlib import Path
+
+import psycopg2
+from testcontainers.postgres import PostgresContainer
 
 # Load migration module by file path because its filename starts with digits and
 # cannot be imported via a normal dotted import.

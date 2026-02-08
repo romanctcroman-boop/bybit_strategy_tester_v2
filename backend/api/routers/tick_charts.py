@@ -9,7 +9,7 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -47,7 +47,7 @@ async def check_connection_limit(client_ip: str) -> tuple[bool, str]:
     Returns:
         Tuple of (allowed: bool, reason: str).
     """
-    global active_connections  # noqa: PLW0603
+    global active_connections
 
     async with active_connections_lock:
         # Check per-worker limit (most important for stability)
@@ -85,7 +85,7 @@ async def release_connection(_client_ip: str) -> None:
     Args:
         _client_ip: Client IP address (unused, kept for rate limiting history).
     """
-    global active_connections  # noqa: PLW0603
+    global active_connections
 
     async with active_connections_lock:
         active_connections = max(0, active_connections - 1)
@@ -227,10 +227,10 @@ async def tick_service_health():
     last_trade_age_ms = None
     if last_trade_time:
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             last_dt = datetime.fromisoformat(last_trade_time.replace("Z", "+00:00"))
-            age = (datetime.now(timezone.utc) - last_dt).total_seconds()
+            age = (datetime.now(UTC) - last_dt).total_seconds()
             last_trade_age_ms = int(age * 1000)
             is_stale = age > 60  # Stale if no trade in 60 seconds
         except Exception:
@@ -442,7 +442,7 @@ async def tick_websocket(
                 try:
                     # Add server timestamp for latency monitoring
                     current["server_time"] = int(
-                        datetime.now(timezone.utc).timestamp() * 1000
+                        datetime.now(UTC).timestamp() * 1000
                     )
                     await websocket.send_json({"type": "current", "data": current})
                 except Exception:

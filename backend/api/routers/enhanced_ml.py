@@ -10,8 +10,8 @@ Endpoints for:
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -29,10 +29,10 @@ router = APIRouter(prefix="/api/v1/ml", tags=["Machine Learning"])
 class DriftDetectionRequest(BaseModel):
     """Request for drift detection"""
 
-    reference_data: List[float] = Field(..., description="Reference distribution")
-    current_data: List[float] = Field(..., description="Current data to check")
-    feature_name: Optional[str] = None
-    methods: List[str] = Field(default=["ks", "psi"], description="Detection methods")
+    reference_data: list[float] = Field(..., description="Reference distribution")
+    current_data: list[float] = Field(..., description="Current data to check")
+    feature_name: str | None = None
+    methods: list[str] = Field(default=["ks", "psi"], description="Detection methods")
     significance_level: float = Field(default=0.05, ge=0.01, le=0.1)
 
 
@@ -40,19 +40,19 @@ class DriftDetectionResponse(BaseModel):
     """Response from drift detection"""
 
     is_drift: bool
-    drift_type: Optional[str]
+    drift_type: str | None
     confidence: float
-    p_value: Optional[float]
-    feature_name: Optional[str]
-    details: Dict[str, Any]
+    p_value: float | None
+    feature_name: str | None
+    details: dict[str, Any]
 
 
 class MultiVariateDriftRequest(BaseModel):
     """Request for multivariate drift detection"""
 
-    reference_data: List[List[float]]  # n_samples x n_features
-    current_data: List[List[float]]
-    feature_names: List[str]
+    reference_data: list[list[float]]  # n_samples x n_features
+    current_data: list[list[float]]
+    feature_names: list[str]
 
 
 class ModelRegistrationRequest(BaseModel):
@@ -62,9 +62,9 @@ class ModelRegistrationRequest(BaseModel):
     version: str
     description: str = ""
     algorithm: str = ""
-    metrics: Dict[str, float] = Field(default_factory=dict)
-    feature_names: List[str] = Field(default_factory=list)
-    tags: Dict[str, str] = Field(default_factory=dict)
+    metrics: dict[str, float] = Field(default_factory=dict)
+    feature_names: list[str] = Field(default_factory=list)
+    tags: dict[str, str] = Field(default_factory=dict)
 
 
 class ModelPromotionRequest(BaseModel):
@@ -87,22 +87,22 @@ class ABTestRequest(BaseModel):
 class AutoMLRequest(BaseModel):
     """Request for AutoML pipeline"""
 
-    X: List[List[float]]  # Features
-    y: List[float]  # Target
-    feature_names: Optional[List[str]] = None
+    X: list[list[float]]  # Features
+    y: list[float]  # Target
+    feature_names: list[str] | None = None
     is_classifier: bool = True
     n_trials: int = Field(default=50, ge=10, le=500)
     timeout_seconds: int = Field(default=1800, ge=60, le=7200)
     metric: str = "accuracy"
-    model_types: Optional[List[str]] = None
+    model_types: list[str] | None = None
 
 
 class OnlineLearningUpdateRequest(BaseModel):
     """Request for online learning update"""
 
     model_id: str
-    X: List[List[float]]
-    y: List[float]
+    X: list[list[float]]
+    y: list[float]
     force_update: bool = False
 
 
@@ -112,10 +112,10 @@ class FeatureDefinitionRequest(BaseModel):
     name: str
     description: str
     feature_type: str = "numerical"
-    computation_fn: Optional[str] = None
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    dependencies: List[str] = Field(default_factory=list)
-    tags: List[str] = Field(default_factory=list)
+    computation_fn: str | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    dependencies: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
 class FeatureGroupRequest(BaseModel):
@@ -123,16 +123,16 @@ class FeatureGroupRequest(BaseModel):
 
     name: str
     description: str
-    features: List[str]
+    features: list[str]
     entity_type: str = "trade"
 
 
 class FeatureComputeRequest(BaseModel):
     """Request to compute features"""
 
-    data: Dict[str, List[float]]
-    features: Optional[List[str]] = None
-    group: Optional[str] = None
+    data: dict[str, list[float]]
+    features: list[str] | None = None
+    group: str | None = None
     use_cache: bool = True
 
 
@@ -142,7 +142,7 @@ class FeatureComputeRequest(BaseModel):
 
 
 @router.post("/drift/detect", response_model=DriftDetectionResponse)
-async def detect_drift(request: DriftDetectionRequest) -> Dict[str, Any]:
+async def detect_drift(request: DriftDetectionRequest) -> dict[str, Any]:
     """
     Detect concept drift between reference and current data
 
@@ -180,7 +180,7 @@ async def detect_drift(request: DriftDetectionRequest) -> Dict[str, Any]:
 @router.post("/drift/multivariate")
 async def detect_multivariate_drift(
     request: MultiVariateDriftRequest,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Detect drift across multiple features"""
     import numpy as np
 
@@ -198,7 +198,7 @@ async def detect_multivariate_drift(
 
 
 @router.get("/drift/methods")
-async def get_drift_methods() -> Dict[str, Any]:
+async def get_drift_methods() -> dict[str, Any]:
     """Get available drift detection methods"""
     return {
         "methods": [
@@ -250,7 +250,7 @@ def _get_registry():
 
 
 @router.post("/registry/models")
-async def register_model(request: ModelRegistrationRequest) -> Dict[str, Any]:
+async def register_model(request: ModelRegistrationRequest) -> dict[str, Any]:
     """Register a new model (without artifact)"""
     from backend.ml.enhanced.model_registry import ModelMetadata, ModelStatus
 
@@ -286,7 +286,7 @@ async def register_model(request: ModelRegistrationRequest) -> Dict[str, Any]:
 
 
 @router.get("/registry/models")
-async def list_models(name: Optional[str] = None) -> Dict[str, Any]:
+async def list_models(name: str | None = None) -> dict[str, Any]:
     """List all registered models"""
     registry = _get_registry()
     models = registry.list_models(name)
@@ -295,7 +295,7 @@ async def list_models(name: Optional[str] = None) -> Dict[str, Any]:
 
 
 @router.get("/registry/models/{name}")
-async def get_model_details(name: str, version: Optional[str] = None) -> Dict[str, Any]:
+async def get_model_details(name: str, version: str | None = None) -> dict[str, Any]:
     """Get model details and metrics"""
     registry = _get_registry()
 
@@ -307,7 +307,7 @@ async def get_model_details(name: str, version: Optional[str] = None) -> Dict[st
 
 
 @router.post("/registry/promote")
-async def promote_model(request: ModelPromotionRequest) -> Dict[str, Any]:
+async def promote_model(request: ModelPromotionRequest) -> dict[str, Any]:
     """Promote a model to production"""
     registry = _get_registry()
 
@@ -326,7 +326,7 @@ async def promote_model(request: ModelPromotionRequest) -> Dict[str, Any]:
 
 
 @router.post("/registry/rollback/{name}")
-async def rollback_model(name: str, to_version: Optional[str] = None) -> Dict[str, Any]:
+async def rollback_model(name: str, to_version: str | None = None) -> dict[str, Any]:
     """Rollback to a previous model version"""
     registry = _get_registry()
 
@@ -341,7 +341,7 @@ async def rollback_model(name: str, to_version: Optional[str] = None) -> Dict[st
 
 
 @router.post("/registry/ab-test")
-async def create_ab_test(request: ABTestRequest) -> Dict[str, Any]:
+async def create_ab_test(request: ABTestRequest) -> dict[str, Any]:
     """Create an A/B test between two model versions"""
     registry = _get_registry()
 
@@ -356,7 +356,7 @@ async def create_ab_test(request: ABTestRequest) -> Dict[str, Any]:
 
 
 @router.get("/registry/ab-test/{test_id}")
-async def get_ab_test_results(test_id: str) -> Dict[str, Any]:
+async def get_ab_test_results(test_id: str) -> dict[str, Any]:
     """Get A/B test results"""
     registry = _get_registry()
 
@@ -370,7 +370,7 @@ async def get_ab_test_results(test_id: str) -> Dict[str, Any]:
 @router.get("/registry/degradation/{name}")
 async def check_model_degradation(
     name: str, threshold: float = Query(default=0.1, ge=0.01, le=0.5)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Check if production model has degraded"""
     registry = _get_registry()
 
@@ -388,7 +388,7 @@ async def check_model_degradation(
 
 
 @router.post("/automl/run")
-async def run_automl(request: AutoMLRequest) -> Dict[str, Any]:
+async def run_automl(request: AutoMLRequest) -> dict[str, Any]:
     """
     Run AutoML pipeline to find best model
 
@@ -435,7 +435,7 @@ async def run_automl(request: AutoMLRequest) -> Dict[str, Any]:
 
 
 @router.get("/automl/model-types")
-async def get_automl_model_types() -> Dict[str, Any]:
+async def get_automl_model_types() -> dict[str, Any]:
     """Get available model types for AutoML"""
     from backend.ml.enhanced.automl_pipeline import ModelType
 
@@ -447,7 +447,7 @@ async def get_automl_model_types() -> Dict[str, Any]:
 # =============================================================================
 
 
-_online_learners: Dict[str, Any] = {}
+_online_learners: dict[str, Any] = {}
 
 
 @router.post("/online/create")
@@ -456,7 +456,7 @@ async def create_online_learner(
     model_type: str = "sgd_classifier",
     update_strategy: str = "batch",
     batch_size: int = 100,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create an online learning instance"""
     from sklearn.linear_model import SGDClassifier, SGDRegressor
 
@@ -488,7 +488,7 @@ async def create_online_learner(
 
 
 @router.post("/online/update")
-async def update_online_model(request: OnlineLearningUpdateRequest) -> Dict[str, Any]:
+async def update_online_model(request: OnlineLearningUpdateRequest) -> dict[str, Any]:
     """Update online model with new data"""
     import numpy as np
 
@@ -508,7 +508,7 @@ async def update_online_model(request: OnlineLearningUpdateRequest) -> Dict[str,
 
 
 @router.post("/online/predict/{model_id}")
-async def online_predict(model_id: str, X: List[List[float]]) -> Dict[str, Any]:
+async def online_predict(model_id: str, X: list[list[float]]) -> dict[str, Any]:
     """Make predictions with online model"""
     import numpy as np
 
@@ -525,7 +525,7 @@ async def online_predict(model_id: str, X: List[List[float]]) -> Dict[str, Any]:
 
 
 @router.get("/online/stats/{model_id}")
-async def get_online_stats(model_id: str) -> Dict[str, Any]:
+async def get_online_stats(model_id: str) -> dict[str, Any]:
     """Get online learning statistics"""
     if model_id not in _online_learners:
         raise HTTPException(status_code=404, detail=f"Learner {model_id} not found")
@@ -535,7 +535,7 @@ async def get_online_stats(model_id: str) -> Dict[str, Any]:
 
 
 @router.post("/online/retrain/{model_id}")
-async def retrain_on_window(model_id: str) -> Dict[str, Any]:
+async def retrain_on_window(model_id: str) -> dict[str, Any]:
     """Retrain online model on rolling window"""
     if model_id not in _online_learners:
         raise HTTPException(status_code=404, detail=f"Learner {model_id} not found")
@@ -565,7 +565,7 @@ def _get_feature_store():
 
 
 @router.post("/features/register")
-async def register_feature(request: FeatureDefinitionRequest) -> Dict[str, Any]:
+async def register_feature(request: FeatureDefinitionRequest) -> dict[str, Any]:
     """Register a new feature definition"""
     from backend.ml.enhanced.feature_store import (
         FeatureDefinition,
@@ -591,8 +591,8 @@ async def register_feature(request: FeatureDefinitionRequest) -> Dict[str, Any]:
 
 @router.get("/features")
 async def list_features(
-    tags: Optional[str] = None, feature_type: Optional[str] = None
-) -> Dict[str, Any]:
+    tags: str | None = None, feature_type: str | None = None
+) -> dict[str, Any]:
     """List all registered features"""
     from backend.ml.enhanced.feature_store import FeatureType
 
@@ -607,7 +607,7 @@ async def list_features(
 
 
 @router.post("/features/groups")
-async def create_feature_group(request: FeatureGroupRequest) -> Dict[str, Any]:
+async def create_feature_group(request: FeatureGroupRequest) -> dict[str, Any]:
     """Create a feature group"""
     from backend.ml.enhanced.feature_store import FeatureGroup
 
@@ -632,7 +632,7 @@ async def create_feature_group(request: FeatureGroupRequest) -> Dict[str, Any]:
 
 
 @router.get("/features/groups")
-async def list_feature_groups() -> Dict[str, Any]:
+async def list_feature_groups() -> dict[str, Any]:
     """List all feature groups"""
     store = _get_feature_store()
     groups = store.list_groups()
@@ -641,7 +641,7 @@ async def list_feature_groups() -> Dict[str, Any]:
 
 
 @router.post("/features/compute")
-async def compute_features(request: FeatureComputeRequest) -> Dict[str, Any]:
+async def compute_features(request: FeatureComputeRequest) -> dict[str, Any]:
     """Compute features from input data"""
     import numpy as np
 
@@ -668,7 +668,7 @@ async def compute_features(request: FeatureComputeRequest) -> Dict[str, Any]:
 
 
 @router.get("/features/lineage/{feature_name}")
-async def get_feature_lineage(feature_name: str) -> Dict[str, Any]:
+async def get_feature_lineage(feature_name: str) -> dict[str, Any]:
     """Get feature lineage (dependencies)"""
     store = _get_feature_store()
     lineage = store.get_lineage(feature_name)
@@ -680,7 +680,7 @@ async def get_feature_lineage(feature_name: str) -> Dict[str, Any]:
 
 
 @router.get("/features/computations")
-async def list_available_computations() -> Dict[str, Any]:
+async def list_available_computations() -> dict[str, Any]:
     """List available computation functions"""
     store = _get_feature_store()
 
@@ -694,7 +694,7 @@ async def list_available_computations() -> Dict[str, Any]:
 
 
 @router.post("/features/version")
-async def create_feature_version(version: str, description: str = "") -> Dict[str, Any]:
+async def create_feature_version(version: str, description: str = "") -> dict[str, Any]:
     """Create a versioned snapshot of feature definitions"""
     store = _get_feature_store()
     fv = store.create_version(version, description)
@@ -703,7 +703,7 @@ async def create_feature_version(version: str, description: str = "") -> Dict[st
 
 
 @router.post("/features/cache/clear")
-async def clear_feature_cache(feature_name: Optional[str] = None) -> Dict[str, Any]:
+async def clear_feature_cache(feature_name: str | None = None) -> dict[str, Any]:
     """Clear feature computation cache"""
     store = _get_feature_store()
     cleared = store.clear_cache(feature_name=feature_name)
@@ -720,24 +720,24 @@ class EnsembleCreateRequest(BaseModel):
     """Request to create an ensemble model"""
 
     name: str
-    models: List[str] = Field(..., description="List of model_name:version")
+    models: list[str] = Field(..., description="List of model_name:version")
     ensemble_type: str = Field(
         default="voting", description="voting, stacking, bagging, boosting"
     )
-    weights: Optional[List[float]] = None
-    meta_learner: Optional[str] = None
+    weights: list[float] | None = None
+    meta_learner: str | None = None
 
 
 class EnsemblePredictRequest(BaseModel):
     """Request for ensemble prediction"""
 
     ensemble_name: str
-    X: List[List[float]]
+    X: list[list[float]]
     return_individual: bool = False
 
 
 @router.post("/ensemble/create")
-async def create_ensemble(request: EnsembleCreateRequest) -> Dict[str, Any]:
+async def create_ensemble(request: EnsembleCreateRequest) -> dict[str, Any]:
     """Create an ensemble from multiple models"""
     registry = _get_registry()
 
@@ -756,7 +756,7 @@ async def create_ensemble(request: EnsembleCreateRequest) -> Dict[str, Any]:
             raise HTTPException(status_code=404, detail=f"Model {model_ref} not found")
 
     ensemble_id = (
-        f"ensemble_{request.name}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        f"ensemble_{request.name}_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
     )
 
     return {
@@ -765,13 +765,13 @@ async def create_ensemble(request: EnsembleCreateRequest) -> Dict[str, Any]:
         "ensemble_type": request.ensemble_type,
         "models": request.models,
         "weights": request.weights,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "status": "created",
     }
 
 
 @router.get("/ensemble/{ensemble_name}")
-async def get_ensemble(ensemble_name: str) -> Dict[str, Any]:
+async def get_ensemble(ensemble_name: str) -> dict[str, Any]:
     """Get ensemble model details"""
     return {
         "name": ensemble_name,
@@ -779,18 +779,18 @@ async def get_ensemble(ensemble_name: str) -> Dict[str, Any]:
         "models": [],
         "weights": [],
         "metrics": {},
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
 @router.get("/ensemble")
-async def list_ensembles() -> Dict[str, Any]:
+async def list_ensembles() -> dict[str, Any]:
     """List all ensemble models"""
     return {"count": 0, "ensembles": []}
 
 
 @router.post("/ensemble/predict")
-async def ensemble_predict(request: EnsemblePredictRequest) -> Dict[str, Any]:
+async def ensemble_predict(request: EnsemblePredictRequest) -> dict[str, Any]:
     """Make predictions using an ensemble"""
     import numpy as np
 
@@ -814,7 +814,7 @@ async def ensemble_predict(request: EnsemblePredictRequest) -> Dict[str, Any]:
 
 
 @router.delete("/ensemble/{ensemble_name}")
-async def delete_ensemble(ensemble_name: str) -> Dict[str, Any]:
+async def delete_ensemble(ensemble_name: str) -> dict[str, Any]:
     """Delete an ensemble model"""
     return {
         "ensemble_name": ensemble_name,
@@ -831,13 +831,13 @@ async def delete_ensemble(ensemble_name: str) -> Dict[str, Any]:
 class ModelCompareRequest(BaseModel):
     """Request to compare models"""
 
-    models: List[str] = Field(..., description="List of model_name:version")
-    test_data: Optional[Dict[str, List[float]]] = None
-    metrics: List[str] = Field(default=["accuracy", "precision", "recall", "f1"])
+    models: list[str] = Field(..., description="List of model_name:version")
+    test_data: dict[str, list[float]] | None = None
+    metrics: list[str] = Field(default=["accuracy", "precision", "recall", "f1"])
 
 
 @router.post("/models/compare")
-async def compare_models(request: ModelCompareRequest) -> Dict[str, Any]:
+async def compare_models(request: ModelCompareRequest) -> dict[str, Any]:
     """Compare multiple models on the same data"""
     import numpy as np
 
@@ -862,14 +862,14 @@ async def compare_models(request: ModelCompareRequest) -> Dict[str, Any]:
         "metrics": request.metrics,
         "comparison": comparison,
         "best_by_metric": best_by_metric,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
 @router.post("/models/statistical-test")
 async def statistical_significance_test(
     model_a: str, model_b: str, metric: str = "accuracy", test_type: str = "paired_t"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Perform statistical significance test between two models"""
     import numpy as np
 
@@ -889,8 +889,8 @@ async def statistical_significance_test(
 
 @router.get("/models/{name}/learning-curve")
 async def get_learning_curve(
-    name: str, version: Optional[str] = None, cv_folds: int = 5
-) -> Dict[str, Any]:
+    name: str, version: str | None = None, cv_folds: int = 5
+) -> dict[str, Any]:
     """Get learning curve data for a model"""
     import numpy as np
 
@@ -923,12 +923,12 @@ class HyperparameterSearchRequest(BaseModel):
     """Request for hyperparameter search"""
 
     model_name: str
-    param_space: Dict[str, Any]
+    param_space: dict[str, Any]
     search_type: str = Field(default="bayesian", description="grid, random, bayesian")
     n_trials: int = Field(default=100, ge=10, le=1000)
     cv_folds: int = Field(default=5, ge=2, le=10)
     metric: str = "accuracy"
-    early_stopping_rounds: Optional[int] = None
+    early_stopping_rounds: int | None = None
 
 
 class HyperparameterScheduleRequest(BaseModel):
@@ -945,11 +945,11 @@ class HyperparameterScheduleRequest(BaseModel):
 
 
 @router.post("/hyperparameters/search")
-async def hyperparameter_search(request: HyperparameterSearchRequest) -> Dict[str, Any]:
+async def hyperparameter_search(request: HyperparameterSearchRequest) -> dict[str, Any]:
     """Launch hyperparameter search"""
     import numpy as np
 
-    search_id = f"hp_search_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    search_id = f"hp_search_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
 
     # Generate fake best params
     best_params = {}
@@ -975,12 +975,12 @@ async def hyperparameter_search(request: HyperparameterSearchRequest) -> Dict[st
         "best_params": best_params,
         "best_score": round(np.random.uniform(0.8, 0.95), 4),
         "trials_completed": request.n_trials,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
 @router.get("/hyperparameters/search/{search_id}")
-async def get_search_status(search_id: str) -> Dict[str, Any]:
+async def get_search_status(search_id: str) -> dict[str, Any]:
     """Get hyperparameter search status"""
     return {
         "search_id": search_id,
@@ -995,7 +995,7 @@ async def get_search_status(search_id: str) -> Dict[str, Any]:
 @router.get("/hyperparameters/search/{search_id}/trials")
 async def get_search_trials(
     search_id: str, limit: int = Query(default=50, ge=1, le=500)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get trials from hyperparameter search"""
     import numpy as np
 
@@ -1021,7 +1021,7 @@ async def get_search_trials(
 @router.post("/hyperparameters/schedule")
 async def create_hyperparameter_schedule(
     request: HyperparameterScheduleRequest,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a hyperparameter schedule (e.g., learning rate schedule)"""
     import numpy as np
 
@@ -1056,7 +1056,7 @@ async def create_hyperparameter_schedule(
         "schedule_type": request.schedule_type,
         "steps": request.steps,
         "values": schedule_values,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -1069,26 +1069,26 @@ class FeatureImportanceRequest(BaseModel):
     """Request for feature importance"""
 
     model_name: str
-    version: Optional[str] = None
+    version: str | None = None
     method: str = Field(
         default="permutation", description="permutation, shap, gain, split"
     )
-    X: Optional[List[List[float]]] = None
-    feature_names: Optional[List[str]] = None
+    X: list[list[float]] | None = None
+    feature_names: list[str] | None = None
 
 
 class SHAPRequest(BaseModel):
     """Request for SHAP values"""
 
     model_name: str
-    version: Optional[str] = None
-    X: List[List[float]]
-    feature_names: Optional[List[str]] = None
+    version: str | None = None
+    X: list[list[float]]
+    feature_names: list[str] | None = None
     max_samples: int = Field(default=100, ge=1, le=1000)
 
 
 @router.post("/explainability/feature-importance")
-async def get_feature_importance(request: FeatureImportanceRequest) -> Dict[str, Any]:
+async def get_feature_importance(request: FeatureImportanceRequest) -> dict[str, Any]:
     """Get feature importance scores"""
     import numpy as np
 
@@ -1112,12 +1112,12 @@ async def get_feature_importance(request: FeatureImportanceRequest) -> Dict[str,
             for i, (name, score) in enumerate(features_ranked)
         ],
         "top_features": [f[0] for f in features_ranked[:5]],
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
 @router.post("/explainability/shap")
-async def compute_shap_values(request: SHAPRequest) -> Dict[str, Any]:
+async def compute_shap_values(request: SHAPRequest) -> dict[str, Any]:
     """Compute SHAP values for model predictions"""
     import numpy as np
 
@@ -1150,10 +1150,10 @@ async def compute_shap_values(request: SHAPRequest) -> Dict[str, Any]:
 @router.post("/explainability/lime")
 async def compute_lime_explanation(
     model_name: str,
-    instance: List[float],
-    feature_names: Optional[List[str]] = None,
+    instance: list[float],
+    feature_names: list[str] | None = None,
     num_features: int = 10,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Compute LIME explanation for a single prediction"""
     import numpy as np
 
@@ -1190,9 +1190,9 @@ async def compute_lime_explanation(
 async def get_partial_dependence(
     model_name: str,
     feature: str,
-    version: Optional[str] = None,
+    version: str | None = None,
     grid_resolution: int = Query(default=50, ge=10, le=200),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get partial dependence plot data for a feature"""
     import numpy as np
 
@@ -1221,9 +1221,9 @@ async def get_feature_interaction(
     model_name: str,
     feature1: str,
     feature2: str,
-    version: Optional[str] = None,
+    version: str | None = None,
     grid_resolution: int = Query(default=20, ge=5, le=50),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get feature interaction effects"""
     import numpy as np
 

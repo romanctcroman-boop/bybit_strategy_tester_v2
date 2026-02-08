@@ -11,10 +11,11 @@ Features:
 
 import hashlib
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -40,7 +41,7 @@ class AutoMLConfig:
     """Configuration for AutoML pipeline"""
 
     # Search space
-    model_types: List[ModelType] = field(
+    model_types: list[ModelType] = field(
         default_factory=lambda: [
             ModelType.RANDOM_FOREST,
             ModelType.GRADIENT_BOOSTING,
@@ -62,7 +63,7 @@ class AutoMLConfig:
 
     # Feature selection
     feature_selection: bool = True
-    max_features: Optional[int] = None
+    max_features: int | None = None
     min_feature_importance: float = 0.01
 
     # Ensemble
@@ -84,10 +85,10 @@ class ModelCandidate:
 
     model_id: str
     model_type: ModelType
-    hyperparameters: Dict[str, Any]
+    hyperparameters: dict[str, Any]
 
     # Performance
-    cv_scores: List[float] = field(default_factory=list)
+    cv_scores: list[float] = field(default_factory=list)
     mean_score: float = 0.0
     std_score: float = 0.0
 
@@ -97,13 +98,13 @@ class ModelCandidate:
 
     # Model info
     model_size_mb: float = 0.0
-    feature_importance: Dict[str, float] = field(default_factory=dict)
-    selected_features: List[str] = field(default_factory=list)
+    feature_importance: dict[str, float] = field(default_factory=dict)
+    selected_features: list[str] = field(default_factory=list)
 
     # Trained model
     model: Any = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary (excluding model)"""
         return {
             "model_id": self.model_id,
@@ -128,30 +129,30 @@ class PipelineResult:
     config: AutoMLConfig
 
     # Best model
-    best_model: Optional[ModelCandidate] = None
+    best_model: ModelCandidate | None = None
     best_score: float = 0.0
 
     # All candidates
-    candidates: List[ModelCandidate] = field(default_factory=list)
+    candidates: list[ModelCandidate] = field(default_factory=list)
 
     # Ensemble
     ensemble_model: Any = None
     ensemble_score: float = 0.0
 
     # Selected features
-    selected_features: List[str] = field(default_factory=list)
-    feature_importance: Dict[str, float] = field(default_factory=dict)
+    selected_features: list[str] = field(default_factory=list)
+    feature_importance: dict[str, float] = field(default_factory=dict)
 
     # Timing
     total_time_seconds: float = 0.0
     trials_completed: int = 0
 
     # Metadata
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    completed_at: Optional[datetime] = None
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
     status: str = "running"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "run_id": self.run_id,
@@ -179,28 +180,28 @@ class AutoMLPipeline:
         predictions = best_model.predict(X_test)
     """
 
-    def __init__(self, config: Optional[AutoMLConfig] = None):
+    def __init__(self, config: AutoMLConfig | None = None):
         self.config = config or AutoMLConfig()
-        self.results: List[PipelineResult] = []
+        self.results: list[PipelineResult] = []
 
         # Optuna study
         self.study = None
 
         # Model factory
-        self._model_factories: Dict[ModelType, Callable] = {}
+        self._model_factories: dict[ModelType, Callable] = {}
         self._setup_model_factories()
 
     def _setup_model_factories(self) -> None:
         """Setup model creation functions"""
 
-        def create_random_forest(params: Dict) -> Any:
+        def create_random_forest(params: dict) -> Any:
             from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
             is_classifier = params.pop("is_classifier", True)
             cls = RandomForestClassifier if is_classifier else RandomForestRegressor
             return cls(**params)
 
-        def create_gradient_boosting(params: Dict) -> Any:
+        def create_gradient_boosting(params: dict) -> Any:
             from sklearn.ensemble import (
                 GradientBoostingClassifier,
                 GradientBoostingRegressor,
@@ -210,7 +211,7 @@ class AutoMLPipeline:
             cls = GradientBoostingClassifier if is_classifier else GradientBoostingRegressor
             return cls(**params)
 
-        def create_xgboost(params: Dict) -> Any:
+        def create_xgboost(params: dict) -> Any:
             try:
                 import xgboost as xgb
 
@@ -221,7 +222,7 @@ class AutoMLPipeline:
                 logger.warning("XGBoost not installed, using GradientBoosting")
                 return create_gradient_boosting(params)
 
-        def create_lightgbm(params: Dict) -> Any:
+        def create_lightgbm(params: dict) -> Any:
             try:
                 import lightgbm as lgb
 
@@ -232,7 +233,7 @@ class AutoMLPipeline:
                 logger.warning("LightGBM not installed, using GradientBoosting")
                 return create_gradient_boosting(params)
 
-        def create_catboost(params: Dict) -> Any:
+        def create_catboost(params: dict) -> Any:
             try:
                 from catboost import CatBoostClassifier, CatBoostRegressor
 
@@ -243,21 +244,21 @@ class AutoMLPipeline:
                 logger.warning("CatBoost not installed, using GradientBoosting")
                 return create_gradient_boosting(params)
 
-        def create_linear(params: Dict) -> Any:
+        def create_linear(params: dict) -> Any:
             from sklearn.linear_model import LogisticRegression, Ridge
 
             is_classifier = params.pop("is_classifier", True)
             cls = LogisticRegression if is_classifier else Ridge
             return cls(**params)
 
-        def create_svm(params: Dict) -> Any:
+        def create_svm(params: dict) -> Any:
             from sklearn.svm import SVC, SVR
 
             is_classifier = params.pop("is_classifier", True)
             cls = SVC if is_classifier else SVR
             return cls(**params)
 
-        def create_neural_network(params: Dict) -> Any:
+        def create_neural_network(params: dict) -> Any:
             from sklearn.neural_network import MLPClassifier, MLPRegressor
 
             is_classifier = params.pop("is_classifier", True)
@@ -275,7 +276,7 @@ class AutoMLPipeline:
             ModelType.NEURAL_NETWORK: create_neural_network,
         }
 
-    def _get_hyperparameter_space(self, model_type: ModelType, trial: Any) -> Dict[str, Any]:
+    def _get_hyperparameter_space(self, model_type: ModelType, trial: Any) -> dict[str, Any]:
         """Get hyperparameter search space for model type"""
 
         if model_type == ModelType.RANDOM_FOREST:
@@ -340,9 +341,9 @@ class AutoMLPipeline:
         self,
         X: np.ndarray,
         y: np.ndarray,
-        feature_names: Optional[List[str]] = None,
+        feature_names: list[str] | None = None,
         is_classifier: bool = True,
-        custom_scorer: Optional[Callable] = None,
+        custom_scorer: Callable | None = None,
     ) -> PipelineResult:
         """
         Run the AutoML pipeline
@@ -366,9 +367,9 @@ class AutoMLPipeline:
             cross_val_score,
         )
 
-        run_id = hashlib.sha256(f"{datetime.now(timezone.utc)}".encode()).hexdigest()[:12]
+        run_id = hashlib.sha256(f"{datetime.now(UTC)}".encode()).hexdigest()[:12]
 
-        result = PipelineResult(run_id=run_id, config=self.config, started_at=datetime.now(timezone.utc))
+        result = PipelineResult(run_id=run_id, config=self.config, started_at=datetime.now(UTC))
 
         if feature_names is None:
             feature_names = [f"feature_{i}" for i in range(X.shape[1])]
@@ -388,7 +389,7 @@ class AutoMLPipeline:
             cv = StratifiedKFold(n_splits=self.config.cv_folds, shuffle=True)
 
         # Optuna objective
-        candidates: List[ModelCandidate] = []
+        candidates: list[ModelCandidate] = []
 
         def objective(trial: optuna.Trial) -> float:
             # Select model type
@@ -492,7 +493,7 @@ class AutoMLPipeline:
                 X, y, result.candidates[: self.config.top_n_models], cv, is_classifier
             )
 
-        result.completed_at = datetime.now(timezone.utc)
+        result.completed_at = datetime.now(UTC)
         result.status = "completed"
 
         self.results.append(result)
@@ -505,7 +506,7 @@ class AutoMLPipeline:
         self,
         X: np.ndarray,
         y: np.ndarray,
-        feature_names: List[str],
+        feature_names: list[str],
         is_classifier: bool,
     ) -> tuple:
         """Select important features"""
@@ -545,7 +546,7 @@ class AutoMLPipeline:
         self,
         X: np.ndarray,
         y: np.ndarray,
-        top_models: List[ModelCandidate],
+        top_models: list[ModelCandidate],
         cv: Any,
         is_classifier: bool,
     ) -> tuple:
@@ -584,7 +585,7 @@ class AutoMLPipeline:
 
         return ensemble, ensemble_score
 
-    def get_best_params(self) -> Optional[Dict[str, Any]]:
+    def get_best_params(self) -> dict[str, Any] | None:
         """Get best hyperparameters from last run"""
         if not self.results:
             return None
@@ -594,7 +595,7 @@ class AutoMLPipeline:
             return last_result.best_model.hyperparameters
         return None
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         """Get feature importance from last run"""
         if not self.results:
             return {}

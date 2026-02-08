@@ -23,7 +23,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -250,7 +250,7 @@ class VolatilitySlippage(SlippageModel):
         order_size: float,
         side: str,
         volatility: float = 0.02,
-        atr: Optional[float] = None,
+        atr: float | None = None,
         **kwargs,
     ) -> SlippageResult:
         """
@@ -323,9 +323,9 @@ class OrderBookSlippage(SlippageModel):
         price: float,
         order_size: float,
         side: str,
-        spread: Optional[float] = None,
-        bid_price: Optional[float] = None,
-        ask_price: Optional[float] = None,
+        spread: float | None = None,
+        bid_price: float | None = None,
+        ask_price: float | None = None,
         book_depth: float = 100_000,
         **kwargs,
     ) -> SlippageResult:
@@ -390,16 +390,16 @@ class CompositeSlippage(SlippageModel):
 
     def __init__(
         self,
-        models: Optional[list[tuple[SlippageModel, float]]] = None,
+        models: list[tuple[SlippageModel, float]] | None = None,
         # Common tunable params forwarded from API/config
-        impact_factor: Optional[float] = None,
-        min_slippage: Optional[float] = None,
-        max_slippage: Optional[float] = None,
-        base_slippage: Optional[float] = None,
-        volatility_multiplier: Optional[float] = None,
-        spread_multiplier: Optional[float] = None,
-        depth_factor: Optional[float] = None,
-        min_spread: Optional[float] = None,
+        impact_factor: float | None = None,
+        min_slippage: float | None = None,
+        max_slippage: float | None = None,
+        base_slippage: float | None = None,
+        volatility_multiplier: float | None = None,
+        spread_multiplier: float | None = None,
+        depth_factor: float | None = None,
+        min_spread: float | None = None,
     ):
         """
         Initialize composite slippage model.
@@ -490,9 +490,9 @@ class AdaptiveSlippage(SlippageModel):
 
     def __init__(
         self,
-        base_model: Optional[SlippageModel] = None,
-        time_multipliers: Optional[dict[int, float]] = None,
-        regime_multipliers: Optional[dict[str, float]] = None,
+        base_model: SlippageModel | None = None,
+        time_multipliers: dict[int, float] | None = None,
+        regime_multipliers: dict[str, float] | None = None,
     ):
         """
         Initialize adaptive slippage model.
@@ -546,7 +546,7 @@ class AdaptiveSlippage(SlippageModel):
         price: float,
         order_size: float,
         side: str,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
         regime: str = "trending",
         order_type: str = "market",
         **kwargs,

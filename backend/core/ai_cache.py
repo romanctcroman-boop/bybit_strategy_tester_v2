@@ -15,7 +15,7 @@ Features:
 import hashlib
 import json
 import time
-from typing import Any, Optional
+from typing import Any
 
 from backend.core.logging_config import get_logger
 
@@ -128,7 +128,7 @@ class AICacheManager:
         temperature: float = 0.7,
         max_tokens: int = 2000,
         **kwargs,
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Получить закэшированный ответ
 
@@ -173,7 +173,7 @@ class AICacheManager:
         response: dict[str, Any],
         temperature: float = 0.7,
         max_tokens: int = 2000,
-        ttl: Optional[int] = None,
+        ttl: int | None = None,
         **kwargs,
     ) -> bool:
         """
@@ -308,7 +308,7 @@ class AICacheManager:
 
 
 # Global cache manager instance
-_cache_manager: Optional[AICacheManager] = None
+_cache_manager: AICacheManager | None = None
 
 
 def get_cache_manager() -> AICacheManager:

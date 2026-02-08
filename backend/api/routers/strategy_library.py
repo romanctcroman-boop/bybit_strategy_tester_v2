@@ -9,7 +9,7 @@ Provides REST API endpoints for:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -38,10 +38,10 @@ class ParameterSpecResponse(BaseModel):
     type: str
     default: Any
     description: str = ""
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    step: Optional[float] = None
-    choices: Optional[List[Any]] = None
+    min_value: float | None = None
+    max_value: float | None = None
+    step: float | None = None
+    choices: list[Any] | None = None
     optimize: bool = True
 
 
@@ -55,16 +55,16 @@ class StrategyInfoResponse(BaseModel):
     version: str = "1.0.0"
     author: str = "System"
     min_candles: int = 50
-    recommended_timeframes: List[str] = []
-    suitable_markets: List[str] = []
+    recommended_timeframes: list[str] = []
+    suitable_markets: list[str] = []
     avg_trades_per_day: float = 1.0
     expected_win_rate: float = 0.5
     expected_risk_reward: float = 2.0
     typical_holding_period: str = "hours"
     risk_level: str = "moderate"
     max_drawdown_expected: float = 0.15
-    parameters: List[ParameterSpecResponse] = []
-    tags: List[str] = []
+    parameters: list[ParameterSpecResponse] = []
+    tags: list[str] = []
 
 
 class StrategySummaryResponse(BaseModel):
@@ -75,7 +75,7 @@ class StrategySummaryResponse(BaseModel):
     category: str
     risk_level: str
     expected_win_rate: float
-    tags: List[str] = []
+    tags: list[str] = []
 
 
 class CategoryInfo(BaseModel):
@@ -91,7 +91,7 @@ class OptimizationSpaceResponse(BaseModel):
     """Optimization parameter space response."""
 
     strategy_id: str
-    parameters: Dict[str, Dict[str, Any]]
+    parameters: dict[str, dict[str, Any]]
 
 
 class CreateStrategyRequest(BaseModel):
@@ -100,7 +100,7 @@ class CreateStrategyRequest(BaseModel):
     strategy_id: str = Field(..., description="Strategy ID from registry")
     symbol: str = Field(..., description="Trading symbol (e.g., BTCUSDT)")
     timeframe: str = Field("60", description="Candle timeframe")
-    parameters: Dict[str, Any] = Field(
+    parameters: dict[str, Any] = Field(
         default_factory=dict, description="Custom parameter values"
     )
     paper_trading: bool = Field(True, description="Use paper trading mode")
@@ -113,7 +113,7 @@ class CreateStrategyResponse(BaseModel):
     message: str
     strategy_id: str
     strategy_name: str
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
 
 
 # =============================================================================
@@ -174,12 +174,12 @@ def strategy_info_to_summary(info: StrategyInfo) -> StrategySummaryResponse:
 # =============================================================================
 
 
-@router.get("/", response_model=List[StrategySummaryResponse])
+@router.get("/", response_model=list[StrategySummaryResponse])
 async def list_strategies(
-    category: Optional[str] = Query(None, description="Filter by category"),
-    risk_level: Optional[str] = Query(None, description="Filter by risk level"),
-    tag: Optional[str] = Query(None, description="Filter by tag"),
-    search: Optional[str] = Query(None, description="Search query"),
+    category: str | None = Query(None, description="Filter by category"),
+    risk_level: str | None = Query(None, description="Filter by risk level"),
+    tag: str | None = Query(None, description="Filter by tag"),
+    search: str | None = Query(None, description="Search query"),
 ):
     """
     List all available strategies with optional filters.
@@ -211,7 +211,7 @@ async def list_strategies(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/categories", response_model=List[CategoryInfo])
+@router.get("/categories", response_model=list[CategoryInfo])
 async def get_categories():
     """
     Get all strategy categories with counts.
@@ -263,7 +263,7 @@ async def get_strategy_details(strategy_id: str):
     return strategy_info_to_response(strategy_class.STRATEGY_INFO)
 
 
-@router.get("/{strategy_id}/parameters", response_model=List[ParameterSpecResponse])
+@router.get("/{strategy_id}/parameters", response_model=list[ParameterSpecResponse])
 async def get_strategy_parameters(strategy_id: str):
     """
     Get parameters for a specific strategy.
@@ -314,7 +314,7 @@ async def get_optimization_space(strategy_id: str):
     )
 
 
-@router.get("/by-category/{category}", response_model=List[StrategySummaryResponse])
+@router.get("/by-category/{category}", response_model=list[StrategySummaryResponse])
 async def list_strategies_by_category(category: str):
     """
     List all strategies in a category.
@@ -328,7 +328,7 @@ async def list_strategies_by_category(category: str):
     return [strategy_info_to_summary(s) for s in strategies]
 
 
-@router.get("/by-risk/{risk_level}", response_model=List[StrategySummaryResponse])
+@router.get("/by-risk/{risk_level}", response_model=list[StrategySummaryResponse])
 async def list_strategies_by_risk(risk_level: str):
     """
     List strategies by risk level.
@@ -347,7 +347,7 @@ async def list_strategies_by_risk(risk_level: str):
 @router.post("/validate-parameters")
 async def validate_parameters(
     strategy_id: str,
-    parameters: Dict[str, Any],
+    parameters: dict[str, Any],
 ):
     """
     Validate parameters for a strategy.
@@ -447,14 +447,14 @@ async def get_library_summary():
 
 @router.get("/recommendations")
 async def get_strategy_recommendations(
-    market_condition: Optional[str] = Query(
+    market_condition: str | None = Query(
         None, description="trending, ranging, volatile"
     ),
-    experience_level: Optional[str] = Query(
+    experience_level: str | None = Query(
         None, description="beginner, intermediate, advanced"
     ),
-    preferred_timeframe: Optional[str] = Query(None, description="Preferred timeframe"),
-    max_risk: Optional[str] = Query("moderate", description="Maximum risk level"),
+    preferred_timeframe: str | None = Query(None, description="Preferred timeframe"),
+    max_risk: str | None = Query("moderate", description="Maximum risk level"),
 ):
     """
     Get strategy recommendations based on conditions.

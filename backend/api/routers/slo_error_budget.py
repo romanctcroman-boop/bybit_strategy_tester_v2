@@ -9,7 +9,7 @@ Provides endpoints for:
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -51,7 +51,7 @@ class ErrorBudgetStateResponse(BaseModel):
     burn_rate_6h: float
     burn_rate_24h: float
     status: str
-    time_until_exhausted_hours: Optional[float]
+    time_until_exhausted_hours: float | None
     window_start: str
     window_end: str
 

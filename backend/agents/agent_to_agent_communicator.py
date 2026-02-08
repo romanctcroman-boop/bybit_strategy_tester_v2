@@ -14,10 +14,11 @@ import asyncio
 import re
 import shutil
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 from redis import asyncio as redis
@@ -48,20 +49,20 @@ class AgentMessage:
     message_type: MessageType
     content: str
     conversation_id: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
     iteration: int = 1
     max_iterations: int = 5
     confidence_score: float = 0.0
-    timestamp: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    timestamp: str | None = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.timestamp is None:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
         if self.metadata is None:
             self.metadata = {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "message_id": self.message_id,
             "from_agent": self.from_agent.value,
@@ -78,7 +79,7 @@ class AgentMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentMessage":
+    def from_dict(cls, data: dict[str, Any]) -> AgentMessage:
         return cls(
             message_id=data["message_id"],
             from_agent=AgentType(data["from_agent"]),
@@ -115,13 +116,13 @@ class AgentToAgentCommunicator:
     ):
         self.agent_interface = get_agent_interface()
         self.redis_url = redis_url
-        self.redis_client: Optional[redis.Redis] = None
-        self.message_handlers: Dict[AgentType, MessageHandler] = {
+        self.redis_client: redis.Redis | None = None
+        self.message_handlers: dict[AgentType, MessageHandler] = {
             AgentType.DEEPSEEK: self._handle_deepseek_message,
             AgentType.PERPLEXITY: self._handle_perplexity_message,
             AgentType.COPILOT: self._handle_copilot_message,
         }
-        self.conversation_cache: Dict[str, List[AgentMessage]] = {}
+        self.conversation_cache: dict[str, list[AgentMessage]] = {}
         self.max_conversation_age = timedelta(minutes=30)
         self.memory_manager = memory_manager or self._create_memory_manager()
 
@@ -143,7 +144,7 @@ class AgentToAgentCommunicator:
             logger.debug(f"Telemetry memory manager unavailable: {exc}")
             return None
 
-    def _record_telemetry(self, event: str, payload: Dict[str, Any]) -> None:
+    def _record_telemetry(self, event: str, payload: dict[str, Any]) -> None:
         if not self.memory_manager:
             return
         try:
@@ -332,7 +333,7 @@ class AgentToAgentCommunicator:
         initial_message: AgentMessage,
         max_turns: int = 10,
         pattern: CommunicationPattern = CommunicationPattern.SEQUENTIAL,
-    ) -> List[AgentMessage]:
+    ) -> list[AgentMessage]:
         history = [initial_message]
         current_message = initial_message
 
@@ -355,9 +356,9 @@ class AgentToAgentCommunicator:
     async def parallel_consensus(
         self,
         question: str,
-        agents: List[AgentType],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        agents: list[AgentType],
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         conversation_id = str(uuid.uuid4())
         context = context or {}
 
@@ -403,10 +404,10 @@ class AgentToAgentCommunicator:
         improver_agent: AgentType,
         max_iterations: int = 5,
         min_confidence: float = 0.8,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         conversation_id = str(uuid.uuid4())
         current_content = initial_task
-        iteration_log: List[Dict[str, Any]] = []
+        iteration_log: list[dict[str, Any]] = []
         final_confidence = 0.0
 
         for iteration in range(1, max_iterations + 1):
@@ -467,7 +468,7 @@ class AgentToAgentCommunicator:
         target_file: str | None = None,
         cycle: int | None = None,
         timeout_seconds: int = 300,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run Phase 6-style validation via both agents with telemetry hooks."""
 
         request_context = {
@@ -555,7 +556,7 @@ class AgentToAgentCommunicator:
 
     def _summarize_validation_response(
         self, agent_type: AgentType, response: AgentResponse
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         text = (response.content or "").strip()
         text_lower = text.lower()
         validated = response.success and any(
@@ -593,7 +594,7 @@ class AgentToAgentCommunicator:
             return False
 
     async def _should_end_conversation(
-        self, response: AgentMessage, history: List[AgentMessage]
+        self, response: AgentMessage, history: list[AgentMessage]
     ) -> bool:
         if response.message_type in (MessageType.COMPLETION, MessageType.ERROR):
             return True
@@ -610,7 +611,7 @@ class AgentToAgentCommunicator:
         self,
         response: AgentMessage,
         pattern: CommunicationPattern,
-        history: List[AgentMessage],
+        history: list[AgentMessage],
     ) -> AgentMessage:
         next_iteration = response.iteration + 1
         next_agent = response.from_agent
@@ -643,7 +644,7 @@ class AgentToAgentCommunicator:
         )
 
     async def _calculate_consensus_confidence(
-        self, responses: List[AgentMessage]
+        self, responses: list[AgentMessage]
     ) -> float:
         if not responses:
             return 0.0
@@ -693,7 +694,7 @@ class AgentToAgentCommunicator:
             await self.redis_client.close()
 
 
-_communicator_instance: Optional[AgentToAgentCommunicator] = None
+_communicator_instance: AgentToAgentCommunicator | None = None
 
 
 def get_communicator() -> AgentToAgentCommunicator:
@@ -708,8 +709,8 @@ AgentCommunicator = AgentToAgentCommunicator
 
 
 __all__ = [
-    "AgentToAgentCommunicator",
     "AgentCommunicator",
-    "get_communicator",
     "AgentMessage",
+    "AgentToAgentCommunicator",
+    "get_communicator",
 ]

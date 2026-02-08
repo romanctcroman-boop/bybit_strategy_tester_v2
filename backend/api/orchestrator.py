@@ -3,14 +3,14 @@ Orchestrator module - Orchestrator Dashboard and Workflow Management
 Provides centralized management and monitoring of strategies and agents
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 __all__ = [
-    "orchestrator_router",
     "get_orchestrator_status",
+    "orchestrator_router",
 ]
 
 
@@ -20,7 +20,7 @@ class OrchestratorStatus(BaseModel):
     active_strategies: int = 0
     active_agents: int = 0
     system_health: str = "healthy"
-    components: Dict[str, str] = {}
+    components: dict[str, str] = {}
 
 
 def get_orchestrator_status() -> OrchestratorStatus:
@@ -45,12 +45,12 @@ class OrchestratorRouter:
         self.prefix = "/orchestrator"
         self.routes = []
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get orchestrator status"""
         status = get_orchestrator_status()
         return status.dict()
 
-    async def get_dashboard_data(self) -> Dict[str, Any]:
+    async def get_dashboard_data(self) -> dict[str, Any]:
         """Get dashboard data"""
         return {
             "status": "operational",
@@ -71,21 +71,21 @@ router = APIRouter()
 
 
 @router.get("/status")
-async def get_status() -> Dict[str, Any]:
+async def get_status() -> dict[str, Any]:
     """Get orchestrator status"""
     return await orchestrator_router.get_status()
 
 
 @router.get("/dashboard")
-async def get_dashboard() -> Dict[str, Any]:
+async def get_dashboard() -> dict[str, Any]:
     """Get dashboard data"""
     return await orchestrator_router.get_dashboard_data()
 
 
 __all__ = [
+    "get_orchestrator_status",
     "orchestrator_router",
     "router",
-    "get_orchestrator_status",
 ]
 
 

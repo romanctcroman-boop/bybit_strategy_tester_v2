@@ -14,7 +14,6 @@ Version: 2.3.0
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -49,31 +48,31 @@ class OrderBookSnapshot:
     asks: list[OrderBookLevel]  # Sorted ascending by price
 
     @property
-    def best_bid(self) -> Optional[float]:
+    def best_bid(self) -> float | None:
         """Get best bid price."""
         return self.bids[0].price if self.bids else None
 
     @property
-    def best_ask(self) -> Optional[float]:
+    def best_ask(self) -> float | None:
         """Get best ask price."""
         return self.asks[0].price if self.asks else None
 
     @property
-    def mid_price(self) -> Optional[float]:
+    def mid_price(self) -> float | None:
         """Get mid price."""
         if self.best_bid and self.best_ask:
             return (self.best_bid + self.best_ask) / 2
         return None
 
     @property
-    def spread(self) -> Optional[float]:
+    def spread(self) -> float | None:
         """Get bid-ask spread."""
         if self.best_bid and self.best_ask:
             return self.best_ask - self.best_bid
         return None
 
     @property
-    def spread_bps(self) -> Optional[float]:
+    def spread_bps(self) -> float | None:
         """Get spread in basis points."""
         if self.spread and self.mid_price:
             return (self.spread / self.mid_price) * 10000
@@ -103,7 +102,7 @@ class OrderBookConfig:
     enable_imbalance: bool = True
 
     # Random seed for reproducibility
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 class OrderBookSimulator:
@@ -118,7 +117,7 @@ class OrderBookSimulator:
     - Order book imbalance calculation
     """
 
-    def __init__(self, config: Optional[OrderBookConfig] = None):
+    def __init__(self, config: OrderBookConfig | None = None):
         """Initialize order book simulator."""
         self.config = config or OrderBookConfig()
         self.rng = np.random.default_rng(self.config.seed)
@@ -358,8 +357,8 @@ class DepthMetrics:
 
     # Liquidity metrics
     liquidity_score: float = 0.0  # 0-100
-    bid_wall_price: Optional[float] = None
-    ask_wall_price: Optional[float] = None
+    bid_wall_price: float | None = None
+    ask_wall_price: float | None = None
 
     # Spread metrics
     spread_bps: float = 0.0
@@ -583,7 +582,7 @@ class MarketImpactCalculator:
     - Optimal execution timing
     """
 
-    def __init__(self, config: Optional[MarketImpactConfig] = None):
+    def __init__(self, config: MarketImpactConfig | None = None):
         """Initialize market impact calculator."""
         self.config = config or MarketImpactConfig()
 
@@ -804,7 +803,7 @@ class LiquidationCascadeSimulator:
     - Stop-loss hunting effects
     """
 
-    def __init__(self, config: Optional[CascadeConfig] = None):
+    def __init__(self, config: CascadeConfig | None = None):
         """Initialize cascade simulator."""
         self.config = config or CascadeConfig()
         self.rng = np.random.default_rng()
@@ -868,7 +867,7 @@ class LiquidationCascadeSimulator:
         self,
         trigger_price: float,
         is_downward: bool,
-        order_book: Optional[OrderBookSimulator] = None,
+        order_book: OrderBookSimulator | None = None,
     ) -> CascadeResult:
         """
         Simulate a liquidation cascade.

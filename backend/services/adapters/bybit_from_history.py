@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import requests
@@ -581,7 +581,7 @@ class BybitAdapter:
             try:
                 start_ms = int(raw[0])
                 parsed["open_time"] = start_ms
-                parsed["open_time_dt"] = datetime.fromtimestamp(start_ms / 1000.0, tz=timezone.utc)
+                parsed["open_time_dt"] = datetime.fromtimestamp(start_ms / 1000.0, tz=UTC)
             except Exception:
                 parsed["open_time"] = None
                 parsed["open_time_dt"] = None
@@ -640,7 +640,7 @@ class BybitAdapter:
 
             parsed["open_time"] = start_ms
             parsed["open_time_dt"] = (
-                datetime.fromtimestamp(start_ms / 1000.0, tz=timezone.utc) if start_ms is not None else None
+                datetime.fromtimestamp(start_ms / 1000.0, tz=UTC) if start_ms is not None else None
             )
 
             def get_str(*keys) -> str | None:
@@ -991,6 +991,6 @@ def _safe_float(val: str | None) -> float | None:
 
 def _to_dt(ms: int | None):
     try:
-        return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc) if ms is not None else None
+        return datetime.fromtimestamp(ms / 1000.0, tz=UTC) if ms is not None else None
     except Exception:
         return None

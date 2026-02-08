@@ -20,7 +20,7 @@ V3 оставлен для обратной совместимости.
 
 import time
 import warnings
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -150,8 +150,8 @@ class FallbackEngineV3(BaseBacktestEngine):
         dca_safety_order_size = getattr(input_data, "dca_safety_order_size", 0.1)
 
         # Рассчитать уровни DCA (SO1 at -1%, SO2 at -1% - 1.4% = -2.4%, etc.)
-        dca_levels: List[float] = []  # Cumulative deviation levels
-        dca_volumes: List[float] = []  # Volume for each SO
+        dca_levels: list[float] = []  # Cumulative deviation levels
+        dca_volumes: list[float] = []  # Volume for each SO
         if dca_enabled and dca_safety_orders > 0:
             cumulative_deviation = 0.0
             current_deviation = dca_price_deviation
@@ -165,12 +165,12 @@ class FallbackEngineV3(BaseBacktestEngine):
 
         # DCA состояние (pending safety orders)
         # Структура: {"direction": "long"/"short", "base_price": float, "filled": [bool, ...]}
-        dca_state: Optional[Dict] = None
+        dca_state: dict | None = None
 
         # Состояние
         cash = capital
         equity_curve = [capital]
-        trades: List[TradeRecord] = []
+        trades: list[TradeRecord] = []
 
         # Pending exits
         pending_long_exit = False
@@ -648,7 +648,7 @@ class FallbackEngineV3(BaseBacktestEngine):
         open_price: float,
         stop_loss: float,
         take_profit: float,
-    ) -> Optional[ExitReason]:
+    ) -> ExitReason | None:
         """Simple SL/TP check using OHLC heuristic"""
         if is_long:
             sl_price = entry_price * (1 - stop_loss) if stop_loss else 0
@@ -684,7 +684,7 @@ class FallbackEngineV3(BaseBacktestEngine):
 
         return None
 
-    def _build_bar_magnifier_index(self, candles: pd.DataFrame, candles_1m: pd.DataFrame) -> Optional[Dict]:
+    def _build_bar_magnifier_index(self, candles: pd.DataFrame, candles_1m: pd.DataFrame) -> dict | None:
         """Build index for Bar Magnifier"""
         if candles_1m is None or len(candles_1m) == 0:
             return None
@@ -692,8 +692,8 @@ class FallbackEngineV3(BaseBacktestEngine):
 
     def _calculate_metrics(
         self,
-        trades: List[TradeRecord],
-        equity_curve: List[float],
+        trades: list[TradeRecord],
+        equity_curve: list[float],
         initial_capital: float,
     ) -> BacktestMetrics:
         """Calculate backtest metrics"""
@@ -774,9 +774,9 @@ class FallbackEngineV3(BaseBacktestEngine):
     def optimize(
         self,
         input_data: BacktestInput,
-        param_ranges: Dict[str, List[Any]],
+        param_ranges: dict[str, list[Any]],
         metric: str = "sharpe_ratio",
         top_n: int = 10,
-    ) -> List[Tuple[Dict[str, Any], BacktestOutput]]:
+    ) -> list[tuple[dict[str, Any], BacktestOutput]]:
         """Optimization not implemented for V3"""
         return []

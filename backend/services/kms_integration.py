@@ -76,13 +76,13 @@ class KMSConfig:
 
     provider: KMSProvider
     region: str = "us-east-1"
-    endpoint: Optional[str] = None
-    master_key_id: Optional[str] = None
-    vault_url: Optional[str] = None
-    vault_token: Optional[str] = None
-    azure_tenant_id: Optional[str] = None
-    azure_client_id: Optional[str] = None
-    azure_client_secret: Optional[str] = None
+    endpoint: str | None = None
+    master_key_id: str | None = None
+    vault_url: str | None = None
+    vault_token: str | None = None
+    azure_tenant_id: str | None = None
+    azure_client_id: str | None = None
+    azure_client_secret: str | None = None
     cache_ttl_seconds: int = 300
     enable_audit_logging: bool = True
 
@@ -95,8 +95,8 @@ class KeyInfo:
     key_type: KeyType
     algorithm: KeyAlgorithm
     created_at: datetime
-    expires_at: Optional[datetime] = None
-    rotated_at: Optional[datetime] = None
+    expires_at: datetime | None = None
+    rotated_at: datetime | None = None
     version: int = 1
     is_enabled: bool = True
     metadata: dict = field(default_factory=dict)
@@ -110,10 +110,10 @@ class AuditLogEntry:
     timestamp: datetime
     action: AuditAction
     key_id: str
-    user_id: Optional[str] = None
-    ip_address: Optional[str] = None
+    user_id: str | None = None
+    ip_address: str | None = None
     success: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
     details: dict = field(default_factory=dict)
 
 
@@ -123,7 +123,7 @@ class CachedKey:
 
     key_id: str
     encrypted_value: bytes
-    decrypted_value: Optional[bytes] = None
+    decrypted_value: bytes | None = None
     cached_at: datetime = field(default_factory=datetime.now)
     ttl_seconds: int = 300
 
@@ -172,7 +172,7 @@ class KMSProviderBase(ABC):
         pass
 
     @abstractmethod
-    async def get_key_info(self, key_id: str) -> Optional[KeyInfo]:
+    async def get_key_info(self, key_id: str) -> KeyInfo | None:
         """Get information about a key."""
         pass
 
@@ -289,7 +289,7 @@ class AWSKMSProvider(KMSProviderBase):
         logger.info(f"AWS KMS: Rotated key {key_id} to version {key_info.version}")
         return key_info
 
-    async def get_key_info(self, key_id: str) -> Optional[KeyInfo]:
+    async def get_key_info(self, key_id: str) -> KeyInfo | None:
         """Get key information from AWS KMS."""
         return self._keys.get(key_id)
 
@@ -423,7 +423,7 @@ class AzureKeyVaultProvider(KMSProviderBase):
         logger.info(f"Azure Key Vault: Rotated key {key_id}")
         return key_info
 
-    async def get_key_info(self, key_id: str) -> Optional[KeyInfo]:
+    async def get_key_info(self, key_id: str) -> KeyInfo | None:
         """Get key information."""
         return self._keys.get(key_id)
 
@@ -553,7 +553,7 @@ class HashiCorpVaultProvider(KMSProviderBase):
         logger.info(f"HashiCorp Vault: Rotated key {key_id}")
         return key_info
 
-    async def get_key_info(self, key_id: str) -> Optional[KeyInfo]:
+    async def get_key_info(self, key_id: str) -> KeyInfo | None:
         """Get key information."""
         return self._keys.get(key_id)
 
@@ -601,7 +601,7 @@ class LocalHSMProvider(KMSProviderBase):
 
     def __init__(self, config: KMSConfig):
         super().__init__(config)
-        self._master_key: Optional[bytes] = None
+        self._master_key: bytes | None = None
         self._keys: dict[str, KeyInfo] = {}
         self._key_material: dict[str, bytes] = {}
         self._storage_path = Path("backend/config/local_hsm.json")
@@ -713,7 +713,7 @@ class LocalHSMProvider(KMSProviderBase):
         logger.info(f"Local HSM: Rotated key {key_id}")
         return key_info
 
-    async def get_key_info(self, key_id: str) -> Optional[KeyInfo]:
+    async def get_key_info(self, key_id: str) -> KeyInfo | None:
         """Get key information."""
         return self._keys.get(key_id)
 
@@ -739,7 +739,7 @@ class LocalHSMProvider(KMSProviderBase):
             return
 
         try:
-            with open(self._storage_path, "r") as f:
+            with open(self._storage_path) as f:
                 data = json.load(f)
 
             for key_id, info in data.get("keys", {}).items():
@@ -841,9 +841,9 @@ class KMSIntegrationService:
 
     _instance: Optional["KMSIntegrationService"] = None
 
-    def __init__(self, config: Optional[KMSConfig] = None):
+    def __init__(self, config: KMSConfig | None = None):
         self.config = config or self._default_config()
-        self._provider: Optional[KMSProviderBase] = None
+        self._provider: KMSProviderBase | None = None
         self._cache: dict[str, CachedKey] = {}
         self._audit_log: list[AuditLogEntry] = []
         self._initialized = False
@@ -918,8 +918,8 @@ class KMSIntegrationService:
         action: AuditAction,
         key_id: str,
         success: bool = True,
-        error_message: Optional[str] = None,
-        details: Optional[dict] = None,
+        error_message: str | None = None,
+        details: dict | None = None,
     ) -> None:
         """Log an audit entry."""
         if not self.config.enable_audit_logging:
@@ -948,7 +948,7 @@ class KMSIntegrationService:
         self,
         key_type: KeyType,
         algorithm: KeyAlgorithm = KeyAlgorithm.AES_256_GCM,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> KeyInfo:
         """Create a new key."""
         if not self._initialized:
@@ -1053,7 +1053,7 @@ class KMSIntegrationService:
             self._log_audit(AuditAction.KEY_ROTATE, key_id, False, str(e))
             raise
 
-    async def get_key_info(self, key_id: str) -> Optional[KeyInfo]:
+    async def get_key_info(self, key_id: str) -> KeyInfo | None:
         """Get key information."""
         if not self._initialized:
             await self.initialize()
@@ -1101,10 +1101,10 @@ class KMSIntegrationService:
 
     def get_audit_log(
         self,
-        key_id: Optional[str] = None,
-        action: Optional[AuditAction] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        key_id: str | None = None,
+        action: AuditAction | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 100,
     ) -> list[AuditLogEntry]:
         """Get audit log entries with optional filters."""

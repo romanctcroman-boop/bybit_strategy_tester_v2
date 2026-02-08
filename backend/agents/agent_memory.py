@@ -8,7 +8,7 @@ Provides storage and retrieval of agent interactions.
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +30,10 @@ class AgentMemoryManager:
         self.project_root = Path(project_root)
         self.memory_dir = self.project_root / "agent_memory"
         self.memory_dir.mkdir(exist_ok=True)
-        self.conversations: Dict[str, List[Dict[str, Any]]] = {}
+        self.conversations: dict[str, list[dict[str, Any]]] = {}
         logger.info(f"AgentMemoryManager initialized at {self.memory_dir}")
 
-    def store_message(self, conversation_id: str, message: Dict[str, Any]) -> None:
+    def store_message(self, conversation_id: str, message: dict[str, Any]) -> None:
         """
         Store a message in the conversation history.
 
@@ -47,7 +47,7 @@ class AgentMemoryManager:
         self.conversations[conversation_id].append(message)
         self._persist_conversation(conversation_id)
 
-    def get_conversation(self, conversation_id: str) -> List[Dict[str, Any]]:
+    def get_conversation(self, conversation_id: str) -> list[dict[str, Any]]:
         """
         Retrieve all messages in a conversation.
 
@@ -92,7 +92,7 @@ class AgentMemoryManager:
         except Exception as e:
             logger.warning(f"Failed to persist conversation {conversation_id}: {e}")
 
-    def _load_conversation(self, conversation_id: str) -> List[Dict[str, Any]]:
+    def _load_conversation(self, conversation_id: str) -> list[dict[str, Any]]:
         """
         Load conversation from disk.
 
@@ -139,7 +139,7 @@ class AgentMemory:
         self._context.append(message)
         self.manager.store_message(self.session_id, message)
 
-    def get_context(self) -> List[Dict[str, Any]]:
+    def get_context(self) -> list[dict[str, Any]]:
         """Get all context messages"""
         # Load from disk if not in memory
         if not self._context:
@@ -152,4 +152,4 @@ class AgentMemory:
         self.manager.clear_conversation(self.session_id)
 
 
-__all__ = ["AgentMemoryManager", "AgentMemory"]
+__all__ = ["AgentMemory", "AgentMemoryManager"]

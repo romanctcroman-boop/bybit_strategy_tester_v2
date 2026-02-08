@@ -21,14 +21,14 @@ from backend.backtesting.dca_strategies.dca_multi_tp import (
 )
 
 __all__ = [
-    "DCADirection",
     "DCADealState",
+    "DCADirection",
     "DCAMultiTPConfig",
     "DCAMultiTPStrategy",
-    "TPMode",
     "SLMode",
-    "create_dca_long_multi_tp",
-    "create_dca_short_multi_tp",
+    "TPMode",
     "create_dca_long_atr_tp_sl",
+    "create_dca_long_multi_tp",
     "create_dca_short_atr_tp_sl",
+    "create_dca_short_multi_tp",
 ]

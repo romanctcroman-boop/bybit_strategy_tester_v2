@@ -6,7 +6,7 @@ Pydantic schemas for backtest configuration, results, and metrics.
 
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -155,33 +155,68 @@ class BacktestConfig(BaseModel):
     )
 
     # Risk management
-    stop_loss: Optional[float] = Field(default=None, ge=0.001, le=0.5, description="Stop loss percentage (0.1% - 50%)")
-    take_profit: Optional[float] = Field(
+    stop_loss: float | None = Field(default=None, ge=0.001, le=0.5, description="Stop loss percentage (0.1% - 50%)")
+    take_profit: float | None = Field(
         default=None,
         ge=0.001,
         le=1.0,
         description="Take profit percentage (0.1% - 100%)",
     )
-    max_drawdown: Optional[float] = Field(default=None, ge=0.01, le=1.0, description="Max drawdown limit (1% - 100%)")
+    max_drawdown: float | None = Field(default=None, ge=0.01, le=1.0, description="Max drawdown limit (1% - 100%)")
 
     # Trailing Stop (TradingView compatible)
     # trail_points: активация трейлинга когда прибыль достигает этого значения (в % от цены)
     # trail_offset: отступ от максимальной прибыли для стоп-лосса (в % от цены)
-    trailing_stop_activation: Optional[float] = Field(
+    trailing_stop_activation: float | None = Field(
         default=None,
         ge=0.001,
         le=0.5,
         description="Trailing stop activation threshold (% from entry, like TradingView trail_points)",
     )
-    trailing_stop_offset: Optional[float] = Field(
+    trailing_stop_offset: float | None = Field(
         default=None,
         ge=0.001,
         le=0.2,
         description="Trailing stop offset from peak (% from price, like TradingView trail_offset)",
     )
 
+    # ===== Breakeven Stop (Strategy Builder: Static SL/TP block) =====
+    # After TP is hit, SL moves to breakeven (average entry price + offset)
+    breakeven_enabled: bool = Field(
+        default=False,
+        description="Enable breakeven stop — move SL to entry price after TP trigger",
+    )
+    breakeven_activation_pct: float = Field(
+        default=0.005,
+        ge=0.0,
+        le=0.5,
+        description="Activate breakeven when price moves this % in profit (decimal, 0.005 = 0.5%)",
+    )
+    breakeven_offset: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=0.1,
+        description="Offset from entry price for breakeven SL (decimal, 0.001 = +0.1%)",
+    )
+
+    # ===== Close Only in Profit (Strategy Builder: Static SL/TP block) =====
+    close_only_in_profit: bool = Field(
+        default=False,
+        description="Only close position via signal if trade is in profit. "
+        "SL/TP exits still work regardless. Prevents closing losing positions on signal.",
+    )
+
+    # ===== SL Type (Strategy Builder: Static SL/TP block) =====
+    # Controls which price is used as reference for Stop Loss calculation:
+    #   average_price — SL is calculated from average entry price (default, standard for DCA)
+    #   last_order    — SL is calculated from the last entry/DCA order price
+    sl_type: str = Field(
+        default="average_price",
+        description="Stop loss reference price type: 'average_price' (default) or 'last_order'",
+    )
+
     # Partial exit (TradingView qty_percent)
-    partial_exit_percent: Optional[float] = Field(
+    partial_exit_percent: float | None = Field(
         default=None,
         ge=0.1,
         le=0.99,
@@ -189,13 +224,13 @@ class BacktestConfig(BaseModel):
     )
 
     # Limit/Stop entry orders (TradingView strategy.entry limit/stop)
-    entry_limit_offset: Optional[float] = Field(
+    entry_limit_offset: float | None = Field(
         default=None,
         ge=0.001,
         le=0.1,
         description="Limit order offset from signal price (% below for long, above for short)",
     )
-    entry_stop_offset: Optional[float] = Field(
+    entry_stop_offset: float | None = Field(
         default=None,
         ge=0.001,
         le=0.1,
@@ -256,19 +291,19 @@ class BacktestConfig(BaseModel):
 
     # ===== NEW: Trailing Stop Enhanced (TradingView compatible) =====
     # trail_price: absolute price at which trailing activates
-    trail_price: Optional[float] = Field(
+    trail_price: float | None = Field(
         default=None,
         ge=0.0,
         description="Trailing stop activation price (absolute value)",
     )
     # trail_points: ticks from entry for activation
-    trail_points: Optional[int] = Field(
+    trail_points: int | None = Field(
         default=None,
         ge=0,
         description="Trailing stop activation in ticks from entry",
     )
     # trail_offset: offset from peak in ticks
-    trail_offset: Optional[int] = Field(
+    trail_offset: int | None = Field(
         default=None,
         ge=0,
         description="Trailing stop offset from peak (in ticks)",
@@ -316,7 +351,7 @@ class BacktestConfig(BaseModel):
         default=True,  # Enabled by default for precise SL/TP detection
         description="Use lower timeframe data for precise order fills (TradingView Premium)",
     )
-    bar_magnifier_timeframe: Optional[str] = Field(
+    bar_magnifier_timeframe: str | None = Field(
         default=None,
         description="Lower timeframe for bar magnifier (e.g., '1m' for 15m chart). Auto-selected if None.",
     )
@@ -527,6 +562,21 @@ class BacktestConfig(BaseModel):
         ge=0.0,
         le=100.0,
         description="TP4 - percentage of position to close (0-100%).",
+    )
+
+    # ===== DCA MANUAL GRID (Custom Orders) =====
+    # Allows defining custom grid levels with specific offsets and volumes
+    # Format: [{"offset": 0.5, "volume": 25}, {"offset": 1.0, "volume": 30}, ...]
+    dca_custom_orders: list | None = Field(
+        default=None,
+        description="Custom grid orders list. Each order has 'offset' (% from entry) and 'volume' (% of deposit). "
+        "When provided, overrides dca_order_count and dca_grid_size_percent.",
+    )
+    dca_grid_trailing_percent: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=50.0,
+        description="Grid trailing percentage. When > 0, grid levels trail the price movement.",
     )
 
     # ===== ENGINE SELECTION =====
@@ -1079,8 +1129,8 @@ class AnalysisWarningModel(BaseModel):
     code: str  # e.g., "LOOKAHEAD_001"
     level: str  # "info", "warning", "error", "critical"
     message: str
-    line_number: Optional[int] = None
-    suggestion: Optional[str] = None
+    line_number: int | None = None
+    suggestion: str | None = None
 
 
 class StaticAnalysisResult(BaseModel):
@@ -1114,23 +1164,23 @@ class BacktestResult(BaseModel):
     id: str
     status: BacktestStatus
     created_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
     # Configuration (copy for record)
     config: BacktestConfig
 
     # Results
-    metrics: Optional[PerformanceMetrics] = None
+    metrics: PerformanceMetrics | None = None
     trades: list[TradeRecord] = Field(default_factory=list)
-    equity_curve: Optional[EquityCurve] = None
+    equity_curve: EquityCurve | None = None
 
     # Final state
-    final_equity: Optional[float] = None
-    final_pnl: Optional[float] = None
-    final_pnl_pct: Optional[float] = None
+    final_equity: float | None = None
+    final_pnl: float | None = None
+    final_pnl_pct: float | None = None
 
     # ===== STATIC ANALYSIS FLAGS (TradingView compatible) =====
-    static_analysis: Optional[StaticAnalysisResult] = Field(
+    static_analysis: StaticAnalysisResult | None = Field(
         default=None,
         description="Static analysis result with lookahead/repaint detection",
     )
@@ -1149,7 +1199,7 @@ class BacktestResult(BaseModel):
     )
 
     # Errors
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 class BacktestCreateRequest(BaseModel):
@@ -1171,8 +1221,8 @@ class BacktestCreateRequest(BaseModel):
     position_size: float = Field(default=1.0, ge=0.01, le=1.0)
     leverage: float = Field(default=1.0, ge=1.0, le=125.0)  # Bybit max leverage
     direction: str = Field(default="long", description="Trading direction: 'long', 'short', or 'both'")
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    stop_loss: float | None = None
+    take_profit: float | None = None
     save_to_db: bool = Field(default=True, description="Save backtest result to database")
 
 

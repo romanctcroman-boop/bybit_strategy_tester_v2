@@ -13,7 +13,6 @@ import json
 import logging
 from collections import deque
 from dataclasses import dataclass
-from typing import Optional
 
 import redis.asyncio as redis
 
@@ -90,7 +89,7 @@ class TickAggregator:
         self._current_buy_vol = 0.0
         self._current_sell_vol = 0.0
 
-    def add_trade(self, trade: Trade) -> Optional[TickCandle]:
+    def add_trade(self, trade: Trade) -> TickCandle | None:
         """Add trade and return candle if complete."""
         self.current_trades.append(trade)
 
@@ -136,7 +135,7 @@ class TickAggregator:
             trade_count=len(self.current_trades),
         )
 
-    def get_current_candle_progress(self) -> Optional[dict]:
+    def get_current_candle_progress(self) -> dict | None:
         """Get current incomplete candle for progress tracking."""
         if not self.current_trades:
             return None
@@ -174,13 +173,13 @@ class TickAggregatorService:
         self.ticks_per_bar = ticks_per_bar
         self.redis_url = redis_url
 
-        self.redis_client: Optional[redis.Redis] = None
-        self.pubsub: Optional[redis.client.PubSub] = None
+        self.redis_client: redis.Redis | None = None
+        self.pubsub: redis.client.PubSub | None = None
 
         self.aggregator = TickAggregator(ticks_per_bar)
 
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
         # Stats
         self._stats = {

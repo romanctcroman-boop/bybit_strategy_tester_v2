@@ -13,9 +13,9 @@ Features:
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .builder import (
     BlockType,
@@ -60,11 +60,11 @@ class GeneratedStrategy:
     version: str
     generated_at: datetime
     source_graph_id: str
-    dependencies: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "code": self.code,
@@ -94,7 +94,7 @@ class CodeGenerator:
     """
 
     def __init__(self):
-        self.templates: Dict[CodeTemplate, str] = {
+        self.templates: dict[CodeTemplate, str] = {
             CodeTemplate.BASIC: TEMPLATE_BASIC,
             CodeTemplate.BACKTEST: TEMPLATE_BACKTEST,
             CodeTemplate.LIVE: TEMPLATE_LIVE,
@@ -102,7 +102,7 @@ class CodeGenerator:
         }
 
         # Block type to code mapping
-        self.block_generators: Dict[BlockType, callable] = {
+        self.block_generators: dict[BlockType, callable] = {
             BlockType.CANDLE_DATA: self._gen_candle_data,
             BlockType.INDICATOR_RSI: self._gen_rsi,
             BlockType.INDICATOR_MACD: self._gen_macd,
@@ -128,9 +128,7 @@ class CodeGenerator:
             BlockType.OUTPUT_SIGNAL: self._gen_output,
         }
 
-    def generate(
-        self, graph: StrategyGraph, options: Optional[GenerationOptions] = None
-    ) -> GeneratedStrategy:
+    def generate(self, graph: StrategyGraph, options: GenerationOptions | None = None) -> GeneratedStrategy:
         """
         Generate Python code from strategy graph
 
@@ -142,8 +140,8 @@ class CodeGenerator:
             GeneratedStrategy with code and metadata
         """
         options = options or GenerationOptions()
-        errors: List[str] = []
-        warnings: List[str] = []
+        errors: list[str] = []
+        warnings: list[str] = []
 
         # Validate graph first
         validation_errors = self._validate_graph(graph)
@@ -154,7 +152,7 @@ class CodeGenerator:
                 strategy_name=graph.name,
                 strategy_id=graph.id,
                 version="1.0",
-                generated_at=datetime.now(timezone.utc),
+                generated_at=datetime.now(UTC),
                 source_graph_id=graph.id,
                 errors=errors,
             )
@@ -175,9 +173,7 @@ class CodeGenerator:
                 if not block.enabled:
                     continue
 
-                code, var_name = self._generate_block_code(
-                    block, connections, variables, options
-                )
+                code, var_name = self._generate_block_code(block, connections, variables, options)
                 block_code[block_id] = code
                 variables[block_id] = var_name
 
@@ -192,7 +188,7 @@ class CodeGenerator:
                 strategy_name=self._sanitize_name(graph.name),
                 strategy_id=graph.id,
                 version=graph.version,
-                generated_at=datetime.now(timezone.utc),
+                generated_at=datetime.now(UTC),
                 source_graph_id=graph.id,
                 dependencies=dependencies,
                 warnings=warnings,
@@ -206,12 +202,12 @@ class CodeGenerator:
                 strategy_name=graph.name,
                 strategy_id=graph.id,
                 version="1.0",
-                generated_at=datetime.now(timezone.utc),
+                generated_at=datetime.now(UTC),
                 source_graph_id=graph.id,
                 errors=errors,
             )
 
-    def _validate_graph(self, graph: StrategyGraph) -> List[str]:
+    def _validate_graph(self, graph: StrategyGraph) -> list[str]:
         """Validate graph before generation"""
         errors = []
 
@@ -220,17 +216,13 @@ class CodeGenerator:
             return errors
 
         # Check for data source
-        has_data = any(
-            b.block_type in [BlockType.CANDLE_DATA, BlockType.ORDERBOOK_DATA]
-            for b in graph.blocks.values()
-        )
+        has_data = any(b.block_type in [BlockType.CANDLE_DATA, BlockType.ORDERBOOK_DATA] for b in graph.blocks.values())
         if not has_data:
             errors.append("Strategy needs a data source")
 
         # Check for action/output
         has_action = any(
-            b.block_type
-            in [BlockType.ACTION_BUY, BlockType.ACTION_SELL, BlockType.OUTPUT_SIGNAL]
+            b.block_type in [BlockType.ACTION_BUY, BlockType.ACTION_SELL, BlockType.OUTPUT_SIGNAL]
             for b in graph.blocks.values()
         )
         if not has_action:
@@ -238,16 +230,14 @@ class CodeGenerator:
 
         return errors
 
-    def _build_connection_map(
-        self, graph: StrategyGraph
-    ) -> Dict[str, Dict[str, tuple]]:
+    def _build_connection_map(self, graph: StrategyGraph) -> dict[str, dict[str, tuple]]:
         """
         Build a map of connections for quick lookup
 
         Returns:
             {target_block_id: {input_name: (source_block_id, output_name)}}
         """
-        connections: Dict[str, Dict[str, tuple]] = {}
+        connections: dict[str, dict[str, tuple]] = {}
 
         for conn in graph.connections:
             if conn.target_block_id not in connections:
@@ -263,8 +253,8 @@ class CodeGenerator:
     def _generate_block_code(
         self,
         block: StrategyBlock,
-        connections: Dict[str, Dict[str, tuple]],
-        variables: Dict[str, str],
+        connections: dict[str, dict[str, tuple]],
+        variables: dict[str, str],
         options: GenerationOptions,
     ) -> tuple:
         """
@@ -309,8 +299,8 @@ class CodeGenerator:
     def _assemble_strategy(
         self,
         graph: StrategyGraph,
-        block_code: Dict[str, str],
-        variables: Dict[str, str],
+        block_code: dict[str, str],
+        variables: dict[str, str],
         options: GenerationOptions,
     ) -> str:
         """Assemble all block code into a complete strategy"""
@@ -378,9 +368,7 @@ class CodeGenerator:
         for block in graph.blocks.values():
             for param_name, param_value in block.parameters.items():
                 var_name = self._make_var_name(block)
-                lines.append(
-                    f"{indent}self.{var_name}_{param_name} = {repr(param_value)}"
-                )
+                lines.append(f"{indent}self.{var_name}_{param_name} = {param_value!r}")
 
         return "\n".join(lines)
 
@@ -391,20 +379,18 @@ class CodeGenerator:
         for block in graph.blocks.values():
             for param_name, param_value in block.parameters.items():
                 var_name = self._make_var_name(block)
-                params.append(
-                    f'        "{var_name}_{param_name}": {repr(param_value)},'
-                )
+                params.append(f'        "{var_name}_{param_name}": {param_value!r},')
 
         return "\n".join(params) if params else "        # No parameters"
 
     def _build_signal_extraction(
         self,
         graph: StrategyGraph,
-        variables: Dict[str, str],
+        variables: dict[str, str],
         options: GenerationOptions,
     ) -> str:
         """Build signal extraction code
-        
+
         For Strategy Builder graphs, we need to extract signals from connections
         to the main strategy node (entry_long, exit_long, entry_short, exit_short).
         The generated code processes data vectorized, so we iterate through bars
@@ -429,13 +415,9 @@ class CodeGenerator:
                 if block.block_type in [BlockType.ACTION_BUY, BlockType.ACTION_SELL]:
                     var_name = variables.get(block_id)
                     if var_name:
-                        action = (
-                            "buy" if block.block_type == BlockType.ACTION_BUY else "sell"
-                        )
+                        action = "buy" if block.block_type == BlockType.ACTION_BUY else "sell"
                         lines.append(f'{indent}if {var_name}.get("signal"):')
-                        lines.append(
-                            f'{indent}    signals.append({{"action": "{action}", "block": "{block.name}"}})'
-                        )
+                        lines.append(f'{indent}    signals.append({{"action": "{action}", "block": "{block.name}"}})')
         else:
             # New style: extract signals from connections to main node
             # Find connections to main node ports
@@ -463,22 +445,30 @@ class CodeGenerator:
             lines.append(f"{indent}# Extract signals bar by bar")
             lines.append(f"{indent}n = len(candles['close'])")
             lines.append(f"{indent}for i in range(n):")
-            
+
             if entry_long_var:
                 # Check if signal is True at bar i
-                lines.append(f'{indent}    if i < len({entry_long_var}.get("result", [])) and {entry_long_var}.get("result", [False])[i]:')
+                lines.append(
+                    f'{indent}    if i < len({entry_long_var}.get("result", [])) and {entry_long_var}.get("result", [False])[i]:'
+                )
                 lines.append(f'{indent}        signals.append({{"action": "buy", "index": i}})')
-            
+
             if exit_long_var:
-                lines.append(f'{indent}    if i < len({exit_long_var}.get("result", [])) and {exit_long_var}.get("result", [False])[i]:')
+                lines.append(
+                    f'{indent}    if i < len({exit_long_var}.get("result", [])) and {exit_long_var}.get("result", [False])[i]:'
+                )
                 lines.append(f'{indent}        signals.append({{"action": "sell", "index": i}})')
-            
+
             if entry_short_var:
-                lines.append(f'{indent}    if i < len({entry_short_var}.get("result", [])) and {entry_short_var}.get("result", [False])[i]:')
+                lines.append(
+                    f'{indent}    if i < len({entry_short_var}.get("result", [])) and {entry_short_var}.get("result", [False])[i]:'
+                )
                 lines.append(f'{indent}        signals.append({{"action": "short", "index": i}})')
-            
+
             if exit_short_var:
-                lines.append(f'{indent}    if i < len({exit_short_var}.get("result", [])) and {exit_short_var}.get("result", [False])[i]:')
+                lines.append(
+                    f'{indent}    if i < len({exit_short_var}.get("result", [])) and {exit_short_var}.get("result", [False])[i]:'
+                )
                 lines.append(f'{indent}        signals.append({{"action": "close", "index": i}})')
 
         if not lines:
@@ -486,9 +476,7 @@ class CodeGenerator:
 
         return "\n".join(lines)
 
-    def _get_dependencies(
-        self, graph: StrategyGraph, options: GenerationOptions
-    ) -> List[str]:
+    def _get_dependencies(self, graph: StrategyGraph, options: GenerationOptions) -> list[str]:
         """Get list of required dependencies"""
         deps = ["numpy"]
 
@@ -499,12 +487,19 @@ class CodeGenerator:
 
     # === Block Code Generators ===
 
-    def _gen_candle_data(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
-        """Generate candle data block code"""
+    def _gen_candle_data(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
+        """Generate candle data block code (also handles constant blocks)"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
+
+        # Check if this is a constant value block
+        const_value = block.parameters.get("value")
+        if const_value is not None:
+            code = f"""
+{indent}# Constant: {block.name}
+{indent}{var_name} = {{'value': np.full(len(candles['close']), {const_value!r}, dtype=float)}}
+"""
+            return code, var_name
 
         code = f"""
 {indent}# Candle Data: {block.name}
@@ -514,44 +509,43 @@ class CodeGenerator:
 {indent}    'low': candles['low'],
 {indent}    'close': candles['close'],
 {indent}    'volume': candles['volume'],
+{indent}    'value': candles['close'],
 {indent}}}
 """
         return code, var_name
 
-    def _gen_rsi(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
-        """Generate RSI indicator code"""
+    def _gen_rsi(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
+        """Generate RSI indicator code using SMA rolling window (matches vectorbt default)"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
         period = block.parameters.get("period", 14)
         source = inputs.get("source", "candles['close']")
 
         code = f"""
-{indent}# RSI: {block.name}
+{indent}# RSI (SMA rolling window): {block.name}
 {indent}def calc_rsi_{var_name}(source, period={period}):
-{indent}    delta = np.diff(source, prepend=source[0])
-{indent}    gains = np.where(delta > 0, delta, 0)
-{indent}    losses = np.where(delta < 0, -delta, 0)
-{indent}    alpha = 1 / period
-{indent}    avg_gain = np.zeros_like(source, dtype=float)
-{indent}    avg_loss = np.zeros_like(source, dtype=float)
-{indent}    avg_gain[period] = np.mean(gains[1:period + 1])
-{indent}    avg_loss[period] = np.mean(losses[1:period + 1])
-{indent}    for i in range(period + 1, len(source)):
-{indent}        avg_gain[i] = alpha * gains[i] + (1 - alpha) * avg_gain[i - 1]
-{indent}        avg_loss[i] = alpha * losses[i] + (1 - alpha) * avg_loss[i - 1]
-{indent}    rs = avg_gain / (avg_loss + 1e-10)
-{indent}    rsi = 100 - (100 / (1 + rs))
-{indent}    rsi[:period] = np.nan
+{indent}    n = len(source)
+{indent}    rsi = np.full(n, np.nan)
+{indent}    if n < period + 1:
+{indent}        return rsi
+{indent}    deltas = np.diff(source)
+{indent}    gains = np.where(deltas > 0, deltas, 0.0)
+{indent}    losses = np.where(deltas < 0, -deltas, 0.0)
+{indent}    for i in range(period - 1, len(deltas)):
+{indent}        avg_gain = np.mean(gains[i - period + 1:i + 1])
+{indent}        avg_loss = np.mean(losses[i - period + 1:i + 1])
+{indent}        if avg_loss < 1e-10:
+{indent}            rsi[i + 1] = 100.0
+{indent}        else:
+{indent}            rs = avg_gain / avg_loss
+{indent}            rsi[i + 1] = 100.0 - (100.0 / (1.0 + rs))
 {indent}    return rsi
-{indent}{var_name} = {{'rsi': calc_rsi_{var_name}({source})}}
+{indent}_rsi_result_{var_name} = calc_rsi_{var_name}({source})
+{indent}{var_name} = {{'rsi': _rsi_result_{var_name}, 'value': _rsi_result_{var_name}}}
 """
         return code, var_name
 
-    def _gen_macd(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_macd(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate MACD indicator code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -582,9 +576,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_bollinger(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_bollinger(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate Bollinger Bands code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -608,9 +600,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_ema(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_ema(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate EMA code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -630,9 +620,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_sma(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_sma(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate SMA code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -647,9 +635,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_atr(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_atr(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate ATR code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -681,9 +667,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_stochastic(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_stochastic(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate Stochastic code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -703,9 +687,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_custom_indicator(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_custom_indicator(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate custom indicator code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -719,15 +701,14 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_compare(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_compare(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate comparison condition code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
         operator = block.parameters.get("operator", ">")
-        left = inputs.get("left", "0")
-        right = inputs.get("right", "0")
+        # Support both "left"/"right" and "a"/"b" port naming conventions
+        left = inputs.get("left") or inputs.get("a", "0")
+        right = inputs.get("right") or inputs.get("b", "0")
 
         code = f"""
 {indent}# Compare: {block.name}
@@ -735,9 +716,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_cross(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_cross(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate crossover condition code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -757,9 +736,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_threshold(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_threshold(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate threshold condition code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -776,9 +753,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_and(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_and(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate AND condition code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -791,9 +766,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_or(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_or(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate OR condition code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -806,9 +779,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_not(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_not(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate NOT condition code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -820,9 +791,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_buy(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_buy(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate buy action code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -841,9 +810,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_sell(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_sell(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate sell action code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -862,9 +829,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_stop_loss(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_stop_loss(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate stop loss code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -881,9 +846,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_take_profit(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_take_profit(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate take profit code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -900,9 +863,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_time_filter(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_time_filter(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate time filter code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -919,9 +880,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_volume_filter(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_volume_filter(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate volume filter code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -940,9 +899,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_position_size(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_position_size(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate position sizing code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2
@@ -961,9 +918,7 @@ class CodeGenerator:
 """
         return code, var_name
 
-    def _gen_output(
-        self, block: StrategyBlock, inputs: Dict[str, str], options: GenerationOptions
-    ) -> tuple:
+    def _gen_output(self, block: StrategyBlock, inputs: dict[str, str], options: GenerationOptions) -> tuple:
         """Generate output block code"""
         var_name = self._make_var_name(block)
         indent = options.indent * 2

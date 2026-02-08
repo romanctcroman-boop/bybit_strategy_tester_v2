@@ -8,7 +8,6 @@ Strategies that trade price breakouts:
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from backend.services.live_trading.strategy_runner import (
     SignalType,
@@ -154,10 +153,10 @@ class ATRBreakoutStrategy(LibraryStrategy):
         super().__init__(config, **params)
 
         self._in_position: str = ""
-        self._prev_breakout_level_up: Optional[float] = None
-        self._prev_breakout_level_down: Optional[float] = None
+        self._prev_breakout_level_up: float | None = None
+        self._prev_breakout_level_down: float | None = None
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate breakout signals."""
         self.add_candle(candle)
 
@@ -374,7 +373,7 @@ class DonchianBreakoutStrategy(LibraryStrategy):
         super().__init__(config, **params)
 
         self._in_position: str = ""
-        self._entry_price: Optional[float] = None
+        self._entry_price: float | None = None
 
     def _donchian_channel(self, period: int) -> tuple[float, float]:
         """Calculate Donchian channel (highest high, lowest low)."""
@@ -386,7 +385,7 @@ class DonchianBreakoutStrategy(LibraryStrategy):
 
         return (max(highs), min(lows))
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate Donchian breakout signals."""
         self.add_candle(candle)
 

@@ -32,13 +32,13 @@ from .regime_detection import (
 )
 
 __all__ = [
+    "HMM_AVAILABLE",
     "AlertChannel",
     "AlertSeverity",
     "DriftAlertConfig",
     "DriftAlertManager",
     "EnhancedDriftAlert",
     "GMMRegimeDetector",
-    "HMM_AVAILABLE",
     "HMMRegimeDetector",
     "IntegratedDriftMonitor",
     "KMeansRegimeDetector",

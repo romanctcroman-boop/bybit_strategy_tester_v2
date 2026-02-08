@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Cost Alert Notification System
 

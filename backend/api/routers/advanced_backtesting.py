@@ -13,7 +13,7 @@ Usage:
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -526,7 +526,7 @@ async def analyze_backtest_endpoint(
             trade_analysis=report.get("trade_analysis", {}),
             performance_attribution=report.get("performance_attribution", {}),
             drawdown_analysis=report.get("drawdown_analysis", {}),
-            generated_at=report.get("generated_at", datetime.now(timezone.utc).isoformat()),
+            generated_at=report.get("generated_at", datetime.now(UTC).isoformat()),
         )
 
     except Exception as e:
@@ -560,7 +560,7 @@ async def calculate_metrics_endpoint(
             rolling=result.get("rolling", {}),
             trade_metrics=result.get("trade_metrics", {}),
             benchmark_comparison=result.get("benchmark_comparison"),
-            calculated_at=result.get("calculated_at", datetime.now(timezone.utc).isoformat()),
+            calculated_at=result.get("calculated_at", datetime.now(UTC).isoformat()),
         )
 
     except Exception as e:
@@ -747,5 +747,5 @@ async def health_check() -> dict[str, str]:
     return {
         "status": "healthy",
         "service": "advanced-backtesting",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }

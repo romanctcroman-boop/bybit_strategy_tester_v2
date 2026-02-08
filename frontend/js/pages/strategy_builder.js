@@ -8,19 +8,17 @@
  * @date 2025-12-21
  */
 
+/* eslint-disable indent */
+
 // Import shared utilities
-import { apiClient, API_CONFIG } from '../api.js';
-import {
-  formatNumber,
-  formatCurrency,
-  formatDate,
-  debounce
-} from '../utils.js';
-import { getFreshnessIcon, getFreshnessText } from './strategies/utils.js';
+import { formatCurrency, formatDate, debounce } from '../utils.js';
 import { updateLeverageRiskForElements } from './strategies/leverageManager.js';
 
 // Import WebSocket validation module
 import * as wsValidation from './strategy_builder_ws.js';
+
+// API Base URL - must be defined early before any usage
+const API_BASE = '/api/v1';
 
 // Forward declaration for checkSymbolDataForProperties (initialized later after runCheckSymbolDataForProperties is defined)
 let checkSymbolDataForProperties = null;
@@ -42,12 +40,57 @@ function hideGlobalLoading() {
   }
 }
 
-function updateGlobalLoadingText(text) {
+function _updateGlobalLoadingText(text) {
   const indicator = document.getElementById('globalLoadingIndicator');
   if (indicator) {
     const textEl = indicator.querySelector('.loading-text');
     if (textEl) textEl.textContent = text;
   }
+}
+
+/**
+ * Add mouse wheel scroll support to number inputs
+ * @param {HTMLInputElement} input - The number input element
+ * @param {Function} [onChangeCallback] - Optional callback after value change
+ */
+function addWheelScrollToInput(input, onChangeCallback = null) {
+  if (!input || input.type !== 'number' || input.dataset.wheelEnabled) return;
+
+  input.dataset.wheelEnabled = 'true';
+  input.addEventListener('wheel', (e) => {
+    if (input.disabled) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const step = parseFloat(input.step) || 1;
+    const min = parseFloat(input.min);
+    const max = parseFloat(input.max);
+    const delta = e.deltaY < 0 ? step : -step;
+
+    let newValue = (parseFloat(input.value) || 0) + delta;
+    if (!isNaN(min)) newValue = Math.max(min, newValue);
+    if (!isNaN(max)) newValue = Math.min(max, newValue);
+
+    // Round to step precision
+    const decimals = (step.toString().split('.')[1] || '').length;
+    input.value = newValue.toFixed(decimals);
+
+    // Trigger change event
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (onChangeCallback) onChangeCallback(input);
+  }, { passive: false });
+}
+
+/**
+ * Add wheel scroll to all number inputs within a container
+ * @param {HTMLElement} container - Container element to search within
+ */
+function enableWheelScrollForNumberInputs(container) {
+  if (!container) return;
+  container.querySelectorAll('input[type="number"]').forEach(input => {
+    addWheelScrollToInput(input);
+  });
 }
 
 // Block Library Data
@@ -278,16 +321,10 @@ const blockLibrary = {
   // NEW CATEGORY: Close Conditions (Exit Rules)
   exits: [
     {
-      id: 'tp_percent',
-      name: 'Take Profit %',
-      desc: 'Exit at % profit',
-      icon: 'trophy'
-    },
-    {
-      id: 'sl_percent',
-      name: 'Stop Loss %',
-      desc: 'Exit at % loss',
-      icon: 'shield-x'
+      id: 'static_sltp',
+      name: 'Static SL/TP',
+      desc: 'Fixed % Stop Loss & Take Profit with breakeven',
+      icon: 'shield-check'
     },
     {
       id: 'trailing_stop_exit',
@@ -429,15 +466,9 @@ const blockLibrary = {
       icon: 'grid-3x3'
     },
     {
-      id: 'pyramiding',
-      name: 'Pyramiding',
-      desc: 'Add to winning position',
-      icon: 'triangle'
-    },
-    {
       id: 'grid_orders',
-      name: 'Grid Orders',
-      desc: 'Grid of entry orders',
+      name: 'Manual Grid',
+      desc: 'Custom offset & volume per order',
       icon: 'grid'
     },
     {
@@ -463,18 +494,6 @@ const blockLibrary = {
       name: 'Anti-Martingale',
       desc: 'Increase size after win',
       icon: 'arrow-down-left-circle'
-    },
-    {
-      id: 'dca_by_signal',
-      name: 'DCA by Signal',
-      desc: 'Add on repeated signal',
-      icon: 'plus-circle'
-    },
-    {
-      id: 'dca_by_percent',
-      name: 'DCA by % Drop',
-      desc: 'Add when price drops %',
-      icon: 'percent'
     },
     {
       id: 'scale_in',
@@ -718,45 +737,6 @@ const blockLibrary = {
       icon: 'table'
     }
   ],
-  // NEW CATEGORY: DCA Grid (from TradingView Multi DCA Strategy)
-  dca_grid: [
-    {
-      id: 'dca_grid_enable',
-      name: 'DCA Grid Mode',
-      desc: 'Enable DCA grid trading with multiple orders',
-      icon: 'grid-3x3-gap'
-    },
-    {
-      id: 'dca_grid_settings',
-      name: 'Grid Settings',
-      desc: 'Configure grid size, order count, leverage',
-      icon: 'sliders'
-    },
-    {
-      id: 'dca_martingale_config',
-      name: 'Martingale Config',
-      desc: 'Order size multiplier (1.0-1.8)',
-      icon: 'arrow-up-right-circle'
-    },
-    {
-      id: 'dca_log_steps',
-      name: 'Logarithmic Steps',
-      desc: 'Order step progression (0.8-1.4)',
-      icon: 'bar-chart-steps'
-    },
-    {
-      id: 'dca_dynamic_tp',
-      name: 'Dynamic TP',
-      desc: 'Adjust TP when many orders active',
-      icon: 'bullseye'
-    },
-    {
-      id: 'dca_safety_close',
-      name: 'Safety Close',
-      desc: 'Close all on max drawdown',
-      icon: 'shield-x'
-    }
-  ],
   // NEW CATEGORY: Multiple Take Profits
   multiple_tp: [
     {
@@ -788,27 +768,6 @@ const blockLibrary = {
       name: 'TP4 Level',
       desc: 'Final take profit (close all)',
       icon: 'award-fill'
-    }
-  ],
-  // NEW CATEGORY: ATR-based Exit
-  atr_exit: [
-    {
-      id: 'atr_sl',
-      name: 'ATR Stop Loss',
-      desc: 'Stop loss based on ATR multiplier',
-      icon: 'shield-exclamation'
-    },
-    {
-      id: 'atr_tp',
-      name: 'ATR Take Profit',
-      desc: 'Take profit based on ATR multiplier',
-      icon: 'bullseye'
-    },
-    {
-      id: 'atr_wicks_mode',
-      name: 'ATR Wicks Mode',
-      desc: 'Consider wicks or only close price',
-      icon: 'candle'
     }
   ],
   // NEW CATEGORY: Signal Memory
@@ -977,6 +936,181 @@ const blockLibrary = {
       name: 'MFI Divergence',
       desc: 'Detect Money Flow Index divergence',
       icon: 'currency-exchange'
+    }
+  ],
+
+  // ============================================
+  // SMART SIGNALS - Composite nodes that combine
+  // indicator + condition in one block
+  // ============================================
+  smart_signals: [
+    // RSI-based signals
+    {
+      id: 'rsi_overbought_signal',
+      name: 'RSI Overbought',
+      desc: 'Signal when RSI > 70 (configurable)',
+      icon: 'graph-up',
+      composite: { indicator: 'rsi', condition: 'greater_than', defaultThreshold: 70 }
+    },
+    {
+      id: 'rsi_oversold_signal',
+      name: 'RSI Oversold',
+      desc: 'Signal when RSI < 30 (configurable)',
+      icon: 'graph-down',
+      composite: { indicator: 'rsi', condition: 'less_than', defaultThreshold: 30 }
+    },
+    {
+      id: 'rsi_cross_up_signal',
+      name: 'RSI Cross Up 50',
+      desc: 'Signal when RSI crosses above 50',
+      icon: 'arrow-up-circle',
+      composite: { indicator: 'rsi', condition: 'crossover', defaultThreshold: 50 }
+    },
+    {
+      id: 'rsi_cross_down_signal',
+      name: 'RSI Cross Down 50',
+      desc: 'Signal when RSI crosses below 50',
+      icon: 'arrow-down-circle',
+      composite: { indicator: 'rsi', condition: 'crossunder', defaultThreshold: 50 }
+    },
+    // Stochastic-based signals
+    {
+      id: 'stoch_overbought_signal',
+      name: 'Stoch Overbought',
+      desc: 'Signal when Stoch %K > 80',
+      icon: 'percent',
+      composite: { indicator: 'stochastic', condition: 'greater_than', defaultThreshold: 80 }
+    },
+    {
+      id: 'stoch_oversold_signal',
+      name: 'Stoch Oversold',
+      desc: 'Signal when Stoch %K < 20',
+      icon: 'percent',
+      composite: { indicator: 'stochastic', condition: 'less_than', defaultThreshold: 20 }
+    },
+    {
+      id: 'stoch_k_cross_d_up',
+      name: 'Stoch K Cross D Up',
+      desc: 'Bullish signal: %K crosses above %D',
+      icon: 'intersect',
+      composite: { indicator: 'stochastic', condition: 'crossover', compareWith: 'stoch_d' }
+    },
+    {
+      id: 'stoch_k_cross_d_down',
+      name: 'Stoch K Cross D Down',
+      desc: 'Bearish signal: %K crosses below %D',
+      icon: 'intersect',
+      composite: { indicator: 'stochastic', condition: 'crossunder', compareWith: 'stoch_d' }
+    },
+    // MACD-based signals
+    {
+      id: 'macd_cross_signal_up',
+      name: 'MACD Cross Signal Up',
+      desc: 'Bullish: MACD crosses above Signal',
+      icon: 'bar-chart',
+      composite: { indicator: 'macd', condition: 'crossover', compareWith: 'macd_signal' }
+    },
+    {
+      id: 'macd_cross_signal_down',
+      name: 'MACD Cross Signal Down',
+      desc: 'Bearish: MACD crosses below Signal',
+      icon: 'bar-chart',
+      composite: { indicator: 'macd', condition: 'crossunder', compareWith: 'macd_signal' }
+    },
+    {
+      id: 'macd_cross_zero_up',
+      name: 'MACD Cross Zero Up',
+      desc: 'Bullish: MACD crosses above zero',
+      icon: 'arrow-up',
+      composite: { indicator: 'macd', condition: 'crossover', defaultThreshold: 0 }
+    },
+    {
+      id: 'macd_cross_zero_down',
+      name: 'MACD Cross Zero Down',
+      desc: 'Bearish: MACD crosses below zero',
+      icon: 'arrow-down',
+      composite: { indicator: 'macd', condition: 'crossunder', defaultThreshold: 0 }
+    },
+    // Moving Average signals
+    {
+      id: 'golden_cross_signal',
+      name: 'Golden Cross',
+      desc: 'Bullish: Fast MA crosses above Slow MA',
+      icon: 'star',
+      composite: { indicator: 'ema', condition: 'crossover', compareWith: 'ema_slow', fastPeriod: 50, slowPeriod: 200 }
+    },
+    {
+      id: 'death_cross_signal',
+      name: 'Death Cross',
+      desc: 'Bearish: Fast MA crosses below Slow MA',
+      icon: 'x-circle',
+      composite: { indicator: 'ema', condition: 'crossunder', compareWith: 'ema_slow', fastPeriod: 50, slowPeriod: 200 }
+    },
+    {
+      id: 'price_above_ma_signal',
+      name: 'Price Above MA',
+      desc: 'Bullish: Price above Moving Average',
+      icon: 'arrow-up-right',
+      composite: { indicator: 'ema', condition: 'price_above', period: 20 }
+    },
+    {
+      id: 'price_below_ma_signal',
+      name: 'Price Below MA',
+      desc: 'Bearish: Price below Moving Average',
+      icon: 'arrow-down-right',
+      composite: { indicator: 'ema', condition: 'price_below', period: 20 }
+    },
+    // Bollinger Bands signals
+    {
+      id: 'bb_upper_touch_signal',
+      name: 'BB Upper Touch',
+      desc: 'Price touches upper Bollinger Band',
+      icon: 'distribute-vertical',
+      composite: { indicator: 'bollinger', condition: 'price_above', compareWith: 'bb_upper' }
+    },
+    {
+      id: 'bb_lower_touch_signal',
+      name: 'BB Lower Touch',
+      desc: 'Price touches lower Bollinger Band',
+      icon: 'distribute-vertical',
+      composite: { indicator: 'bollinger', condition: 'price_below', compareWith: 'bb_lower' }
+    },
+    {
+      id: 'bb_squeeze_signal',
+      name: 'BB Squeeze',
+      desc: 'Bollinger Band width at minimum',
+      icon: 'arrows-collapse',
+      composite: { indicator: 'bollinger', condition: 'squeeze' }
+    },
+    // SuperTrend signals
+    {
+      id: 'supertrend_buy_signal',
+      name: 'SuperTrend Buy',
+      desc: 'Price crosses above SuperTrend',
+      icon: 'arrow-up-right-circle',
+      composite: { indicator: 'supertrend', condition: 'bullish_flip' }
+    },
+    {
+      id: 'supertrend_sell_signal',
+      name: 'SuperTrend Sell',
+      desc: 'Price crosses below SuperTrend',
+      icon: 'arrow-down-right-circle',
+      composite: { indicator: 'supertrend', condition: 'bearish_flip' }
+    },
+    // Volume signals
+    {
+      id: 'volume_spike_signal',
+      name: 'Volume Spike',
+      desc: 'Volume > 2x average',
+      icon: 'bar-chart-steps',
+      composite: { indicator: 'volume', condition: 'greater_than', multiplier: 2 }
+    },
+    {
+      id: 'volume_dry_signal',
+      name: 'Volume Dry Up',
+      desc: 'Volume < 0.5x average',
+      icon: 'bar-chart-line',
+      composite: { indicator: 'volume', condition: 'less_than', multiplier: 0.5 }
     }
   ]
 };
@@ -1268,6 +1402,8 @@ const redoStack = [];
 const MAX_UNDO_HISTORY = 50;
 let lastAutoSavePayload = null;
 const AUTOSAVE_INTERVAL_MS = 30000;
+const STORAGE_KEY_PREFIX = 'strategy_builder_draft_';
+let skipNextAutoSave = false; // Flag to skip autosave after reset
 let selectedBlockId = null;
 let selectedBlockIds = []; // Multi-selection array
 let selectedTemplate = null;
@@ -1279,6 +1415,373 @@ let dragOffset = { x: 0, y: 0 };
 let isMarqueeSelecting = false;
 let marqueeStart = { x: 0, y: 0 };
 let marqueeElement = null;
+
+// ============================================
+// LOCAL STORAGE PERSISTENCE
+// ============================================
+
+/**
+ * Try to load strategy from localStorage
+ * @param {string} strategyId - Strategy ID or 'draft'
+ * @returns {boolean} - True if loaded successfully
+ */
+function tryLoadFromLocalStorage(strategyId) {
+  try {
+    const key = STORAGE_KEY_PREFIX + strategyId;
+    const saved = window.localStorage.getItem(key);
+
+    if (!saved) {
+      console.log('[Strategy Builder] No saved draft found in localStorage');
+      return false;
+    }
+
+    const data = JSON.parse(saved);
+    console.log('[Strategy Builder] Found saved draft:', {
+      blocks: data.blocks?.length || 0,
+      connections: data.connections?.length || 0
+    });
+
+    // Don't restore if it's just the initial clean state (only Strategy node, no connections)
+    const hasOnlyStrategyNode = data.blocks?.length === 1 &&
+      (data.blocks[0].isMain || data.blocks[0].type === 'strategy');
+    const hasNoConnections = !data.connections || data.connections.length === 0;
+
+    if (hasOnlyStrategyNode && hasNoConnections) {
+      console.log('[Strategy Builder] Skipping restore - saved state is clean initial state');
+      // Remove this clean state from localStorage
+      window.localStorage.removeItem(key);
+      return false;
+    }
+
+    // Restore blocks
+    if (data.blocks && Array.isArray(data.blocks)) {
+      strategyBlocks.length = 0; // Clear existing
+
+      // First, ensure main Strategy node exists
+      const mainBlock = data.blocks.find(b => b.isMain || b.id === 'main_strategy');
+      if (mainBlock) {
+        strategyBlocks.push({
+          id: mainBlock.id || 'main_strategy',
+          type: mainBlock.type || 'strategy',
+          category: 'main',
+          name: mainBlock.name || 'Strategy',
+          icon: mainBlock.icon || 'diagram-3',
+          x: mainBlock.x || 800,
+          y: mainBlock.y || 300,
+          isMain: true,
+          params: mainBlock.params || {}
+        });
+      } else {
+        // Create default main node
+        createMainStrategyNode();
+      }
+
+      // Add other blocks
+      data.blocks.forEach(block => {
+        if (!block.isMain && block.id !== 'main_strategy') {
+          strategyBlocks.push({
+            id: block.id,
+            type: block.type,
+            category: block.category || 'indicator',
+            name: block.name || block.type,
+            icon: block.icon || 'box',
+            x: block.x || 100,
+            y: block.y || 100,
+            params: block.params || {},
+            optimizationParams: block.optimizationParams || {}
+          });
+        }
+      });
+    }
+
+    // Restore connections
+    if (data.connections && Array.isArray(data.connections)) {
+      connections.length = 0; // Clear existing
+      data.connections.forEach(conn => {
+        if (conn.source && conn.target) {
+          connections.push({
+            source: conn.source,
+            target: conn.target,
+            sourcePort: conn.sourcePort,
+            targetPort: conn.targetPort
+          });
+        }
+      });
+    }
+
+    // Restore UI state if available
+    if (data.uiState) {
+      // Restore zoom
+      if (data.uiState.zoom && typeof data.uiState.zoom === 'number') {
+        zoom = data.uiState.zoom;
+        // updateZoom will be called after DOM is ready
+      }
+
+      // Restore panel values
+      if (data.uiState.strategyName) {
+        const nameInput = document.getElementById('strategyName');
+        if (nameInput) nameInput.value = data.uiState.strategyName;
+      }
+    }
+
+    console.log('[Strategy Builder] Restored from localStorage:', {
+      blocks: strategyBlocks.length,
+      connections: connections.length
+    });
+
+    // Show notification
+    showRestoreNotification();
+
+    return true;
+  } catch (err) {
+    console.warn('[Strategy Builder] Failed to load from localStorage:', err);
+    return false;
+  }
+}
+
+/**
+ * Show notification that draft was restored
+ */
+function showRestoreNotification() {
+  const notification = document.createElement('div');
+  notification.className = 'restore-notification';
+  notification.innerHTML = `
+    <i class="bi bi-clock-history"></i>
+    <span>Черновик восстановлен</span>
+    <button class="restore-notification-close" title="Закрыть">&times;</button>
+  `;
+  notification.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #1a1f2e 0%, #252b3d 100%);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    border-radius: 8px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #58a6ff;
+    font-size: 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    animation: slideUp 0.3s ease;
+  `;
+
+  // Add animation keyframes
+  if (!document.getElementById('restore-notification-styles')) {
+    const style = document.createElement('style');
+    style.id = 'restore-notification-styles';
+    style.textContent = `
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.body.appendChild(notification);
+
+  // Close button handler
+  notification.querySelector('.restore-notification-close').addEventListener('click', () => {
+    notification.remove();
+  });
+
+  // Auto-remove after 4 seconds
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.style.opacity = '0';
+      notification.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => notification.remove(), 300);
+    }
+  }, 4000);
+}
+
+/**
+ * Clear saved draft from localStorage
+ * @param {string} strategyId - Strategy ID or 'draft'. If null, clears ALL drafts.
+ */
+function clearLocalStorageDraft(strategyId) {
+  try {
+    if (strategyId) {
+      // Clear specific draft
+      const key = STORAGE_KEY_PREFIX + strategyId;
+      window.localStorage.removeItem(key);
+      console.log('[Strategy Builder] Cleared localStorage draft:', key);
+    } else {
+      // Clear ALL strategy builder drafts
+      const keysToRemove = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => {
+        window.localStorage.removeItem(key);
+        console.log('[Strategy Builder] Removed:', key);
+      });
+      console.log('[Strategy Builder] Cleared ALL localStorage drafts:', keysToRemove.length);
+    }
+  } catch (err) {
+    console.warn('[Strategy Builder] Failed to clear localStorage:', err);
+  }
+}
+
+/**
+ * Clear all blocks, connections and reset to default state
+ * Clears localStorage and resets all parameters
+ */
+function clearAllAndReset() {
+  console.log('[Strategy Builder] clearAllAndReset() called');
+
+  // Ask for confirmation with more visible dialog
+  const userConfirmed = window.confirm('⚠️ ОЧИСТИТЬ ВСЁ?\n\n• Все блоки будут удалены\n• Все соединения будут удалены\n• Настройки сбросятся\n• Сохранённый черновик удалится\n\nНажмите OK для подтверждения');
+
+  if (!userConfirmed) {
+    console.log('[Strategy Builder] User cancelled reset');
+    return;
+  }
+
+  console.log('[Strategy Builder] User confirmed. Clearing all and resetting...');
+
+  try {
+    // FIRST: Set flag to skip next autosave
+    skipNextAutoSave = true;
+
+    // Clear last autosave payload to prevent immediate re-save
+    lastAutoSavePayload = null;
+
+    // Clear ALL localStorage drafts (pass null to clear all)
+    clearLocalStorageDraft(null);
+
+    // Also explicitly clear the 'draft' key just in case
+    try {
+      window.localStorage.removeItem(STORAGE_KEY_PREFIX + 'draft');
+      console.log('[Strategy Builder] Explicitly removed draft key');
+    } catch (e) {
+      console.warn('[Strategy Builder] Could not remove draft key:', e);
+    }
+
+    // Clear all blocks
+    strategyBlocks.length = 0;
+
+    // Clear all connections
+    connections.length = 0;
+
+    // Clear undo/redo history
+    undoStack.length = 0;
+    redoStack.length = 0;
+
+    // Clear selection
+    selectedBlockId = null;
+    selectedBlockIds = [];
+
+    // Reset zoom
+    zoom = 1;
+    updateZoom();
+
+    // Recreate main Strategy node at default position
+    createMainStrategyNode();
+
+    // Reset form values to defaults
+    resetFormToDefaults();
+
+    // Update undo/redo buttons
+    updateUndoRedoButtons();
+
+    // Re-render
+    renderBlocks();
+    renderConnections();
+
+    // Show notification
+    showNotification('Всё очищено. Начните заново!', 'success');
+
+    console.log('[Strategy Builder] Reset complete. localStorage cleared.');
+
+    // Log current localStorage state for debugging
+    const remainingKeys = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith('strategy_builder')) {
+        remainingKeys.push(key);
+      }
+    }
+    console.log('[Strategy Builder] Remaining strategy keys:', remainingKeys);
+
+  } catch (err) {
+    console.error('[Strategy Builder] Error during reset:', err);
+    showNotification('Ошибка при очистке: ' + err.message, 'error');
+  }
+}
+
+/**
+ * Reset all form inputs to default values
+ */
+function resetFormToDefaults() {
+  // Strategy name
+  const nameEl = document.getElementById('strategyName');
+  if (nameEl) nameEl.value = 'New Strategy';
+
+  // Symbol
+  const symbolEl = document.getElementById('strategySymbol');
+  if (symbolEl) symbolEl.value = '';
+  const backtestSymbolEl = document.getElementById('backtestSymbol');
+  if (backtestSymbolEl) backtestSymbolEl.value = '';
+
+  // Timeframe
+  const timeframeEl = document.getElementById('strategyTimeframe');
+  if (timeframeEl) timeframeEl.value = '15';
+
+  // Market type
+  const marketTypeEl = document.getElementById('builderMarketType');
+  if (marketTypeEl) marketTypeEl.value = 'linear';
+
+  // Direction
+  const directionEl = document.getElementById('builderDirection');
+  if (directionEl) directionEl.value = 'both';
+
+  // Capital
+  const capitalEl = document.getElementById('backtestCapital');
+  if (capitalEl) capitalEl.value = '10000';
+
+  // Position size
+  const positionSizeTypeEl = document.getElementById('backtestPositionSizeType');
+  if (positionSizeTypeEl) positionSizeTypeEl.value = 'percent';
+  const positionSizeEl = document.getElementById('backtestPositionSize');
+  if (positionSizeEl) positionSizeEl.value = '100';
+
+  // Commission
+  const commissionEl = document.getElementById('backtestCommission');
+  if (commissionEl) commissionEl.value = '0.07';
+
+  // Leverage
+  const leverageEl = document.getElementById('backtestLeverage');
+  if (leverageEl) leverageEl.value = '10';
+  const leverageRangeEl = document.getElementById('backtestLeverageRange');
+  if (leverageRangeEl) leverageRangeEl.value = '10';
+  updateBacktestLeverageDisplay(10);
+
+  // Start/End dates
+  const startDateEl = document.getElementById('backtestStartDate');
+  if (startDateEl) startDateEl.value = '2025-01-01';
+  const endDateEl = document.getElementById('backtestEndDate');
+  if (endDateEl) {
+    const today = new Date();
+    endDateEl.value = today.toISOString().split('T')[0];
+  }
+
+  // Clear no-trade days checkboxes
+  document.querySelectorAll('.no-trade-day-checkbox').forEach(cb => {
+    cb.checked = false;
+  });
+
+  // Update UI displays
+  syncStrategyNameDisplay();
+  updateBacktestPositionSizeInput();
+}
 
 // Group dragging variables
 let isGroupDragging = false;
@@ -1335,13 +1838,17 @@ function initializeStrategyBuilder() {
         console.log('[Strategy Builder] Strategy loaded');
       }).catch((err) => {
         console.error('[Strategy Builder] Error loading strategy:', err);
-        // Create new strategy if load fails
-        createMainStrategyNode();
+        // Try to load from localStorage draft
+        if (!tryLoadFromLocalStorage(strategyId)) {
+          createMainStrategyNode();
+        }
       });
     } else {
-      // Create new strategy - create main Strategy node
+      // Create new strategy - try to restore from localStorage first
       console.log('[Strategy Builder] Creating new strategy');
-      createMainStrategyNode();
+      if (!tryLoadFromLocalStorage('draft')) {
+        createMainStrategyNode();
+      }
     }
 
     console.log('[Strategy Builder] Rendering block library...');
@@ -1368,10 +1875,20 @@ function initializeStrategyBuilder() {
     updateBacktestLeverageDisplay(document.getElementById('backtestLeverageRange')?.value || document.getElementById('backtestLeverage')?.value || 10);
     updateBacktestLeverageRisk();
 
+    // Enable mouse wheel scroll for all number inputs in Properties panel
+    const propertiesPanel = document.getElementById('propertiesPanel');
+    if (propertiesPanel) {
+      enableWheelScrollForNumberInputs(propertiesPanel);
+      console.log('[Strategy Builder] Wheel scroll enabled for Properties number inputs');
+    }
+
     // Проверка данных БД только при смене Symbol/TF/Тип рынка, не при открытии блока Properties
 
     // Periodic autosave to localStorage and server
     setInterval(autoSaveStrategy, AUTOSAVE_INTERVAL_MS);
+
+    // Initialize undo/redo button states
+    updateUndoRedoButtons();
 
     console.log('[Strategy Builder] Initialization complete!');
   } catch (error) {
@@ -1390,14 +1907,19 @@ if (document.readyState === 'loading') {
 
 // Create the main Strategy node that cannot be deleted
 function createMainStrategyNode() {
+  // Fixed default position for Strategy node (right side, vertically centered)
+  // These coordinates are calibrated for standard 1920x1080 screen
+  const DEFAULT_STRATEGY_X = 1550;
+  const DEFAULT_STRATEGY_Y = 350;
+
   const mainNode = {
     id: 'main_strategy',
     type: 'strategy',
     category: 'main',
     name: 'Strategy',
     icon: 'diagram-3',
-    x: 400,
-    y: 200,
+    x: DEFAULT_STRATEGY_X,
+    y: DEFAULT_STRATEGY_Y,
     isMain: true,
     params: {}
   };
@@ -1412,75 +1934,171 @@ function renderBlockLibrary() {
   }
   container.innerHTML = '';
 
-  const categories = [
-    { key: 'indicators', name: 'Indicators', iconType: 'indicator' },
-    { key: 'filters', name: 'Filters', iconType: 'filter' },
-    { key: 'conditions', name: 'Conditions', iconType: 'condition' },
-    { key: 'actions', name: 'Actions', iconType: 'action' },
-    { key: 'exits', name: 'Close Conditions', iconType: 'exit' },
-    { key: 'position_sizing', name: 'Position Sizing', iconType: 'sizing' },
-    { key: 'entry_refinement', name: 'Entry Refinement', iconType: 'entry' },
-    { key: 'risk_controls', name: 'Risk Controls', iconType: 'risk' },
-    { key: 'session_mgmt', name: 'Session Management', iconType: 'session' },
-    { key: 'time_mgmt', name: 'Time Management', iconType: 'time' },
-    { key: 'logic', name: 'Logic', iconType: 'logic' },
-    { key: 'inputs', name: 'Inputs', iconType: 'input' },
-    { key: 'correlation', name: 'Correlation & Multi-Symbol', iconType: 'filter' },
-    { key: 'alerts', name: 'Alerts', iconType: 'session' },
-    { key: 'visualization', name: 'Visualization', iconType: 'visualization' },
-    { key: 'dca_grid', name: 'DCA Grid', iconType: 'entry' },
-    { key: 'multiple_tp', name: 'Multiple Take Profits', iconType: 'action' },
-    { key: 'atr_exit', name: 'ATR Exit', iconType: 'exit' },
-    { key: 'signal_memory', name: 'Signal Memory', iconType: 'logic' },
-    { key: 'close_conditions', name: 'Close Conditions (TradingView)', iconType: 'exit' },
-    { key: 'price_action', name: 'Price Action Patterns', iconType: 'filter' },
-    { key: 'divergence', name: 'Divergence', iconType: 'filter' }
+  // Simplified category groups (7 main groups)
+  const categoryGroups = [
+    {
+      groupName: '⚡ Быстрые сигналы',
+      groupIcon: 'lightning-charge',
+      groupColor: '#00ff88',
+      categories: [
+        { key: 'smart_signals', name: 'Smart Signals', iconType: 'smart' }
+      ]
+    },
+    {
+      groupName: '📊 Индикаторы',
+      groupIcon: 'graph-up',
+      groupColor: '#58a6ff',
+      categories: [
+        { key: 'indicators', name: 'Технические индикаторы', iconType: 'indicator' },
+        { key: 'divergence', name: 'Дивергенции', iconType: 'filter' }
+      ]
+    },
+    {
+      groupName: '🎯 Условия входа',
+      groupIcon: 'bullseye',
+      groupColor: '#a371f7',
+      categories: [
+        { key: 'filters', name: 'Фильтры', iconType: 'filter' },
+        { key: 'conditions', name: 'Условия', iconType: 'condition' },
+        { key: 'price_action', name: 'Price Action', iconType: 'filter' }
+      ]
+    },
+    {
+      groupName: '🚀 Действия',
+      groupIcon: 'play-circle',
+      groupColor: '#3fb950',
+      categories: [
+        { key: 'actions', name: 'Действия', iconType: 'action' },
+        { key: 'entry_refinement', name: 'Уточнение входа', iconType: 'entry' }
+      ]
+    },
+    {
+      groupName: '🚪 Выходы',
+      groupIcon: 'box-arrow-right',
+      groupColor: '#f0883e',
+      categories: [
+        { key: 'exits', name: 'Условия выхода', iconType: 'exit' },
+        { key: 'multiple_tp', name: 'Multiple TP', iconType: 'action' },
+        { key: 'close_conditions', name: 'TradingView Close', iconType: 'exit' }
+      ]
+    },
+    {
+      groupName: '⚙️ Управление',
+      groupIcon: 'gear',
+      groupColor: '#d29922',
+      categories: [
+        { key: 'position_sizing', name: 'Размер позиции', iconType: 'sizing' },
+        { key: 'risk_controls', name: 'Риск-контроль', iconType: 'risk' },
+        { key: 'session_mgmt', name: 'Сессии', iconType: 'session' },
+        { key: 'time_mgmt', name: 'Время', iconType: 'time' }
+      ]
+    },
+    {
+      groupName: '🔧 Утилиты',
+      groupIcon: 'tools',
+      groupColor: '#8b949e',
+      categories: [
+        { key: 'logic', name: 'Логика', iconType: 'logic' },
+        { key: 'inputs', name: 'Входные данные', iconType: 'input' },
+        { key: 'signal_memory', name: 'Память сигналов', iconType: 'logic' },
+        { key: 'correlation', name: 'Корреляция', iconType: 'filter' },
+        { key: 'alerts', name: 'Алерты', iconType: 'session' },
+        { key: 'visualization', name: 'Визуализация', iconType: 'visualization' }
+      ]
+    }
   ];
 
   const ADAPTER_SPECIFIC_CATEGORIES = [
-    'dca_grid', 'multiple_tp', 'atr_exit', 'signal_memory',
+    'smart_signals', 'multiple_tp', 'atr_exit', 'signal_memory',
     'close_conditions', 'price_action', 'divergence', 'correlation',
     'session_mgmt', 'time_mgmt', 'risk_controls', 'entry_refinement',
     'position_sizing', 'alerts', 'visualization'
   ];
-  categories.forEach((cat) => {
-    const blocks = blockLibrary[cat.key];
-    if (!blocks || !Array.isArray(blocks)) return;
-    const blockCategory = ADAPTER_SPECIFIC_CATEGORIES.includes(cat.key) ? cat.key : cat.iconType;
-    const html = `
-                    <div class="block-category">
-                        <div class="category-header">
-                            <i class="bi bi-chevron-right"></i>
-                            <span class="category-count">(${blocks.length})</span>
-                            <span class="category-title">${cat.name}</span>
-                        </div>
-                        <div class="block-list">
-                            ${blocks
-        .map(
-          (block) => `
-                                <div class="block-item" 
-                                     draggable="true" 
-                                     data-block-id="${block.id}"
-                                     data-block-type="${blockCategory}">
-                                    <div class="block-icon ${cat.iconType}">
-                                        <i class="bi bi-${block.icon}"></i>
-                                    </div>
-                                    <div class="block-info">
-                                        <div class="block-name">${block.name}</div>
-                                        <div class="block-desc">${block.desc}</div>
-                                    </div>
-                                </div>
-                            `
-        )
-        .join('')}
-                        </div>
-                    </div>
-                `;
-    container.innerHTML += html;
+
+  // Render grouped categories
+  categoryGroups.forEach((group) => {
+    // Calculate total blocks in group
+    let totalBlocks = 0;
+    group.categories.forEach((cat) => {
+      const blocks = blockLibrary[cat.key];
+      if (blocks && Array.isArray(blocks)) {
+        totalBlocks += blocks.length;
+      }
+    });
+
+    if (totalBlocks === 0) return;
+
+    // Create group container
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'block-category-group';
+    groupDiv.innerHTML = `
+      <div class="category-group-header" style="--group-color: ${group.groupColor}">
+        <i class="bi bi-chevron-right group-chevron"></i>
+        <i class="bi bi-${group.groupIcon}" style="color: ${group.groupColor}"></i>
+        <span class="group-name">${group.groupName}</span>
+        <span class="group-count">(${totalBlocks})</span>
+      </div>
+      <div class="category-group-content"></div>
+    `;
+
+    const contentDiv = groupDiv.querySelector('.category-group-content');
+
+    // Render subcategories
+    group.categories.forEach((cat) => {
+      const blocks = blockLibrary[cat.key];
+      console.log(`[Strategy Builder] Category ${cat.key}: ${blocks ? blocks.length : 0} blocks`);
+      if (!blocks || !Array.isArray(blocks) || blocks.length === 0) return;
+
+      const blockCategory = ADAPTER_SPECIFIC_CATEGORIES.includes(cat.key) ? cat.key : cat.iconType;
+
+      const catDiv = document.createElement('div');
+      catDiv.className = 'block-category collapsed'; // Start collapsed
+      catDiv.innerHTML = `
+        <div class="category-header subcategory">
+          <i class="bi bi-chevron-right"></i>
+          <span class="category-count">(${blocks.length})</span>
+          <span class="category-title">${cat.name}</span>
+        </div>
+        <div class="block-list">
+          ${blocks
+          .map(
+            (block) => `
+              <div class="block-item" 
+                   draggable="true" 
+                   data-block-id="${block.id}"
+                   data-block-type="${blockCategory}">
+                <div class="block-icon ${cat.iconType}">
+                  <i class="bi bi-${block.icon}"></i>
+                </div>
+                <div class="block-info">
+                  <div class="block-name">${block.name}</div>
+                  <div class="block-desc">${block.desc}</div>
+                </div>
+              </div>
+            `
+          )
+          .join('')}
+        </div>
+      `;
+
+      contentDiv.appendChild(catDiv);
+    });
+
+    container.appendChild(groupDiv);
   });
 
-  console.log('[Strategy Builder] Block library rendered. Categories in DOM:',
-    document.querySelectorAll('.block-category').length);
+  // Add click handlers for group headers
+  container.querySelectorAll('.category-group-header').forEach((header) => {
+    header.addEventListener('click', () => {
+      const group = header.closest('.block-category-group');
+      group.classList.toggle('collapsed');
+    });
+  });
+
+  // Subcategory click handling is done via event delegation in setupDragAndDrop()
+
+  console.log('[Strategy Builder] Block library rendered with groups. Groups in DOM:',
+    document.querySelectorAll('.block-category-group').length);
 }
 
 function renderTemplates() {
@@ -2044,23 +2662,29 @@ function initDunnahBasePanel() {
         .map((g) => {
           const sym = (g.symbol || '').trim();
           const mt = g.market_type || 'linear';
-          const ivs = Object.keys(g.intervals || {}).sort().join(', ');
+          const intervals = Object.keys(g.intervals || {}).filter(i => i !== 'UNKNOWN').sort((a, b) => {
+            const order = { '1': 1, '5': 2, '15': 3, '30': 4, '60': 5, '240': 6, 'D': 7, 'W': 8, 'M': 9 };
+            return (order[a] || 99) - (order[b] || 99);
+          });
           const total = g.total_rows || 0;
           const isBlocked = blocked.has(sym.toUpperCase());
+          const tfDisplay = intervals.length > 4
+            ? intervals.slice(0, 4).join(', ') + ` +${intervals.length - 4}`
+            : intervals.join(', ');
 
           return `
           <div class="dunnah-group-item" data-symbol="${sym}" data-market="${mt}">
             <div class="dunnah-group-header">
               <span class="dunnah-group-symbol">${sym}</span>
               <span class="dunnah-group-mt">${mt}</span>
-              ${isBlocked ? '<span class="dunnah-blocked-badge" title="Заблокирован">🔒</span>' : '<span class="dunnah-unblocked-badge" title="Разблокирован">🔓</span>'}
+              ${isBlocked ? '<span class="dunnah-blocked-badge" title="Заблокирован">🔒</span>' : '<span class="dunnah-unblocked-badge" title="Активен">🔓</span>'}
             </div>
-            <div class="dunnah-group-info text-muted text-sm">TF: ${ivs} · ${total.toLocaleString()} свечей</div>
+            <div class="dunnah-group-info">${tfDisplay} · ${total.toLocaleString()} свечей</div>
             <div class="dunnah-group-actions">
-              <button type="button" class="btn-dunnah-delete btn-sm" data-symbol="${sym}" data-market="${mt}" title="Удалить из БД">🗑️ Удалить</button>
+              <button type="button" class="btn-dunnah-delete" data-symbol="${sym}" data-market="${mt}">🗑️ Удалить</button>
               ${isBlocked
-              ? `<button type="button" class="btn-dunnah-unblock btn-sm" data-symbol="${sym}" title="Разблокировать">🔒 Разблокировать</button>`
-              : `<button type="button" class="btn-dunnah-block btn-sm" data-symbol="${sym}" title="Блокировать догрузку">🔓 Блокировать</button>`
+              ? `<button type="button" class="btn-dunnah-unblock" data-symbol="${sym}">� Разблокировать</button>`
+              : `<button type="button" class="btn-dunnah-block" data-symbol="${sym}">� Блокировать</button>`
             }
             </div>
           </div>`;
@@ -2072,14 +2696,15 @@ function initDunnahBasePanel() {
           const symbol = btn.dataset.symbol;
           const market = btn.dataset.market || 'linear';
           if (!confirm(`Удалить все данные ${symbol} (${market}) из БД?`)) return;
-          container.innerHTML = '<p class="text-muted text-sm">Удаление...</p>';
+          btn.disabled = true;
+          btn.textContent = '⏳';
           try {
             const r = await fetch(`${API_BASE}/marketdata/symbols/db-groups?symbol=${encodeURIComponent(symbol)}&market_type=${encodeURIComponent(market)}`, { method: 'DELETE' });
             if (!r.ok) throw new Error(await r.text());
+            // Invalidate caches and reload in parallel
             localSymbolsCache = null;
             blockedSymbolsCache = null;
-            await fetchLocalSymbols();
-            await loadAndRender();
+            await Promise.all([fetchLocalSymbols(), loadAndRender()]);
           } catch (e) {
             console.error(e);
             alert('Ошибка удаления: ' + e.message);
@@ -2090,17 +2715,18 @@ function initDunnahBasePanel() {
       container.querySelectorAll('.btn-dunnah-block').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const symbol = btn.dataset.symbol;
+          btn.disabled = true;
+          btn.textContent = '⏳';
           try {
             const r = await fetch(`${API_BASE}/marketdata/symbols/blocked?symbol=${encodeURIComponent(symbol)}`, { method: 'POST' });
             if (!r.ok) throw new Error(await r.text());
+            // Invalidate caches and reload - loadAndRender fetches blocked data already
             localSymbolsCache = null;
             blockedSymbolsCache = null;
-            await fetchBlockedSymbols();
-            await fetchLocalSymbols();
+            await loadAndRender();
           } catch (e) {
             console.error(e);
             alert('Ошибка: ' + e.message);
-          } finally {
             await loadAndRender();
           }
         });
@@ -2108,17 +2734,18 @@ function initDunnahBasePanel() {
       container.querySelectorAll('.btn-dunnah-unblock').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const symbol = btn.dataset.symbol;
+          btn.disabled = true;
+          btn.textContent = '⏳';
           try {
             const r = await fetch(`${API_BASE}/marketdata/symbols/blocked/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
             if (!r.ok) throw new Error(await r.text());
+            // Invalidate caches and reload - loadAndRender fetches blocked data already
             localSymbolsCache = null;
             blockedSymbolsCache = null;
-            await fetchBlockedSymbols();
-            await fetchLocalSymbols();
+            await loadAndRender();
           } catch (e) {
             console.error(e);
             alert('Ошибка: ' + e.message);
-          } finally {
             await loadAndRender();
           }
         });
@@ -2134,8 +2761,6 @@ function initDunnahBasePanel() {
   refreshDunnahBasePanel = loadAndRender;
   loadAndRender();
 }
-
-const API_BASE = '/api/v1';
 
 function updatePropertiesProgressBar(visible, options = {}) {
   const { indeterminate = false, percent = 0 } = options;
@@ -2310,6 +2935,7 @@ async function syncSymbolData(forceRefresh = false) {
     let buffer = '';
     let result = null;
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -2556,6 +3182,15 @@ function setupEventListeners() {
   });
   if (builderMarketTypeEl) builderMarketTypeEl.addEventListener('change', checkSymbolDataForProperties);
 
+  // Direction change - update Strategy node ports
+  const builderDirectionEl = document.getElementById('builderDirection');
+  if (builderDirectionEl) {
+    builderDirectionEl.addEventListener('change', () => {
+      // Re-render blocks to update Strategy node ports based on direction
+      renderBlocks();
+    });
+  }
+
   const backtestPositionSizeTypeEl = document.getElementById('backtestPositionSizeType');
   const backtestLeverageRangeEl = document.getElementById('backtestLeverageRange');
   if (backtestPositionSizeTypeEl) {
@@ -2620,6 +3255,83 @@ function setupEventListeners() {
     .getElementById('blockSearch')
     .addEventListener('input', filterBlocks);
 
+  // Store original positions for all blocks (before panel opens)
+  const blocksOriginalPositions = new Map(); // blockId -> {x, y}
+  let isFloatingWindowOpen = false;
+
+  // Listen for floating window toggle to adjust all nodes positions
+  document.addEventListener('floatingWindowToggle', function (e) {
+    const canvasContainer = document.getElementById('canvasContainer');
+    if (!canvasContainer) return;
+
+    const canvasWidth = canvasContainer.offsetWidth;
+    const floatingWindowWidth = 480; // Width of floating panels
+    const spineWidth = 35; // Width of panel spines/tabs
+    const margin = 15; // Small margin from spines
+
+    // Threshold X - nodes right of this need to move
+    const thresholdX = canvasWidth - floatingWindowWidth - spineWidth - margin;
+
+    if (e.detail.isOpen && !isFloatingWindowOpen) {
+      // Window opening - save positions and move affected nodes
+      isFloatingWindowOpen = true;
+      blocksOriginalPositions.clear();
+
+      strategyBlocks.forEach(function (block) {
+        // Get block width (main node is 130px, others ~180-280px)
+        const blockWidth = block.isMain ? 130 : 200;
+        const blockRightEdge = block.x + blockWidth;
+
+        // If block's right edge extends past threshold, it needs to move
+        if (blockRightEdge > thresholdX) {
+          // Save original position
+          blocksOriginalPositions.set(block.id, { x: block.x, y: block.y });
+
+          // Calculate new X to keep block left of threshold
+          const newX = thresholdX - blockWidth;
+
+          // Find DOM element and animate
+          const blockElement = document.getElementById(block.id);
+          if (blockElement) {
+            blockElement.style.transition = 'left 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+            blockElement.style.left = newX + 'px';
+          }
+          block.x = newX;
+        }
+      });
+
+    } else if (!e.detail.isOpen && isFloatingWindowOpen) {
+      // Window closing - return all affected nodes to saved positions
+      isFloatingWindowOpen = false;
+
+      blocksOriginalPositions.forEach(function (originalPos, blockId) {
+        const block = strategyBlocks.find(b => b.id === blockId);
+        if (block) {
+          const blockElement = document.getElementById(blockId);
+          if (blockElement) {
+            blockElement.style.transition = 'left 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+            blockElement.style.left = originalPos.x + 'px';
+          }
+          block.x = originalPos.x;
+        }
+      });
+
+      blocksOriginalPositions.clear();
+    }
+
+    // Update connections after animation
+    setTimeout(function () {
+      renderConnections();
+      // Remove transitions from all blocks
+      strategyBlocks.forEach(function (block) {
+        const blockElement = document.getElementById(block.id);
+        if (blockElement) {
+          blockElement.style.transition = '';
+        }
+      });
+    }, 400);
+  });
+
   // Block library - drag start (event delegation for CSP compliance)
   const blockCategories = document.getElementById('blockCategories');
   if (blockCategories) {
@@ -2638,11 +3350,23 @@ function setupEventListeners() {
     blockCategories.addEventListener('click', function (e) {
       console.log('[Strategy Builder] Block categories clicked:', e.target, e.target.className);
 
-      // Check if clicking on category header - don't prevent default, let sidebar-toggle handle it
+      // Check if clicking on category header
       const categoryHeader = e.target.closest('.category-header');
       if (categoryHeader) {
+        // If inside a category group, handle subcategory toggle here
+        if (categoryHeader.closest('.block-category-group')) {
+          e.preventDefault();
+          e.stopPropagation();
+          const category = categoryHeader.closest('.block-category');
+          if (category) {
+            category.classList.toggle('collapsed');
+            console.log('[Strategy Builder] Subcategory toggled:', category.classList.contains('collapsed'));
+          }
+          return;
+        }
+        // Otherwise let sidebar-toggle.js handle category toggle
         console.log('[Strategy Builder] Category header clicked - letting sidebar-toggle handle');
-        return; // Let sidebar-toggle.js handle category toggle
+        return;
       }
 
       // Check if clicking on block item
@@ -2768,9 +3492,23 @@ function setupEventListeners() {
       if (!e.target.closest('.strategy-block') &&
         !e.target.closest('.block-params-popup') &&
         !e.target.closest('.zoom-controls') &&
-        !e.target.closest('.canvas-toolbar')) {
+        !e.target.closest('.canvas-toolbar') &&
+        !e.target.closest('.quick-add-dialog')) {
         e.preventDefault();
         startMarqueeSelection(e);
+      }
+    });
+
+    // Quick-Add Dialog on double-click on empty canvas
+    canvasContainer.addEventListener('dblclick', function (e) {
+      if (!e.target.closest('.strategy-block') &&
+        !e.target.closest('.block-params-popup') &&
+        !e.target.closest('.quick-add-dialog')) {
+        e.preventDefault();
+        const rect = canvasContainer.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        showQuickAddDialog(x, y);
       }
     });
   }
@@ -2804,6 +3542,18 @@ function setupEventListeners() {
     if (e.key === 'd' && e.ctrlKey && selectedBlockId) {
       e.preventDefault();
       duplicateSelected();
+    }
+    // Save selection as preset with Ctrl+Shift+S
+    if (e.key === 's' && e.ctrlKey && e.shiftKey) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      showSavePresetDialog();
+    }
+    // Open presets panel with Ctrl+P
+    if (e.key === 'p' && e.ctrlKey && !e.shiftKey) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      showPresetsPanel();
     }
   });
 
@@ -3070,6 +3820,63 @@ function setupEventListeners() {
     btn.addEventListener('click', autoLayout);
   });
 
+  // ===== Toolbar buttons by ID (CSP-compliant) =====
+  const btnUndo = document.getElementById('btnUndo');
+  if (btnUndo) {
+    btnUndo.addEventListener('click', () => {
+      console.log('[Strategy Builder] Undo button clicked');
+      undo();
+    });
+  }
+
+  const btnRedo = document.getElementById('btnRedo');
+  if (btnRedo) {
+    btnRedo.addEventListener('click', () => {
+      console.log('[Strategy Builder] Redo button clicked');
+      redo();
+    });
+  }
+
+  const btnDuplicate = document.getElementById('btnDuplicate');
+  if (btnDuplicate) {
+    btnDuplicate.addEventListener('click', () => {
+      console.log('[Strategy Builder] Duplicate button clicked');
+      duplicateSelected();
+    });
+  }
+
+  const btnClearAll = document.getElementById('btnClearAll');
+  if (btnClearAll) {
+    btnClearAll.addEventListener('click', () => {
+      console.log('[Strategy Builder] Clear All button clicked');
+      clearAllAndReset();
+    });
+    console.log('[Strategy Builder] Clear All button listener attached');
+  } else {
+    console.warn('[Strategy Builder] Clear All button not found!');
+  }
+
+  const btnAlignLeft = document.getElementById('btnAlignLeft');
+  if (btnAlignLeft) {
+    btnAlignLeft.addEventListener('click', () => alignBlocks('left'));
+  }
+
+  const btnAlignCenter = document.getElementById('btnAlignCenter');
+  if (btnAlignCenter) {
+    btnAlignCenter.addEventListener('click', () => alignBlocks('center'));
+  }
+
+  const btnAlignRight = document.getElementById('btnAlignRight');
+  if (btnAlignRight) {
+    btnAlignRight.addEventListener('click', () => alignBlocks('right'));
+  }
+
+  const btnAutoLayout = document.getElementById('btnAutoLayout');
+  if (btnAutoLayout) {
+    btnAutoLayout.addEventListener('click', () => autoLayout());
+  }
+  // ===== End Toolbar buttons =====
+
   document.querySelectorAll('[onclick*="fitToScreen"]').forEach((btn) => {
     btn.removeAttribute('onclick');
     btn.addEventListener('click', fitToScreen);
@@ -3175,7 +3982,7 @@ function setupEventListeners() {
   }
 }
 
-function toggleCategory(header) {
+function _toggleCategory(header) {
   const category = header.parentElement;
   const wasCollapsed = category.classList.contains('collapsed');
 
@@ -3204,14 +4011,67 @@ function toggleCategory(header) {
 }
 
 function filterBlocks() {
-  const search = document.getElementById('blockSearch').value.toLowerCase();
+  const search = document.getElementById('blockSearch').value.toLowerCase().trim();
   const items = document.querySelectorAll('.block-item');
+  const categories = document.querySelectorAll('.block-category');
+
+  if (!search) {
+    // Show all blocks and restore category state
+    items.forEach((item) => {
+      item.style.display = 'flex';
+      item.classList.remove('search-highlight');
+    });
+    categories.forEach((cat) => {
+      cat.style.display = 'block';
+      cat.classList.remove('has-search-results', 'no-search-results');
+      // Update count to original
+      const count = cat.querySelectorAll('.block-item').length;
+      const countEl = cat.querySelector('.category-count');
+      if (countEl) countEl.textContent = `(${count})`;
+    });
+    return;
+  }
+
+  // Filter blocks and track matches per category
+  const categoryMatches = new Map();
 
   items.forEach((item) => {
     const name = item.querySelector('.block-name').textContent.toLowerCase();
     const desc = item.querySelector('.block-desc').textContent.toLowerCase();
-    item.style.display =
-      name.includes(search) || desc.includes(search) ? 'flex' : 'none';
+    const blockId = item.dataset.blockId?.toLowerCase() || '';
+    const matches = name.includes(search) || desc.includes(search) || blockId.includes(search);
+
+    item.style.display = matches ? 'flex' : 'none';
+    item.classList.toggle('search-highlight', matches);
+
+    // Track category matches
+    const category = item.closest('.block-category');
+    if (category) {
+      const currentCount = categoryMatches.get(category) || 0;
+      categoryMatches.set(category, currentCount + (matches ? 1 : 0));
+    }
+  });
+
+  // Update category visibility and counts
+  categories.forEach((cat) => {
+    const matchCount = categoryMatches.get(cat) || 0;
+    const hasMatches = matchCount > 0;
+
+    cat.style.display = hasMatches ? 'block' : 'none';
+    cat.classList.toggle('has-search-results', hasMatches);
+    cat.classList.toggle('no-search-results', !hasMatches);
+
+    // Update count to show matches
+    const countEl = cat.querySelector('.category-count');
+    if (countEl && hasMatches) {
+      const totalCount = cat.querySelectorAll('.block-item').length;
+      countEl.textContent = `(${matchCount}/${totalCount})`;
+    }
+
+    // Auto-expand categories with matches
+    if (hasMatches) {
+      cat.classList.remove('collapsed');
+    }
   });
 }
 
@@ -4052,13 +4912,13 @@ function getDefaultParams(blockType) {
       atr_sl_enable: true,
       atr_sl_wicks: true,
       atr_sl_method: 'RMA',
-      atr_sl_period: 14,
+      atr_sl_period: 140,
       atr_sl_multiplier: 2.0,
       // ATR Take Profit
       atr_tp_enable: false,
       atr_tp_wicks: true,
       atr_tp_method: 'RMA',
-      atr_tp_period: 14,
+      atr_tp_period: 140,
       atr_tp_multiplier: 3.0,
       from_entry: true
     },
@@ -4103,15 +4963,14 @@ function getDefaultParams(blockType) {
     // =============================================
     // CLOSE CONDITIONS (EXIT RULES)
     // =============================================
-    tp_percent: {
-      take_profit_percent: 3.0,
-      use_for_long: true,
-      use_for_short: true
-    },
-    sl_percent: {
+    static_sltp: {
+      take_profit_percent: 1.5,
       stop_loss_percent: 1.5,
-      use_for_long: true,
-      use_for_short: true
+      sl_type: 'average_price',
+      close_only_in_profit: false,
+      activate_breakeven: false,
+      breakeven_activation_percent: 0.5,
+      new_breakeven_sl_percent: 0.1
     },
     trailing_stop_exit: {
       activation_percent: 1.0,
@@ -4119,11 +4978,16 @@ function getDefaultParams(blockType) {
       trail_type: 'percent'
     },
     atr_exit: {
-      atr_period: 14,
-      tp_atr_multiplier: 3.0,
-      sl_atr_multiplier: 1.5,
-      use_atr_tp: true,
-      use_atr_sl: true
+      use_atr_sl: false,
+      atr_sl_on_wicks: false,
+      atr_sl_smoothing: 'WMA',
+      atr_sl_period: 140,
+      atr_sl_multiplier: 4.0,
+      use_atr_tp: false,
+      atr_tp_on_wicks: false,
+      atr_tp_smoothing: 'WMA',
+      atr_tp_period: 140,
+      atr_tp_multiplier: 4.0
     },
     time_exit: {
       exit_after_bars: 10,
@@ -4289,20 +5153,22 @@ function getDefaultParams(blockType) {
     // ENTRY REFINEMENT
     // =============================================
     dca: {
-      orders_count: 5,
-      price_step: 1.0,
-      size_multiplier: 1.0,
-      total_size: 100
-    },
-    pyramiding: {
-      max_adds: 3,
-      add_size_percent: 50,
-      profit_trigger: 1.0
+      grid_size_percent: 15,
+      order_count: 5,
+      martingale_coefficient: 1.0,
+      log_steps_coefficient: 1.0,
+      first_order_offset: 0,
+      grid_trailing: 0
     },
     grid_orders: {
-      grid_levels: 5,
-      grid_step: 1.0,
-      size_per_level: 20
+      // Manual grid - array of orders with offset % and volume %
+      orders: [
+        { offset: 0.1, volume: 25 },
+        { offset: 1.0, volume: 25 },
+        { offset: 1.5, volume: 25 },
+        { offset: 2.0, volume: 25 }
+      ],
+      grid_trailing: 0 // Grid Trailing / Cancel (%), 0 = disabled
     },
     average_down: {
       max_adds: 3,
@@ -4325,19 +5191,6 @@ function getDefaultParams(blockType) {
       max_steps: 3,
       reset_on_loss: true,
       base_size_percent: 10
-    },
-    dca_by_signal: {
-      max_dca_orders: 5,
-      size_multiplier: 1.0,
-      same_signal_required: true,
-      min_bars_between: 3
-    },
-    dca_by_percent: {
-      price_drop_percent: 2.0,
-      max_dca_orders: 5,
-      size_per_order: 20,
-      size_multiplier: 1.5,
-      use_multiplier: true
     },
     scale_in: {
       total_orders: 3,
@@ -4579,44 +5432,6 @@ function getDefaultParams(blockType) {
     },
 
     // =============================================
-    // DCA GRID (from TradingView Multi DCA Strategy)
-    // =============================================
-    dca_grid_enable: {
-      enabled: false,
-      direction: 'long',
-      deposit: 1000,
-      leverage: 1
-    },
-    dca_grid_settings: {
-      grid_size_percent: 15,
-      order_count: 5,
-      leverage: 1,
-      use_isolated_margin: true
-    },
-    dca_martingale_config: {
-      martingale_multiplier: 1.0,
-      min_multiplier: 1.0,
-      max_multiplier: 1.8,
-      step: 0.1
-    },
-    dca_log_steps: {
-      log_steps_multiplier: 1.0,
-      min_multiplier: 0.8,
-      max_multiplier: 1.4,
-      step: 0.05
-    },
-    dca_dynamic_tp: {
-      enabled: false,
-      trigger_order_count: 3,
-      new_tp_percent: 0.5
-    },
-    dca_safety_close: {
-      enabled: false,
-      max_drawdown_amount: 95,
-      use_percent: false
-    },
-
-    // =============================================
     // MULTIPLE TAKE PROFITS
     // =============================================
     multi_tp_enable: {
@@ -4642,28 +5457,6 @@ function getDefaultParams(blockType) {
       percent: 2.0,
       close_percent: 25,
       enabled: true
-    },
-
-    // =============================================
-    // ATR-BASED EXIT
-    // =============================================
-    atr_sl: {
-      enabled: false,
-      atr_period: 14,
-      atr_multiplier: 2.0,
-      smoothing_method: 'RMA',
-      use_wicks: false
-    },
-    atr_tp: {
-      enabled: false,
-      atr_period: 14,
-      atr_multiplier: 3.0,
-      smoothing_method: 'RMA',
-      use_wicks: false
-    },
-    atr_wicks_mode: {
-      check_wicks: false,
-      description: 'If disabled, ATR SL/TP checked only on bar close'
     },
 
     // =============================================
@@ -4848,9 +5641,390 @@ function getDefaultParams(blockType) {
       pivot_lookback: 5,
       use_regular: true,
       use_hidden: false
+    },
+
+    // =============================================
+    // SMART SIGNALS (Composite nodes)
+    // =============================================
+    // RSI signals
+    rsi_overbought_signal: {
+      period: 14,
+      threshold: 70,
+      source: 'close',
+      signal_type: 'short'
+    },
+    rsi_oversold_signal: {
+      period: 14,
+      threshold: 30,
+      source: 'close',
+      signal_type: 'long'
+    },
+    rsi_cross_up_signal: {
+      period: 14,
+      threshold: 50,
+      source: 'close',
+      signal_type: 'long'
+    },
+    rsi_cross_down_signal: {
+      period: 14,
+      threshold: 50,
+      source: 'close',
+      signal_type: 'short'
+    },
+    // Stochastic signals
+    stoch_overbought_signal: {
+      k_period: 14,
+      d_period: 3,
+      smooth_k: 3,
+      threshold: 80,
+      signal_type: 'short'
+    },
+    stoch_oversold_signal: {
+      k_period: 14,
+      d_period: 3,
+      smooth_k: 3,
+      threshold: 20,
+      signal_type: 'long'
+    },
+    stoch_k_cross_d_up: {
+      k_period: 14,
+      d_period: 3,
+      smooth_k: 3,
+      signal_type: 'long'
+    },
+    stoch_k_cross_d_down: {
+      k_period: 14,
+      d_period: 3,
+      smooth_k: 3,
+      signal_type: 'short'
+    },
+    // MACD signals
+    macd_cross_signal_up: {
+      fast_period: 12,
+      slow_period: 26,
+      signal_period: 9,
+      signal_type: 'long'
+    },
+    macd_cross_signal_down: {
+      fast_period: 12,
+      slow_period: 26,
+      signal_period: 9,
+      signal_type: 'short'
+    },
+    macd_cross_zero_up: {
+      fast_period: 12,
+      slow_period: 26,
+      signal_period: 9,
+      signal_type: 'long'
+    },
+    macd_cross_zero_down: {
+      fast_period: 12,
+      slow_period: 26,
+      signal_period: 9,
+      signal_type: 'short'
+    },
+    // Moving Average signals
+    golden_cross_signal: {
+      fast_period: 50,
+      slow_period: 200,
+      ma_type: 'ema',
+      signal_type: 'long'
+    },
+    death_cross_signal: {
+      fast_period: 50,
+      slow_period: 200,
+      ma_type: 'ema',
+      signal_type: 'short'
+    },
+    price_above_ma_signal: {
+      period: 20,
+      ma_type: 'ema',
+      source: 'close',
+      signal_type: 'long'
+    },
+    price_below_ma_signal: {
+      period: 20,
+      ma_type: 'ema',
+      source: 'close',
+      signal_type: 'short'
+    },
+    // Bollinger signals
+    bb_upper_touch_signal: {
+      period: 20,
+      std_dev: 2.0,
+      source: 'close',
+      signal_type: 'short'
+    },
+    bb_lower_touch_signal: {
+      period: 20,
+      std_dev: 2.0,
+      source: 'close',
+      signal_type: 'long'
+    },
+    bb_squeeze_signal: {
+      period: 20,
+      std_dev: 2.0,
+      squeeze_threshold: 0.02,
+      signal_type: 'neutral'
+    },
+    // SuperTrend signals
+    supertrend_buy_signal: {
+      period: 10,
+      multiplier: 3.0,
+      signal_type: 'long'
+    },
+    supertrend_sell_signal: {
+      period: 10,
+      multiplier: 3.0,
+      signal_type: 'short'
+    },
+    // Volume signals
+    volume_spike_signal: {
+      ma_period: 20,
+      multiplier: 2.0,
+      signal_type: 'neutral'
+    },
+    volume_dry_signal: {
+      ma_period: 20,
+      multiplier: 0.5,
+      signal_type: 'neutral'
     }
   };
   return params[blockType] || {};
+}
+
+/**
+ * Render Manual Grid Orders panel with dynamic order list
+ * Allows adding/removing orders with offset % and volume %
+ */
+function renderGridOrdersPanel(block, blockId, _optimizationMode = false) {
+  const params = block.params || {};
+  const orders = params.orders || [{ offset: 0.1, volume: 25 }];
+  const MAX_ORDERS = 40;
+
+  // Calculate stats
+  const totalVolume = orders.reduce((sum, o) => sum + (parseFloat(o.volume) || 0), 0);
+  const remainingVolume = Math.max(0, 100 - totalVolume);
+  const isVolumeValid = Math.abs(totalVolume - 100) < 0.01;
+
+  let html = `
+    <div class="tv-params-container grid-orders-panel" data-block-id="${blockId}">
+      <div class="grid-orders-header">
+        <div class="grid-orders-stats">
+          <span class="grid-stat">
+            <span class="grid-stat-label">ОРДЕРОВ</span>
+            <span class="grid-stat-value">${orders.length}/${MAX_ORDERS}</span>
+          </span>
+          <span class="grid-stat">
+            <span class="grid-stat-label">ОСТАТОК ДЕПОЗИТА</span>
+            <span class="grid-stat-value ${remainingVolume > 0 ? 'warning' : ''}">${remainingVolume.toFixed(1)}%</span>
+          </span>
+        </div>
+        <div class="grid-orders-hint ${isVolumeValid ? 'valid' : 'warning'}">
+          <i class="bi bi-${isVolumeValid ? 'check-circle-fill' : 'exclamation-circle'}"></i>
+          ${isVolumeValid
+      ? 'Распределено 100% объёма депозита'
+      : 'Распределите 100% объёма по ордерам'}
+        </div>
+      </div>
+      
+      <div class="grid-trailing-row">
+        <div class="grid-order-field grid-trailing-field">
+          <label class="grid-order-label">
+            GRID TRAILING / CANCEL (%)
+            <i class="bi bi-info-circle" title="Подтяжка сетки: отмена ордеров если цена отклонилась на указанный %. 0 = отключено."></i>
+          </label>
+          <input type="number" 
+                 class="grid-order-input grid-trailing-input" 
+                 value="${params.grid_trailing || 0}" 
+                 step="0.1" 
+                 min="0" 
+                 max="30"
+                 data-field="grid_trailing"
+                 id="gridTrailing_${blockId}">
+        </div>
+      </div>
+      
+      <div class="grid-orders-list" id="gridOrdersList_${blockId}">
+  `;
+
+  // Render each order row
+  orders.forEach((order, index) => {
+    html += `
+        <div class="grid-order-row" data-order-index="${index}">
+          <div class="grid-order-field">
+            <label class="grid-order-label">ОТСТУП %</label>
+            <input type="number" 
+                   class="grid-order-input" 
+                   value="${order.offset}" 
+                   step="0.01" 
+                   min="0" 
+                   max="100"
+                   data-field="offset"
+                   data-order-index="${index}">
+          </div>
+          <div class="grid-order-field">
+            <label class="grid-order-label">ОБЪЁМ %</label>
+            <input type="number" 
+                   class="grid-order-input" 
+                   value="${order.volume}" 
+                   step="0.1" 
+                   min="0.1" 
+                   max="100"
+                   data-field="volume"
+                   data-order-index="${index}">
+          </div>
+          <button class="grid-order-remove" data-order-index="${index}" title="Удалить ордер">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+    `;
+  });
+
+  html += `
+      </div>
+      
+      <button class="grid-orders-add-btn" id="gridAddOrder_${blockId}" ${orders.length >= MAX_ORDERS ? 'disabled' : ''}>
+        <i class="bi bi-plus-lg"></i> Добавить ордер
+      </button>
+    </div>
+  `;
+
+  return html;
+}
+
+/**
+ * Initialize Grid Orders panel event handlers
+ * Called after popup is rendered
+ */
+function initGridOrdersPanel(popup, blockId) {
+  const block = strategyBlocks.find(b => b.id === blockId);
+  if (!block || block.type !== 'grid_orders') return;
+
+  const panel = popup.querySelector('.grid-orders-panel');
+  if (!panel) return;
+
+  // Helper to update block hint
+  const updateHint = () => {
+    const blockEl = document.getElementById(blockId);
+    if (blockEl) {
+      const hintEl = blockEl.querySelector('.block-param-hint');
+      if (hintEl) {
+        hintEl.textContent = getCompactParamHint(block.params, block.type);
+      }
+    }
+  };
+
+  // Handle input changes
+  panel.addEventListener('input', (e) => {
+    if (e.target.classList.contains('grid-order-input')) {
+      const field = e.target.dataset.field;
+      const value = parseFloat(e.target.value) || 0;
+
+      // Handle grid_trailing separately (not in orders array)
+      if (field === 'grid_trailing') {
+        block.params.grid_trailing = value;
+        updateHint();
+        pushUndo();
+        return;
+      }
+
+      // Handle order fields
+      const index = parseInt(e.target.dataset.orderIndex);
+      if (!block.params.orders) block.params.orders = [];
+      if (block.params.orders[index]) {
+        block.params.orders[index][field] = value;
+      }
+
+      updateGridOrdersStats(panel, block);
+      updateHint();
+      pushUndo();
+    }
+  });
+
+  // Handle remove button clicks
+  panel.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.grid-order-remove');
+    if (removeBtn) {
+      const index = parseInt(removeBtn.dataset.orderIndex);
+      if (block.params.orders && block.params.orders.length > 1) {
+        block.params.orders.splice(index, 1);
+        refreshGridOrdersPanel(popup, blockId);
+        updateHint();
+        pushUndo();
+      }
+    }
+  });
+
+  // Handle add button
+  const addBtn = panel.querySelector('.grid-orders-add-btn');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      if (!block.params.orders) block.params.orders = [];
+      if (block.params.orders.length < 40) {
+        // Calculate next offset (last offset + 0.5%)
+        const lastOrder = block.params.orders[block.params.orders.length - 1];
+        const newOffset = lastOrder ? parseFloat(lastOrder.offset) + 0.5 : 0.1;
+
+        // Calculate remaining volume and distribute
+        const totalVolume = block.params.orders.reduce((sum, o) => sum + (parseFloat(o.volume) || 0), 0);
+        const remaining = Math.max(0, 100 - totalVolume);
+        const newVolume = remaining > 0 ? Math.min(remaining, 25) : 25;
+
+        block.params.orders.push({ offset: newOffset, volume: newVolume });
+        refreshGridOrdersPanel(popup, blockId);
+        updateHint();
+        pushUndo();
+      }
+    });
+  }
+
+  // Enable wheel scroll for number inputs
+  enableWheelScrollForNumberInputs(panel);
+}
+
+/**
+ * Refresh Grid Orders panel after changes
+ */
+function refreshGridOrdersPanel(popup, blockId) {
+  const block = strategyBlocks.find(b => b.id === blockId);
+  if (!block) return;
+
+  const container = popup.querySelector('.popup-body');
+  if (!container) return;
+
+  container.innerHTML = renderGridOrdersPanel(block, blockId, false);
+  initGridOrdersPanel(popup, blockId);
+}
+
+/**
+ * Update Grid Orders stats display
+ */
+function updateGridOrdersStats(panel, block) {
+  const orders = block.params.orders || [];
+  const totalVolume = orders.reduce((sum, o) => sum + (parseFloat(o.volume) || 0), 0);
+  const remainingVolume = Math.max(0, 100 - totalVolume);
+  const isVolumeValid = Math.abs(totalVolume - 100) < 0.01;
+
+  // Update stats
+  const statsValue = panel.querySelectorAll('.grid-stat-value');
+  if (statsValue[0]) statsValue[0].textContent = `${orders.length}/40`;
+  if (statsValue[1]) {
+    statsValue[1].textContent = `${remainingVolume.toFixed(1)}%`;
+    statsValue[1].classList.toggle('warning', remainingVolume > 0);
+  }
+
+  // Update hint
+  const hint = panel.querySelector('.grid-orders-hint');
+  if (hint) {
+    hint.className = `grid-orders-hint ${isVolumeValid ? 'valid' : 'warning'}`;
+    hint.innerHTML = `
+      <i class="bi bi-${isVolumeValid ? 'check-circle-fill' : 'exclamation-circle'}"></i>
+      ${isVolumeValid
+        ? 'Распределено 100% объёма депозита'
+        : 'Распределите 100% объёма по ордерам'}
+    `;
+  }
 }
 
 /**
@@ -4861,9 +6035,13 @@ function getDefaultParams(blockType) {
  * Render params like TradingView - simple vertical layout
  * Supports both Default and Optimization modes
  */
-function renderGroupedParams(block, optimizationMode = false) {
+function renderGroupedParams(block, optimizationMode = false, showHeader = true) {
   const blockId = block.id;
-  const params = block.params || {};
+  // Merge defaults with existing params so missing keys get filled
+  const defaults = getDefaultParams(block.type);
+  const params = { ...defaults, ...(block.params || {}) };
+  // Persist merged params back to block so values are saved
+  block.params = params;
   const optParams = block.optimizationParams || {};
 
   // Только таймфреймы Bybit API v5: 1,3,5,15,30,60,120,240,360,720,D,W,M
@@ -6103,40 +7281,42 @@ function renderGroupedParams(block, optimizationMode = false) {
     // =============================================
     // CLOSE CONDITIONS (EXIT RULES)
     // =============================================
-    tp_percent: {
-      title: 'TAKE PROFIT %',
+    static_sltp: {
+      title: 'STATIC SL/TP',
       fields: [
-        { key: 'take_profit_percent', label: 'Take Profit %', type: 'number', optimizable: true },
-        { key: 'use_for_long', label: 'Use for LONG positions', type: 'checkbox' },
-        { key: 'use_for_short', label: 'Use for SHORT positions', type: 'checkbox' }
-      ]
-    },
-    sl_percent: {
-      title: 'STOP LOSS %',
-      fields: [
-        { key: 'stop_loss_percent', label: 'Stop Loss %', type: 'number', optimizable: true },
-        { key: 'use_for_long', label: 'Use for LONG positions', type: 'checkbox' },
-        { key: 'use_for_short', label: 'Use for SHORT positions', type: 'checkbox' }
+        { key: 'take_profit_percent', label: 'Take Profit (%)', type: 'number', optimizable: true },
+        { key: 'stop_loss_percent', label: 'Stop Loss (%)', type: 'number', optimizable: true },
+        { key: 'sl_type', label: 'Тип стоп-лосса', type: 'select', options: ['average_price', 'last_order'], optionLabels: ['От средней цены', 'От последнего ордера'], selectStyle: 'min-width: 200px;' },
+        { key: '_sep_advanced', label: 'Advanced', type: 'separator' },
+        { key: 'close_only_in_profit', label: 'Close only in Profit', type: 'checkbox' },
+        { key: 'activate_breakeven', label: 'Activate Breakeven?', type: 'checkbox' },
+        { key: 'breakeven_activation_percent', label: '(%) to Activate Breakeven', type: 'number', optimizable: true },
+        { key: 'new_breakeven_sl_percent', label: 'New Breakeven SL (%)', type: 'number', optimizable: true }
       ]
     },
     trailing_stop_exit: {
       title: 'TRAILING STOP',
       fields: [
-        { key: 'activation_percent', label: 'Activation Profit %', type: 'number', optimizable: true },
-        { key: 'trailing_percent', label: 'Trail Distance %', type: 'number', optimizable: true },
-        { key: 'trail_type', label: 'Trail Type', type: 'select', options: ['percent', 'atr', 'points'] }
+        { key: 'activation_percent', label: 'Активация (% прибыли)', type: 'number', optimizable: true },
+        { key: 'trailing_percent', label: 'Дистанция трейла (%)', type: 'number', optimizable: true },
+        { key: 'trail_type', label: 'Тип трейлинга', type: 'select', options: ['percent', 'atr', 'points'], optionLabels: ['Процент', 'ATR', 'Пункты'], selectStyle: 'min-width: 200px;' }
       ]
     },
     atr_exit: {
       title: 'ATR-BASED EXIT',
       fields: [
-        { key: 'atr_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Take Profit -------' },
-        { key: 'use_atr_tp', label: 'Use ATR for Take Profit', type: 'checkbox' },
-        { key: 'tp_atr_multiplier', label: 'TP ATR Multiplier', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Stop Loss -------' },
-        { key: 'use_atr_sl', label: 'Use ATR for Stop Loss', type: 'checkbox' },
-        { key: 'sl_atr_multiplier', label: 'SL ATR Multiplier', type: 'number', optimizable: true }
+        { type: 'separator', label: '======== ATR STOP LOSS ========' },
+        { key: 'use_atr_sl', label: 'Use ATR Stop Loss ?', type: 'checkbox', hasTooltip: true, tooltip: 'Close position if current Loss >= (Multiplier × ATR)' },
+        { key: 'atr_sl_on_wicks', label: 'ATR SL work on Wicks ?', type: 'checkbox', hasTooltip: true, tooltip: 'If Disabled — ATR SL will be checked only after Close of current bar. Wicks are ignored. Use Static SL for protection.' },
+        { key: 'atr_sl_smoothing', label: 'ATR SL Smoothing Method', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'], optionLabels: ['WMA', 'RMA', 'SMA', 'EMA'], selectStyle: 'min-width: 120px;' },
+        { key: 'atr_sl_period', label: 'ATR SL Smoothing Period', type: 'number', min: 1, max: 150, optimizable: true },
+        { key: 'atr_sl_multiplier', label: 'Size of ATR SL (Multiplier×ATR)', type: 'number', min: 0.1, max: 4, step: 0.1, optimizable: true },
+        { type: 'separator', label: '======== ATR TAKE PROFIT ========' },
+        { key: 'use_atr_tp', label: 'Use ATR Take Profit ?', type: 'checkbox', hasTooltip: true, tooltip: 'Close position if current Profit >= (Multiplier × ATR)' },
+        { key: 'atr_tp_on_wicks', label: 'ATR TP work on Wicks ?', type: 'checkbox', hasTooltip: true, tooltip: 'If Disabled — ATR TP will be checked only after Close of current bar. Wicks are ignored.' },
+        { key: 'atr_tp_smoothing', label: 'ATR TP Smoothing Method', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'], optionLabels: ['WMA', 'RMA', 'SMA', 'EMA'], selectStyle: 'min-width: 120px;' },
+        { key: 'atr_tp_period', label: 'ATR TP Smoothing Period', type: 'number', min: 1, max: 150, optimizable: true },
+        { key: 'atr_tp_multiplier', label: 'Size of ATR TP (Multiplier×ATR)', type: 'number', min: 0.1, max: 4, step: 0.1, optimizable: true }
       ]
     },
     time_exit: {
@@ -6379,27 +7559,18 @@ function renderGroupedParams(block, optimizationMode = false) {
     dca: {
       title: 'DCA (Dollar Cost Averaging)',
       fields: [
-        { key: 'orders_count', label: 'Number of Orders', type: 'number', optimizable: true },
-        { key: 'price_step', label: 'Price Step %', type: 'number', optimizable: true },
-        { key: 'size_multiplier', label: 'Size Multiplier', type: 'number', optimizable: true },
-        { key: 'total_size', label: 'Total Size %', type: 'number', optimizable: false }
-      ]
-    },
-    pyramiding: {
-      title: 'Pyramiding',
-      fields: [
-        { key: 'max_adds', label: 'Max Additions', type: 'number', optimizable: true },
-        { key: 'add_size_percent', label: 'Add Size %', type: 'number', optimizable: true },
-        { key: 'profit_trigger', label: 'Profit Trigger %', type: 'number', optimizable: true }
+        { key: 'grid_size_percent', label: 'Grid Size (%)', type: 'number', step: 1, min: 1, max: 100, optimizable: true },
+        { key: 'order_count', label: 'Number of orders in the grid (3-15)', type: 'number', step: 1, min: 3, max: 15, optimizable: true },
+        { key: 'martingale_coefficient', label: 'Orders Value Martingale (1.0-1.8)', type: 'number', step: 0.1, min: 1.0, max: 1.8, optimizable: true },
+        { key: 'log_steps_coefficient', label: 'Logarithmic Orders Steps (0.8-1.4)', type: 'number', step: 0.1, min: 0.8, max: 1.4, optimizable: true },
+        { key: 'first_order_offset', label: 'Indent / Offset (0=Market, 0.01-10%)', type: 'number', step: 0.01, min: 0, max: 10, optimizable: true },
+        { key: 'grid_trailing', label: 'Grid Trailing / Cancel (0.1-30%)', type: 'number', step: 0.1, min: 0, max: 30, optimizable: true }
       ]
     },
     grid_orders: {
-      title: 'Grid Orders',
-      fields: [
-        { key: 'grid_levels', label: 'Grid Levels', type: 'number', optimizable: true },
-        { key: 'grid_step', label: 'Grid Step %', type: 'number', optimizable: true },
-        { key: 'size_per_level', label: 'Size per Level %', type: 'number', optimizable: false }
-      ]
+      title: 'Manual Grid Orders',
+      customRenderer: 'grid_orders', // Special renderer for dynamic order list
+      fields: [] // Handled by custom renderer
     },
     average_down: {
       title: 'Average Down',
@@ -6438,30 +7609,6 @@ function renderGroupedParams(block, optimizationMode = false) {
         { key: 'reset_on_loss', label: 'Reset on Loss', type: 'checkbox' },
         { type: 'separator', label: '------- Base Size -------' },
         { key: 'base_size_percent', label: 'Base Size %', type: 'number', optimizable: true }
-      ]
-    },
-    // =============================================
-    // DCA VARIANTS
-    // =============================================
-    dca_by_signal: {
-      title: 'DCA BY SIGNAL',
-      fields: [
-        { key: 'max_dca_orders', label: 'Max DCA Orders', type: 'number', optimizable: true },
-        { key: 'size_multiplier', label: 'Size Multiplier', type: 'number', optimizable: true },
-        { key: 'same_signal_required', label: 'Same Signal Required', type: 'checkbox' },
-        { type: 'separator', label: '------- Timing -------' },
-        { key: 'min_bars_between', label: 'Min Bars Between Orders', type: 'number', optimizable: true }
-      ]
-    },
-    dca_by_percent: {
-      title: 'DCA BY % DROP',
-      fields: [
-        { key: 'price_drop_percent', label: 'Price Drop % to Trigger', type: 'number', optimizable: true },
-        { key: 'max_dca_orders', label: 'Max DCA Orders', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Size Settings -------' },
-        { key: 'size_per_order', label: 'Size per Order %', type: 'number', optimizable: true },
-        { key: 'use_multiplier', label: 'Use Size Multiplier', type: 'checkbox' },
-        { key: 'size_multiplier', label: 'Size Multiplier (1.5)', type: 'number', optimizable: true }
       ]
     },
     scale_in: {
@@ -6766,75 +7913,6 @@ function renderGroupedParams(block, optimizationMode = false) {
     },
 
     // =============================================
-    // DCA GRID SETTINGS (TradingView Multi DCA)
-    // =============================================
-    dca_grid_enable: {
-      title: 'DCA GRID MODE',
-      fields: [
-        { key: 'enabled', label: 'Enable DCA Grid', type: 'checkbox' },
-        { key: 'direction', label: 'Grid Direction', type: 'select', options: ['long', 'short', 'both'] },
-        { key: 'leverage', label: 'Leverage', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Alerts -------' },
-        { key: 'first_order_alert_only', label: 'Alert Only on First Order', type: 'checkbox' }
-      ]
-    },
-    dca_grid_settings: {
-      title: 'GRID CONFIGURATION',
-      fields: [
-        { key: 'deposit', label: 'Bot Deposit ($)', type: 'number', optimizable: false },
-        { key: 'grid_size_percent', label: 'Grid Size %', type: 'number', optimizable: true },
-        { key: 'order_count', label: 'Number of Orders (3-15)', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Order Distribution -------' },
-        { key: 'first_order_percent', label: 'First Order % of Deposit', type: 'number', optimizable: true },
-        { key: 'step_type', label: 'Step Type', type: 'select', options: ['linear', 'logarithmic', 'custom'] }
-      ]
-    },
-    dca_martingale_config: {
-      title: 'MARTINGALE CONFIGURATION',
-      fields: [
-        { key: 'enabled', label: 'Use Martingale', type: 'checkbox' },
-        { key: 'coefficient', label: 'Martingale Coefficient (1.0-1.8)', type: 'number', optimizable: true },
-        { key: 'mode', label: 'Mode', type: 'select', options: ['multiply_each', 'multiply_total', 'progressive'] },
-        { type: 'separator', label: '------- Safety Limits -------' },
-        { key: 'max_order_size', label: 'Max Single Order Size ($)', type: 'number', optimizable: false },
-        { key: 'max_total_position', label: 'Max Total Position ($)', type: 'number', optimizable: false }
-      ]
-    },
-    dca_log_steps: {
-      title: 'LOGARITHMIC STEPS',
-      fields: [
-        { key: 'enabled', label: 'Use Log Steps', type: 'checkbox' },
-        { key: 'coefficient', label: 'Log Coefficient (0.8-1.4)', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Step Preview -------' },
-        { key: 'first_step_percent', label: 'First Step %', type: 'number', optimizable: true },
-        { key: 'last_step_percent', label: 'Last Step %', type: 'number', optimizable: true }
-      ]
-    },
-    dca_dynamic_tp: {
-      title: 'DYNAMIC TAKE PROFIT',
-      fields: [
-        { key: 'enabled', label: 'Change TP on Many Orders', type: 'checkbox' },
-        { key: 'trigger_orders', label: 'If Orders More Than', type: 'number', optimizable: true },
-        { key: 'new_tp_percent', label: 'Set New TP %', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Adjustments -------' },
-        { key: 'decrease_per_order', label: 'Decrease TP per Order %', type: 'number', optimizable: true },
-        { key: 'min_tp_percent', label: 'Minimum TP %', type: 'number', optimizable: true }
-      ]
-    },
-    dca_safety_close: {
-      title: 'SAFETY CLOSE (DRAWDOWN)',
-      fields: [
-        { key: 'enabled', label: 'Close on Big Drawdown', type: 'checkbox' },
-        { key: 'threshold_type', label: 'Threshold Type', type: 'select', options: ['percent', 'amount'] },
-        { key: 'drawdown_percent', label: 'Drawdown % to Close', type: 'number', optimizable: true },
-        { key: 'drawdown_amount', label: 'Drawdown $ to Close', type: 'number', optimizable: false },
-        { type: 'separator', label: '------- Action -------' },
-        { key: 'action', label: 'Action', type: 'select', options: ['close_all', 'close_partial', 'pause'] },
-        { key: 'partial_close_percent', label: 'Partial Close %', type: 'number', optimizable: false }
-      ]
-    },
-
-    // =============================================
     // MULTIPLE TAKE PROFITS (TP1-TP4)
     // =============================================
     multi_tp_enable: {
@@ -6879,37 +7957,6 @@ function renderGroupedParams(block, optimizationMode = false) {
     },
 
     // =============================================
-    // ATR-BASED EXIT
-    // =============================================
-    atr_sl: {
-      title: 'ATR STOP LOSS',
-      fields: [
-        { key: 'enabled', label: 'Use ATR SL', type: 'checkbox' },
-        { key: 'atr_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true },
-        { key: 'smoothing', label: 'Smoothing', type: 'select', options: ['RMA', 'SMA', 'EMA', 'WMA'] },
-        { key: 'use_wicks', label: 'Consider Wicks', type: 'checkbox' }
-      ]
-    },
-    atr_tp: {
-      title: 'ATR TAKE PROFIT',
-      fields: [
-        { key: 'enabled', label: 'Use ATR TP', type: 'checkbox' },
-        { key: 'atr_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true },
-        { key: 'smoothing', label: 'Smoothing', type: 'select', options: ['RMA', 'SMA', 'EMA', 'WMA'] }
-      ]
-    },
-    atr_wicks_mode: {
-      title: 'ATR WICKS MODE',
-      fields: [
-        { key: 'enabled', label: 'Enable Wicks Mode', type: 'checkbox' },
-        { key: 'sl_wicks', label: 'SL Uses Wicks', type: 'checkbox' },
-        { key: 'tp_wicks', label: 'TP Uses Wicks', type: 'checkbox' }
-      ]
-    },
-
-    // =============================================
     // SIGNAL MEMORY
     // =============================================
     signal_memory_enable: {
@@ -6944,6 +7991,11 @@ function renderGroupedParams(block, optimizationMode = false) {
   const layout = customLayouts[block.type];
   if (!layout) return null;
 
+  // Special renderer for grid_orders (Manual Grid)
+  if (layout.customRenderer === 'grid_orders') {
+    return renderGridOrdersPanel(block, blockId, optimizationMode);
+  }
+
   // Helper to render a complete optimization row (label + checkbox + range inputs)
   const renderOptRow = (key, label, value) => {
     const opt = optParams[key] || { enabled: false, min: value, max: value, step: 1 };
@@ -6968,13 +8020,13 @@ function renderGroupedParams(block, optimizationMode = false) {
 
   let html = '<div class="tv-params-container">';
 
-  // Header
-  if (layout.title && !optimizationMode) {
+  // Header - only show if showHeader is true
+  if (showHeader && layout.title && !optimizationMode) {
     html += `<div class="tv-params-header">${layout.title}</div>`;
   }
 
-  // Optimization mode header
-  if (optimizationMode) {
+  // Optimization mode header - only show if showHeader is true
+  if (showHeader && optimizationMode) {
     html += `<div class="tv-params-header">Optimization: ${layout.title || block.name}</div>`;
   }
 
@@ -7000,12 +8052,16 @@ function renderGroupedParams(block, optimizationMode = false) {
           html += `<span class="tv-inline-label">${f.label}</span>`;
         } else if (f.type === 'number') {
           const val = params[f.key] ?? '';
+          const stepAttr = f.step ? `step="${f.step}"` : '';
+          const minAttr = f.min !== undefined ? `min="${f.min}"` : '';
+          const maxAttr = f.max !== undefined ? `max="${f.max}"` : '';
           html += `
             ${f.label ? `<span class="tv-inline-label">${f.label}</span>` : ''}
             <input type="number" 
                    class="tv-input tv-input-inline"
                    style="width: ${f.width || '80px'}"
                    value="${val}"
+                   ${stepAttr} ${minAttr} ${maxAttr}
                    data-block-id="${blockId}"
                    data-param-key="${f.key}">
           `;
@@ -7037,16 +8093,18 @@ function renderGroupedParams(block, optimizationMode = false) {
         </div>
       `;
     } else if (field.type === 'select' && !optimizationMode) {
-      const val = params[field.key] ?? 'chart';
+      const val = (params[field.key] ?? 'chart').toString().toLowerCase();
       html += `
         <div class="tv-param-row">
           <label class="tv-label">${field.label}</label>
           <select class="tv-select"
                   data-block-id="${blockId}"
-                  data-param-key="${field.key}">
-            ${field.options.map(opt => {
+                  data-param-key="${field.key}"
+                  style="${field.selectStyle || ''}">
+            ${field.options.map((opt, idx) => {
         const optVal = opt.toLowerCase();
-        return `<option value="${optVal}" ${val === optVal ? 'selected' : ''}>${opt}</option>`;
+        const displayLabel = field.optionLabels ? field.optionLabels[idx] : opt;
+        return `<option value="${optVal}" ${val === optVal ? 'selected' : ''}>${displayLabel}</option>`;
       }).join('')}
           </select>
         </div>
@@ -7058,13 +8116,17 @@ function renderGroupedParams(block, optimizationMode = false) {
         // Optimization mode - use complete opt row
         html += renderOptRow(field.key, field.label, val);
       } else if (!optimizationMode) {
-        // Default mode - show single input
+        // Default mode - show single input with step, min, max attributes
+        const stepAttr = field.step ? `step="${field.step}"` : '';
+        const minAttr = field.min !== undefined ? `min="${field.min}"` : '';
+        const maxAttr = field.max !== undefined ? `max="${field.max}"` : '';
         html += `
           <div class="tv-param-row">
             <label class="tv-label">${field.label}</label>
             <input type="number" 
                    class="tv-input"
                    value="${val}"
+                   ${stepAttr} ${minAttr} ${maxAttr}
                    data-block-id="${blockId}"
                    data-param-key="${field.key}">
             ${field.hasTooltip ? '<i class="bi bi-info-circle tv-tooltip-icon"></i>' : ''}
@@ -7077,7 +8139,7 @@ function renderGroupedParams(block, optimizationMode = false) {
 }
 
 // Get port configuration based on block type
-function getBlockPorts(blockId, category) {
+function getBlockPorts(blockId, _category) {
   const portConfigs = {
     // Indicators - output data
     rsi: {
@@ -7244,19 +8306,37 @@ function getBlockPorts(blockId, category) {
     timeframe: {
       inputs: [],
       outputs: [{ id: 'value', label: '', type: 'data' }]
-    },
+    }
 
-    // Main Strategy node - receives entry/exit signals
-    strategy: {
+    // Note: 'strategy' ports are dynamic - handled below
+  };
+
+  // Special handling for main Strategy node - ports depend on direction setting
+  // Always 2 ports: Entry and Exit (direction determines which signals are used)
+  if (blockId === 'strategy') {
+    const direction = document.getElementById('builderDirection')?.value || 'both';
+    let entryLabel, exitLabel;
+
+    if (direction === 'long') {
+      entryLabel = 'Entry';
+      exitLabel = 'Exit';
+    } else if (direction === 'short') {
+      entryLabel = 'Entry';
+      exitLabel = 'Exit';
+    } else {
+      // both - universal ports
+      entryLabel = 'Entry';
+      exitLabel = 'Exit';
+    }
+
+    return {
       inputs: [
-        { id: 'entry_long', label: 'Entry Long', type: 'condition' },
-        { id: 'exit_long', label: 'Exit Long', type: 'condition' },
-        { id: 'entry_short', label: 'Entry Short', type: 'condition' },
-        { id: 'exit_short', label: 'Exit Short', type: 'condition' }
+        { id: 'entry', label: entryLabel, type: 'condition' },
+        { id: 'exit', label: exitLabel, type: 'condition' }
       ],
       outputs: []
-    }
-  };
+    };
+  }
 
   return (
     portConfigs[blockId] || {
@@ -7302,6 +8382,44 @@ function renderPorts(ports, direction, blockId) {
   `;
 }
 
+// Special render for main Strategy node with ports on top and bottom
+function renderMainStrategyNode(block, ports) {
+  const entryPort = ports.inputs.find(p => p.id === 'entry');
+  const exitPort = ports.inputs.find(p => p.id === 'exit');
+
+  return `
+    <div class="strategy-block main main-block main-strategy-node"
+         id="${block.id}"
+         style="left: ${block.x}px; top: ${block.y}px"
+         data-block-id="${block.id}">
+        <!-- Entry port on top (outside circle) -->
+        <div class="port condition-port main-port-top" 
+             data-port-id="entry" 
+             data-port-type="condition"
+             data-block-id="${block.id}"
+             data-direction="input"
+             title="Entry Signal"></div>
+        
+        <!-- Entry label inside circle, under top port -->
+        <span class="main-port-label top-label">${entryPort?.label || 'Entry'}</span>
+        
+        <!-- Center title -->
+        <div class="main-block-title">${block.name}</div>
+        
+        <!-- Exit label inside circle, above bottom port -->
+        <span class="main-port-label bottom-label">${exitPort?.label || 'Exit'}</span>
+        
+        <!-- Exit port on bottom (outside circle) -->
+        <div class="port condition-port main-port-bottom" 
+             data-port-id="exit" 
+             data-port-type="condition"
+             data-block-id="${block.id}"
+             data-direction="input"
+             title="Exit Signal"></div>
+    </div>
+  `;
+}
+
 function renderBlocks() {
   console.log(`[Strategy Builder] renderBlocks called, blocks count: ${strategyBlocks.length}`);
   const container = document.getElementById('blocksContainer');
@@ -7313,11 +8431,17 @@ function renderBlocks() {
     .map((block) => {
       const ports = getBlockPorts(block.type, block.category);
       const isMain = block.isMain === true;
-      const paramHint = getCompactParamHint(block.params || {});
+
+      // Special rendering for main Strategy node
+      if (isMain) {
+        return renderMainStrategyNode(block, ports);
+      }
+
+      const paramHint = getCompactParamHint(block.params || {}, block.type);
       const hasOptimization = block.optimizationParams &&
         Object.values(block.optimizationParams).some(p => p.enabled);
       return `
-        <div class="strategy-block ${block.category} ${selectedBlockId === block.id ? 'selected' : ''} ${isMain ? 'main-block' : ''} ${hasOptimization ? 'has-optimization' : ''}"
+        <div class="strategy-block ${block.category} ${selectedBlockId === block.id ? 'selected' : ''} ${hasOptimization ? 'has-optimization' : ''}"
              id="${block.id}"
              style="left: ${block.x}px; top: ${block.y}px"
              data-block-id="${block.id}">
@@ -7327,12 +8451,11 @@ function renderBlocks() {
                     <i class="bi bi-${block.icon}"></i>
                 </div>
                 <span class="block-header-title">${block.name}</span>
-                ${!isMain ? `
                 <div class="block-header-actions">
                     <button class="block-action-btn" data-action="duplicate" title="Duplicate"><i class="bi bi-copy"></i></button>
                     <button class="block-action-btn" data-action="delete" title="Delete"><i class="bi bi-trash"></i></button>
                     <button class="block-header-menu" title="Settings"><i class="bi bi-three-dots"></i></button>
-                </div>` : ''}
+                </div>
             </div>
             ${paramHint ? `<div class="block-param-hint">${paramHint}</div>` : ''}
             ${renderPorts(ports.outputs, 'output', block.id)}
@@ -7346,21 +8469,60 @@ function renderBlocks() {
 }
 
 // Generate compact param hint for block (e.g. "14 | 70 | 30")
-function getCompactParamHint(params) {
+function getCompactParamHint(params, blockType) {
+  // Special handling for grid_orders
+  if (params.orders && Array.isArray(params.orders)) {
+    const count = params.orders.length;
+    const totalVolume = params.orders.reduce((sum, o) => sum + (parseFloat(o.volume) || 0), 0);
+    return `${count} orders | ${totalVolume.toFixed(0)}%`;
+  }
+
+  // Special compact hints for complex block types
+  if (blockType === 'atr_exit') {
+    const parts = [];
+    if (params.use_atr_sl) {
+      parts.push(`SL: ${params.atr_sl_period || 140}×${params.atr_sl_multiplier || 4}`);
+    }
+    if (params.use_atr_tp) {
+      parts.push(`TP: ${params.atr_tp_period || 140}×${params.atr_tp_multiplier || 4}`);
+    }
+    if (parts.length === 0) parts.push('Disabled');
+    return parts.join(' | ');
+  }
+
+  if (blockType === 'static_sltp') {
+    const parts = [];
+    if (params.take_profit_percent) parts.push(`TP: ${params.take_profit_percent}%`);
+    if (params.stop_loss_percent) parts.push(`SL: ${params.stop_loss_percent}%`);
+    return parts.join(' | ') || 'Not set';
+  }
+
+  if (blockType === 'trailing_stop_exit') {
+    const act = params.activation_percent ?? 1.0;
+    const trail = params.trailing_percent ?? 0.5;
+    return `Act: ${act}% | Trail: ${trail}%`;
+  }
+
+  if (blockType === 'dca') {
+    return `Grid: ${params.grid_size_percent || 0}% | ${params.order_count || 0} orders | M:${params.martingale_coefficient || 1}`;
+  }
+
   const entries = Object.entries(params);
   if (entries.length === 0) return '';
 
-  // Show up to 3 key values separated by |
-  const values = entries.slice(0, 3).map(([_key, val]) => {
+  // Show up to 6 key values separated by |
+  const values = entries.slice(0, 6).map(([_key, val]) => {
     // Shorten booleans
     if (val === true) return '✓';
     if (val === false) return '✗';
+    // Skip arrays/objects
+    if (typeof val === 'object') return null;
     // Shorten long strings
     if (typeof val === 'string' && val.length > 6) return val.slice(0, 6) + '…';
     return val;
-  });
+  }).filter(v => v !== null);
 
-  return values.join(' | ') + (entries.length > 3 ? ' …' : '');
+  return values.join(' | ') + (entries.length > 6 ? ' …' : '');
 }
 
 // Show block parameters popup
@@ -7396,7 +8558,7 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
       <button class="popup-close" data-action="close"><i class="bi bi-x"></i></button>
     </div>
     <div class="popup-body">
-      ${renderGroupedParams(block, optimizationMode) || (Object.keys(params).length === 0
+      ${renderGroupedParams(block, optimizationMode, false) || (Object.keys(params).length === 0
       ? '<p class="text-muted">No parameters</p>'
       : Object.entries(params).map(([key, value]) => {
         const opt = optParams[key] || { enabled: false, min: value, max: value, step: 1 };
@@ -7421,11 +8583,12 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
           ` : `
           <div class="popup-param-row">
             <label class="popup-param-label">${formatParamName(key)}</label>
-            <input type="text" 
+            <input type="number" 
                    class="popup-param-input" 
                    value="${value}"
                    data-block-id="${blockId}"
-                   data-param-key="${key}">
+                   data-param-key="${key}"
+                   step="any">
           </div>
           `;
       }).join(''))}
@@ -7621,23 +8784,72 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
     });
   });
 
-  // Append popup inside the block element
-  blockEl.appendChild(popup);
+  // Append popup to body for proper z-index layering (above all nodes)
+  document.body.appendChild(popup);
+
+  // Enable wheel scroll for all number inputs in popup
+  enableWheelScrollForNumberInputs(popup);
+
+  // Initialize special panels (Grid Orders)
+  if (block.type === 'grid_orders') {
+    initGridOrdersPanel(popup, blockId);
+  }
 
   // CRITICAL: Stop all clicks inside popup from bubbling to document
   popup.addEventListener('click', (e) => {
     e.stopPropagation();
   });
 
-  // Position popup to the right of the block
-  const blockWidth = blockEl.offsetWidth;
-  popup.style.left = `${blockWidth + 10}px`;
-  popup.style.top = '0px';
+  // Position popup next to the block, ensuring it stays within viewport
+  positionPopupInViewport(popup, blockEl);
 
   // Close on outside click
   setTimeout(() => {
     document.addEventListener('click', closePopupOnOutsideClick);
   }, 10);
+}
+
+/**
+ * Position popup next to block element, ensuring it stays within viewport
+ */
+function positionPopupInViewport(popup, blockEl) {
+  const blockRect = blockEl.getBoundingClientRect();
+  const popupWidth = popup.offsetWidth || 320;
+  const popupHeight = popup.offsetHeight || 400;
+  const padding = 10; // Gap between block and popup
+  const margin = 20; // Margin from viewport edges
+
+  let left, top;
+
+  // Try to position to the right of the block
+  if (blockRect.right + padding + popupWidth + margin <= window.innerWidth) {
+    left = blockRect.right + padding;
+  }
+  // Try to position to the left of the block
+  else if (blockRect.left - padding - popupWidth >= margin) {
+    left = blockRect.left - padding - popupWidth;
+  }
+  // Position at right edge of viewport
+  else {
+    left = window.innerWidth - popupWidth - margin;
+  }
+
+  // Position vertically aligned with block top, but ensure within viewport
+  top = blockRect.top;
+
+  // Check if popup goes below viewport
+  if (top + popupHeight + margin > window.innerHeight) {
+    top = window.innerHeight - popupHeight - margin;
+  }
+
+  // Check if popup goes above viewport
+  if (top < margin) {
+    top = margin;
+  }
+
+  popup.style.position = 'fixed';
+  popup.style.left = `${left}px`;
+  popup.style.top = `${top}px`;
 }
 
 // Update block visual indicator for optimization
@@ -7665,6 +8877,520 @@ function closeBlockParamsPopup() {
   const popup = document.querySelector('.block-params-popup');
   if (popup) popup.remove();
   document.removeEventListener('click', closePopupOnOutsideClick);
+}
+
+// ============================================
+// QUICK-ADD DIALOG
+// ============================================
+
+let quickAddDialog = null;
+
+/**
+ * Show quick-add dialog at specified position
+ * @param {number} x - X coordinate on canvas
+ * @param {number} y - Y coordinate on canvas
+ */
+function showQuickAddDialog(x, y) {
+  closeQuickAddDialog();
+
+  const container = document.getElementById('blocksContainer');
+
+  quickAddDialog = document.createElement('div');
+  quickAddDialog.className = 'quick-add-dialog';
+  quickAddDialog.innerHTML = `
+    <div class="quick-add-header">
+      <input type="text" class="quick-add-search" placeholder="Поиск блоков..." autofocus>
+      <button class="quick-add-close" title="Закрыть">×</button>
+    </div>
+    <div class="quick-add-categories"></div>
+    <div class="quick-add-results"></div>
+  `;
+
+  quickAddDialog.style.left = `${x}px`;
+  quickAddDialog.style.top = `${y}px`;
+
+  container.appendChild(quickAddDialog);
+
+  // Build categories
+  const categoriesDiv = quickAddDialog.querySelector('.quick-add-categories');
+  const mainCategories = [
+    { key: 'indicators', label: 'Индикаторы', icon: 'graph-up' },
+    { key: 'filters', label: 'Фильтры', icon: 'funnel' },
+    { key: 'conditions', label: 'Условия', icon: 'signpost' },
+    { key: 'logic', label: 'Логика', icon: 'diagram-3' },
+    { key: 'actions', label: 'Действия', icon: 'play-circle' },
+    { key: 'exits', label: 'Выходы', icon: 'box-arrow-right' }
+  ];
+
+  mainCategories.forEach((cat) => {
+    if (blockLibrary[cat.key] && blockLibrary[cat.key].length > 0) {
+      const btn = document.createElement('button');
+      btn.className = 'quick-add-cat-btn';
+      btn.dataset.category = cat.key;
+      btn.innerHTML = `<i class="bi bi-${cat.icon}"></i> ${cat.label}`;
+      btn.addEventListener('click', () => showQuickAddCategory(cat.key));
+      categoriesDiv.appendChild(btn);
+    }
+  });
+
+  // Search functionality
+  const searchInput = quickAddDialog.querySelector('.quick-add-search');
+  searchInput.addEventListener('input', (e) => {
+    filterQuickAddResults(e.target.value);
+  });
+
+  // Close button
+  quickAddDialog.querySelector('.quick-add-close').addEventListener('click', closeQuickAddDialog);
+
+  // Close on Escape
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeQuickAddDialog();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  // Store position for adding block
+  quickAddDialog.dataset.addX = x;
+  quickAddDialog.dataset.addY = y;
+
+  // Focus search input
+  setTimeout(() => searchInput.focus(), 50);
+}
+
+/**
+ * Show blocks from a specific category in Quick-Add dialog
+ * @param {string} category - Category key
+ */
+function showQuickAddCategory(category) {
+  if (!quickAddDialog) return;
+
+  const resultsDiv = quickAddDialog.querySelector('.quick-add-results');
+  const blocks = blockLibrary[category] || [];
+
+  resultsDiv.innerHTML = '';
+
+  blocks.forEach((block) => {
+    const item = document.createElement('div');
+    item.className = 'quick-add-item';
+    item.innerHTML = `
+      <i class="bi bi-${block.icon || 'box'}"></i>
+      <div class="quick-add-item-info">
+        <span class="quick-add-item-name">${block.name}</span>
+        <span class="quick-add-item-desc">${block.desc || ''}</span>
+      </div>
+    `;
+    item.addEventListener('click', () => {
+      const x = parseInt(quickAddDialog.dataset.addX) || 200;
+      const y = parseInt(quickAddDialog.dataset.addY) || 200;
+      addBlockToCanvas(block.id, category, x, y);
+      closeQuickAddDialog();
+    });
+    resultsDiv.appendChild(item);
+  });
+
+  // Highlight selected category
+  quickAddDialog.querySelectorAll('.quick-add-cat-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.category === category);
+  });
+}
+
+/**
+ * Filter Quick-Add results by search query
+ * @param {string} query - Search query
+ */
+function filterQuickAddResults(query) {
+  if (!quickAddDialog) return;
+
+  const resultsDiv = quickAddDialog.querySelector('.quick-add-results');
+  resultsDiv.innerHTML = '';
+
+  if (!query || query.length < 2) {
+    // Show categories when no search
+    quickAddDialog.querySelector('.quick-add-categories').style.display = 'flex';
+    return;
+  }
+
+  // Hide categories during search
+  quickAddDialog.querySelector('.quick-add-categories').style.display = 'none';
+
+  const lowerQuery = query.toLowerCase();
+  const matches = [];
+
+  // Search in all categories
+  Object.entries(blockLibrary).forEach(([category, blocks]) => {
+    blocks.forEach((block) => {
+      const nameMatch = block.name.toLowerCase().includes(lowerQuery);
+      const descMatch = block.desc && block.desc.toLowerCase().includes(lowerQuery);
+      const idMatch = block.id.toLowerCase().includes(lowerQuery);
+
+      if (nameMatch || descMatch || idMatch) {
+        matches.push({ block, category });
+      }
+    });
+  });
+
+  // Show results
+  matches.slice(0, 15).forEach(({ block, category }) => {
+    const item = document.createElement('div');
+    item.className = 'quick-add-item';
+    item.innerHTML = `
+      <i class="bi bi-${block.icon || 'box'}"></i>
+      <div class="quick-add-item-info">
+        <span class="quick-add-item-name">${block.name}</span>
+        <span class="quick-add-item-desc">${block.desc || ''}</span>
+      </div>
+    `;
+    item.addEventListener('click', () => {
+      const x = parseInt(quickAddDialog.dataset.addX) || 200;
+      const y = parseInt(quickAddDialog.dataset.addY) || 200;
+      addBlockToCanvas(block.id, category, x, y);
+      closeQuickAddDialog();
+    });
+    resultsDiv.appendChild(item);
+  });
+
+  if (matches.length === 0) {
+    resultsDiv.innerHTML = '<div class="quick-add-empty">Ничего не найдено</div>';
+  }
+}
+
+/**
+ * Close Quick-Add dialog
+ */
+function closeQuickAddDialog() {
+  if (quickAddDialog) {
+    quickAddDialog.remove();
+    quickAddDialog = null;
+  }
+}
+
+// ============================================
+// PRESETS / SUBFLOWS
+// ============================================
+
+const PRESETS_STORAGE_KEY = 'strategy_builder_presets';
+
+/**
+ * Get all saved presets from localStorage
+ * @returns {Array} Array of preset objects
+ */
+function getSavedPresets() {
+  try {
+    const data = localStorage.getItem(PRESETS_STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    console.error('[Presets] Error loading presets:', e);
+    return [];
+  }
+}
+
+/**
+ * Save presets to localStorage
+ * @param {Array} presets - Array of preset objects
+ */
+function savePresetsToStorage(presets) {
+  try {
+    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+  } catch (e) {
+    console.error('[Presets] Error saving presets:', e);
+    showNotification('Ошибка сохранения пресета', 'error');
+  }
+}
+
+/**
+ * Save selected blocks as a preset
+ * @param {string} name - Preset name
+ * @param {string} description - Preset description
+ */
+function saveSelectionAsPreset(name, description = '') {
+  if (selectedBlockIds.length === 0) {
+    showNotification('Сначала выделите блоки (Shift+Click или область выделения)', 'warning');
+    return;
+  }
+
+  // Get selected blocks data
+  const selectedBlocks = strategyBlocks.filter((b) => selectedBlockIds.includes(b.id));
+
+  if (selectedBlocks.length === 0) {
+    showNotification('Нет выделенных блоков', 'warning');
+    return;
+  }
+
+  // Calculate bounding box to normalize positions
+  const minX = Math.min(...selectedBlocks.map((b) => b.x));
+  const minY = Math.min(...selectedBlocks.map((b) => b.y));
+
+  // Create normalized block copies
+  const normalizedBlocks = selectedBlocks.map((block) => ({
+    ...block,
+    id: block.id, // Will be regenerated on paste
+    x: block.x - minX,
+    y: block.y - minY
+  }));
+
+  // Get connections between selected blocks
+  const selectedConnections = connections.filter(
+    (conn) =>
+      selectedBlockIds.includes(conn.source.blockId) &&
+      selectedBlockIds.includes(conn.target.blockId)
+  );
+
+  // Create preset object
+  const preset = {
+    id: `preset_${Date.now()}`,
+    name: name || `Пресет ${getSavedPresets().length + 1}`,
+    description: description,
+    createdAt: new Date().toISOString(),
+    blocks: normalizedBlocks,
+    connections: selectedConnections,
+    blockCount: normalizedBlocks.length,
+    connectionCount: selectedConnections.length
+  };
+
+  // Save to storage
+  const presets = getSavedPresets();
+  presets.push(preset);
+  savePresetsToStorage(presets);
+
+  showNotification(`Пресет "${preset.name}" сохранён (${preset.blockCount} блоков)`, 'success');
+  return preset;
+}
+
+/**
+ * Show dialog to save preset
+ */
+function showSavePresetDialog() {
+  if (selectedBlockIds.length === 0) {
+    showNotification('Сначала выделите блоки для сохранения', 'warning');
+    return;
+  }
+
+  const container = document.getElementById('blocksContainer');
+
+  const dialog = document.createElement('div');
+  dialog.className = 'preset-dialog';
+  dialog.innerHTML = `
+    <div class="preset-dialog-content">
+      <div class="preset-dialog-header">
+        <h3>💾 Сохранить как пресет</h3>
+        <button class="preset-dialog-close">×</button>
+      </div>
+      <div class="preset-dialog-body">
+        <div class="preset-dialog-info">
+          Выделено блоков: <strong>${selectedBlockIds.length}</strong>
+        </div>
+        <label>
+          Название:
+          <input type="text" class="preset-name-input" placeholder="Мой пресет" autofocus>
+        </label>
+        <label>
+          Описание:
+          <textarea class="preset-desc-input" placeholder="Описание пресета (опционально)"></textarea>
+        </label>
+      </div>
+      <div class="preset-dialog-footer">
+        <button class="btn-cancel">Отмена</button>
+        <button class="btn-save">Сохранить</button>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(dialog);
+
+  // Event handlers
+  const closeDialog = () => dialog.remove();
+
+  dialog.querySelector('.preset-dialog-close').addEventListener('click', closeDialog);
+  dialog.querySelector('.btn-cancel').addEventListener('click', closeDialog);
+
+  dialog.querySelector('.btn-save').addEventListener('click', () => {
+    const name = dialog.querySelector('.preset-name-input').value.trim();
+    const desc = dialog.querySelector('.preset-desc-input').value.trim();
+    saveSelectionAsPreset(name, desc);
+    closeDialog();
+  });
+
+  // Close on Escape
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeDialog();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  // Focus input
+  setTimeout(() => dialog.querySelector('.preset-name-input').focus(), 50);
+}
+
+/**
+ * Insert a preset at specified position
+ * @param {string} presetId - Preset ID
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ */
+function insertPreset(presetId, x = 200, y = 200) {
+  const presets = getSavedPresets();
+  const preset = presets.find((p) => p.id === presetId);
+
+  if (!preset) {
+    showNotification('Пресет не найден', 'error');
+    return;
+  }
+
+  pushUndo();
+
+  // Map old IDs to new IDs
+  const idMap = new Map();
+
+  // Create new blocks with unique IDs
+  preset.blocks.forEach((block) => {
+    const newId = `block_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    idMap.set(block.id, newId);
+
+    const newBlock = {
+      ...block,
+      id: newId,
+      x: block.x + x,
+      y: block.y + y,
+      params: { ...block.params }
+    };
+
+    strategyBlocks.push(newBlock);
+  });
+
+  // Create new connections with updated IDs
+  preset.connections.forEach((conn) => {
+    const newSourceId = idMap.get(conn.source.blockId);
+    const newTargetId = idMap.get(conn.target.blockId);
+
+    if (newSourceId && newTargetId) {
+      connections.push({
+        id: `conn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        source: { blockId: newSourceId, portId: conn.source.portId },
+        target: { blockId: newTargetId, portId: conn.target.portId },
+        type: conn.type
+      });
+    }
+  });
+
+  renderBlocks();
+  renderConnections();
+
+  showNotification(`Пресет "${preset.name}" вставлен`, 'success');
+}
+
+/**
+ * Delete a preset
+ * @param {string} presetId - Preset ID
+ */
+function deletePreset(presetId) {
+  const presets = getSavedPresets();
+  const preset = presets.find((p) => p.id === presetId);
+
+  if (!preset) return;
+
+  const filtered = presets.filter((p) => p.id !== presetId);
+  savePresetsToStorage(filtered);
+
+  showNotification(`Пресет "${preset.name}" удалён`, 'success');
+}
+
+/**
+ * Show presets panel/list
+ */
+function showPresetsPanel() {
+  const container = document.getElementById('blocksContainer');
+
+  // Remove existing panel if open
+  const existing = document.querySelector('.presets-panel');
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const presets = getSavedPresets();
+
+  const panel = document.createElement('div');
+  panel.className = 'presets-panel';
+  panel.innerHTML = `
+    <div class="presets-panel-header">
+      <h3>📦 Мои пресеты</h3>
+      <button class="presets-panel-close">×</button>
+    </div>
+    <div class="presets-panel-actions">
+      <button class="btn-save-selection" ${selectedBlockIds.length === 0 ? 'disabled' : ''}>
+        <i class="bi bi-plus-circle"></i> Сохранить выделение
+      </button>
+    </div>
+    <div class="presets-list">
+      ${presets.length === 0
+      ? '<div class="presets-empty">Нет сохранённых пресетов.<br>Выделите блоки и нажмите "Сохранить выделение"</div>'
+      : presets
+        .map(
+          (p) => `
+          <div class="preset-item" data-preset-id="${p.id}">
+            <div class="preset-item-info">
+              <div class="preset-item-name">${p.name}</div>
+              <div class="preset-item-meta">
+                ${p.blockCount} блоков, ${p.connectionCount} связей
+              </div>
+              ${p.description ? `<div class="preset-item-desc">${p.description}</div>` : ''}
+            </div>
+            <div class="preset-item-actions">
+              <button class="btn-insert-preset" title="Вставить на canvas">
+                <i class="bi bi-box-arrow-in-down"></i>
+              </button>
+              <button class="btn-delete-preset" title="Удалить">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+        `
+        )
+        .join('')
+    }
+    </div>
+  `;
+
+  panel.style.cssText = `
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    z-index: 1001;
+  `;
+
+  container.appendChild(panel);
+
+  // Event handlers
+  panel.querySelector('.presets-panel-close').addEventListener('click', () => panel.remove());
+
+  panel.querySelector('.btn-save-selection')?.addEventListener('click', () => {
+    panel.remove();
+    showSavePresetDialog();
+  });
+
+  panel.querySelectorAll('.btn-insert-preset').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const presetId = e.target.closest('.preset-item').dataset.presetId;
+      insertPreset(presetId, 300, 300);
+      panel.remove();
+    });
+  });
+
+  panel.querySelectorAll('.btn-delete-preset').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const presetId = e.target.closest('.preset-item').dataset.presetId;
+      if (confirm('Удалить этот пресет?')) {
+        deletePreset(presetId);
+        panel.remove();
+        showPresetsPanel(); // Refresh
+      }
+    });
+  });
 }
 
 function updateBlockParamFromPopup(input) {
@@ -7744,7 +9470,7 @@ function deleteBlock(blockId) {
   dispatchBlocksChanged();
 }
 
-function renderBlockParams(block) {
+function _renderBlockParams(block) {
   const params = block.params;
   if (Object.keys(params).length === 0) {
     return '<span class="text-secondary" style="font-size: 11px">No parameters</span>';
@@ -7771,6 +9497,12 @@ function formatParamName(name) {
 }
 
 function selectBlock(blockId) {
+  // Close any open params popup when selecting different block
+  const existingPopup = document.querySelector('.block-params-popup');
+  if (existingPopup && existingPopup.dataset.blockId !== blockId) {
+    closeBlockParamsPopup();
+  }
+
   // Clear multi-selection when selecting single block
   clearMultiSelection();
   selectedBlockId = blockId;
@@ -7991,9 +9723,10 @@ const blockValidationRules = {
 
   // Exit Blocks
   atr_exit: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    tp_mult: { min: 0.1, max: 50, type: 'number', required: true },
-    sl_mult: { min: 0.1, max: 50, type: 'number', required: true }
+    atr_sl_period: { min: 1, max: 150, type: 'number' },
+    atr_sl_multiplier: { min: 0.1, max: 4, type: 'number' },
+    atr_tp_period: { min: 1, max: 150, type: 'number' },
+    atr_tp_multiplier: { min: 0.1, max: 4, type: 'number' }
   },
   session_exit: {
     hour: { min: 0, max: 23, type: 'number', required: true },
@@ -8061,6 +9794,16 @@ const blockValidationRules = {
   break_even_exit: {
     trigger: { min: 0.001, max: 100, type: 'number', required: true },
     offset: { min: -10, max: 10, type: 'number' }
+  },
+  static_sltp: {
+    take_profit_percent: { min: 0.01, max: 100, type: 'number', required: true },
+    stop_loss_percent: { min: 0.01, max: 100, type: 'number', required: true },
+    breakeven_activation_percent: { min: 0.01, max: 100, type: 'number' },
+    new_breakeven_sl_percent: { min: 0.001, max: 100, type: 'number' }
+  },
+  trailing_stop_exit: {
+    activation_percent: { min: 0.01, max: 50, type: 'number', required: true },
+    trailing_percent: { min: 0.01, max: 50, type: 'number', required: true }
   },
 
   // Conditions
@@ -8274,7 +10017,7 @@ function updateBlockParam(blockId, param, value) {
     if (blockEl) {
       const hintEl = blockEl.querySelector('.block-param-hint');
       if (hintEl) {
-        hintEl.textContent = getCompactParamHint(block.params);
+        hintEl.textContent = getCompactParamHint(block.params, block.type);
       }
     }
 
@@ -8305,8 +10048,94 @@ function updateBlockParam(blockId, param, value) {
   }
 }
 
+// ============================================
+// NODE REPULSION (Avoid Overlapping)
+// ============================================
+
+/**
+ * Push overlapping nodes away from the dragged block.
+ * Small interaction zone - only pushes when blocks actually overlap.
+ * @param {string} movedBlockId - ID of the block that was just moved
+ */
+function applyNodeRepulsion(movedBlockId) {
+  const movedBlock = strategyBlocks.find(b => b.id === movedBlockId);
+  if (!movedBlock) return;
+
+  const movedEl = document.getElementById(movedBlockId);
+  if (!movedEl) return;
+
+  const movedBounds = {
+    left: movedBlock.x,
+    top: movedBlock.y,
+    right: movedBlock.x + movedEl.offsetWidth,
+    bottom: movedBlock.y + movedEl.offsetHeight,
+    width: movedEl.offsetWidth,
+    height: movedEl.offsetHeight,
+    centerX: movedBlock.x + movedEl.offsetWidth / 2,
+    centerY: movedBlock.y + movedEl.offsetHeight / 2
+  };
+
+  // Small gap to maintain between blocks (10px)
+  const minGap = 10;
+
+  strategyBlocks.forEach(block => {
+    // Skip self only
+    if (block.id === movedBlockId) return;
+
+    const blockEl = document.getElementById(block.id);
+    if (!blockEl) return;
+
+    const blockBounds = {
+      left: block.x,
+      top: block.y,
+      right: block.x + blockEl.offsetWidth,
+      bottom: block.y + blockEl.offsetHeight,
+      width: blockEl.offsetWidth,
+      height: blockEl.offsetHeight,
+      centerX: block.x + blockEl.offsetWidth / 2,
+      centerY: block.y + blockEl.offsetHeight / 2
+    };
+
+    // Check if blocks actually overlap (including small gap)
+    const gapX = Math.max(movedBounds.left, blockBounds.left) - Math.min(movedBounds.right, blockBounds.right);
+    const gapY = Math.max(movedBounds.top, blockBounds.top) - Math.min(movedBounds.bottom, blockBounds.bottom);
+
+    // Only push if blocks overlap or are closer than minGap
+    if (gapX < minGap && gapY < minGap) {
+      // Calculate how much they overlap (negative gap = overlap)
+      const overlapX = minGap - gapX;
+      const overlapY = minGap - gapY;
+
+      // Calculate push direction (from moved block center to other block center)
+      const dx = blockBounds.centerX - movedBounds.centerX;
+      const dy = blockBounds.centerY - movedBounds.centerY;
+
+      // Push along the axis with less overlap (minimal movement)
+      if (overlapX <= overlapY) {
+        // Push horizontally
+        const pushDir = dx >= 0 ? 1 : -1;
+        block.x = Math.max(0, block.x + overlapX * pushDir);
+      } else {
+        // Push vertically
+        const pushDir = dy >= 0 ? 1 : -1;
+        block.y = Math.max(0, block.y + overlapY * pushDir);
+      }
+
+      // Update DOM position
+      blockEl.style.left = `${block.x}px`;
+      blockEl.style.top = `${block.y}px`;
+    }
+  });
+
+  // Update connections after repulsion
+  renderConnections();
+}
+
 function startDragBlock(event, blockId) {
   if (event.target.closest('.block-param-input')) return;
+
+  // Close popup when starting to drag
+  closeBlockParamsPopup();
 
   pushUndo();
   isDragging = true;
@@ -8317,14 +10146,18 @@ function startDragBlock(event, blockId) {
     y: event.clientY - rect.top
   };
 
+  let rafPending = false;
+
   const onMouseMove = (e) => {
     if (!isDragging) return;
+
     const container = document
       .getElementById('canvasContainer')
       .getBoundingClientRect();
     const x = e.clientX - container.left - dragOffset.x;
     const y = e.clientY - container.top - dragOffset.y;
 
+    // Update DOM position immediately for responsiveness
     block.style.left = `${Math.max(0, x)}px`;
     block.style.top = `${Math.max(0, y)}px`;
 
@@ -8335,14 +10168,27 @@ function startDragBlock(event, blockId) {
       blockData.y = Math.max(0, y);
     }
 
-    // Update connections in real-time
-    renderConnections();
+    // Throttle connection rendering using requestAnimationFrame
+    if (!rafPending) {
+      rafPending = true;
+      requestAnimationFrame(() => {
+        renderConnections();
+        rafPending = false;
+      });
+    }
   };
 
   const onMouseUp = () => {
     isDragging = false;
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
+
+    // Apply node repulsion to push away overlapping blocks
+    applyNodeRepulsion(blockId);
+
+    // Try auto-snap connection if block dropped near compatible port
+    tryAutoSnapConnection(blockId);
+
     renderConnections(); // Update connections when block moved
   };
 
@@ -8497,6 +10343,9 @@ function clearMultiSelection() {
 // ============================================
 
 function startGroupDrag(event) {
+  // Close popup when starting group drag
+  closeBlockParamsPopup();
+
   pushUndo();
   isGroupDragging = true;
 
@@ -8517,13 +10366,15 @@ function startGroupDrag(event) {
     }
   });
 
+  let rafPending = false;
+
   const onMouseMove = (e) => {
     if (!isGroupDragging) return;
 
     const currentX = e.clientX - rect.left;
     const currentY = e.clientY - rect.top;
 
-    // Move all selected blocks
+    // Move all selected blocks immediately for responsiveness
     selectedBlockIds.forEach(blockId => {
       const block = strategyBlocks.find(b => b.id === blockId);
       const blockEl = document.getElementById(blockId);
@@ -8540,11 +10391,25 @@ function startGroupDrag(event) {
       }
     });
 
-    renderConnections();
+    // Throttle connection rendering using requestAnimationFrame
+    if (!rafPending) {
+      rafPending = true;
+      requestAnimationFrame(() => {
+        renderConnections();
+        rafPending = false;
+      });
+    }
   };
 
   const onMouseUp = () => {
     isGroupDragging = false;
+
+    // Apply node repulsion for all moved blocks
+    const movedBlockIdsCopy = [...selectedBlockIds];
+    movedBlockIdsCopy.forEach(blockId => {
+      applyNodeRepulsionForGroup(blockId, movedBlockIdsCopy);
+    });
+
     groupDragOffsets = {};
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
@@ -8555,6 +10420,72 @@ function startGroupDrag(event) {
   document.addEventListener('mouseup', onMouseUp);
 }
 
+/**
+ * Apply repulsion for group drag - excludes other selected blocks
+ * @param {string} movedBlockId - ID of block to check collisions for
+ * @param {string[]} excludeIds - IDs of other blocks in the group (don't push them)
+ */
+function applyNodeRepulsionForGroup(movedBlockId, excludeIds) {
+  const movedBlock = strategyBlocks.find(b => b.id === movedBlockId);
+  if (!movedBlock) return;
+
+  const movedEl = document.getElementById(movedBlockId);
+  if (!movedEl) return;
+
+  const movedBounds = {
+    left: movedBlock.x,
+    top: movedBlock.y,
+    right: movedBlock.x + movedEl.offsetWidth,
+    bottom: movedBlock.y + movedEl.offsetHeight,
+    centerX: movedBlock.x + movedEl.offsetWidth / 2,
+    centerY: movedBlock.y + movedEl.offsetHeight / 2
+  };
+
+  // Small gap to maintain between blocks (10px)
+  const minGap = 10;
+
+  strategyBlocks.forEach(block => {
+    // Skip self and other selected blocks (they move together)
+    if (block.id === movedBlockId || excludeIds.includes(block.id)) return;
+
+    const blockEl = document.getElementById(block.id);
+    if (!blockEl) return;
+
+    const blockBounds = {
+      left: block.x,
+      top: block.y,
+      right: block.x + blockEl.offsetWidth,
+      bottom: block.y + blockEl.offsetHeight,
+      centerX: block.x + blockEl.offsetWidth / 2,
+      centerY: block.y + blockEl.offsetHeight / 2
+    };
+
+    // Check if blocks actually overlap (including small gap)
+    const gapX = Math.max(movedBounds.left, blockBounds.left) - Math.min(movedBounds.right, blockBounds.right);
+    const gapY = Math.max(movedBounds.top, blockBounds.top) - Math.min(movedBounds.bottom, blockBounds.bottom);
+
+    // Only push if blocks overlap or are closer than minGap
+    if (gapX < minGap && gapY < minGap) {
+      const overlapX = minGap - gapX;
+      const overlapY = minGap - gapY;
+
+      const dx = blockBounds.centerX - movedBounds.centerX;
+      const dy = blockBounds.centerY - movedBounds.centerY;
+
+      if (overlapX <= overlapY) {
+        const pushDir = dx >= 0 ? 1 : -1;
+        block.x = Math.max(0, block.x + overlapX * pushDir);
+      } else {
+        const pushDir = dy >= 0 ? 1 : -1;
+        block.y = Math.max(0, block.y + overlapY * pushDir);
+      }
+
+      blockEl.style.left = `${block.x}px`;
+      blockEl.style.top = `${block.y}px`;
+    }
+  });
+}
+
 // ============================================
 
 let isConnecting = false;
@@ -8562,7 +10493,7 @@ let connectionStart = null;
 let tempLine = null;
 
 function initConnectionSystem() {
-  const canvas = document.getElementById('connectionsCanvas');
+  const _canvas = document.getElementById('connectionsCanvas');
   const container = document.getElementById('canvasContainer');
 
   // Listen for port clicks
@@ -8594,7 +10525,7 @@ function initConnectionSystem() {
   });
 }
 
-function startConnection(portElement, event) {
+function startConnection(portElement, _event) {
   isConnecting = true;
   const rect = portElement.getBoundingClientRect();
   const containerRect = document
@@ -8618,6 +10549,172 @@ function startConnection(portElement, event) {
   svg.appendChild(tempLine);
 
   portElement.classList.add('connecting');
+
+  // Highlight compatible ports
+  highlightCompatiblePorts(connectionStart);
+}
+
+/**
+ * Highlight ports that are compatible with the connection being made
+ * @param {Object} startInfo - Connection start info with portType and direction
+ */
+function highlightCompatiblePorts(startInfo) {
+  const allPorts = document.querySelectorAll('.port');
+  const compatibleType = startInfo.portType;
+  const oppositeDirection = startInfo.direction === 'output' ? 'input' : 'output';
+
+  allPorts.forEach(port => {
+    // Skip the starting port itself
+    if (port === startInfo.element) return;
+
+    const portType = port.dataset.portType;
+    const portDirection = port.dataset.direction;
+    const portBlockId = port.dataset.blockId;
+
+    // Check compatibility:
+    // 1. Same port type (data->data, condition->condition, flow->flow)
+    // 2. Opposite direction (output->input or input->output)
+    // 3. Different block
+    const isCompatible =
+      portType === compatibleType &&
+      portDirection === oppositeDirection &&
+      portBlockId !== startInfo.blockId;
+
+    if (isCompatible) {
+      port.classList.add('port-compatible');
+    } else {
+      port.classList.add('port-incompatible');
+    }
+  });
+}
+
+/**
+ * Remove all port highlighting
+ */
+function clearPortHighlights() {
+  document.querySelectorAll('.port').forEach((port) => {
+    port.classList.remove('port-compatible', 'port-incompatible');
+  });
+}
+
+/**
+ * Try to auto-connect when a block is dropped near a compatible port
+ * @param {string} droppedBlockId - ID of the block that was just dropped
+ */
+function tryAutoSnapConnection(droppedBlockId) {
+  const droppedBlock = document.getElementById(droppedBlockId);
+  if (!droppedBlock) return;
+
+  const SNAP_DISTANCE = 50; // pixels - distance threshold for auto-snap
+  const droppedPorts = droppedBlock.querySelectorAll('.port');
+
+  // Get all ports from other blocks
+  const otherPorts = document.querySelectorAll(
+    `.port:not([data-block-id="${droppedBlockId}"])`
+  );
+
+  let bestMatch = null;
+  let bestDistance = SNAP_DISTANCE;
+
+  droppedPorts.forEach((droppedPort) => {
+    const droppedRect = droppedPort.getBoundingClientRect();
+    const droppedCenterX = droppedRect.left + droppedRect.width / 2;
+    const droppedCenterY = droppedRect.top + droppedRect.height / 2;
+
+    const droppedType = droppedPort.dataset.portType;
+    const droppedDirection = droppedPort.dataset.direction;
+    const droppedPortId = droppedPort.dataset.portId;
+
+    otherPorts.forEach((otherPort) => {
+      const otherType = otherPort.dataset.portType;
+      const otherDirection = otherPort.dataset.direction;
+      const otherBlockId = otherPort.dataset.blockId;
+      const otherPortId = otherPort.dataset.portId;
+
+      // Check compatibility: same type, opposite direction
+      if (otherType !== droppedType || otherDirection === droppedDirection) {
+        return;
+      }
+
+      // Check if already connected
+      const alreadyConnected = connections.some((c) => {
+        const matchesDropped =
+          (c.source.blockId === droppedBlockId &&
+            c.source.portId === droppedPortId) ||
+          (c.target.blockId === droppedBlockId &&
+            c.target.portId === droppedPortId);
+        const matchesOther =
+          (c.source.blockId === otherBlockId &&
+            c.source.portId === otherPortId) ||
+          (c.target.blockId === otherBlockId &&
+            c.target.portId === otherPortId);
+        return matchesDropped && matchesOther;
+      });
+
+      if (alreadyConnected) return;
+
+      // Calculate distance
+      const otherRect = otherPort.getBoundingClientRect();
+      const otherCenterX = otherRect.left + otherRect.width / 2;
+      const otherCenterY = otherRect.top + otherRect.height / 2;
+
+      const distance = Math.sqrt(
+        Math.pow(droppedCenterX - otherCenterX, 2) +
+        Math.pow(droppedCenterY - otherCenterY, 2)
+      );
+
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestMatch = {
+          droppedPort: {
+            blockId: droppedBlockId,
+            portId: droppedPortId,
+            direction: droppedDirection
+          },
+          otherPort: {
+            blockId: otherBlockId,
+            portId: otherPortId,
+            direction: otherDirection
+          },
+          type: droppedType
+        };
+      }
+    });
+  });
+
+  // Create connection if found close match
+  if (bestMatch) {
+    const source =
+      bestMatch.droppedPort.direction === 'output'
+        ? bestMatch.droppedPort
+        : bestMatch.otherPort;
+    const target =
+      bestMatch.droppedPort.direction === 'output'
+        ? bestMatch.otherPort
+        : bestMatch.droppedPort;
+
+    // Check if this exact connection already exists
+    const exists = connections.some(
+      (c) =>
+        c.source.blockId === source.blockId &&
+        c.source.portId === source.portId &&
+        c.target.blockId === target.blockId &&
+        c.target.portId === target.portId
+    );
+
+    if (!exists) {
+      pushUndo();
+      connections.push({
+        id: `conn_${Date.now()}`,
+        source: { blockId: source.blockId, portId: source.portId },
+        target: { blockId: target.blockId, portId: target.portId },
+        type: bestMatch.type
+      });
+
+      // Visual feedback
+      showNotification('Соединение создано автоматически', 'success');
+    }
+  }
 }
 
 function updateTempConnection(event) {
@@ -8719,6 +10816,9 @@ function cancelConnection() {
     connectionStart.element.classList.remove('connecting');
   }
   connectionStart = null;
+
+  // Clear port highlighting
+  clearPortHighlights();
 }
 
 function renderConnections() {
@@ -9614,6 +11714,7 @@ function pushUndo() {
   if (undoStack.length >= MAX_UNDO_HISTORY) undoStack.shift();
   undoStack.push(snapshot);
   redoStack.length = 0;
+  updateUndoRedoButtons();
 }
 
 function undo() {
@@ -9621,7 +11722,8 @@ function undo() {
   redoStack.push(getStateSnapshot());
   const prev = undoStack.pop();
   restoreStateSnapshot(prev);
-  showNotification('Отмена действия', 'info');
+  updateUndoRedoButtons();
+  showNotification(`Отмена (осталось: ${undoStack.length})`, 'info');
 }
 
 function redo() {
@@ -9629,7 +11731,32 @@ function redo() {
   undoStack.push(getStateSnapshot());
   const next = redoStack.pop();
   restoreStateSnapshot(next);
-  showNotification('Повтор действия', 'info');
+  updateUndoRedoButtons();
+  showNotification(`Повтор (осталось: ${redoStack.length})`, 'info');
+}
+
+/**
+ * Update undo/redo button states and tooltips
+ */
+function updateUndoRedoButtons() {
+  const undoBtn = document.querySelector('button[onclick="undo()"]');
+  const redoBtn = document.querySelector('button[onclick="redo()"]');
+
+  if (undoBtn) {
+    undoBtn.disabled = undoStack.length === 0;
+    undoBtn.title = undoStack.length > 0
+      ? `Отмена (${undoStack.length} шагов)`
+      : 'Отмена (нет действий)';
+    undoBtn.classList.toggle('btn-disabled', undoStack.length === 0);
+  }
+
+  if (redoBtn) {
+    redoBtn.disabled = redoStack.length === 0;
+    redoBtn.title = redoStack.length > 0
+      ? `Повтор (${redoStack.length} шагов)`
+      : 'Повтор (нет действий)';
+    redoBtn.classList.toggle('btn-disabled', redoStack.length === 0);
+  }
 }
 
 // Toolbar functions (called from HTML buttons)
@@ -10257,8 +12384,30 @@ function buildStrategyPayload() {
       _no_trade_days: noTradeDays.length ? noTradeDays : undefined,
       _commission: parseFloat(document.getElementById('backtestCommission')?.value || '0.07') / 100
     },
-    blocks: strategyBlocks.filter((b) => !b.isMain),
-    connections: connections
+    blocks: strategyBlocks.map(b => ({
+      id: b.id,
+      type: b.type,
+      category: b.category,
+      name: b.name,
+      icon: b.icon,
+      x: b.x,
+      y: b.y,
+      isMain: b.isMain || false,
+      params: b.params || {},
+      optimizationParams: b.optimizationParams || {}
+    })),
+    connections: connections.map(c => ({
+      source: c.source,
+      target: c.target,
+      sourcePort: c.sourcePort,
+      targetPort: c.targetPort
+    })),
+    // UI state for restoration
+    uiState: {
+      zoom: zoom,
+      strategyName: nameEl?.value || 'New Strategy',
+      savedAt: new Date().toISOString()
+    }
   };
 
   console.log('[Strategy Builder] Payload built:', {
@@ -10272,11 +12421,24 @@ function buildStrategyPayload() {
 
 async function autoSaveStrategy() {
   try {
+    // Skip autosave if reset was just performed
+    if (skipNextAutoSave) {
+      skipNextAutoSave = false;
+      console.log('[Strategy Builder] Skipping autosave after reset');
+      return;
+    }
+
     const strategyId = getStrategyIdFromURL() || 'draft';
     const payload = buildStrategyPayload();
 
     // Не автосохраняем пустые стратегии
     if (!payload.blocks.length && !connections.length) {
+      return;
+    }
+
+    // Don't autosave if only Strategy node exists (clean state)
+    if (payload.blocks.length === 1 && payload.blocks[0].type === 'strategy' && !connections.length) {
+      console.log('[Strategy Builder] Skipping autosave - clean initial state');
       return;
     }
 
@@ -10314,6 +12476,48 @@ async function autoSaveStrategy() {
   } catch (err) {
     console.warn('Autosave failed:', err);
   }
+}
+
+/**
+ * Migrate legacy blocks to new unified block types.
+ * Converts old tp_percent + sl_percent blocks into a single static_sltp block.
+ */
+function migrateLegacyBlocks(blocks) {
+  const tpBlock = blocks.find(b => b.type === 'tp_percent');
+  const slBlock = blocks.find(b => b.type === 'sl_percent');
+
+  if (!tpBlock && !slBlock) return blocks;
+
+  // Build merged static_sltp params from legacy blocks
+  const tpParams = tpBlock?.params || tpBlock?.config || {};
+  const slParams = slBlock?.params || slBlock?.config || {};
+  const mergedParams = {
+    take_profit_percent: tpParams.take_profit_percent ?? 1.5,
+    stop_loss_percent: slParams.stop_loss_percent ?? 1.5,
+    close_only_in_profit: false,
+    activate_breakeven: false,
+    breakeven_activation_percent: 0.5,
+    new_breakeven_sl_percent: 0.1
+  };
+
+  // Use position of the first found legacy block
+  const refBlock = tpBlock || slBlock;
+  const staticSltpBlock = {
+    id: refBlock.id,
+    type: 'static_sltp',
+    name: 'Static SL/TP',
+    x: refBlock.x,
+    y: refBlock.y,
+    params: mergedParams,
+    config: mergedParams
+  };
+
+  // Filter out both legacy blocks and add the merged one
+  const filtered = blocks.filter(b => b.type !== 'tp_percent' && b.type !== 'sl_percent');
+  filtered.push(staticSltpBlock);
+
+  console.log('[Migration] Converted tp_percent + sl_percent → static_sltp', mergedParams);
+  return filtered;
 }
 
 async function loadStrategy(strategyId) {
@@ -10399,9 +12603,10 @@ async function loadStrategy(strategyId) {
     const mainNode = strategyBlocks.find((b) => b.isMain);
     strategyBlocks = mainNode ? [mainNode] : [];
 
-    // Добавить загруженные блоки
+    // Добавить загруженные блоки (with legacy migration)
     if (strategy.blocks && Array.isArray(strategy.blocks)) {
-      strategyBlocks.push(...strategy.blocks);
+      const migratedBlocks = migrateLegacyBlocks(strategy.blocks);
+      strategyBlocks.push(...migratedBlocks);
     }
 
     // Восстановить соединения
@@ -10699,6 +12904,7 @@ function buildBacktestRequest() {
     initial_capital: parseFloat(document.getElementById('backtestCapital')?.value) || 10000,
     leverage: parseInt(document.getElementById('backtestLeverage')?.value) || 10,
     direction: document.getElementById('builderDirection')?.value || 'both',
+    pyramiding: parseInt(document.getElementById('backtestPyramiding')?.value) || 1,
 
     // Commission: read from UI (default 0.07% = 0.0007)
     commission: parseFloat(document.getElementById('backtestCommission')?.value || '0.07') / 100 || 0.0007,
@@ -11396,6 +13602,7 @@ window.updateBlockParamFromPopup = updateBlockParamFromPopup;
 window.duplicateBlock = duplicateBlock;
 window.deleteBlock = deleteBlock;
 window.resetBlockToDefaults = resetBlockToDefaults;
+window.renderBlockLibrary = renderBlockLibrary;
 
 // Block validation functions
 window.validateBlockParams = validateBlockParams;
@@ -11418,6 +13625,12 @@ window.exportAsTemplate = exportAsTemplate;
 window.importTemplateFromFile = importTemplateFromFile;
 window.revertToVersion = revertToVersion;
 window.deleteSelected = deleteSelected;
+
+// LocalStorage persistence functions
+window.tryLoadFromLocalStorage = tryLoadFromLocalStorage;
+window.clearLocalStorageDraft = clearLocalStorageDraft;
+window.clearAllAndReset = clearAllAndReset;
+window.resetFormToDefaults = resetFormToDefaults;
 
 // Modal functions
 window.openTemplatesModal = openTemplatesModal;

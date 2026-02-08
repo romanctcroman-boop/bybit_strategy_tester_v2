@@ -20,7 +20,7 @@ Uses:
 import warnings
 from dataclasses import dataclass
 from itertools import product
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -40,7 +40,7 @@ except ImportError:
     logger.warning("vectorbt not available for optimization")
 
 try:
-    from numba import jit  # noqa: F401
+    from numba import jit
 
     NUMBA_AVAILABLE = True
 except ImportError:
@@ -74,7 +74,7 @@ else:
 class OptimizationResult:
     """Result of a single parameter combination"""
 
-    params: Dict[str, Any]
+    params: dict[str, Any]
     total_return: float
     sharpe_ratio: float
     max_drawdown: float
@@ -93,11 +93,11 @@ class VectorbtOptimizationResult:
     total_combinations: int
     tested_combinations: int
     execution_time_seconds: float
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_score: float
-    best_metrics: Dict[str, Any]
-    top_results: List[Dict[str, Any]]
-    performance_stats: Dict[str, Any]
+    best_metrics: dict[str, Any]
+    top_results: list[dict[str, Any]]
+    performance_stats: dict[str, Any]
 
 
 class VectorbtGridOptimizer:
@@ -135,18 +135,18 @@ class VectorbtGridOptimizer:
     def optimize(
         self,
         candles: pd.DataFrame,
-        rsi_period_range: List[int],
-        rsi_overbought_range: List[int],
-        rsi_oversold_range: List[int],
-        stop_loss_range: List[float],
-        take_profit_range: List[float],
+        rsi_period_range: list[int],
+        rsi_overbought_range: list[int],
+        rsi_oversold_range: list[int],
+        stop_loss_range: list[float],
+        take_profit_range: list[float],
         initial_capital: float = 10000.0,
         leverage: int = 1,
         commission: float = 0.0007,  # 0.07% TradingView parity
         optimize_metric: str = "sharpe_ratio",
         direction: str = "long",
-        weights: Optional[Dict[str, float]] = None,
-        filters: Optional[Dict[str, float]] = None,
+        weights: dict[str, float] | None = None,
+        filters: dict[str, float] | None = None,
     ) -> VectorbtOptimizationResult:
         """
         Run high-performance grid search optimization.
@@ -334,20 +334,20 @@ class VectorbtGridOptimizer:
     def _run_batch(
         self,
         close_series: pd.Series,
-        high_series: Optional[pd.Series],
-        low_series: Optional[pd.Series],
+        high_series: pd.Series | None,
+        low_series: pd.Series | None,
         close_array: np.ndarray,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
         freq: str,
         direction: str,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Run a batch of backtests using TRUE vectorbt broadcasting.
 
@@ -739,8 +739,8 @@ class VectorbtGridOptimizer:
         return freq_map.get(int(diff), "1H")
 
     def _apply_filters(
-        self, results: List[Dict], filters: Dict[str, float]
-    ) -> List[Dict]:
+        self, results: list[dict], filters: dict[str, float]
+    ) -> list[dict]:
         """Apply minimum threshold filters"""
         filtered = []
 
@@ -764,10 +764,10 @@ class VectorbtGridOptimizer:
 
     def _calculate_scores(
         self,
-        results: List[Dict],
+        results: list[dict],
         metric: str,
-        weights: Optional[Dict[str, float]] = None,
-    ) -> List[Dict]:
+        weights: dict[str, float] | None = None,
+    ) -> list[dict]:
         """Calculate optimization scores for each result"""
         for r in results:
             if metric == "sharpe_ratio":
@@ -966,8 +966,8 @@ if CUPY_AVAILABLE:
         return cp.asnumpy(rsi_gpu)
 
     def _batch_calculate_rsi_gpu(
-        close: np.ndarray, periods: List[int]
-    ) -> Dict[int, np.ndarray]:
+        close: np.ndarray, periods: list[int]
+    ) -> dict[int, np.ndarray]:
         """
         Calculate RSI for multiple periods in a single GPU batch.
 
@@ -1028,7 +1028,7 @@ else:
         return _calculate_rsi_numba(close, period)
 
     def _batch_calculate_rsi_gpu(
-        close: np.ndarray, periods: List[int]
-    ) -> Dict[int, np.ndarray]:
+        close: np.ndarray, periods: list[int]
+    ) -> dict[int, np.ndarray]:
         """Fallback batch calculation"""
         return {p: _calculate_rsi_numba(close, p) for p in periods}

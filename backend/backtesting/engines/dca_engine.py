@@ -19,7 +19,7 @@ Speed: ~1x (reference implementation, extends FallbackEngineV4)
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -52,6 +52,11 @@ class DCAGridConfig:
     # Order distribution
     first_order_percent: float = 10.0  # First order as % of deposit
     step_type: str = "linear"  # linear, logarithmic, custom
+
+    # Manual Grid (custom orders) - list of {offset: %, volume: %}
+    # When custom_orders is set, use these instead of calculated orders
+    custom_orders: list = None  # [{"offset": 0.5, "volume": 25}, ...]
+    grid_trailing_percent: float = 0.0  # Grid trailing/cancel percent (0 = disabled)
 
     # Martingale
     use_martingale: bool = True
@@ -198,7 +203,7 @@ class DCAOrder:
     size_usd: float  # Size in USD
     size_coins: float  # Size in coins
     filled: bool = False
-    fill_time: Optional[int] = None  # Bar index when filled
+    fill_time: int | None = None  # Bar index when filled
     fill_price: float = 0.0
 
 
@@ -210,7 +215,7 @@ class DCAPosition:
     is_open: bool = False
 
     # Orders
-    orders: List[DCAOrder] = field(default_factory=list)
+    orders: list[DCAOrder] = field(default_factory=list)
     active_orders_count: int = 0
 
     # Position aggregates
@@ -225,7 +230,7 @@ class DCAPosition:
     max_adverse_excursion: float = 0.0  # MAE
 
     # TP state
-    tp_hit: List[bool] = field(default_factory=lambda: [False, False, False, False])
+    tp_hit: list[bool] = field(default_factory=lambda: [False, False, False, False])
     remaining_size_percent: float = 100.0
 
     # Timing
@@ -237,7 +242,7 @@ class DCAGridCalculator:
     """Calculator for DCA grid order placement."""
 
     @staticmethod
-    def calculate_grid_orders(config: DCAGridConfig, base_price: float, direction: str) -> List[DCAOrder]:
+    def calculate_grid_orders(config: DCAGridConfig, base_price: float, direction: str) -> list[DCAOrder]:
         """
         Calculate DCA grid order levels and sizes.
 
@@ -250,6 +255,10 @@ class DCAGridCalculator:
             List of DCAOrder objects
         """
         orders = []
+
+        # Check if using custom orders (Manual Grid mode)
+        if config.custom_orders and len(config.custom_orders) > 0:
+            return DCAGridCalculator._calculate_custom_orders(config, base_price, direction)
 
         # Calculate step distances
         total_grid_size = base_price * (config.grid_size_percent / 100)
@@ -304,14 +313,71 @@ class DCAGridCalculator:
         return orders
 
     @staticmethod
-    def _calculate_linear_steps(order_count: int) -> List[float]:
+    def _calculate_custom_orders(config: DCAGridConfig, base_price: float, direction: str) -> list[DCAOrder]:
+        """
+        Calculate orders from custom (Manual Grid) configuration.
+
+        Each custom order has:
+        - offset: % distance from entry price
+        - volume: % of total deposit for this order
+
+        Args:
+            config: DCA configuration with custom_orders
+            base_price: Current price (base for grid calculation)
+            direction: "long" or "short"
+
+        Returns:
+            List of DCAOrder objects
+        """
+        orders = []
+
+        for i, order_config in enumerate(config.custom_orders):
+            offset_percent = order_config.get("offset", 0)
+            volume_percent = order_config.get("volume", 0)
+
+            if offset_percent <= 0 or volume_percent <= 0:
+                continue
+
+            # Calculate trigger price based on offset
+            if direction == "long":
+                # Long grid: orders below base price
+                trigger_price = base_price * (1 - offset_percent / 100)
+            else:
+                # Short grid: orders above base price
+                trigger_price = base_price * (1 + offset_percent / 100)
+
+            # Calculate USD size from volume percent
+            size_usd = config.deposit * (volume_percent / 100)
+            if config.max_order_size > 0:
+                size_usd = min(size_usd, config.max_order_size)
+
+            # Apply leverage
+            size_usd_leveraged = size_usd * config.leverage
+
+            # Calculate coins
+            size_coins = size_usd_leveraged / trigger_price if trigger_price > 0 else 0
+
+            orders.append(
+                DCAOrder(
+                    level=i,
+                    price=trigger_price,
+                    size_percent=volume_percent,
+                    size_usd=size_usd,
+                    size_coins=size_coins,
+                )
+            )
+
+        return orders
+
+    @staticmethod
+    def _calculate_linear_steps(order_count: int) -> list[float]:
         """Calculate linear step distribution."""
         if order_count <= 1:
             return [1.0]
         return [1.0 / order_count] * order_count
 
     @staticmethod
-    def _calculate_log_steps(order_count: int, coefficient: float) -> List[float]:
+    def _calculate_log_steps(order_count: int, coefficient: float) -> list[float]:
         """
         Calculate logarithmic step distribution.
 
@@ -335,7 +401,7 @@ class DCAGridCalculator:
     @staticmethod
     def _calculate_order_sizes(
         order_count: int, first_order_percent: float, martingale_coef: float, mode: str
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Calculate order sizes with martingale.
 
@@ -396,24 +462,24 @@ class DCAEngine(BaseBacktestEngine):
         self.indent_order = IndentOrderConfig()
 
         # Pending indent orders
-        self.pending_indent: Optional[PendingIndentOrder] = None
+        self.pending_indent: PendingIndentOrder | None = None
 
         # State
         self.position = DCAPosition()
-        self.equity_curve: List[float] = []
-        self.trades: List[TradeRecord] = []
+        self.equity_curve: list[float] = []
+        self.trades: list[TradeRecord] = []
 
         # Indicator caches for close conditions
-        self._rsi_cache: Optional[np.ndarray] = None
-        self._stoch_k_cache: Optional[np.ndarray] = None
-        self._stoch_d_cache: Optional[np.ndarray] = None
-        self._ma1_cache: Optional[np.ndarray] = None
-        self._ma2_cache: Optional[np.ndarray] = None
-        self._psar_cache: Optional[np.ndarray] = None
-        self._bb_upper_cache: Optional[np.ndarray] = None
-        self._bb_lower_cache: Optional[np.ndarray] = None
-        self._keltner_upper_cache: Optional[np.ndarray] = None
-        self._keltner_lower_cache: Optional[np.ndarray] = None
+        self._rsi_cache: np.ndarray | None = None
+        self._stoch_k_cache: np.ndarray | None = None
+        self._stoch_d_cache: np.ndarray | None = None
+        self._ma1_cache: np.ndarray | None = None
+        self._ma2_cache: np.ndarray | None = None
+        self._psar_cache: np.ndarray | None = None
+        self._bb_upper_cache: np.ndarray | None = None
+        self._bb_lower_cache: np.ndarray | None = None
+        self._keltner_upper_cache: np.ndarray | None = None
+        self._keltner_lower_cache: np.ndarray | None = None
 
         # Statistics
         self.total_signals = 0
@@ -439,10 +505,10 @@ class DCAEngine(BaseBacktestEngine):
     def optimize(
         self,
         input_data: BacktestInput,
-        param_ranges: Dict[str, List[Any]],
+        param_ranges: dict[str, list[Any]],
         metric: str = "sharpe_ratio",
         top_n: int = 10,
-    ) -> List[Tuple[Dict[str, Any], BacktestOutput]]:
+    ) -> list[tuple[dict[str, Any], BacktestOutput]]:
         """
         Optimize DCA parameters using grid search.
 
@@ -543,14 +609,14 @@ class DCAEngine(BaseBacktestEngine):
             # Check for new entry signal
             elif signals[i] != 0:
                 direction = "long" if signals[i] > 0 else "short"
-                
+
                 if self.indent_order.enabled:
                     # Create pending indent order instead of immediate entry
                     self._create_indent_order(i, close, direction)
                 else:
                     # Immediate entry
                     self._open_dca_position(i, close, direction)
-                    
+
                 self.total_signals += 1
 
             # Update equity curve
@@ -626,6 +692,10 @@ class DCAEngine(BaseBacktestEngine):
         self.grid_config.close_on_drawdown = getattr(config, "dca_safety_close_enabled", True)
         self.grid_config.drawdown_threshold_percent = getattr(config, "dca_drawdown_threshold", 30.0)
 
+        # Manual Grid (custom orders) from BacktestConfig
+        self.grid_config.custom_orders = getattr(config, "dca_custom_orders", None)
+        self.grid_config.grid_trailing_percent = getattr(config, "dca_grid_trailing_percent", 0.0)
+
         # Multi-TP settings from BacktestConfig
         self.multi_tp.enabled = getattr(config, "dca_multi_tp_enabled", False)
         self.multi_tp.tp1_percent = getattr(config, "dca_tp1_percent", 0.5)
@@ -653,7 +723,7 @@ class DCAEngine(BaseBacktestEngine):
                 if hasattr(io, key):
                     setattr(io, key, value)
 
-    def run_from_config(self, config: Any, ohlcv: pd.DataFrame) -> Any:
+    def run_from_config(self, config: Any, ohlcv: pd.DataFrame, custom_strategy: Any = None) -> Any:
         """
         Run DCA backtest from BacktestConfig (Pydantic model).
 
@@ -662,10 +732,14 @@ class DCAEngine(BaseBacktestEngine):
         Args:
             config: BacktestConfig with DCA-specific fields
             ohlcv: DataFrame with OHLCV data
+            custom_strategy: Optional StrategyBuilderAdapter for generating signals
+                            from Strategy Builder graph
 
         Returns:
             BacktestResult compatible object
         """
+        # Store custom_strategy for signal generation
+        self._custom_strategy = custom_strategy
         import uuid
         from datetime import datetime
 
@@ -673,10 +747,6 @@ class DCAEngine(BaseBacktestEngine):
             BacktestResult,
             BacktestStatus,
             EquityCurve,
-            PerformanceMetrics,
-        )
-        from backend.backtesting.models import (
-            TradeRecord as ModelTradeRecord,
         )
 
         start_time = time.time()
@@ -707,6 +777,11 @@ class DCAEngine(BaseBacktestEngine):
 
         # Generate signals using strategy from config
         signals = self._generate_signals_from_config(config, ohlcv)
+
+        # Log signal statistics
+        long_signals = int(np.sum(signals > 0))
+        short_signals = int(np.sum(signals < 0))
+        logger.info(f"DCAEngine: Generated {long_signals} long signals, {short_signals} short signals")
 
         # Main loop
         for i in range(1, len(ohlcv)):
@@ -762,7 +837,9 @@ class DCAEngine(BaseBacktestEngine):
             trades=model_trades,
             metrics=metrics,
             equity_curve=EquityCurve(
-                timestamps=[ohlcv.index[i].to_pydatetime() for i in range(min(len(ohlcv.index), len(self.equity_curve)))],
+                timestamps=[
+                    ohlcv.index[i].to_pydatetime() for i in range(min(len(ohlcv.index), len(self.equity_curve)))
+                ],
                 equity=self.equity_curve,
             ),
             final_equity=equity,
@@ -782,6 +859,35 @@ class DCAEngine(BaseBacktestEngine):
                 - 0 = no signal
         """
         signals = np.zeros(len(df))
+
+        # If custom_strategy (StrategyBuilderAdapter) is provided, use it for signals
+        if hasattr(self, "_custom_strategy") and self._custom_strategy is not None:
+            try:
+                adapter = self._custom_strategy
+                logger.info(f"DCAEngine: Using custom strategy adapter: {type(adapter).__name__}")
+                # Generate signals from Strategy Builder graph
+                result = adapter.generate_signals(df)
+                logger.info(f"DCAEngine: Adapter returned result type: {type(result)}")
+                if result is not None:
+                    if hasattr(result, "entries") and hasattr(result, "short_entries"):
+                        # SignalResult object
+                        entries_count = int(result.entries.sum())
+                        short_count = int(result.short_entries.sum())
+                        logger.info(f"DCAEngine: SignalResult entries={entries_count}, short_entries={short_count}")
+                        for i in range(len(df)):
+                            if i < len(result.entries) and result.entries.iloc[i]:
+                                signals[i] = 1
+                            elif i < len(result.short_entries) and result.short_entries.iloc[i]:
+                                signals[i] = -1
+                        return signals
+                    elif isinstance(result, np.ndarray):
+                        return result
+                    elif isinstance(result, pd.Series):
+                        return result.values
+                    elif isinstance(result, pd.DataFrame) and "signal" in result.columns:
+                        return result["signal"].values
+            except Exception as e:
+                logger.warning(f"Custom strategy signal generation failed: {e}, falling back to config")
 
         strategy_type = getattr(config, "strategy_type", "rsi")
         strategy_params = getattr(config, "strategy_params", {}) or {}
@@ -817,7 +923,7 @@ class DCAEngine(BaseBacktestEngine):
 
         return signals
 
-    def _convert_trades_to_model(self, ohlcv: pd.DataFrame) -> List:
+    def _convert_trades_to_model(self, ohlcv: pd.DataFrame) -> list:
         """Convert internal trades to BacktestModel TradeRecord format."""
         from backend.backtesting.models import TradeRecord as ModelTradeRecord
 
@@ -853,7 +959,7 @@ class DCAEngine(BaseBacktestEngine):
 
         return model_trades
 
-    def _build_performance_metrics(self, initial_capital: float, final_equity: float, trades: List) -> Any:
+    def _build_performance_metrics(self, initial_capital: float, final_equity: float, trades: list) -> Any:
         """Build PerformanceMetrics from trades."""
         from backend.backtesting.models import PerformanceMetrics
 
@@ -916,7 +1022,7 @@ class DCAEngine(BaseBacktestEngine):
 
         return signals
 
-    def _generate_rsi_signals(self, df: pd.DataFrame, params: Dict) -> np.ndarray:
+    def _generate_rsi_signals(self, df: pd.DataFrame, params: dict) -> np.ndarray:
         """Generate RSI-based signals."""
         signals = np.zeros(len(df))
 
@@ -1095,7 +1201,7 @@ class DCAEngine(BaseBacktestEngine):
             tp_price = self.position.average_entry_price * (1 - tp_percent)
             return low <= tp_price
 
-    def _check_multi_tp(self, bar_index: int, high: float, low: float, close: float) -> Optional[float]:
+    def _check_multi_tp(self, bar_index: int, high: float, low: float, close: float) -> float | None:
         """Check multi-level take profits and execute partial closes."""
         # Not implemented yet - placeholder
         return None
@@ -1104,7 +1210,7 @@ class DCAEngine(BaseBacktestEngine):
     # CLOSE CONDITIONS (Session 5.5)
     # =========================================================================
 
-    def _check_close_conditions(self, bar_index: int, close: float) -> Optional[ExitReason]:
+    def _check_close_conditions(self, bar_index: int, close: float) -> ExitReason | None:
         """
         Check all enabled close conditions.
 
@@ -1205,11 +1311,27 @@ class DCAEngine(BaseBacktestEngine):
         cc = self.close_conditions
 
         if cc.channel_close_type == "Keltner":
-            upper = self._keltner_upper_cache[bar_index] if self._keltner_upper_cache is not None and bar_index < len(self._keltner_upper_cache) else float('inf')
-            lower = self._keltner_lower_cache[bar_index] if self._keltner_lower_cache is not None and bar_index < len(self._keltner_lower_cache) else 0
+            upper = (
+                self._keltner_upper_cache[bar_index]
+                if self._keltner_upper_cache is not None and bar_index < len(self._keltner_upper_cache)
+                else float("inf")
+            )
+            lower = (
+                self._keltner_lower_cache[bar_index]
+                if self._keltner_lower_cache is not None and bar_index < len(self._keltner_lower_cache)
+                else 0
+            )
         else:  # Bollinger
-            upper = self._bb_upper_cache[bar_index] if self._bb_upper_cache is not None and bar_index < len(self._bb_upper_cache) else float('inf')
-            lower = self._bb_lower_cache[bar_index] if self._bb_lower_cache is not None and bar_index < len(self._bb_lower_cache) else 0
+            upper = (
+                self._bb_upper_cache[bar_index]
+                if self._bb_upper_cache is not None and bar_index < len(self._bb_upper_cache)
+                else float("inf")
+            )
+            lower = (
+                self._bb_lower_cache[bar_index]
+                if self._bb_lower_cache is not None and bar_index < len(self._bb_lower_cache)
+                else 0
+            )
 
         if cc.channel_close_band == "Breakout":
             if self.position.direction == "long":
@@ -1296,7 +1418,9 @@ class DCAEngine(BaseBacktestEngine):
 
         # PSAR
         if cc.psar_close_enable:
-            self._psar_cache = self._calculate_psar(high, low, cc.psar_close_start, cc.psar_close_increment, cc.psar_close_maximum)
+            self._psar_cache = self._calculate_psar(
+                high, low, cc.psar_close_start, cc.psar_close_increment, cc.psar_close_maximum
+            )
 
     def _calculate_rsi(self, close: np.ndarray, period: int) -> np.ndarray:
         """Calculate RSI indicator."""
@@ -1309,8 +1433,8 @@ class DCAEngine(BaseBacktestEngine):
 
         # Initial SMA
         if len(close) > period:
-            avg_gain[period] = np.mean(gains[1:period + 1])
-            avg_loss[period] = np.mean(losses[1:period + 1])
+            avg_gain[period] = np.mean(gains[1 : period + 1])
+            avg_loss[period] = np.mean(losses[1 : period + 1])
 
             # EMA-style smoothing
             for i in range(period + 1, len(close)):
@@ -1321,13 +1445,14 @@ class DCAEngine(BaseBacktestEngine):
         rsi = 100 - (100 / (1 + rs))
         return rsi
 
-    def _calculate_stochastic(self, high: np.ndarray, low: np.ndarray, close: np.ndarray,
-                               k_period: int, k_smooth: int, d_smooth: int) -> Tuple[np.ndarray, np.ndarray]:
+    def _calculate_stochastic(
+        self, high: np.ndarray, low: np.ndarray, close: np.ndarray, k_period: int, k_smooth: int, d_smooth: int
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Calculate Stochastic %K and %D."""
         stoch_k = np.zeros_like(close)
         for i in range(k_period - 1, len(close)):
-            highest_high = np.max(high[i - k_period + 1:i + 1])
-            lowest_low = np.min(low[i - k_period + 1:i + 1])
+            highest_high = np.max(high[i - k_period + 1 : i + 1])
+            lowest_low = np.min(low[i - k_period + 1 : i + 1])
             if highest_high != lowest_low:
                 stoch_k[i] = 100 * (close[i] - lowest_low) / (highest_high - lowest_low)
             else:
@@ -1353,8 +1478,9 @@ class DCAEngine(BaseBacktestEngine):
         else:
             return self._ema(data, period)  # Default to EMA
 
-    def _calculate_keltner(self, high: np.ndarray, low: np.ndarray, close: np.ndarray,
-                           period: int, mult: float) -> Tuple[np.ndarray, np.ndarray]:
+    def _calculate_keltner(
+        self, high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int, mult: float
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Calculate Keltner Channel."""
         basis = self._ema(close, period)
         tr = np.maximum(high - low, np.maximum(np.abs(high - np.roll(close, 1)), np.abs(low - np.roll(close, 1))))
@@ -1363,17 +1489,19 @@ class DCAEngine(BaseBacktestEngine):
         lower = basis - mult * atr
         return upper, lower
 
-    def _calculate_bollinger(self, close: np.ndarray, period: int, deviation: float) -> Tuple[np.ndarray, np.ndarray]:
+    def _calculate_bollinger(self, close: np.ndarray, period: int, deviation: float) -> tuple[np.ndarray, np.ndarray]:
         """Calculate Bollinger Bands."""
         basis = self._sma(close, period)
         std = np.zeros_like(close)
         for i in range(period - 1, len(close)):
-            std[i] = np.std(close[i - period + 1:i + 1])
+            std[i] = np.std(close[i - period + 1 : i + 1])
         upper = basis + deviation * std
         lower = basis - deviation * std
         return upper, lower
 
-    def _calculate_psar(self, high: np.ndarray, low: np.ndarray, start: float, increment: float, maximum: float) -> np.ndarray:
+    def _calculate_psar(
+        self, high: np.ndarray, low: np.ndarray, start: float, increment: float, maximum: float
+    ) -> np.ndarray:
         """Calculate Parabolic SAR."""
         length = len(high)
         psar = np.zeros(length)
@@ -1420,7 +1548,7 @@ class DCAEngine(BaseBacktestEngine):
         """Simple Moving Average."""
         result = np.zeros_like(data)
         for i in range(period - 1, len(data)):
-            result[i] = np.mean(data[i - period + 1:i + 1])
+            result[i] = np.mean(data[i - period + 1 : i + 1])
         return result
 
     def _ema(self, data: np.ndarray, period: int) -> np.ndarray:
@@ -1438,7 +1566,7 @@ class DCAEngine(BaseBacktestEngine):
         weights = np.arange(1, period + 1)
         weight_sum = weights.sum()
         for i in range(period - 1, len(data)):
-            result[i] = np.sum(data[i - period + 1:i + 1] * weights) / weight_sum
+            result[i] = np.sum(data[i - period + 1 : i + 1] * weights) / weight_sum
         return result
 
     # =========================================================================
@@ -1448,47 +1576,46 @@ class DCAEngine(BaseBacktestEngine):
     def _create_indent_order(self, bar_index: int, price: float, direction: str) -> None:
         """
         Create a pending indent (limit) order.
-        
+
         Args:
             bar_index: Current bar index
             price: Current price (signal price)
             direction: "long" or "short"
         """
         indent_pct = self.indent_order.indent_percent / 100
-        
+
         if direction == "long":
             # For long: indent below current price
             entry_price = price * (1 - indent_pct)
         else:
             # For short: indent above current price
             entry_price = price * (1 + indent_pct)
-        
+
         self.pending_indent = PendingIndentOrder(
             direction=direction,
             signal_bar=bar_index,
             signal_price=price,
             entry_price=entry_price,
             expires_bar=bar_index + self.indent_order.cancel_after_bars,
-            filled=False
+            filled=False,
         )
 
-    def _check_indent_order_fill(self, bar_index: int, high: float, low: float, 
-                                  close: float, equity: float) -> float:
+    def _check_indent_order_fill(self, bar_index: int, high: float, low: float, close: float, equity: float) -> float:
         """
         Check if pending indent order should be filled or cancelled.
-        
+
         Returns updated equity.
         """
         if self.pending_indent is None:
             return equity
-        
+
         indent = self.pending_indent
-        
+
         # Check expiration
         if bar_index >= indent.expires_bar:
             self.pending_indent = None
             return equity
-        
+
         # Check fill
         filled = False
         if indent.direction == "long":
@@ -1499,12 +1626,12 @@ class DCAEngine(BaseBacktestEngine):
             # Short indent fills when high reaches entry price
             if high >= indent.entry_price:
                 filled = True
-        
+
         if filled:
             indent.filled = True
             self._open_dca_position(bar_index, indent.entry_price, indent.direction)
             self.pending_indent = None
-        
+
         return equity
 
     def _close_position(self, bar_index: int, close_price: float, reason: ExitReason) -> float:

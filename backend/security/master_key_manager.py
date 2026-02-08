@@ -24,7 +24,7 @@ class MasterKeyManager:
 
     def __init__(self):
         self.master_key = os.getenv("ENCRYPTION_KEY", "")
-        self.crypto_manager: Optional[CryptoManager] = None
+        self.crypto_manager: CryptoManager | None = None
 
         if self.master_key:
             logger.info("✅ Master key loaded from environment")
@@ -45,7 +45,7 @@ class MasterKeyManager:
 
 
 # Global instance
-_master_key_manager: Optional[MasterKeyManager] = None
+_master_key_manager: MasterKeyManager | None = None
 
 
 def get_master_key_manager() -> MasterKeyManager:

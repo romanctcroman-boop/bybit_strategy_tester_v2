@@ -30,7 +30,7 @@ plotly>=5.22.0
 tqdm>=4.66.4
 
 # Online learning / streaming models
-river>=0.21.0,<0.22.0
+river>=0.22.0,<0.24.0
 
 # Сохранение моделей
 joblib>=1.4.2

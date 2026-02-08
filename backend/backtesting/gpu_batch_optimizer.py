@@ -9,7 +9,7 @@ Performance: ~10-50x faster than sequential single-process optimization.
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from loguru import logger
@@ -33,7 +33,7 @@ except ImportError:
 class BatchOptimizationResult:
     """Result for a single parameter combination."""
 
-    params: Dict[str, Any]
+    params: dict[str, Any]
     total_return: float
     net_profit: float
     max_drawdown: float
@@ -63,12 +63,12 @@ class GPUBatchOptimizer:
     def optimize_rsi_batch(
         self,
         candles: "pd.DataFrame",
-        param_combinations: List[Tuple],  # (period, overbought, oversold, sl, tp)
+        param_combinations: list[tuple],  # (period, overbought, oversold, sl, tp)
         initial_capital: float = 10000.0,
         leverage: int = 10,
         commission: float = 0.0007,  # 0.07% TradingView parity
         direction: str = "both",
-    ) -> List[BatchOptimizationResult]:
+    ) -> list[BatchOptimizationResult]:
         """
         Run batch optimization for RSI strategy.
 
@@ -131,12 +131,12 @@ class GPUBatchOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        param_combinations: List[Tuple],
+        param_combinations: list[tuple],
         initial_capital: float,
         leverage: int,
         commission: float,
         direction: str,
-    ) -> List[BatchOptimizationResult]:
+    ) -> list[BatchOptimizationResult]:
         """GPU-accelerated batch optimization using CuPy."""
         n_combos = len(param_combinations)  # noqa: F841
         n_bars = len(close)  # noqa: F841
@@ -242,7 +242,7 @@ class GPUBatchOptimizer:
         stop_loss: float,
         take_profit: float,
         direction: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Simplified vectorized backtest on GPU.
         Returns approximate metrics (fast but less accurate than full simulation).
@@ -279,12 +279,12 @@ class GPUBatchOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        param_combinations: List[Tuple],
+        param_combinations: list[tuple],
         initial_capital: float,
         leverage: int,
         commission: float,
         direction: str,
-    ) -> List[BatchOptimizationResult]:
+    ) -> list[BatchOptimizationResult]:
         """CPU fallback for batch optimization."""
         results = []
         period_cache = {}
@@ -374,7 +374,7 @@ class GPUBatchOptimizer:
         stop_loss: float,
         take_profit: float,
         direction: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Simulate trades and calculate metrics."""
         n = len(close)
         allow_long = direction in ("long", "both")

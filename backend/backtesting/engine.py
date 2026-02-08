@@ -17,7 +17,6 @@ REFACTORED: 2026-01-25 - Now uses MetricsCalculator.calculate_all()
 import uuid
 import warnings
 from datetime import datetime
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -121,10 +120,7 @@ def compute_period_analysis(
         # Sharpe for period (simplified - daily returns annualized)
         if len(group) > 1:
             returns = group.pct_change().dropna()
-            if len(returns) > 0 and returns.std() > 0:
-                sharpe = returns.mean() / returns.std() * np.sqrt(252)  # Annualized
-            else:
-                sharpe = 0.0
+            sharpe = returns.mean() / returns.std() * np.sqrt(252) if len(returns) > 0 and returns.std() > 0 else 0.0
         else:
             sharpe = 0.0
 
@@ -269,7 +265,7 @@ def _build_performance_metrics(
     timestamps: list,
     close: pd.Series,
     drawdown: pd.Series,
-    pnl_distribution: Optional[list] = None,
+    pnl_distribution: list | None = None,
 ) -> PerformanceMetrics:
     """
     Build PerformanceMetrics using centralized MetricsCalculator.
@@ -766,7 +762,7 @@ class BacktestEngine:
         config: BacktestConfig,
         ohlcv: pd.DataFrame,
         silent: bool = False,
-        custom_strategy: Optional[BaseStrategy] = None,
+        custom_strategy: BaseStrategy | None = None,
     ) -> BacktestResult:
         """
         Run a backtest with the given configuration.
@@ -1203,10 +1199,10 @@ class BacktestEngine:
         entries = np.asarray(signals.entries.values, dtype=bool).copy()
         exits = signals.exits.values
 
-        # Get long/short signals if available
+        # Get long/short signals if available (None-safe: attribute may exist but be None)
         long_entries = (
             np.asarray(signals.long_entries.values, dtype=bool).copy()
-            if hasattr(signals, "long_entries")
+            if hasattr(signals, "long_entries") and signals.long_entries is not None
             else entries.copy()
         )
         short_entries = (
@@ -1214,8 +1210,12 @@ class BacktestEngine:
             if hasattr(signals, "short_entries") and signals.short_entries is not None
             else None
         )
-        long_exits = signals.long_exits.values if hasattr(signals, "long_exits") else exits
-        short_exits = signals.short_exits.values if hasattr(signals, "short_exits") else None
+        long_exits = (
+            signals.long_exits.values if hasattr(signals, "long_exits") and signals.long_exits is not None else exits
+        )
+        short_exits = (
+            signals.short_exits.values if hasattr(signals, "short_exits") and signals.short_exits is not None else None
+        )
 
         # Mask entries on blocked weekdays (0=Mon … 6=Sun)
         no_trade_days = getattr(config, "no_trade_days", ()) or ()
@@ -1234,9 +1234,63 @@ class BacktestEngine:
         direction = getattr(config, "direction", "both")
         stop_loss = getattr(config, "stop_loss", None)
         take_profit = getattr(config, "take_profit", None)
-        take_profit = getattr(config, "take_profit", None)
         leverage = getattr(config, "leverage", 1.0)
         slippage = getattr(config, "slippage", 0.0)
+
+        # ========== BREAKEVEN STOP ==========
+        # After price moves breakeven_activation_pct in profit, SL moves to
+        # entry_price + breakeven_offset (protects from loss after profitable move)
+        breakeven_enabled = getattr(config, "breakeven_enabled", False)
+        breakeven_activation_pct = getattr(config, "breakeven_activation_pct", 0.005)
+        breakeven_offset = getattr(config, "breakeven_offset", 0.0)
+        breakeven_active = False  # Track if breakeven has been activated for current trade
+        breakeven_sl_price: float | None = None  # Calculated breakeven SL price
+
+        # ========== CLOSE ONLY IN PROFIT ==========
+        # Signal exits only fire if trade is currently profitable
+        close_only_in_profit = getattr(config, "close_only_in_profit", False)
+
+        # ========== SL TYPE (average_price / last_order) ==========
+        # Controls reference price for SL calculation:
+        #   average_price — use average entry price (entry_price variable, default)
+        #   last_order    — use last entry/DCA order price
+        sl_type = getattr(config, "sl_type", "average_price")
+        last_entry_price = 0.0  # Tracks the most recent entry/DCA fill price
+
+        # ========== ATR-BASED DYNAMIC SL/TP ==========
+        # ATR exit uses per-bar ATR values to compute dynamic SL/TP price levels.
+        # ATR series and config are passed via signals.extra_data from the adapter.
+        extra_data = getattr(signals, "extra_data", None) or {}
+        use_atr_sl = extra_data.get("use_atr_sl", False)
+        use_atr_tp = extra_data.get("use_atr_tp", False)
+        atr_sl_series = extra_data.get("atr_sl")  # pd.Series or None
+        atr_tp_series = extra_data.get("atr_tp")  # pd.Series or None
+        atr_sl_mult = extra_data.get("atr_sl_mult", 1.0)
+        atr_tp_mult = extra_data.get("atr_tp_mult", 1.0)
+        atr_sl_on_wicks = extra_data.get("atr_sl_on_wicks", False)
+        atr_tp_on_wicks = extra_data.get("atr_tp_on_wicks", False)
+        # Convert ATR series to numpy arrays for fast per-bar access
+        atr_sl_values = atr_sl_series.values if atr_sl_series is not None else None
+        atr_tp_values = atr_tp_series.values if atr_tp_series is not None else None
+        # ATR SL/TP prices are set at entry and remain fixed for the trade duration
+        atr_sl_price: float | None = None
+        atr_tp_price: float | None = None
+
+        # ========== TRAILING STOP ==========
+        # Trailing stop activates after price moves trailing_activation in profit,
+        # then tracks the highest (long) / lowest (short) price and exits when
+        # price retraces trailing_offset from the peak.
+        # Sources: config fields OR extra_data from strategy builder adapter.
+        trailing_activation = getattr(config, "trailing_stop_activation", None)
+        trailing_offset = getattr(config, "trailing_stop_offset", None)
+        # Override from extra_data (strategy builder trailing_stop_exit block)
+        if extra_data.get("use_trailing_stop"):
+            trailing_activation = extra_data["trailing_activation_percent"] / 100.0
+            trailing_offset = extra_data["trailing_percent"] / 100.0
+        use_trailing = trailing_activation is not None and trailing_offset is not None
+        trailing_active = False  # Whether trailing has been activated for current trade
+        trailing_peak_price = 0.0  # Highest (long) / lowest (short) since activation
+        trailing_stop_price: float | None = None  # Current trailing stop level
 
         # ========== UNIVERSAL BAR MAGNIFIER INITIALIZATION ==========
         # If enabled, load 1m data for precise intrabar order execution
@@ -1342,9 +1396,9 @@ class BacktestEngine:
                 # Long entry
                 if direction in ("long", "both") and long_entries[i]:
                     entry_price = price * (1 + slippage)
+                    last_entry_price = entry_price  # Track last fill for sl_type=last_order
 
-                    # Calculate position size with leverage
-                    # Bybit formula: Position Value = Margin × Leverage
+                    # Bybit formula: Position Value = Margin * Leverage
                     # allocated_capital = margin (what we risk from our cash)
                     # position_value = notional value of the position
                     # entry_size = quantity in base currency (e.g., BTC)
@@ -1359,18 +1413,27 @@ class BacktestEngine:
                     position = entry_size
                     is_long = True
                     entry_time = timestamps[i]
-                    # entry_idx kept for potential diagnostics/traceability
-                    entry_idx = i  # noqa: F841
+                    entry_idx = i  # kept for diagnostics/traceability
                     # Initialize MFE/MAE with current bar's high/low
                     max_favorable_price = current_high  # Best high so far
                     max_adverse_price = current_low  # Worst low so far
 
+                    # Calculate ATR-based SL/TP prices at entry bar
+                    if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
+                        atr_sl_price = entry_price - atr_sl_values[i] * atr_sl_mult
+                    else:
+                        atr_sl_price = None
+                    if use_atr_tp and atr_tp_values is not None and i < len(atr_tp_values):
+                        atr_tp_price = entry_price + atr_tp_values[i] * atr_tp_mult
+                    else:
+                        atr_tp_price = None
+
                 # Short entry
                 elif direction in ("short", "both") and short_entries is not None and short_entries[i]:
                     entry_price = price * (1 - slippage)
+                    last_entry_price = entry_price  # Track last fill for sl_type=last_order
 
-                    # Calculate position size with leverage (same as long)
-                    # Bybit formula: Position Value = Margin × Leverage
+                    # Bybit formula: Position Value = Margin * Leverage
 
                     allocated_capital = cash * config.position_size  # margin
                     position_value = allocated_capital * leverage  # notional with leverage
@@ -1382,11 +1445,20 @@ class BacktestEngine:
                     position = entry_size
                     is_long = False
                     entry_time = timestamps[i]
-                    # entry_idx kept for potential diagnostics/traceability
-                    entry_idx = i  # noqa: F841
+                    entry_idx = i  # kept for diagnostics/traceability
                     # For short: favorable = lowest, adverse = highest
                     max_favorable_price = current_low  # Best low so far
                     max_adverse_price = current_high  # Worst high so far
+
+                    # Calculate ATR-based SL/TP prices at entry bar (short)
+                    if use_atr_sl and atr_sl_values is not None and i < len(atr_sl_values):
+                        atr_sl_price = entry_price + atr_sl_values[i] * atr_sl_mult
+                    else:
+                        atr_sl_price = None
+                    if use_atr_tp and atr_tp_values is not None and i < len(atr_tp_values):
+                        atr_tp_price = entry_price - atr_tp_values[i] * atr_tp_mult
+                    else:
+                        atr_tp_price = None
 
             # While in position: update MFE/MAE and check exits
             elif position > 0:
@@ -1434,11 +1506,15 @@ class BacktestEngine:
                     best_price_in_bar = current_low
 
                 # Calculate P/L % at worst and best points within bar
+                # sl_ref_price: reference price for SL calculation
+                # - average_price (default): uses entry_price (average across DCA fills)
+                # - last_order: uses last_entry_price (most recent fill)
+                sl_ref_price = last_entry_price if sl_type == "last_order" and last_entry_price > 0 else entry_price
                 if is_long:
-                    worst_pnl_pct = (worst_price_in_bar - entry_price) / entry_price * leverage
+                    worst_pnl_pct = (worst_price_in_bar - sl_ref_price) / sl_ref_price * leverage
                     best_pnl_pct = (best_price_in_bar - entry_price) / entry_price * leverage
                 else:
-                    worst_pnl_pct = (entry_price - worst_price_in_bar) / entry_price * leverage
+                    worst_pnl_pct = (sl_ref_price - worst_price_in_bar) / sl_ref_price * leverage
                     best_pnl_pct = (entry_price - best_price_in_bar) / entry_price * leverage
 
                 should_exit = False
@@ -1455,12 +1531,12 @@ class BacktestEngine:
                         interval_ms = self._get_interval_ms(config.interval)
                         bar_end_ms = bar_start_ms + interval_ms
 
-                        # Calculate SL/TP prices
+                        # Calculate SL/TP prices (SL uses sl_ref_price for sl_type support)
                         if is_long:
-                            sl_price = entry_price * (1 - stop_loss / leverage) if stop_loss else None
+                            sl_price = sl_ref_price * (1 - stop_loss / leverage) if stop_loss else None
                             tp_price = entry_price * (1 + take_profit / leverage) if take_profit else None
                         else:
-                            sl_price = entry_price * (1 + stop_loss / leverage) if stop_loss else None
+                            sl_price = sl_ref_price * (1 + stop_loss / leverage) if stop_loss else None
                             tp_price = entry_price * (1 - take_profit / leverage) if take_profit else None
 
                         # Check SL/TP on each tick - find which triggers FIRST
@@ -1472,16 +1548,12 @@ class BacktestEngine:
 
                             # Check SL trigger
                             if sl_price is not None and sl_triggered_at is None:
-                                if is_long and tick_price <= sl_price:
-                                    sl_triggered_at = (tick_idx, sl_price)
-                                elif not is_long and tick_price >= sl_price:
+                                if (is_long and tick_price <= sl_price) or (not is_long and tick_price >= sl_price):
                                     sl_triggered_at = (tick_idx, sl_price)
 
                             # Check TP trigger
                             if tp_price is not None and tp_triggered_at is None:
-                                if is_long and tick_price >= tp_price:
-                                    tp_triggered_at = (tick_idx, tp_price)
-                                elif not is_long and tick_price <= tp_price:
+                                if (is_long and tick_price >= tp_price) or (not is_long and tick_price <= tp_price):
                                     tp_triggered_at = (tick_idx, tp_price)
 
                             # If both found, no need to continue
@@ -1530,15 +1602,106 @@ class BacktestEngine:
 
                 # Standard SL/TP check (no Bar Magnifier or fallback)
                 if not should_exit:
+                    # === BREAKEVEN ACTIVATION CHECK ===
+                    # Activate breakeven SL when price moves breakeven_activation_pct in profit
+                    if breakeven_enabled and not breakeven_active:
+                        if is_long:
+                            profit_pct = (best_price_in_bar - sl_ref_price) / sl_ref_price
+                        else:
+                            profit_pct = (sl_ref_price - best_price_in_bar) / sl_ref_price
+                        if profit_pct >= breakeven_activation_pct:
+                            breakeven_active = True
+                            # Set breakeven SL to sl_ref_price + offset
+                            if is_long:
+                                breakeven_sl_price = sl_ref_price * (1 + breakeven_offset)
+                            else:
+                                breakeven_sl_price = sl_ref_price * (1 - breakeven_offset)
+
+                    # === BREAKEVEN SL CHECK ===
+                    # If breakeven is active, check breakeven SL before regular SL
+                    if breakeven_active and breakeven_sl_price is not None:
+                        if (is_long and current_low <= breakeven_sl_price) or (not is_long and current_high >= breakeven_sl_price):
+                            should_exit = True
+                            exit_reason = "stop_loss"
+                            exit_price = breakeven_sl_price
+                            exit_price = max(current_low, min(current_high, exit_price))
+                            apply_slippage = True
+
+                    # === ATR-BASED DYNAMIC SL CHECK ===
+                    # ATR SL: price-based level set at entry (entry_price ± ATR*mult)
+                    # on_wicks=True: check high/low (default behavior)
+                    # on_wicks=False: check close price only
+                    if not should_exit and atr_sl_price is not None:
+                        if atr_sl_on_wicks:
+                            sl_check_price = current_low if is_long else current_high
+                        else:
+                            sl_check_price = price  # close price
+                        if (is_long and sl_check_price <= atr_sl_price) or (not is_long and sl_check_price >= atr_sl_price):
+                            should_exit = True
+                            exit_reason = "stop_loss"
+                            exit_price = max(current_low, min(current_high, atr_sl_price))
+                            apply_slippage = True
+
+                    # === ATR-BASED DYNAMIC TP CHECK ===
+                    if not should_exit and atr_tp_price is not None:
+                        if atr_tp_on_wicks:
+                            tp_check_price = current_high if is_long else current_low
+                        else:
+                            tp_check_price = price  # close price
+                        if (is_long and tp_check_price >= atr_tp_price) or (not is_long and tp_check_price <= atr_tp_price):
+                            should_exit = True
+                            exit_reason = "take_profit"
+                            exit_price = max(current_low, min(current_high, atr_tp_price))
+                            apply_slippage = False
+
+                    # === TRAILING STOP CHECK ===
+                    # After price moves trailing_activation in profit, start tracking peak.
+                    # Exit when price retraces trailing_offset from peak.
+                    if not should_exit and use_trailing:
+                        if is_long:
+                            profit_pct = (current_high - entry_price) / entry_price
+                        else:
+                            profit_pct = (entry_price - current_low) / entry_price
+
+                        # Check activation
+                        if not trailing_active and profit_pct >= trailing_activation:
+                            trailing_active = True
+                            trailing_peak_price = current_high if is_long else current_low
+
+                        if trailing_active:
+                            # Update peak
+                            if is_long:
+                                if current_high > trailing_peak_price:
+                                    trailing_peak_price = current_high
+                                # Calculate trailing stop price
+                                trailing_stop_price = trailing_peak_price * (1 - trailing_offset)
+                                # Check if triggered
+                                if current_low <= trailing_stop_price:
+                                    should_exit = True
+                                    exit_reason = "trailing_stop"
+                                    exit_price = max(current_low, min(current_high, trailing_stop_price))
+                                    apply_slippage = True
+                            else:
+                                if current_low < trailing_peak_price:
+                                    trailing_peak_price = current_low
+                                # Calculate trailing stop price
+                                trailing_stop_price = trailing_peak_price * (1 + trailing_offset)
+                                # Check if triggered
+                                if current_high >= trailing_stop_price:
+                                    should_exit = True
+                                    exit_reason = "trailing_stop"
+                                    exit_price = max(current_low, min(current_high, trailing_stop_price))
+                                    apply_slippage = True
+
                     # Check Stop Loss using worst price within bar (TradingView style)
-                    if stop_loss and worst_pnl_pct <= -stop_loss:
+                    if not should_exit and stop_loss and worst_pnl_pct <= -stop_loss:
                         should_exit = True
                         exit_reason = "stop_loss"
-                        # Calculate exact SL price
+                        # Calculate exact SL price using sl_ref_price (average or last order)
                         if is_long:
-                            exit_price = entry_price * (1 - stop_loss / leverage)
+                            exit_price = sl_ref_price * (1 - stop_loss / leverage)
                         else:
-                            exit_price = entry_price * (1 + stop_loss / leverage)
+                            exit_price = sl_ref_price * (1 + stop_loss / leverage)
                         # Ensure exit price is within bar range
                         exit_price = max(current_low, min(current_high, exit_price))
                         apply_slippage = True  # SL is market order
@@ -1557,15 +1720,27 @@ class BacktestEngine:
                         exit_price = max(current_low, min(current_high, exit_price))
 
                 # Check signal exit (uses close price)
+                # close_only_in_profit: skip signal exit if trade is currently at a loss
                 if not should_exit:
-                    if is_long and long_exits[i]:
-                        should_exit = True
-                        exit_reason = "signal"
-                        exit_price = price  # Signal exits at close
-                    elif not is_long and short_exits is not None and short_exits[i]:
-                        should_exit = True
-                        exit_reason = "signal"
-                        exit_price = price  # Signal exits at close
+                    signal_exit_triggered = False
+                    if (is_long and long_exits[i]) or (not is_long and short_exits is not None and short_exits[i]):
+                        signal_exit_triggered = True
+
+                    if signal_exit_triggered:
+                        if close_only_in_profit:
+                            # Only exit if current price is profitable vs entry
+                            if is_long:
+                                is_profitable = price > entry_price
+                            else:
+                                is_profitable = price < entry_price
+                            if is_profitable:
+                                should_exit = True
+                                exit_reason = "signal"
+                                exit_price = price
+                        else:
+                            should_exit = True
+                            exit_reason = "signal"
+                            exit_price = price
 
                 if should_exit:
                     # Apply slippage if applicable
@@ -1582,7 +1757,7 @@ class BacktestEngine:
                     fees = position_value * config.taker_fee
 
                     # Calculate PnL (entry_size already reflects leveraged quantity)
-                    # PnL = price_diff × qty - fees
+                    # PnL = price_diff * qty - fees
                     if is_long:
                         pnl = (exit_price - entry_price) * entry_size - fees
                     else:
@@ -1631,6 +1806,7 @@ class BacktestEngine:
                     exit_comment_map = {
                         "stop_loss": "SL",
                         "take_profit": "TP",
+                        "trailing_stop": "TRAIL",
                         "signal": "signal",
                         "liquidation": "LIQ",
                     }
@@ -1661,8 +1837,19 @@ class BacktestEngine:
 
                     position = 0.0
                     entry_price = 0.0
+                    last_entry_price = 0.0
                     entry_time = None
                     entry_size = 0.0
+                    # Reset breakeven state for next trade
+                    breakeven_active = False
+                    breakeven_sl_price = None
+                    # Reset ATR SL/TP prices for next trade
+                    atr_sl_price = None
+                    atr_tp_price = None
+                    # Reset trailing stop state for next trade
+                    trailing_active = False
+                    trailing_peak_price = 0.0
+                    trailing_stop_price = None
 
             # Update equity
             if position > 0:
@@ -1674,6 +1861,83 @@ class BacktestEngine:
             else:
                 current_equity = cash
             equity.append(current_equity)
+
+        # ========== CLOSE REMAINING POSITION AT END OF BACKTEST ==========
+        # TradingView closes all positions at the end of the backtest period
+        if position > 0:
+            exit_price = close[-1]  # Close at last bar's close price
+            exit_time = timestamps[-1]
+
+            # Apply slippage for market close
+            if is_long:
+                exit_price = exit_price * (1 - slippage)
+            else:
+                exit_price = exit_price * (1 + slippage)
+
+            # Calculate position value and fees
+            position_value = position * exit_price
+            fees = position_value * config.taker_fee
+
+            # Calculate PnL
+            if is_long:
+                pnl = (exit_price - entry_price) * entry_size - fees
+            else:
+                pnl = (entry_price - exit_price) * entry_size - fees
+
+            # Calculate margin that was originally allocated
+            entry_position_value = entry_size * entry_price
+            margin_used = entry_position_value / leverage if leverage > 0 else entry_position_value
+
+            # Return margin + PnL
+            cash += margin_used + pnl
+
+            # Calculate P&L percentage
+            pnl_pct = pnl / margin_used if margin_used > 0 else 0
+
+            # Calculate MFE/MAE
+            if is_long:
+                mfe_pct = (max_favorable_price - entry_price) / entry_price * 100 * leverage
+                mae_pct = (entry_price - max_adverse_price) / entry_price * 100 * leverage
+                mfe_value = (max_favorable_price - entry_price) * entry_size
+                mae_value = (entry_price - max_adverse_price) * entry_size
+            else:
+                mfe_pct = (entry_price - max_favorable_price) / entry_price * 100 * leverage
+                mae_pct = (max_adverse_price - entry_price) / entry_price * 100 * leverage
+                mfe_value = (entry_price - max_favorable_price) * entry_size
+                mae_value = (max_adverse_price - entry_price) * entry_size
+
+            total_trade_fees = fees * 2  # Approximate entry + exit fees
+
+            logger.debug(
+                f"Position closed at end of backtest: is_long={is_long}, entry={entry_price:.2f}, "
+                f"exit={exit_price:.2f}, pnl={pnl:.2f}"
+            )
+
+            trades.append(
+                TradeRecord(
+                    entry_time=entry_time if entry_time is not None else timestamps[-1],
+                    exit_time=exit_time,
+                    side=OrderSide.BUY if is_long else OrderSide.SELL,
+                    entry_price=entry_price,
+                    exit_price=exit_price,
+                    size=entry_size,
+                    pnl=pnl,
+                    pnl_pct=pnl_pct * 100,  # Convert to percentage
+                    fees=total_trade_fees,
+                    duration_hours=(exit_time - entry_time).total_seconds() / 3600 if entry_time else 0,
+                    bars_in_trade=len(ohlcv)
+                    - (ohlcv.index.get_loc(entry_time) if entry_time and entry_time in ohlcv.index else 0),
+                    entry_bar_index=ohlcv.index.get_loc(entry_time) if entry_time and entry_time in ohlcv.index else 0,
+                    exit_bar_index=len(ohlcv) - 1,
+                    mfe=mfe_value,  # Absolute value in USDT
+                    mae=mae_value,  # Absolute value in USDT
+                    mfe_pct=mfe_pct,
+                    mae_pct=mae_pct,
+                    exit_comment="end_of_backtest",
+                )
+            )
+
+            position = 0.0
 
         # Calculate metrics
         equity_series = pd.Series(equity[1:], index=timestamps)
@@ -1799,7 +2063,7 @@ class BacktestEngine:
 
         if not has_sl_tp:
             # Simple mode without SL/TP - use from_signals
-            # Position value = margin × leverage (margin = position_size × capital)
+            # Position value = margin * leverage (margin = position_size * capital)
             # VectorBT uses init_cash to limit position size, so we must multiply by leverage
             leverage = float(getattr(config, "leverage", 1.0))
             margin = float(config.position_size) * float(config.initial_capital)
@@ -1911,7 +2175,7 @@ class BacktestEngine:
             final_pnl_pct=(final_equity - config.initial_capital) / config.initial_capital,
         )
 
-    def get_result(self, backtest_id: str) -> Optional[BacktestResult]:
+    def get_result(self, backtest_id: str) -> BacktestResult | None:
         """Get cached backtest result by ID"""
         return self._results_cache.get(backtest_id)
 
@@ -1934,7 +2198,7 @@ class BacktestEngine:
 
 
 # Global engine instance
-_engine: Optional[BacktestEngine] = None
+_engine: BacktestEngine | None = None
 
 
 def get_engine() -> BacktestEngine:

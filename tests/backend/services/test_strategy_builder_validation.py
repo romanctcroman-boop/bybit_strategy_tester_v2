@@ -8,6 +8,7 @@ Tests enhanced validation including:
 """
 
 import pytest
+
 from backend.services.strategy_builder.builder import (
     BlockConnection,
     BlockInput,
@@ -15,8 +16,8 @@ from backend.services.strategy_builder.builder import (
     BlockType,
     ConnectionType,
     StrategyBlock,
-    StrategyGraph,
     StrategyBuilder,
+    StrategyGraph,
 )
 from backend.services.strategy_builder.validator import (
     StrategyValidator,

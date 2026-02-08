@@ -27,10 +27,8 @@ Features:
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from loguru import logger
 
 try:
     from numba import njit
@@ -107,7 +105,7 @@ class TradeRecord:
     # Bar Magnifier data
     intrabar_sl_hit: bool = False
     intrabar_tp_hit: bool = False
-    intrabar_exit_price: Optional[float] = None
+    intrabar_exit_price: float | None = None
 
     # MFE/MAE
     mfe: float = 0.0  # Maximum Favorable Excursion
@@ -130,8 +128,8 @@ class ExecutorConfig:
     atr_tp_multiplier: float = 2.0
 
     # Multi-level TP (tp_mode=MULTI)
-    tp_levels: Tuple[float, ...] = (0.005, 0.010, 0.015, 0.020)
-    tp_portions: Tuple[float, ...] = (0.25, 0.25, 0.25, 0.25)
+    tp_levels: tuple[float, ...] = (0.005, 0.010, 0.015, 0.020)
+    tp_portions: tuple[float, ...] = (0.25, 0.25, 0.25, 0.25)
 
     # === ATR PARAMS ===
     atr_period: int = 14
@@ -184,8 +182,8 @@ class ActiveTrade:
     # SL/TP prices
     sl_price: float = 0.0
     tp_price: float = 0.0  # For fixed TP
-    tp_prices: List[float] = field(default_factory=list)  # For multi-level
-    tp_portions: List[float] = field(default_factory=list)
+    tp_prices: list[float] = field(default_factory=list)  # For multi-level
+    tp_portions: list[float] = field(default_factory=list)
 
     # State tracking
     mfe: float = 0.0
@@ -202,7 +200,7 @@ class ActiveTrade:
     breakeven_price: float = 0.0
 
     # Multi-TP tracking
-    tp_levels_hit: List[int] = field(default_factory=list)
+    tp_levels_hit: list[int] = field(default_factory=list)
     remaining_size: float = 0.0
 
     # DCA average price (if applicable)
@@ -267,7 +265,7 @@ def calculate_sl_tp_fixed(
     direction: int,  # 0=long, 1=short
     stop_loss_pct: float,
     take_profit_pct: float,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Calculate fixed SL/TP prices."""
     if direction == 0:  # Long
         sl_price = entry_price * (1 - stop_loss_pct)
@@ -288,7 +286,7 @@ def calculate_sl_tp_atr(
     atr_tp_mult: float,
     fixed_sl_pct: float,  # Max limit
     sl_max_limit_enabled: bool,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Calculate ATR-based SL/TP prices."""
     sl_distance = atr_value * atr_sl_mult
     tp_distance = atr_value * atr_tp_mult
@@ -340,7 +338,7 @@ def update_trailing_stop(
     trailing_distance: float,
     activation_price: float,
     is_activated: bool,
-) -> Tuple[float, bool]:
+) -> tuple[float, bool]:
     """Update trailing stop price."""
     # Check activation
     if not is_activated:
@@ -375,7 +373,7 @@ def calculate_mfe_mae(
     low: float,
     current_mfe: float,
     current_mae: float,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Update MFE/MAE tracking."""
     if direction == 0:  # Long
         # MFE: max favorable = highest price
@@ -404,7 +402,7 @@ def calculate_mfe_mae(
 @njit(cache=True)
 def calculate_pnl(
     direction: int, entry_price: float, exit_price: float, size: float, fees: float
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Calculate PnL and PnL percentage."""
     if direction == 0:  # Long
         pnl_pct = (exit_price - entry_price) / entry_price
@@ -458,9 +456,9 @@ class UniversalTradeExecutor:
 
     def __init__(self, config: ExecutorConfig):
         self.config = config
-        self.atr_values: Optional[np.ndarray] = None
-        self.active_trades: List[ActiveTrade] = []
-        self.completed_trades: List[TradeRecord] = []
+        self.atr_values: np.ndarray | None = None
+        self.active_trades: list[ActiveTrade] = []
+        self.completed_trades: list[TradeRecord] = []
 
     def set_atr_values(self, high: np.ndarray, low: np.ndarray, close: np.ndarray):
         """Pre-calculate ATR values for the entire series."""
@@ -559,8 +557,8 @@ class UniversalTradeExecutor:
         close: float,
         long_exit: bool = False,
         short_exit: bool = False,
-        candles_1m: Optional[np.ndarray] = None,  # For bar magnifier
-    ) -> List[TradeRecord]:
+        candles_1m: np.ndarray | None = None,  # For bar magnifier
+    ) -> list[TradeRecord]:
         """
         Process a bar and check for exits.
 
@@ -618,10 +616,7 @@ class UniversalTradeExecutor:
                 )
 
                 if trade.trailing_activated:
-                    if trade.direction == "long" and low <= trade.trailing_stop_price:
-                        exit_reason = ExitReason.TRAILING_STOP
-                        exit_price = trade.trailing_stop_price
-                    elif (
+                    if (trade.direction == "long" and low <= trade.trailing_stop_price) or (
                         trade.direction == "short" and high >= trade.trailing_stop_price
                     ):
                         exit_reason = ExitReason.TRAILING_STOP
@@ -691,10 +686,7 @@ class UniversalTradeExecutor:
 
             # 4. Check signal exit
             if exit_reason is None:
-                if trade.direction == "long" and long_exit:
-                    exit_reason = ExitReason.SIGNAL
-                    exit_price = close
-                elif trade.direction == "short" and short_exit:
+                if (trade.direction == "long" and long_exit) or (trade.direction == "short" and short_exit):
                     exit_reason = ExitReason.SIGNAL
                     exit_price = close
 
@@ -767,7 +759,7 @@ class UniversalTradeExecutor:
         bar_time: datetime,
         close_price: float,
         reason: ExitReason = ExitReason.END_OF_DATA,
-    ) -> List[TradeRecord]:
+    ) -> list[TradeRecord]:
         """Close all active trades at end of backtest."""
         closed = []
         cfg = self.config

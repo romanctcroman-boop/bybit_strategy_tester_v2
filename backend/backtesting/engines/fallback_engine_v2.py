@@ -18,7 +18,7 @@ V2 оставлен для обратной совместимости и пар
 
 import time
 import warnings
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -143,7 +143,7 @@ class FallbackEngineV2(BaseBacktestEngine):
         # Состояние
         cash = capital
         equity_curve = [capital]
-        trades: List[TradeRecord] = []
+        trades: list[TradeRecord] = []
 
         # Позиции
         in_long = False
@@ -590,10 +590,10 @@ class FallbackEngineV2(BaseBacktestEngine):
     def optimize(
         self,
         input_data: BacktestInput,
-        param_ranges: Dict[str, List[Any]],
+        param_ranges: dict[str, list[Any]],
         metric: str = "sharpe_ratio",
         top_n: int = 10,
-    ) -> List[Tuple[Dict[str, Any], BacktestOutput]]:
+    ) -> list[tuple[dict[str, Any], BacktestOutput]]:
         """Оптимизация (последовательная)"""
         from itertools import product
 
@@ -622,7 +622,7 @@ class FallbackEngineV2(BaseBacktestEngine):
 
     def _build_bar_magnifier_index(
         self, candles: pd.DataFrame, candles_1m: pd.DataFrame
-    ) -> Dict[int, Tuple[int, int]]:
+    ) -> dict[int, tuple[int, int]]:
         """
         Построение индекса для Bar Magnifier.
         Возвращает словарь: bar_idx -> (start_1m_idx, end_1m_idx)
@@ -682,10 +682,10 @@ class FallbackEngineV2(BaseBacktestEngine):
         signal_exit: bool,
         slippage: float,
         use_bar_magnifier: bool,
-        bar_magnifier_index: Optional[Dict],
+        bar_magnifier_index: dict | None,
         bar_idx: int,
-        candles_1m: Optional[pd.DataFrame],
-    ) -> Tuple[Optional[ExitReason], float]:
+        candles_1m: pd.DataFrame | None,
+    ) -> tuple[ExitReason | None, float]:
         """
         Проверка условий выхода с поддержкой Bar Magnifier.
 
@@ -781,7 +781,7 @@ class FallbackEngineV2(BaseBacktestEngine):
         exit_price: float,
         size: float,
         taker_fee: float,
-    ) -> Tuple[float, float, float]:
+    ) -> tuple[float, float, float]:
         """Расчёт PnL, PnL%, и комиссий (entry + exit как в TV)"""
         if is_long:
             pnl = (exit_price - entry_price) * size
@@ -810,7 +810,7 @@ class FallbackEngineV2(BaseBacktestEngine):
         high: float,
         low: float,
         size: float,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Расчёт Maximum Favorable/Adverse Excursion"""
         if is_long:
             mfe = (high - entry_price) * size
@@ -823,7 +823,7 @@ class FallbackEngineV2(BaseBacktestEngine):
 
     def _calculate_metrics(
         self,
-        trades: List[TradeRecord],
+        trades: list[TradeRecord],
         equity_curve: np.ndarray,
         initial_capital: float,
     ) -> BacktestMetrics:
@@ -984,7 +984,7 @@ class FallbackEngineV2(BaseBacktestEngine):
         return metrics
 
     def _apply_params(
-        self, input_data: BacktestInput, params: Dict[str, Any]
+        self, input_data: BacktestInput, params: dict[str, Any]
     ) -> BacktestInput:
         """Применение параметров к input"""
         from dataclasses import replace

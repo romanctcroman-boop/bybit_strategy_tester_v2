@@ -12,8 +12,9 @@ The integration is gradual:
 
 import logging
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -53,7 +54,7 @@ class RepositoryMetrics:
     def record_error(self):
         self._stats["errors"] += 1
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get current statistics."""
         stats = self._stats.copy()
         # Calculate averages
@@ -80,7 +81,7 @@ class RepositoryAdapter:
     without breaking existing functionality.
     """
 
-    def __init__(self, db_url: Optional[str] = None):
+    def __init__(self, db_url: str | None = None):
         """
         Initialize adapter.
 
@@ -120,7 +121,7 @@ class RepositoryAdapter:
         return self._session_factory
 
     @contextmanager
-    def session(self) -> Generator[Session, None, None]:
+    def session(self) -> Generator[Session]:
         """Get a session context manager."""
         session = self.session_factory()
         try:
@@ -133,7 +134,7 @@ class RepositoryAdapter:
             session.close()
 
     @contextmanager
-    def unit_of_work(self) -> Generator[UnitOfWork, None, None]:
+    def unit_of_work(self) -> Generator[UnitOfWork]:
         """Get a Unit of Work for transaction management."""
         with self.session() as session:
             uow = UnitOfWork(session)
@@ -141,7 +142,7 @@ class RepositoryAdapter:
                 yield uow
 
     @contextmanager
-    def read_only(self) -> Generator[ReadOnlyUnitOfWork, None, None]:
+    def read_only(self) -> Generator[ReadOnlyUnitOfWork]:
         """Get a read-only Unit of Work."""
         with self.session() as session:
             uow = ReadOnlyUnitOfWork(session)
@@ -153,8 +154,8 @@ class RepositoryAdapter:
         symbol: str,
         interval: str,
         limit: int = 500,
-        end_time: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        end_time: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get klines using Repository pattern.
 
@@ -185,7 +186,7 @@ class RepositoryAdapter:
 
     def get_coverage(
         self, symbol: str, interval: str
-    ) -> Optional[Tuple[int, int, int]]:
+    ) -> tuple[int, int, int] | None:
         """
         Get database coverage using Repository pattern.
 
@@ -218,7 +219,7 @@ class RepositoryAdapter:
         start_time: int,
         end_time: int,
         expected_interval_ms: int,
-    ) -> List[Tuple[int, int]]:
+    ) -> list[tuple[int, int]]:
         """
         Find gaps in kline data using Repository pattern.
 
@@ -235,8 +236,8 @@ class RepositoryAdapter:
             )
 
     def bulk_upsert(
-        self, symbol: str, interval: str, candles: List[Dict[str, Any]]
-    ) -> Tuple[int, int]:
+        self, symbol: str, interval: str, candles: list[dict[str, Any]]
+    ) -> tuple[int, int]:
         """
         Bulk upsert klines using Repository pattern.
 
@@ -248,7 +249,7 @@ class RepositoryAdapter:
             session.commit()
             return result
 
-    def get_all_symbols_summary(self) -> List[Dict[str, Any]]:
+    def get_all_symbols_summary(self) -> list[dict[str, Any]]:
         """Get summary of all symbols in database."""
         with self.session() as session:
             # Use raw SQL for this complex aggregation
@@ -267,10 +268,10 @@ class RepositoryAdapter:
 
 
 # Singleton instance
-_adapter_instance: Optional[RepositoryAdapter] = None
+_adapter_instance: RepositoryAdapter | None = None
 
 
-def get_repository_adapter(db_url: Optional[str] = None) -> RepositoryAdapter:
+def get_repository_adapter(db_url: str | None = None) -> RepositoryAdapter:
     """
     Get singleton RepositoryAdapter instance.
 

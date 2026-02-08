@@ -52,6 +52,18 @@ executor = ThreadPoolExecutor(max_workers=4)
 # Global cached BybitAdapter instance (avoid recreating on each request)
 _bybit_adapter: BybitAdapter | None = None
 
+# Cache for db-groups query (heavy GROUP BY - takes ~500ms on 2M+ rows)
+_db_groups_cache: dict | None = None
+_db_groups_cache_time: float = 0
+_DB_GROUPS_CACHE_TTL: float = 5.0  # seconds
+
+
+def invalidate_db_groups_cache():
+    """Invalidate db-groups cache (call after delete/block/unblock operations)."""
+    global _db_groups_cache, _db_groups_cache_time
+    _db_groups_cache = None
+    _db_groups_cache_time = 0
+
 
 def get_bybit_adapter() -> BybitAdapter:
     """Get or create cached BybitAdapter instance."""
@@ -137,8 +149,19 @@ def get_local_symbols(
 def get_db_groups(db: Session = Depends(get_db)):
     """
     Группы тикеров в БД: (symbol, market_type) → интервалы и счётчики.
-    Для секции «База Даннах».
+    Для секции «База Даннах». Кэшируется на 5 секунд.
     """
+    import time
+
+    global _db_groups_cache, _db_groups_cache_time
+
+    # Return cached data if fresh (within TTL)
+    now = time.time()
+    if _db_groups_cache is not None and (now - _db_groups_cache_time) < _DB_GROUPS_CACHE_TTL:
+        # Update blocked list (fast operation)
+        _db_groups_cache["blocked"] = list(_get_blocked())
+        return _db_groups_cache
+
     try:
         from sqlalchemy import func
         from sqlalchemy.exc import OperationalError
@@ -181,7 +204,13 @@ def get_db_groups(db: Session = Depends(get_db)):
             groups[key]["intervals"][iv] = {"count": cnt, "min_time": min_t, "max_time": max_t}
             groups[key]["total_rows"] += cnt
 
-        return {"groups": [v for v in groups.values()], "blocked": list(_get_blocked())}
+        result = {"groups": list(groups.values()), "blocked": list(_get_blocked())}
+
+        # Cache the result
+        _db_groups_cache = result
+        _db_groups_cache_time = now
+
+        return result
     except Exception as e:
         logger.error(f"Error getting db groups: {e}")
         return {"groups": [], "blocked": []}
@@ -220,6 +249,10 @@ def delete_db_group(
         q = db.query(BybitKlineAudit).filter(BybitKlineAudit.symbol == symbol)
         count = q.delete(synchronize_session=False)
     db.commit()
+
+    # Invalidate cache after delete
+    invalidate_db_groups_cache()
+
     logger.info(f"Deleted {count} candles for {symbol}/{market_type}")
     return {"deleted": count, "symbol": symbol, "market_type": market_type}
 

@@ -11,7 +11,7 @@ import logging
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Optional
 
 from backend.services.live_trading.strategy_runner import (
     BaseStrategy,
@@ -61,18 +61,18 @@ class ParameterSpec:
     description: str = ""
 
     # Numeric bounds (for INT, FLOAT)
-    min_value: Optional[float] = None
-    max_value: Optional[float] = None
-    step: Optional[float] = None
+    min_value: float | None = None
+    max_value: float | None = None
+    step: float | None = None
 
     # Categorical options (for CATEGORICAL)
-    choices: Optional[List[Any]] = None
+    choices: list[Any] | None = None
 
     # Optimization settings
     optimize: bool = True
     log_scale: bool = False  # Use logarithmic scale for optimization
 
-    def to_optuna_spec(self) -> Dict[str, Any]:
+    def to_optuna_spec(self) -> dict[str, Any]:
         """Convert to Optuna parameter specification."""
         spec = {
             "name": self.name,
@@ -119,10 +119,10 @@ class StrategyInfo:
 
     # Requirements
     min_candles: int = 50  # Minimum candles needed
-    recommended_timeframes: List[str] = field(
+    recommended_timeframes: list[str] = field(
         default_factory=lambda: ["15", "60", "240"]
     )
-    suitable_markets: List[str] = field(
+    suitable_markets: list[str] = field(
         default_factory=lambda: ["crypto", "forex", "stocks"]
     )
 
@@ -137,20 +137,20 @@ class StrategyInfo:
     max_drawdown_expected: float = 0.15  # 15%
 
     # Parameters
-    parameters: List[ParameterSpec] = field(default_factory=list)
+    parameters: list[ParameterSpec] = field(default_factory=list)
 
     # Tags for search/filter
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
-    def get_optimization_space(self) -> Dict[str, Dict[str, Any]]:
+    def get_optimization_space(self) -> dict[str, dict[str, Any]]:
         """Get parameter space for optimization."""
         return {p.name: p.to_optuna_spec() for p in self.parameters if p.optimize}
 
-    def get_defaults(self) -> Dict[str, Any]:
+    def get_defaults(self) -> dict[str, Any]:
         """Get default parameter values."""
         return {p.name: p.default for p in self.parameters}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "id": self.id,
@@ -214,12 +214,12 @@ class LibraryStrategy(BaseStrategy):
                     self._params[name] = default
 
         # Signal history
-        self._signal_history: List[TradingSignal] = []
+        self._signal_history: list[TradingSignal] = []
         self._max_signal_history = 100
 
         # Performance tracking
         self._signals_total = 0
-        self._signals_by_type: Dict[SignalType, int] = {
+        self._signals_by_type: dict[SignalType, int] = {
             SignalType.BUY: 0,
             SignalType.SELL: 0,
             SignalType.CLOSE_LONG: 0,
@@ -228,11 +228,11 @@ class LibraryStrategy(BaseStrategy):
         }
 
     @classmethod
-    def get_info(cls) -> Optional[StrategyInfo]:
+    def get_info(cls) -> StrategyInfo | None:
         """Get strategy metadata."""
         return cls.STRATEGY_INFO
 
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         """Get current parameter values."""
         return self._params.copy()
 
@@ -255,7 +255,7 @@ class LibraryStrategy(BaseStrategy):
         if len(self._signal_history) > self._max_signal_history:
             self._signal_history = self._signal_history[-self._max_signal_history :]
 
-    def get_signal_stats(self) -> Dict[str, Any]:
+    def get_signal_stats(self) -> dict[str, Any]:
         """Get signal generation statistics."""
         return {
             "total_signals": self._signals_total,
@@ -269,8 +269,8 @@ class LibraryStrategy(BaseStrategy):
         price: float = 0.0,
         reason: str = "",
         confidence: float = 1.0,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
         **metadata,
     ) -> TradingSignal:
         """Helper to create and record a signal."""
@@ -294,7 +294,7 @@ class LibraryStrategy(BaseStrategy):
         return len(self._candles) >= 50
 
     @abstractmethod
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate signal. Must be implemented."""
         pass
 
@@ -307,7 +307,7 @@ class StrategyRegistry:
     """
 
     _instance: Optional["StrategyRegistry"] = None
-    _strategies: Dict[str, Type[LibraryStrategy]] = {}
+    _strategies: dict[str, type[LibraryStrategy]] = {}
 
     def __new__(cls):
         if cls._instance is None:
@@ -315,7 +315,7 @@ class StrategyRegistry:
         return cls._instance
 
     @classmethod
-    def register(cls, strategy_class: Type[LibraryStrategy]):
+    def register(cls, strategy_class: type[LibraryStrategy]):
         """Register a strategy class."""
         if strategy_class.STRATEGY_INFO:
             strategy_id = strategy_class.STRATEGY_INFO.id
@@ -325,17 +325,17 @@ class StrategyRegistry:
             logger.warning(f"Strategy {strategy_class.__name__} has no STRATEGY_INFO")
 
     @classmethod
-    def get(cls, strategy_id: str) -> Optional[Type[LibraryStrategy]]:
+    def get(cls, strategy_id: str) -> type[LibraryStrategy] | None:
         """Get strategy class by ID."""
         return cls._strategies.get(strategy_id)
 
     @classmethod
-    def list_all(cls) -> List[StrategyInfo]:
+    def list_all(cls) -> list[StrategyInfo]:
         """List all registered strategies."""
         return [s.STRATEGY_INFO for s in cls._strategies.values() if s.STRATEGY_INFO]
 
     @classmethod
-    def list_by_category(cls, category: StrategyCategory) -> List[StrategyInfo]:
+    def list_by_category(cls, category: StrategyCategory) -> list[StrategyInfo]:
         """List strategies by category."""
         return [
             s.STRATEGY_INFO
@@ -346,11 +346,11 @@ class StrategyRegistry:
     @classmethod
     def search(
         cls,
-        query: Optional[str] = None,
-        category: Optional[StrategyCategory] = None,
-        risk_level: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-    ) -> List[StrategyInfo]:
+        query: str | None = None,
+        category: StrategyCategory | None = None,
+        risk_level: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[StrategyInfo]:
         """Search strategies with filters."""
         results = []
 
@@ -387,7 +387,7 @@ class StrategyRegistry:
     @classmethod
     def create(
         cls, strategy_id: str, config: StrategyConfig, **params
-    ) -> Optional[LibraryStrategy]:
+    ) -> LibraryStrategy | None:
         """Create strategy instance by ID."""
         strategy_class = cls.get(strategy_id)
         if not strategy_class:
@@ -401,7 +401,7 @@ class StrategyRegistry:
             return None
 
     @classmethod
-    def get_optimization_space(cls, strategy_id: str) -> Dict[str, Dict[str, Any]]:
+    def get_optimization_space(cls, strategy_id: str) -> dict[str, dict[str, Any]]:
         """Get optimization parameter space for a strategy."""
         strategy_class = cls.get(strategy_id)
         if not strategy_class or not strategy_class.STRATEGY_INFO:
@@ -409,7 +409,7 @@ class StrategyRegistry:
         return strategy_class.STRATEGY_INFO.get_optimization_space()
 
 
-def register_strategy(strategy_class: Type[LibraryStrategy]):
+def register_strategy(strategy_class: type[LibraryStrategy]):
     """Decorator to register a strategy."""
     StrategyRegistry.register(strategy_class)
     return strategy_class

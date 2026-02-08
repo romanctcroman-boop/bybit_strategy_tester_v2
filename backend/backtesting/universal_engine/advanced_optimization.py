@@ -11,9 +11,10 @@ Advanced Optimization Module для Universal Math Engine.
 Версия: 1.0.0
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -85,10 +86,10 @@ class BayesianConfig:
     n_warmup_steps: int = 5
 
     # Multi-objective
-    directions: List[str] = field(default_factory=lambda: ["maximize"])
+    directions: list[str] = field(default_factory=lambda: ["maximize"])
 
     # Timeout
-    timeout_seconds: Optional[int] = None
+    timeout_seconds: int | None = None
 
 
 @dataclass
@@ -153,20 +154,20 @@ class MonteCarloConfig:
     block_size: int = 1  # For block bootstrap
 
     # Confidence levels
-    confidence_levels: List[float] = field(default_factory=lambda: [0.95, 0.99])
+    confidence_levels: list[float] = field(default_factory=lambda: [0.95, 0.99])
 
     # Seed for reproducibility
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 @dataclass
 class WalkForwardResult:
     """Результат Walk-Forward Analysis."""
 
-    fold_results: List[Dict[str, Any]]
-    in_sample_metrics: Dict[str, float]
-    out_of_sample_metrics: Dict[str, float]
-    optimal_params_per_fold: List[Dict[str, Any]]
+    fold_results: list[dict[str, Any]]
+    in_sample_metrics: dict[str, float]
+    out_of_sample_metrics: dict[str, float]
+    optimal_params_per_fold: list[dict[str, Any]]
     robustness_ratio: float  # OOS/IS performance ratio
     consistency_score: float  # Percentage of profitable folds
 
@@ -177,7 +178,7 @@ class MonteCarloResult:
 
     mean_return: float
     std_return: float
-    confidence_intervals: Dict[float, Tuple[float, float]]
+    confidence_intervals: dict[float, tuple[float, float]]
     var_95: float  # Value at Risk
     cvar_95: float  # Conditional VaR
     max_drawdown_distribution: np.ndarray
@@ -301,7 +302,7 @@ def calculate_win_rates(trade_pnls: np.ndarray) -> np.ndarray:
 def calculate_var_cvar(
     returns: np.ndarray,
     confidence: float = 0.95,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Calculate Value at Risk and Conditional VaR.
 
@@ -336,8 +337,8 @@ class GeneticOptimizer:
 
     def __init__(
         self,
-        config: Optional[GeneticConfig] = None,
-        param_bounds: Optional[Dict[str, Tuple[float, float]]] = None,
+        config: GeneticConfig | None = None,
+        param_bounds: dict[str, tuple[float, float]] | None = None,
     ):
         self.config = config or GeneticConfig()
         self.param_bounds = param_bounds or {}
@@ -345,12 +346,12 @@ class GeneticOptimizer:
         self.n_params = len(self.param_names)
 
         # History
-        self.population: List[np.ndarray] = []
-        self.fitness_history: List[float] = []
-        self.best_individual: Optional[np.ndarray] = None
+        self.population: list[np.ndarray] = []
+        self.fitness_history: list[float] = []
+        self.best_individual: np.ndarray | None = None
         self.best_fitness: float = float("-inf")
 
-    def _initialize_population(self) -> List[np.ndarray]:
+    def _initialize_population(self) -> list[np.ndarray]:
         """Initialize random population."""
         population = []
 
@@ -363,18 +364,18 @@ class GeneticOptimizer:
 
         return population
 
-    def _decode_individual(self, individual: np.ndarray) -> Dict[str, float]:
+    def _decode_individual(self, individual: np.ndarray) -> dict[str, float]:
         """Convert array to parameter dict."""
         return {name: individual[i] for i, name in enumerate(self.param_names)}
 
-    def _encode_params(self, params: Dict[str, float]) -> np.ndarray:
+    def _encode_params(self, params: dict[str, float]) -> np.ndarray:
         """Convert parameter dict to array."""
         return np.array([params[name] for name in self.param_names])
 
     def _tournament_select(
         self,
-        population: List[np.ndarray],
-        fitness: List[float],
+        population: list[np.ndarray],
+        fitness: list[float],
     ) -> np.ndarray:
         """Tournament selection."""
         indices = np.random.choice(
@@ -390,7 +391,7 @@ class GeneticOptimizer:
         self,
         parent1: np.ndarray,
         parent2: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Crossover operation."""
         if np.random.random() > self.config.crossover_prob:
             return parent1.copy(), parent2.copy()
@@ -444,9 +445,9 @@ class GeneticOptimizer:
 
     def optimize(
         self,
-        objective_func: Callable[[Dict[str, float]], float],
+        objective_func: Callable[[dict[str, float]], float],
         verbose: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run genetic algorithm optimization.
 
@@ -537,9 +538,9 @@ class BayesianOptimizer:
 
     def __init__(
         self,
-        config: Optional[BayesianConfig] = None,
-        param_bounds: Optional[Dict[str, Tuple[float, float]]] = None,
-        param_types: Optional[Dict[str, str]] = None,  # "float", "int", "categorical"
+        config: BayesianConfig | None = None,
+        param_bounds: dict[str, tuple[float, float]] | None = None,
+        param_types: dict[str, str] | None = None,  # "float", "int", "categorical"
     ):
         if not OPTUNA_AVAILABLE:
             raise ImportError(
@@ -551,9 +552,9 @@ class BayesianOptimizer:
         self.param_bounds = param_bounds or {}
         self.param_types = param_types or {}
 
-        self.study: Optional[Any] = None
-        self.best_params: Optional[Dict[str, Any]] = None
-        self.best_value: Optional[float] = None
+        self.study: Any | None = None
+        self.best_params: dict[str, Any] | None = None
+        self.best_value: float | None = None
 
     def _create_sampler(self) -> Any:
         """Create Optuna sampler."""
@@ -585,7 +586,7 @@ class BayesianOptimizer:
         else:
             return optuna.pruners.MedianPruner()
 
-    def _suggest_params(self, trial: Any) -> Dict[str, Any]:
+    def _suggest_params(self, trial: Any) -> dict[str, Any]:
         """Suggest parameters for a trial."""
         params = {}
 
@@ -605,10 +606,10 @@ class BayesianOptimizer:
 
     def optimize(
         self,
-        objective_func: Callable[[Dict[str, Any]], float],
+        objective_func: Callable[[dict[str, Any]], float],
         direction: str = "maximize",
         verbose: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run Bayesian optimization.
 
@@ -675,14 +676,14 @@ class WalkForwardAnalyzer:
     Walk-Forward Analysis для стратегий.
     """
 
-    def __init__(self, config: Optional[WalkForwardConfig] = None):
+    def __init__(self, config: WalkForwardConfig | None = None):
         self.config = config or WalkForwardConfig()
-        self.results: Optional[WalkForwardResult] = None
+        self.results: WalkForwardResult | None = None
 
     def _create_folds(
         self,
         n_samples: int,
-    ) -> List[Tuple[np.ndarray, np.ndarray]]:
+    ) -> list[tuple[np.ndarray, np.ndarray]]:
         """Create train/test fold indices."""
         folds = []
         n_folds = self.config.n_folds
@@ -756,8 +757,8 @@ class WalkForwardAnalyzer:
     def analyze(
         self,
         data: np.ndarray,  # OHLCV data
-        optimize_func: Callable[[np.ndarray], Dict[str, Any]],
-        backtest_func: Callable[[np.ndarray, Dict[str, Any]], Dict[str, float]],
+        optimize_func: Callable[[np.ndarray], dict[str, Any]],
+        backtest_func: Callable[[np.ndarray, dict[str, Any]], dict[str, float]],
         verbose: bool = True,
     ) -> WalkForwardResult:
         """
@@ -857,9 +858,9 @@ class MonteCarloSimulator:
     Monte Carlo Simulation для оценки риска.
     """
 
-    def __init__(self, config: Optional[MonteCarloConfig] = None):
+    def __init__(self, config: MonteCarloConfig | None = None):
         self.config = config or MonteCarloConfig()
-        self.results: Optional[MonteCarloResult] = None
+        self.results: MonteCarloResult | None = None
 
     def simulate(
         self,
@@ -956,11 +957,11 @@ class AdvancedOptimizer:
     def __init__(
         self,
         method: OptimizationMethod = OptimizationMethod.BAYESIAN,
-        param_bounds: Optional[Dict[str, Tuple[float, float]]] = None,
-        bayesian_config: Optional[BayesianConfig] = None,
-        genetic_config: Optional[GeneticConfig] = None,
-        walk_forward_config: Optional[WalkForwardConfig] = None,
-        monte_carlo_config: Optional[MonteCarloConfig] = None,
+        param_bounds: dict[str, tuple[float, float]] | None = None,
+        bayesian_config: BayesianConfig | None = None,
+        genetic_config: GeneticConfig | None = None,
+        walk_forward_config: WalkForwardConfig | None = None,
+        monte_carlo_config: MonteCarloConfig | None = None,
     ):
         self.method = method
         self.param_bounds = param_bounds or {}
@@ -970,14 +971,14 @@ class AdvancedOptimizer:
         self.walk_forward_config = walk_forward_config
         self.monte_carlo_config = monte_carlo_config
 
-        self._optimizer: Optional[Any] = None
+        self._optimizer: Any | None = None
 
     def optimize(
         self,
-        objective_func: Callable[[Dict[str, Any]], float],
+        objective_func: Callable[[dict[str, Any]], float],
         direction: str = "maximize",
         verbose: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run optimization using selected method.
         """

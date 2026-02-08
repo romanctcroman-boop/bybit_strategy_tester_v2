@@ -69,7 +69,7 @@ def recalculate_tp_portions(
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -155,7 +155,7 @@ class TradeRecord:
     # Bar Magnifier данные (опционально)
     intrabar_sl_hit: bool = False
     intrabar_tp_hit: bool = False
-    intrabar_exit_price: Optional[float] = None
+    intrabar_exit_price: float | None = None
 
     # MFE/MAE (Maximum Favorable/Adverse Excursion)
     mfe: float = 0.0  # Максимальная прибыль во время сделки
@@ -171,7 +171,7 @@ class BacktestInput:
 
     # === РЫНОЧНЫЕ ДАННЫЕ ===
     candles: pd.DataFrame  # Основной таймфрейм (OHLCV)
-    candles_1m: Optional[pd.DataFrame] = None  # 1-минутные для Bar Magnifier
+    candles_1m: pd.DataFrame | None = None  # 1-минутные для Bar Magnifier
 
     # === СИГНАЛЫ ===
     long_entries: np.ndarray = None  # bool array
@@ -229,13 +229,13 @@ class BacktestInput:
     # === MULTI-LEVEL TP (tp_mode=MULTI) ===
     # TP1-TP4: частичное закрытие на 4 уровнях
     # Активируется когда tp_mode = TpMode.MULTI
-    tp_levels: Tuple[float, ...] = (
+    tp_levels: tuple[float, ...] = (
         0.005,
         0.010,
         0.015,
         0.020,
     )  # Уровни TP в % от входа (0.5%, 1%, 1.5%, 2%)
-    tp_portions: Tuple[float, ...] = (
+    tp_portions: tuple[float, ...] = (
         0.25,
         0.25,
         0.25,
@@ -269,8 +269,8 @@ class BacktestInput:
     exit_on_session_close: bool = False  # Закрыть все позиции в конце сессии
     session_start_hour: int = 0  # Час начала торговой сессии (0-23 UTC)
     session_end_hour: int = 24  # Час конца сессии (24 = конец дня)
-    no_trade_days: Tuple[int, ...] = ()  # Дни без торговли (0=Пн, 6=Вс)
-    no_trade_hours: Tuple[int, ...] = ()  # Часы без входов (например (0,1,2,3))
+    no_trade_days: tuple[int, ...] = ()  # Дни без торговли (0=Пн, 6=Вс)
+    no_trade_hours: tuple[int, ...] = ()  # Часы без входов (например (0,1,2,3))
     exit_end_of_week: bool = False  # Закрыть позиции в пятницу вечером
     exit_before_weekend: int = 0  # Закрыть за N часов до конца пятницы
     # Timezone для time filter: "UTC", "US/Eastern", "Europe/London", "Asia/Tokyo"
@@ -315,8 +315,8 @@ class BacktestInput:
     # === PARTIAL ENTRY (Масштабирование входа) ===
     # =========================================================================
     scale_in_enabled: bool = False  # Частичный вход (scale-in)
-    scale_in_levels: Tuple[float, ...] = (1.0,)  # Уровни входа (1.0 = сразу 100%)
-    scale_in_portions: Tuple[float, ...] = (1.0,)  # Доли на каждом уровне
+    scale_in_levels: tuple[float, ...] = (1.0,)  # Уровни входа (1.0 = сразу 100%)
+    scale_in_portions: tuple[float, ...] = (1.0,)  # Доли на каждом уровне
     # Пример: levels=(0, 0.01, 0.02), portions=(0.33, 0.33, 0.34)
     # = 33% сразу, 33% при +1%, 34% при +2%
 
@@ -409,8 +409,8 @@ class BacktestInput:
     mtf_htf_interval: str = (
         "60"  # Интервал HTF (старший ТФ): "60"=1H, "240"=4H, "D"=Day
     )
-    mtf_htf_candles: Optional[pd.DataFrame] = None  # HTF OHLCV данные
-    mtf_htf_index_map: Optional[np.ndarray] = None  # Маппинг LTF→HTF (от index_mapper)
+    mtf_htf_candles: pd.DataFrame | None = None  # HTF OHLCV данные
+    mtf_htf_index_map: np.ndarray | None = None  # Маппинг LTF→HTF (от index_mapper)
     mtf_filter_type: str = "sma"  # Тип HTF фильтра: "sma", "ema"
     mtf_filter_period: int = 200  # Период индикатора HTF (например, SMA200)
     mtf_neutral_zone_pct: float = 0.0  # Нейтральная зона % (0 = строгий режим)
@@ -419,8 +419,8 @@ class BacktestInput:
     # BTC Correlation filter - торговать альты только по направлению BTC
     # Пример: LONG на ETHUSDT только если BTC > SMA50
     mtf_btc_filter_enabled: bool = False  # Включить BTC корреляцию
-    mtf_btc_candles: Optional[pd.DataFrame] = None  # BTC OHLCV данные
-    mtf_btc_index_map: Optional[np.ndarray] = None  # Маппинг LTF→BTC
+    mtf_btc_candles: pd.DataFrame | None = None  # BTC OHLCV данные
+    mtf_btc_index_map: np.ndarray | None = None  # Маппинг LTF→BTC
     mtf_btc_filter_period: int = 50  # Период SMA для BTC (например, D50)
 
     # === LEGACY COMPATIBILITY (deprecated, use tp_mode/sl_mode) ===
@@ -548,7 +548,7 @@ class BacktestInput:
             except Exception:
                 pass
 
-    def validate(self) -> Tuple[bool, List[str]]:
+    def validate(self) -> tuple[bool, list[str]]:
         """Валидация входных данных с проверкой взаимной блокировки режимов."""
         errors = []
 
@@ -735,7 +735,7 @@ class BacktestInput:
 
         return len(errors) == 0, errors
 
-    def get_effective_modes(self) -> Tuple["TpMode", "SlMode"]:
+    def get_effective_modes(self) -> tuple["TpMode", "SlMode"]:
         """
         Возвращает эффективные режимы с учётом legacy флагов.
         Используйте этот метод в движке для определения актуальных режимов.
@@ -824,7 +824,7 @@ class BacktestMetrics:
     recovery_factor: float = 0.0
     payoff_ratio: float = 0.0  # avg_win / abs(avg_loss)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Конвертация в словарь для сериализации"""
         return {
             "net_profit": round(self.net_profit, 2),
@@ -855,7 +855,7 @@ class BacktestOutput:
     metrics: BacktestMetrics = field(default_factory=BacktestMetrics)
 
     # === СДЕЛКИ ===
-    trades: List[TradeRecord] = field(default_factory=list)
+    trades: list[TradeRecord] = field(default_factory=list)
 
     # === EQUITY CURVE ===
     equity_curve: np.ndarray = field(default_factory=lambda: np.array([]))
@@ -869,7 +869,7 @@ class BacktestOutput:
 
     # === ВАЛИДАЦИЯ ===
     is_valid: bool = True
-    validation_errors: List[str] = field(default_factory=list)
+    validation_errors: list[str] = field(default_factory=list)
 
 
 class BaseBacktestEngine(ABC):
@@ -913,10 +913,10 @@ class BaseBacktestEngine(ABC):
     def optimize(
         self,
         input_data: BacktestInput,
-        param_ranges: Dict[str, List[Any]],
+        param_ranges: dict[str, list[Any]],
         metric: str = "sharpe_ratio",
         top_n: int = 10,
-    ) -> List[Tuple[Dict[str, Any], BacktestOutput]]:
+    ) -> list[tuple[dict[str, Any], BacktestOutput]]:
         """
         Оптимизация параметров.
 
@@ -931,7 +931,7 @@ class BaseBacktestEngine(ABC):
         """
         pass
 
-    def validate_input(self, input_data: BacktestInput) -> Tuple[bool, List[str]]:
+    def validate_input(self, input_data: BacktestInput) -> tuple[bool, list[str]]:
         """Валидация входных данных"""
         return input_data.validate()
 
@@ -944,13 +944,13 @@ class EngineComparator:
 
     def __init__(self, reference_engine: BaseBacktestEngine):
         self.reference = reference_engine
-        self.engines: List[BaseBacktestEngine] = []
+        self.engines: list[BaseBacktestEngine] = []
 
     def add_engine(self, engine: BaseBacktestEngine):
         """Добавить движок для сравнения"""
         self.engines.append(engine)
 
-    def compare(self, input_data: BacktestInput) -> Dict[str, Any]:
+    def compare(self, input_data: BacktestInput) -> dict[str, Any]:
         """
         Сравнить результаты всех движков.
 
@@ -992,7 +992,7 @@ class EngineComparator:
 
     def _calculate_drift(
         self, ref: BacktestMetrics, test: BacktestMetrics
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Расчёт отклонения от эталона"""
 
         def safe_pct_diff(a, b):

@@ -13,10 +13,11 @@ import asyncio
 import logging
 import random
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ class FaultConfig:
     error_message: str = "Chaos experiment induced failure"
     enabled: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "fault_type": self.fault_type.value,
             "target_service": self.target_service,
@@ -78,16 +79,16 @@ class ExperimentResult:
     status: ExperimentStatus
     fault_config: FaultConfig
     started_at: datetime
-    ended_at: Optional[datetime] = None
+    ended_at: datetime | None = None
     affected_requests: int = 0
     errors_injected: int = 0
     latency_added_ms: int = 0
-    recovery_time_ms: Optional[int] = None
-    metrics_before: Dict[str, Any] = field(default_factory=dict)
-    metrics_after: Dict[str, Any] = field(default_factory=dict)
-    observations: List[str] = field(default_factory=list)
+    recovery_time_ms: int | None = None
+    metrics_before: dict[str, Any] = field(default_factory=dict)
+    metrics_after: dict[str, Any] = field(default_factory=dict)
+    observations: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "experiment_id": self.experiment_id,
             "name": self.name,
@@ -107,8 +108,8 @@ class FaultInjector:
     """Handles actual fault injection during experiments."""
 
     def __init__(self):
-        self.active_faults: Dict[str, FaultConfig] = {}
-        self._original_handlers: Dict[str, Callable] = {}
+        self.active_faults: dict[str, FaultConfig] = {}
+        self._original_handlers: dict[str, Callable] = {}
 
     def inject_fault(self, config: FaultConfig):
         """Activate a fault injection."""
@@ -128,7 +129,7 @@ class FaultInjector:
         self.active_faults.clear()
         logger.info("All faults cleared")
 
-    def should_inject(self, service_name: str) -> Optional[FaultConfig]:
+    def should_inject(self, service_name: str) -> FaultConfig | None:
         """Check if a fault should be injected for a service."""
         config = self.active_faults.get(service_name)
         if not config or not config.enabled:
@@ -140,7 +141,7 @@ class FaultInjector:
 
         return config
 
-    async def apply_fault(self, config: FaultConfig) -> Dict[str, Any]:
+    async def apply_fault(self, config: FaultConfig) -> dict[str, Any]:
         """Apply the fault and return result info."""
         result = {"applied": True, "fault_type": config.fault_type.value}
 
@@ -182,16 +183,16 @@ class ChaosExperiment:
         self.hypothesis = hypothesis
         self.rollback_on_failure = rollback_on_failure
         self.status = ExperimentStatus.PENDING
-        self.result: Optional[ExperimentResult] = None
+        self.result: ExperimentResult | None = None
 
     async def run(
         self,
         injector: FaultInjector,
-        test_func: Optional[Callable] = None,
+        test_func: Callable | None = None,
     ) -> ExperimentResult:
         """Execute the chaos experiment."""
         self.status = ExperimentStatus.RUNNING
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
 
         result = ExperimentResult(
             experiment_id=self.id,
@@ -215,14 +216,14 @@ class ChaosExperiment:
                     await test_func()
                     result.observations.append("Test function completed successfully")
                 except Exception as e:
-                    result.observations.append(f"Test function failed: {str(e)}")
+                    result.observations.append(f"Test function failed: {e!s}")
 
             result.status = ExperimentStatus.COMPLETED
             result.observations.append("Experiment completed successfully")
 
         except Exception as e:
             result.status = ExperimentStatus.FAILED
-            result.observations.append(f"Experiment failed: {str(e)}")
+            result.observations.append(f"Experiment failed: {e!s}")
 
             if self.rollback_on_failure:
                 injector.remove_fault(self.fault_config.target_service)
@@ -232,7 +233,7 @@ class ChaosExperiment:
         finally:
             # Clean up
             injector.remove_fault(self.fault_config.target_service)
-            result.ended_at = datetime.now(timezone.utc)
+            result.ended_at = datetime.now(UTC)
 
             # Calculate recovery time
             if result.ended_at:
@@ -252,14 +253,14 @@ class ChaosEngineeringService:
 
     def __init__(self):
         self.injector = FaultInjector()
-        self.experiments: Dict[str, ChaosExperiment] = {}
-        self.results: List[ExperimentResult] = []
+        self.experiments: dict[str, ChaosExperiment] = {}
+        self.results: list[ExperimentResult] = []
         self.enabled = False  # Disabled by default for safety
 
         # Pre-defined experiment templates
         self.templates = self._create_templates()
 
-    def _create_templates(self) -> Dict[str, FaultConfig]:
+    def _create_templates(self) -> dict[str, FaultConfig]:
         """Create pre-defined experiment templates."""
         return {
             "deepseek_latency": FaultConfig(
@@ -327,7 +328,7 @@ class ChaosEngineeringService:
     def create_from_template(
         self,
         template_name: str,
-        experiment_name: Optional[str] = None,
+        experiment_name: str | None = None,
     ) -> ChaosExperiment:
         """Create experiment from a pre-defined template."""
         if template_name not in self.templates:
@@ -377,15 +378,15 @@ class ChaosEngineeringService:
         self.results.append(result)
         return result
 
-    def get_active_faults(self) -> Dict[str, FaultConfig]:
+    def get_active_faults(self) -> dict[str, FaultConfig]:
         """Get all currently active faults."""
         return self.injector.active_faults.copy()
 
-    def get_experiment_history(self, limit: int = 50) -> List[ExperimentResult]:
+    def get_experiment_history(self, limit: int = 50) -> list[ExperimentResult]:
         """Get experiment history."""
         return self.results[-limit:]
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get chaos engineering metrics."""
         completed = [r for r in self.results if r.status == ExperimentStatus.COMPLETED]
         failed = [r for r in self.results if r.status == ExperimentStatus.FAILED]
@@ -408,7 +409,7 @@ class ChaosEngineeringService:
 
 
 # Global instance
-_chaos_service: Optional[ChaosEngineeringService] = None
+_chaos_service: ChaosEngineeringService | None = None
 
 
 def get_chaos_service() -> ChaosEngineeringService:

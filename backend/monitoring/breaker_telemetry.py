@@ -4,13 +4,13 @@ Circuit Breaker Telemetry
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def get_agent_breaker_snapshot() -> Dict[str, Any]:
+def get_agent_breaker_snapshot() -> dict[str, Any]:
     """
     Получить snapshot состояния circuit breakers для всех агентов
 
@@ -47,7 +47,7 @@ def get_agent_breaker_snapshot() -> Dict[str, Any]:
         healthy_breakers = sum(1 for b in status.values() if b.get("state") == "closed")
 
         snapshot = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "breakers": status,
             "summary": {
                 "total_breakers": total_breakers,
@@ -62,7 +62,7 @@ def get_agent_breaker_snapshot() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to get circuit breaker snapshot: {e}", exc_info=True)
         return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "breakers": {},
             "summary": {
                 "total_breakers": 0,
@@ -74,7 +74,7 @@ def get_agent_breaker_snapshot() -> Dict[str, Any]:
         }
 
 
-def get_breaker_history(breaker_name: str, limit: int = 100) -> List[Dict[str, Any]]:
+def get_breaker_history(breaker_name: str, limit: int = 100) -> list[dict[str, Any]]:
     """
     Получить историю состояний circuit breaker
 
@@ -139,7 +139,7 @@ def record_breaker_event(breaker_name: str, event_type: str, state: str, **metad
         history_key = f"breaker:history:{breaker_name}"
 
         event = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "breaker": breaker_name,
             "event_type": event_type,
             "state": state,
@@ -162,7 +162,7 @@ def record_breaker_event(breaker_name: str, event_type: str, state: str, **metad
         logger.warning(f"Failed to record breaker event: {e}")
 
 
-def get_breaker_metrics(breaker_name: str) -> Dict[str, Any]:
+def get_breaker_metrics(breaker_name: str) -> dict[str, Any]:
     """
     Получить детальные метрики для конкретного breaker
 
@@ -199,7 +199,7 @@ def get_breaker_metrics(breaker_name: str) -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-def reset_breaker(breaker_name: str) -> Dict[str, Any]:
+def reset_breaker(breaker_name: str) -> dict[str, Any]:
     """
     Сбросить состояние circuit breaker (вручную закрыть)
 
@@ -230,7 +230,7 @@ def reset_breaker(breaker_name: str) -> Dict[str, Any]:
             "success": True,
             "breaker_name": breaker_name,
             "new_state": "closed",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -238,7 +238,7 @@ def reset_breaker(breaker_name: str) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-def reset_all_breakers() -> Dict[str, Any]:
+def reset_all_breakers() -> dict[str, Any]:
     """
     Сбросить все circuit breakers
 
@@ -256,7 +256,7 @@ def reset_all_breakers() -> Dict[str, Any]:
         return {
             "success": True,
             "breakers_reset": len(circuit_manager.breakers),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -268,6 +268,6 @@ __all__ = [
     "get_agent_breaker_snapshot",
     "get_breaker_history",
     "get_breaker_metrics",
-    "reset_breaker",
     "reset_all_breakers",
+    "reset_breaker",
 ]

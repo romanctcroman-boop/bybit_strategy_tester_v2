@@ -4,7 +4,7 @@ Unit tests that test models/schemas directly and API tests via a test-only FastA
 to avoid MCP lifespan issues.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
@@ -237,7 +237,7 @@ class TestStrategyModel:
 
         # Soft delete
         strategy.is_deleted = True
-        strategy.deleted_at = datetime.now(timezone.utc)
+        strategy.deleted_at = datetime.now(UTC)
         db_session.commit()
 
         assert strategy.is_deleted is True
@@ -338,7 +338,7 @@ class TestStrategyModel:
         strategy.win_rate = 0.65
         strategy.total_trades = 150
         strategy.backtest_count = 5
-        strategy.last_backtest_at = datetime.now(timezone.utc)
+        strategy.last_backtest_at = datetime.now(UTC)
         db_session.commit()
 
         # Verify

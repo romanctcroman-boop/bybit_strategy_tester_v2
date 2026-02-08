@@ -3,16 +3,15 @@
 Расчёт ATR для использования в TP/SL.
 """
 
-from typing import Union
 
 import numpy as np
 import pandas as pd
 
 
 def calculate_atr(
-    high: Union[np.ndarray, pd.Series],
-    low: Union[np.ndarray, pd.Series],
-    close: Union[np.ndarray, pd.Series],
+    high: np.ndarray | pd.Series,
+    low: np.ndarray | pd.Series,
+    close: np.ndarray | pd.Series,
     period: int = 14,
 ) -> np.ndarray:
     """

@@ -21,8 +21,8 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
@@ -207,8 +207,8 @@ class DrawdownAnalysis:
     # Maximum
     max_drawdown: float = 0.0
     max_drawdown_duration: int = 0
-    max_drawdown_start: Optional[datetime] = None
-    max_drawdown_end: Optional[datetime] = None
+    max_drawdown_start: datetime | None = None
+    max_drawdown_end: datetime | None = None
     recovery_time: int = 0  # bars to recover
 
     # Statistics
@@ -557,7 +557,7 @@ class BacktestAnalytics:
         return analysis
 
     def analyze_regimes(
-        self, price_data: Optional[list[float]] = None
+        self, price_data: list[float] | None = None
     ) -> RegimeAnalysis:
         """Analyze performance by market regime."""
         analysis = RegimeAnalysis()
@@ -632,7 +632,7 @@ class BacktestAnalytics:
             "trade_analysis": trade_analysis.to_dict(),
             "performance_attribution": attribution.to_dict(),
             "drawdown_analysis": drawdown_analysis.to_dict(),
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         }
 
 

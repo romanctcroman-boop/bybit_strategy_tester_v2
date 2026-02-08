@@ -9,7 +9,7 @@ P2 Fix (2026-01-28): Now uses KeyManager for secure API key access instead of os
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -25,7 +25,7 @@ except ImportError:
 import os
 
 
-def _get_api_key(key_name: str) -> Optional[str]:
+def _get_api_key(key_name: str) -> str | None:
     """
     Get API key securely via KeyManager, fallback to env.
     
@@ -40,16 +40,16 @@ def _get_api_key(key_name: str) -> Optional[str]:
             return _key_manager.get_decrypted_key(key_name)
         except Exception as e:
             logger.debug(f"KeyManager failed for {key_name}: {e}")
-    
+
     # Fallback to environment
     return os.environ.get(key_name)
 
-from backend.agents.consensus.deliberation import (  # noqa: E402
+from backend.agents.consensus.deliberation import (
     DeliberationResult,
     MultiAgentDeliberation,
     VotingStrategy,
 )
-from backend.agents.llm.connections import (  # noqa: E402
+from backend.agents.llm.connections import (
     DeepSeekClient,
     LLMConfig,
     LLMMessage,
@@ -82,7 +82,7 @@ class RealLLMDeliberation(MultiAgentDeliberation):
         """Initialize with real LLM clients"""
         super().__init__()
 
-        self._clients: Dict[str, Any] = {}
+        self._clients: dict[str, Any] = {}
         self._initialize_clients()
 
         # Override ask_fn to use real LLM
@@ -178,7 +178,7 @@ class RealLLMDeliberation(MultiAgentDeliberation):
 
 
 # Global instance
-_real_deliberation: Optional[RealLLMDeliberation] = None
+_real_deliberation: RealLLMDeliberation | None = None
 
 
 def get_real_deliberation() -> RealLLMDeliberation:
@@ -191,7 +191,7 @@ def get_real_deliberation() -> RealLLMDeliberation:
 
 async def deliberate_with_llm(
     question: str,
-    agents: List[str] = None,
+    agents: list[str] = None,
     max_rounds: int = 2,
     min_confidence: float = 0.7,
     voting_strategy: VotingStrategy = VotingStrategy.WEIGHTED,
@@ -226,6 +226,6 @@ async def deliberate_with_llm(
 
 __all__ = [
     "RealLLMDeliberation",
-    "get_real_deliberation",
     "deliberate_with_llm",
+    "get_real_deliberation",
 ]

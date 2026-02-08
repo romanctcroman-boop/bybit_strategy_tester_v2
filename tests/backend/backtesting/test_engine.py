@@ -4,7 +4,7 @@ Tests for Backtesting Engine
 Tests strategy implementations, engine execution, and metrics calculation.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
@@ -40,7 +40,7 @@ def sample_ohlcv() -> pd.DataFrame:
         start="2024-01-01",
         periods=n_periods,
         freq="1h",
-        tz=timezone.utc,
+        tz=UTC,
     )
 
     # Generate random walk price
@@ -77,8 +77,8 @@ def sample_config() -> BacktestConfig:
     return BacktestConfig(
         symbol="BTCUSDT",
         interval="1h",
-        start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        end_date=datetime(2024, 1, 21, tzinfo=timezone.utc),
+        start_date=datetime(2024, 1, 1, tzinfo=UTC),
+        end_date=datetime(2024, 1, 21, tzinfo=UTC),
         strategy_type=StrategyType.SMA_CROSSOVER,
         strategy_params={"fast_period": 10, "slow_period": 30},
         initial_capital=10000.0,
@@ -266,8 +266,8 @@ class TestBacktestEngine:
         config = BacktestConfig(
             symbol="BTCUSDT",
             interval="1h",
-            start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2024, 1, 21, tzinfo=timezone.utc),
+            start_date=datetime(2024, 1, 1, tzinfo=UTC),
+            end_date=datetime(2024, 1, 21, tzinfo=UTC),
             strategy_type=StrategyType.RSI,
             strategy_params={"period": 14, "oversold": 30, "overbought": 70},
             initial_capital=10000.0,
@@ -281,8 +281,8 @@ class TestBacktestEngine:
         config = BacktestConfig(
             symbol="BTCUSDT",
             interval="1h",
-            start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2024, 1, 21, tzinfo=timezone.utc),
+            start_date=datetime(2024, 1, 1, tzinfo=UTC),
+            end_date=datetime(2024, 1, 21, tzinfo=UTC),
             strategy_type=StrategyType.MACD,
             initial_capital=10000.0,
         )

@@ -1,6 +1,5 @@
 """Find active period for RSI strategy testing."""
 
-import json
 
 import requests
 

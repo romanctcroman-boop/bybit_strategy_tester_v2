@@ -8,7 +8,6 @@ Strategies that trade momentum continuation:
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
 
 from backend.services.live_trading.strategy_runner import (
     SignalType,
@@ -162,10 +161,10 @@ class RSIMomentumStrategy(LibraryStrategy):
     def __init__(self, config: StrategyConfig, **params):
         super().__init__(config, **params)
 
-        self._prev_rsi: Optional[float] = None
+        self._prev_rsi: float | None = None
         self._in_position: str = ""
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate momentum signals."""
         self.add_candle(candle)
 
@@ -396,9 +395,9 @@ class StochasticMomentumStrategy(LibraryStrategy):
     def __init__(self, config: StrategyConfig, **params):
         super().__init__(config, **params)
 
-        self._k_values: List[float] = []
-        self._prev_k: Optional[float] = None
-        self._prev_d: Optional[float] = None
+        self._k_values: list[float] = []
+        self._prev_k: float | None = None
+        self._prev_d: float | None = None
         self._in_position: str = ""
 
     def _calculate_stochastic(
@@ -449,7 +448,7 @@ class StochasticMomentumStrategy(LibraryStrategy):
 
         return (k, d)
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate stochastic signals."""
         self.add_candle(candle)
 

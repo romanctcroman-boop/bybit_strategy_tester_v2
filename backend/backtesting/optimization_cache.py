@@ -16,7 +16,7 @@ import pickle
 from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -39,7 +39,7 @@ class OptimizationCache:
 
     def __init__(self, enabled: bool = True):
         self.enabled = enabled
-        self._memory_cache: Dict[str, Any] = {}
+        self._memory_cache: dict[str, Any] = {}
         self._memory_cache_order = []  # LRU order
 
         # Create cache directory
@@ -101,7 +101,7 @@ class OptimizationCache:
     # MEMORY CACHE (Level 1)
     # =========================================================
 
-    def get_memory(self, key: str) -> Tuple[bool, Any]:
+    def get_memory(self, key: str) -> tuple[bool, Any]:
         """Get from memory cache."""
         if not self.enabled:
             return False, None
@@ -137,7 +137,7 @@ class OptimizationCache:
         """Get disk path for cache key."""
         return self.CACHE_DIR / f"{key}.pkl"
 
-    def get_disk(self, key: str) -> Tuple[bool, Any]:
+    def get_disk(self, key: str) -> tuple[bool, Any]:
         """Get from disk cache."""
         if not self.enabled:
             return False, None
@@ -210,7 +210,7 @@ class OptimizationCache:
     # HIGH-LEVEL API
     # =========================================================
 
-    def get(self, key: str) -> Tuple[bool, Any]:
+    def get(self, key: str) -> tuple[bool, Any]:
         """Get from cache (checks memory first, then disk)."""
         # Try memory
         hit, value = self.get_memory(key)
@@ -241,7 +241,7 @@ class OptimizationCache:
             for path in self.CACHE_DIR.glob("*.pkl"):
                 path.unlink()
 
-        self.stats = {k: 0 for k in self.stats}
+        self.stats = dict.fromkeys(self.stats, 0)
         logger.info("🗑️ Cache cleared")
 
     def print_stats(self):

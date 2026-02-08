@@ -84,9 +84,9 @@ class Finding:
     line_number: int
     line_content: str  # Masked
     pattern_name: str
-    commit_hash: Optional[str] = None
-    author: Optional[str] = None
-    commit_date: Optional[datetime] = None
+    commit_hash: str | None = None
+    author: str | None = None
+    commit_date: datetime | None = None
     is_false_positive: bool = False
     remediation: str = ""
 
@@ -97,7 +97,7 @@ class ScanResult:
 
     scan_id: str
     start_time: datetime
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     status: ScanStatus = ScanStatus.PENDING
     files_scanned: int = 0
     findings: list[Finding] = field(default_factory=list)
@@ -604,7 +604,7 @@ class GitSecretsScanner:
             return findings
 
         try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(file_path, encoding="utf-8", errors="ignore") as f:
                 lines = f.readlines()
 
             for line_num, line in enumerate(lines, 1):
@@ -838,7 +838,7 @@ class GitSecretsScanner:
         """Get recent scan history."""
         return self._scan_history[-limit:]
 
-    def get_scan_by_id(self, scan_id: str) -> Optional[ScanResult]:
+    def get_scan_by_id(self, scan_id: str) -> ScanResult | None:
         """Get a specific scan by ID."""
         for scan in self._scan_history:
             if scan.scan_id == scan_id:

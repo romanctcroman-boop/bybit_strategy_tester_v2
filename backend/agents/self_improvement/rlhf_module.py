@@ -23,10 +23,10 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -61,11 +61,11 @@ class FeedbackSample:
     preference: int  # -1 = A better, 0 = tie, 1 = B better
     preference_type: PreferenceType
     confidence: float  # 0.0 to 1.0
-    reasoning: Optional[str] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    reasoning: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "prompt": self.prompt,
@@ -80,7 +80,7 @@ class FeedbackSample:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "FeedbackSample":
+    def from_dict(cls, data: dict[str, Any]) -> FeedbackSample:
         return cls(
             id=data["id"],
             prompt=data["prompt"],
@@ -138,21 +138,21 @@ class RewardModel:
     """
 
     def __init__(self, learning_rate: float = 0.1, patience: int = 3):
-        self.feature_weights: Dict[str, float] = {
+        self.feature_weights: dict[str, float] = {
             "length_ratio": 0.0,
             "keyword_overlap": 0.0,
             "sentiment_score": 0.0,
             "structure_score": 0.0,  # NEW: sentence structure quality
             "specificity_score": 0.0,  # NEW: specific vs vague
         }
-        self.training_samples: List[FeedbackSample] = []
-        self.training_history: List[Dict[str, float]] = []
+        self.training_samples: list[FeedbackSample] = []
+        self.training_history: list[dict[str, float]] = []
         self.initial_lr = learning_rate
         self.patience = patience
-        self.best_weights: Dict[str, float] = {}
+        self.best_weights: dict[str, float] = {}
         self.best_loss: float = float("inf")
 
-    def extract_features(self, prompt: str, response: str) -> Dict[str, float]:
+    def extract_features(self, prompt: str, response: str) -> dict[str, float]:
         """Extract features from a response"""
         features = {}
 
@@ -222,12 +222,12 @@ class RewardModel:
 
     def train(
         self,
-        samples: List[FeedbackSample],
+        samples: list[FeedbackSample],
         epochs: int = 10,
         lr: float = 0.1,
         use_early_stopping: bool = True,
         validation_split: float = 0.2,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Train reward model on feedback samples with improvements.
 
@@ -338,7 +338,7 @@ class RewardModel:
         logger.info(f"🎓 Reward model trained: accuracy={accuracy:.2%}, loss={avg_loss:.4f}, epochs={epoch + 1}")
         return result
 
-    def _compute_validation_loss(self, val_samples: List[FeedbackSample]) -> float:
+    def _compute_validation_loss(self, val_samples: list[FeedbackSample]) -> float:
         """Compute validation loss for early stopping"""
         import math
 
@@ -366,7 +366,7 @@ class RewardModel:
 
         return total_loss / max(len(val_samples), 1)
 
-    def cross_validate(self, samples: List[FeedbackSample], k_folds: int = 5, epochs: int = 10) -> Dict[str, float]:
+    def cross_validate(self, samples: list[FeedbackSample], k_folds: int = 5, epochs: int = 10) -> dict[str, float]:
         """
         Perform k-fold cross-validation on feedback samples.
 
@@ -448,7 +448,7 @@ class RLHFModule:
 
     def __init__(
         self,
-        persist_path: Optional[str] = None,
+        persist_path: str | None = None,
         min_samples_for_training: int = 10,
     ):
         """
@@ -461,7 +461,7 @@ class RLHFModule:
         self.persist_path = Path(persist_path) if persist_path else None
         self.min_samples_for_training = min_samples_for_training
 
-        self.feedback_buffer: List[FeedbackSample] = []
+        self.feedback_buffer: list[FeedbackSample] = []
         self.reward_model = RewardModel()
         self.evaluator_interface = None  # Will be set to AgentInterface
 
@@ -486,7 +486,7 @@ class RLHFModule:
         response_a: str,
         response_b: str,
         preference: int,
-        reasoning: Optional[str] = None,
+        reasoning: str | None = None,
     ) -> FeedbackSample:
         """
         Store human preference feedback
@@ -518,9 +518,9 @@ class RLHFModule:
     async def collect_ai_feedback(
         self,
         prompt: str,
-        responses: List[str],
-        evaluator_fn: Optional[Any] = None,
-    ) -> List[FeedbackSample]:
+        responses: list[str],
+        evaluator_fn: Any | None = None,
+    ) -> list[FeedbackSample]:
         """
         Collect AI feedback on responses (RLAIF)
 
@@ -581,7 +581,7 @@ class RLHFModule:
         self,
         prompt: str,
         response: str,
-        criteria: Optional[List[str]] = None,
+        criteria: list[str] | None = None,
     ) -> QualityScore:
         """
         Self-evaluate response quality
@@ -641,7 +641,7 @@ class RLHFModule:
         logger.debug(f"📊 Self-evaluation: overall={scores.overall:.2f}")
         return scores
 
-    def train_reward_model(self, force: bool = False) -> Optional[Dict[str, float]]:
+    def train_reward_model(self, force: bool = False) -> dict[str, float] | None:
         """
         Train reward model on collected feedback
 
@@ -665,7 +665,7 @@ class RLHFModule:
         prompt: str,
         response_a: str,
         response_b: str,
-    ) -> Tuple[int, float]:
+    ) -> tuple[int, float]:
         """
         Predict which response is preferred
 
@@ -690,7 +690,7 @@ class RLHFModule:
         prompt: str,
         response_a: str,
         response_b: str,
-    ) -> Tuple[int, float, str]:
+    ) -> tuple[int, float, str]:
         """Simple heuristic-based evaluation"""
         # Length preference (moderate length is better)
         ideal_length = len(prompt) * 3
@@ -746,7 +746,7 @@ class RLHFModule:
 
         for file_path in self.persist_path.glob("*.json"):
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     data = json.load(f)
                     sample = FeedbackSample.from_dict(data)
                     self.feedback_buffer.append(sample)
@@ -755,7 +755,7 @@ class RLHFModule:
 
         logger.info(f"📂 Loaded {len(self.feedback_buffer)} feedback samples")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get module statistics"""
         return {
             **self.stats,
@@ -766,9 +766,9 @@ class RLHFModule:
 
 
 __all__ = [
-    "RLHFModule",
     "FeedbackSample",
     "PreferenceType",
     "QualityScore",
+    "RLHFModule",
     "RewardModel",
 ]

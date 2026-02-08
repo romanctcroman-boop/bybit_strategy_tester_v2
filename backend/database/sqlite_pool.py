@@ -23,7 +23,6 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -381,12 +380,12 @@ class SQLiteConnectionPool:
 # Global Pool Instance
 # ============================================================================
 
-_pool: Optional[SQLiteConnectionPool] = None
+_pool: SQLiteConnectionPool | None = None
 _pool_lock = threading.Lock()
 
 
 def get_pool(
-    db_path: Optional[str] = None,
+    db_path: str | None = None,
     pool_size: int = 10,
 ) -> SQLiteConnectionPool:
     """

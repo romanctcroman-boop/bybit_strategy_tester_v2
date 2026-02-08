@@ -7,19 +7,19 @@ Connects AI Agent System with trading infrastructure:
 """
 
 from backend.agents.integration.ai_backtest_integration import (
-    AIBacktestResult,
-    AIOptimizationResult,
     AIBacktestAnalyzer,
+    AIBacktestResult,
     AIOptimizationAnalyzer,
+    AIOptimizationResult,
     get_backtest_analyzer,
     get_optimization_analyzer,
 )
 
 __all__ = [
-    "AIBacktestResult",
-    "AIOptimizationResult",
     "AIBacktestAnalyzer",
+    "AIBacktestResult",
     "AIOptimizationAnalyzer",
+    "AIOptimizationResult",
     "get_backtest_analyzer",
     "get_optimization_analyzer",
 ]

@@ -13,7 +13,6 @@ import ast
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class WarningLevel(str, Enum):
@@ -32,8 +31,8 @@ class AnalysisWarning:
     code: str  # e.g., "LOOKAHEAD_001"
     level: WarningLevel
     message: str
-    line_number: Optional[int] = None
-    suggestion: Optional[str] = None
+    line_number: int | None = None
+    suggestion: str | None = None
 
 
 @dataclass

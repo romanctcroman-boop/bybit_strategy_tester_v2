@@ -29,10 +29,11 @@ Usage:
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +74,9 @@ class CircuitBreakerStats:
     successful_calls: int = 0
     failed_calls: int = 0
     rejected_calls: int = 0
-    state_changes: List[Dict[str, Any]] = field(default_factory=list)
-    last_failure_time: Optional[float] = None
-    last_success_time: Optional[float] = None
+    state_changes: list[dict[str, Any]] = field(default_factory=list)
+    last_failure_time: float | None = None
+    last_success_time: float | None = None
     consecutive_failures: int = 0
     consecutive_successes: int = 0
 
@@ -116,7 +117,7 @@ class CircuitBreaker:
         result = cb.execute(lambda: cursor.execute("SELECT ..."))
     """
 
-    def __init__(self, config: Optional[CircuitBreakerConfig] = None):
+    def __init__(self, config: CircuitBreakerConfig | None = None):
         self.config = config or CircuitBreakerConfig()
         self._state = CircuitState.CLOSED
         self._stats = CircuitBreakerStats()
@@ -282,7 +283,7 @@ class CircuitBreaker:
             self._stats.consecutive_successes = 0
             logger.info(f"CircuitBreaker '{self.config.name}' manually reset")
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get metrics for monitoring."""
         with self._lock:
             return {
@@ -352,7 +353,7 @@ def circuit_breaker(func: Callable) -> Callable:
     return db_circuit_breaker(func)
 
 
-def get_circuit_breaker_metrics() -> Dict[str, Any]:
+def get_circuit_breaker_metrics() -> dict[str, Any]:
     """Get metrics from the default circuit breaker."""
     return db_circuit_breaker.get_metrics()
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 AI Agent Project Audit Script
 

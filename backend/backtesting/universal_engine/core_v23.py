@@ -15,7 +15,7 @@ Version: 2.3.0
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -25,14 +25,9 @@ from loguru import logger
 from backend.backtesting.universal_engine.advanced_signals import (
     AdaptiveConfig,
     AdaptiveSignalGenerator,
-    EnsembleConfig,
-    EnsemblePredictor,
     FeatureCategory,
     FeatureConfig,
     FeatureEngine,
-    SignalClassifier,
-    SignalType,
-    SimpleMLPClassifier,
 )
 
 # Core modules
@@ -43,8 +38,6 @@ from backend.backtesting.universal_engine.filter_engine import (
 
 # v2.3 modules - GPU Acceleration
 from backend.backtesting.universal_engine.gpu_acceleration import (
-    BatchBacktestConfig,
-    BatchBacktester,
     GPUBackend,
     GPUBackendType,
     GPUConfig,
@@ -130,7 +123,7 @@ class MLSignalConfig:
     feature_short_period: int = 5
     feature_medium_period: int = 20
     feature_long_period: int = 50
-    feature_categories: List[FeatureCategory] = field(
+    feature_categories: list[FeatureCategory] = field(
         default_factory=lambda: [
             FeatureCategory.PRICE,
             FeatureCategory.MOMENTUM,
@@ -140,7 +133,7 @@ class MLSignalConfig:
     normalize_features: bool = True
 
     # Signal classifier
-    classifier_hidden_layers: List[int] = field(default_factory=lambda: [64, 32])
+    classifier_hidden_layers: list[int] = field(default_factory=lambda: [64, 32])
     classifier_learning_rate: float = 0.001
     classifier_epochs: int = 100
 
@@ -229,7 +222,7 @@ class EngineMetricsV23:
     execution_time_signals: float = 0.0
     execution_time_simulation: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             # Basic
@@ -260,7 +253,7 @@ class EngineOutputV23:
     """Extended output with v2.3 features."""
 
     metrics: EngineMetricsV23 = field(default_factory=EngineMetricsV23)
-    trades: List[TradeRecord] = field(default_factory=list)
+    trades: list[TradeRecord] = field(default_factory=list)
     equity_curve: np.ndarray = field(default_factory=lambda: np.array([]))
     timestamps: np.ndarray = field(default_factory=lambda: np.array([]))
 
@@ -271,24 +264,24 @@ class EngineOutputV23:
 
     # Validation
     is_valid: bool = True
-    validation_errors: List[str] = field(default_factory=list)
+    validation_errors: list[str] = field(default_factory=list)
 
     # Signal stats
     signals_generated: int = 0
     signals_filtered: int = 0
-    filter_stats: Dict = field(default_factory=dict)
+    filter_stats: dict = field(default_factory=dict)
 
     # V2.3: Order Book data
-    market_impact_history: List[MarketImpactResult] = field(default_factory=list)
-    orderbook_slippage_history: List[float] = field(default_factory=list)
+    market_impact_history: list[MarketImpactResult] = field(default_factory=list)
+    orderbook_slippage_history: list[float] = field(default_factory=list)
 
     # V2.3: ML Signal data
-    ml_features: Optional[Dict[str, np.ndarray]] = None
-    ml_predictions: Optional[np.ndarray] = None
-    ml_confidence: Optional[np.ndarray] = None
+    ml_features: dict[str, np.ndarray] | None = None
+    ml_predictions: np.ndarray | None = None
+    ml_confidence: np.ndarray | None = None
 
     # V2.3: Performance breakdown
-    timing_breakdown: Dict[str, float] = field(default_factory=dict)
+    timing_breakdown: dict[str, float] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -319,7 +312,7 @@ class UniversalMathEngineV23:
     def __init__(
         self,
         use_numba: bool = True,
-        v23_config: Optional[V23IntegrationConfig] = None,
+        v23_config: V23IntegrationConfig | None = None,
     ):
         """
         Initialize Universal Math Engine v2.3.
@@ -336,9 +329,9 @@ class UniversalMathEngineV23:
         self.filter_engine = UniversalFilterEngine(use_numba=use_numba)
 
         # Per-run modules
-        self.position_manager: Optional[UniversalPositionManager] = None
-        self.trade_executor: Optional[UniversalTradeExecutor] = None
-        self.risk_manager: Optional[UniversalRiskManager] = None
+        self.position_manager: UniversalPositionManager | None = None
+        self.trade_executor: UniversalTradeExecutor | None = None
+        self.risk_manager: UniversalRiskManager | None = None
 
         # V2.3 modules
         self._init_v23_modules()
@@ -412,7 +405,7 @@ class UniversalMathEngineV23:
         self,
         candles: pd.DataFrame,
         strategy_type: str,
-        strategy_params: Dict[str, Any],
+        strategy_params: dict[str, Any],
         initial_capital: float = 10000.0,
         direction: str = "both",
         stop_loss: float = 0.02,
@@ -422,10 +415,10 @@ class UniversalMathEngineV23:
         taker_fee: float = 0.001,
         slippage: float = 0.0005,
         # Advanced options
-        filter_config: Optional[FilterConfig] = None,
-        position_config: Optional[PositionConfig] = None,
-        executor_config: Optional[ExecutorConfig] = None,
-        risk_config: Optional[RiskConfig] = None,
+        filter_config: FilterConfig | None = None,
+        position_config: PositionConfig | None = None,
+        executor_config: ExecutorConfig | None = None,
+        risk_config: RiskConfig | None = None,
     ) -> EngineOutputV23:
         """
         Run backtest with all v2.3 features.
@@ -805,7 +798,7 @@ class UniversalMathEngineV23:
         low: np.ndarray,
         volume: np.ndarray,
         strategy_type: str,
-        strategy_params: Dict[str, Any],
+        strategy_params: dict[str, Any],
         direction: str,
     ) -> SignalOutput:
         """Generate signals using GPU-accelerated indicators."""
@@ -918,7 +911,7 @@ class UniversalMathEngineV23:
         long_entries: np.ndarray,
         short_entries: np.ndarray,
         direction: str,
-    ) -> Optional[Tuple[np.ndarray, np.ndarray, Dict[str, np.ndarray], np.ndarray]]:
+    ) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray], np.ndarray] | None:
         """Enhance signals using ML features."""
         if self.feature_engine is None:
             return None
@@ -986,11 +979,11 @@ class UniversalMathEngineV23:
 
     def _calculate_metrics_v23(
         self,
-        trades: List[TradeRecord],
+        trades: list[TradeRecord],
         equity: np.ndarray,
         initial_capital: float,
-        market_impact_history: List[MarketImpactResult],
-        orderbook_slippage_history: List[float],
+        market_impact_history: list[MarketImpactResult],
+        orderbook_slippage_history: list[float],
         total_market_impact: float,
         total_slippage_cost: float,
     ) -> EngineMetricsV23:
@@ -1112,8 +1105,8 @@ class BatchBacktesterV23:
 
     def __init__(
         self,
-        engine: Optional[UniversalMathEngineV23] = None,
-        gpu_config: Optional[GPUConfig] = None,
+        engine: UniversalMathEngineV23 | None = None,
+        gpu_config: GPUConfig | None = None,
     ):
         """Initialize batch backtester."""
         self.engine = engine or UniversalMathEngineV23()
@@ -1129,10 +1122,10 @@ class BatchBacktesterV23:
         self,
         candles: pd.DataFrame,
         strategy_type: str,
-        param_combinations: List[Dict[str, Any]],
-        base_config: Dict[str, Any],
+        param_combinations: list[dict[str, Any]],
+        base_config: dict[str, Any],
         n_jobs: int = -1,
-    ) -> List[EngineOutputV23]:
+    ) -> list[EngineOutputV23]:
         """
         Run batch of backtests with different parameters.
 

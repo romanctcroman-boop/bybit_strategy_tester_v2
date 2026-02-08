@@ -60,6 +60,70 @@ def calculate_atr(
     return atr
 
 
+def calculate_atr_smoothed(
+    high: np.ndarray,
+    low: np.ndarray,
+    close: np.ndarray,
+    period: int = 14,
+    method: str = "RMA",
+) -> np.ndarray:
+    """Calculate ATR with configurable smoothing method.
+
+    Args:
+        high: Array of high prices
+        low: Array of low prices
+        close: Array of closing prices
+        period: Smoothing period (default: 14)
+        method: Smoothing method - 'RMA' (Wilder's), 'SMA', 'EMA', 'WMA'
+
+    Returns:
+        Array of ATR values smoothed with the chosen method.
+    """
+    n = len(close)
+    atr = np.full(n, np.nan)
+
+    if n < period + 1:
+        return atr
+
+    # True Range components
+    tr1 = high - low
+    tr2 = np.abs(high - np.roll(close, 1))
+    tr3 = np.abs(low - np.roll(close, 1))
+    tr2[0] = tr1[0]
+    tr3[0] = tr1[0]
+    tr = np.maximum(np.maximum(tr1, tr2), tr3)
+
+    method = method.upper()
+
+    if method == "SMA":
+        # Simple Moving Average of True Range
+        for i in range(period - 1, n):
+            atr[i] = np.mean(tr[i - period + 1 : i + 1])
+
+    elif method == "EMA":
+        # Exponential Moving Average of True Range
+        multiplier = 2.0 / (period + 1)
+        atr[period - 1] = np.mean(tr[:period])
+        for i in range(period, n):
+            atr[i] = tr[i] * multiplier + atr[i - 1] * (1 - multiplier)
+
+    elif method == "WMA":
+        # Weighted Moving Average of True Range
+        weights = np.arange(1, period + 1, dtype=np.float64)
+        weight_sum = weights.sum()
+        for i in range(period - 1, n):
+            window = tr[i - period + 1 : i + 1]
+            atr[i] = np.dot(window, weights) / weight_sum
+
+    else:
+        # RMA (Wilder's smoothing) — default, same as standard calculate_atr
+        atr[period - 1] = np.mean(tr[:period])
+        for i in range(period, n):
+            atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
+
+    return atr
+
+
 # =============================================================================
 # Bollinger Bands
 # =============================================================================

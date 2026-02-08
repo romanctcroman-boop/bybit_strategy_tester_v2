@@ -7,7 +7,6 @@ Profits from price oscillation within a range.
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 from backend.services.live_trading.strategy_runner import (
     SignalType,
@@ -32,9 +31,9 @@ class GridLevel:
 
     price: float
     type: str  # "buy" or "sell"
-    order_id: Optional[str] = None
+    order_id: str | None = None
     filled: bool = False
-    fill_price: Optional[float] = None
+    fill_price: float | None = None
 
 
 @dataclass
@@ -164,14 +163,14 @@ class GridTradingStrategy(LibraryStrategy):
 
         # Grid state
         self._grid_initialized: bool = False
-        self._grid_levels: List[GridLevel] = []
+        self._grid_levels: list[GridLevel] = []
         self._grid_lower: float = 0.0
         self._grid_upper: float = 0.0
         self._grid_step: float = 0.0
 
         # Position tracking
-        self._open_positions: Dict[float, dict] = {}  # price -> position info
-        self._last_signal_price: Optional[float] = None
+        self._open_positions: dict[float, dict] = {}  # price -> position info
+        self._last_signal_price: float | None = None
 
     def _initialize_grid(self, current_price: float, atr: float):
         """Initialize grid levels around current price."""
@@ -205,7 +204,7 @@ class GridTradingStrategy(LibraryStrategy):
             f"step: {self._grid_step:.2f}, levels: {len(self._grid_levels)}"
         )
 
-    def _find_nearest_grid(self, price: float, direction: str) -> Optional[GridLevel]:
+    def _find_nearest_grid(self, price: float, direction: str) -> GridLevel | None:
         """Find nearest unfilled grid level in given direction."""
         candidates = []
 
@@ -213,9 +212,7 @@ class GridTradingStrategy(LibraryStrategy):
             if level.filled:
                 continue
 
-            if direction == "down" and level.type == "buy" and level.price < price:
-                candidates.append(level)
-            elif direction == "up" and level.type == "sell" and level.price > price:
+            if (direction == "down" and level.type == "buy" and level.price < price) or (direction == "up" and level.type == "sell" and level.price > price):
                 candidates.append(level)
 
         if not candidates:
@@ -226,7 +223,7 @@ class GridTradingStrategy(LibraryStrategy):
         else:
             return min(candidates, key=lambda x: x.price)  # Nearest above
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate grid trading signals."""
         self.add_candle(candle)
 

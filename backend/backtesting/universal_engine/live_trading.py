@@ -19,10 +19,11 @@ import hmac
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 from urllib.parse import urlencode
 
 import numpy as np
@@ -87,8 +88,8 @@ class Order:
     side: OrderSide
     order_type: OrderType
     quantity: float
-    price: Optional[float] = None  # For limit orders
-    stop_price: Optional[float] = None  # For stop orders
+    price: float | None = None  # For limit orders
+    stop_price: float | None = None  # For stop orders
     status: OrderStatus = OrderStatus.PENDING
     filled_quantity: float = 0.0
     filled_price: float = 0.0
@@ -99,7 +100,7 @@ class Order:
     time_in_force: str = "GTC"  # GTC, IOC, FOK
     reduce_only: bool = False
     post_only: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         if not self.client_order_id:
@@ -219,7 +220,7 @@ class ExchangeConnection(ABC):
         pass
 
     @abstractmethod
-    async def get_positions(self) -> List[Position]:
+    async def get_positions(self) -> list[Position]:
         """Get open positions."""
         pass
 
@@ -270,10 +271,10 @@ class PaperTradingEngine(ExchangeConnection):
 
         # State
         self._balance = initial_balance
-        self._positions: Dict[str, Position] = {}
-        self._orders: Dict[str, Order] = {}
-        self._trades: List[Trade] = []
-        self._market_prices: Dict[str, float] = {}
+        self._positions: dict[str, Position] = {}
+        self._orders: dict[str, Order] = {}
+        self._trades: list[Trade] = []
+        self._market_prices: dict[str, float] = {}
         self._unrealized_pnl = 0.0
         self._realized_pnl = 0.0
 
@@ -314,7 +315,7 @@ class PaperTradingEngine(ExchangeConnection):
             margin_ratio=margin_used / self._balance if self._balance > 0 else 0,
         )
 
-    async def get_positions(self) -> List[Position]:
+    async def get_positions(self) -> list[Position]:
         """Get open positions."""
         self._update_positions()
         return list(self._positions.values())
@@ -348,19 +349,7 @@ class PaperTradingEngine(ExchangeConnection):
 
         # Check for limit order
         if order.order_type == OrderType.LIMIT:
-            if order.side == OrderSide.BUY and fill_price > order.price:
-                order.status = OrderStatus.OPEN
-                self._orders[order.order_id] = order
-                return ExecutionReport(
-                    order_id=order.order_id,
-                    status=OrderStatus.OPEN,
-                    filled_quantity=0,
-                    avg_fill_price=0,
-                    slippage=0,
-                    execution_time_ms=(time.time() - start_time) * 1000,
-                    commission=0,
-                )
-            elif order.side == OrderSide.SELL and fill_price < order.price:
+            if (order.side == OrderSide.BUY and fill_price > order.price) or (order.side == OrderSide.SELL and fill_price < order.price):
                 order.status = OrderStatus.OPEN
                 self._orders[order.order_id] = order
                 return ExecutionReport(
@@ -534,7 +523,7 @@ class PaperTradingEngine(ExchangeConnection):
         """Get order status."""
         return self._orders.get(order_id)
 
-    def get_trades(self) -> List[Trade]:
+    def get_trades(self) -> list[Trade]:
         """Get all trades."""
         return self._trades
 
@@ -571,9 +560,9 @@ class BybitConnection(ExchangeConnection):
         )
 
         self._connected = False
-        self._positions: Dict[str, Position] = {}
+        self._positions: dict[str, Position] = {}
 
-    def _sign_request(self, params: Dict) -> str:
+    def _sign_request(self, params: dict) -> str:
         """Create signature for request."""
         param_str = urlencode(sorted(params.items()))
         signature = hmac.new(
@@ -603,7 +592,7 @@ class BybitConnection(ExchangeConnection):
             margin_used=2000,
         )
 
-    async def get_positions(self) -> List[Position]:
+    async def get_positions(self) -> list[Position]:
         """Get positions from Bybit."""
         # Placeholder
         return list(self._positions.values())
@@ -653,15 +642,15 @@ class OrderManager:
     """
 
     def __init__(
-        self, connection: ExchangeConnection, risk_limits: Optional[RiskLimits] = None
+        self, connection: ExchangeConnection, risk_limits: RiskLimits | None = None
     ):
         self.connection = connection
         self.risk_limits = risk_limits or RiskLimits()
 
-        self._pending_orders: Dict[str, Order] = {}
-        self._open_orders: Dict[str, Order] = {}
-        self._filled_orders: List[Order] = []
-        self._order_callbacks: List[Callable[[ExecutionReport], None]] = []
+        self._pending_orders: dict[str, Order] = {}
+        self._open_orders: dict[str, Order] = {}
+        self._filled_orders: list[Order] = []
+        self._order_callbacks: list[Callable[[ExecutionReport], None]] = []
 
     def add_callback(self, callback: Callable[[ExecutionReport], None]) -> None:
         """Add order callback."""
@@ -673,8 +662,8 @@ class OrderManager:
         side: OrderSide,
         quantity: float,
         order_type: OrderType = OrderType.MARKET,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        price: float | None = None,
+        stop_price: float | None = None,
         reduce_only: bool = False,
     ) -> ExecutionReport:
         """
@@ -763,8 +752,8 @@ class OrderManager:
         side: OrderSide,
         quantity: float,
         order_type: OrderType,
-        price: Optional[float],
-    ) -> Dict[str, Any]:
+        price: float | None,
+    ) -> dict[str, Any]:
         """Validate order against risk limits."""
         errors = []
 
@@ -804,7 +793,7 @@ class OrderManager:
 
         return success
 
-    async def cancel_all_orders(self, symbol: Optional[str] = None) -> int:
+    async def cancel_all_orders(self, symbol: str | None = None) -> int:
         """Cancel all open orders."""
         cancelled = 0
         orders_to_cancel = list(self._open_orders.keys())
@@ -817,14 +806,14 @@ class OrderManager:
 
         return cancelled
 
-    def get_open_orders(self, symbol: Optional[str] = None) -> List[Order]:
+    def get_open_orders(self, symbol: str | None = None) -> list[Order]:
         """Get open orders."""
         orders = list(self._open_orders.values())
         if symbol:
             orders = [o for o in orders if o.symbol == symbol]
         return orders
 
-    def get_filled_orders(self, symbol: Optional[str] = None) -> List[Order]:
+    def get_filled_orders(self, symbol: str | None = None) -> list[Order]:
         """Get filled orders."""
         orders = self._filled_orders
         if symbol:
@@ -844,8 +833,8 @@ class PositionTracker:
 
     def __init__(self, connection: ExchangeConnection):
         self.connection = connection
-        self._positions: Dict[str, Position] = {}
-        self._position_callbacks: List[Callable[[Position], None]] = []
+        self._positions: dict[str, Position] = {}
+        self._position_callbacks: list[Callable[[Position], None]] = []
 
     def add_callback(self, callback: Callable[[Position], None]) -> None:
         """Add position update callback."""
@@ -860,11 +849,11 @@ class PositionTracker:
             for pos in positions:
                 callback(pos)
 
-    def get_position(self, symbol: str) -> Optional[Position]:
+    def get_position(self, symbol: str) -> Position | None:
         """Get position for symbol."""
         return self._positions.get(symbol)
 
-    def get_all_positions(self) -> List[Position]:
+    def get_all_positions(self) -> list[Position]:
         """Get all positions."""
         return list(self._positions.values())
 
@@ -903,7 +892,7 @@ class RiskManager:
     """
 
     def __init__(
-        self, connection: ExchangeConnection, limits: Optional[RiskLimits] = None
+        self, connection: ExchangeConnection, limits: RiskLimits | None = None
     ):
         self.connection = connection
         self.limits = limits or RiskLimits()
@@ -921,7 +910,7 @@ class RiskManager:
         self._daily_start_equity = balance.total_equity
         self._max_equity = balance.total_equity
 
-    async def check_limits(self) -> Dict[str, Any]:
+    async def check_limits(self) -> dict[str, Any]:
         """Check all risk limits."""
         balance = await self.connection.get_balance()
         positions = await self.connection.get_positions()
@@ -1035,8 +1024,8 @@ class ExecutionAnalytics:
     """
 
     def __init__(self):
-        self._executions: List[ExecutionReport] = []
-        self._market_prices_at_order: Dict[str, float] = {}
+        self._executions: list[ExecutionReport] = []
+        self._market_prices_at_order: dict[str, float] = {}
 
     def record_execution(
         self, report: ExecutionReport, market_price_at_order: float
@@ -1045,7 +1034,7 @@ class ExecutionAnalytics:
         self._executions.append(report)
         self._market_prices_at_order[report.order_id] = market_price_at_order
 
-    def get_summary(self) -> Dict[str, float]:
+    def get_summary(self) -> dict[str, float]:
         """Get execution summary statistics."""
         if not self._executions:
             return {}
@@ -1070,7 +1059,7 @@ class ExecutionAnalytics:
             "avg_commission": float(np.mean(commissions)),
         }
 
-    def get_slippage_analysis(self) -> Dict[str, Any]:
+    def get_slippage_analysis(self) -> dict[str, Any]:
         """Detailed slippage analysis."""
         filled = [e for e in self._executions if e.status == OrderStatus.FILLED]
 
@@ -1106,8 +1095,8 @@ class LiveTradingBridge:
     def __init__(
         self,
         mode: TradingMode = TradingMode.PAPER,
-        connection: Optional[ExchangeConnection] = None,
-        risk_limits: Optional[RiskLimits] = None,
+        connection: ExchangeConnection | None = None,
+        risk_limits: RiskLimits | None = None,
     ):
         self.mode = mode
         self.risk_limits = risk_limits or RiskLimits()
@@ -1127,7 +1116,7 @@ class LiveTradingBridge:
         self.execution_analytics = ExecutionAnalytics()
 
         self._running = False
-        self._price_callbacks: List[Callable[[str, float], None]] = []
+        self._price_callbacks: list[Callable[[str, float], None]] = []
 
     async def start(self) -> bool:
         """Start the trading bridge."""
@@ -1168,8 +1157,8 @@ class LiveTradingBridge:
         side: OrderSide,
         quantity: float,
         order_type: OrderType = OrderType.MARKET,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        price: float | None = None,
+        stop_price: float | None = None,
         reduce_only: bool = False,
     ) -> ExecutionReport:
         """Submit trading order."""
@@ -1210,7 +1199,7 @@ class LiveTradingBridge:
 
         return report
 
-    async def get_status(self) -> Dict[str, Any]:
+    async def get_status(self) -> dict[str, Any]:
         """Get current trading status."""
         balance = await self.connection.get_balance()
         positions = self.position_tracker.get_all_positions()

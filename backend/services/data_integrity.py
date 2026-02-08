@@ -16,10 +16,10 @@ import logging
 import pickle
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +49,12 @@ class IntegrityCheckResult:
     check_name: str
     status: IntegrityStatus
     source: DataSource
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     message: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     duration_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "check_name": self.check_name,
             "status": self.status.value,
@@ -72,9 +72,9 @@ class Snapshot:
 
     snapshot_id: str
     created_at: datetime
-    state_data: Dict[str, Any]
+    state_data: dict[str, Any]
     checksum: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def verify_checksum(self) -> bool:
         """Verify snapshot integrity."""
@@ -82,7 +82,7 @@ class Snapshot:
         return calculated == self.checksum
 
     @staticmethod
-    def _calculate_checksum(data: Dict[str, Any]) -> str:
+    def _calculate_checksum(data: dict[str, Any]) -> str:
         """Calculate checksum for data."""
         json_str = json.dumps(data, sort_keys=True, default=str)
         return hashlib.sha256(json_str.encode()).hexdigest()
@@ -116,8 +116,8 @@ class SnapshotManager:
 
     async def create_snapshot(
         self,
-        state_data: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
+        state_data: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
     ) -> Snapshot:
         """
         Create a new snapshot.
@@ -129,7 +129,7 @@ class SnapshotManager:
         Returns:
             Created snapshot
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snapshot_id = now.strftime("%Y%m%d_%H%M%S")
 
         checksum = Snapshot._calculate_checksum(state_data)
@@ -175,7 +175,7 @@ class SnapshotManager:
                 indent=2,
             )
 
-    async def load_snapshot(self, snapshot_id: str) -> Optional[Snapshot]:
+    async def load_snapshot(self, snapshot_id: str) -> Snapshot | None:
         """Load snapshot from file."""
         filepath = self.snapshot_dir / f"snapshot_{snapshot_id}.pkl"
 
@@ -197,7 +197,7 @@ class SnapshotManager:
             logger.error(f"Failed to load snapshot {snapshot_id}: {e}")
             return None
 
-    async def list_snapshots(self) -> List[Dict[str, Any]]:
+    async def list_snapshots(self) -> list[dict[str, Any]]:
         """List all available snapshots."""
         snapshots = []
 
@@ -248,9 +248,9 @@ class DataIntegrityChecker:
     """
 
     def __init__(self):
-        self.results: List[IntegrityCheckResult] = []
+        self.results: list[IntegrityCheckResult] = []
 
-    async def run_all_checks(self) -> Dict[str, Any]:
+    async def run_all_checks(self) -> dict[str, Any]:
         """Run all integrity checks."""
         start = time.time()
         self.results = []
@@ -281,7 +281,7 @@ class DataIntegrityChecker:
             "total_checks": len(self.results),
             "status_counts": status_counts,
             "duration_ms": round(total_duration, 2),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "results": [r.to_dict() for r in self.results],
         }
 
@@ -421,8 +421,8 @@ class DataIntegrityChecker:
 
 
 # Global instances
-_snapshot_manager: Optional[SnapshotManager] = None
-_integrity_checker: Optional[DataIntegrityChecker] = None
+_snapshot_manager: SnapshotManager | None = None
+_integrity_checker: DataIntegrityChecker | None = None
 
 
 def get_snapshot_manager() -> SnapshotManager:
@@ -443,11 +443,11 @@ def get_integrity_checker() -> DataIntegrityChecker:
 
 __all__ = [
     "DataIntegrityChecker",
-    "SnapshotManager",
-    "Snapshot",
+    "DataSource",
     "IntegrityCheckResult",
     "IntegrityStatus",
-    "DataSource",
-    "get_snapshot_manager",
+    "Snapshot",
+    "SnapshotManager",
     "get_integrity_checker",
+    "get_snapshot_manager",
 ]

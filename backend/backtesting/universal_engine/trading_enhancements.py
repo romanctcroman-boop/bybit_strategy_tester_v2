@@ -13,10 +13,8 @@ Version: 2.2.0
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 import numpy as np
-from numpy.typing import NDArray
 
 # =============================================================================
 # 1. ORDER TYPES MODULE
@@ -60,15 +58,15 @@ class Order:
     order_type: OrderType
     side: OrderSide
     size: float
-    price: Optional[float] = None  # For limit orders
-    stop_price: Optional[float] = None  # For stop orders
-    trailing_delta: Optional[float] = None  # For trailing stops (as decimal)
+    price: float | None = None  # For limit orders
+    stop_price: float | None = None  # For stop orders
+    trailing_delta: float | None = None  # For trailing stops (as decimal)
     time_in_force: str = "GTC"  # GTC, IOC, FOK
     status: OrderStatus = OrderStatus.PENDING
     filled_size: float = 0.0
     filled_price: float = 0.0
     created_at: int = 0  # Timestamp
-    expires_at: Optional[int] = None  # For GTD orders
+    expires_at: int | None = None  # For GTD orders
 
 
 @dataclass
@@ -79,7 +77,7 @@ class TrailingStopConfig:
     trail_percent: float = 0.01
 
     # Activation price (optional) - only start trailing after this price
-    activation_price: Optional[float] = None
+    activation_price: float | None = None
 
     # Callback rate - how much price must move to update stop
     callback_rate: float = 0.001  # 0.1%
@@ -100,8 +98,8 @@ class OCOConfig:
     stop_loss_price: float = 0.0
 
     # Optional limit prices for TP/SL
-    take_profit_limit: Optional[float] = None
-    stop_loss_limit: Optional[float] = None
+    take_profit_limit: float | None = None
+    stop_loss_limit: float | None = None
 
 
 class OrderManager:
@@ -166,7 +164,7 @@ class OrderManager:
         side: OrderSide,
         size: float,
         stop_price: float,
-        limit_price: Optional[float] = None,
+        limit_price: float | None = None,
         timestamp: int = 0,
     ) -> Order:
         """Create a stop-market or stop-limit order."""
@@ -294,49 +292,37 @@ class OrderManager:
         low: float,
         close: float,
         timestamp: int,
-    ) -> Optional[float]:
+    ) -> float | None:
         """Check if order should be filled, return fill price if so."""
         if order.order_type == OrderType.LIMIT:
-            if order.side == OrderSide.BUY and low <= order.price:
-                return order.price
-            elif order.side == OrderSide.SELL and high >= order.price:
+            if (order.side == OrderSide.BUY and low <= order.price) or (order.side == OrderSide.SELL and high >= order.price):
                 return order.price
 
         elif order.order_type in (OrderType.STOP_MARKET, OrderType.STOP_LIMIT):
             triggered = False
-            if order.side == OrderSide.SELL and low <= order.stop_price:
-                triggered = True
-            elif order.side == OrderSide.BUY and high >= order.stop_price:
+            if (order.side == OrderSide.SELL and low <= order.stop_price) or (order.side == OrderSide.BUY and high >= order.stop_price):
                 triggered = True
 
             if triggered:
                 if order.order_type == OrderType.STOP_LIMIT:
                     # Check if limit price also reachable
-                    if order.side == OrderSide.SELL and low <= order.price:
-                        return order.price
-                    elif order.side == OrderSide.BUY and high >= order.price:
+                    if (order.side == OrderSide.SELL and low <= order.price) or (order.side == OrderSide.BUY and high >= order.price):
                         return order.price
                 else:
                     return order.stop_price
 
         elif order.order_type == OrderType.TRAILING_STOP:
-            if order.side == OrderSide.SELL and low <= order.stop_price:
-                return order.stop_price
-            elif order.side == OrderSide.BUY and high >= order.stop_price:
+            if (order.side == OrderSide.SELL and low <= order.stop_price) or (order.side == OrderSide.BUY and high >= order.stop_price):
                 return order.stop_price
 
         elif order.order_type == OrderType.OCO:
             # Check as limit for TP side
             if order.price:
-                if order.side == OrderSide.SELL and high >= order.price:
-                    return order.price
-                elif order.side == OrderSide.BUY and low <= order.price:
+                if (order.side == OrderSide.SELL and high >= order.price) or (order.side == OrderSide.BUY and low <= order.price):
                     return order.price
             # Check as stop for SL side
             if order.stop_price:
-                if order.side == OrderSide.SELL and low <= order.stop_price:
-                    return order.stop_price
-                elif order.side == OrderSide.BUY and high >= order.stop_price:
+                if (order.side == OrderSide.SELL and low <= order.stop_price) or (order.side == OrderSide.BUY and high >= order.stop_price):
                     return order.stop_price
 
         return None
@@ -474,8 +460,8 @@ class RiskAction:
 
     action: str  # "allow", "reduce", "close", "pause", "add_margin"
     reason: str
-    suggested_size: Optional[float] = None
-    pause_until_bar: Optional[int] = None
+    suggested_size: float | None = None
+    pause_until_bar: int | None = None
 
 
 class RiskManagement:
@@ -491,10 +477,10 @@ class RiskManagement:
 
     def __init__(
         self,
-        anti_liq_config: Optional[AntiLiquidationConfig] = None,
-        break_even_config: Optional[BreakEvenConfig] = None,
-        risk_per_trade_config: Optional[RiskPerTradeConfig] = None,
-        drawdown_config: Optional[DrawdownGuardianConfig] = None,
+        anti_liq_config: AntiLiquidationConfig | None = None,
+        break_even_config: BreakEvenConfig | None = None,
+        risk_per_trade_config: RiskPerTradeConfig | None = None,
+        drawdown_config: DrawdownGuardianConfig | None = None,
     ):
         """Initialize risk management."""
         self.anti_liq = anti_liq_config or AntiLiquidationConfig()
@@ -558,7 +544,7 @@ class RiskManagement:
         current_price: float,
         is_long: bool,
         current_stop: float,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Check if break-even stop should be activated.
 
@@ -606,8 +592,8 @@ class RiskManagement:
         equity: float,
         entry_price: float,
         stop_price: float,
-        take_profit_price: Optional[float] = None,
-        win_rate: Optional[float] = None,
+        take_profit_price: float | None = None,
+        win_rate: float | None = None,
     ) -> tuple[float, str]:
         """
         Calculate position size based on risk parameters.
@@ -671,7 +657,7 @@ class RiskManagement:
     def check_drawdown_guardian(
         self,
         current_equity: float,
-        last_trade_pnl: Optional[float] = None,
+        last_trade_pnl: float | None = None,
         current_bar: int = 0,
     ) -> RiskAction:
         """
@@ -853,9 +839,9 @@ class TradingFilters:
 
     def __init__(
         self,
-        session_config: Optional[SessionFilterConfig] = None,
-        news_config: Optional[NewsFilterConfig] = None,
-        cooldown_config: Optional[CooldownConfig] = None,
+        session_config: SessionFilterConfig | None = None,
+        news_config: NewsFilterConfig | None = None,
+        cooldown_config: CooldownConfig | None = None,
     ):
         """Initialize trading filters."""
         self.session = session_config or SessionFilterConfig()
@@ -865,7 +851,7 @@ class TradingFilters:
         # State
         self.news_events: list[NewsEvent] = []
         self.last_trade_bar: int = 0
-        self.last_trade_result: Optional[str] = None  # "win" or "loss"
+        self.last_trade_result: str | None = None  # "win" or "loss"
         self.trades_today: int = 0
         self.current_day: int = 0
 
@@ -1058,7 +1044,7 @@ class SpreadSimulator:
     - Volume-adjusted spread
     """
 
-    def __init__(self, config: Optional[SpreadConfig] = None):
+    def __init__(self, config: SpreadConfig | None = None):
         """Initialize spread simulator."""
         self.config = config or SpreadConfig()
         self.average_volume: float = 0.0

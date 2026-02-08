@@ -15,9 +15,9 @@ Intrabar Engine: Universal Bar Magnifier
 """
 
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Generator, Optional
 
 import numpy as np
 import pandas as pd
@@ -89,8 +89,8 @@ class IntrabarEngine:
 
     def __init__(self, config: IntrabarConfig = None):
         self.config = config or IntrabarConfig()
-        self.m1_data: Optional[pd.DataFrame] = None
-        self.m1_timestamps: Optional[np.ndarray] = None
+        self.m1_data: pd.DataFrame | None = None
+        self.m1_timestamps: np.ndarray | None = None
 
         # Кэш для быстрого поиска 1m баров
         self._m1_index: dict[int, int] = {}  # timestamp_ms -> index
@@ -143,7 +143,7 @@ class IntrabarEngine:
 
     def generate_ticks_for_m1_bar(
         self, m1_bar: pd.Series, bar_index: int
-    ) -> Generator[PseudoTick, None, None]:
+    ) -> Generator[PseudoTick]:
         """
         Сгенерировать последовательность псевдотиков из одного 1m бара.
 
@@ -227,7 +227,7 @@ class IntrabarEngine:
         time_from: int,
         source_bar_time: int,
         bar_index: int,
-    ) -> Generator[PseudoTick, None, None]:
+    ) -> Generator[PseudoTick]:
         """Генерировать промежуточные тики между двумя точками."""
         n = self.config.subticks_per_segment
         for i in range(1, n + 1):
@@ -259,7 +259,7 @@ class IntrabarEngine:
 
     def generate_ticks(
         self, bar_start_ms: int, bar_end_ms: int
-    ) -> Generator[PseudoTick, None, None]:
+    ) -> Generator[PseudoTick]:
         """
         Генерировать все псевдотики для бара старшего ТФ.
 

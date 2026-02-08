@@ -6,7 +6,7 @@
 # ==============================================================================
 
 # Stage 1: Builder - Install dependencies and prepare wheels
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 
 # Set build arguments
 ARG TARGETARCH=amd64
@@ -37,7 +37,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements-backend.txt
 # ==============================================================================
 # Stage 2: Runtime - Minimal production image
 # ==============================================================================
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # Labels for container metadata
 LABEL maintainer="Bybit Strategy Tester Team"

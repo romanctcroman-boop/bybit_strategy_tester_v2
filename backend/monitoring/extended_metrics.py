@@ -24,7 +24,7 @@ import time
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class Histogram:
     # Bucket thresholds in milliseconds
     BUCKET_THRESHOLDS = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
 
-    buckets: List[HistogramBucket] = field(default_factory=list)
+    buckets: list[HistogramBucket] = field(default_factory=list)
     count: int = 0
     sum: float = 0.0
 
@@ -71,7 +71,7 @@ class Histogram:
 class CounterWithLabels:
     """Counter metric with label support."""
 
-    values: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    values: dict[str, int] = field(default_factory=lambda: defaultdict(int))
 
     def inc(self, labels: str, value: int = 1) -> None:
         """Increment counter for given labels."""
@@ -93,17 +93,17 @@ class MetricsCollector:
         self._lock = threading.Lock()
 
         # Query duration histograms: {(operation, table): Histogram}
-        self._query_histograms: Dict[tuple, Histogram] = defaultdict(Histogram)
+        self._query_histograms: dict[tuple, Histogram] = defaultdict(Histogram)
 
         # Connection pool wait time histogram
         self._connection_wait_histogram = Histogram()
 
         # Archive table sizes: {table_name: size_bytes}
-        self._archive_sizes: Dict[str, int] = {}
+        self._archive_sizes: dict[str, int] = {}
 
         # Operation counters: {(operation, table): count}
-        self._operation_counts: Dict[tuple, int] = defaultdict(int)
-        self._error_counts: Dict[tuple, int] = defaultdict(int)
+        self._operation_counts: dict[tuple, int] = defaultdict(int)
+        self._error_counts: dict[tuple, int] = defaultdict(int)
 
         # Last update timestamps
         self._archive_sizes_updated: float = 0
@@ -168,13 +168,13 @@ class MetricsCollector:
         with self._lock:
             self._error_counts[key] += 1
 
-    def update_archive_sizes(self, sizes: Dict[str, int]) -> None:
+    def update_archive_sizes(self, sizes: dict[str, int]) -> None:
         """Update archive table sizes."""
         with self._lock:
             self._archive_sizes = sizes.copy()
             self._archive_sizes_updated = time.time()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get all metrics as dictionary."""
         with self._lock:
             # Aggregate query stats
@@ -307,7 +307,7 @@ class MetricsCollector:
 metrics_collector = MetricsCollector()
 
 
-def get_extended_metrics() -> Dict[str, Any]:
+def get_extended_metrics() -> dict[str, Any]:
     """Get extended metrics as dictionary."""
     return metrics_collector.get_stats()
 

@@ -20,9 +20,9 @@ import logging
 import os
 import secrets
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -66,18 +66,17 @@ class HSMKey:
     key_type: KeyType
     usage: KeyUsage
     created_at: datetime
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     version: int = 1
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     is_exportable: bool = False
 
     def is_expired(self) -> bool:
         """Check if the key has expired."""
         if self.expires_at is None:
             return False
-        from datetime import timezone
 
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
 
 @dataclass
@@ -85,10 +84,10 @@ class HSMConfig:
     """Configuration for HSM connection."""
 
     provider: HSMProvider
-    connection_string: Optional[str] = None
-    credentials: Optional[Dict[str, str]] = None
-    region: Optional[str] = None
-    key_ring: Optional[str] = None
+    connection_string: str | None = None
+    credentials: dict[str, str] | None = None
+    region: str | None = None
+    key_ring: str | None = None
     timeout_seconds: int = 30
     retry_attempts: int = 3
     enable_audit_log: bool = True
@@ -115,7 +114,7 @@ class HSMInterface(Protocol):
         """Create a new key in HSM."""
         ...
 
-    def get_key(self, key_id: str) -> Optional[HSMKey]:
+    def get_key(self, key_id: str) -> HSMKey | None:
         """Get key metadata from HSM."""
         ...
 
@@ -123,7 +122,7 @@ class HSMInterface(Protocol):
         """Delete a key from HSM."""
         ...
 
-    def list_keys(self) -> List[HSMKey]:
+    def list_keys(self) -> list[HSMKey]:
         """List all keys in HSM."""
         ...
 
@@ -156,12 +155,12 @@ class LocalHSM:
     For production, use a real HSM provider.
     """
 
-    def __init__(self, config: Optional[HSMConfig] = None):
+    def __init__(self, config: HSMConfig | None = None):
         """Initialize local HSM."""
         self.config = config or HSMConfig(provider=HSMProvider.LOCAL)
-        self._keys: Dict[str, dict] = {}
+        self._keys: dict[str, dict] = {}
         self._connected = False
-        self._master_key: Optional[bytes] = None
+        self._master_key: bytes | None = None
 
         # Try to import crypto for actual encryption
         try:
@@ -224,13 +223,12 @@ class LocalHSM:
             # For asymmetric keys, generate placeholder
             key_material = secrets.token_bytes(32)
 
-        from datetime import timezone
 
         hsm_key = HSMKey(
             key_id=key_id,
             key_type=key_type,
             usage=usage,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             version=1,
             is_exportable=exportable,
         )
@@ -244,7 +242,7 @@ class LocalHSM:
         logger.info(f"LocalHSM: Created key {key_id}")
         return hsm_key
 
-    def get_key(self, key_id: str) -> Optional[HSMKey]:
+    def get_key(self, key_id: str) -> HSMKey | None:
         """Get key metadata."""
         if key_id in self._keys:
             return self._keys[key_id]["metadata"]
@@ -261,7 +259,7 @@ class LocalHSM:
             return True
         return False
 
-    def list_keys(self) -> List[HSMKey]:
+    def list_keys(self) -> list[HSMKey]:
         """List all keys."""
         return [k["metadata"] for k in self._keys.values()]
 
@@ -437,7 +435,7 @@ class HSMFactory:
 
 
 # Global HSM instance
-_global_hsm: Optional[HSMInterface] = None
+_global_hsm: HSMInterface | None = None
 
 
 def get_hsm() -> HSMInterface:
@@ -460,16 +458,16 @@ def set_hsm(hsm: HSMInterface) -> None:
 
 
 __all__ = [
+    "AWSKMSAdapter",
+    "HSMConfig",
+    "HSMFactory",
+    "HSMInterface",
+    "HSMKey",
     "HSMProvider",
+    "HashiCorpVaultAdapter",
     "KeyType",
     "KeyUsage",
-    "HSMKey",
-    "HSMConfig",
-    "HSMInterface",
     "LocalHSM",
-    "AWSKMSAdapter",
-    "HashiCorpVaultAdapter",
-    "HSMFactory",
     "get_hsm",
     "set_hsm",
 ]

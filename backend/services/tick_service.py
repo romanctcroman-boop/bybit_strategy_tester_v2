@@ -13,9 +13,9 @@ import json
 import logging
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Callable, Deque, Dict, List, Optional, Set
+from datetime import UTC, datetime
 
 import websockets
 
@@ -85,8 +85,8 @@ class TickAggregator:
     """Aggregates trades into tick candles."""
 
     ticks_per_bar: int = 100
-    current_trades: List[Trade] = field(default_factory=list)
-    completed_candles: Deque[TickCandle] = field(
+    current_trades: list[Trade] = field(default_factory=list)
+    completed_candles: deque[TickCandle] = field(
         default_factory=lambda: deque(maxlen=1000)
     )
     # Cached values for current candle (avoid recalculating on each get)
@@ -95,7 +95,7 @@ class TickAggregator:
     _current_buy_vol: float = 0.0
     _current_sell_vol: float = 0.0
 
-    def add_trade(self, trade: Trade) -> Optional[TickCandle]:
+    def add_trade(self, trade: Trade) -> TickCandle | None:
         """
         Add a trade and return completed candle if threshold reached.
 
@@ -149,7 +149,7 @@ class TickAggregator:
             trade_count=len(self.current_trades),
         )
 
-    def get_current_candle(self) -> Optional[dict]:
+    def get_current_candle(self) -> dict | None:
         """Get current incomplete candle for real-time updates."""
         if not self.current_trades:
             return None
@@ -170,7 +170,7 @@ class TickAggregator:
             "is_complete": False,
         }
 
-    def get_history(self, limit: int = 100) -> List[dict]:
+    def get_history(self, limit: int = 100) -> list[dict]:
         """Get completed candles history."""
         candles = list(self.completed_candles)[-limit:]
         return [c.to_dict() for c in candles]
@@ -195,8 +195,8 @@ class TickService:
         self, use_redis: bool = False, redis_url: str = "redis://localhost:6379"
     ):
         self._running = False
-        self._ws: Optional[websockets.WebSocketClientProtocol] = None
-        self._ws_task: Optional[asyncio.Task] = None
+        self._ws: websockets.WebSocketClientProtocol | None = None
+        self._ws_task: asyncio.Task | None = None
         self._reconnect_delay = 5
         self._initial_reconnect_delay = 5
         self._max_reconnect_delay = 60
@@ -209,26 +209,26 @@ class TickService:
 
         # Aggregators per symbol and tick count
         # Key: (symbol, ticks_per_bar), Value: TickAggregator
-        self._aggregators: Dict[tuple, TickAggregator] = {}
+        self._aggregators: dict[tuple, TickAggregator] = {}
 
         # OPTIMIZATION: Index for fast lookup by symbol
         # Instead of looping through all 500 aggregators for each trade,
         # we maintain a symbol-based index for O(1) lookup
-        self._aggregators_by_symbol: Dict[
-            str, List[tuple]
+        self._aggregators_by_symbol: dict[
+            str, list[tuple]
         ] = {}  # symbol -> [(symbol, ticks), ...]
 
         # Subscribed symbols
-        self._subscribed_symbols: Set[str] = set()
+        self._subscribed_symbols: set[str] = set()
 
         # Callbacks for new candles
-        self._candle_callbacks: List[Callable[[str, int, TickCandle], None]] = []
+        self._candle_callbacks: list[Callable[[str, int, TickCandle], None]] = []
 
         # Callbacks for trade updates (real-time)
-        self._trade_callbacks: List[Callable[[str, Trade], None]] = []
+        self._trade_callbacks: list[Callable[[str, Trade], None]] = []
 
         # Recent trades buffer per symbol
-        self._recent_trades: Dict[str, Deque[Trade]] = {}
+        self._recent_trades: dict[str, deque[Trade]] = {}
 
         # Trade deduplication - ExpiringSet with 60s TTL, max 100k trades
         # Prevents duplicate trades (e.g., reconnection, Redis retry)
@@ -281,7 +281,7 @@ class TickService:
 
         return self._aggregators[key]
 
-    async def start(self, symbols: List[str] = None):
+    async def start(self, symbols: list[str] = None):
         """Start the tick service."""
         if self._running:
             logger.warning("TickService already running")
@@ -300,7 +300,7 @@ class TickService:
             logger.info(f"Starting TickService in DIRECT mode for symbols: {symbols}")
             self._ws_task = asyncio.create_task(self._ws_loop())
 
-    async def _start_redis_subscriber(self, symbols: List[str]):
+    async def _start_redis_subscriber(self, symbols: list[str]):
         """Start Redis subscriber for horizontal scaling."""
         try:
             from backend.services.tick_redis_broadcaster import RedisTickSubscriber
@@ -486,7 +486,7 @@ class TickService:
             return
 
         self._stats["trades_received"] += 1
-        self._stats["last_trade_time"] = datetime.now(timezone.utc).isoformat()
+        self._stats["last_trade_time"] = datetime.now(UTC).isoformat()
 
         # Store in recent trades
         if symbol not in self._recent_trades:
@@ -556,19 +556,19 @@ class TickService:
 
     def get_tick_candles(
         self, symbol: str, ticks_per_bar: int = 100, limit: int = 100
-    ) -> List[dict]:
+    ) -> list[dict]:
         """Get tick candles for symbol."""
         aggregator = self.get_aggregator(symbol, ticks_per_bar)
         return aggregator.get_history(limit)
 
     def get_current_candle(
         self, symbol: str, ticks_per_bar: int = 100
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """Get current incomplete candle."""
         aggregator = self.get_aggregator(symbol, ticks_per_bar)
         return aggregator.get_current_candle()
 
-    def get_recent_trades(self, symbol: str, limit: int = 100) -> List[dict]:
+    def get_recent_trades(self, symbol: str, limit: int = 100) -> list[dict]:
         """Get recent trades for symbol."""
         trades = self._recent_trades.get(symbol, deque())
         return [
@@ -622,7 +622,7 @@ class TickService:
 
 
 # Singleton instance
-_tick_service: Optional[TickService] = None
+_tick_service: TickService | None = None
 
 
 def get_tick_service(use_redis: bool = None, redis_url: str = None) -> TickService:

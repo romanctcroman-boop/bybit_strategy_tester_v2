@@ -18,12 +18,11 @@ Example:
     - lookahead_mode="allow": sees HTF Bar 1 (current, incomplete)
 """
 
-from typing import Optional, Tuple
 
 import numpy as np
 
 
-def interval_to_minutes(interval: str) -> Optional[int]:
+def interval_to_minutes(interval: str) -> int | None:
     """
     Convert interval string to minutes.
 
@@ -215,10 +214,10 @@ def get_htf_bar_at_ltf(
     ltf_bar_idx: int,
     htf_index_map: np.ndarray,
     htf_candles_close: np.ndarray,
-    htf_candles_high: Optional[np.ndarray] = None,
-    htf_candles_low: Optional[np.ndarray] = None,
-    htf_candles_open: Optional[np.ndarray] = None,
-) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+    htf_candles_high: np.ndarray | None = None,
+    htf_candles_low: np.ndarray | None = None,
+    htf_candles_open: np.ndarray | None = None,
+) -> tuple[float | None, float | None, float | None, float | None]:
     """
     Get HTF OHLC values visible at a specific LTF bar.
 
@@ -254,7 +253,7 @@ def get_htf_bar_at_ltf(
 
 def validate_htf_index_map(
     htf_index_map: np.ndarray, n_htf: int, ltf_interval: str, htf_interval: str
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """
     Validate HTF index map for correctness.
 

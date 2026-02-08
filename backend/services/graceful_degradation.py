@@ -15,11 +15,12 @@ Features:
 import asyncio
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -53,23 +54,23 @@ class CachedResponse:
     created_at: datetime
     expires_at: datetime
     access_count: int = 0
-    last_accessed: Optional[datetime] = None
+    last_accessed: datetime | None = None
     source: str = "unknown"
 
     @property
     def is_expired(self) -> bool:
         """Check if cache entry is expired."""
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     @property
     def age_seconds(self) -> float:
         """Get age of cache entry in seconds."""
-        return (datetime.now(timezone.utc) - self.created_at).total_seconds()
+        return (datetime.now(UTC) - self.created_at).total_seconds()
 
     def access(self):
         """Record cache access."""
         self.access_count += 1
-        self.last_accessed = datetime.now(timezone.utc)
+        self.last_accessed = datetime.now(UTC)
 
 
 @dataclass
@@ -78,12 +79,12 @@ class ServiceHealth:
 
     name: str
     status: ServiceStatus = ServiceStatus.UNKNOWN
-    last_check: Optional[datetime] = None
-    last_success: Optional[datetime] = None
+    last_check: datetime | None = None
+    last_success: datetime | None = None
     failure_count: int = 0
     success_count: int = 0
-    degraded_since: Optional[datetime] = None
-    error_message: Optional[str] = None
+    degraded_since: datetime | None = None
+    error_message: str | None = None
 
     @property
     def success_rate(self) -> float:
@@ -94,21 +95,21 @@ class ServiceHealth:
     def record_success(self):
         """Record successful call."""
         self.success_count += 1
-        self.last_success = datetime.now(timezone.utc)
-        self.last_check = datetime.now(timezone.utc)
+        self.last_success = datetime.now(UTC)
+        self.last_check = datetime.now(UTC)
         if self.status != ServiceStatus.HEALTHY:
             self.status = ServiceStatus.HEALTHY
             self.degraded_since = None
             self.error_message = None
 
-    def record_failure(self, error: Optional[str] = None):
+    def record_failure(self, error: str | None = None):
         """Record failed call."""
         self.failure_count += 1
-        self.last_check = datetime.now(timezone.utc)
+        self.last_check = datetime.now(UTC)
         self.error_message = error
         if self.status == ServiceStatus.HEALTHY:
             self.status = ServiceStatus.DEGRADED
-            self.degraded_since = datetime.now(timezone.utc)
+            self.degraded_since = datetime.now(UTC)
 
 
 class FallbackCache:
@@ -128,7 +129,7 @@ class FallbackCache:
         self.max_entries = max_entries
         self.cleanup_interval = cleanup_interval
 
-        self._cache: Dict[str, CachedResponse] = {}
+        self._cache: dict[str, CachedResponse] = {}
         self._last_cleanup = time.time()
 
         # Metrics
@@ -165,14 +166,14 @@ class FallbackCache:
             self.evictions += 1
 
     def set(
-        self, key: str, value: Any, ttl: Optional[int] = None, source: str = "unknown"
+        self, key: str, value: Any, ttl: int | None = None, source: str = "unknown"
     ):
         """Store a value in the cache."""
         self._cleanup_if_needed()
         self._ensure_capacity()
 
         ttl = ttl or self.default_ttl
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         self._cache[key] = CachedResponse(
             key=key,
@@ -182,7 +183,7 @@ class FallbackCache:
             source=source,
         )
 
-    def get(self, key: str, allow_expired: bool = False) -> Optional[Any]:
+    def get(self, key: str, allow_expired: bool = False) -> Any | None:
         """Get a value from the cache."""
         entry = self._cache.get(key)
         if not entry:
@@ -197,7 +198,7 @@ class FallbackCache:
         self.hits += 1
         return entry.value
 
-    def get_with_metadata(self, key: str) -> Optional[CachedResponse]:
+    def get_with_metadata(self, key: str) -> CachedResponse | None:
         """Get cache entry with full metadata."""
         return self._cache.get(key)
 
@@ -212,7 +213,7 @@ class FallbackCache:
         self._cache.clear()
         return count
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         total_requests = self.hits + self.misses
         return {
@@ -235,9 +236,9 @@ class GracefulDegradationManager:
 
     def __init__(self):
         self.cache = FallbackCache()
-        self.services: Dict[str, ServiceHealth] = {}
-        self.fallback_handlers: Dict[str, Callable] = {}
-        self.static_fallbacks: Dict[str, Any] = {}
+        self.services: dict[str, ServiceHealth] = {}
+        self.fallback_handlers: dict[str, Callable] = {}
+        self.static_fallbacks: dict[str, Any] = {}
 
         # Default static fallbacks
         self._register_default_fallbacks()
@@ -282,7 +283,7 @@ class GracefulDegradationManager:
             self.services[name] = ServiceHealth(name=name)
         return self.services[name]
 
-    def get_service(self, name: str) -> Optional[ServiceHealth]:
+    def get_service(self, name: str) -> ServiceHealth | None:
         """Get service health information."""
         return self.services.get(name)
 
@@ -298,8 +299,8 @@ class GracefulDegradationManager:
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
-        service: Optional[str] = None,
+        ttl: int | None = None,
+        service: str | None = None,
     ):
         """Cache a successful response for fallback."""
         self.cache.set(key, value, ttl=ttl, source=service or "unknown")
@@ -310,7 +311,7 @@ class GracefulDegradationManager:
         fallback_type: FallbackType = FallbackType.CACHED,
         *args,
         **kwargs,
-    ) -> Optional[Any]:
+    ) -> Any | None:
         """
         Get fallback response for a key.
 
@@ -345,19 +346,19 @@ class GracefulDegradationManager:
         return None
 
     def record_success(
-        self, service: str, key: str, response: Any, ttl: Optional[int] = None
+        self, service: str, key: str, response: Any, ttl: int | None = None
     ):
         """Record successful service call and cache response."""
         svc = self.register_service(service)
         svc.record_success()
         self.cache_response(key, response, ttl=ttl, service=service)
 
-    def record_failure(self, service: str, error: Optional[str] = None):
+    def record_failure(self, service: str, error: str | None = None):
         """Record service failure."""
         svc = self.register_service(service)
         svc.record_failure(error)
 
-    def get_degraded_services(self) -> List[ServiceHealth]:
+    def get_degraded_services(self) -> list[ServiceHealth]:
         """Get list of degraded services."""
         return [s for s in self.services.values() if s.status != ServiceStatus.HEALTHY]
 
@@ -376,7 +377,7 @@ class GracefulDegradationManager:
 
         return ServiceStatus.DEGRADED
 
-    def get_status_report(self) -> Dict[str, Any]:
+    def get_status_report(self) -> dict[str, Any]:
         """Get comprehensive status report."""
         return {
             "overall_status": self.get_overall_status().value,
@@ -400,7 +401,7 @@ class GracefulDegradationManager:
 
 
 # Global instance
-_degradation_manager: Optional[GracefulDegradationManager] = None
+_degradation_manager: GracefulDegradationManager | None = None
 
 
 def get_degradation_manager() -> GracefulDegradationManager:

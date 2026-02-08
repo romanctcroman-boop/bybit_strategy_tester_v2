@@ -95,12 +95,29 @@ class StrategyBuilderAdapter(BaseStrategy):
                 - connections: List of connection objects
                 - name: Strategy name
                 - description: Strategy description (optional)
+                - main_strategy: (optional) The main strategy node with isMain: True
         """
         self.graph = strategy_graph
         self.name = strategy_graph.get("name", "Builder Strategy")
         self.description = strategy_graph.get("description", "")
         self.blocks = {block["id"]: block for block in strategy_graph.get("blocks", [])}
         self.connections = strategy_graph.get("connections", [])
+
+        # Handle main_strategy node if present
+        # This is the "strategy" node that collects all entry/exit signals
+        main_strategy = strategy_graph.get("main_strategy")
+        if main_strategy and isinstance(main_strategy, dict):
+            main_id = main_strategy.get("id")
+            if main_id:
+                # Ensure isMain is set
+                main_strategy["isMain"] = True
+                # Add to blocks if not already there
+                if main_id not in self.blocks:
+                    self.blocks[main_id] = main_strategy
+                else:
+                    # Update existing block with isMain flag
+                    self.blocks[main_id]["isMain"] = True
+
         self.params = self._extract_params()
 
         # Build execution order (topological sort)
@@ -128,28 +145,41 @@ class StrategyBuilderAdapter(BaseStrategy):
             logger.warning("No main strategy node found. Entry/exit signals may not be connected.")
 
     def _extract_params(self) -> dict[str, Any]:
-        """Extract parameters from blocks"""
+        """Extract parameters from blocks (supports both 'params' and 'config' keys)"""
         params = {}
         for block_id, block in self.blocks.items():
-            if block.get("params"):
-                params[block_id] = block["params"]
+            block_params = block.get("params") or block.get("config")
+            if block_params:
+                params[block_id] = block_params
         return params
 
     def _get_connection_source_id(self, conn: dict[str, Any]) -> str:
-        """Get source block ID from connection, supporting both formats."""
+        """Get source block ID from connection, supporting multiple formats."""
         # Format 1: conn["source"]["blockId"] (old format)
         if "source" in conn and isinstance(conn["source"], dict):
             return conn["source"].get("blockId", "")
+        # Format 1b: conn["source"] is a string block ID (frontend/test format)
+        if "source" in conn and isinstance(conn["source"], str):
+            return conn["source"]
         # Format 2: conn["source_block"] (new API format)
-        return conn.get("source_block", "")
+        if "source_block" in conn:
+            return conn.get("source_block", "")
+        # Format 3: conn["from"] (frontend/Strategy Builder format)
+        return conn.get("from", "")
 
     def _get_connection_target_id(self, conn: dict[str, Any]) -> str:
-        """Get target block ID from connection, supporting both formats."""
+        """Get target block ID from connection, supporting multiple formats."""
         # Format 1: conn["target"]["blockId"] (old format)
         if "target" in conn and isinstance(conn["target"], dict):
             return conn["target"].get("blockId", "")
+        # Format 1b: conn["target"] is a string block ID (frontend/test format)
+        if "target" in conn and isinstance(conn["target"], str):
+            return conn["target"]
         # Format 2: conn["target_block"] (new API format)
-        return conn.get("target_block", "")
+        if "target_block" in conn:
+            return conn.get("target_block", "")
+        # Format 3: conn["to"] (frontend/Strategy Builder format)
+        return conn.get("to", "")
 
     def _build_execution_order(self) -> list[str]:
         """
@@ -207,7 +237,8 @@ class StrategyBuilderAdapter(BaseStrategy):
         block = self.blocks[block_id]
         block_type = block["type"]
         category = block.get("category", "")
-        params = block.get("params", {})
+        # Support both "params" and "config" keys (frontend sends "config", some tests send "params")
+        params = block.get("params") or block.get("config") or {}
 
         # Get input values from cache
         inputs = self._get_block_inputs(block_id)
@@ -233,7 +264,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Position sizing blocks - config-only, processed by engine
             return self._execute_position_sizing(block_type, params)
         elif category in ("entry", "entry_refinement"):
-            # Entry refinement blocks (DCA, pyramiding, etc.) - config-only
+            # Entry refinement blocks (DCA, grid, martingale, etc.) - config-only
             return {}
         elif category in ("risk", "risk_controls"):
             # Risk control blocks - config-only
@@ -274,25 +305,41 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif category == "visualization":
             # Visualization blocks - config-only, no signals
             return {}
+        elif category == "signal":
+            # Signal blocks (long_entry, short_entry, long_exit, short_exit)
+            # These pass through condition input to output
+            return self._execute_signal_block(block_type, params, inputs)
         else:
             logger.warning(f"Unknown block category: {category} for block {block_id}")
             return {}
 
     def _get_connection_source_port(self, conn: dict[str, Any]) -> str:
-        """Get source port ID from connection, supporting both formats."""
+        """Get source port ID from connection, supporting multiple formats."""
         # Format 1: conn["source"]["portId"] (old format)
         if "source" in conn and isinstance(conn["source"], dict):
             return conn["source"].get("portId", "value")
         # Format 2: conn["source_output"] (new API format)
-        return conn.get("source_output", "value")
+        if "source_output" in conn:
+            return conn.get("source_output", "value")
+        # Format 3: conn["sourcePort"] (frontend/Strategy Builder format)
+        if "sourcePort" in conn:
+            return conn.get("sourcePort", "value")
+        # Format 4: conn["fromPort"] (test/API format)
+        return conn.get("fromPort", "value")
 
     def _get_connection_target_port(self, conn: dict[str, Any]) -> str:
-        """Get target port ID from connection, supporting both formats."""
+        """Get target port ID from connection, supporting multiple formats."""
         # Format 1: conn["target"]["portId"] (old format)
         if "target" in conn and isinstance(conn["target"], dict):
             return conn["target"].get("portId", "value")
         # Format 2: conn["target_input"] (new API format)
-        return conn.get("target_input", "value")
+        if "target_input" in conn:
+            return conn.get("target_input", "value")
+        # Format 3: conn["targetPort"] (frontend/Strategy Builder format)
+        if "targetPort" in conn:
+            return conn.get("targetPort", "value")
+        # Format 4: conn["toPort"] (test/API format)
+        return conn.get("toPort", "value")
 
     def _get_block_inputs(self, block_id: str) -> dict[str, pd.Series]:
         """Get input values for a block from connections"""
@@ -322,8 +369,17 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         if indicator_type == "rsi":
             period = params.get("period", 14)
+            overbought = params.get("overbought", 70)
+            oversold = params.get("oversold", 30)
             rsi = vbt.RSI.run(close, window=period).rsi
-            return {"value": rsi}
+            # Generate overbought/oversold signals
+            overbought_signal = pd.Series(rsi > overbought, index=ohlcv.index)
+            oversold_signal = pd.Series(rsi < oversold, index=ohlcv.index)
+            return {
+                "value": rsi,
+                "overbought": overbought_signal,
+                "oversold": oversold_signal,
+            }
 
         elif indicator_type == "macd":
             fast = _param(params, 12, "fast_period", "fast")
@@ -712,6 +768,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 "high": ohlcv["high"],
                 "low": ohlcv["low"],
                 "close": ohlcv["close"],
+                "value": ohlcv["close"],  # Alias for compatibility with connections
             }
         elif input_type == "volume":
             return {"value": ohlcv["volume"]}
@@ -750,6 +807,53 @@ class StrategyBuilderAdapter(BaseStrategy):
             signal = inputs.get("signal", pd.Series([False] * 100))
             filter_val = inputs.get("filter", pd.Series([True] * 100))
             return {"result": signal & filter_val}
+
+        elif logic_type == "comparison":
+            # Comparison block - compare two values with an operator
+            # Inputs: value_a, value_b (numeric series)
+            # Params: operator (>, <, >=, <=, ==, !=, crosses_above, crosses_below)
+            # Output: result (boolean series)
+            a = inputs.get("value_a", inputs.get("a", pd.Series([0.0] * 100)))
+            b = inputs.get("value_b", inputs.get("b", pd.Series([0.0] * 100)))
+            op = params.get("operator", "==")
+
+            # Ensure series are aligned
+            if len(a) != len(b):
+                # Try to broadcast if one is scalar
+                if len(a) == 1:
+                    a = pd.Series([float(a.iloc[0])] * len(b), index=b.index)
+                elif len(b) == 1:
+                    b = pd.Series([float(b.iloc[0])] * len(a), index=a.index)
+
+            if op == ">":
+                result = a > b
+            elif op == "<":
+                result = a < b
+            elif op == ">=":
+                result = a >= b
+            elif op == "<=":
+                result = a <= b
+            elif op == "==":
+                result = a == b
+            elif op == "!=":
+                result = a != b
+            elif op == "crosses_above":
+                # a crosses above b: a[i] > b[i] and a[i-1] <= b[i-1]
+                above_now = a > b
+                below_before = a.shift(1) <= b.shift(1)
+                result = above_now & below_before
+                result = result.fillna(False)
+            elif op == "crosses_below":
+                # a crosses below b: a[i] < b[i] and a[i-1] >= b[i-1]
+                below_now = a < b
+                above_before = a.shift(1) >= b.shift(1)
+                result = below_now & above_before
+                result = result.fillna(False)
+            else:
+                logger.warning(f"Unknown comparison operator: {op}")
+                result = pd.Series([False] * len(a), index=a.index)
+
+            return {"result": result}
 
         else:
             logger.warning(f"Unknown logic type: {logic_type}")
@@ -825,9 +929,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 sell = crossover(rsi, np.full(n, overbought))
 
             mem_bars = int(params.get("signal_memory_bars", 0))
-            if mem_bars > 0 and (
-                params.get("signal_memory_enable", False) or params.get("use_signal_memory", False)
-            ):
+            if mem_bars > 0 and (params.get("signal_memory_enable", False) or params.get("use_signal_memory", False)):
                 buy, sell = apply_signal_memory(np.asarray(buy, dtype=bool), np.asarray(sell, dtype=bool), mem_bars)
 
             return {
@@ -1381,7 +1483,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             o = ohlcv["open"]
             h = ohlcv["high"]
-            l = ohlcv["low"]
+            low = ohlcv["low"]
             c = ohlcv["close"]
             body = abs(c - o)
 
@@ -1407,7 +1509,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             elif pattern == "hammer":
                 # Hammer: long lower wick
-                lower_wick = pd.concat([o, c], axis=1).min(axis=1) - l
+                lower_wick = pd.concat([o, c], axis=1).min(axis=1) - low
                 upper_wick = h - pd.concat([o, c], axis=1).max(axis=1)
                 bullish = (lower_wick > body * 2) & (upper_wick < body * 0.5)
                 bearish = (upper_wick > body * 2) & (lower_wick < body * 0.5)
@@ -1428,6 +1530,114 @@ class StrategyBuilderAdapter(BaseStrategy):
                 "buy": pd.Series([False] * n, index=ohlcv.index),
                 "sell": pd.Series([False] * n, index=ohlcv.index),
             }
+
+    def _execute_signal_block(
+        self, signal_type: str, params: dict[str, Any], inputs: dict[str, pd.Series]
+    ) -> dict[str, pd.Series]:
+        """
+        Execute signal blocks (long_entry, short_entry, long_exit, short_exit, signal).
+
+        Signal blocks receive a boolean condition and output it as the appropriate
+        signal type. They act as the terminal nodes that define entry/exit signals.
+
+        Supported signal types:
+            - long_entry: Generate long entry signal
+            - short_entry: Generate short entry signal
+            - long_exit: Generate long exit signal
+            - short_exit: Generate short exit signal
+            - signal: Universal signal block that receives signals on multiple ports
+                      (entry_long, exit_long, entry_short, exit_short)
+
+        Args:
+            signal_type: Type of signal block
+            params: Block parameters
+            inputs: Input values from connected blocks
+
+        Returns:
+            Dictionary with signal output
+        """
+        result: dict[str, pd.Series] = {}
+
+        # Handle universal "signal" block type that receives multiple signal inputs
+        if signal_type == "signal":
+            # Universal signal block - each input port maps directly to output
+            n = len(next(iter(inputs.values()))) if inputs else 100
+
+            # Check for entry_long input
+            if "entry_long" in inputs:
+                sig = inputs["entry_long"]
+                if not sig.dtype == bool:
+                    sig = sig.astype(bool)
+                result["entry_long"] = sig
+
+            # Check for exit_long input
+            if "exit_long" in inputs:
+                sig = inputs["exit_long"]
+                if not sig.dtype == bool:
+                    sig = sig.astype(bool)
+                result["exit_long"] = sig
+
+            # Check for entry_short input
+            if "entry_short" in inputs:
+                sig = inputs["entry_short"]
+                if not sig.dtype == bool:
+                    sig = sig.astype(bool)
+                result["entry_short"] = sig
+
+            # Check for exit_short input
+            if "exit_short" in inputs:
+                sig = inputs["exit_short"]
+                if not sig.dtype == bool:
+                    sig = sig.astype(bool)
+                result["exit_short"] = sig
+
+            # Also support generic "signal" or "condition" input for backwards compat
+            for key in ["signal", "condition", "result", "input", "output"]:
+                if key in inputs and key not in ["entry_long", "exit_long", "entry_short", "exit_short"]:
+                    sig = inputs[key]
+                    if not sig.dtype == bool:
+                        sig = sig.astype(bool)
+                    result["signal"] = sig
+                    break
+
+            # If no outputs generated, return empty signals
+            if not result:
+                empty = pd.Series([False] * n)
+                result = {"signal": empty}
+
+            return result
+
+        # Handle specific signal types (long_entry, short_entry, etc.)
+        # Get input signal (from condition, result, or signal port)
+        input_signal = None
+        for key in ["condition", "result", "signal", "input", "output"]:
+            if key in inputs:
+                input_signal = inputs[key]
+                break
+
+        if input_signal is None:
+            # No input - return empty signal
+            n = len(next(iter(inputs.values()))) if inputs else 100
+            return {"signal": pd.Series([False] * n)}
+
+        # Ensure it's a boolean series
+        if not input_signal.dtype == bool:
+            input_signal = input_signal.astype(bool)
+
+        result = {"signal": input_signal}
+
+        if signal_type in ["long_entry", "entry_long", "buy_signal"]:
+            result["entry_long"] = input_signal
+        elif signal_type in ["short_entry", "entry_short", "sell_signal"]:
+            result["entry_short"] = input_signal
+        elif signal_type in ["long_exit", "exit_long", "close_long"]:
+            result["exit_long"] = input_signal
+        elif signal_type in ["short_exit", "exit_short", "close_short"]:
+            result["exit_short"] = input_signal
+        else:
+            logger.warning(f"Unknown signal type: {signal_type}")
+
+        return result
 
     def _execute_action(
         self, action_type: str, params: dict[str, Any], inputs: dict[str, pd.Series]
@@ -1602,7 +1812,8 @@ class StrategyBuilderAdapter(BaseStrategy):
         Exit blocks generate exit signals based on price conditions or indicators.
 
         Supported exit types:
-            - tp_percent, sl_percent: Fixed % take profit / stop loss
+            - static_sltp: Unified fixed % SL/TP with breakeven
+            - tp_percent, sl_percent: Legacy fixed % take profit / stop loss
             - trailing_stop_exit: Trailing stop
             - atr_stop, atr_tp: ATR-based exits
             - time_exit: Exit after N bars
@@ -1612,17 +1823,28 @@ class StrategyBuilderAdapter(BaseStrategy):
         n = len(ohlcv)
         result: dict[str, pd.Series] = {}
 
-        if exit_type == "tp_percent":
-            # Take profit is handled by engine config, return empty
+        if exit_type == "static_sltp":
+            # Unified static SL/TP — config-only block, engine handles execution
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
+            # Pass SL/TP values for engine config extraction
+            result["stop_loss_percent"] = params.get("stop_loss_percent", 1.5)
+            result["take_profit_percent"] = params.get("take_profit_percent", 1.5)
+            result["close_only_in_profit"] = params.get("close_only_in_profit", False)
+            result["activate_breakeven"] = params.get("activate_breakeven", False)
+            result["breakeven_activation_percent"] = params.get("breakeven_activation_percent", 0.5)
+            result["new_breakeven_sl_percent"] = params.get("new_breakeven_sl_percent", 0.1)
 
-        elif exit_type == "sl_percent":
-            # Stop loss is handled by engine config, return empty
+        elif exit_type in ("tp_percent", "sl_percent"):
+            # Legacy blocks — kept for backward compatibility
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
 
         elif exit_type == "trailing_stop_exit":
-            # Trailing stop is handled by engine
+            # Trailing stop is config-only — engine handles bar-by-bar execution.
+            # Pass params so generate_signals can relay them via extra_data.
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
+            result["trailing_activation_percent"] = params.get("activation_percent", 1.0)
+            result["trailing_percent"] = params.get("trailing_percent", 0.5)
+            result["trail_type"] = params.get("trail_type", "percent")
 
         elif exit_type == "atr_stop":
             # ATR-based stop loss
@@ -1664,23 +1886,49 @@ class StrategyBuilderAdapter(BaseStrategy):
             result["exit"] = result["exit_long"] | result["exit_short"]
 
         elif exit_type == "atr_exit":
-            # ATR-based TP/SL exit
-            period = params.get("period", params.get("atr_period", 14))
-            sl_mult = params.get("sl_multiplier", 2.0)
-            tp_mult = params.get("tp_multiplier", 3.0)
-            atr = pd.Series(
-                calculate_atr(
-                    ohlcv["high"].values,
-                    ohlcv["low"].values,
-                    ohlcv["close"].values,
-                    period=period,
-                ),
-                index=ohlcv.index,
-            )
+            # ATR-based TP/SL exit with separate smoothing methods and periods
+            from backend.core.indicators import calculate_atr_smoothed
+
+            use_atr_sl = params.get("use_atr_sl", False)
+            use_atr_tp = params.get("use_atr_tp", False)
+
+            high_arr = ohlcv["high"].values
+            low_arr = ohlcv["low"].values
+            close_arr = ohlcv["close"].values
+
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
-            result["atr"] = atr
-            result["atr_sl_mult"] = sl_mult
-            result["atr_tp_mult"] = tp_mult
+            result["use_atr_sl"] = use_atr_sl
+            result["use_atr_tp"] = use_atr_tp
+
+            if use_atr_sl:
+                sl_period = max(1, min(150, int(params.get("atr_sl_period", 150))))
+                sl_smoothing = params.get("atr_sl_smoothing", "WMA")
+                if sl_smoothing not in ("WMA", "RMA", "SMA", "EMA"):
+                    sl_smoothing = "RMA"
+                sl_mult = max(0.1, min(4.0, float(params.get("atr_sl_multiplier", 4.0))))
+                sl_on_wicks = params.get("atr_sl_on_wicks", False)
+                atr_sl = pd.Series(
+                    calculate_atr_smoothed(high_arr, low_arr, close_arr, period=sl_period, method=sl_smoothing),
+                    index=ohlcv.index,
+                )
+                result["atr_sl"] = atr_sl
+                result["atr_sl_mult"] = sl_mult
+                result["atr_sl_on_wicks"] = sl_on_wicks
+
+            if use_atr_tp:
+                tp_period = max(1, min(150, int(params.get("atr_tp_period", 150))))
+                tp_smoothing = params.get("atr_tp_smoothing", "WMA")
+                if tp_smoothing not in ("WMA", "RMA", "SMA", "EMA"):
+                    tp_smoothing = "RMA"
+                tp_mult = max(0.1, min(4.0, float(params.get("atr_tp_multiplier", 4.0))))
+                tp_on_wicks = params.get("atr_tp_on_wicks", False)
+                atr_tp = pd.Series(
+                    calculate_atr_smoothed(high_arr, low_arr, close_arr, period=tp_period, method=tp_smoothing),
+                    index=ohlcv.index,
+                )
+                result["atr_tp"] = atr_tp
+                result["atr_tp_mult"] = tp_mult
+                result["atr_tp_on_wicks"] = tp_on_wicks
 
         elif exit_type == "session_exit":
             # Exit at session end (specific hour)
@@ -1883,11 +2131,11 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         o = ohlcv["open"]
         h = ohlcv["high"]
-        l = ohlcv["low"]
+        low = ohlcv["low"]
         c = ohlcv["close"]
         body = abs(c - o)
         upper_wick = h - pd.concat([o, c], axis=1).max(axis=1)
-        lower_wick = pd.concat([o, c], axis=1).min(axis=1) - l
+        lower_wick = pd.concat([o, c], axis=1).min(axis=1) - low
 
         if pattern_type == "engulfing":
             # Bullish engulfing: prev red, current green, current body > prev body
@@ -1918,7 +2166,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         elif pattern_type == "doji":
             threshold = params.get("body_threshold", 0.1)
-            avg_range = (h - l).rolling(20).mean()
+            avg_range = (h - low).rolling(20).mean()
 
             doji = body < avg_range * threshold
             result["doji"] = doji.fillna(False)
@@ -1938,13 +2186,13 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         elif pattern_type == "inside_bar":
             # Current bar inside previous bar
-            inside = (h <= h.shift(1)) & (l >= l.shift(1))
+            inside = (h <= h.shift(1)) & (low >= low.shift(1))
             result["inside"] = inside.fillna(False)
             result["signal"] = inside.fillna(False)
 
         elif pattern_type == "outside_bar":
             # Current bar engulfs previous bar
-            outside = (h > h.shift(1)) & (l < l.shift(1))
+            outside = (h > h.shift(1)) & (low < low.shift(1))
             result["outside"] = outside.fillna(False)
             result["signal"] = outside.fillna(False)
 
@@ -1981,7 +2229,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif pattern_type == "doji_patterns":
             # Multiple doji types: standard, dragonfly, gravestone
             threshold = params.get("body_threshold", 0.1)
-            avg_range = (h - l).rolling(20).mean()
+            avg_range = (h - low).rolling(20).mean()
 
             small_body = body < avg_range * threshold
             # Dragonfly doji: small body at top, long lower wick
@@ -1992,6 +2240,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             standard_doji = small_body & ~dragonfly & ~gravestone
 
             result["doji"] = small_body.fillna(False)
+            result["standard_doji"] = standard_doji.fillna(False)
             result["dragonfly"] = dragonfly.fillna(False)
             result["gravestone"] = gravestone.fillna(False)
             result["bullish"] = dragonfly.fillna(False)  # Dragonfly is bullish
@@ -2029,7 +2278,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             tolerance = params.get("tolerance", 0.001)
 
             # Tweezer bottom: same lows, first red then green
-            same_low = abs(l - l.shift(1)) < (l * tolerance)
+            same_low = abs(low - low.shift(1)) < (low * tolerance)
             first_red = o.shift(1) > c.shift(1)
             second_green = c > o
             tweezer_bottom = same_low & first_red & second_green
@@ -2052,15 +2301,15 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Rising three methods: big green, 3 small reds inside, big green
             big_green_1 = green.shift(4) & (body.shift(4) > body.shift(4).rolling(10).mean())
             small_reds = red.shift(3) & red.shift(2) & red.shift(1)
-            contained = (l.shift(1) > l.shift(4)) & (h.shift(1) < h.shift(4))
+            contained = (low.shift(1) > low.shift(4)) & (h.shift(1) < h.shift(4))
             big_green_2 = green & (c > h.shift(4))
             rising_three = big_green_1 & small_reds & contained & big_green_2
 
             # Falling three methods: opposite
             big_red_1 = red.shift(4) & (body.shift(4) > body.shift(4).rolling(10).mean())
             small_greens = green.shift(3) & green.shift(2) & green.shift(1)
-            contained_fall = (h.shift(1) < h.shift(4)) & (l.shift(1) > l.shift(4))
-            big_red_2 = red & (c < l.shift(4))
+            contained_fall = (h.shift(1) < h.shift(4)) & (low.shift(1) > low.shift(4))
+            big_red_2 = red & (c < low.shift(4))
             falling_three = big_red_1 & small_greens & contained_fall & big_red_2
 
             result["bullish"] = rising_three.fillna(False)
@@ -2073,7 +2322,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Piercing line: red candle, then green opens below prev low, closes above midpoint
             prev_red = o.shift(1) > c.shift(1)
             curr_green = c > o
-            opens_below = o < l.shift(1)
+            opens_below = o < low.shift(1)
             closes_above_mid = c > (o.shift(1) + c.shift(1)) / 2
             piercing = prev_red & curr_green & opens_below & closes_above_mid
 
@@ -2463,14 +2712,57 @@ class StrategyBuilderAdapter(BaseStrategy):
             "dca_tp3_close_percent": 25.0,
             "dca_tp4_percent": 3.0,
             "dca_tp4_close_percent": 25.0,
+            # Manual Grid (custom orders)
+            "custom_orders": None,
+            "grid_trailing_percent": 0.0,
         }
 
         for block_id, block in self.blocks.items():
             category = block.get("category", "")
             block_type = block.get("type", "")
-            params = block.get("params", {})
+            params = block.get("params") or block.get("config") or {}
 
-            if category == "dca_grid":
+            # Support for Manual Grid (grid_orders) block from entry_refinement category
+            if category == "entry_refinement" and block_type == "grid_orders":
+                custom_orders = params.get("orders", [])
+                if custom_orders and len(custom_orders) > 0:
+                    dca_config["dca_enabled"] = True
+                    dca_config["custom_orders"] = custom_orders
+                    dca_config["dca_order_count"] = len(custom_orders)
+                    # Calculate total grid size from max offset
+                    max_offset = max(order.get("offset", 0) for order in custom_orders)
+                    dca_config["dca_grid_size_percent"] = max_offset
+                # Grid trailing
+                grid_trailing = params.get("grid_trailing", 0)
+                if grid_trailing > 0:
+                    dca_config["grid_trailing_percent"] = grid_trailing
+                    dca_config["grid_trailing"] = grid_trailing
+
+            # Support for unified 'dca' block from entry_refinement category (new format)
+            elif category == "entry_refinement" and block_type == "dca":
+                dca_config["dca_enabled"] = True
+                dca_config["dca_grid_size_percent"] = params.get("grid_size_percent", 15.0)
+                dca_config["dca_order_count"] = params.get("order_count", 5)
+                dca_config["dca_martingale_coef"] = params.get("martingale_coefficient", 1.0)
+                # Map log_steps_coefficient to dca_log_step_coef
+                log_coef = params.get("log_steps_coefficient", 1.0)
+                if log_coef != 1.0:
+                    dca_config["dca_log_step_enabled"] = True
+                    dca_config["dca_log_step_coef"] = log_coef
+                # Map first_order_offset to indent_order config
+                first_offset = params.get("first_order_offset", 0)
+                if first_offset > 0:
+                    dca_config["indent_order"] = {
+                        "enabled": True,
+                        "indent_percent": first_offset,
+                        "cancel_after_bars": 10,
+                    }
+                # grid_trailing - store for future use (not yet implemented in backend)
+                grid_trailing = params.get("grid_trailing", 0)
+                if grid_trailing > 0:
+                    dca_config["grid_trailing"] = grid_trailing
+
+            elif category == "dca_grid":
                 if block_type == "dca_grid_enable":
                     dca_config["dca_enabled"] = params.get("enabled", True)
                     dca_config["dca_direction"] = params.get("direction", "both")
@@ -2506,7 +2798,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         close_conditions: dict[str, Any] = {}
         for block_id, block in self.blocks.items():
             block_type = block.get("type", "")
-            params = block.get("params", {})
+            params = block.get("params") or block.get("config") or {}
             if block_type == "rsi_close":
                 close_conditions["rsi_close_enable"] = True
                 close_conditions["rsi_close_length"] = params.get("rsi_close_length", 14)
@@ -2564,7 +2856,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         indent_order: dict[str, Any] = {}
         for block_id, block in self.blocks.items():
             block_type = block.get("type", "")
-            params = block.get("params", {})
+            params = block.get("params") or block.get("config") or {}
             if block_type == "indent_order":
                 indent_order["enabled"] = params.get("indent_enable", True)
                 indent_order["indent_percent"] = params.get("indent_percent", 0.1)
@@ -2580,13 +2872,20 @@ class StrategyBuilderAdapter(BaseStrategy):
         Check if strategy contains any DCA grid blocks.
 
         Returns:
-            True if any block has category="dca_grid" and is enabled
+            True if any block has category="dca_grid" or is 'dca' type from entry_refinement
         """
         for block in self.blocks.values():
-            if block.get("category") == "dca_grid":
-                block_type = block.get("type", "")
+            category = block.get("category", "")
+            block_type = block.get("type", "")
+
+            # New format: 'dca' block from entry_refinement category
+            if category == "entry_refinement" and block_type == "dca":
+                return True
+
+            # Old format: dca_grid category
+            if category == "dca_grid":
                 if block_type == "dca_grid_enable":
-                    params = block.get("params", {})
+                    params = block.get("params") or block.get("config") or {}
                     if params.get("enabled", True):
                         return True
         return False
@@ -2610,8 +2909,9 @@ class StrategyBuilderAdapter(BaseStrategy):
             block = self.blocks[block_id]
             block_type = block.get("type")
 
-            # Skip main strategy node (it doesn't produce outputs)
-            if block_type == "strategy" or block.get("isMain"):
+            # Skip pure strategy node (they just aggregate signals, don't produce own outputs)
+            # But DO execute signal blocks (long_entry, short_entry, etc.) even if they are main
+            if block_type == "strategy":
                 continue
 
             # Execute block and cache outputs
@@ -2620,9 +2920,11 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # Find main strategy node and collect entry/exit signals
         main_node_id = None
+        main_node = None
         for block_id, block in self.blocks.items():
             if block.get("type") == "strategy" or block.get("isMain"):
                 main_node_id = block_id
+                main_node = block
                 break
 
         # Initialize signals
@@ -2633,7 +2935,35 @@ class StrategyBuilderAdapter(BaseStrategy):
         short_exits = pd.Series([False] * n, index=ohlcv.index)
 
         if main_node_id:
-            # Collect signals connected to main node
+            # Case 1: Main node is a signal block (long_entry, short_entry, etc.)
+            # Its outputs should directly map to signals
+            if main_node_id in self._value_cache:
+                main_outputs = self._value_cache[main_node_id]
+                main_type = main_node.get("type", "") if main_node else ""
+
+                # Map signal block outputs directly
+                if "entry_long" in main_outputs:
+                    entries = entries | main_outputs["entry_long"]
+                if "entry_short" in main_outputs:
+                    short_entries = short_entries | main_outputs["entry_short"]
+                if "exit_long" in main_outputs:
+                    exits = exits | main_outputs["exit_long"]
+                if "exit_short" in main_outputs:
+                    short_exits = short_exits | main_outputs["exit_short"]
+
+                # Also check for generic "signal" output based on block type
+                if "signal" in main_outputs:
+                    signal = main_outputs["signal"]
+                    if main_type in ["long_entry", "entry_long", "buy_signal"]:
+                        entries = entries | signal
+                    elif main_type in ["short_entry", "entry_short", "sell_signal"]:
+                        short_entries = short_entries | signal
+                    elif main_type in ["long_exit", "exit_long", "close_long"]:
+                        exits = exits | signal
+                    elif main_type in ["short_exit", "exit_short", "close_short"]:
+                        short_exits = short_exits | signal
+
+            # Case 2: Main node is a pure strategy aggregator - collect from connections
             for conn in self.connections:
                 target_id = self._get_connection_target_id(conn)
                 if target_id == main_node_id:
@@ -2647,6 +2977,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                             signal = source_outputs[source_port]
 
                             # Map to appropriate signal series
+                            # Support both old format (entry_long/entry_short) and new (entry/exit)
                             if target_port == "entry_long":
                                 entries = entries | signal
                             elif target_port == "exit_long":
@@ -2655,12 +2986,85 @@ class StrategyBuilderAdapter(BaseStrategy):
                                 short_entries = short_entries | signal
                             elif target_port == "exit_short":
                                 short_exits = short_exits | signal
+                            elif target_port == "entry":
+                                # Universal entry - applies to both long and short based on direction
+                                entries = entries | signal
+                                short_entries = short_entries | signal
+                            elif target_port == "exit":
+                                # Universal exit - applies to both long and short
+                                exits = exits | signal
+                                short_exits = short_exits | signal
+
+        # Fallback: If no main node found, look for signal blocks directly
+        if not main_node_id or (entries.sum() == 0 and short_entries.sum() == 0):
+            for block_id, block in self.blocks.items():
+                block_type = block.get("type", "")
+                category = block.get("category", "")
+
+                # Signal category blocks
+                if category == "signal" and block_id in self._value_cache:
+                    outputs = self._value_cache[block_id]
+
+                    if block_type in ["long_entry", "entry_long", "buy_signal"]:
+                        if "signal" in outputs:
+                            entries = entries | outputs["signal"]
+                        if "entry_long" in outputs:
+                            entries = entries | outputs["entry_long"]
+
+                    elif block_type in ["short_entry", "entry_short", "sell_signal"]:
+                        if "signal" in outputs:
+                            short_entries = short_entries | outputs["signal"]
+                        if "entry_short" in outputs:
+                            short_entries = short_entries | outputs["entry_short"]
+
+                    elif block_type in ["long_exit", "exit_long", "close_long"]:
+                        if "signal" in outputs:
+                            exits = exits | outputs["signal"]
+                        if "exit_long" in outputs:
+                            exits = exits | outputs["exit_long"]
+
+                    elif block_type in ["short_exit", "exit_short", "close_short"]:
+                        if "signal" in outputs:
+                            short_exits = short_exits | outputs["signal"]
+                        if "exit_short" in outputs:
+                            short_exits = short_exits | outputs["exit_short"]
+
+        # ========== Collect ATR exit data for engine ==========
+        extra_data: dict = {}
+        for block_id, block in self.blocks.items():
+            if block.get("type") == "atr_exit" and block_id in self._value_cache:
+                cached = self._value_cache[block_id]
+                if cached.get("use_atr_sl"):
+                    extra_data["use_atr_sl"] = True
+                    extra_data["atr_sl"] = cached["atr_sl"]  # pd.Series
+                    extra_data["atr_sl_mult"] = cached["atr_sl_mult"]
+                    extra_data["atr_sl_on_wicks"] = cached.get("atr_sl_on_wicks", False)
+                if cached.get("use_atr_tp"):
+                    extra_data["use_atr_tp"] = True
+                    extra_data["atr_tp"] = cached["atr_tp"]  # pd.Series
+                    extra_data["atr_tp_mult"] = cached["atr_tp_mult"]
+                    extra_data["atr_tp_on_wicks"] = cached.get("atr_tp_on_wicks", False)
+                break  # Only one atr_exit block expected
+
+        # ========== Collect trailing_stop_exit data for engine ==========
+        for block_id, block in self.blocks.items():
+            if block.get("type") == "trailing_stop_exit" and block_id in self._value_cache:
+                cached = self._value_cache[block_id]
+                activation = cached.get("trailing_activation_percent")
+                trail_dist = cached.get("trailing_percent")
+                if activation is not None and trail_dist is not None:
+                    extra_data["use_trailing_stop"] = True
+                    extra_data["trailing_activation_percent"] = float(activation)
+                    extra_data["trailing_percent"] = float(trail_dist)
+                    extra_data["trail_type"] = cached.get("trail_type", "percent")
+                break  # Only one trailing_stop_exit block expected
 
         return SignalResult(
             entries=entries,
             exits=exits,
             short_entries=short_entries,
             short_exits=short_exits,
+            extra_data=extra_data if extra_data else None,
         )
 
     @classmethod
@@ -2669,4 +3073,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         return {}
 
     def __repr__(self) -> str:
-        return f"StrategyBuilderAdapter(name='{self.name}', blocks={len(self.blocks)}, connections={len(self.connections)})"
+        return (
+            f"StrategyBuilderAdapter(name='{self.name}', "
+            f"blocks={len(self.blocks)}, connections={len(self.connections)})"
+        )

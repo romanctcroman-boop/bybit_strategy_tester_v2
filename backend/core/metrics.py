@@ -22,7 +22,6 @@ Usage:
 """
 
 import logging
-from typing import Optional
 
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -409,7 +408,7 @@ class MetricsCollector:
     # -------------------------------------------------------------------------
 
     def mcp_tool_call(
-        self, tool: str, success: bool, duration: Optional[float] = None
+        self, tool: str, success: bool, duration: float | None = None
     ) -> None:
         """Record MCP tool call."""
         try:
@@ -427,7 +426,7 @@ class MetricsCollector:
             logger.warning(f"Failed to record MCP tool error: {e}")
 
     def mcp_bridge_call(
-        self, tool: str, success: bool, duration: Optional[float] = None
+        self, tool: str, success: bool, duration: float | None = None
     ) -> None:
         """Record MCP bridge call."""
         try:
@@ -481,9 +480,9 @@ class MetricsCollector:
         strategy_id: str,
         health_score: float,
         strategy_name: str = "",
-        drawdown: Optional[float] = None,
-        win_rate: Optional[float] = None,
-        sharpe_ratio: Optional[float] = None,
+        drawdown: float | None = None,
+        win_rate: float | None = None,
+        sharpe_ratio: float | None = None,
     ) -> None:
         """Record strategy health metrics."""
         try:
@@ -668,7 +667,7 @@ class MetricsCollector:
 # SINGLETON INSTANCE
 # =============================================================================
 
-_metrics_instance: Optional[MetricsCollector] = None
+_metrics_instance: MetricsCollector | None = None
 
 
 def get_metrics() -> MetricsCollector:
@@ -702,8 +701,8 @@ class MetricsTimer:
         self.metric_type = metric_type
         self.success = success
         self.labels = labels
-        self.start_time: Optional[float] = None
-        self.duration: Optional[float] = None
+        self.start_time: float | None = None
+        self.duration: float | None = None
 
     def __enter__(self) -> "MetricsTimer":
         import time

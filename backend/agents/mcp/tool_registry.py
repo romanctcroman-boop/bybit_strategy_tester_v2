@@ -12,10 +12,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, get_type_hints
+from typing import Any, get_type_hints
 
 from loguru import logger
 
@@ -40,10 +41,10 @@ class ToolParameter:
     description: str = ""
     required: bool = True
     default: Any = None
-    enum: Optional[List[Any]] = None
-    items_type: Optional[ParameterType] = None  # For array types
+    enum: list[Any] | None = None
+    items_type: ParameterType | None = None  # For array types
 
-    def to_json_schema(self) -> Dict[str, Any]:
+    def to_json_schema(self) -> dict[str, Any]:
         """Convert to JSON Schema format"""
         schema = {"type": self.type.value}
 
@@ -68,11 +69,11 @@ class ToolResult:
 
     success: bool
     data: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     execution_time_ms: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "success": self.success,
@@ -91,7 +92,7 @@ class ToolUsageStats:
     successful_calls: int = 0
     failed_calls: int = 0
     total_execution_time_ms: float = 0.0
-    last_called: Optional[datetime] = None
+    last_called: datetime | None = None
 
     @property
     def average_execution_time_ms(self) -> float:
@@ -132,15 +133,15 @@ class Tool:
     name: str
     description: str
     handler: Callable
-    parameters: List[ToolParameter] = field(default_factory=list)
+    parameters: list[ToolParameter] = field(default_factory=list)
     permission: ToolPermission = ToolPermission.PUBLIC
     category: str = "general"
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     version: str = "1.0.0"
     deprecated: bool = False
     stats: ToolUsageStats = field(default_factory=ToolUsageStats)
 
-    def get_input_schema(self) -> Dict[str, Any]:
+    def get_input_schema(self) -> dict[str, Any]:
         """Get JSON Schema for tool input"""
         properties = {}
         required = []
@@ -160,7 +161,7 @@ class Tool:
 
         return schema
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "name": self.name,
@@ -199,7 +200,7 @@ class Tool:
             self.stats.total_calls += 1
             self.stats.successful_calls += 1
             self.stats.total_execution_time_ms += execution_time
-            self.stats.last_called = datetime.now(timezone.utc)
+            self.stats.last_called = datetime.now(UTC)
 
             return ToolResult(
                 success=True,
@@ -214,7 +215,7 @@ class Tool:
             self.stats.total_calls += 1
             self.stats.failed_calls += 1
             self.stats.total_execution_time_ms += execution_time
-            self.stats.last_called = datetime.now(timezone.utc)
+            self.stats.last_called = datetime.now(UTC)
 
             logger.error(f"Tool execution failed: {self.name} - {e}")
 
@@ -227,13 +228,13 @@ class Tool:
     @classmethod
     def from_function(
         cls,
-        func: Optional[Callable] = None,
+        func: Callable | None = None,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
         permission: ToolPermission = ToolPermission.PUBLIC,
         category: str = "general",
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
     ):
         """Create Tool from function with automatic schema generation"""
 
@@ -313,20 +314,20 @@ class ToolRegistry:
     """
 
     def __init__(self):
-        self.tools: Dict[str, Tool] = {}
-        self._categories: Dict[str, List[str]] = {}  # category -> tool names
+        self.tools: dict[str, Tool] = {}
+        self._categories: dict[str, list[str]] = {}  # category -> tool names
 
         logger.info("🔧 ToolRegistry initialized")
 
     def register(
         self,
-        func: Optional[Callable] = None,
+        func: Callable | None = None,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
         permission: ToolPermission = ToolPermission.PUBLIC,
         category: str = "general",
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
     ) -> Callable:
         """Register a tool"""
 
@@ -362,16 +363,16 @@ class ToolRegistry:
 
         logger.debug(f"🔧 Registered tool: {tool.name} [{tool.category}]")
 
-    def get_tool(self, name: str) -> Optional[Tool]:
+    def get_tool(self, name: str) -> Tool | None:
         """Get tool by name"""
         return self.tools.get(name)
 
     def list_tools(
         self,
-        category: Optional[str] = None,
-        permission: Optional[ToolPermission] = None,
+        category: str | None = None,
+        permission: ToolPermission | None = None,
         include_deprecated: bool = False,
-    ) -> List[Tool]:
+    ) -> list[Tool]:
         """List tools with optional filters"""
         tools = list(self.tools.values())
 
@@ -386,7 +387,7 @@ class ToolRegistry:
 
         return tools
 
-    def list_categories(self) -> List[str]:
+    def list_categories(self) -> list[str]:
         """List all categories"""
         return list(self._categories.keys())
 
@@ -409,7 +410,7 @@ class ToolRegistry:
 
         return await tool.execute(**kwargs)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get registry statistics"""
         total_calls = sum(t.stats.total_calls for t in self.tools.values())
         successful_calls = sum(t.stats.successful_calls for t in self.tools.values())
@@ -423,7 +424,7 @@ class ToolRegistry:
             "by_category": {cat: len(tools) for cat, tools in self._categories.items()},
         }
 
-    def export_schema(self) -> Dict[str, Any]:
+    def export_schema(self) -> dict[str, Any]:
         """Export all tools as OpenAPI schema"""
         return {
             "tools": [tool.to_dict() for tool in self.tools.values()],
@@ -433,7 +434,7 @@ class ToolRegistry:
 
 
 # Global registry instance
-_global_registry: Optional[ToolRegistry] = None
+_global_registry: ToolRegistry | None = None
 
 
 def get_tool_registry() -> ToolRegistry:
@@ -446,10 +447,10 @@ def get_tool_registry() -> ToolRegistry:
 
 # Convenience decorators
 def tool(
-    name: Optional[str] = None,
-    description: Optional[str] = None,
+    name: str | None = None,
+    description: str | None = None,
     category: str = "general",
-    tags: Optional[List[str]] = None,
+    tags: list[str] | None = None,
 ) -> Callable:
     """Decorator to register tool in global registry"""
     registry = get_tool_registry()
@@ -463,12 +464,12 @@ def tool(
 
 __all__ = [
     "ParameterType",
+    "Tool",
     "ToolParameter",
+    "ToolPermission",
+    "ToolRegistry",
     "ToolResult",
     "ToolUsageStats",
-    "ToolPermission",
-    "Tool",
-    "ToolRegistry",
     "get_tool_registry",
     "tool",
 ]

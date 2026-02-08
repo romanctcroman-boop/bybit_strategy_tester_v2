@@ -30,9 +30,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
 
@@ -67,10 +68,10 @@ class ParameterSpace:
 
     name: str
     param_type: str  # 'int', 'float', 'categorical'
-    low: Optional[float] = None
-    high: Optional[float] = None
-    choices: Optional[list[Any]] = None
-    step: Optional[float] = None
+    low: float | None = None
+    high: float | None = None
+    choices: list[Any] | None = None
+    step: float | None = None
     log_scale: bool = False
 
     def suggest(self, trial: Any) -> Any:
@@ -103,7 +104,7 @@ class OptimizationResult:
     duration_seconds: float
     algorithm: str
     objective: str
-    pareto_front: Optional[list[dict]] = None
+    pareto_front: list[dict] | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -139,7 +140,7 @@ class MLOptimizer:
         n_trials: int = 100,
         algorithm: str = "bayesian",
         n_jobs: int = 1,
-        timeout_seconds: Optional[int] = None,
+        timeout_seconds: int | None = None,
         seed: int = 42,
     ):
         """

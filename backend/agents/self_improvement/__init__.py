@@ -13,26 +13,26 @@ Based on 2025 research:
 - "Self-Refine: Iterative Refinement with Self-Feedback" (2023)
 """
 
-from backend.agents.self_improvement.rlhf_module import (
-    RLHFModule,
-    FeedbackSample,
-    PreferenceType,
-)
-from backend.agents.self_improvement.self_reflection import (
-    SelfReflectionEngine,
-    ReflectionResult,
-)
 from backend.agents.self_improvement.performance_evaluator import (
     PerformanceEvaluator,
     PerformanceMetrics,
 )
+from backend.agents.self_improvement.rlhf_module import (
+    FeedbackSample,
+    PreferenceType,
+    RLHFModule,
+)
+from backend.agents.self_improvement.self_reflection import (
+    ReflectionResult,
+    SelfReflectionEngine,
+)
 
 __all__ = [
-    "RLHFModule",
     "FeedbackSample",
-    "PreferenceType",
-    "SelfReflectionEngine",
-    "ReflectionResult",
     "PerformanceEvaluator",
     "PerformanceMetrics",
+    "PreferenceType",
+    "RLHFModule",
+    "ReflectionResult",
+    "SelfReflectionEngine",
 ]

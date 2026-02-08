@@ -3,7 +3,6 @@ Tests for Strategy Builder API
 Tests CRUD operations for visual block-based strategies.
 """
 
-from datetime import datetime, timezone
 
 import pytest
 from fastapi import FastAPI

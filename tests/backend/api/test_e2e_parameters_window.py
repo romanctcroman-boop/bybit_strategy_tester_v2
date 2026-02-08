@@ -5,22 +5,25 @@ E2E тесты окна «Параметры» Strategy Builder.
 корректно передаются в API бэктеста и сохранения стратегии.
 """
 
-import pathlib
 import sys
+from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
-project_root = pathlib.Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(project_root))
+# Ensure project root is on sys.path for reliable imports
+_project_root = str(Path(__file__).resolve().parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+from fastapi.testclient import TestClient
 
 from backend.api.app import app
 from backend.database import Base, get_db
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
@@ -112,6 +115,7 @@ class TestParametersFlowToBacktest:
     def test_end_date_clamped_to_today(self):
         """Frontend обрезает end_date до сегодня, если в будущем."""
         from datetime import date
+
         today = date.today().isoformat()
         # Simulate: user picks 2030-01-01, frontend sends min(end, today)
         end_future = "2030-01-01"

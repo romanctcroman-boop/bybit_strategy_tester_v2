@@ -21,7 +21,6 @@ Version: 2.4.0
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -60,7 +59,7 @@ class RegimeState:
     confidence: float  # 0-1
     start_bar: int
     duration: int  # bars in current regime
-    probabilities: Dict[MarketRegime, float] = field(default_factory=dict)
+    probabilities: dict[MarketRegime, float] = field(default_factory=dict)
 
     # Regime characteristics
     avg_return: float = 0.0
@@ -120,15 +119,15 @@ class RegimeOutput:
     """Output from regime detection."""
 
     regimes: NDArray  # Array of MarketRegime values per bar
-    regime_states: List[RegimeState]
-    transitions: List[RegimeTransition]
+    regime_states: list[RegimeState]
+    transitions: list[RegimeTransition]
     probabilities: NDArray  # Shape: (n_bars, n_regimes)
-    features_used: Dict[str, NDArray]
+    features_used: dict[str, NDArray]
 
     # Statistics
-    regime_counts: Dict[MarketRegime, int] = field(default_factory=dict)
-    avg_regime_duration: Dict[MarketRegime, float] = field(default_factory=dict)
-    transition_matrix: Optional[NDArray] = None
+    regime_counts: dict[MarketRegime, int] = field(default_factory=dict)
+    avg_regime_duration: dict[MarketRegime, float] = field(default_factory=dict)
+    transition_matrix: NDArray | None = None
 
 
 # =============================================================================
@@ -153,10 +152,10 @@ class RegimeFeatureEngine:
     def generate_features(
         self,
         close: NDArray,
-        high: Optional[NDArray] = None,
-        low: Optional[NDArray] = None,
-        volume: Optional[NDArray] = None,
-    ) -> Dict[str, NDArray]:
+        high: NDArray | None = None,
+        low: NDArray | None = None,
+        volume: NDArray | None = None,
+    ) -> dict[str, NDArray]:
         """Generate features for regime detection."""
         n = len(close)
         features = {}
@@ -359,10 +358,10 @@ class RuleBasedRegimeDetector:
     def detect(
         self,
         close: NDArray,
-        high: Optional[NDArray] = None,
-        low: Optional[NDArray] = None,
-        volume: Optional[NDArray] = None,
-    ) -> Tuple[NDArray, NDArray]:
+        high: NDArray | None = None,
+        low: NDArray | None = None,
+        volume: NDArray | None = None,
+    ) -> tuple[NDArray, NDArray]:
         """
         Detect regimes using rules.
 
@@ -498,16 +497,16 @@ class ClusteringRegimeDetector:
     def __init__(self, config: RegimeConfig):
         self.config = config
         self.feature_engine = RegimeFeatureEngine(config)
-        self.cluster_centers_: Optional[NDArray] = None
-        self.labels_: Optional[NDArray] = None
+        self.cluster_centers_: NDArray | None = None
+        self.labels_: NDArray | None = None
 
     def detect(
         self,
         close: NDArray,
-        high: Optional[NDArray] = None,
-        low: Optional[NDArray] = None,
-        volume: Optional[NDArray] = None,
-    ) -> Tuple[NDArray, NDArray]:
+        high: NDArray | None = None,
+        low: NDArray | None = None,
+        volume: NDArray | None = None,
+    ) -> tuple[NDArray, NDArray]:
         """Detect regimes using clustering."""
         features = self.feature_engine.generate_features(close, high, low, volume)
         n = len(close)
@@ -542,7 +541,7 @@ class ClusteringRegimeDetector:
 
     def _kmeans(
         self, X: NDArray, k: int, max_iter: int = 100
-    ) -> Tuple[NDArray, NDArray]:
+    ) -> tuple[NDArray, NDArray]:
         """Simple K-Means clustering."""
         n, d = X.shape
 
@@ -579,9 +578,9 @@ class ClusteringRegimeDetector:
         self,
         labels: NDArray,
         centers: NDArray,
-        features: Dict[str, NDArray],
+        features: dict[str, NDArray],
         n: int,
-    ) -> Tuple[NDArray, NDArray]:
+    ) -> tuple[NDArray, NDArray]:
         """Map cluster labels to market regimes."""
         k = len(centers)
 
@@ -676,9 +675,9 @@ class MLRegimeClassifier:
         self,
         close: NDArray,
         labels: NDArray,
-        high: Optional[NDArray] = None,
-        low: Optional[NDArray] = None,
-        volume: Optional[NDArray] = None,
+        high: NDArray | None = None,
+        low: NDArray | None = None,
+        volume: NDArray | None = None,
     ):
         """Train the classifier on labeled data."""
         features = self.feature_engine.generate_features(close, high, low, volume)
@@ -704,7 +703,7 @@ class MLRegimeClassifier:
 
     def _train_simple_forest(
         self, X: NDArray, y: NDArray, n_trees: int = 10
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Train a simple random forest."""
         trees = []
         n_samples = len(X)
@@ -721,7 +720,7 @@ class MLRegimeClassifier:
 
         return trees
 
-    def _train_decision_stump(self, X: NDArray, y: NDArray) -> Dict:
+    def _train_decision_stump(self, X: NDArray, y: NDArray) -> dict:
         """Train a simple decision stump."""
         n_features = X.shape[1]
         best_feature = 0
@@ -763,10 +762,10 @@ class MLRegimeClassifier:
     def predict(
         self,
         close: NDArray,
-        high: Optional[NDArray] = None,
-        low: Optional[NDArray] = None,
-        volume: Optional[NDArray] = None,
-    ) -> Tuple[NDArray, NDArray]:
+        high: NDArray | None = None,
+        low: NDArray | None = None,
+        volume: NDArray | None = None,
+    ) -> tuple[NDArray, NDArray]:
         """Predict regimes using trained model."""
         if not self._is_trained or self.model is None:
             # Fallback to rule-based
@@ -857,10 +856,10 @@ class EnsembleRegimeDetector:
     def detect(
         self,
         close: NDArray,
-        high: Optional[NDArray] = None,
-        low: Optional[NDArray] = None,
-        volume: Optional[NDArray] = None,
-    ) -> Tuple[NDArray, NDArray]:
+        high: NDArray | None = None,
+        low: NDArray | None = None,
+        volume: NDArray | None = None,
+    ) -> tuple[NDArray, NDArray]:
         """Detect regimes using ensemble of methods."""
         n = len(close)
         combined_probs = np.zeros((n, 5))
@@ -899,7 +898,7 @@ class RegimeDetector:
     Supports multiple detection methods and provides comprehensive output.
     """
 
-    def __init__(self, config: Optional[RegimeConfig] = None):
+    def __init__(self, config: RegimeConfig | None = None):
         self.config = config or RegimeConfig()
         self._init_detector()
 
@@ -919,9 +918,9 @@ class RegimeDetector:
     def detect(
         self,
         close: NDArray,
-        high: Optional[NDArray] = None,
-        low: Optional[NDArray] = None,
-        volume: Optional[NDArray] = None,
+        high: NDArray | None = None,
+        low: NDArray | None = None,
+        volume: NDArray | None = None,
     ) -> RegimeOutput:
         """
         Detect market regimes.
@@ -988,7 +987,7 @@ class RegimeDetector:
         regimes: NDArray,
         probs: NDArray,
         close: NDArray,
-    ) -> Tuple[List[RegimeState], List[RegimeTransition]]:
+    ) -> tuple[list[RegimeState], list[RegimeTransition]]:
         """Analyze regimes to create states and transitions."""
         states = []
         transitions = []
@@ -1053,7 +1052,7 @@ class RegimeDetector:
 
         return states, transitions
 
-    def _count_regimes(self, regimes: NDArray) -> Dict[MarketRegime, int]:
+    def _count_regimes(self, regimes: NDArray) -> dict[MarketRegime, int]:
         """Count regime occurrences."""
         counts = {}
         for regime in MarketRegime:
@@ -1061,10 +1060,10 @@ class RegimeDetector:
         return counts
 
     def _calculate_avg_duration(
-        self, states: List[RegimeState]
-    ) -> Dict[MarketRegime, float]:
+        self, states: list[RegimeState]
+    ) -> dict[MarketRegime, float]:
         """Calculate average duration per regime."""
-        durations: Dict[MarketRegime, List[int]] = {}
+        durations: dict[MarketRegime, list[int]] = {}
         for state in states:
             if state.regime not in durations:
                 durations[state.regime] = []
@@ -1076,7 +1075,7 @@ class RegimeDetector:
 
     def _calculate_transition_matrix(
         self,
-        transitions: List[RegimeTransition],
+        transitions: list[RegimeTransition],
     ) -> NDArray:
         """Calculate regime transition probability matrix."""
         n_regimes = 5
@@ -1104,9 +1103,9 @@ class RegimeDetector:
     def get_current_regime(
         self,
         close: NDArray,
-        high: Optional[NDArray] = None,
-        low: Optional[NDArray] = None,
-        volume: Optional[NDArray] = None,
+        high: NDArray | None = None,
+        low: NDArray | None = None,
+        volume: NDArray | None = None,
     ) -> RegimeState:
         """Get the current market regime."""
         output = self.detect(close, high, low, volume)
@@ -1124,10 +1123,10 @@ class RegimeDetector:
     def get_regime_filter(
         self,
         close: NDArray,
-        allowed_regimes: List[MarketRegime],
-        high: Optional[NDArray] = None,
-        low: Optional[NDArray] = None,
-        volume: Optional[NDArray] = None,
+        allowed_regimes: list[MarketRegime],
+        high: NDArray | None = None,
+        low: NDArray | None = None,
+        volume: NDArray | None = None,
     ) -> NDArray:
         """
         Get boolean filter for allowed regimes.

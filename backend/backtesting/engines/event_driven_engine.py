@@ -10,15 +10,13 @@ Event-Driven Backtest Engine — очередь событий, один код 
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
-
-from loguru import logger
-
 
 # =============================================================================
 # Events
@@ -140,7 +138,7 @@ class EventQueue:
         self._events.append(event)
         self._events.sort(key=lambda e: e.timestamp)
 
-    def pop(self) -> Optional[Event]:
+    def pop(self) -> Event | None:
         """Извлечь следующее событие."""
         if not self._events:
             return None
@@ -148,7 +146,7 @@ class EventQueue:
         self._current_time = event.timestamp
         return event
 
-    def peek(self) -> Optional[Event]:
+    def peek(self) -> Event | None:
         """Посмотреть следующее без извлечения."""
         return self._events[0] if self._events else None
 
@@ -196,7 +194,7 @@ class SimulationExecutionHandler(ExecutionHandler):
     Realistic execution simulation: latency, slippage, partial fills, rejections.
     """
 
-    def __init__(self, config: Optional[SimulationConfig] = None):
+    def __init__(self, config: SimulationConfig | None = None):
         self.config = config or SimulationConfig()
         self._order_counter = 0
 
@@ -279,8 +277,8 @@ class EventDrivenEngine:
     def __init__(
         self,
         initial_capital: float = 10000.0,
-        on_bar: Optional[Callable[[BarEvent], list[OrderEvent]]] = None,
-        execution_handler: Optional[ExecutionHandler] = None,
+        on_bar: Callable[[BarEvent], list[OrderEvent]] | None = None,
+        execution_handler: ExecutionHandler | None = None,
     ):
         self.initial_capital = initial_capital
         self.on_bar = on_bar or (lambda e: [])
@@ -288,7 +286,7 @@ class EventDrivenEngine:
         self.queue = EventQueue()
         self.equity: float = initial_capital
         self.trades: list[dict[str, Any]] = []
-        self._bars_df: Optional[pd.DataFrame] = None
+        self._bars_df: pd.DataFrame | None = None
         self._bar_index: int = 0
 
     def load_bars(self, df: pd.DataFrame, timestamp_col: str = "open_time") -> None:
@@ -412,7 +410,6 @@ def create_on_bar_from_adapter(
     Pre-computes signals via adapter.generate_signals(df), then for each bar
     emits OrderEvents when entry/exit signals trigger.
     """
-    from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
 
     result = adapter.generate_signals(df)
     entries = result.entries if hasattr(result.entries, "values") else pd.Series()
@@ -487,7 +484,7 @@ def run_event_driven_with_adapter(
     initial_capital: float = 10000.0,
     symbol: str = "BTCUSDT",
     timestamp_col: str = "open_time",
-    execution_config: Optional[SimulationConfig] = None,
+    execution_config: SimulationConfig | None = None,
 ) -> dict[str, Any]:
     """
     Run event-driven backtest using StrategyBuilderAdapter.
@@ -498,7 +495,6 @@ def run_event_driven_with_adapter(
     Returns:
         dict with final_equity, total_return, trades, bar_count
     """
-    from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
 
     on_bar = create_on_bar_from_adapter(adapter, df, symbol=symbol)
     handler = (

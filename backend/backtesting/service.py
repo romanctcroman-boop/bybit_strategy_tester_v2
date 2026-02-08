@@ -6,7 +6,6 @@ Integrates BacktestEngine with Market Data sources (BybitAdapter, Cache, Local D
 
 import time
 from datetime import datetime
-from typing import Optional
 
 import pandas as pd
 from loguru import logger
@@ -33,9 +32,9 @@ class BacktestService:
     - Caching and retrieving results
     """
 
-    def __init__(self, engine: Optional[BacktestEngine] = None):
+    def __init__(self, engine: BacktestEngine | None = None):
         self.engine = engine or get_engine()
-        self._adapter: Optional[BybitAdapter] = None
+        self._adapter: BybitAdapter | None = None
 
     @property
     def adapter(self) -> BybitAdapter:
@@ -160,7 +159,7 @@ class BacktestService:
         start_date: datetime,
         end_date: datetime,
         market_type: str = "linear",
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """
         Fetch historical OHLCV data, prioritizing local database.
 
@@ -314,7 +313,7 @@ class BacktestService:
             logger.error(f"Failed to fetch historical data: {e}")
             raise
 
-    def get_result(self, backtest_id: str) -> Optional[BacktestResult]:
+    def get_result(self, backtest_id: str) -> BacktestResult | None:
         """Get cached backtest result by ID"""
         return self.engine.get_result(backtest_id)
 
@@ -325,7 +324,7 @@ class BacktestService:
 
 
 # Global service instance
-_service: Optional[BacktestService] = None
+_service: BacktestService | None = None
 
 
 def get_backtest_service() -> BacktestService:

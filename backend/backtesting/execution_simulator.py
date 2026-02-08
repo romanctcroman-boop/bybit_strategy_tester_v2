@@ -16,9 +16,8 @@ Usage:
     fill = sim.simulate_fill(order_price=50000.0, side="buy", size=0.1)
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 import numpy as np
 
@@ -41,7 +40,7 @@ class FillResult:
     fill_size: float  # Actual filled size (may be partial)
     slippage_bps: float
     latency_ms: float
-    rejected_reason: Optional[str] = None
+    rejected_reason: str | None = None
 
 
 class ExecutionSimulator:
@@ -66,7 +65,7 @@ class ExecutionSimulator:
         partial_fill_probability: float = 0.8,
         min_fill_ratio: float = 0.1,
         rejection_probability: float = 0.01,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ):
         self.latency_ms = latency_ms
         self.slippage_bps = slippage_bps

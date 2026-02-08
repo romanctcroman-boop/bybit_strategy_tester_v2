@@ -7,9 +7,9 @@ Self-Learning Signal Service
 import json
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +29,16 @@ class PerformanceSnapshot:
     success_rate: float
 
     # Model metrics
-    model_accuracy: Optional[float] = None
-    concept_drift_score: Optional[float] = None
-    confidence_scores: Dict[str, float] = field(default_factory=dict)
+    model_accuracy: float | None = None
+    concept_drift_score: float | None = None
+    confidence_scores: dict[str, float] = field(default_factory=dict)
 
     # Resource metrics
-    cpu_usage: Optional[float] = None
-    memory_mb: Optional[float] = None
+    cpu_usage: float | None = None
+    memory_mb: float | None = None
 
     # Metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -68,8 +68,8 @@ class SelfLearningSignalPublisher:
 
     def __init__(
         self,
-        output_dir: Optional[Path] = None,
-        redis_url: Optional[str] = None,
+        output_dir: Path | None = None,
+        redis_url: str | None = None,
         drift_threshold: float = 0.15,
         error_rate_threshold: float = 0.05,
         latency_threshold_ms: float = 120.0,
@@ -94,19 +94,19 @@ class SelfLearningSignalPublisher:
         self.latency_threshold_ms = latency_threshold_ms
 
         # In-memory storage для baseline
-        self.baseline_metrics: Dict[str, float] = {}
-        self.recent_snapshots: List[PerformanceSnapshot] = []
+        self.baseline_metrics: dict[str, float] = {}
+        self.recent_snapshots: list[PerformanceSnapshot] = []
         self.max_recent_snapshots = 100
 
         # Alerts
-        self.alerts: List[DriftAlert] = []
+        self.alerts: list[DriftAlert] = []
 
         logger.info(
             f"✅ SelfLearningSignalPublisher initialized "
             f"(drift_threshold={drift_threshold}, output_dir={self.output_dir})"
         )
 
-    async def publish_snapshot(self, snapshot: Dict[str, Any]) -> None:
+    async def publish_snapshot(self, snapshot: dict[str, Any]) -> None:
         """
         Публикует performance snapshot
 
@@ -143,10 +143,10 @@ class SelfLearningSignalPublisher:
         except Exception as e:
             logger.error(f"Failed to publish snapshot: {e}", exc_info=True)
 
-    def _dict_to_snapshot(self, data: Dict[str, Any]) -> PerformanceSnapshot:
+    def _dict_to_snapshot(self, data: dict[str, Any]) -> PerformanceSnapshot:
         """Конвертирует словарь в PerformanceSnapshot"""
         return PerformanceSnapshot(
-            timestamp=data.get("timestamp", datetime.now(timezone.utc).isoformat()),
+            timestamp=data.get("timestamp", datetime.now(UTC).isoformat()),
             tournament_id=data.get("tournament_id", "unknown"),
             phase=data.get("phase", "unknown"),
             latency_ms=float(data.get("latency_ms", 0.0)),
@@ -165,7 +165,7 @@ class SelfLearningSignalPublisher:
         """Сохраняет snapshot в JSON файл"""
         try:
             # Имя файла: snapshots_YYYY-MM-DD.jsonl
-            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            date_str = datetime.now(UTC).strftime("%Y-%m-%d")
             file_path = self.output_dir / f"snapshots_{date_str}.jsonl"
 
             # Append to JSONL file
@@ -207,7 +207,7 @@ class SelfLearningSignalPublisher:
             # Non-critical - just log and continue
             logger.debug(f"Redis pub/sub not available: {e}")
 
-    async def _analyze_drift(self, snapshot: PerformanceSnapshot) -> List[DriftAlert]:
+    async def _analyze_drift(self, snapshot: PerformanceSnapshot) -> list[DriftAlert]:
         """
         Анализирует snapshot на наличие drift и performance issues
 
@@ -283,7 +283,7 @@ class SelfLearningSignalPublisher:
         }
         logger.info(f"📊 Baseline metrics updated: {self.baseline_metrics}")
 
-    async def _handle_alerts(self, alerts: List[DriftAlert]) -> None:
+    async def _handle_alerts(self, alerts: list[DriftAlert]) -> None:
         """Обрабатывает алерты (логирование, сохранение)"""
         self.alerts.extend(alerts)
 
@@ -305,7 +305,7 @@ class SelfLearningSignalPublisher:
     async def _save_alert_to_file(self, alert: DriftAlert) -> None:
         """Сохраняет alert в файл"""
         try:
-            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            date_str = datetime.now(UTC).strftime("%Y-%m-%d")
             file_path = self.output_dir / f"alerts_{date_str}.jsonl"
 
             alert_dict = asdict(alert)
@@ -315,12 +315,12 @@ class SelfLearningSignalPublisher:
         except Exception as e:
             logger.warning(f"Failed to save alert to file: {e}")
 
-    def get_recent_snapshots(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_snapshots(self, limit: int = 10) -> list[dict[str, Any]]:
         """Возвращает последние N snapshots"""
         recent = self.recent_snapshots[-limit:]
         return [asdict(s) for s in recent]
 
-    def get_alerts(self, severity: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_alerts(self, severity: str | None = None) -> list[dict[str, Any]]:
         """
         Возвращает алерты
 
@@ -334,11 +334,11 @@ class SelfLearningSignalPublisher:
 
         return [asdict(a) for a in filtered]
 
-    def get_baseline_metrics(self) -> Dict[str, float]:
+    def get_baseline_metrics(self) -> dict[str, float]:
         """Возвращает baseline метрики"""
         return self.baseline_metrics.copy()
 
-    async def trigger_retraining(self, reason: str) -> Dict[str, Any]:
+    async def trigger_retraining(self, reason: str) -> dict[str, Any]:
         """
         Триггерит автоматическое переобучение модели
 
@@ -352,7 +352,7 @@ class SelfLearningSignalPublisher:
 
         # Save retraining trigger
         trigger_data = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "reason": reason,
             "baseline_metrics": self.baseline_metrics,
             "recent_drift_alerts": [
@@ -372,7 +372,7 @@ class SelfLearningSignalPublisher:
 
 
 # Singleton instance
-_publisher_instance: Optional[SelfLearningSignalPublisher] = None
+_publisher_instance: SelfLearningSignalPublisher | None = None
 
 
 def get_self_learning_publisher() -> SelfLearningSignalPublisher:
@@ -384,8 +384,8 @@ def get_self_learning_publisher() -> SelfLearningSignalPublisher:
 
 
 __all__ = [
-    "SelfLearningSignalPublisher",
-    "PerformanceSnapshot",
     "DriftAlert",
+    "PerformanceSnapshot",
+    "SelfLearningSignalPublisher",
     "get_self_learning_publisher",
 ]

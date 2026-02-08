@@ -29,8 +29,9 @@ Usage:
 """
 
 import logging
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Callable, Optional, TypeVar
+from typing import TypeVar
 
 from sqlalchemy.orm import Session
 
@@ -57,7 +58,7 @@ class UnitOfWork:
 
     def __init__(
         self,
-        session_factory: Optional[Callable[[], Session]] = None,
+        session_factory: Callable[[], Session] | None = None,
     ):
         """
         Initialize Unit of Work.
@@ -67,7 +68,7 @@ class UnitOfWork:
                            Defaults to SessionLocal from backend.database
         """
         self.session_factory = session_factory or SessionLocal
-        self.session: Optional[Session] = None
+        self.session: Session | None = None
         self._is_nested = False
 
     def __enter__(self) -> "UnitOfWork":
@@ -178,7 +179,7 @@ class UnitOfWork:
 
 
 @contextmanager
-def unit_of_work(session_factory: Optional[Callable[[], Session]] = None):
+def unit_of_work(session_factory: Callable[[], Session] | None = None):
     """
     Functional context manager for Unit of Work.
 

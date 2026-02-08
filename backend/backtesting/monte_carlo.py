@@ -30,7 +30,6 @@ Example Usage:
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -62,16 +61,16 @@ class MonteCarloResult:
     mean_final_equity: float
     median_final_equity: float
     std_final_equity: float
-    equity_ci_90: Tuple[float, float] = (0.0, 0.0)
-    equity_ci_95: Tuple[float, float] = (0.0, 0.0)
-    equity_ci_99: Tuple[float, float] = (0.0, 0.0)
+    equity_ci_90: tuple[float, float] = (0.0, 0.0)
+    equity_ci_95: tuple[float, float] = (0.0, 0.0)
+    equity_ci_99: tuple[float, float] = (0.0, 0.0)
 
     # Drawdown statistics
     mean_max_drawdown: float = 0.0
     median_max_drawdown: float = 0.0
     worst_drawdown: float = 0.0  # Worst across all simulations
-    drawdown_ci_95: Tuple[float, float] = (0.0, 0.0)
-    drawdown_ci_99: Tuple[float, float] = (0.0, 0.0)
+    drawdown_ci_95: tuple[float, float] = (0.0, 0.0)
+    drawdown_ci_99: tuple[float, float] = (0.0, 0.0)
 
     # Risk metrics
     probability_of_ruin: float = 0.0  # P(equity < ruin_threshold)
@@ -81,15 +80,15 @@ class MonteCarloResult:
 
     # Sharpe distribution
     mean_sharpe: float = 0.0
-    sharpe_ci_95: Tuple[float, float] = (0.0, 0.0)
+    sharpe_ci_95: tuple[float, float] = (0.0, 0.0)
 
     # Percentiles
-    equity_percentiles: Dict[int, float] = field(default_factory=dict)
-    drawdown_percentiles: Dict[int, float] = field(default_factory=dict)
+    equity_percentiles: dict[int, float] = field(default_factory=dict)
+    drawdown_percentiles: dict[int, float] = field(default_factory=dict)
 
     # Raw simulation data (optional)
-    all_final_equities: Optional[np.ndarray] = None
-    all_max_drawdowns: Optional[np.ndarray] = None
+    all_final_equities: np.ndarray | None = None
+    all_max_drawdowns: np.ndarray | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -133,8 +132,8 @@ class MonteCarloSimulator:
 
     def __init__(
         self,
-        trades: Optional[List[dict]] = None,
-        pnl_values: Optional[np.ndarray] = None,
+        trades: list[dict] | None = None,
+        pnl_values: np.ndarray | None = None,
         initial_capital: float = 10000.0,
         ruin_threshold: float = 0.5,  # 50% of initial capital
     ):
@@ -169,8 +168,8 @@ class MonteCarloSimulator:
         n_simulations: int = 10000,
         method: SimulationMethod = SimulationMethod.TRADE_SHUFFLE,
         block_size: int = 5,
-        confidence_levels: List[float] = None,
-        seed: Optional[int] = None,
+        confidence_levels: list[float] = None,
+        seed: int | None = None,
         store_raw: bool = False,
     ) -> MonteCarloResult:
         """
@@ -250,7 +249,7 @@ class MonteCarloSimulator:
 
     def _simulate_shuffle(
         self, n_simulations: int
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Simulate by shuffling trade order."""
         final_equities = np.zeros(n_simulations)
         max_drawdowns = np.zeros(n_simulations)
@@ -277,7 +276,7 @@ class MonteCarloSimulator:
 
     def _simulate_bootstrap(
         self, n_simulations: int
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Simulate by sampling with replacement."""
         final_equities = np.zeros(n_simulations)
         max_drawdowns = np.zeros(n_simulations)
@@ -300,7 +299,7 @@ class MonteCarloSimulator:
 
     def _simulate_block_bootstrap(
         self, n_simulations: int, block_size: int
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Simulate using block bootstrap to preserve some serial correlation."""
         final_equities = np.zeros(n_simulations)
         max_drawdowns = np.zeros(n_simulations)
@@ -335,7 +334,7 @@ class MonteCarloSimulator:
 
     def _simulate_parametric(
         self, n_simulations: int
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Simulate assuming normal distribution of returns."""
         final_equities = np.zeros(n_simulations)
         max_drawdowns = np.zeros(n_simulations)
@@ -364,7 +363,7 @@ class MonteCarloSimulator:
         n_simulations: int,
         miss_fill_prob: float = 0.05,
         slippage_pct: float = 0.001,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Stress test: random missed fills + slippage on PnL.
         Simulates real-world execution friction.
@@ -397,7 +396,7 @@ class MonteCarloSimulator:
         self,
         n_simulations: int,
         noise_std: float = 0.15,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Add Gaussian noise to PnL to detect curve-fitting.
         Simulates 'what if prices had been slightly different'.
@@ -441,7 +440,7 @@ class MonteCarloSimulator:
         sharpes: np.ndarray,
         n_simulations: int,
         method: SimulationMethod,
-        confidence_levels: List[float],
+        confidence_levels: list[float],
         store_raw: bool,
     ) -> MonteCarloResult:
         """Calculate comprehensive statistics from simulation results."""
@@ -505,7 +504,7 @@ class MonteCarloSimulator:
 
     def _percentile_ci(
         self, values: np.ndarray, confidence: float
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Calculate confidence interval using percentiles."""
         lower_pct = (1 - confidence) / 2 * 100
         upper_pct = (1 + confidence) / 2 * 100
@@ -532,7 +531,7 @@ class MonteCarloSimulator:
         n_simulations: int = 1000,
         confidence_level: float = 0.95,
         method: SimulationMethod = SimulationMethod.TRADE_SHUFFLE,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         """
         Generate confidence bands for equity curve visualization.
 
@@ -581,11 +580,11 @@ class MonteCarloSimulator:
 
 
 def run_monte_carlo_analysis(
-    trades: List[dict],
+    trades: list[dict],
     initial_capital: float = 10000.0,
     n_simulations: int = 10000,
-    methods: Optional[List[SimulationMethod]] = None,
-) -> Dict[str, MonteCarloResult]:
+    methods: list[SimulationMethod] | None = None,
+) -> dict[str, MonteCarloResult]:
     """
     Run comprehensive Monte Carlo analysis with multiple methods.
 

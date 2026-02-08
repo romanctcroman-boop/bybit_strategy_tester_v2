@@ -11,9 +11,8 @@ SPOT and LINEAR (perpetual) market data. This enables:
 3. Better data organization
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers
 revision = "20260121_market_type"

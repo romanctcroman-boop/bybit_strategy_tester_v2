@@ -19,7 +19,6 @@ Use cases:
 
 import secrets
 from dataclasses import dataclass
-from typing import List, Tuple
 
 
 class GF256:
@@ -94,7 +93,7 @@ class GF256:
 GF256._init()
 
 
-def _eval_poly(coeffs: List[int], x: int) -> int:
+def _eval_poly(coeffs: list[int], x: int) -> int:
     """
     Evaluate polynomial at x in GF(256).
 
@@ -112,7 +111,7 @@ def _eval_poly(coeffs: List[int], x: int) -> int:
     return result
 
 
-def _interpolate(points: List[Tuple[int, int]], x: int) -> int:
+def _interpolate(points: list[tuple[int, int]], x: int) -> int:
     """
     Lagrange interpolation at point x in GF(256).
 
@@ -207,7 +206,7 @@ class ShamirSecretSharing:
 
     def split(
         self, secret: bytes, threshold: int, num_shares: int
-    ) -> List[SecretShare]:
+    ) -> list[SecretShare]:
         """
         Split a secret into shares using Shamir's scheme.
 
@@ -231,7 +230,7 @@ class ShamirSecretSharing:
         if not secret:
             raise ValueError("Secret cannot be empty")
 
-        shares_data: List[bytearray] = [bytearray() for _ in range(num_shares)]
+        shares_data: list[bytearray] = [bytearray() for _ in range(num_shares)]
 
         # Process each byte of the secret
         for byte in secret:
@@ -258,7 +257,7 @@ class ShamirSecretSharing:
             for i in range(num_shares)
         ]
 
-    def combine(self, shares: List[SecretShare]) -> bytes:
+    def combine(self, shares: list[SecretShare]) -> bytes:
         """
         Reconstruct the secret from shares.
 
@@ -307,7 +306,7 @@ class ShamirSecretSharing:
 
         return bytes(result)
 
-    def verify_share(self, share: SecretShare, other_shares: List[SecretShare]) -> bool:
+    def verify_share(self, share: SecretShare, other_shares: list[SecretShare]) -> bool:
         """
         Verify a share is consistent with others.
 
@@ -341,7 +340,7 @@ class ShamirSecretSharing:
         return secrets.token_bytes(length)
 
 
-def split_key(key: bytes, threshold: int = 3, num_shares: int = 5) -> List[str]:
+def split_key(key: bytes, threshold: int = 3, num_shares: int = 5) -> list[str]:
     """
     Convenience function to split a key.
 
@@ -358,7 +357,7 @@ def split_key(key: bytes, threshold: int = 3, num_shares: int = 5) -> List[str]:
     return [s.to_hex() for s in shares]
 
 
-def combine_key(share_strings: List[str]) -> bytes:
+def combine_key(share_strings: list[str]) -> bytes:
     """
     Convenience function to combine shares.
 
@@ -374,9 +373,9 @@ def combine_key(share_strings: List[str]) -> bytes:
 
 
 __all__ = [
-    "ShamirSecretSharing",
-    "SecretShare",
-    "split_key",
-    "combine_key",
     "GF256",
+    "SecretShare",
+    "ShamirSecretSharing",
+    "combine_key",
+    "split_key",
 ]

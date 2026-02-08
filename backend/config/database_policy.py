@@ -11,7 +11,7 @@ Policy:
 - Sliding window: when data exceeds limit, oldest month is trimmed
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # =============================================================================
 # DATA RETENTION POLICY CONSTANTS
@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 # Minimum start date for all historical data
 # No data before this date will be stored in the database
-DATA_START_DATE = datetime(2025, 1, 1, tzinfo=timezone.utc)
+DATA_START_DATE = datetime(2025, 1, 1, tzinfo=UTC)
 
 # Data start timestamp in milliseconds (for DB queries)
 DATA_START_TIMESTAMP_MS = int(DATA_START_DATE.timestamp() * 1000)

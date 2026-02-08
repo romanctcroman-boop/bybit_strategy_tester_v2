@@ -16,7 +16,7 @@ import logging
 import secrets
 import sys
 from contextlib import contextmanager
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class SecureString:
         del secret            # Or let destructor handle it
     """
 
-    __slots__ = ("_data", "_size", "_locked", "_cleared")
+    __slots__ = ("_cleared", "_data", "_locked", "_size")
 
     def __init__(self, value: str):
         """
@@ -330,7 +330,7 @@ def secure_compare(a: str | bytes, b: str | bytes) -> bool:
     return secrets.compare_digest(a, b)
 
 
-def secure_random_string(length: int = 32, alphabet: Optional[str] = None) -> str:
+def secure_random_string(length: int = 32, alphabet: str | None = None) -> str:
     """
     Generate a cryptographically secure random string.
 
@@ -368,11 +368,11 @@ def wipe_string_from_memory(s: str) -> None:
 
 
 __all__ = [
-    "SecureString",
+    "MLOCK_AVAILABLE",
     "MemoryGuard",
-    "secure_operation",
+    "SecureString",
     "secure_compare",
+    "secure_operation",
     "secure_random_string",
     "wipe_string_from_memory",
-    "MLOCK_AVAILABLE",
 ]

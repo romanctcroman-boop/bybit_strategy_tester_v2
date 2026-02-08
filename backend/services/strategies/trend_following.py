@@ -9,7 +9,6 @@ Strategies that identify and follow market trends:
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
 
 from backend.services.live_trading.strategy_runner import (
     SignalType,
@@ -155,11 +154,11 @@ class EMACrossoverStrategy(LibraryStrategy):
         super().__init__(config, **params)
 
         # State tracking
-        self._prev_fast_ema: Optional[float] = None
-        self._prev_slow_ema: Optional[float] = None
+        self._prev_fast_ema: float | None = None
+        self._prev_slow_ema: float | None = None
         self._in_position: str = ""  # "long", "short", or ""
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate crossover signals."""
         # Add candle to history
         self.add_candle(candle)
@@ -402,12 +401,12 @@ class MACDTrendStrategy(LibraryStrategy):
         super().__init__(config, **params)
 
         # State tracking
-        self._prev_macd: Optional[float] = None
-        self._prev_signal: Optional[float] = None
-        self._prev_histogram: Optional[float] = None
+        self._prev_macd: float | None = None
+        self._prev_signal: float | None = None
+        self._prev_histogram: float | None = None
 
         # MACD history for proper calculation
-        self._macd_values: List[float] = []
+        self._macd_values: list[float] = []
 
     def _calculate_macd_proper(
         self, fast: int, slow: int, signal_period: int
@@ -440,7 +439,7 @@ class MACDTrendStrategy(LibraryStrategy):
 
         return (macd_line, signal_line, histogram)
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate MACD signals."""
         self.add_candle(candle)
 
@@ -673,9 +672,9 @@ class TripleEMAStrategy(LibraryStrategy):
         super().__init__(config, **params)
 
         # State tracking
-        self._prev_aligned: Optional[str] = None  # "bullish", "bearish", None
+        self._prev_aligned: str | None = None  # "bullish", "bearish", None
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate signals on EMA alignment."""
         self.add_candle(candle)
 

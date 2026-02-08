@@ -15,7 +15,7 @@ Universal Math Engine Core - Главный оркестратор всех мо
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -35,7 +35,6 @@ from backend.backtesting.universal_engine.risk_manager import (
     UniversalRiskManager,
 )
 from backend.backtesting.universal_engine.signal_generator import (
-    SignalOutput,
     UniversalSignalGenerator,
 )
 from backend.backtesting.universal_engine.trade_executor import (
@@ -104,7 +103,7 @@ class EngineMetrics:
     payoff_ratio: float = 0.0
     recovery_factor: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "net_profit": round(self.net_profit, 2),
@@ -129,7 +128,7 @@ class EngineOutput:
     """Output from Universal Math Engine."""
 
     metrics: EngineMetrics = field(default_factory=EngineMetrics)
-    trades: List[TradeRecord] = field(default_factory=list)
+    trades: list[TradeRecord] = field(default_factory=list)
     equity_curve: np.ndarray = field(default_factory=lambda: np.array([]))
     timestamps: np.ndarray = field(default_factory=lambda: np.array([]))
 
@@ -140,12 +139,12 @@ class EngineOutput:
 
     # Validation
     is_valid: bool = True
-    validation_errors: List[str] = field(default_factory=list)
+    validation_errors: list[str] = field(default_factory=list)
 
     # Debug info
     signals_generated: int = 0
     signals_filtered: int = 0
-    filter_stats: Dict = field(default_factory=dict)
+    filter_stats: dict = field(default_factory=dict)
 
 
 class UniversalMathEngine:
@@ -173,9 +172,9 @@ class UniversalMathEngine:
         self.filter_engine = UniversalFilterEngine(use_numba=use_numba)
 
         # These are created per-run with specific config
-        self.position_manager: Optional[UniversalPositionManager] = None
-        self.trade_executor: Optional[UniversalTradeExecutor] = None
-        self.risk_manager: Optional[UniversalRiskManager] = None
+        self.position_manager: UniversalPositionManager | None = None
+        self.trade_executor: UniversalTradeExecutor | None = None
+        self.risk_manager: UniversalRiskManager | None = None
 
         logger.info("UniversalMathEngine initialized")
 
@@ -183,7 +182,7 @@ class UniversalMathEngine:
         self,
         candles: pd.DataFrame,
         strategy_type: str,
-        strategy_params: Dict[str, Any],
+        strategy_params: dict[str, Any],
         initial_capital: float = 10000.0,
         direction: str = "both",
         stop_loss: float = 0.02,
@@ -193,10 +192,10 @@ class UniversalMathEngine:
         taker_fee: float = 0.001,
         slippage: float = 0.0005,
         # Advanced options
-        filter_config: Optional[FilterConfig] = None,
-        position_config: Optional[PositionConfig] = None,
-        executor_config: Optional[ExecutorConfig] = None,
-        risk_config: Optional[RiskConfig] = None,
+        filter_config: FilterConfig | None = None,
+        position_config: PositionConfig | None = None,
+        executor_config: ExecutorConfig | None = None,
+        risk_config: RiskConfig | None = None,
     ) -> EngineOutput:
         """
         Run backtest with all features.
@@ -493,7 +492,7 @@ class UniversalMathEngine:
         )
 
     def _calculate_metrics(
-        self, trades: List[TradeRecord], equity: np.ndarray, initial_capital: float
+        self, trades: list[TradeRecord], equity: np.ndarray, initial_capital: float
     ) -> EngineMetrics:
         """Calculate all metrics from trades and equity curve."""
         metrics = EngineMetrics()

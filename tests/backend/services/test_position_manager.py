@@ -1,6 +1,4 @@
 """Tests for PositionManager (AUDIT_PROJECT_EXTENDED)."""
-import pytest
-from datetime import datetime, timezone
 
 from backend.services.live_trading.position_manager import (
     PositionMode,

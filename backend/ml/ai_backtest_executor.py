@@ -13,8 +13,8 @@ Features:
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime
+from typing import Any
 
 from backend.core.logging_config import get_logger
 from backend.ml.ai_feature_engineer import AIFeatureEngineer
@@ -27,17 +27,17 @@ class AIStrategy:
     """AI-generated trading strategy configuration"""
 
     name: str
-    features: List[str]
-    entry_long: List[str]
-    entry_short: List[str]
-    exit_long: Dict[str, Any]  # take_profit, stop_loss, trailing_stop
-    exit_short: Dict[str, Any]
-    position_sizing: Dict[str, Any]
+    features: list[str]
+    entry_long: list[str]
+    entry_short: list[str]
+    exit_long: dict[str, Any]  # take_profit, stop_loss, trailing_stop
+    exit_short: dict[str, Any]
+    position_sizing: dict[str, Any]
     risk_per_trade: float
     timeframe: str
     asset: str
 
-    def to_backtest_config(self) -> Dict[str, Any]:
+    def to_backtest_config(self) -> dict[str, Any]:
         """Convert AI strategy to backtest configuration"""
         return {
             "name": self.name,
@@ -51,7 +51,7 @@ class AIStrategy:
             "position_sizing": self.position_sizing,
             "risk_per_trade": self.risk_per_trade,
             "ai_generated": True,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         }
 
 
@@ -70,8 +70,8 @@ class AIBacktestExecutor:
 
     def __init__(self):
         self.engineer = AIFeatureEngineer()
-        self.backtest_results: List[Dict[str, Any]] = []
-        self.ai_strategies: List[AIStrategy] = []
+        self.backtest_results: list[dict[str, Any]] = []
+        self.ai_strategies: list[AIStrategy] = []
 
     async def generate_ai_strategy(
         self,
@@ -142,7 +142,7 @@ class AIBacktestExecutor:
         start_date: str,
         end_date: str,
         initial_capital: float = 10000.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Convert AI strategy to backtest configuration
 
@@ -176,7 +176,7 @@ class AIBacktestExecutor:
                 "max_drawdown": initial_capital * 0.20,  # 20% max drawdown
             },
             "metadata": {
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "ai_generated": True,
                 "ai_model": "deepseek-chat",
             },
@@ -197,7 +197,7 @@ class AIBacktestExecutor:
         start_date: str,
         end_date: str,
         num_variations: int = 3,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Execute multiple backtests with AI-generated variations
 
@@ -248,7 +248,7 @@ class AIBacktestExecutor:
                 "backtest_config": backtest_config,
                 "features": ai_strategy.features,
                 "status": "ready_for_execution",
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
             }
             results.append(result)
 
@@ -273,8 +273,8 @@ class AIBacktestExecutor:
 
     async def analyze_backtest_results(
         self,
-        results: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        results: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """
         Ask AI to analyze backtest results and recommend best strategy
 
@@ -352,20 +352,20 @@ Provide recommendations in JSON format:
             logger.error(f"❌ Error analyzing results: {e}")
             return {"error": str(e)}
 
-    def get_strategy_history(self) -> List[Dict[str, Any]]:
+    def get_strategy_history(self) -> list[dict[str, Any]]:
         """Get history of generated strategies"""
         return [asdict(strategy) for strategy in self.ai_strategies]
 
-    def get_backtest_history(self) -> List[Dict[str, Any]]:
+    def get_backtest_history(self) -> list[dict[str, Any]]:
         """Get history of backtest executions"""
         return self.backtest_results
 
     async def _run_backtest(
         self,
-        backtest_config: Dict[str, Any],
+        backtest_config: dict[str, Any],
         start_date: str,
         end_date: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Execute backtest using BacktestEngine
 
@@ -445,7 +445,7 @@ async def run_ai_backtest_pipeline(
     risk_tolerance: str = "medium",
     start_date: str = "2024-01-01",
     end_date: str = "2024-12-31",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Quick helper to run complete AI backtest pipeline
 

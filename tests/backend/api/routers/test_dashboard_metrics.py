@@ -5,7 +5,7 @@ Tests real-time performance metrics endpoints for monitoring dashboard.
 """
 
 import copy
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -76,7 +76,7 @@ def mock_db_session():
 @pytest.fixture
 def sample_backtests():
     """Sample backtest data"""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     return [
         create_mock_backtest(
@@ -189,7 +189,7 @@ def agent_breaker_snapshot(monkeypatch):
 @pytest.fixture
 def sample_optimizations():
     """Sample optimization data"""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     return [
         MagicMock(id=1, status="completed", created_at=now - timedelta(days=2)),

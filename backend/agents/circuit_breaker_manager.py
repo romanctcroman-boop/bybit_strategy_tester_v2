@@ -15,9 +15,10 @@ import os
 import statistics
 import time
 from collections import deque
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ class CircuitBreaker:
         recovery_timeout: int = 60,
         expected_exception: type = Exception,
         enable_adaptive: bool = True,
-        fallback_handler: Optional[Callable] = None,
+        fallback_handler: Callable | None = None,
     ):
         self.name = name
         self.base_failure_threshold = failure_threshold
@@ -135,7 +136,7 @@ class CircuitBreaker:
         self.failure_count = 0
         self.success_count = 0
         self.total_calls = 0
-        self.last_failure_time: Optional[datetime] = None
+        self.last_failure_time: datetime | None = None
         self.state = CircuitState.CLOSED
         self.consecutive_successes = 0
         self.trip_count = 0  # How many times circuit has tripped
@@ -263,7 +264,7 @@ class CircuitBreaker:
         """Handle failed call"""
         self.failure_count += 1
         self.consecutive_successes = 0
-        self.last_failure_time = datetime.now(timezone.utc)
+        self.last_failure_time = datetime.now(UTC)
 
         current_threshold = self.failure_threshold
         if self.failure_count >= current_threshold:
@@ -286,7 +287,7 @@ class CircuitBreaker:
             return True
 
         timeout_elapsed = (
-            datetime.now(timezone.utc) - self.last_failure_time
+            datetime.now(UTC) - self.last_failure_time
         ).total_seconds() >= self.recovery_timeout
 
         return timeout_elapsed
@@ -295,7 +296,7 @@ class CircuitBreaker:
         """Set fallback handler for graceful degradation."""
         self.fallback_handler = handler
 
-    def get_health_info(self) -> Dict[str, Any]:
+    def get_health_info(self) -> dict[str, Any]:
         """Get detailed health information."""
         return {
             "name": self.name,
@@ -322,13 +323,13 @@ class CircuitBreakerManager:
     """Manager for multiple circuit breakers"""
 
     def __init__(self):
-        self.breakers: Dict[str, CircuitBreaker] = {}
-        self._last_adapt_time: Optional[datetime] = None
+        self.breakers: dict[str, CircuitBreaker] = {}
+        self._last_adapt_time: datetime | None = None
         self._persistence_enabled: bool = False
         self._persistence_redis = None
-        self._persistence_task: Optional[asyncio.Task] = None
+        self._persistence_task: asyncio.Task | None = None
         self._autosave_interval: int = 60  # default autosave interval
-        self._configs: Dict[str, Any] = {}  # configurations tracked
+        self._configs: dict[str, Any] = {}  # configurations tracked
 
     def get_breaker(
         self,
@@ -370,7 +371,7 @@ class CircuitBreakerManager:
             breaker.success_count = 0
             logger.info(f"Reset circuit breaker '{breaker.name}'")
 
-    def get_status(self) -> Dict[str, Dict[str, Any]]:
+    def get_status(self) -> dict[str, dict[str, Any]]:
         """Get status of all circuit breakers"""
         return {
             name: {
@@ -381,7 +382,7 @@ class CircuitBreakerManager:
             for name, breaker in self.breakers.items()
         }
 
-    def get_all_breakers(self) -> List[str]:
+    def get_all_breakers(self) -> list[str]:
         """Return a list of registered breaker names."""
         return list(self.breakers.keys())
 
@@ -486,12 +487,12 @@ class CircuitBreakerManager:
         except asyncio.CancelledError:
             return
 
-    def get_breaker_state(self, name: str) -> Optional[CircuitState]:
+    def get_breaker_state(self, name: str) -> CircuitState | None:
         """Return the CircuitState for a named breaker, or None if missing."""
         b = self.breakers.get(name)
         return b.state if b is not None else None
 
-    def get_breaker_metrics(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_breaker_metrics(self, name: str) -> dict[str, Any] | None:
         """Return detailed metrics for a specific circuit breaker by name.
 
         Args:
@@ -561,11 +562,11 @@ class CircuitBreakerManager:
         """
 
         class _Metrics:
-            def __init__(self, data: Dict[str, Any], breakers_dict: Dict[str, Any]):
+            def __init__(self, data: dict[str, Any], breakers_dict: dict[str, Any]):
                 self._data = data
                 self.breakers = breakers_dict
 
-            def to_dict(self) -> Dict[str, Any]:
+            def to_dict(self) -> dict[str, Any]:
                 return self._data
 
         data = {
@@ -603,14 +604,14 @@ class CircuitBreakerManager:
 
     def maybe_adapt_breakers(
         self, force: bool = False, min_interval_seconds: int = 300
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Adaptive tuning hook.
 
         Currently a safe, idempotent no-op that records last adapt time and returns any
         adaptations performed (empty dict by default). Callers may use `force=True` to
         bypass the interval.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not force and self._last_adapt_time is not None:
             delta = (now - self._last_adapt_time).total_seconds()
             if delta < min_interval_seconds:
@@ -622,7 +623,7 @@ class CircuitBreakerManager:
 
 
 # Global circuit breaker manager instance
-_circuit_manager: Optional[CircuitBreakerManager] = None
+_circuit_manager: CircuitBreakerManager | None = None
 
 
 def get_circuit_manager() -> CircuitBreakerManager:
@@ -668,10 +669,10 @@ def on_config_change(config: Any) -> None:
 
 
 __all__ = [
-    "CircuitBreakerError",
-    "CircuitState",
     "CircuitBreaker",
+    "CircuitBreakerError",
     "CircuitBreakerManager",
+    "CircuitState",
     "get_circuit_manager",
     "on_config_change",
 ]

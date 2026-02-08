@@ -5,7 +5,7 @@ Provides REST API endpoints for cache warming management.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -40,7 +40,7 @@ class TargetResponse(BaseModel):
     interval: str
     priority: str
     enabled: bool
-    last_warmed: Optional[str]
+    last_warmed: str | None
     warm_count: int
     failure_count: int
     avg_warm_time_ms: float
@@ -54,7 +54,7 @@ class WarmingResultResponse(BaseModel):
     status: str
     candles_loaded: int
     duration_ms: float
-    error_message: Optional[str]
+    error_message: str | None
     timestamp: str
 
 
@@ -70,7 +70,7 @@ class WarmingMetricsResponse(BaseModel):
     avg_warm_time_ms: float
     cache_hit_rate: float
     target_hit_rate: float
-    last_full_warm: Optional[str]
+    last_full_warm: str | None
     warm_queue_size: int
     active_warming: bool
 
@@ -93,8 +93,8 @@ class StatusResponse(BaseModel):
     total_targets: int
     enabled_targets: int
     stale_targets: int
-    metrics: Dict[str, Any]
-    cache_stats: Dict[str, Any]
+    metrics: dict[str, Any]
+    cache_stats: dict[str, Any]
 
 
 class HealthResponse(BaseModel):
@@ -106,7 +106,7 @@ class HealthResponse(BaseModel):
     target_hit_rate: float
     hit_rate_ok: bool
     failures_ok: bool
-    checks: Dict[str, bool]
+    checks: dict[str, bool]
 
 
 # ============================================================================
@@ -178,9 +178,9 @@ async def get_cache_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/targets", response_model=List[TargetResponse])
+@router.get("/targets", response_model=list[TargetResponse])
 async def get_targets(
-    priority: Optional[str] = Query(None, description="Filter by priority"),
+    priority: str | None = Query(None, description="Filter by priority"),
     enabled_only: bool = Query(True, description="Only enabled targets"),
 ):
     """Get warming targets."""
@@ -304,9 +304,9 @@ async def warm_single(symbol: str, interval: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/warm-all", response_model=List[WarmingResultResponse])
+@router.post("/warm-all", response_model=list[WarmingResultResponse])
 async def warm_all(
-    priority: Optional[str] = Query(None, description="Only warm this priority"),
+    priority: str | None = Query(None, description="Only warm this priority"),
     force: bool = Query(False, description="Force warm even if recently warmed"),
 ):
     """Warm all targets."""
@@ -331,7 +331,7 @@ async def warm_all(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/warm-critical", response_model=List[WarmingResultResponse])
+@router.post("/warm-critical", response_model=list[WarmingResultResponse])
 async def warm_critical():
     """Warm only critical targets (BTC, ETH)."""
     try:
@@ -354,7 +354,7 @@ async def warm_critical():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/results", response_model=List[WarmingResultResponse])
+@router.get("/results", response_model=list[WarmingResultResponse])
 async def get_results(
     limit: int = Query(100, ge=1, le=1000, description="Number of results to return"),
 ):

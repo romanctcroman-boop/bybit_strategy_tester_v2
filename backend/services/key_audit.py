@@ -66,12 +66,12 @@ class KeyAccessEvent:
     key_id: str
     key_provider: KeyProvider
     access_type: KeyAccessType
-    user_id: Optional[str] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    request_path: Optional[str] = None
+    user_id: str | None = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    request_path: str | None = None
     success: bool = True
-    error_message: Optional[str] = None
+    error_message: str | None = None
     latency_ms: float = 0.0
     metadata: dict = field(default_factory=dict)
 
@@ -99,8 +99,8 @@ class KeyUsageStats:
     total_accesses: int = 0
     successful_accesses: int = 0
     failed_accesses: int = 0
-    last_access: Optional[datetime] = None
-    first_access: Optional[datetime] = None
+    last_access: datetime | None = None
+    first_access: datetime | None = None
     unique_users: int = 0
     unique_ips: int = 0
     avg_latency_ms: float = 0.0
@@ -113,7 +113,7 @@ class AuditConfig:
     """Configuration for audit logging."""
 
     enabled: bool = True
-    log_file_path: Optional[Path] = None
+    log_file_path: Path | None = None
     max_events_in_memory: int = 10000
     anomaly_detection_enabled: bool = True
     max_requests_per_minute: int = 100
@@ -132,7 +132,7 @@ class KeyUsageAuditService:
 
     _instance: Optional["KeyUsageAuditService"] = None
 
-    def __init__(self, config: Optional[AuditConfig] = None):
+    def __init__(self, config: AuditConfig | None = None):
         self.config = config or AuditConfig()
         self._events: list[KeyAccessEvent] = []
         self._anomalies: list[UsageAnomaly] = []
@@ -157,14 +157,14 @@ class KeyUsageAuditService:
         key_id: str,
         key_provider: KeyProvider,
         access_type: KeyAccessType,
-        user_id: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        request_path: Optional[str] = None,
+        user_id: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        request_path: str | None = None,
         success: bool = True,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
         latency_ms: float = 0.0,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> KeyAccessEvent:
         """Log a key access event."""
         self._event_count += 1
@@ -398,11 +398,11 @@ class KeyUsageAuditService:
 
     def get_events(
         self,
-        key_id: Optional[str] = None,
-        access_type: Optional[KeyAccessType] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        success_only: Optional[bool] = None,
+        key_id: str | None = None,
+        access_type: KeyAccessType | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        success_only: bool | None = None,
         limit: int = 100,
     ) -> list[KeyAccessEvent]:
         """Get audit events with optional filters."""
@@ -427,8 +427,8 @@ class KeyUsageAuditService:
 
     def get_anomalies(
         self,
-        key_id: Optional[str] = None,
-        severity: Optional[AlertSeverity] = None,
+        key_id: str | None = None,
+        severity: AlertSeverity | None = None,
         unacknowledged_only: bool = False,
         limit: int = 100,
     ) -> list[UsageAnomaly]:
@@ -455,7 +455,7 @@ class KeyUsageAuditService:
                 return True
         return False
 
-    def get_key_stats(self, key_id: str) -> Optional[KeyUsageStats]:
+    def get_key_stats(self, key_id: str) -> KeyUsageStats | None:
         """Get usage statistics for a key."""
         return self._key_stats.get(key_id)
 

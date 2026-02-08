@@ -2,6 +2,8 @@
 Tests for Walk-Forward Optimization Service.
 """
 
+from datetime import UTC
+
 import pytest
 
 from backend.services.walk_forward import (
@@ -43,14 +45,14 @@ class TestWalkForwardWindow:
 
     def test_window_to_dict(self):
         """Test window serialization."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         window = WalkForwardWindow(
             window_id=1,
-            train_start=datetime(2024, 1, 1, tzinfo=timezone.utc),
-            train_end=datetime(2024, 3, 1, tzinfo=timezone.utc),
-            test_start=datetime(2024, 3, 1, tzinfo=timezone.utc),
-            test_end=datetime(2024, 4, 1, tzinfo=timezone.utc),
+            train_start=datetime(2024, 1, 1, tzinfo=UTC),
+            train_end=datetime(2024, 3, 1, tzinfo=UTC),
+            test_start=datetime(2024, 3, 1, tzinfo=UTC),
+            test_end=datetime(2024, 4, 1, tzinfo=UTC),
             train_return=0.15,
             test_return=0.08,
             train_sharpe=1.5,

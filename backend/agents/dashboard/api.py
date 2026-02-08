@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from loguru import logger
@@ -22,10 +22,10 @@ class MetricQuery(BaseModel):
     """Metric query parameters"""
 
     metric_name: str
-    time_from: Optional[str] = "now-1h"
-    time_to: Optional[str] = "now"
-    aggregation: Optional[str] = "avg"
-    labels: Optional[Dict[str, str]] = None
+    time_from: str | None = "now-1h"
+    time_to: str | None = "now"
+    aggregation: str | None = "avg"
+    labels: dict[str, str] | None = None
 
 
 class AlertCreate(BaseModel):
@@ -36,7 +36,7 @@ class AlertCreate(BaseModel):
     condition: str  # "gt", "lt", "eq"
     threshold: float
     severity: str = "warning"
-    message: Optional[str] = None
+    message: str | None = None
 
 
 class DashboardWidget(BaseModel):
@@ -46,8 +46,8 @@ class DashboardWidget(BaseModel):
     type: str  # "stat", "chart", "table", "gauge"
     title: str
     metric_name: str
-    position: Dict[str, int]  # x, y, w, h
-    options: Optional[Dict[str, Any]] = None
+    position: dict[str, int]  # x, y, w, h
+    options: dict[str, Any] | None = None
 
 
 class DashboardLayout(BaseModel):
@@ -55,7 +55,7 @@ class DashboardLayout(BaseModel):
 
     id: str
     name: str
-    widgets: List[DashboardWidget]
+    widgets: list[DashboardWidget]
 
 
 # Create router
@@ -74,7 +74,7 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "ai-agent-dashboard",
     }
 
@@ -316,7 +316,7 @@ async def list_traces(limit: int = 50):
 
 
 @router.get("/anomalies")
-async def list_anomalies(metric_name: Optional[str] = None, limit: int = 100):
+async def list_anomalies(metric_name: str | None = None, limit: int = 100):
     """List detected anomalies"""
     try:
         from backend.agents.monitoring.ml_anomaly import get_anomaly_detector
@@ -406,7 +406,7 @@ class ConnectionManager:
     """WebSocket connection manager"""
 
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -415,7 +415,7 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
-    async def broadcast(self, message: Dict[str, Any]):
+    async def broadcast(self, message: dict[str, Any]):
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
@@ -436,7 +436,7 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.send_json(
             {
                 "type": "connected",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
 
@@ -460,12 +460,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 elif msg.get("type") == "ping":
                     await websocket.send_json({"type": "pong"})
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Send heartbeat
                 await websocket.send_json(
                     {
                         "type": "heartbeat",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     }
                 )
 
@@ -480,24 +480,24 @@ async def broadcast_metric_update(metric_name: str, value: Any):
             "type": "metric_update",
             "metric_name": metric_name,
             "value": value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     )
 
 
-async def broadcast_alert(alert: Dict[str, Any]):
+async def broadcast_alert(alert: dict[str, Any]):
     """Broadcast alert to all connected clients"""
     await manager.broadcast(
         {
             "type": "alert",
             "alert": alert,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     )
 
 
 __all__ = [
-    "router",
-    "broadcast_metric_update",
     "broadcast_alert",
+    "broadcast_metric_update",
+    "router",
 ]

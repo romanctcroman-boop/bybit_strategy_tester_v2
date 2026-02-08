@@ -20,7 +20,6 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -60,9 +59,9 @@ class SentimentData:
     score: float  # -1 (bearish) to +1 (bullish)
     confidence: float  # 0-1
     volume: int = 1  # Number of mentions/articles
-    raw_text: Optional[str] = None
-    keywords: List[str] = field(default_factory=list)
-    symbol: Optional[str] = None
+    raw_text: str | None = None
+    keywords: list[str] = field(default_factory=list)
+    symbol: str | None = None
 
 
 @dataclass
@@ -73,9 +72,9 @@ class AggregateSentiment:
     overall_score: float  # -1 to +1
     overall_confidence: float
     level: SentimentLevel
-    source_scores: Dict[SentimentSource, float] = field(default_factory=dict)
-    source_volumes: Dict[SentimentSource, int] = field(default_factory=dict)
-    trending_keywords: List[str] = field(default_factory=list)
+    source_scores: dict[SentimentSource, float] = field(default_factory=dict)
+    source_volumes: dict[SentimentSource, int] = field(default_factory=dict)
+    trending_keywords: list[str] = field(default_factory=list)
     change_24h: float = 0.0
 
 
@@ -84,12 +83,12 @@ class SentimentConfig:
     """Configuration for sentiment analysis."""
 
     # Sources to use
-    enabled_sources: List[SentimentSource] = field(
+    enabled_sources: list[SentimentSource] = field(
         default_factory=lambda: [SentimentSource.NEWS, SentimentSource.TWITTER]
     )
 
     # Weights for each source
-    source_weights: Dict[SentimentSource, float] = field(
+    source_weights: dict[SentimentSource, float] = field(
         default_factory=lambda: {
             SentimentSource.NEWS: 0.3,
             SentimentSource.TWITTER: 0.25,
@@ -115,7 +114,7 @@ class SentimentConfig:
     contrarian_mode: bool = False  # Trade against extreme sentiment
 
     # Keywords to track
-    bullish_keywords: List[str] = field(
+    bullish_keywords: list[str] = field(
         default_factory=lambda: [
             "bullish",
             "moon",
@@ -131,7 +130,7 @@ class SentimentConfig:
             "reversal up",
         ]
     )
-    bearish_keywords: List[str] = field(
+    bearish_keywords: list[str] = field(
         default_factory=lambda: [
             "bearish",
             "dump",
@@ -320,7 +319,7 @@ class LexiconSentimentAnalyzer:
 
         return max(-1.0, min(1.0, score))
 
-    def extract_keywords(self, text: str) -> List[str]:
+    def extract_keywords(self, text: str) -> list[str]:
         """Extract sentiment-relevant keywords from text."""
         if not text:
             return []
@@ -351,13 +350,13 @@ class NewsSentimentAnalyzer:
     def __init__(self, config: SentimentConfig):
         self.config = config
         self.lexicon = LexiconSentimentAnalyzer(config)
-        self._cache: Dict[str, SentimentData] = {}
+        self._cache: dict[str, SentimentData] = {}
 
     def analyze_article(
         self,
         title: str,
-        content: Optional[str] = None,
-        timestamp: Optional[datetime] = None,
+        content: str | None = None,
+        timestamp: datetime | None = None,
         source_name: str = "unknown",
     ) -> SentimentData:
         """Analyze a single news article."""
@@ -389,8 +388,8 @@ class NewsSentimentAnalyzer:
 
     def analyze_batch(
         self,
-        articles: List[Dict],
-        timestamp: Optional[datetime] = None,
+        articles: list[dict],
+        timestamp: datetime | None = None,
     ) -> SentimentData:
         """Analyze a batch of articles and aggregate."""
         if not articles:
@@ -448,9 +447,9 @@ class SocialSentimentTracker:
 
     def analyze_posts(
         self,
-        posts: List[Dict],
+        posts: list[dict],
         platform: SentimentSource,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
     ) -> SentimentData:
         """Analyze social media posts."""
         if not posts:
@@ -500,7 +499,7 @@ class SocialSentimentTracker:
         price_returns: NDArray,
         volatility: NDArray,
         base_sentiment: float = 0.0,
-    ) -> List[SentimentData]:
+    ) -> list[SentimentData]:
         """
         Simulate social sentiment based on price action.
 
@@ -566,10 +565,10 @@ class FearGreedCalculator:
     def calculate(
         self,
         close: NDArray,
-        volume: Optional[NDArray] = None,
-        btc_dominance: Optional[float] = None,
-        social_sentiment: Optional[float] = None,
-    ) -> Tuple[float, SentimentLevel]:
+        volume: NDArray | None = None,
+        btc_dominance: float | None = None,
+        social_sentiment: float | None = None,
+    ) -> tuple[float, SentimentLevel]:
         """
         Calculate Fear & Greed Index.
 
@@ -656,7 +655,7 @@ class FearGreedCalculator:
     def _calculate_momentum_component(
         self,
         close: NDArray,
-        volume: Optional[NDArray] = None,
+        volume: NDArray | None = None,
     ) -> float:
         """Calculate momentum/volume component."""
         if len(close) < 30:
@@ -773,8 +772,8 @@ class SentimentSignalGenerator:
 
     def aggregate_sentiment(
         self,
-        sentiment_data: List[SentimentData],
-        timestamp: Optional[datetime] = None,
+        sentiment_data: list[SentimentData],
+        timestamp: datetime | None = None,
     ) -> AggregateSentiment:
         """Aggregate sentiment from multiple sources."""
         if not sentiment_data:
@@ -785,8 +784,8 @@ class SentimentSignalGenerator:
                 level=SentimentLevel.NEUTRAL,
             )
 
-        source_scores: Dict[SentimentSource, List[float]] = {}
-        source_volumes: Dict[SentimentSource, int] = {}
+        source_scores: dict[SentimentSource, list[float]] = {}
+        source_volumes: dict[SentimentSource, int] = {}
         all_keywords = []
 
         for data in sentiment_data:
@@ -819,7 +818,7 @@ class SentimentSignalGenerator:
         level = self._score_to_level(overall_score)
 
         # Get trending keywords
-        keyword_counts: Dict[str, int] = {}
+        keyword_counts: dict[str, int] = {}
         for kw in all_keywords:
             keyword_counts[kw] = keyword_counts.get(kw, 0) + 1
         trending = sorted(
@@ -852,8 +851,8 @@ class SentimentSignalGenerator:
     def simulate_sentiment_history(
         self,
         close: NDArray,
-        volume: Optional[NDArray] = None,
-    ) -> List[AggregateSentiment]:
+        volume: NDArray | None = None,
+    ) -> list[AggregateSentiment]:
         """
         Simulate sentiment history for backtesting.
 
@@ -911,7 +910,7 @@ class SentimentAnalyzer:
     Combines all sentiment sources and generates trading signals.
     """
 
-    def __init__(self, config: Optional[SentimentConfig] = None):
+    def __init__(self, config: SentimentConfig | None = None):
         self.config = config or SentimentConfig()
         self.signal_generator = SentimentSignalGenerator(self.config)
         self.fear_greed = FearGreedCalculator(self.config)
@@ -919,10 +918,10 @@ class SentimentAnalyzer:
     def analyze(
         self,
         close: NDArray,
-        volume: Optional[NDArray] = None,
-        news_data: Optional[List[Dict]] = None,
-        social_data: Optional[List[Dict]] = None,
-    ) -> Tuple[List[AggregateSentiment], List[SentimentSignal]]:
+        volume: NDArray | None = None,
+        news_data: list[dict] | None = None,
+        social_data: list[dict] | None = None,
+    ) -> tuple[list[AggregateSentiment], list[SentimentSignal]]:
         """
         Analyze sentiment and generate signals.
 
@@ -960,9 +959,9 @@ class SentimentAnalyzer:
     def _process_real_data(
         self,
         close: NDArray,
-        news_data: Optional[List[Dict]],
-        social_data: Optional[List[Dict]],
-    ) -> List[AggregateSentiment]:
+        news_data: list[dict] | None,
+        social_data: list[dict] | None,
+    ) -> list[AggregateSentiment]:
         """Process real sentiment data."""
         n = len(close)
         sentiments = []
@@ -1004,8 +1003,8 @@ class SentimentAnalyzer:
     def get_sentiment_filter(
         self,
         close: NDArray,
-        allowed_levels: List[SentimentLevel],
-        volume: Optional[NDArray] = None,
+        allowed_levels: list[SentimentLevel],
+        volume: NDArray | None = None,
     ) -> NDArray:
         """
         Get boolean filter for trading based on sentiment levels.
@@ -1024,8 +1023,8 @@ class SentimentAnalyzer:
     def get_fear_greed_history(
         self,
         close: NDArray,
-        volume: Optional[NDArray] = None,
-    ) -> Tuple[NDArray, List[SentimentLevel]]:
+        volume: NDArray | None = None,
+    ) -> tuple[NDArray, list[SentimentLevel]]:
         """
         Get Fear & Greed index history.
 

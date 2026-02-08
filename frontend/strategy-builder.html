@@ -80,6 +80,9 @@
         </div>
         <div class="sidebar-header">
           <span class="sidebar-title">Библиотека</span>
+          <button class="btn-icon-sm" id="refreshLibraryBtn" title="Refresh library">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
         </div>
         <div class="block-categories" id="blockCategories">
           <!-- Populated by JavaScript -->
@@ -95,34 +98,34 @@
       <div class="canvas-area">
         <div class="canvas-toolbar">
           <div class="toolbar-group">
-            <button class="btn btn-icon btn-secondary" onclick="undo()" title="Undo">
+            <button id="btnUndo" class="btn btn-icon btn-secondary" title="Undo">
               <i class="bi bi-arrow-counterclockwise"></i>
             </button>
-            <button class="btn btn-icon btn-secondary" onclick="redo()" title="Redo">
+            <button id="btnRedo" class="btn btn-icon btn-secondary" title="Redo">
               <i class="bi bi-arrow-clockwise"></i>
             </button>
           </div>
           <div class="toolbar-group">
-            <button class="btn btn-icon btn-secondary" onclick="deleteSelected()" title="Delete">
-              <i class="bi bi-trash"></i>
-            </button>
-            <button class="btn btn-icon btn-secondary" onclick="duplicateSelected()" title="Duplicate">
+            <button id="btnDuplicate" class="btn btn-icon btn-secondary" title="Duplicate">
               <i class="bi bi-copy"></i>
+            </button>
+            <button id="btnClearAll" class="btn btn-icon btn-secondary btn-clear-all" title="Очистить всё и сбросить к началу">
+              <i class="bi bi-trash3"></i>
             </button>
           </div>
           <div class="toolbar-group">
-            <button class="btn btn-icon btn-secondary" onclick="alignBlocks('left')" title="Align Left">
+            <button id="btnAlignLeft" class="btn btn-icon btn-secondary" title="Align Left">
               <i class="bi bi-align-start"></i>
             </button>
-            <button class="btn btn-icon btn-secondary" onclick="alignBlocks('center')" title="Align Center">
+            <button id="btnAlignCenter" class="btn btn-icon btn-secondary" title="Align Center">
               <i class="bi bi-align-center"></i>
             </button>
-            <button class="btn btn-icon btn-secondary" onclick="alignBlocks('right')" title="Align Right">
+            <button id="btnAlignRight" class="btn btn-icon btn-secondary" title="Align Right">
               <i class="bi bi-align-end"></i>
             </button>
           </div>
           <div class="toolbar-group">
-            <button class="btn btn-icon btn-secondary" onclick="autoLayout()" title="Auto Layout">
+            <button id="btnAutoLayout" class="btn btn-icon btn-secondary" title="Auto Layout">
               <i class="bi bi-grid-3x3"></i>
             </button>
             <button class="btn btn-icon btn-secondary" onclick="fitToScreen()" title="Fit to Screen">
@@ -265,6 +268,11 @@
                   min="1" max="50" step="1" value="10" title="Кредитное плечо 1–50x" />
                 <input type="hidden" id="backtestLeverage" value="10" />
                 <div id="backtestLeverageRiskIndicator" class="leverage-risk-indicator properties-leverage-risk"></div>
+              </div>
+              <div class="property-row property-row-vertical">
+                <label for="backtestPyramiding" class="property-label">Pyramiding (макс. одновременных позиций)</label>
+                <input type="number" class="property-input property-input-full" id="backtestPyramiding" value="1"
+                  min="0" max="99" step="1" title="Макс. одновременных входов в одном направлении (0-99, совместимо с TradingView)" />
               </div>
               <div class="property-row property-row-two-cols">
                 <div class="property-row property-row-vertical property-col-half">

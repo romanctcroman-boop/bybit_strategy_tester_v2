@@ -6,10 +6,11 @@ for live trading risk control.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from backend.services.risk_management.exposure_controller import (
     ExposureController,
@@ -88,17 +89,17 @@ class RiskAssessment:
     approved: bool
     risk_level: RiskLevel
     position_size: float
-    recommended_stop_loss: Optional[float]
-    recommended_take_profit: Optional[float]
+    recommended_stop_loss: float | None
+    recommended_take_profit: float | None
     max_allowed_size: float
     current_exposure_pct: float
     available_capacity_pct: float
-    warnings: List[str]
-    rejection_reasons: List[str]
-    details: Dict[str, Any]
+    warnings: list[str]
+    rejection_reasons: list[str]
+    details: dict[str, Any]
     assessed_at: datetime
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "approved": self.approved,
@@ -132,9 +133,9 @@ class PortfolioRiskSnapshot:
     active_stops: int
     risk_level: RiskLevel
     is_trading_allowed: bool
-    warnings: List[str]
+    warnings: list[str]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -166,7 +167,7 @@ class RiskEngine:
     Provides a single interface for all risk management operations.
     """
 
-    def __init__(self, config: Optional[RiskEngineConfig] = None):
+    def __init__(self, config: RiskEngineConfig | None = None):
         """Initialize the Risk Engine."""
         self.config = config or RiskEngineConfig()
 
@@ -179,14 +180,14 @@ class RiskEngine:
         # State
         self._is_running = False
         self._trading_paused = False
-        self._pause_reason: Optional[str] = None
-        self._risk_history: List[PortfolioRiskSnapshot] = []
+        self._pause_reason: str | None = None
+        self._risk_history: list[PortfolioRiskSnapshot] = []
         self._max_history_size = 1000
 
         # Callbacks
-        self.on_risk_alert: Optional[Callable[[str, RiskLevel], None]] = None
-        self.on_trading_paused: Optional[Callable[[str], None]] = None
-        self.on_stop_triggered: Optional[Callable[[str, float, float], None]] = None
+        self.on_risk_alert: Callable[[str, RiskLevel], None] | None = None
+        self.on_trading_paused: Callable[[str], None] | None = None
+        self.on_stop_triggered: Callable[[str, float, float], None] | None = None
 
         logger.info(
             f"RiskEngine initialized: equity=${self.config.initial_equity:.2f}, "
@@ -259,10 +260,10 @@ class RiskEngine:
         symbol: str,
         side: str,
         entry_price: float,
-        stop_loss: Optional[float] = None,
-        take_profit: Optional[float] = None,
-        volatility: Optional[float] = None,
-        atr: Optional[float] = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        volatility: float | None = None,
+        atr: float | None = None,
         win_rate: float = 0.5,
         avg_win: float = 1.0,
         avg_loss: float = 1.0,
@@ -377,7 +378,7 @@ class RiskEngine:
             total_pnl=self.exposure_controller.total_pnl,
             daily_pnl=self.exposure_controller.daily_pnl,
             open_positions_count=len(self.exposure_controller.positions),
-            positions_by_symbol={s: 1 for s in self.exposure_controller.positions},
+            positions_by_symbol=dict.fromkeys(self.exposure_controller.positions, 1),
             trades_today=0,  # Would need external tracking
             trades_this_hour=0,
             last_trade_time=None,
@@ -431,7 +432,7 @@ class RiskEngine:
         self,
         position_size: float,
         entry_price: float,
-        stop_loss: Optional[float],
+        stop_loss: float | None,
         current_exposure: float,
         equity: float,
     ) -> RiskLevel:
@@ -497,7 +498,7 @@ class RiskEngine:
         size: float,
         entry_price: float,
         leverage: float = 1.0,
-        stop_loss: Optional[float] = None,
+        stop_loss: float | None = None,
     ):
         """
         Register an executed trade with the risk engine.
@@ -684,11 +685,11 @@ class RiskEngine:
         if len(self._risk_history) > self._max_history_size:
             self._risk_history = self._risk_history[-self._max_history_size :]
 
-    def get_risk_history(self, limit: int = 100) -> List[PortfolioRiskSnapshot]:
+    def get_risk_history(self, limit: int = 100) -> list[PortfolioRiskSnapshot]:
         """Get recent risk history."""
         return self._risk_history[-limit:]
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get comprehensive risk engine status."""
         snapshot = self.get_risk_snapshot()
 

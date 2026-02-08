@@ -20,10 +20,10 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -51,15 +51,15 @@ class ReasoningResult:
     """Result from local reasoning"""
 
     content: str
-    thinking: Optional[str] = None  # Chain-of-thought trace
+    thinking: str | None = None  # Chain-of-thought trace
     confidence: float = 0.0
     tokens_used: int = 0
     latency_ms: float = 0.0
     model_name: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "content": self.content,
             "thinking": self.thinking,
@@ -84,7 +84,7 @@ class ModelConfig:
     top_p: float = 0.95
     threads: int = 4
     gpu_layers: int = 0  # Number of layers to offload to GPU
-    quantization: Optional[str] = "Q4_K_M"  # For GGUF models
+    quantization: str | None = "Q4_K_M"  # For GGUF models
 
 
 class LocalReasonerEngine:
@@ -139,8 +139,8 @@ Be specific about entry/exit conditions.""",
 
     def __init__(
         self,
-        model_path: Optional[str] = None,
-        config: Optional[ModelConfig] = None,
+        model_path: str | None = None,
+        config: ModelConfig | None = None,
     ):
         """
         Initialize local reasoner
@@ -230,8 +230,8 @@ Be specific about entry/exit conditions.""",
     async def _init_transformers(self) -> None:
         """Initialize Hugging Face transformers backend"""
         try:
-            from transformers import AutoModelForCausalLM, AutoTokenizer
             import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
 
             def load_model():
                 tokenizer = AutoTokenizer.from_pretrained(
@@ -279,10 +279,10 @@ Be specific about entry/exit conditions.""",
     async def reason(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         task_type: str = "reasoning",
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
     ) -> ReasoningResult:
         """
         Perform reasoning with local model
@@ -391,7 +391,7 @@ Be specific about entry/exit conditions.""",
         prompt: str,
         max_tokens: int,
         temperature: float,
-    ) -> Tuple[str, Optional[str], int]:
+    ) -> tuple[str, str | None, int]:
         """Generate with llama.cpp"""
 
         def generate():
@@ -424,7 +424,7 @@ Be specific about entry/exit conditions.""",
         prompt: str,
         max_tokens: int,
         temperature: float,
-    ) -> Tuple[str, Optional[str], int]:
+    ) -> tuple[str, str | None, int]:
         """Generate with transformers"""
         import torch
 
@@ -459,7 +459,7 @@ Be specific about entry/exit conditions.""",
         prompt: str,
         max_tokens: int,
         temperature: float,
-    ) -> Tuple[str, Optional[str], int]:
+    ) -> tuple[str, str | None, int]:
         """Generate with Ollama API"""
         import httpx
 
@@ -486,7 +486,7 @@ Be specific about entry/exit conditions.""",
             else:
                 raise Exception(f"Ollama error: {response.status_code}")
 
-    def _estimate_confidence(self, content: str, thinking: Optional[str]) -> float:
+    def _estimate_confidence(self, content: str, thinking: str | None) -> float:
         """Estimate confidence in the response"""
         confidence = 0.5  # Base confidence
 
@@ -556,7 +556,7 @@ Step 1:"""
 
         return result
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get engine statistics"""
         return {
             **self.stats,
@@ -567,9 +567,9 @@ Step 1:"""
 
 
 __all__ = [
+    "InferenceBackend",
     "LocalReasonerEngine",
-    "ReasoningResult",
     "ModelConfig",
     "ModelSize",
-    "InferenceBackend",
+    "ReasoningResult",
 ]

@@ -4,18 +4,18 @@ Implements market regime detection using ML techniques
 Based on Two Sigma and industry best practices 2024-2026
 """
 
-import numpy as np
-import pandas as pd
-from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
+import numpy as np
+import pandas as pd
 from loguru import logger
 
 # Optional ML dependencies
 try:
-    from sklearn.mixture import GaussianMixture
     from sklearn.cluster import KMeans
+    from sklearn.mixture import GaussianMixture
     from sklearn.preprocessing import StandardScaler
 
     SKLEARN_AVAILABLE = True
@@ -58,13 +58,13 @@ class RegimeDetectionResult:
 
     regimes: np.ndarray  # Regime label for each bar
     n_regimes: int
-    regime_names: List[str]
+    regime_names: list[str]
 
     # Statistics per regime
-    regime_stats: Dict[int, Dict[str, float]] = field(default_factory=dict)
+    regime_stats: dict[int, dict[str, float]] = field(default_factory=dict)
 
     # Transition probabilities
-    transition_matrix: Optional[np.ndarray] = None
+    transition_matrix: np.ndarray | None = None
 
     # Current state
     current_regime: int = 0
@@ -76,7 +76,7 @@ class RegimeDetectionResult:
             return self.regimes[index]
         return 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "n_regimes": self.n_regimes,
             "regime_names": self.regime_names,
@@ -125,7 +125,7 @@ class HMMRegimeDetector:
         self.scaler = StandardScaler() if SKLEARN_AVAILABLE else None
 
     def fit_predict(
-        self, data: pd.DataFrame, features: Optional[List[str]] = None
+        self, data: pd.DataFrame, features: list[str] | None = None
     ) -> RegimeDetectionResult:
         """
         Fit HMM and predict regimes.
@@ -190,7 +190,7 @@ class HMMRegimeDetector:
 
     def predict_next_regime(
         self, current_regime: int, n_steps: int = 1
-    ) -> List[Tuple[int, float]]:
+    ) -> list[tuple[int, float]]:
         """
         Predict most likely next regime(s).
 
@@ -215,7 +215,7 @@ class HMMRegimeDetector:
         return sorted(predictions, key=lambda x: x[1], reverse=True)
 
     def _prepare_features(
-        self, data: pd.DataFrame, features: Optional[List[str]]
+        self, data: pd.DataFrame, features: list[str] | None
     ) -> np.ndarray:
         """Prepare features for regime detection"""
         close = data["close"].values
@@ -242,7 +242,7 @@ class HMMRegimeDetector:
 
     def _analyze_regimes(
         self, data: pd.DataFrame, regimes: np.ndarray
-    ) -> Dict[int, Dict[str, float]]:
+    ) -> dict[int, dict[str, float]]:
         """Analyze statistics for each regime"""
         close = data["close"].values
         returns = np.diff(close) / close[:-1]
@@ -273,7 +273,7 @@ class HMMRegimeDetector:
 
         return stats
 
-    def _name_regimes(self, stats: Dict[int, Dict[str, float]]) -> List[str]:
+    def _name_regimes(self, stats: dict[int, dict[str, float]]) -> list[str]:
         """Assign meaningful names to regimes based on characteristics"""
         names = []
 
@@ -475,7 +475,7 @@ class RegimeAdaptiveStrategy:
     Allows different parameters or strategies for different regimes.
     """
 
-    def __init__(self, detector: Any, regime_strategies: Dict[int, Dict[str, Any]]):
+    def __init__(self, detector: Any, regime_strategies: dict[int, dict[str, Any]]):
         """
         Initialize regime-adaptive strategy.
 
@@ -486,7 +486,7 @@ class RegimeAdaptiveStrategy:
         self.detector = detector
         self.regime_strategies = regime_strategies
 
-    def get_strategy_params(self, current_regime: int) -> Dict[str, Any]:
+    def get_strategy_params(self, current_regime: int) -> dict[str, Any]:
         """Get strategy parameters for current regime"""
         return self.regime_strategies.get(
             current_regime, self.regime_strategies.get(0, {})

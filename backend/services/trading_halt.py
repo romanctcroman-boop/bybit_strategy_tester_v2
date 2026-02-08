@@ -11,10 +11,11 @@ Provides emergency trading halt mechanisms with:
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +87,8 @@ class HaltEvent:
     timestamp: datetime
     triggered_by: str  # System, user, or automatic
     details: dict = field(default_factory=dict)
-    resolved_at: Optional[datetime] = None
-    resolved_by: Optional[str] = None
+    resolved_at: datetime | None = None
+    resolved_by: str | None = None
 
 
 @dataclass
@@ -95,11 +96,11 @@ class TradingState:
     """Current trading state."""
 
     status: TradingStatus
-    halt_level: Optional[HaltLevel]
-    halt_reason: Optional[HaltReason]
-    halted_at: Optional[datetime]
-    halted_by: Optional[str]
-    resume_at: Optional[datetime]
+    halt_level: HaltLevel | None
+    halt_reason: HaltReason | None
+    halted_at: datetime | None
+    halted_by: str | None
+    resume_at: datetime | None
     message: str = ""
 
 
@@ -132,7 +133,7 @@ class TradingHaltService:
     - Audit trail of all halt events
     """
 
-    def __init__(self, config: Optional[HaltConfig] = None):
+    def __init__(self, config: HaltConfig | None = None):
         self._config = config or HaltConfig()
         self._state = TradingState(
             status=TradingStatus.ACTIVE,
@@ -196,8 +197,8 @@ class TradingHaltService:
         reason: HaltReason,
         level: HaltLevel = HaltLevel.HARD,
         triggered_by: str = "system",
-        duration_minutes: Optional[int] = None,
-        details: Optional[dict] = None,
+        duration_minutes: int | None = None,
+        details: dict | None = None,
     ) -> HaltEvent:
         """
         Halt trading with specified level and reason.
@@ -215,7 +216,7 @@ class TradingHaltService:
         async with self._lock:
             resume_at = None
             if duration_minutes and self._config.auto_recovery_enabled:
-                resume_at = datetime.now(timezone.utc) + timedelta(
+                resume_at = datetime.now(UTC) + timedelta(
                     minutes=duration_minutes
                 )
 
@@ -278,7 +279,7 @@ class TradingHaltService:
                 cooldown_end = self._state.halted_at + timedelta(
                     minutes=self._config.recovery_cooldown_minutes
                 )
-                if datetime.now(timezone.utc) < cooldown_end:
+                if datetime.now(UTC) < cooldown_end:
                     logger.warning(
                         f"⏳ Resume blocked - cooldown active until {cooldown_end}"
                     )
@@ -286,7 +287,7 @@ class TradingHaltService:
 
             # Mark last event as resolved
             if self._events:
-                self._events[-1].resolved_at = datetime.now(timezone.utc)
+                self._events[-1].resolved_at = datetime.now(UTC)
                 self._events[-1].resolved_by = resumed_by
 
             self._state = TradingState(
@@ -372,7 +373,7 @@ class TradingHaltService:
     # Risk Monitoring & Auto-Halt
     # ============================================================
 
-    async def update_risk_metrics(self, metrics: RiskMetrics) -> Optional[HaltEvent]:
+    async def update_risk_metrics(self, metrics: RiskMetrics) -> HaltEvent | None:
         """
         Update risk metrics and check for auto-halt triggers.
 
@@ -456,7 +457,7 @@ class TradingHaltService:
             id=f"HALT-{self._event_counter:06d}",
             reason=reason,
             level=level,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             triggered_by=triggered_by,
             details=details,
         )
@@ -576,7 +577,7 @@ class TradingHaltService:
 
 
 # Singleton instance
-_trading_halt_service: Optional[TradingHaltService] = None
+_trading_halt_service: TradingHaltService | None = None
 
 
 def get_trading_halt_service() -> TradingHaltService:

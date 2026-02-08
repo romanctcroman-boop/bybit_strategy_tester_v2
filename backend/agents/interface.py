@@ -12,9 +12,9 @@ from backend.agents.unified_agent_interface import (
 )
 
 __all__ = [
+    "AgentChannel",
     "AgentRequest",
     "AgentResponse",
-    "get_agent_interface",
     "UnifiedAgentInterface",
-    "AgentChannel",
+    "get_agent_interface",
 ]

@@ -6,7 +6,6 @@ Models for storing reasoning chains, chain-of-thought steps, and strategy evolut
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class ThoughtType(str, Enum):
@@ -39,9 +38,9 @@ class ChainOfThought:
     step_number: int
     thought_type: str
     content: str
-    intermediate_conclusion: Optional[str] = None
-    confidence_score: Optional[float] = None
-    citations: Optional[dict] = None
+    intermediate_conclusion: str | None = None
+    confidence_score: float | None = None
+    citations: dict | None = None
     created_at: datetime = field(default_factory=datetime.now)
 
     def to_dict(self):
@@ -77,8 +76,8 @@ class StrategyEvolution:
     strategy_id: str
     version: int
     changes: str
-    performance_delta: Optional[dict] = None
-    reasoning: Optional[str] = None
+    performance_delta: dict | None = None
+    reasoning: str | None = None
     created_at: datetime = field(default_factory=datetime.now)
 
     def to_dict(self):
@@ -118,7 +117,7 @@ class ReasoningTrace:
     final_conclusion: str
     processing_time: float
     chain_of_thought: list = field(default_factory=list)
-    strategy_evolution: Optional[StrategyEvolution] = None
+    strategy_evolution: StrategyEvolution | None = None
     metadata: dict = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
 
@@ -150,8 +149,8 @@ class ReasoningTrace:
         step_number: int,
         thought_type: str,
         content: str,
-        intermediate_conclusion: Optional[str] = None,
-        confidence_score: Optional[float] = None,
+        intermediate_conclusion: str | None = None,
+        confidence_score: float | None = None,
     ) -> ChainOfThought:
         """Add a thought step to the chain"""
         step = ChainOfThought(

@@ -28,7 +28,7 @@ Usage:
 import itertools
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -57,12 +57,12 @@ class MTFOptimizationResult:
     total_combinations: int
     tested_combinations: int
     execution_time_seconds: float
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_score: float
-    best_metrics: Dict[str, Any]
-    top_results: List[Dict[str, Any]]
-    performance_stats: Dict[str, Any]
-    mtf_params_tested: Dict[str, List[Any]] = field(default_factory=dict)
+    best_metrics: dict[str, Any]
+    top_results: list[dict[str, Any]]
+    performance_stats: dict[str, Any]
+    mtf_params_tested: dict[str, list[Any]] = field(default_factory=dict)
 
 
 class MTFOptimizer:
@@ -92,9 +92,9 @@ class MTFOptimizer:
     def _precompute_htf_indicators(
         self,
         htf_candles: pd.DataFrame,
-        htf_filter_types: List[str],
-        htf_filter_periods: List[int],
-    ) -> Dict[str, Dict[int, np.ndarray]]:
+        htf_filter_types: list[str],
+        htf_filter_periods: list[int],
+    ) -> dict[str, dict[int, np.ndarray]]:
         """
         Precompute all HTF indicators to avoid redundant calculations.
 
@@ -154,8 +154,8 @@ class MTFOptimizer:
         htf_close: np.ndarray,
         filter_type: str,
         period: int,
-        precomputed: Dict,
-    ) -> Tuple[bool, bool]:
+        precomputed: dict,
+    ) -> tuple[bool, bool]:
         """
         Get filter decision for a specific HTF bar.
 
@@ -210,14 +210,14 @@ class MTFOptimizer:
         htf_candles: pd.DataFrame,
         htf_index_map: np.ndarray,
         # Strategy params
-        rsi_period_range: List[int] = [14],
-        rsi_overbought_range: List[int] = [70],
-        rsi_oversold_range: List[int] = [30],
-        stop_loss_range: List[float] = [0.02],
-        take_profit_range: List[float] = [0.03],
+        rsi_period_range: list[int] = [14],
+        rsi_overbought_range: list[int] = [70],
+        rsi_oversold_range: list[int] = [30],
+        stop_loss_range: list[float] = [0.02],
+        take_profit_range: list[float] = [0.03],
         # MTF params
-        htf_filter_types: List[str] = ["sma"],
-        htf_filter_periods: List[int] = [200],
+        htf_filter_types: list[str] = ["sma"],
+        htf_filter_periods: list[int] = [200],
         # Trading params
         initial_capital: float = 10000.0,
         leverage: int = 10,

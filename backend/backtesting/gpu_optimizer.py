@@ -27,7 +27,7 @@ import time
 import warnings
 from dataclasses import dataclass
 from multiprocessing import Pool, shared_memory
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -2027,11 +2027,11 @@ class WarmProcessPool:
 
     def map_periods(
         self,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
@@ -2039,7 +2039,7 @@ class WarmProcessPool:
         direction: str,
         top_k: int = 1000,
         gpu_dtype: str = "float64",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Process all RSI periods in parallel."""
         if self.pool is None:
             raise RuntimeError("Pool not initialized. Call initialize() first.")
@@ -2115,15 +2115,15 @@ def _process_rsi_period(
     close: np.ndarray,
     high: np.ndarray,
     low: np.ndarray,
-    overbought_levels: List[int],
-    oversold_levels: List[int],
-    stop_losses: List[float],
-    take_profits: List[float],
+    overbought_levels: list[int],
+    oversold_levels: list[int],
+    stop_losses: list[float],
+    take_profits: list[float],
     initial_capital: float,
     leverage: int,
     commission: float,
     direction: str,
-) -> List[Dict]:
+) -> list[dict]:
     """
     Process a single RSI period with all parameter combinations.
     This runs in a separate process via joblib.
@@ -2531,13 +2531,13 @@ class GPUOptimizationResult:
     total_combinations: int
     tested_combinations: int
     execution_time_seconds: float
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_score: float
-    best_metrics: Dict[str, Any]
-    top_results: List[Dict[str, Any]]
-    performance_stats: Dict[str, Any]
+    best_metrics: dict[str, Any]
+    top_results: list[dict[str, Any]]
+    performance_stats: dict[str, Any]
     execution_mode: str
-    fallback_reason: Optional[str] = None
+    fallback_reason: str | None = None
 
 
 class GPUGridOptimizer:
@@ -2563,11 +2563,11 @@ class GPUGridOptimizer:
     def optimize(
         self,
         candles: pd.DataFrame,
-        rsi_period_range: List[int],
-        rsi_overbought_range: List[int],
-        rsi_oversold_range: List[int],
-        stop_loss_range: List[float],
-        take_profit_range: List[float],
+        rsi_period_range: list[int],
+        rsi_overbought_range: list[int],
+        rsi_oversold_range: list[int],
+        stop_loss_range: list[float],
+        take_profit_range: list[float],
         initial_capital: float = 10000.0,
         leverage: int = 1,
         commission: float = 0.0007,  # 0.07% TradingView parity
@@ -2583,7 +2583,7 @@ class GPUGridOptimizer:
         Run GPU-accelerated grid search optimization.
         """
         execution_mode = "gpu" if self.use_gpu else "cpu"
-        fallback_reason: Optional[str] = None
+        fallback_reason: str | None = None
 
         # Use provided position_size or instance default
         if position_size is not None:
@@ -2822,11 +2822,11 @@ class GPUGridOptimizer:
         high: np.ndarray,
         low: np.ndarray,
         n_candles: int,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
@@ -2834,7 +2834,7 @@ class GPUGridOptimizer:
         direction: str,
         top_k: int = 1000,
         gpu_dtype: str = "float64",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """GPU-accelerated optimization using CuPy for signals, Numba for RSI & backtest"""
 
         results = []
@@ -2926,11 +2926,11 @@ class GPUGridOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
@@ -2938,7 +2938,7 @@ class GPUGridOptimizer:
         direction: str,
         top_k: int = 1000,
         gpu_dtype: str = "float64",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Parallel optimization using WarmProcessPool with shared memory.
         Workers are pre-initialized with Numba JIT compiled, data in shared memory.
@@ -3018,13 +3018,13 @@ class GPUGridOptimizer:
         low: np.ndarray,
         entries: np.ndarray,
         exits: np.ndarray,
-        stop_loss: Optional[float],
-        take_profit: Optional[float],
+        stop_loss: float | None,
+        take_profit: float | None,
         capital: float,
         commission: float,
         slippage: float = 0.0005,
         position_size: float = 1.0,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Fast backtest simulation using Numba JIT.
         """
@@ -3178,11 +3178,11 @@ class GPUGridOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
@@ -3191,7 +3191,7 @@ class GPUGridOptimizer:
         position_mode: str = "block",  # NEW: block, close_and_open, hedge
         top_k: int = 1000,
         gpu_dtype: str = "float64",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Vectorized optimization using DeepSeek recommendations.
         V2: Uses _backtest_all_with_params to eliminate Python dict bottleneck.
@@ -3348,18 +3348,18 @@ class GPUGridOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
         direction: str,
         top_k: int = 1000,
         gpu_dtype: str = "float64",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         V3 Vectorized optimization with HOISTED signal generation.
         DeepSeek Priority 1: Pre-compute ALL signals before SL/TP loops.
@@ -3489,11 +3489,11 @@ class GPUGridOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
@@ -3501,7 +3501,7 @@ class GPUGridOptimizer:
         min_signals: int = 5,
         max_loss_pct: float = 50.0,
         top_k: int = 1000,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         V4 Vectorized optimization with EARLY TERMINATION.
         DeepSeek Recommendation: 40-70% speedup for large parameter spaces.
@@ -3635,18 +3635,18 @@ class GPUGridOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
         direction: str,
         top_k: int = 1000,
         gpu_dtype: str = "float64",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         V5 Vectorized optimization with TRANSPOSED memory layout.
         DeepSeek Recommendation: 1.2-1.5x speedup from better cache locality.
@@ -3772,18 +3772,18 @@ class GPUGridOptimizer:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
         direction: str,
         top_k: int = 1000,
         gpu_dtype: str = "float64",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         GPU-accelerated optimization using CuPy + Numba hybrid.
 
@@ -3924,11 +3924,11 @@ class GPUGridOptimizer:
         high: np.ndarray,
         low: np.ndarray,
         n_candles: int,
-        rsi_periods: List[int],
-        overbought_levels: List[int],
-        oversold_levels: List[int],
-        stop_losses: List[float],
-        take_profits: List[float],
+        rsi_periods: list[int],
+        overbought_levels: list[int],
+        oversold_levels: list[int],
+        stop_losses: list[float],
+        take_profits: list[float],
         initial_capital: float,
         leverage: int,
         commission: float,
@@ -3936,7 +3936,7 @@ class GPUGridOptimizer:
         direction: str,
         top_k: int = 1000,
         gpu_dtype: str = "float64",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """CPU fallback using Numba"""
 
         results = []
@@ -4023,7 +4023,7 @@ class GPUGridOptimizer:
 
         return rsi
 
-    def _calculate_scores(self, results: List[Dict], metric: str) -> List[Dict]:
+    def _calculate_scores(self, results: list[dict], metric: str) -> list[dict]:
         """Calculate optimization scores based on selected metric"""
         for r in results:
             if metric == "sharpe_ratio":
@@ -4077,11 +4077,11 @@ class GPUGridOptimizer:
 
 def run_gpu_optimization(
     candles: pd.DataFrame,
-    rsi_period_range: List[int],
-    rsi_overbought_range: List[int],
-    rsi_oversold_range: List[int],
-    stop_loss_range: List[float],
-    take_profit_range: List[float],
+    rsi_period_range: list[int],
+    rsi_overbought_range: list[int],
+    rsi_oversold_range: list[int],
+    stop_loss_range: list[float],
+    take_profit_range: list[float],
     initial_capital: float = 10000.0,
     leverage: int = 1,
     commission: float = 0.0007,  # 0.07% TradingView parity

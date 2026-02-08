@@ -12,8 +12,8 @@ import logging
 import os
 import re
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import requests
 
@@ -32,8 +32,8 @@ except Exception:
 class BybitAdapter:
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        api_secret: Optional[str] = None,
+        api_key: str | None = None,
+        api_secret: str | None = None,
         timeout: int = 10,
     ):
         self.api_key = api_key
@@ -48,14 +48,14 @@ class BybitAdapter:
         else:
             self._client = None
         # cache of discovered instruments: symbol -> metadata
-        self._instruments_cache: Dict[str, Dict] = {}
-        self._instruments_cache_at: Optional[float] = None
+        self._instruments_cache: dict[str, dict] = {}
+        self._instruments_cache_at: float | None = None
         # cache TTL in seconds
         self._instruments_cache_ttl = 60 * 5
 
     def get_klines(
         self, symbol: str, interval: str = "1", limit: int = 200
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Fetch kline/candle data. interval is minutes as string in Bybit public API mapping.
 
         Returns list of dicts with keys: open_time, open, high, low, close, volume
@@ -276,31 +276,31 @@ class BybitAdapter:
             logger.exception("All Bybit probes failed")
             raise
 
-    def _normalize_kline_row(self, row: Dict) -> Dict:
+    def _normalize_kline_row(self, row: dict) -> dict:
         # Accept both list-style and dict-style rows
         # Always preserve the original data under 'raw' to avoid any data loss
         if isinstance(row, list):
             raw: Any = list(row)
             # Bybit v5 list format documented: [startTime, openPrice, highPrice, lowPrice, closePrice, volume, turnover?]
-            parsed: Dict[str, Any] = {"raw": raw}
+            parsed: dict[str, Any] = {"raw": raw}
             try:
                 start_ms = int(raw[0])
                 parsed["open_time"] = start_ms
                 parsed["open_time_dt"] = datetime.fromtimestamp(
-                    start_ms / 1000.0, tz=timezone.utc
+                    start_ms / 1000.0, tz=UTC
                 )
             except Exception:
                 parsed["open_time"] = None
                 parsed["open_time_dt"] = None
 
             # map string fields and keep originals
-            def _as_str(idx: int) -> Optional[str]:
+            def _as_str(idx: int) -> str | None:
                 try:
                     return str(raw[idx])
                 except Exception:
                     return None
 
-            def _as_float(val: Optional[str]) -> Optional[float]:
+            def _as_float(val: str | None) -> float | None:
                 try:
                     return float(val) if val is not None and val != "" else None
                 except Exception:
@@ -326,7 +326,7 @@ class BybitAdapter:
             return parsed
         elif isinstance(row, dict):
             raw = dict(row)
-            parsed: Dict[str, Any] = {"raw": raw}
+            parsed: dict[str, Any] = {"raw": raw}
             # Common key aliases used across Bybit responses
             start_candidates = [
                 raw.get("startTime"),
@@ -350,12 +350,12 @@ class BybitAdapter:
                         continue
             parsed["open_time"] = start_ms
             parsed["open_time_dt"] = (
-                datetime.fromtimestamp(start_ms / 1000.0, tz=timezone.utc)
+                datetime.fromtimestamp(start_ms / 1000.0, tz=UTC)
                 if start_ms is not None
                 else None
             )
 
-            def get_str(*keys) -> Optional[str]:
+            def get_str(*keys) -> str | None:
                 for k in keys:
                     v = raw.get(k)
                     if v is not None:
@@ -385,9 +385,9 @@ class BybitAdapter:
     def _persist_klines_to_db(
         self,
         symbol: str,
-        normalized_rows: List[Dict],
-        db: Optional[object] = None,
-        engine: Optional[object] = None,
+        normalized_rows: list[dict],
+        db: object | None = None,
+        engine: object | None = None,
     ):
         """Persist normalized klines (list of dicts as returned by _normalize_kline_row) into audit table.
 
@@ -714,17 +714,17 @@ class BybitAdapter:
         raise ValueError(f"symbol {symbol} not found in instruments-info")
 
 
-def _safe_float(val: Optional[str]) -> Optional[float]:
+def _safe_float(val: str | None) -> float | None:
     try:
         return float(val) if val is not None and val != "" else None
     except Exception:
         return None
 
 
-def _to_dt(ms: Optional[int]):
+def _to_dt(ms: int | None):
     try:
         return (
-            datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
+            datetime.fromtimestamp(ms / 1000.0, tz=UTC)
             if ms is not None
             else None
         )

@@ -13,9 +13,8 @@ This migration adds fields to support the visual Strategy Builder:
 These fields allow storing visual block-based strategies in the database.
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import sqlite
+from alembic import op
 
 # revision identifiers
 revision = "20260129_strategy_builder"

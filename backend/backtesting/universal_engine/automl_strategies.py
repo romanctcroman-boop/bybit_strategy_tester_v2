@@ -15,9 +15,10 @@ Version: 2.4.0
 import copy
 import random
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -74,7 +75,7 @@ class Feature:
 
     name: str
     feature_type: FeatureType
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
     importance: float = 0.0
     correlation_with_target: float = 0.0
 
@@ -83,10 +84,10 @@ class Feature:
 class FeatureSet:
     """Set of features for a strategy."""
 
-    features: List[Feature]
-    feature_matrix: Optional[NDArray] = None
-    target: Optional[NDArray] = None
-    feature_importance: Dict[str, float] = field(default_factory=dict)
+    features: list[Feature]
+    feature_matrix: NDArray | None = None
+    target: NDArray | None = None
+    feature_importance: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -94,13 +95,13 @@ class StrategyGenome:
     """Genome representation of a trading strategy."""
 
     # Entry conditions
-    entry_features: List[str]
-    entry_thresholds: Dict[str, Tuple[float, float]]  # (min, max)
+    entry_features: list[str]
+    entry_thresholds: dict[str, tuple[float, float]]  # (min, max)
     entry_logic: str  # "and" or "or"
 
     # Exit conditions
-    exit_features: List[str]
-    exit_thresholds: Dict[str, Tuple[float, float]]
+    exit_features: list[str]
+    exit_thresholds: dict[str, tuple[float, float]]
     exit_logic: str
 
     # Position sizing
@@ -122,10 +123,10 @@ class AutoMLConfig:
 
     # Feature engineering
     max_features: int = 50
-    feature_types: List[FeatureType] = field(default_factory=lambda: list(FeatureType))
+    feature_types: list[FeatureType] = field(default_factory=lambda: list(FeatureType))
 
     # Model selection
-    model_types: List[ModelType] = field(default_factory=lambda: [ModelType.ENSEMBLE])
+    model_types: list[ModelType] = field(default_factory=lambda: [ModelType.ENSEMBLE])
     max_models: int = 10
 
     # Genetic algorithm
@@ -176,9 +177,9 @@ class FeatureEngineering:
     Generates hundreds of technical indicators automatically.
     """
 
-    def __init__(self, config: Optional[AutoMLConfig] = None):
+    def __init__(self, config: AutoMLConfig | None = None):
         self.config = config or AutoMLConfig()
-        self._feature_generators: Dict[FeatureType, List[Callable]] = {}
+        self._feature_generators: dict[FeatureType, list[Callable]] = {}
         self._register_generators()
 
     def _register_generators(self) -> None:
@@ -228,7 +229,7 @@ class FeatureEngineering:
         low: NDArray,
         close: NDArray,
         volume: NDArray,
-        target: Optional[NDArray] = None,
+        target: NDArray | None = None,
     ) -> FeatureSet:
         """
         Generate comprehensive feature set.
@@ -244,8 +245,8 @@ class FeatureEngineering:
         Returns:
             FeatureSet with all generated features
         """
-        features: List[Feature] = []
-        feature_arrays: List[NDArray] = []
+        features: list[Feature] = []
+        feature_arrays: list[NDArray] = []
 
         for feature_type in self.config.feature_types:
             if feature_type in self._feature_generators:
@@ -292,8 +293,8 @@ class FeatureEngineering:
         return FeatureSet(features=[], feature_matrix=None)
 
     def _calculate_importance(
-        self, features: NDArray, target: NDArray, feature_list: List[Feature]
-    ) -> Dict[str, float]:
+        self, features: NDArray, target: NDArray, feature_list: list[Feature]
+    ) -> dict[str, float]:
         """Calculate feature importance using correlation and mutual info."""
         importance = {}
         n_features = features.shape[1]
@@ -326,7 +327,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate RSI features with multiple periods."""
         features = {}
         for period in [7, 14, 21, 28]:
@@ -353,7 +354,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate Rate of Change features."""
         features = {}
         for period in [5, 10, 20, 50]:
@@ -369,7 +370,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate momentum features."""
         features = {}
         for period in [10, 20, 50]:
@@ -385,7 +386,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate True Strength Index."""
         price_change = np.diff(close)
         double_smooth_pc = self._ewma(self._ewma(price_change, 25), 13)
@@ -409,7 +410,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate SMA crossover features."""
         features = {}
 
@@ -445,7 +446,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate EMA crossover features."""
         features = {}
 
@@ -470,7 +471,7 @@ class FeatureEngineering:
 
     def _generate_adx(
         self, _open: NDArray, high: NDArray, low: NDArray, close: NDArray, _vol: NDArray
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate ADX and DI features."""
         period = 14
         n = len(close)
@@ -525,7 +526,7 @@ class FeatureEngineering:
         low: NDArray,
         _close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate Aroon indicator."""
         period = 25
         n = len(high)
@@ -555,7 +556,7 @@ class FeatureEngineering:
 
     def _generate_atr(
         self, _open: NDArray, high: NDArray, low: NDArray, close: NDArray, _vol: NDArray
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate ATR features."""
         features = {}
 
@@ -580,7 +581,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate Bollinger Band features."""
         features = {}
 
@@ -598,7 +599,7 @@ class FeatureEngineering:
 
     def _generate_keltner(
         self, _open: NDArray, high: NDArray, low: NDArray, close: NDArray, _vol: NDArray
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate Keltner Channel features."""
         period = 20
         atr_mult = 2
@@ -628,7 +629,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate standard deviation features."""
         features = {}
 
@@ -658,7 +659,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         volume: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate On-Balance Volume features."""
         obv = np.zeros(len(close))
         obv[0] = volume[0]
@@ -682,7 +683,7 @@ class FeatureEngineering:
         low: NDArray,
         close: NDArray,
         volume: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate VWAP features."""
         typical_price = (high + low + close) / 3
         cum_tp_vol = np.cumsum(typical_price * volume)
@@ -699,7 +700,7 @@ class FeatureEngineering:
         low: NDArray,
         close: NDArray,
         volume: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate Money Flow Index."""
         period = 14
         typical_price = (high + low + close) / 3
@@ -729,7 +730,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         volume: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate volume ratio features."""
         features = {}
 
@@ -758,7 +759,7 @@ class FeatureEngineering:
         low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate candlestick pattern features."""
         n = len(close)
 
@@ -805,7 +806,7 @@ class FeatureEngineering:
 
     def _generate_pivot_points(
         self, _open: NDArray, high: NDArray, low: NDArray, close: NDArray, _vol: NDArray
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate pivot point features."""
         # Standard pivot points (using previous day)
         pivot = (high + low + close) / 3
@@ -832,7 +833,7 @@ class FeatureEngineering:
 
     def _generate_support_resistance(
         self, _open: NDArray, high: NDArray, low: NDArray, close: NDArray, _vol: NDArray
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate support/resistance features."""
         window = 20
         n = len(close)
@@ -866,7 +867,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate Z-score features."""
         features = {}
 
@@ -885,7 +886,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate percentile rank features."""
         features = {}
 
@@ -905,7 +906,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate skewness and kurtosis features."""
         returns = np.diff(np.log(close))
         returns = np.insert(returns, 0, 0)
@@ -933,7 +934,7 @@ class FeatureEngineering:
         _low: NDArray,
         close: NDArray,
         _vol: NDArray,
-    ) -> Dict[str, NDArray]:
+    ) -> dict[str, NDArray]:
         """Generate Hurst exponent feature."""
         period = 100
         n = len(close)
@@ -1019,7 +1020,7 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         """Get model parameters."""
         pass
 
@@ -1029,7 +1030,7 @@ class LinearModel(BaseModel):
 
     def __init__(self, regularization: float = 0.01):
         self.regularization = regularization
-        self._weights: Optional[NDArray] = None
+        self._weights: NDArray | None = None
         self._bias: float = 0.0
 
     def fit(self, X: NDArray, y: NDArray) -> "LinearModel":
@@ -1051,7 +1052,7 @@ class LinearModel(BaseModel):
             raise ValueError("Model not fitted")
         return X @ self._weights + self._bias
 
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         return {"regularization": self.regularization}
 
 
@@ -1061,14 +1062,14 @@ class DecisionTreeModel(BaseModel):
     def __init__(self, max_depth: int = 5, min_samples_split: int = 10):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
-        self._tree: Optional[Dict] = None
+        self._tree: dict | None = None
 
     def fit(self, X: NDArray, y: NDArray) -> "DecisionTreeModel":
         """Build decision tree."""
         self._tree = self._build_tree(X, y, depth=0)
         return self
 
-    def _build_tree(self, X: NDArray, y: NDArray, depth: int) -> Dict:
+    def _build_tree(self, X: NDArray, y: NDArray, depth: int) -> dict:
         """Recursively build tree."""
         n_samples = len(y)
 
@@ -1121,7 +1122,7 @@ class DecisionTreeModel(BaseModel):
             "right": self._build_tree(X[right_mask], y[right_mask], depth + 1),
         }
 
-    def _predict_one(self, x: NDArray, tree: Dict) -> float:
+    def _predict_one(self, x: NDArray, tree: dict) -> float:
         """Predict single sample."""
         if tree["leaf"]:
             return tree["value"]
@@ -1136,7 +1137,7 @@ class DecisionTreeModel(BaseModel):
             raise ValueError("Model not fitted")
         return np.array([self._predict_one(x, self._tree) for x in X])
 
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         return {
             "max_depth": self.max_depth,
             "min_samples_split": self.min_samples_split,
@@ -1149,7 +1150,7 @@ class EnsembleModel(BaseModel):
     def __init__(self, n_estimators: int = 10, base_model: str = "tree"):
         self.n_estimators = n_estimators
         self.base_model = base_model
-        self._models: List[BaseModel] = []
+        self._models: list[BaseModel] = []
 
     def fit(self, X: NDArray, y: NDArray) -> "EnsembleModel":
         """Fit ensemble with bagging."""
@@ -1178,16 +1179,16 @@ class EnsembleModel(BaseModel):
         predictions = np.array([m.predict(X) for m in self._models])
         return np.mean(predictions, axis=0)
 
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         return {"n_estimators": self.n_estimators, "base_model": self.base_model}
 
 
 class ModelSelector:
     """Auto model selection and hyperparameter tuning."""
 
-    def __init__(self, config: Optional[AutoMLConfig] = None):
+    def __init__(self, config: AutoMLConfig | None = None):
         self.config = config or AutoMLConfig()
-        self._best_model: Optional[BaseModel] = None
+        self._best_model: BaseModel | None = None
         self._best_score: float = -np.inf
 
     def select_model(
@@ -1229,7 +1230,7 @@ class ModelSelector:
 
         return self._best_model
 
-    def _generate_candidates(self) -> List[BaseModel]:
+    def _generate_candidates(self) -> list[BaseModel]:
         """Generate model candidates with different hyperparameters."""
         candidates = []
 
@@ -1267,13 +1268,13 @@ class StrategyEvolver:
 
     def __init__(
         self,
-        config: Optional[AutoMLConfig] = None,
-        feature_names: Optional[List[str]] = None,
+        config: AutoMLConfig | None = None,
+        feature_names: list[str] | None = None,
     ):
         self.config = config or AutoMLConfig()
         self.feature_names = feature_names or []
-        self._population: List[StrategyGenome] = []
-        self._best_genome: Optional[StrategyGenome] = None
+        self._population: list[StrategyGenome] = []
+        self._best_genome: StrategyGenome | None = None
         self._generation: int = 0
 
     def initialize_population(self) -> None:
@@ -1313,7 +1314,7 @@ class StrategyEvolver:
         )
 
     def evolve(
-        self, features: NDArray, prices: NDArray, n_generations: Optional[int] = None
+        self, features: NDArray, prices: NDArray, n_generations: int | None = None
     ) -> StrategyGenome:
         """
         Run genetic algorithm evolution.
@@ -1588,8 +1589,8 @@ class SignalCombiner:
 
     def __init__(self, combination_method: str = "weighted_average"):
         self.combination_method = combination_method
-        self._signal_sources: Dict[
-            str, Tuple[NDArray, float]
+        self._signal_sources: dict[
+            str, tuple[NDArray, float]
         ] = {}  # name -> (signals, weight)
 
     def add_signal_source(
@@ -1646,7 +1647,7 @@ class WalkForwardValidator:
     Prevents overfitting by testing on unseen data.
     """
 
-    def __init__(self, config: Optional[AutoMLConfig] = None):
+    def __init__(self, config: AutoMLConfig | None = None):
         self.config = config or AutoMLConfig()
 
     def validate(
@@ -1654,7 +1655,7 @@ class WalkForwardValidator:
         strategy_func: Callable[[NDArray, NDArray], NDArray],
         features: NDArray,
         prices: NDArray,
-    ) -> List[ValidationResult]:
+    ) -> list[ValidationResult]:
         """
         Run walk-forward validation.
 
@@ -1732,7 +1733,7 @@ class WalkForwardValidator:
 
         return results
 
-    def _calculate_metrics(self, signals: NDArray, prices: NDArray) -> Dict[str, float]:
+    def _calculate_metrics(self, signals: NDArray, prices: NDArray) -> dict[str, float]:
         """Calculate trading metrics from signals."""
         # Simple position tracking
         returns = []
@@ -1812,15 +1813,15 @@ class AutoMLPipeline:
     Combines feature engineering, model selection, and strategy evolution.
     """
 
-    def __init__(self, config: Optional[AutoMLConfig] = None):
+    def __init__(self, config: AutoMLConfig | None = None):
         self.config = config or AutoMLConfig()
         self.feature_engineer = FeatureEngineering(config)
         self.model_selector = ModelSelector(config)
         self.validator = WalkForwardValidator(config)
 
-        self._feature_set: Optional[FeatureSet] = None
-        self._best_model: Optional[BaseModel] = None
-        self._best_strategy: Optional[StrategyGenome] = None
+        self._feature_set: FeatureSet | None = None
+        self._best_model: BaseModel | None = None
+        self._best_strategy: StrategyGenome | None = None
 
     def fit(
         self,
@@ -1829,7 +1830,7 @@ class AutoMLPipeline:
         low: NDArray,
         close: NDArray,
         volume: NDArray,
-        target: Optional[NDArray] = None,
+        target: NDArray | None = None,
     ) -> "AutoMLPipeline":
         """
         Fit the AutoML pipeline.
@@ -1891,11 +1892,11 @@ class AutoMLPipeline:
 
         return signals
 
-    def get_best_strategy(self) -> Optional[StrategyGenome]:
+    def get_best_strategy(self) -> StrategyGenome | None:
         """Get the best evolved strategy."""
         return self._best_strategy
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         """Get feature importance scores."""
         if self._feature_set:
             return self._feature_set.feature_importance

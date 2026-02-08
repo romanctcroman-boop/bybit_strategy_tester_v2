@@ -9,7 +9,7 @@ Tests cover:
 5. Circuit breaker integration
 """
 
-from datetime import datetime, timedelta, timezone  # noqa: F401
+from datetime import UTC, datetime, timedelta, timezone  # noqa: F401
 
 import pytest
 
@@ -55,7 +55,7 @@ class TestResponseCache:
 
         # Manually expire the entry
         key = cache._hash_prompt("test prompt", "deepseek")
-        cache._cache[key].cached_at = datetime.now(timezone.utc) - timedelta(seconds=10)
+        cache._cache[key].cached_at = datetime.now(UTC) - timedelta(seconds=10)
 
         result = cache.get("test prompt", "deepseek")
         assert result is None
@@ -118,7 +118,7 @@ class TestFallbackResponse:
             content="test",
             fallback_type=FallbackType.CACHED,
             original_prompt="test",
-            cached_at=datetime.now(timezone.utc),
+            cached_at=datetime.now(UTC),
             ttl_seconds=3600,
         )
 
@@ -130,7 +130,7 @@ class TestFallbackResponse:
             content="test",
             fallback_type=FallbackType.CACHED,
             original_prompt="test",
-            cached_at=datetime.now(timezone.utc) - timedelta(hours=2),
+            cached_at=datetime.now(UTC) - timedelta(hours=2),
             ttl_seconds=3600,
         )
 
@@ -138,7 +138,7 @@ class TestFallbackResponse:
 
     def test_to_dict(self):
         """Test to_dict serialization"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         response = FallbackResponse(
             content="test content",
             fallback_type=FallbackType.CACHED,
@@ -162,7 +162,7 @@ class TestServiceStatus:
 
     def test_to_dict(self):
         """Test ServiceStatus serialization"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         status = ServiceStatus(
             name="deepseek",
             health=ServiceHealth.HEALTHY,

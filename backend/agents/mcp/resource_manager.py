@@ -13,11 +13,12 @@ from __future__ import annotations
 import asyncio
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -50,14 +51,14 @@ class Resource:
     uri: str
     name: str
     type: ResourceType = ResourceType.CUSTOM
-    description: Optional[str] = None
-    mime_type: Optional[str] = None
-    size_bytes: Optional[int] = None
-    created_at: Optional[datetime] = None
-    modified_at: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    description: str | None = None
+    mime_type: str | None = None
+    size_bytes: int | None = None
+    created_at: datetime | None = None
+    modified_at: datetime | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         data = {
             "uri": self.uri,
@@ -85,10 +86,10 @@ class ResourceContent:
 
     uri: str
     mime_type: str
-    text: Optional[str] = None
-    blob: Optional[bytes] = None
+    text: str | None = None
+    blob: bytes | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to MCP format"""
         data = {
             "uri": self.uri,
@@ -107,7 +108,7 @@ class ResourceProvider(ABC):
     """Abstract resource provider"""
 
     @abstractmethod
-    async def list_resources(self) -> List[Resource]:
+    async def list_resources(self) -> list[Resource]:
         """List available resources"""
         pass
 
@@ -125,7 +126,7 @@ class ResourceProvider(ABC):
 class FileResourceProvider(ResourceProvider):
     """File system resource provider"""
 
-    def __init__(self, base_path: str, allowed_extensions: Optional[List[str]] = None):
+    def __init__(self, base_path: str, allowed_extensions: list[str] | None = None):
         self.base_path = Path(base_path)
         self.allowed_extensions = allowed_extensions or [
             ".json",
@@ -139,7 +140,7 @@ class FileResourceProvider(ResourceProvider):
 
         logger.info(f"📁 FileResourceProvider initialized: {base_path}")
 
-    async def list_resources(self) -> List[Resource]:
+    async def list_resources(self) -> list[Resource]:
         """List files in base path"""
         resources = []
 
@@ -157,7 +158,7 @@ class FileResourceProvider(ResourceProvider):
                         mime_type=self._get_mime_type(path.suffix),
                         size_bytes=stat.st_size,
                         modified_at=datetime.fromtimestamp(
-                            stat.st_mtime, tz=timezone.utc
+                            stat.st_mtime, tz=UTC
                         ),
                     )
                 )
@@ -213,7 +214,7 @@ class MemoryResourceProvider(ResourceProvider):
     """In-memory resource provider"""
 
     def __init__(self):
-        self._resources: Dict[str, tuple[Resource, ResourceContent]] = {}
+        self._resources: dict[str, tuple[Resource, ResourceContent]] = {}
         logger.info("🧠 MemoryResourceProvider initialized")
 
     def add_resource(
@@ -222,7 +223,7 @@ class MemoryResourceProvider(ResourceProvider):
         name: str,
         content: str,
         mime_type: str = "text/plain",
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> Resource:
         """Add in-memory resource"""
         resource = Resource(
@@ -232,7 +233,7 @@ class MemoryResourceProvider(ResourceProvider):
             description=description,
             mime_type=mime_type,
             size_bytes=len(content.encode()),
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         content_obj = ResourceContent(
@@ -251,14 +252,14 @@ class MemoryResourceProvider(ResourceProvider):
 
         resource, _ = self._resources[uri]
         resource.size_bytes = len(content.encode())
-        resource.modified_at = datetime.now(timezone.utc)
+        resource.modified_at = datetime.now(UTC)
 
         self._resources[uri] = (
             resource,
             ResourceContent(uri=uri, mime_type=resource.mime_type, text=content),
         )
 
-    async def list_resources(self) -> List[Resource]:
+    async def list_resources(self) -> list[Resource]:
         """List in-memory resources"""
         return [res for res, _ in self._resources.values()]
 
@@ -280,7 +281,7 @@ class DatabaseResourceProvider(ResourceProvider):
         self.connection_string = connection_string
         logger.info("🗄️ DatabaseResourceProvider initialized")
 
-    async def list_resources(self) -> List[Resource]:
+    async def list_resources(self) -> list[Resource]:
         """List tables/views as resources"""
         # Placeholder - would query database metadata
         return [
@@ -331,10 +332,10 @@ class ResourceManager:
     """
 
     def __init__(self):
-        self.providers: List[ResourceProvider] = []
-        self._cache: Dict[str, tuple[ResourceContent, datetime]] = {}
+        self.providers: list[ResourceProvider] = []
+        self._cache: dict[str, tuple[ResourceContent, datetime]] = {}
         self._cache_ttl_seconds: int = 60
-        self._subscriptions: Dict[str, List[Callable]] = {}
+        self._subscriptions: dict[str, list[Callable]] = {}
 
         logger.info("📦 ResourceManager initialized")
 
@@ -344,8 +345,8 @@ class ResourceManager:
         logger.debug(f"Added provider: {type(provider).__name__}")
 
     async def list_resources(
-        self, type_filter: Optional[ResourceType] = None
-    ) -> List[Resource]:
+        self, type_filter: ResourceType | None = None
+    ) -> list[Resource]:
         """List all resources from all providers"""
         all_resources = []
 
@@ -365,7 +366,7 @@ class ResourceManager:
         # Check cache
         if use_cache and uri in self._cache:
             content, cached_at = self._cache[uri]
-            age = (datetime.now(timezone.utc) - cached_at).total_seconds()
+            age = (datetime.now(UTC) - cached_at).total_seconds()
             if age < self._cache_ttl_seconds:
                 return content
 
@@ -376,7 +377,7 @@ class ResourceManager:
 
                 # Cache if text content
                 if content.text:
-                    self._cache[uri] = (content, datetime.now(timezone.utc))
+                    self._cache[uri] = (content, datetime.now(UTC))
 
                 return content
 
@@ -419,7 +420,7 @@ class ResourceManager:
         """Clear resource cache"""
         self._cache.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get manager statistics"""
         return {
             "providers": len(self.providers),
@@ -429,7 +430,7 @@ class ResourceManager:
 
 
 # Global instance
-_global_manager: Optional[ResourceManager] = None
+_global_manager: ResourceManager | None = None
 
 
 def get_resource_manager() -> ResourceManager:
@@ -441,13 +442,13 @@ def get_resource_manager() -> ResourceManager:
 
 
 __all__ = [
-    "ResourceType",
-    "Resource",
-    "ResourceContent",
-    "ResourceProvider",
+    "DatabaseResourceProvider",
     "FileResourceProvider",
     "MemoryResourceProvider",
-    "DatabaseResourceProvider",
+    "Resource",
+    "ResourceContent",
     "ResourceManager",
+    "ResourceProvider",
+    "ResourceType",
     "get_resource_manager",
 ]

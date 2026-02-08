@@ -9,9 +9,10 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +59,13 @@ class Task:
         self.timeout = timeout
         self.retry_count = 0
         self.status = TaskStatus.PENDING
-        self.created_at = datetime.now(timezone.utc)
-        self.started_at: Optional[datetime] = None
-        self.completed_at: Optional[datetime] = None
+        self.created_at = datetime.now(UTC)
+        self.started_at: datetime | None = None
+        self.completed_at: datetime | None = None
         self.result: Any = None
-        self.error: Optional[str] = None
+        self.error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize task to dictionary."""
         return {
             "task_id": self.task_id,
@@ -86,7 +87,7 @@ class Task:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Task":
+    def from_dict(cls, data: dict[str, Any]) -> "Task":
         """Deserialize task from dictionary."""
         task = cls(
             func_name=data["func_name"],
@@ -135,8 +136,8 @@ class QueueAdapter:
         self.result_ttl = result_ttl
         self._redis = None
         self._connected = False
-        self._handlers: Dict[str, Callable] = {}
-        self._worker_task: Optional[asyncio.Task] = None
+        self._handlers: dict[str, Callable] = {}
+        self._worker_task: asyncio.Task | None = None
         self._stats = {
             "tasks_submitted": 0,
             "tasks_completed": 0,
@@ -234,7 +235,7 @@ class QueueAdapter:
 
         return task.task_id
 
-    async def get_task(self, task_id: str) -> Optional[Task]:
+    async def get_task(self, task_id: str) -> Task | None:
         """Get task by ID."""
         if not await self._ensure_connected():
             return None
@@ -244,7 +245,7 @@ class QueueAdapter:
             return Task.from_dict(json.loads(data))
         return None
 
-    async def get_result(self, task_id: str) -> Optional[Any]:
+    async def get_result(self, task_id: str) -> Any | None:
         """Get task result."""
         task = await self.get_task(task_id)
         if task:
@@ -277,7 +278,7 @@ class QueueAdapter:
             return True
         return False
 
-    async def get_queue_stats(self) -> Dict[str, Any]:
+    async def get_queue_stats(self) -> dict[str, Any]:
         """Get queue statistics."""
         if not await self._ensure_connected():
             return {"connected": False, **self._stats}
@@ -322,7 +323,7 @@ class QueueAdapter:
 
                     # Execute task
                     task.status = TaskStatus.RUNNING
-                    task.started_at = datetime.now(timezone.utc)
+                    task.started_at = datetime.now(UTC)
                     await self._update_task(task)
 
                     try:
@@ -341,7 +342,7 @@ class QueueAdapter:
 
                         task.status = TaskStatus.COMPLETED
                         task.result = result
-                        task.completed_at = datetime.now(timezone.utc)
+                        task.completed_at = datetime.now(UTC)
                         self._stats["tasks_completed"] += 1
 
                     except Exception as e:
@@ -405,7 +406,7 @@ queue_adapter = QueueAdapter()
 __all__ = [
     "QueueAdapter",
     "Task",
-    "TaskStatus",
     "TaskPriority",
+    "TaskStatus",
     "queue_adapter",
 ]

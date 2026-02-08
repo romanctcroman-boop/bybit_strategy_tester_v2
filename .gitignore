@@ -459,3 +459,44 @@ deepseek_*.md
 
 # Validation reports
 validation_reports.json
+
+# ==============================================================================
+# Additional entries (2026-02-08 sync cleanup)
+# ==============================================================================
+
+# Debug scripts in root (temporary dev files)
+/debug_*.py
+/verify_*.py
+/simple_api_*.py
+/run_api_*.py
+/quick_api_test.py
+
+# Temporary batch files
+/run_*.bat
+/test_api.bat
+
+# Debug/test output text files in root
+/api_backtest_debug.txt
+/api_response.json
+/api_test_*.txt
+/backtest_flow_output.txt
+/bisect*.txt
+/curl_test_result.txt
+/dca_debug_output*.txt
+/dca_test_output.txt
+/debug_*.txt
+/endpoint_check.txt
+/engine_adapter_output*.txt
+/eval_criteria_test_result.txt
+/eval_test_v2_result.txt
+/final_api_result.txt
+/final_eval_result.txt
+/find_data_result.txt
+/fix_output.txt
+/full_run.txt
+/get_test_result.txt
+/health_*.txt
+/mega_test_*.txt
+/opt_result*.txt
+/quick_result.txt
+/signal_gen_output*.txt

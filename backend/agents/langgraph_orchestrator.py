@@ -17,10 +17,11 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -47,22 +48,22 @@ class AgentState:
     """State object passed between agents in the graph."""
 
     # Core state
-    messages: List[Dict[str, Any]] = field(default_factory=list)
-    context: Dict[str, Any] = field(default_factory=dict)
+    messages: list[dict[str, Any]] = field(default_factory=list)
+    context: dict[str, Any] = field(default_factory=dict)
 
     # Execution tracking
-    current_node: Optional[str] = None
-    visited_nodes: List[str] = field(default_factory=list)
-    execution_path: List[Tuple[str, float]] = field(default_factory=list)
+    current_node: str | None = None
+    visited_nodes: list[str] = field(default_factory=list)
+    execution_path: list[tuple[str, float]] = field(default_factory=list)
 
     # Results storage
-    results: Dict[str, Any] = field(default_factory=dict)
-    errors: List[Dict[str, Any]] = field(default_factory=list)
+    results: dict[str, Any] = field(default_factory=dict)
+    errors: list[dict[str, Any]] = field(default_factory=list)
 
     # Metadata
     session_id: str = field(default_factory=lambda: str(uuid4()))
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def add_message(self, role: str, content: str, agent: str = "system"):
         """Add a message to the state."""
@@ -71,17 +72,17 @@ class AgentState:
                 "role": role,
                 "content": content,
                 "agent": agent,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def set_result(self, node: str, result: Any):
         """Store result from a node execution."""
         self.results[node] = result
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
-    def get_result(self, node: str) -> Optional[Any]:
+    def get_result(self, node: str) -> Any | None:
         """Get result from a node execution."""
         return self.results.get(node)
 
@@ -92,12 +93,12 @@ class AgentState:
                 "node": node,
                 "error_type": type(error).__name__,
                 "error_message": str(error),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert state to dictionary."""
         return {
             "session_id": self.session_id,
@@ -134,7 +135,7 @@ class AgentNode(ABC):
         self.retry_count = retry_count
         self.retry_delay = retry_delay
         self.status = ExecutionStatus.PENDING
-        self.execution_time: Optional[float] = None
+        self.execution_time: float | None = None
 
     @abstractmethod
     async def execute(self, state: AgentState) -> AgentState:
@@ -168,7 +169,7 @@ class AgentNode(ABC):
                 )
                 return result_state
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 last_error = TimeoutError(
                     f"Agent '{self.name}' timed out after {self.timeout}s"
                 )
@@ -287,9 +288,9 @@ class Edge:
     """Edge connecting two nodes in the graph."""
 
     source: str
-    target: Union[str, List[str]]  # Single node or list for parallel
+    target: str | list[str]  # Single node or list for parallel
     edge_type: EdgeType = EdgeType.DIRECT
-    condition: Optional[Callable[[AgentState], bool]] = None
+    condition: Callable[[AgentState], bool] | None = None
     priority: int = 0
 
     def should_traverse(self, state: AgentState) -> bool:
@@ -307,8 +308,8 @@ class ConditionalRouter:
 
     def __init__(self, name: str):
         self.name = name
-        self.routes: List[Tuple[Callable[[AgentState], bool], str]] = []
-        self.default_route: Optional[str] = None
+        self.routes: list[tuple[Callable[[AgentState], bool], str]] = []
+        self.default_route: str | None = None
 
     def add_route(self, condition: Callable[[AgentState], bool], target: str):
         """Add a conditional route."""
@@ -318,7 +319,7 @@ class ConditionalRouter:
         """Set default route."""
         self.default_route = target
 
-    def get_next_node(self, state: AgentState) -> Optional[str]:
+    def get_next_node(self, state: AgentState) -> str | None:
         """Get the next node based on state."""
         for condition, target in self.routes:
             if condition(state):
@@ -346,13 +347,13 @@ class AgentGraph:
         self.max_iterations = max_iterations
 
         # Graph structure
-        self.nodes: Dict[str, AgentNode] = {}
-        self.edges: Dict[str, List[Edge]] = {}
-        self.routers: Dict[str, ConditionalRouter] = {}
+        self.nodes: dict[str, AgentNode] = {}
+        self.edges: dict[str, list[Edge]] = {}
+        self.routers: dict[str, ConditionalRouter] = {}
 
         # Special nodes
-        self.entry_point: Optional[str] = None
-        self.exit_points: Set[str] = set()
+        self.entry_point: str | None = None
+        self.exit_points: set[str] = set()
 
         # Execution metrics
         self.total_executions = 0
@@ -368,9 +369,9 @@ class AgentGraph:
     def add_edge(
         self,
         source: str,
-        target: Union[str, List[str]],
+        target: str | list[str],
         edge_type: EdgeType = EdgeType.DIRECT,
-        condition: Optional[Callable[[AgentState], bool]] = None,
+        condition: Callable[[AgentState], bool] | None = None,
         priority: int = 0,
     ) -> "AgentGraph":
         """Add an edge between nodes."""
@@ -412,7 +413,7 @@ class AgentGraph:
         self.exit_points.add(node_name)
         return self
 
-    def _get_next_nodes(self, current: str, state: AgentState) -> List[str]:
+    def _get_next_nodes(self, current: str, state: AgentState) -> list[str]:
         """Get the next nodes to execute."""
         # Check for conditional router
         if current in self.routers:
@@ -438,7 +439,7 @@ class AgentGraph:
         return [n for n in next_nodes if n != "END"]
 
     async def _execute_parallel(
-        self, node_names: List[str], state: AgentState
+        self, node_names: list[str], state: AgentState
     ) -> AgentState:
         """Execute multiple nodes in parallel."""
         tasks = []
@@ -462,8 +463,8 @@ class AgentGraph:
 
     async def execute(
         self,
-        initial_state: Optional[AgentState] = None,
-        input_message: Optional[str] = None,
+        initial_state: AgentState | None = None,
+        input_message: str | None = None,
     ) -> AgentState:
         """Execute the graph starting from entry point."""
         if not self.entry_point:
@@ -519,7 +520,7 @@ class AgentGraph:
         logger.info(f"Graph '{self.name}' completed in {iterations} iterations")
         return state
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get graph execution metrics."""
         return {
             "name": self.name,
@@ -647,7 +648,7 @@ class TradingAnalysisChain:
     def _data_preparation(state: AgentState) -> AgentState:
         """Prepare data for analysis."""
         state.context["data_prepared"] = True
-        state.context["timestamp"] = datetime.now(timezone.utc).isoformat()
+        state.context["timestamp"] = datetime.now(UTC).isoformat()
         state.add_message("system", "Data preparation completed", "data_preparation")
         state.set_result("data_preparation", {"status": "prepared"})
         return state
@@ -657,7 +658,7 @@ class TradingAnalysisChain:
         """Generate final report from all results."""
         report = {
             "session_id": state.session_id,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "technical_analysis": state.get_result("technical_analysis"),
             "risk_assessment": state.get_result("risk_assessment"),
             "recommendations": state.get_result("strategy_recommendation"),
@@ -675,7 +676,7 @@ class TradingAnalysisChain:
 # ============================================================================
 
 
-_graph_registry: Dict[str, AgentGraph] = {}
+_graph_registry: dict[str, AgentGraph] = {}
 
 
 def register_graph(graph: AgentGraph):
@@ -683,12 +684,12 @@ def register_graph(graph: AgentGraph):
     _graph_registry[graph.name] = graph
 
 
-def get_graph(name: str) -> Optional[AgentGraph]:
+def get_graph(name: str) -> AgentGraph | None:
     """Get a graph from the registry."""
     return _graph_registry.get(name)
 
 
-def list_graphs() -> List[str]:
+def list_graphs() -> list[str]:
     """List all registered graphs."""
     return list(_graph_registry.keys())
 

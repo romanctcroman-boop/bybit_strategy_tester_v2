@@ -15,8 +15,9 @@ Universal Signal Generator - Генерация сигналов для ВСЕХ
 Версия: 1.0.0
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -204,7 +205,7 @@ def calculate_atr_numba(
 @njit(cache=True)
 def calculate_macd_numba(
     close: np.ndarray, fast: int, slow: int, signal: int
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate MACD using Numba."""
     ema_fast = calculate_ema_numba(close, fast)
     ema_slow = calculate_ema_numba(close, slow)
@@ -219,7 +220,7 @@ def calculate_macd_numba(
 @njit(cache=True)
 def calculate_bollinger_numba(
     close: np.ndarray, period: int, std_dev: float
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate Bollinger Bands using Numba."""
     n = len(close)
     middle = calculate_sma_numba(close, period)
@@ -253,7 +254,7 @@ def calculate_stochastic_numba(
     k_period: int,
     d_period: int,
     smooth: int,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Calculate Stochastic Oscillator using Numba."""
     n = len(close)
     k_raw = np.zeros(n, dtype=np.float64)
@@ -288,7 +289,7 @@ def calculate_supertrend_numba(
     close: np.ndarray,
     atr_period: int,
     multiplier: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Calculate SuperTrend indicator using Numba.
 
@@ -354,7 +355,7 @@ def generate_rsi_signals_numba(
     oversold: float,
     overbought: float,
     direction: int,  # 0=long, 1=short, 2=both
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate RSI signals using Numba.
 
@@ -401,7 +402,7 @@ def generate_macd_signals_numba(
     signal_line: np.ndarray,
     histogram: np.ndarray,
     direction: int,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Generate MACD crossover signals."""
     n = len(macd_line)
     long_entries = np.zeros(n, dtype=np.bool_)
@@ -437,7 +438,7 @@ def generate_macd_signals_numba(
 @njit(cache=True)
 def generate_bb_signals_numba(
     close: np.ndarray, upper: np.ndarray, lower: np.ndarray, direction: int
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Generate Bollinger Bands mean reversion signals."""
     n = len(close)
     long_entries = np.zeros(n, dtype=np.bool_)
@@ -466,7 +467,7 @@ def generate_bb_signals_numba(
 @njit(cache=True)
 def generate_stoch_signals_numba(
     k: np.ndarray, d: np.ndarray, oversold: float, overbought: float, direction: int
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Generate Stochastic signals."""
     n = len(k)
     long_entries = np.zeros(n, dtype=np.bool_)
@@ -499,7 +500,7 @@ def generate_stoch_signals_numba(
 def generate_supertrend_signals_numba(
     direction_arr: np.ndarray,  # 1 = uptrend, -1 = downtrend
     signal_direction: int,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Generate SuperTrend signals."""
     n = len(direction_arr)
     long_entries = np.zeros(n, dtype=np.bool_)
@@ -531,7 +532,7 @@ def generate_supertrend_signals_numba(
 @njit(cache=True)
 def generate_ma_crossover_signals_numba(
     fast_ma: np.ndarray, slow_ma: np.ndarray, direction: int
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Generate Moving Average crossover signals."""
     n = len(fast_ma)
     long_entries = np.zeros(n, dtype=np.bool_)
@@ -573,7 +574,7 @@ class SignalOutput:
     long_exits: np.ndarray
     short_entries: np.ndarray
     short_exits: np.ndarray
-    indicator_values: Dict[str, np.ndarray]
+    indicator_values: dict[str, np.ndarray]
 
 
 class UniversalSignalGenerator:
@@ -623,7 +624,7 @@ class UniversalSignalGenerator:
             use_numba: Use Numba acceleration if available
         """
         self.use_numba = use_numba and NUMBA_AVAILABLE
-        self._custom_generators: Dict[str, Callable] = {}
+        self._custom_generators: dict[str, Callable] = {}
 
         if self.use_numba:
             logger.debug("UniversalSignalGenerator: Numba acceleration enabled")
@@ -645,7 +646,7 @@ class UniversalSignalGenerator:
         self,
         candles: pd.DataFrame,
         strategy_type: str,
-        strategy_params: Dict[str, Any],
+        strategy_params: dict[str, Any],
         direction: str = "both",  # "long", "short", "both"
     ) -> SignalOutput:
         """
@@ -695,7 +696,7 @@ class UniversalSignalGenerator:
             )
 
     def _generate_rsi(
-        self, close: np.ndarray, params: Dict, direction: int
+        self, close: np.ndarray, params: dict, direction: int
     ) -> SignalOutput:
         """Generate RSI signals."""
         period = int(params.get("period", 14))
@@ -716,7 +717,7 @@ class UniversalSignalGenerator:
         )
 
     def _generate_macd(
-        self, close: np.ndarray, params: Dict, direction: int
+        self, close: np.ndarray, params: dict, direction: int
     ) -> SignalOutput:
         """Generate MACD signals."""
         fast = int(params.get("fast_period", 12))
@@ -743,7 +744,7 @@ class UniversalSignalGenerator:
         )
 
     def _generate_bollinger(
-        self, close: np.ndarray, params: Dict, direction: int
+        self, close: np.ndarray, params: dict, direction: int
     ) -> SignalOutput:
         """Generate Bollinger Bands signals."""
         period = int(params.get("period", 20))
@@ -771,7 +772,7 @@ class UniversalSignalGenerator:
         high: np.ndarray,
         low: np.ndarray,
         close: np.ndarray,
-        params: Dict,
+        params: dict,
         direction: int,
     ) -> SignalOutput:
         """Generate Stochastic signals."""
@@ -795,7 +796,7 @@ class UniversalSignalGenerator:
         )
 
     def _generate_ma_crossover(
-        self, close: np.ndarray, params: Dict, direction: int
+        self, close: np.ndarray, params: dict, direction: int
     ) -> SignalOutput:
         """Generate MA crossover signals."""
         fast_period = int(params.get("fast_period", 10))
@@ -826,7 +827,7 @@ class UniversalSignalGenerator:
         high: np.ndarray,
         low: np.ndarray,
         close: np.ndarray,
-        params: Dict,
+        params: dict,
         direction: int,
     ) -> SignalOutput:
         """Generate SuperTrend signals."""
@@ -852,8 +853,8 @@ class UniversalSignalGenerator:
         )
 
     def get_indicator_values(
-        self, candles: pd.DataFrame, strategy_type: str, strategy_params: Dict[str, Any]
-    ) -> Dict[str, np.ndarray]:
+        self, candles: pd.DataFrame, strategy_type: str, strategy_params: dict[str, Any]
+    ) -> dict[str, np.ndarray]:
         """
         Get indicator values without generating signals.
         Useful for visualization and debugging.

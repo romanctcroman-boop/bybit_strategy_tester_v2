@@ -16,7 +16,6 @@ Version: 2.4.0
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import List, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -152,7 +151,7 @@ class StrategyPayoff:
 
     price_range: NDArray  # Underlying price range
     payoff: NDArray  # Payoff at each price
-    breakeven_points: List[float]
+    breakeven_points: list[float]
     max_profit: float
     max_loss: float
     probability_of_profit: float
@@ -494,7 +493,7 @@ class MonteCarloPricer:
         self,
         n_simulations: int = 100000,
         n_steps: int = 252,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ):
         self.n_simulations = n_simulations
         self.n_steps = n_steps
@@ -536,7 +535,7 @@ class MonteCarloPricer:
         sigma: float,
         option_type: OptionType,
         q: float = 0.0,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         Price European option.
 
@@ -570,7 +569,7 @@ class MonteCarloPricer:
         option_type: OptionType,
         averaging: str = "arithmetic",
         q: float = 0.0,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         Price Asian (average price) option.
 
@@ -608,7 +607,7 @@ class MonteCarloPricer:
         barrier: float,
         barrier_type: str,  # "up-and-out", "up-and-in", "down-and-out", "down-and-in"
         q: float = 0.0,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Price barrier option."""
         paths = self.simulate_paths(S, T, r, sigma, q)
         final_prices = paths[:, -1]
@@ -740,15 +739,15 @@ class VolatilitySurface:
     """
 
     def __init__(self):
-        self.strikes: List[float] = []
-        self.expiries: List[float] = []
+        self.strikes: list[float] = []
+        self.expiries: list[float] = []
         self.ivs: NDArray = np.array([])
 
     def build(
         self,
         spot: float,
-        strikes: List[float],
-        expiries: List[float],  # In years
+        strikes: list[float],
+        expiries: list[float],  # In years
         market_prices: NDArray,  # Shape: (len(strikes), len(expiries))
         r: float,
         option_type: OptionType,
@@ -791,14 +790,14 @@ class VolatilitySurface:
 
         return float(self.ivs[strike_idx, expiry_idx])
 
-    def get_smile(self, expiry: float) -> Tuple[List[float], List[float]]:
+    def get_smile(self, expiry: float) -> tuple[list[float], list[float]]:
         """Get volatility smile for given expiry."""
         expiry_idx = np.searchsorted(self.expiries, expiry)
         expiry_idx = max(0, min(expiry_idx, len(self.expiries) - 1))
 
         return self.strikes, list(self.ivs[:, expiry_idx])
 
-    def get_term_structure(self, strike: float) -> Tuple[List[float], List[float]]:
+    def get_term_structure(self, strike: float) -> tuple[list[float], list[float]]:
         """Get term structure for given strike."""
         strike_idx = np.searchsorted(self.strikes, strike)
         strike_idx = max(0, min(strike_idx, len(self.strikes) - 1))
@@ -823,7 +822,7 @@ class OptionsStrategy:
         self.r = r
         self.sigma = sigma
         self.q = q
-        self.legs: List[Tuple[Option, int]] = []  # (option, quantity)
+        self.legs: list[tuple[Option, int]] = []  # (option, quantity)
 
     def add_leg(
         self,
@@ -831,7 +830,7 @@ class OptionsStrategy:
         expiry_days: int,
         option_type: OptionType,
         quantity: int,
-        premium: Optional[float] = None,
+        premium: float | None = None,
     ) -> "OptionsStrategy":
         """
         Add leg to strategy.
@@ -985,7 +984,7 @@ class StrategyFactory:
     def create_strategy(
         strategy_type: StrategyType,
         spot: float,
-        atm_strike: Optional[float] = None,
+        atm_strike: float | None = None,
         expiry_days: int = 30,
         width: float = 0.05,  # Strike width for spreads
         r: float = 0.05,
@@ -1077,7 +1076,7 @@ class StrategyFactory:
         return strategy
 
     @staticmethod
-    def get_available_strategies() -> List[str]:
+    def get_available_strategies() -> list[str]:
         """Get list of available strategy types."""
         return [s.value for s in StrategyType]
 
@@ -1093,8 +1092,8 @@ class OptionsPortfolio:
     """
 
     def __init__(self):
-        self.positions: List[OptionPosition] = []
-        self.closed_positions: List[OptionPosition] = []
+        self.positions: list[OptionPosition] = []
+        self.closed_positions: list[OptionPosition] = []
 
     def add_position(self, position: OptionPosition) -> None:
         """Add new position."""

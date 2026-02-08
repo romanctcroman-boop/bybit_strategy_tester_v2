@@ -1735,17 +1735,7 @@ def _passes_dynamic_constraints(result: dict, constraints: list[dict]) -> bool:
 
         # Apply operator
         try:
-            if operator == "<=" and value > threshold:
-                return False
-            elif operator == ">=" and value < threshold:
-                return False
-            elif operator == "<" and value >= threshold:
-                return False
-            elif operator == ">" and value <= threshold:
-                return False
-            elif operator == "==" and value != threshold:
-                return False
-            elif operator == "!=" and value == threshold:
+            if (operator == "<=" and value > threshold) or (operator == ">=" and value < threshold) or (operator == "<" and value >= threshold) or (operator == ">" and value <= threshold) or (operator == "==" and value != threshold) or (operator == "!=" and value == threshold):
                 return False
         except (TypeError, ValueError):
             continue

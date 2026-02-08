@@ -87,7 +87,7 @@ def process_file(filepath):
     """Process a single JS file"""
     print(f"\n📄 Processing: {filepath.name}")
 
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         content = f.read()
 
     functions = find_all_functions(content)

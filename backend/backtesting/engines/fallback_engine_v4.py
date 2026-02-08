@@ -12,7 +12,7 @@
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -35,26 +35,26 @@ class MultiTPState:
     """Состояние Multi-level TP для одной позиции."""
 
     # Какие уровни TP уже сработали
-    tp_hit: List[bool] = field(default_factory=lambda: [False, False, False, False])
+    tp_hit: list[bool] = field(default_factory=lambda: [False, False, False, False])
 
     # Цены уровней TP (рассчитываются при входе)
-    tp_prices: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])
+    tp_prices: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])
 
     # Доли для каждого уровня
-    tp_portions: Tuple[float, ...] = (0.25, 0.25, 0.25, 0.25)
+    tp_portions: tuple[float, ...] = (0.25, 0.25, 0.25, 0.25)
 
     def reset(self):
         """Сброс состояния при закрытии позиции."""
         self.tp_hit = [False, False, False, False]
         self.tp_prices = [0.0, 0.0, 0.0, 0.0]
 
-    def set_prices(self, prices: List[float], portions: Tuple[float, ...]):
+    def set_prices(self, prices: list[float], portions: tuple[float, ...]):
         """Установить цены TP при открытии позиции."""
         self.tp_prices = prices[:4] if len(prices) >= 4 else prices + [0.0] * (4 - len(prices))
         self.tp_portions = portions
         self.tp_hit = [False] * len(self.tp_prices)
 
-    def get_next_tp_level(self) -> Optional[int]:
+    def get_next_tp_level(self) -> int | None:
         """Получить индекс следующего несработавшего TP."""
         for i, hit in enumerate(self.tp_hit):
             if not hit and self.tp_prices[i] > 0:
@@ -95,7 +95,7 @@ class TrailingStopState:
         entry_price: float,
         activation_pct: float,
         distance_pct: float,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Обновить trailing stop для LONG.
 
@@ -123,7 +123,7 @@ class TrailingStopState:
         entry_price: float,
         activation_pct: float,
         distance_pct: float,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Обновить trailing stop для SHORT.
 
@@ -202,7 +202,7 @@ class BreakevenState:
 
         self.last_tp_price = tp_price
 
-    def get_sl_price(self) -> Optional[float]:
+    def get_sl_price(self) -> float | None:
         """Получить текущую цену SL (или None если breakeven не активен)."""
         if self.enabled and self.current_sl_price > 0:
             return self.current_sl_price
@@ -224,7 +224,7 @@ class AdaptiveATRMultiplier:
 
     def __init__(self, lookback: int = 100):
         self.lookback = lookback
-        self.atr_history: List[float] = []
+        self.atr_history: list[float] = []
 
     def update(self, atr_value: float) -> None:
         """Добавить новое значение ATR в историю."""
@@ -298,9 +298,9 @@ class MarketRegimeDetector:
 
     def __init__(self, lookback: int = 50):
         self.lookback = lookback
-        self.price_history: List[float] = []
-        self.volume_history: List[float] = []
-        self.atr_history: List[float] = []
+        self.price_history: list[float] = []
+        self.volume_history: list[float] = []
+        self.atr_history: list[float] = []
 
     def update(self, close_price: float, volume: float = 0.0, atr: float = 0.0) -> None:
         """Добавить новые данные."""
@@ -319,7 +319,7 @@ class MarketRegimeDetector:
             if len(self.atr_history) > self.lookback:
                 self.atr_history = self.atr_history[-self.lookback :]
 
-    def get_regime(self) -> Dict[str, Any]:
+    def get_regime(self) -> dict[str, Any]:
         """
         Определить текущий рыночный режим.
 
@@ -939,15 +939,15 @@ class FallbackEngineV4(BaseBacktestEngine):
         cooldown_after_loss = getattr(input_data, "cooldown_after_loss", 0)
 
         # === ADVANCED ORDERS (for future limit/stop order execution) ===
-        entry_order_type = getattr(input_data, "entry_order_type", "market")  # noqa: F841
-        limit_entry_offset = getattr(input_data, "limit_entry_offset", 0.001)  # noqa: F841
-        limit_entry_timeout_bars = getattr(input_data, "limit_entry_timeout_bars", 5)  # noqa: F841
-        stop_entry_offset = getattr(input_data, "stop_entry_offset", 0.001)  # noqa: F841
+        entry_order_type = getattr(input_data, "entry_order_type", "market")
+        limit_entry_offset = getattr(input_data, "limit_entry_offset", 0.001)
+        limit_entry_timeout_bars = getattr(input_data, "limit_entry_timeout_bars", 5)
+        stop_entry_offset = getattr(input_data, "stop_entry_offset", 0.001)
 
         # === SCALE-IN (for future scale-in execution) ===
-        scale_in_enabled = getattr(input_data, "scale_in_enabled", False)  # noqa: F841
+        scale_in_enabled = getattr(input_data, "scale_in_enabled", False)
         scale_in_levels = getattr(input_data, "scale_in_levels", (1.0,))
-        scale_in_portions = getattr(input_data, "scale_in_portions", (1.0,))  # noqa: F841
+        scale_in_portions = getattr(input_data, "scale_in_portions", (1.0,))
 
         # === VALIDATION: scale_in_portions must sum to 1.0 ===
         if scale_in_enabled:
@@ -1017,7 +1017,7 @@ class FallbackEngineV4(BaseBacktestEngine):
         mtf_enabled = getattr(input_data, "mtf_enabled", False)
         mtf_htf_interval = getattr(input_data, "mtf_htf_interval", "60")  # noqa: F841
         mtf_htf_candles = getattr(input_data, "mtf_htf_candles", None)
-        mtf_htf_index_map: List[int] | None = getattr(input_data, "mtf_htf_index_map", None)
+        mtf_htf_index_map: list[int] | None = getattr(input_data, "mtf_htf_index_map", None)
         mtf_filter_type = getattr(input_data, "mtf_filter_type", "sma")
         mtf_filter_period = getattr(input_data, "mtf_filter_period", 200)
         mtf_neutral_zone_pct = getattr(input_data, "mtf_neutral_zone_pct", 0.0)
@@ -1025,12 +1025,12 @@ class FallbackEngineV4(BaseBacktestEngine):
         # BTC Correlation filter
         mtf_btc_filter_enabled = getattr(input_data, "mtf_btc_filter_enabled", False)
         mtf_btc_candles = getattr(input_data, "mtf_btc_candles", None)
-        mtf_btc_index_map: List[int] | None = getattr(input_data, "mtf_btc_index_map", None)
+        mtf_btc_index_map: list[int] | None = getattr(input_data, "mtf_btc_index_map", None)
         mtf_btc_filter_period = getattr(input_data, "mtf_btc_filter_period", 50)
 
         # Рассчитать уровни DCA
-        dca_levels: List[float] = []
-        dca_volumes: List[float] = []
+        dca_levels: list[float] = []
+        dca_volumes: list[float] = []
         if dca_enabled and dca_safety_orders > 0:
             cumulative_deviation = 0.0
             current_deviation = dca_price_deviation
@@ -1042,7 +1042,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                 current_deviation *= dca_step_scale
                 current_volume *= dca_volume_scale
 
-        dca_state: Optional[Dict] = None
+        dca_state: dict | None = None
 
         # Менеджер пирамидинга
         pyramid_mgr = PyramidingManager(
@@ -1073,20 +1073,20 @@ class FallbackEngineV4(BaseBacktestEngine):
 
         # === СОСТОЯНИЕ PENDING LIMIT/STOP ORDERS ===
         # These will be used when limit/stop order execution logic is added
-        pending_limit_long = None  # noqa: F841 {"price": float, "timeout_bar": int}
-        pending_limit_short = None  # noqa: F841
-        pending_stop_long = None  # noqa: F841
-        pending_stop_short = None  # noqa: F841
+        pending_limit_long = None
+        pending_limit_short = None
+        pending_stop_long = None
+        pending_stop_short = None
 
         # === СОСТОЯНИЕ SCALE-IN ===
         # Scale-in: входить в позицию частями по сетке цен
         # levels = (0.0, -0.01, -0.02) -> вход по текущей, -1%, -2%
         # portions = (0.5, 0.3, 0.2) -> 50% сразу, 30% на -1%, 20% на -2%
-        scale_in_state_long: Optional[Dict] = None  # Активный scale-in для лонга
-        scale_in_state_short: Optional[Dict] = None  # Активный scale-in для шорта
+        scale_in_state_long: dict | None = None  # Активный scale-in для лонга
+        scale_in_state_short: dict | None = None  # Активный scale-in для шорта
 
         # === СОСТОЯНИЕ FUNDING ===
-        last_funding_bar = 0  # noqa: F841 - track last funding bar
+        last_funding_bar = 0
         accumulated_funding = 0.0  # Track total funding paid/received
 
         # === PRE-CALCULATE FILTER INDICATORS ===
@@ -1184,7 +1184,7 @@ class FallbackEngineV4(BaseBacktestEngine):
         # === ОСНОВНОЕ СОСТОЯНИЕ ===
         cash = capital
         equity_curve = [capital]
-        trades: List[TradeRecord] = []
+        trades: list[TradeRecord] = []
 
         # Pending exits
         pending_long_exit = False
@@ -1271,7 +1271,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                 if hasattr(timestamps[i], "to_pydatetime")
                 else timestamps[i]
             )
-            _open_price = open_prices[i]  # noqa: F841 - для bar magnifier
+            _open_price = open_prices[i]
             high_price = high_prices[i]
             low_price = low_prices[i]
             close_price = close_prices[i]
@@ -1298,8 +1298,8 @@ class FallbackEngineV4(BaseBacktestEngine):
             if adaptive_atr is not None and atr_values is not None:
                 adaptive_atr.update(atr_values[i])
                 # Локально переопределяем множители для этого бара
-                atr_tp_multiplier_local = adaptive_atr.get_multiplier(atr_tp_multiplier)  # noqa: F841
-                atr_sl_multiplier_local = adaptive_atr.get_multiplier(atr_sl_multiplier)  # noqa: F841
+                atr_tp_multiplier_local = adaptive_atr.get_multiplier(atr_tp_multiplier)
+                atr_sl_multiplier_local = adaptive_atr.get_multiplier(atr_sl_multiplier)
             else:
                 atr_tp_multiplier_local = atr_tp_multiplier  # noqa: F841
                 atr_sl_multiplier_local = atr_sl_multiplier  # noqa: F841
@@ -2565,7 +2565,7 @@ class FallbackEngineV4(BaseBacktestEngine):
         pyramid_mgr: PyramidingManager,
         direction: str,
         tp_state: MultiTPState,
-        tp_levels: Tuple[float, ...],
+        tp_levels: tuple[float, ...],
         current_atr: float,
         take_profit: float,
         atr_enabled: bool,
@@ -2586,7 +2586,7 @@ class FallbackEngineV4(BaseBacktestEngine):
 
         tp_state.set_prices(tp_prices, tp_state.tp_portions)
 
-    def _build_bar_magnifier_index(self, candles: pd.DataFrame, candles_1m: pd.DataFrame) -> Optional[Dict]:
+    def _build_bar_magnifier_index(self, candles: pd.DataFrame, candles_1m: pd.DataFrame) -> dict | None:
         """
         Build index for bar magnifier (1m data lookup).
         Returns: bar_idx -> (start_1m_idx, end_1m_idx)
@@ -2633,8 +2633,8 @@ class FallbackEngineV4(BaseBacktestEngine):
 
     def _calculate_metrics(
         self,
-        trades: List[TradeRecord],
-        equity_curve: List[float],
+        trades: list[TradeRecord],
+        equity_curve: list[float],
         initial_capital: float,
     ) -> BacktestMetrics:
         """Calculate backtest metrics."""
@@ -2679,9 +2679,9 @@ class FallbackEngineV4(BaseBacktestEngine):
     def optimize(
         self,
         input_data: BacktestInput,
-        param_ranges: Dict[str, List[Any]],
+        param_ranges: dict[str, list[Any]],
         metric: str = "sharpe_ratio",
         top_n: int = 10,
-    ) -> List[Tuple[Dict[str, Any], BacktestOutput]]:
+    ) -> list[tuple[dict[str, Any], BacktestOutput]]:
         """Optimization not implemented for V4."""
         return []

@@ -20,7 +20,6 @@ Example:
 """
 
 import logging
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -48,7 +47,7 @@ def generate_mtf_rsi_signals(
     direction: str = "both",
     # Entry timing
     warmup_bars: int = None,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate RSI signals filtered by HTF trend.
 
@@ -174,7 +173,7 @@ def generate_mtf_sma_crossover_signals(
     neutral_zone_pct: float = 0.0,
     # Direction
     direction: str = "both",
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate SMA crossover signals filtered by HTF trend.
 
@@ -297,7 +296,7 @@ def generate_mtf_signals_with_btc(
     require_btc_alignment: bool = True,
     # Direction
     direction: str = "both",
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate signals with both HTF trend and BTC correlation filtering.
 

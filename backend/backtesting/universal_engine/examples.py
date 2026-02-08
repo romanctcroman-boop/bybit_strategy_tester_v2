@@ -8,7 +8,6 @@ Author: Universal Math Engine Team
 Version: 2.2.0
 """
 
-import numpy as np
 
 # =============================================================================
 # Example 1: Basic Order Management
@@ -63,7 +62,7 @@ def example_order_management():
         size=0.1,
         config=OCOConfig(take_profit_price=55000.0, stop_loss_price=47000.0),
     )
-    print(f"   OCO Orders: TP @ $55,000, SL @ $47,000")
+    print("   OCO Orders: TP @ $55,000, SL @ $47,000")
 
     # Simulate price movement
     print("\n2. Processing price bars...")
@@ -131,9 +130,9 @@ def example_risk_management():
         take_profit_price=53000,  # 6% reward = 3:1 R:R
         win_rate=0.55,
     )
-    print(f"   Equity: $100,000")
-    print(f"   Entry: $50,000, Stop: $49,000, TP: $53,000")
-    print(f"   Win Rate: 55%")
+    print("   Equity: $100,000")
+    print("   Entry: $50,000, Stop: $49,000, TP: $53,000")
+    print("   Win Rate: 55%")
     print(f"   → Position Size: ${size:,.2f}")
     print(f"   → Reason: {reason}")
 
@@ -296,7 +295,7 @@ def example_spread_simulation():
     print("\n2. Execution prices...")
     exec_buy = simulator.get_execution_price(50000, is_buy=True, volatility=0.02)
     exec_sell = simulator.get_execution_price(50000, is_buy=False, volatility=0.02)
-    print(f"   Mid price: $50,000")
+    print("   Mid price: $50,000")
     print(f"   Buy execution: ${exec_buy:,.2f} (pay spread)")
     print(f"   Sell execution: ${exec_sell:,.2f} (pay spread)")
 
@@ -325,7 +324,7 @@ def example_position_tracking():
         is_long=True,
         size=1.0,
     )
-    print(f"   Entry: $50,000 (1 BTC long)")
+    print("   Entry: $50,000 (1 BTC long)")
 
     # Simulate price path
     print("\n2. Simulating price movement...")
@@ -340,7 +339,7 @@ def example_position_tracking():
     print("\n3. Closing position...")
     metrics = tracker.close_position(exit_bar=10, exit_timestamp=1706400000000 + 600000)
 
-    print(f"\n   Position Age Metrics:")
+    print("\n   Position Age Metrics:")
     print(f"   ├─ Duration: {metrics.duration_bars} bars")
     print(f"   ├─ Time to max profit: bar {metrics.time_to_max_profit_bars}")
     print(f"   ├─ Max unrealized profit: ${metrics.max_unrealized_profit:,.2f}")
@@ -382,13 +381,13 @@ def example_bar_simulation():
         open_price=50000, high_price=50500, low_price=49700, close_price=50300
     )
 
-    print(f"   Bar: O=$50,000 H=$50,500 L=$49,700 C=$50,300")
+    print("   Bar: O=$50,000 H=$50,500 L=$49,700 C=$50,300")
     print(f"   Generated {len(path)} ticks")
     print(f"   Path range: ${min(path):,.2f} - ${max(path):,.2f}")
 
     # Show first and last few ticks
-    print(f"   First 5 ticks: {['${:,.0f}'.format(p) for p in path[:5]]}")
-    print(f"   Last 5 ticks: {['${:,.0f}'.format(p) for p in path[-5:]]}")
+    print(f"   First 5 ticks: {[f'${p:,.0f}' for p in path[:5]]}")
+    print(f"   Last 5 ticks: {[f'${p:,.0f}' for p in path[-5:]]}")
 
     print("\n2. Stop-loss trigger detection...")
     test_stops = [49800, 49700, 49600]
@@ -507,7 +506,7 @@ def example_volume_slippage():
         order_size_usd=500000, average_volume_usd=1000000, n_bars_to_execute=10
     )
 
-    print(f"   Order: $500,000 | Avg Volume: $1,000,000")
+    print("   Order: $500,000 | Avg Volume: $1,000,000")
     print(f"   Single execution slippage: {impact['single_execution_slippage']:.4%}")
     print(f"   TWAP (10 bars) slippage: {impact['split_execution_slippage']:.4%}")
     print(f"   Savings from TWAP: {impact['savings_from_split']:.4%}")

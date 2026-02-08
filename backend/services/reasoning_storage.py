@@ -7,7 +7,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,8 @@ class ReasoningStorageService:
         reasoning_chain: Any,
         final_conclusion: str,
         processing_time: float,
-        metadata: Optional[Dict[str, Any]] = None,
-        trace_id: Optional[str] = None,
+        metadata: dict[str, Any] | None = None,
+        trace_id: str | None = None,
     ) -> str:
         """
         Store a reasoning trace.
@@ -91,11 +91,11 @@ class ReasoningStorageService:
         self,
         tournament_id: str,
         tournament_name: str,
-        strategies: List[Dict[str, Any]],
-        winner: Optional[Dict[str, Any]],
-        market_regime: Optional[str],
-        metrics: Dict[str, Any],
-        metadata: Optional[Dict[str, Any]] = None,
+        strategies: list[dict[str, Any]],
+        winner: dict[str, Any] | None,
+        market_regime: str | None,
+        metrics: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Store a tournament trace.
@@ -141,10 +141,10 @@ class ReasoningStorageService:
 
     async def get_recent_traces(
         self,
-        agent_type: Optional[str] = None,
-        task_type: Optional[str] = None,
+        agent_type: str | None = None,
+        task_type: str | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get recent reasoning traces.
 
@@ -172,7 +172,7 @@ class ReasoningStorageService:
             # Read traces from files
             for trace_file in trace_files:
                 try:
-                    with open(trace_file, "r", encoding="utf-8") as f:
+                    with open(trace_file, encoding="utf-8") as f:
                         for line in f:
                             if line.strip():
                                 trace = json.loads(line)
@@ -190,7 +190,7 @@ class ReasoningStorageService:
             logger.error(f"Failed to get recent traces: {exc}")
             return []
 
-    async def get_trace_by_id(self, trace_id: str) -> Optional[Dict[str, Any]]:
+    async def get_trace_by_id(self, trace_id: str) -> dict[str, Any] | None:
         """
         Get a specific reasoning trace by ID.
 
@@ -203,7 +203,7 @@ class ReasoningStorageService:
         try:
             # Search all trace files
             for trace_file in self.storage_path.glob("*.jsonl"):
-                with open(trace_file, "r", encoding="utf-8") as f:
+                with open(trace_file, encoding="utf-8") as f:
                     for line in f:
                         if line.strip():
                             trace = json.loads(line)
@@ -219,10 +219,10 @@ class ReasoningStorageService:
     async def search_traces(
         self,
         query: str,
-        agent_type: Optional[str] = None,
-        task_type: Optional[str] = None,
+        agent_type: str | None = None,
+        task_type: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Search reasoning traces by keyword.
 
@@ -262,7 +262,7 @@ class ReasoningStorageService:
 
         return matching_traces
 
-    async def get_statistics(self) -> Dict[str, Any]:
+    async def get_statistics(self) -> dict[str, Any]:
         """
         Get statistics about stored reasoning traces.
 
@@ -282,7 +282,7 @@ class ReasoningStorageService:
 
             for trace_file in trace_files:
                 file_trace_count = 0
-                with open(trace_file, "r", encoding="utf-8") as f:
+                with open(trace_file, encoding="utf-8") as f:
                     for line in f:
                         if line.strip():
                             file_trace_count += 1

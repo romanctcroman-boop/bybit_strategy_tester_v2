@@ -15,17 +15,17 @@ from backend.database.models.strategy_version import StrategyVersion
 from backend.database.models.trade import Trade, TradeSide, TradeStatus
 
 __all__ = [
-    "ChatConversation",
-    "Strategy",
-    "StrategyType",
-    "StrategyStatus",
     "Backtest",
     "BacktestStatus",
+    "ChatConversation",
     "Optimization",
     "OptimizationStatus",
     "OptimizationType",
+    "Strategy",
+    "StrategyStatus",
+    "StrategyType",
+    "StrategyVersion",
     "Trade",
     "TradeSide",
     "TradeStatus",
-    "StrategyVersion",
 ]

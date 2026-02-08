@@ -24,7 +24,7 @@ V4: + ATR SL/TP, Multi-TP (4 уровня), Trailing Stop, DCA
 """
 
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -74,7 +74,7 @@ if NUMBA_AVAILABLE:
         initial_capital: float,
         use_fixed_amount: bool,  # NEW: True = use fixed_amount, False = use position_size
         fixed_amount: float,  # NEW: Fixed amount per trade (for TV parity)
-    ) -> Tuple[
+    ) -> tuple[
         np.ndarray,
         np.ndarray,
         np.ndarray,
@@ -442,7 +442,7 @@ if NUMBA_AVAILABLE:
         fixed_amount: float,
         # === PYRAMIDING PARAMS ===
         max_entries: int,  # pyramiding limit (1 = no pyramiding)
-    ) -> Tuple[
+    ) -> tuple[
         np.ndarray,  # equity_curve
         np.ndarray,  # trade_pnls
         np.ndarray,  # trade_directions
@@ -892,7 +892,7 @@ if NUMBA_AVAILABLE:
         slippage_multipliers: np.ndarray,  # Pre-calculated slippage multipliers per bar
         # === CLOSE RULE (FIFO/LIFO/ALL) ===
         close_rule: int,  # 0=ALL (close all entries), 1=FIFO (first in first out), 2=LIFO (last in first out)
-    ) -> Tuple[
+    ) -> tuple[
         np.ndarray,  # equity_curve
         np.ndarray,  # trade_pnls
         np.ndarray,  # trade_directions
@@ -1257,7 +1257,7 @@ if NUMBA_AVAILABLE:
                                     # Update re-entry state
                                     last_exit_bar = i
                                     consecutive_losses = 0  # Full TP = not a loss
-                                    
+
                                     n_long_entries = 0
                                     long_remaining_pct = 1.0
                                     for k in range(4):
@@ -2144,7 +2144,7 @@ if NUMBA_AVAILABLE:
         initial_capital: float,
         use_fixed_amount: bool,  # NEW: True = use fixed_amount, False = use position_size
         fixed_amount: float,  # NEW: Fixed amount per trade (for TV parity)
-    ) -> Tuple[
+    ) -> tuple[
         np.ndarray,
         np.ndarray,
         np.ndarray,
@@ -3007,10 +3007,10 @@ class NumbaEngineV2(BaseBacktestEngine):
     def optimize(
         self,
         input_data: BacktestInput,
-        param_ranges: Dict[str, List[Any]],
+        param_ranges: dict[str, list[Any]],
         metric: str = "sharpe_ratio",
         top_n: int = 10,
-    ) -> List[Tuple[Dict[str, Any], BacktestOutput]]:
+    ) -> list[tuple[dict[str, Any], BacktestOutput]]:
         """Parallel optimization using Numba"""
         from itertools import product
 
@@ -3069,7 +3069,7 @@ class NumbaEngineV2(BaseBacktestEngine):
 
     def _calculate_volume_filter(
         self,
-        volumes: Optional[np.ndarray],
+        volumes: np.ndarray | None,
         enabled: bool,
         min_percentile: float,
         lookback: int,
@@ -3109,7 +3109,7 @@ class NumbaEngineV2(BaseBacktestEngine):
         enabled: bool,
         period: int,
         mode: str,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculate trend filter masks based on SMA.
 
@@ -3152,7 +3152,7 @@ class NumbaEngineV2(BaseBacktestEngine):
         self,
         close_prices: np.ndarray,
         atr_values: np.ndarray,
-        volumes: Optional[np.ndarray],
+        volumes: np.ndarray | None,
         enabled: bool,
     ) -> np.ndarray:
         """
@@ -3203,7 +3203,7 @@ class NumbaEngineV2(BaseBacktestEngine):
 
     def _build_bar_magnifier_arrays(
         self, candles: pd.DataFrame, candles_1m: pd.DataFrame
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Build arrays for Bar Magnifier Numba function"""
         n = len(candles)
 
@@ -3244,7 +3244,7 @@ class NumbaEngineV2(BaseBacktestEngine):
         trade_sizes: np.ndarray = None,
         trade_fees: np.ndarray = None,
         initial_capital: float = 10000.0,
-    ) -> List[TradeRecord]:
+    ) -> list[TradeRecord]:
         """Convert Numba output to TradeRecord list with EXACT data"""
         trades = []
 
@@ -3305,7 +3305,7 @@ class NumbaEngineV2(BaseBacktestEngine):
 
     def _calculate_metrics(
         self,
-        trades: List[TradeRecord],
+        trades: list[TradeRecord],
         equity_curve: np.ndarray,
         initial_capital: float,
     ) -> BacktestMetrics:
@@ -3406,7 +3406,7 @@ class NumbaEngineV2(BaseBacktestEngine):
 
         return metrics
 
-    def _apply_params(self, input_data: BacktestInput, params: Dict[str, Any]) -> BacktestInput:
+    def _apply_params(self, input_data: BacktestInput, params: dict[str, Any]) -> BacktestInput:
         """Apply params to input"""
         from dataclasses import replace
 

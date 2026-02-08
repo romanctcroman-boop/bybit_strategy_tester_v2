@@ -11,8 +11,6 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
-
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +42,13 @@ class APIKeyRotationManager:
             f"API Key Rotation Manager initialized (rotation_days={rotation_days})"
         )
 
-    def _load_metadata(self) -> Dict:
+    def _load_metadata(self) -> dict:
         """Load key metadata from file"""
         if not self.metadata_file.exists():
             return {"keys": {}, "audit_log": []}
 
         try:
-            with open(self.metadata_file, "r", encoding="utf-8") as f:
+            with open(self.metadata_file, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"Failed to load metadata: {e}")
@@ -71,7 +69,7 @@ class APIKeyRotationManager:
         except Exception as e:
             logger.error(f"Failed to save metadata: {e}")
 
-    def _add_audit_log(self, action: str, key_id: str, details: Dict = None):
+    def _add_audit_log(self, action: str, key_id: str, details: dict = None):
         """Add entry to audit log"""
         entry = {
             "timestamp": datetime.now().isoformat(),
@@ -150,7 +148,7 @@ class APIKeyRotationManager:
 
             logger.info(f"Recorded rotation for key {key_hash}")
 
-    def check_rotation_needed(self) -> List[Dict]:
+    def check_rotation_needed(self) -> list[dict]:
         """
         Check which keys need rotation
 
@@ -177,7 +175,7 @@ class APIKeyRotationManager:
 
         return needs_rotation
 
-    def get_expiring_soon(self, days_threshold: int = 7) -> List[Dict]:
+    def get_expiring_soon(self, days_threshold: int = 7) -> list[dict]:
         """
         Get keys expiring within threshold
 
@@ -209,7 +207,7 @@ class APIKeyRotationManager:
 
         return expiring
 
-    def get_statistics(self) -> Dict:
+    def get_statistics(self) -> dict:
         """Get rotation statistics"""
         total_keys = len(self.metadata["keys"])
         needs_rotation = len(self.check_rotation_needed())
@@ -272,7 +270,7 @@ class APIKeyRotationManager:
 
 
 # Global instance
-_rotation_manager: Optional[APIKeyRotationManager] = None
+_rotation_manager: APIKeyRotationManager | None = None
 
 
 def get_rotation_manager() -> APIKeyRotationManager:

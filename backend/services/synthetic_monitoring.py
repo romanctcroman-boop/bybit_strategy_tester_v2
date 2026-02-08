@@ -12,10 +12,11 @@ AI Agent Recommendation Implementation:
 import asyncio
 import logging
 import time
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class ProbeResult:
     latency_ms: float
     timestamp: datetime
     success: bool
-    error_message: Optional[str] = None
+    error_message: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -86,9 +87,9 @@ class ProbeMetrics:
     max_latency_ms: float = 0.0
     current_status: ProbeStatus = ProbeStatus.UNKNOWN
     uptime_pct: float = 100.0
-    last_run: Optional[datetime] = None
-    last_success: Optional[datetime] = None
-    last_failure: Optional[datetime] = None
+    last_run: datetime | None = None
+    last_success: datetime | None = None
+    last_failure: datetime | None = None
 
 
 @dataclass
@@ -232,7 +233,7 @@ class SyntheticMonitor:
 
         logger.info(f"Registered probe: {config.name} ({config.probe_id})")
 
-    async def run_probe(self, probe_id: str) -> Optional[ProbeResult]:
+    async def run_probe(self, probe_id: str) -> ProbeResult | None:
         """Run a single probe and record results."""
         if probe_id not in self._probes:
             logger.error(f"Probe not found: {probe_id}")
@@ -251,7 +252,7 @@ class SyntheticMonitor:
                 probe_func(),
                 timeout=config.timeout_seconds,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             error_message = f"Probe timed out after {config.timeout_seconds}s"
         except Exception as e:
             error_message = str(e)
@@ -262,9 +263,7 @@ class SyntheticMonitor:
         # Determine status
         if not success:
             status = ProbeStatus.UNHEALTHY
-        elif latency_ms > config.degraded_threshold_ms:
-            status = ProbeStatus.DEGRADED
-        elif latency_ms > config.healthy_threshold_ms:
+        elif latency_ms > config.degraded_threshold_ms or latency_ms > config.healthy_threshold_ms:
             status = ProbeStatus.DEGRADED
         else:
             status = ProbeStatus.HEALTHY
@@ -450,7 +449,7 @@ class SyntheticMonitor:
     # Metrics and Reporting
     # ========================================================================
 
-    def get_probe_metrics(self, probe_id: str) -> Optional[ProbeMetrics]:
+    def get_probe_metrics(self, probe_id: str) -> ProbeMetrics | None:
         """Get metrics for a specific probe."""
         return self._metrics.get(probe_id)
 
@@ -463,7 +462,7 @@ class SyntheticMonitor:
         history = self._results_history.get(probe_id, [])
         return history[-limit:]
 
-    def get_sla_status(self, sla_name: str = "default") -> Optional[SLAStatus]:
+    def get_sla_status(self, sla_name: str = "default") -> SLAStatus | None:
         """Get current SLA status."""
         if sla_name not in self._sla_configs:
             return None
@@ -599,7 +598,7 @@ class SyntheticMonitor:
 
 
 # Global monitor instance
-_monitor: Optional[SyntheticMonitor] = None
+_monitor: SyntheticMonitor | None = None
 
 
 def get_synthetic_monitor() -> SyntheticMonitor:

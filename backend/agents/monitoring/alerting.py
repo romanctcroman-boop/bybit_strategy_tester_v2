@@ -14,9 +14,9 @@ from __future__ import annotations
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 
@@ -61,8 +61,8 @@ class AlertRule:
     threshold: float
     severity: AlertSeverity
     duration_seconds: int = 0  # Must be true for this duration
-    labels: Dict[str, str] = field(default_factory=dict)
-    annotations: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
+    annotations: dict[str, str] = field(default_factory=dict)
     enabled: bool = True
 
     def evaluate(self, value: float) -> bool:
@@ -93,21 +93,21 @@ class Alert:
     message: str
     value: float
     threshold: float
-    labels: Dict[str, str] = field(default_factory=dict)
-    annotations: Dict[str, str] = field(default_factory=dict)
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    resolved_at: Optional[datetime] = None
-    last_evaluated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    firing_since: Optional[datetime] = None
+    labels: dict[str, str] = field(default_factory=dict)
+    annotations: dict[str, str] = field(default_factory=dict)
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    resolved_at: datetime | None = None
+    last_evaluated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    firing_since: datetime | None = None
     notification_sent: bool = False
 
     @property
     def duration_seconds(self) -> float:
         """How long the alert has been active"""
-        end = self.resolved_at or datetime.now(timezone.utc)
+        end = self.resolved_at or datetime.now(UTC)
         return (end - self.started_at).total_seconds()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "rule_name": self.rule_name,
@@ -158,7 +158,7 @@ class LogNotifier(AlertNotifier):
 class WebhookNotifier(AlertNotifier):
     """Send alerts to webhook"""
 
-    def __init__(self, url: str, headers: Optional[Dict[str, str]] = None):
+    def __init__(self, url: str, headers: dict[str, str] | None = None):
         self.url = url
         self.headers = headers or {}
 
@@ -260,7 +260,7 @@ class AlertManager:
 
     def __init__(
         self,
-        notifiers: Optional[List[AlertNotifier]] = None,
+        notifiers: list[AlertNotifier] | None = None,
         auto_add_defaults: bool = True,
     ):
         """
@@ -272,15 +272,15 @@ class AlertManager:
         """
         self.notifiers = notifiers or [LogNotifier()]
 
-        self.rules: Dict[str, AlertRule] = {}
-        self.alerts: Dict[str, Alert] = {}
-        self.alert_history: List[Alert] = []
+        self.rules: dict[str, AlertRule] = {}
+        self.alerts: dict[str, Alert] = {}
+        self.alert_history: list[Alert] = []
 
         # For anomaly detection
-        self.metric_history: Dict[str, List[Tuple[datetime, float]]] = defaultdict(list)
+        self.metric_history: dict[str, list[tuple[datetime, float]]] = defaultdict(list)
 
         # Silenced alerts
-        self.silences: Dict[str, datetime] = {}  # rule_name -> until
+        self.silences: dict[str, datetime] = {}  # rule_name -> until
 
         # Stats
         self.stats = {
@@ -307,7 +307,7 @@ class AlertManager:
             return True
         return False
 
-    async def evaluate(self, metrics: Dict[str, float]) -> List[Alert]:
+    async def evaluate(self, metrics: dict[str, float]) -> list[Alert]:
         """
         Evaluate all rules against current metrics
 
@@ -318,7 +318,7 @@ class AlertManager:
             List of newly fired alerts
         """
         new_alerts = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         for rule_name, rule in self.rules.items():
             if not rule.enabled:
@@ -413,7 +413,7 @@ class AlertManager:
         if rule_name not in self.rules:
             return False
 
-        until = datetime.now(timezone.utc) + timedelta(minutes=duration_minutes)
+        until = datetime.now(UTC) + timedelta(minutes=duration_minutes)
         self.silences[rule_name] = until
 
         # Resolve any active alerts for this rule
@@ -432,8 +432,8 @@ class AlertManager:
 
     def get_active_alerts(
         self,
-        severity: Optional[AlertSeverity] = None,
-    ) -> List[Alert]:
+        severity: AlertSeverity | None = None,
+    ) -> list[Alert]:
         """Get currently active alerts"""
         alerts = [a for a in self.alerts.values() if a.state == AlertState.FIRING]
 
@@ -445,8 +445,8 @@ class AlertManager:
     def get_alert_history(
         self,
         limit: int = 100,
-        severity: Optional[AlertSeverity] = None,
-    ) -> List[Alert]:
+        severity: AlertSeverity | None = None,
+    ) -> list[Alert]:
         """Get historical alerts"""
         history = self.alert_history[-limit:]
 
@@ -461,7 +461,7 @@ class AlertManager:
         current_value: float,
         std_threshold: float = 3.0,
         min_samples: int = 10,
-    ) -> Optional[Alert]:
+    ) -> Alert | None:
         """
         Detect anomaly using statistical methods
 
@@ -518,7 +518,7 @@ class AlertManager:
 
         return removed
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get alert manager statistics"""
         return {
             **self.stats,
@@ -530,7 +530,7 @@ class AlertManager:
 
 
 # Global instance
-_manager: Optional[AlertManager] = None
+_manager: AlertManager | None = None
 
 
 def get_alert_manager() -> AlertManager:
@@ -542,13 +542,13 @@ def get_alert_manager() -> AlertManager:
 
 
 __all__ = [
-    "AlertManager",
     "Alert",
+    "AlertManager",
+    "AlertNotifier",
+    "AlertRule",
     "AlertSeverity",
     "AlertState",
-    "AlertRule",
     "ComparisonOperator",
-    "AlertNotifier",
     "LogNotifier",
     "WebhookNotifier",
     "get_alert_manager",

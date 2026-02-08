@@ -38,7 +38,7 @@ Architecture:
 """
 
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -249,7 +249,7 @@ class GPUEngineV2(BaseBacktestEngine):
         equity_curve = np.zeros(n, dtype=np.float64)
         equity_curve[0] = initial_capital
 
-        trades: List[TradeRecord] = []
+        trades: list[TradeRecord] = []
 
         # State
         cash = initial_capital
@@ -558,10 +558,10 @@ class GPUEngineV2(BaseBacktestEngine):
         signal_exit: bool,
         slippage: float,
         use_bar_magnifier: bool = False,
-        bar_magnifier_index: Optional[Dict] = None,
+        bar_magnifier_index: dict | None = None,
         bar_idx: int = 0,
-        candles_1m: Optional[pd.DataFrame] = None,
-    ) -> Tuple[Optional[ExitReason], float]:
+        candles_1m: pd.DataFrame | None = None,
+    ) -> tuple[ExitReason | None, float]:
         """Check exit conditions with Bar Magnifier support - same logic as FallbackEngineV2."""
 
         if is_long:
@@ -648,7 +648,7 @@ class GPUEngineV2(BaseBacktestEngine):
 
     def _build_bar_magnifier_index(
         self, candles: pd.DataFrame, candles_1m: pd.DataFrame
-    ) -> Dict[int, Tuple[int, int]]:
+    ) -> dict[int, tuple[int, int]]:
         """
         Build index for Bar Magnifier.
         Returns dict: bar_idx -> (start_1m_idx, end_1m_idx)
@@ -696,7 +696,7 @@ class GPUEngineV2(BaseBacktestEngine):
         size: float,
         taker_fee: float,
         entry_fee: float = 0.0,  # TV: entry fee from position open
-    ) -> Tuple[float, float, float]:
+    ) -> tuple[float, float, float]:
         """Calculate PnL, PnL%, and fees - TV style (entry + exit fees)."""
 
         if is_long:
@@ -716,7 +716,7 @@ class GPUEngineV2(BaseBacktestEngine):
 
     def _calculate_metrics(
         self,
-        trades: List[TradeRecord],
+        trades: list[TradeRecord],
         equity_curve: np.ndarray,
         initial_capital: float,
     ) -> BacktestMetrics:
@@ -893,10 +893,10 @@ class GPUEngineV2(BaseBacktestEngine):
     def optimize(
         self,
         input_data: BacktestInput,
-        param_ranges: Dict[str, List[Any]],
+        param_ranges: dict[str, list[Any]],
         metric: str = "sharpe_ratio",
         top_n: int = 10,
-    ) -> List[Tuple[Dict[str, Any], BacktestOutput]]:
+    ) -> list[tuple[dict[str, Any], BacktestOutput]]:
         """
         Optimize parameters using GPU-accelerated grid search.
 

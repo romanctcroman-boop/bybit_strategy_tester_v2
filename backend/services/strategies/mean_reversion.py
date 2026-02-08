@@ -8,7 +8,6 @@ Strategies that trade price returning to average/mean:
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from backend.services.live_trading.strategy_runner import (
     SignalType,
@@ -175,10 +174,10 @@ class RSIMeanReversionStrategy(LibraryStrategy):
         super().__init__(config, **params)
 
         # State
-        self._prev_rsi: Optional[float] = None
+        self._prev_rsi: float | None = None
         self._in_position: str = ""  # "long", "short", ""
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate RSI signals."""
         self.add_candle(candle)
 
@@ -468,9 +467,9 @@ class BollingerBandsStrategy(LibraryStrategy):
         super().__init__(config, **params)
 
         self._in_position: str = ""
-        self._entry_price: Optional[float] = None
+        self._entry_price: float | None = None
 
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """Process candle and generate Bollinger Band signals."""
         self.add_candle(candle)
 

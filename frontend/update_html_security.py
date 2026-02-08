@@ -58,7 +58,7 @@ EXTERNAL_CSS_IMPORTS = """    <!-- External CSS (Phase 1) -->
 def load_sri_hashes() -> dict:
     """Load SRI hashes from JSON file."""
     if SRI_HASHES_FILE.exists():
-        with open(SRI_HASHES_FILE, "r", encoding="utf-8") as f:
+        with open(SRI_HASHES_FILE, encoding="utf-8") as f:
             return json.load(f)
     return {}
 
@@ -194,7 +194,7 @@ def update_html_file(filepath: Path, sri_hashes: dict, dry_run: bool = False) ->
     print(f"\n📄 Processing: {filepath.name}")
 
     # Read file
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         original_html = f.read()
 
     html = original_html

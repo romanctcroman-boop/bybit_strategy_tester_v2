@@ -5,11 +5,12 @@ Coverage Target: 100%
 Tests: DeepSeek API client for health checks
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-import httpx
-from backend.api.deepseek_client import DeepSeekClient
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
+import pytest
+
+from backend.api.deepseek_client import DeepSeekClient
 
 # ==================== INITIALIZATION TESTS ====================
 

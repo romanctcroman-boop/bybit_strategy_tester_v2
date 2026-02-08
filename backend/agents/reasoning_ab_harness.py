@@ -6,7 +6,7 @@ Provides A/B testing framework for comparing different reasoning strategies.
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +26,10 @@ class ABTestConfig:
     """
 
     test_name: str
-    variant_a: Dict[str, Any]
-    variant_b: Dict[str, Any]
+    variant_a: dict[str, Any]
+    variant_b: dict[str, Any]
     traffic_split: float = 50.0
-    metrics: List[str] = field(default_factory=lambda: ["accuracy", "latency", "cost"])
+    metrics: list[str] = field(default_factory=lambda: ["accuracy", "latency", "cost"])
     duration_hours: int = 24
     min_sample_size: int = 100
 
@@ -57,8 +57,8 @@ class ABTestResult:
     """
 
     test_name: str
-    variant_a_metrics: Dict[str, float]
-    variant_b_metrics: Dict[str, float]
+    variant_a_metrics: dict[str, float]
+    variant_b_metrics: dict[str, float]
     winner: str
     confidence: float
     sample_size_a: int
@@ -76,8 +76,8 @@ class ReasoningABHarness:
 
     def __init__(self):
         """Initialize A/B testing harness"""
-        self._active_tests: Dict[str, ABTestConfig] = {}
-        self._results: Dict[str, List[Dict[str, Any]]] = {}
+        self._active_tests: dict[str, ABTestConfig] = {}
+        self._results: dict[str, list[dict[str, Any]]] = {}
         logger.info("Reasoning A/B Harness initialized")
 
     def start_test(self, config: ABTestConfig) -> str:
@@ -129,8 +129,8 @@ class ReasoningABHarness:
         self,
         test_id: str,
         variant: str,
-        metrics: Dict[str, float],
-        metadata: Optional[Dict[str, Any]] = None,
+        metrics: dict[str, float],
+        metadata: dict[str, Any] | None = None,
     ):
         """
         Record results for a test request.
@@ -206,7 +206,7 @@ class ReasoningABHarness:
             completed_at=datetime.now(),
         )
 
-    def _aggregate_metrics(self, results: List[Dict[str, Any]]) -> Dict[str, float]:
+    def _aggregate_metrics(self, results: list[dict[str, Any]]) -> dict[str, float]:
         """
         Aggregate metrics from multiple results.
 
@@ -261,7 +261,7 @@ class ReasoningABHarness:
 
         return results
 
-    def list_active_tests(self) -> List[str]:
+    def list_active_tests(self) -> list[str]:
         """
         List all active test IDs.
 
@@ -275,4 +275,4 @@ class ReasoningABHarness:
 ReasoningHarness = ReasoningABHarness
 
 
-__all__ = ["ReasoningABHarness", "ReasoningHarness", "ABTestConfig", "ABTestResult"]
+__all__ = ["ABTestConfig", "ABTestResult", "ReasoningABHarness", "ReasoningHarness"]

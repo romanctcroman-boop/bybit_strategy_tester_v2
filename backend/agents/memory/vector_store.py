@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -34,7 +35,7 @@ class SearchResult:
     content: str
     distance: float
     score: float  # Similarity score (1 - normalized distance)
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 class VectorMemoryStore:
@@ -68,8 +69,8 @@ class VectorMemoryStore:
     def __init__(
         self,
         collection_name: str = DEFAULT_COLLECTION_NAME,
-        persist_path: Optional[str] = None,
-        embedding_fn: Optional[Callable[[str], List[float]]] = None,
+        persist_path: str | None = None,
+        embedding_fn: Callable[[str], list[float]] | None = None,
         use_local_embeddings: bool = True,
     ):
         """
@@ -166,7 +167,7 @@ class VectorMemoryStore:
             )
             self._local_model = None
 
-    async def get_embedding(self, text: str) -> Optional[List[float]]:
+    async def get_embedding(self, text: str) -> list[float] | None:
         """
         Get embedding for text
 
@@ -202,11 +203,11 @@ class VectorMemoryStore:
 
     async def add(
         self,
-        texts: List[str],
-        ids: Optional[List[str]] = None,
-        metadatas: Optional[List[Dict[str, Any]]] = None,
-        embeddings: Optional[List[List[float]]] = None,
-    ) -> List[str]:
+        texts: list[str],
+        ids: list[str] | None = None,
+        metadatas: list[dict[str, Any]] | None = None,
+        embeddings: list[list[float]] | None = None,
+    ) -> list[str]:
         """
         Add documents to vector store
 
@@ -281,12 +282,12 @@ class VectorMemoryStore:
 
     async def query(
         self,
-        query_text: Optional[str] = None,
-        query_embedding: Optional[List[float]] = None,
+        query_text: str | None = None,
+        query_embedding: list[float] | None = None,
         n_results: int = 10,
-        where: Optional[Dict[str, Any]] = None,
-        include: Optional[List[str]] = None,
-    ) -> List[SearchResult]:
+        where: dict[str, Any] | None = None,
+        include: list[str] | None = None,
+    ) -> list[SearchResult]:
         """
         Query similar documents
 
@@ -363,8 +364,8 @@ class VectorMemoryStore:
 
     async def delete(
         self,
-        ids: Optional[List[str]] = None,
-        where: Optional[Dict[str, Any]] = None,
+        ids: list[str] | None = None,
+        where: dict[str, Any] | None = None,
     ) -> int:
         """
         Delete documents from vector store
@@ -432,7 +433,7 @@ class DeepSeekEmbeddingProvider:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = "deepseek-chat",  # DeepSeek doesn't have separate embedding model yet
     ):
         self.api_key = api_key
@@ -450,7 +451,7 @@ class DeepSeekEmbeddingProvider:
             except Exception:
                 logger.warning("DeepSeek API key not available for embeddings")
 
-    async def get_embedding(self, text: str) -> Optional[List[float]]:
+    async def get_embedding(self, text: str) -> list[float] | None:
         """Get embedding from DeepSeek API"""
         if not self.api_key:
             return None
@@ -464,7 +465,7 @@ class DeepSeekEmbeddingProvider:
 
 
 __all__ = [
-    "VectorMemoryStore",
-    "SearchResult",
     "DeepSeekEmbeddingProvider",
+    "SearchResult",
+    "VectorMemoryStore",
 ]

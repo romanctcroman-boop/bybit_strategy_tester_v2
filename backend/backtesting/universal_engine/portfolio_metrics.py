@@ -12,7 +12,7 @@ Metrics Integration и Portfolio Mode для Universal Math Engine.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -71,10 +71,10 @@ class PortfolioConfig:
     allocation_method: AllocationMethod = AllocationMethod.FIXED
 
     # Symbols
-    symbols: List[str] = field(default_factory=lambda: ["BTCUSDT"])
+    symbols: list[str] = field(default_factory=lambda: ["BTCUSDT"])
 
     # Weights (для FIXED allocation)
-    weights: Dict[str, float] = field(default_factory=dict)
+    weights: dict[str, float] = field(default_factory=dict)
 
     # Correlation settings
     max_correlation: float = 0.7  # Максимальная допустимая корреляция
@@ -139,11 +139,11 @@ class PortfolioPosition:
 class PortfolioState:
     """Состояние портфеля."""
 
-    positions: Dict[str, PortfolioPosition]
+    positions: dict[str, PortfolioPosition]
     cash: float
     total_equity: float
-    weights: Dict[str, float]
-    correlations: Dict[Tuple[str, str], float]
+    weights: dict[str, float]
+    correlations: dict[tuple[str, str], float]
     last_rebalance_bar: int = 0
 
 
@@ -159,7 +159,7 @@ class MetricsCalculator:
     Интегрируется с backend/core/metrics_calculator.py.
     """
 
-    def __init__(self, config: Optional[MetricsConfig] = None):
+    def __init__(self, config: MetricsConfig | None = None):
         self.config = config or MetricsConfig()
         self._metrics_module = None
 
@@ -179,9 +179,9 @@ class MetricsCalculator:
     def calculate_basic_metrics(
         self,
         equity_curve: np.ndarray,
-        trades: List[Dict[str, Any]],
+        trades: list[dict[str, Any]],
         initial_capital: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Рассчитать базовые метрики."""
         if len(equity_curve) == 0:
             return {}
@@ -229,7 +229,7 @@ class MetricsCalculator:
     def calculate_drawdown_metrics(
         self,
         equity_curve: np.ndarray,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Рассчитать метрики просадки."""
         if len(equity_curve) < 2:
             return {}
@@ -278,9 +278,9 @@ class MetricsCalculator:
     def calculate_risk_metrics(
         self,
         equity_curve: np.ndarray,
-        trades: List[Dict[str, Any]],
+        trades: list[dict[str, Any]],
         initial_capital: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Рассчитать риск-метрики."""
         if len(equity_curve) < 2:
             return {}
@@ -351,8 +351,8 @@ class MetricsCalculator:
 
     def calculate_trade_stats(
         self,
-        trades: List[Dict[str, Any]],
-    ) -> Dict[str, float]:
+        trades: list[dict[str, Any]],
+    ) -> dict[str, float]:
         """Рассчитать статистику сделок."""
         if not trades:
             return {}
@@ -425,8 +425,8 @@ class MetricsCalculator:
 
     def calculate_streak_metrics(
         self,
-        trades: List[Dict[str, Any]],
-    ) -> Dict[str, int]:
+        trades: list[dict[str, Any]],
+    ) -> dict[str, int]:
         """Рассчитать метрики серий."""
         if not trades:
             return {}
@@ -478,9 +478,9 @@ class MetricsCalculator:
     def calculate_all_metrics(
         self,
         equity_curve: np.ndarray,
-        trades: List[Dict[str, Any]],
+        trades: list[dict[str, Any]],
         initial_capital: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Рассчитать все доступные метрики."""
         metrics = {}
 
@@ -574,9 +574,9 @@ class CorrelationManager:
         self.max_correlation = max_correlation
         self.lookback = lookback
 
-        self.symbols: List[str] = []
-        self.returns_history: Dict[str, List[float]] = {}
-        self.correlation_matrix: Optional[np.ndarray] = None
+        self.symbols: list[str] = []
+        self.returns_history: dict[str, list[float]] = {}
+        self.correlation_matrix: np.ndarray | None = None
 
     def add_return(self, symbol: str, return_value: float) -> None:
         """Добавить значение доходности."""
@@ -629,7 +629,7 @@ class CorrelationManager:
     def can_trade(
         self,
         new_symbol: str,
-        existing_positions: List[str],
+        existing_positions: list[str],
     ) -> bool:
         """Проверить можно ли торговать символ с учётом корреляций."""
         if self.correlation_matrix is None:
@@ -647,8 +647,8 @@ class CorrelationManager:
 
     def get_diversification_score(
         self,
-        symbols: List[str],
-        weights: List[float],
+        symbols: list[str],
+        weights: list[float],
     ) -> float:
         """Рассчитать скор диверсификации портфеля."""
         if self.correlation_matrix is None or len(symbols) < 2:
@@ -687,7 +687,7 @@ class PortfolioManager:
     Управляет мультисимвольным портфелем.
     """
 
-    def __init__(self, config: Optional[PortfolioConfig] = None):
+    def __init__(self, config: PortfolioConfig | None = None):
         self.config = config or PortfolioConfig()
 
         self.state = PortfolioState(
@@ -703,7 +703,7 @@ class PortfolioManager:
             lookback=self.config.correlation_lookback,
         )
 
-        self.trade_history: List[Dict[str, Any]] = []
+        self.trade_history: list[dict[str, Any]] = []
 
     def initialize(self, initial_capital: float) -> None:
         """Инициализировать портфель."""
@@ -716,12 +716,12 @@ class PortfolioManager:
             self.state.weights = self.config.weights.copy()
         else:
             equal_weight = 1.0 / n_symbols if n_symbols > 0 else 0
-            self.state.weights = {s: equal_weight for s in self.config.symbols}
+            self.state.weights = dict.fromkeys(self.config.symbols, equal_weight)
 
     def calculate_weights(
         self,
-        returns_data: Dict[str, np.ndarray],
-    ) -> Dict[str, float]:
+        returns_data: dict[str, np.ndarray],
+    ) -> dict[str, float]:
         """Рассчитать веса портфеля."""
         mode = self.config.mode
         symbols = self.config.symbols
@@ -731,7 +731,7 @@ class PortfolioManager:
             return {}
 
         if mode == PortfolioMode.EQUAL_WEIGHT:
-            return {s: 1.0 / n for s in symbols}
+            return dict.fromkeys(symbols, 1.0 / n)
 
         if mode == PortfolioMode.RISK_PARITY:
             # Inverse volatility weighting
@@ -748,7 +748,7 @@ class PortfolioManager:
             if total_inv_vol > 0:
                 return {s: v / total_inv_vol for s, v in inv_vols.items()}
             else:
-                return {s: 1.0 / n for s in symbols}
+                return dict.fromkeys(symbols, 1.0 / n)
 
         if mode == PortfolioMode.MIN_VARIANCE:
             # Simplified: use inverse variance
@@ -765,10 +765,10 @@ class PortfolioManager:
             if total_inv_var > 0:
                 return {s: v / total_inv_var for s, v in inv_vars.items()}
             else:
-                return {s: 1.0 / n for s in symbols}
+                return dict.fromkeys(symbols, 1.0 / n)
 
         # Default: equal weight
-        return {s: 1.0 / n for s in symbols}
+        return dict.fromkeys(symbols, 1.0 / n)
 
     def can_open_position(
         self,
@@ -848,7 +848,7 @@ class PortfolioManager:
         symbol: str,
         price: float,
         timestamp: int,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Закрыть позицию."""
         if symbol not in self.state.positions:
             return None
@@ -881,7 +881,7 @@ class PortfolioManager:
 
         return trade
 
-    def update_equity(self, prices: Dict[str, float]) -> None:
+    def update_equity(self, prices: dict[str, float]) -> None:
         """Обновить equity портфеля."""
         position_value = 0.0
 
@@ -905,7 +905,7 @@ class PortfolioManager:
     def should_rebalance(
         self,
         current_bar: int,
-        prices: Dict[str, float],
+        prices: dict[str, float],
     ) -> bool:
         """Проверить нужна ли ребалансировка."""
         # Check frequency
@@ -935,9 +935,9 @@ class PortfolioManager:
 
     def get_rebalance_orders(
         self,
-        prices: Dict[str, float],
+        prices: dict[str, float],
         current_bar: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Получить ордера для ребалансировки."""
         orders = []
 
@@ -970,7 +970,7 @@ class PortfolioManager:
 
         return orders
 
-    def get_portfolio_metrics(self) -> Dict[str, Any]:
+    def get_portfolio_metrics(self) -> dict[str, Any]:
         """Получить метрики портфеля."""
         return {
             "total_equity": self.state.total_equity,

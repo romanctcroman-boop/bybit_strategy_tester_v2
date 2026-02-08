@@ -1,54 +1,123 @@
-# 🧠 Claude Opus 4.5 Global Rules
+# 🧠 Claude Sonnet 4.5 / Opus 4.5 — Enhanced Agent Rules
 
 ## Bybit Strategy Tester v2
 
-> **Model**: Claude Opus 4.5 (thinking)
-> **Mode**: Planning (Extended Thinking)
-> **Autonomy Level**: Maximum
+> **Models**: Claude Sonnet 4.5, Claude Opus 4.5  
+> **Mode**: Agent Mode (Extended Thinking + Tool Use)  
+> **Autonomy Level**: Maximum  
+> **Last Updated**: 2026-02-08  
+> **Version**: 2.0
 
 ---
 
-## Extended Thinking Mode
+## 🎯 Model-Specific Capabilities (Claude 4.5)
 
-### When to Use Deep Thinking
+### Claude Sonnet 4.5 Strengths
 
-- Complex architectural decisions
-- Performance optimization strategies
-- Security vulnerability analysis
-- Multi-step implementation plans
-- Algorithm design and optimization
+- **Fastest reasoning** — use for quick fixes, code generation, refactoring
+- **Tool orchestration** — parallel tool calls, multi-file edits
+- **Code-first thinking** — generates code directly without over-explaining
+- **Context window**: 200K tokens — can hold entire project context
 
-### Thinking Process
+### Claude Opus 4.5 Strengths
 
-1. Break down task into components
-2. Analyze trade-offs for each approach
-3. Consider edge cases and failure modes
-4. Document reasoning in thinking blocks
-5. Synthesize into actionable plan
+- **Deep reasoning** — complex architecture decisions, algorithm design
+- **Extended thinking** — step-by-step analysis for non-obvious problems
+- **Planning mode** — multi-phase implementation plans
+- **Security analysis** — finds subtle vulnerabilities
+
+### When to Use Deep Thinking (Extended Thinking Mode)
+
+- Complex architectural decisions requiring trade-off analysis
+- Performance optimization (profiling → hypothesis → implementation → verification)
+- Security vulnerability analysis and remediation
+- Multi-step implementation plans spanning 5+ files
+- Algorithm design and optimization (Big-O analysis)
+- Debugging race conditions or intermittent failures
+- Database schema design with constraint analysis
+
+### Thinking Process (Chain-of-Thought)
+
+1. **Decompose** — Break task into atomic sub-problems
+2. **Context Gather** — Read relevant files BEFORE reasoning (use `@workspace`, `grep_search`)
+3. **Analyze Trade-offs** — Compare 2-3 approaches with pros/cons
+4. **Edge Cases** — Consider failure modes, boundary conditions, null/empty inputs
+5. **Plan** — Create ordered execution plan with dependencies
+6. **Execute** — Implement with parallel tool calls where possible
+7. **Verify** — Run tests, check lint, validate output
+
+### Advanced Reasoning Techniques
+
+```markdown
+## Multi-File Reasoning
+
+When a change spans multiple files:
+
+1. Map ALL affected files first (grep for usages)
+2. Order changes by dependency (models → services → API → tests)
+3. Apply changes atomically — don't leave inconsistent state
+4. Run tests after EACH logical group of changes
+
+## Hypothesis-Driven Debugging
+
+1. State hypothesis: "The bug is likely in X because Y"
+2. Design minimal test to confirm/deny
+3. If confirmed → fix. If denied → next hypothesis
+4. Maximum 3 hypotheses before escalating
+
+## Architecture Decision Records (ADR)
+
+For non-trivial decisions, document:
+
+- Context: What situation requires a decision?
+- Decision: What was decided?
+- Consequences: What are the trade-offs?
+- Alternatives: What was rejected and why?
+```
 
 ---
 
 ## Memory & Context Management
 
-### Session Start Checklist
+### Session Start Checklist (MANDATORY)
 
 ```
 □ Read AGENTS.MD (global rules)
-□ Read .agent/docs/ARCHITECTURE.md
-□ Read .agent/docs/DECISIONS.md
-□ Read .agent/docs/CHANGELOG.md (recent context)
-□ Check relevant Knowledge Items
-□ Check applicable Skills
+□ Read .agent/memory/CONTEXT.md (what happened last)
+□ Read .agent/memory/TODO.md (pending work)
+□ Scan CHANGELOG.md tail (last 50 lines)
+□ Check .agent/docs/DECISIONS.md (recent ADRs)
+□ Check .agent/docs/ARCHITECTURE.md (system map)
+□ Check applicable .github/instructions/ (path-specific rules)
+□ Check applicable .agent/skills/ (reusable patterns)
 ```
 
 ### Session End Checklist
 
 ```
-□ Update CHANGELOG.md with work done
+□ Update CHANGELOG.md with ALL work done (timestamped)
+□ Update .agent/memory/CONTEXT.md (what to know next time)
+□ Update .agent/memory/TODO.md (incomplete items)
 □ Update ARCHITECTURE.md if structure changed
-□ Add ADR if significant decision made
-□ Leave clear context for next session
-□ Suggest KI creation if knowledge is reusable
+□ Add ADR to DECISIONS.md if significant decision made
+□ Leave clear commit messages (conventional commits)
+□ Run final quality check: pytest + ruff + mypy
+```
+
+### Smart Context Loading
+
+```markdown
+## Priority Context (always load):
+
+1. copilot-instructions.md — project rules
+2. .agent/memory/CONTEXT.md — recent state
+3. Path-specific instructions for current task
+
+## On-Demand Context (load when relevant):
+
+4. .copilot/variable-tracker.md — when modifying critical vars
+5. .agent/rules/\*.md — when autonomy questions arise
+6. docs/architecture/\*.md — when touching architecture
 ```
 
 ---
@@ -332,18 +401,143 @@ Save screenshots to `.agent/reports/ui/` for comparison.
 
 ## Self-Check Before Completing
 
-| Check          | Question                         |
-| -------------- | -------------------------------- |
-| ✅ Goal met?   | Did exactly what was asked?      |
-| ✅ Tested?     | All tests passing?               |
-| ✅ Documented? | CHANGELOG, comments, docstrings? |
-| ✅ Clean?      | No lint errors?                  |
-| ✅ Context?    | Enough info for next session?    |
-| ✅ Innovative? | Any improvements suggested?      |
+| Check          | Question                             |
+| -------------- | ------------------------------------ |
+| ✅ Goal met?   | Did exactly what was asked?          |
+| ✅ Tested?     | All tests passing?                   |
+| ✅ Documented? | CHANGELOG, comments, docstrings?     |
+| ✅ Clean?      | No lint errors, no type errors?      |
+| ✅ Context?    | Enough info for next session?        |
+| ✅ Innovative? | Any improvements suggested?          |
+| ✅ Complete?   | No half-done changes or broken refs? |
+| ✅ Secure?     | No secrets, no injection vectors?    |
 
 ---
 
-_Version: 1.1_
-_Model: Claude Opus 4.5_
-_Last Updated: 2026-01-25_
-_Changes: Enhanced Windows security rules, added Browser Testing section_
+## 🚀 Advanced Tool Orchestration (Claude 4.5 Specific)
+
+### Parallel Tool Usage Strategy
+
+Claude 4.5 excels at calling multiple tools simultaneously. Use this:
+
+```markdown
+## When to Parallelize:
+
+- Reading multiple files that don't depend on each other
+- Running grep_search + file_search simultaneously
+- Checking errors in multiple files at once
+- Reading instruction files + source files together
+
+## When to Serialize:
+
+- Edit A must complete before Edit B (dependency)
+- Need file content before knowing what to edit
+- Terminal commands that depend on prior output
+- Test results needed to decide next action
+```
+
+### Multi-File Edit Workflow
+
+```markdown
+1. GATHER: Read all affected files in parallel (read_file × N)
+2. PLAN: Map dependency order of changes
+3. EDIT: Apply changes in dependency order
+4. VERIFY: Check for errors (get_errors for all files)
+5. TEST: Run relevant test suite
+6. COMMIT: Stage and commit with conventional message
+```
+
+### Smart File Discovery
+
+```markdown
+## Finding relevant files for a task:
+
+1. grep_search for function/class names → find definitions
+2. list_code_usages → find all callers/importers
+3. file_search with glob patterns → find by naming convention
+4. semantic_search → when you don't know exact names
+5. read_file on **init**.py → understand module structure
+```
+
+---
+
+## 🔍 Advanced Debugging Protocol
+
+### Systematic Debug Flow
+
+```markdown
+1. REPRODUCE: Understand the exact error/behavior
+2. HYPOTHESIZE: Form 2-3 theories about root cause
+3. NARROW: Use binary search to isolate the issue
+    - Add strategic logging/breakpoints
+    - Check input/output at each layer boundary
+4. ROOT CAUSE: Identify the exact line/condition
+5. FIX: Implement minimal change
+6. VERIFY: Run tests + manual verification
+7. PREVENT: Add test for this specific case
+```
+
+### Error Pattern Recognition
+
+```python
+# Common patterns in this project:
+# 1. SQLAlchemy detached instance → use asyncio.to_thread() or eager loading
+# 2. Bybit API retCode != 0 → check rate limits, validate params
+# 3. DataFrame column missing → check strategy.generate_signals() output
+# 4. Commission mismatch → ALWAYS use 0.0007
+# 5. Timeframe mapping → check legacy TF conversion (3→5, 120→60)
+```
+
+---
+
+## 🧪 Testing Superpowers
+
+### Smart Test Selection
+
+```markdown
+## Run only relevant tests:
+
+- Changed backend/backtesting/ → pytest tests/backtesting/ -v
+- Changed backend/api/ → pytest tests/api/ -v
+- Changed strategies/ → pytest tests/strategies/ -v
+- Changed core metrics → pytest tests/ -v -k "metric"
+- Unsure → pytest tests/ -v --tb=short (all tests, short output)
+```
+
+### Test Quality Rules
+
+```python
+# Every test MUST:
+# 1. Test ONE thing (single assertion focus)
+# 2. Have descriptive name: test_[what]_[scenario]_[expected]
+# 3. Use fixtures from conftest.py (sample_ohlcv, mock_adapter)
+# 4. NEVER call real Bybit API
+# 5. Run in < 5 seconds (mark slow tests with @pytest.mark.slow)
+```
+
+---
+
+## 📊 Performance Profiling Skills
+
+### When Performance Matters
+
+```python
+# Profile BEFORE optimizing:
+# 1. py -3.14 -m cProfile -s cumtime script.py
+# 2. memory_profiler for memory-intensive operations
+# 3. timeit for micro-benchmarks
+# 4. pandas .info() and .memory_usage() for DataFrame optimization
+
+# Common bottlenecks in this project:
+# - Large DataFrame copies (use .copy() only when needed)
+# - Repeated indicator calculations (cache results)
+# - SQLite N+1 queries (use batch loading)
+# - JSON serialization of large trade lists
+```
+
+---
+
+_Version: 2.0_
+_Models: Claude Sonnet 4.5, Claude Opus 4.5_
+_Last Updated: 2026-02-08_
+_Changes: v2.0 - Complete rewrite for Claude 4.5 capabilities, added tool orchestration, advanced debugging, performance profiling, multi-file reasoning, hypothesis-driven debugging_

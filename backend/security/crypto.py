@@ -17,7 +17,6 @@ import hashlib
 import logging
 import os
 import secrets
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +101,7 @@ class CryptoManager:
     KEY_SIZE = 32  # 256 bits
     TAG_SIZE = 16  # 128 bits
 
-    def __init__(self, master_key: Optional[str] = None):
+    def __init__(self, master_key: str | None = None):
         """
         Initialize with optional master key.
 
@@ -112,8 +111,8 @@ class CryptoManager:
         """
         raw_key = master_key or os.getenv("ENCRYPTION_KEY", "")
         self.enabled = bool(raw_key) and CRYPTO_AVAILABLE
-        self._aesgcm: Optional[AESGCM] = None
-        self._key: Optional[SecureBytes] = None
+        self._aesgcm: AESGCM | None = None
+        self._key: SecureBytes | None = None
 
         if not raw_key:
             logger.warning(
@@ -151,7 +150,7 @@ class CryptoManager:
         # Derive key from password using Argon2id or Scrypt
         return self._derive_key(raw_key.encode("utf-8"))
 
-    def _derive_key(self, password: bytes, salt: Optional[bytes] = None) -> bytes:
+    def _derive_key(self, password: bytes, salt: bytes | None = None) -> bytes:
         """
         Derive a 256-bit key from password using Argon2id (preferred) or Scrypt.
 
@@ -320,9 +319,9 @@ class CryptoManager:
 
 
 # Legacy compatibility alias
-def create_crypto_manager(master_key: Optional[str] = None) -> CryptoManager:
+def create_crypto_manager(master_key: str | None = None) -> CryptoManager:
     """Create a new CryptoManager instance."""
     return CryptoManager(master_key)
 
 
-__all__ = ["CryptoManager", "SecureBytes", "create_crypto_manager", "CRYPTO_AVAILABLE"]
+__all__ = ["CRYPTO_AVAILABLE", "CryptoManager", "SecureBytes", "create_crypto_manager"]

@@ -10,7 +10,7 @@ Endpoints for AI-powered trading strategy generation:
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -60,7 +60,7 @@ class GenerateStrategyRequest(BaseModel):
     )
 
     # Indicators
-    indicators: List[str] = Field(
+    indicators: list[str] = Field(
         default_factory=lambda: ["rsi", "atr"],
         description="List of indicators to use",
     )
@@ -83,10 +83,10 @@ class GenerateStrategyRequest(BaseModel):
     )
 
     # Backtesting
-    symbols: List[str] = Field(
+    symbols: list[str] = Field(
         default_factory=lambda: ["BTCUSDT"], description="Symbols to backtest"
     )
-    timeframes: List[str] = Field(
+    timeframes: list[str] = Field(
         default_factory=lambda: ["60", "240"], description="Timeframes to use"
     )
     min_backtest_period_days: int = Field(
@@ -124,31 +124,31 @@ class GeneratedStrategyResponse(BaseModel):
     status: str
 
     # Code
-    code: Optional[str] = None
-    class_name: Optional[str] = None
+    code: str | None = None
+    class_name: str | None = None
 
     # Metadata
     description: str = ""
     pattern_type: str = ""
-    indicators_used: List[str] = Field(default_factory=list)
+    indicators_used: list[str] = Field(default_factory=list)
 
     # Parameters
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    default_params: Dict[str, Any] = Field(default_factory=dict)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    default_params: dict[str, Any] = Field(default_factory=dict)
 
     # Validation
     is_valid: bool = False
-    validation_errors: List[str] = Field(default_factory=list)
+    validation_errors: list[str] = Field(default_factory=list)
 
     # Backtest results
-    backtest_results: Optional[Dict[str, Any]] = None
+    backtest_results: dict[str, Any] | None = None
 
     # Timestamps
     created_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
     # Error
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     @classmethod
     def from_strategy(cls, strategy: GeneratedStrategy) -> "GeneratedStrategyResponse":
@@ -178,19 +178,19 @@ class StrategyListResponse(BaseModel):
     """Response containing list of strategies."""
 
     total: int
-    strategies: List[GeneratedStrategyResponse]
+    strategies: list[GeneratedStrategyResponse]
 
 
 class PatternTypesResponse(BaseModel):
     """Available pattern types."""
 
-    pattern_types: List[Dict[str, str]]
+    pattern_types: list[dict[str, str]]
 
 
 class IndicatorsResponse(BaseModel):
     """Available indicators."""
 
-    indicators: List[Dict[str, str]]
+    indicators: list[dict[str, str]]
 
 
 class ValidationRequest(BaseModel):
@@ -205,9 +205,9 @@ class ValidationResponse(BaseModel):
     """Code validation response."""
 
     is_valid: bool
-    errors: List[str] = Field(default_factory=list)
-    warnings: List[str] = Field(default_factory=list)
-    suggestions: List[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
 
 
 # ============================================================================
@@ -351,8 +351,8 @@ async def list_strategies(
     limit: int = Query(
         default=50, ge=1, le=200, description="Maximum strategies to return"
     ),
-    status_filter: Optional[str] = Query(default=None, description="Filter by status"),
-    pattern_filter: Optional[str] = Query(
+    status_filter: str | None = Query(default=None, description="Filter by status"),
+    pattern_filter: str | None = Query(
         default=None, description="Filter by pattern type"
     ),
 ):

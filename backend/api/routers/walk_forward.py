@@ -8,7 +8,7 @@ Provides endpoints for:
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -58,8 +58,8 @@ class WindowResult(BaseModel):
     """Single window result."""
 
     window_id: int
-    train_period: dict[str, Optional[str]]
-    test_period: dict[str, Optional[str]]
+    train_period: dict[str, str | None]
+    test_period: dict[str, str | None]
     train_metrics: dict[str, float]
     test_metrics: dict[str, float]
     best_params: dict[str, Any]
@@ -177,7 +177,7 @@ async def quick_validation(request: QuickValidationRequest) -> ValidationMetrics
         degradations = []
         for train, test in zip(request.train_returns, request.test_returns):
             if train != 0:
-                degradations.append((test / train - 1))
+                degradations.append(test / train - 1)
         avg_deg = sum(degradations) / len(degradations) if degradations else 0
 
         # Overfit score

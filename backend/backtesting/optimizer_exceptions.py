@@ -5,7 +5,7 @@ Custom exceptions for GPU and Fast optimizers.
 Provides clear error messages and proper error handling.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class OptimizerError(Exception):
@@ -14,8 +14,8 @@ class OptimizerError(Exception):
     def __init__(
         self,
         message: str,
-        details: Optional[Dict[str, Any]] = None,
-        original_error: Optional[Exception] = None,
+        details: dict[str, Any] | None = None,
+        original_error: Exception | None = None,
     ):
         self.message = message
         self.details = details or {}
@@ -37,7 +37,7 @@ class GPUNotAvailableError(OptimizerError):
     def __init__(
         self,
         message: str = "GPU not available. Install CuPy with CUDA support.",
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         super().__init__(message, details)
 
@@ -48,8 +48,8 @@ class CUDAError(OptimizerError):
     def __init__(
         self,
         message: str,
-        cuda_error: Optional[str] = None,
-        device_id: Optional[int] = None,
+        cuda_error: str | None = None,
+        device_id: int | None = None,
     ):
         details = {}
         if cuda_error:
@@ -65,8 +65,8 @@ class GPUMemoryError(OptimizerError):
     def __init__(
         self,
         message: str = "GPU out of memory",
-        required_mb: Optional[float] = None,
-        available_mb: Optional[float] = None,
+        required_mb: float | None = None,
+        available_mb: float | None = None,
     ):
         details = {}
         if required_mb is not None:
@@ -82,9 +82,9 @@ class ParameterGridError(OptimizerError):
     def __init__(
         self,
         message: str,
-        param_name: Optional[str] = None,
-        param_value: Optional[Any] = None,
-        valid_range: Optional[tuple] = None,
+        param_name: str | None = None,
+        param_value: Any | None = None,
+        valid_range: tuple | None = None,
     ):
         details = {}
         if param_name:
@@ -103,7 +103,7 @@ class GridSizeExceededError(OptimizerError):
         self,
         actual_size: int,
         max_size: int,
-        message: Optional[str] = None,
+        message: str | None = None,
     ):
         if message is None:
             message = f"Grid size {actual_size:,} exceeds maximum {max_size:,}"
@@ -120,9 +120,9 @@ class DataValidationError(OptimizerError):
     def __init__(
         self,
         message: str,
-        field: Optional[str] = None,
-        expected: Optional[str] = None,
-        actual: Optional[str] = None,
+        field: str | None = None,
+        expected: str | None = None,
+        actual: str | None = None,
     ):
         details = {}
         if field:
@@ -141,7 +141,7 @@ class InsufficientDataError(DataValidationError):
         self,
         required_bars: int,
         actual_bars: int,
-        message: Optional[str] = None,
+        message: str | None = None,
     ):
         if message is None:
             message = f"Insufficient data: need {required_bars} bars, got {actual_bars}"
@@ -160,8 +160,8 @@ class OptimizationTimeoutError(OptimizerError):
         self,
         timeout_seconds: float,
         elapsed_seconds: float,
-        combinations_completed: Optional[int] = None,
-        total_combinations: Optional[int] = None,
+        combinations_completed: int | None = None,
+        total_combinations: int | None = None,
     ):
         message = f"Optimization timed out after {elapsed_seconds:.1f}s (limit: {timeout_seconds}s)"
         details = {
@@ -198,7 +198,7 @@ class WorkerError(OptimizerError):
         self,
         worker_id: int,
         error: Exception,
-        task_info: Optional[Dict[str, Any]] = None,
+        task_info: dict[str, Any] | None = None,
     ):
         message = f"Worker {worker_id} failed"
         details = {"worker_id": worker_id}
@@ -214,7 +214,7 @@ class SharedMemoryError(OptimizerError):
         self,
         operation: str,
         error: Exception,
-        memory_name: Optional[str] = None,
+        memory_name: str | None = None,
     ):
         message = f"Shared memory {operation} failed"
         details = {"operation": operation}
@@ -254,7 +254,7 @@ def handle_gpu_error(func):
 
 
 def validate_parameter_grid(
-    param_ranges: Dict[str, Any],
+    param_ranges: dict[str, Any],
     max_combinations: int = 50_000_000,
 ) -> int:
     """
@@ -298,7 +298,7 @@ def validate_parameter_grid(
 
 
 def validate_price_data(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     min_bars: int = 100,
 ) -> None:
     """

@@ -15,10 +15,6 @@ Universal Risk Manager - Управление рисками для ВСЕХ с�
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional
-
-import numpy as np
-from loguru import logger
 
 
 @dataclass
@@ -60,7 +56,7 @@ class RiskState:
     """Current state of risk management."""
 
     # Trade history
-    recent_trades: List[TradeResult] = field(default_factory=list)
+    recent_trades: list[TradeResult] = field(default_factory=list)
 
     # Consecutive tracking
     consecutive_losses: int = 0
@@ -78,8 +74,8 @@ class RiskState:
     # Trade counts
     trades_today: int = 0
     trades_this_week: int = 0
-    current_day: Optional[int] = None  # Day of year
-    current_week: Optional[int] = None  # Week of year
+    current_day: int | None = None  # Day of year
+    current_week: int | None = None  # Week of year
 
     # Circuit breaker
     trading_halted: bool = False
@@ -106,7 +102,7 @@ class UniversalRiskManager:
         )
 
     def can_trade(
-        self, current_bar: int, current_time: Optional[datetime] = None
+        self, current_bar: int, current_time: datetime | None = None
     ) -> tuple:
         """
         Check if trading is allowed based on all risk rules.
@@ -270,7 +266,7 @@ class UniversalRiskManager:
             peak_equity=self.initial_capital, current_equity=self.initial_capital
         )
 
-    def get_risk_stats(self) -> Dict:
+    def get_risk_stats(self) -> dict:
         """Get current risk statistics."""
         state = self.state
 

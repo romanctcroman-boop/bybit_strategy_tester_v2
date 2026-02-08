@@ -4,8 +4,8 @@ Provides API endpoints for managing and executing multi-agent graphs.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -30,8 +30,8 @@ class ExecutionRequest(BaseModel):
     """Request to execute a graph."""
 
     graph_name: str = Field(..., description="Name of the graph to execute")
-    input_message: Optional[str] = Field(None, description="Initial input message")
-    context: Optional[Dict[str, Any]] = Field(
+    input_message: str | None = Field(None, description="Initial input message")
+    context: dict[str, Any] | None = Field(
         default_factory=dict, description="Additional context"
     )
 
@@ -42,9 +42,9 @@ class ExecutionResult(BaseModel):
     session_id: str
     graph_name: str
     status: str
-    execution_path: List[tuple]
-    results: Dict[str, Any]
-    errors: List[Dict[str, Any]]
+    execution_path: list[tuple]
+    results: dict[str, Any]
+    errors: list[dict[str, Any]]
     messages_count: int
     total_duration_ms: float
     completed_at: str
@@ -57,9 +57,9 @@ class GraphInfo(BaseModel):
     description: str
     nodes_count: int
     edges_count: int
-    entry_point: Optional[str]
-    exit_points: List[str]
-    metrics: Dict[str, Any]
+    entry_point: str | None
+    exit_points: list[str]
+    metrics: dict[str, Any]
 
 
 class GraphVisualization(BaseModel):
@@ -73,7 +73,7 @@ class OrchestratorStatus(BaseModel):
     """Overall orchestrator status."""
 
     registered_graphs: int
-    graph_names: List[str]
+    graph_names: list[str]
     total_executions: int
     successful_executions: int
     overall_success_rate: float
@@ -115,7 +115,7 @@ async def get_orchestrator_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/graphs", response_model=List[GraphInfo])
+@router.get("/graphs", response_model=list[GraphInfo])
 async def list_registered_graphs():
     """
     List all registered graphs with their information.
@@ -251,7 +251,7 @@ async def execute_graph(request: ExecutionRequest):
             errors=result_state.errors,
             messages_count=len(result_state.messages),
             total_duration_ms=round(duration_ms, 2),
-            completed_at=datetime.now(timezone.utc).isoformat(),
+            completed_at=datetime.now(UTC).isoformat(),
         )
 
     except HTTPException:

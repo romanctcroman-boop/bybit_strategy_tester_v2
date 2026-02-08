@@ -14,11 +14,12 @@ import json
 import logging
 import os
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,10 @@ class KeyMetadata:
     provider: KeyProvider
     created_at: datetime
     expires_at: datetime
-    last_used: Optional[datetime] = None
+    last_used: datetime | None = None
     usage_count: int = 0
     status: KeyStatus = KeyStatus.ACTIVE
-    rotated_from: Optional[str] = None
+    rotated_from: str | None = None
     description: str = ""
     tags: list[str] = field(default_factory=list)
 
@@ -72,7 +73,7 @@ class RotationEvent:
     rotated_at: datetime
     reason: str
     success: bool
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 @dataclass
@@ -83,8 +84,8 @@ class KeyUsageStats:
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
-    last_success: Optional[datetime] = None
-    last_failure: Optional[datetime] = None
+    last_success: datetime | None = None
+    last_failure: datetime | None = None
     avg_latency_ms: float = 0.0
     error_rate: float = 0.0
 
@@ -97,9 +98,9 @@ class SecureKeyStorage:
     falls back to obfuscation otherwise.
     """
 
-    def __init__(self, storage_path: Optional[Path] = None):
+    def __init__(self, storage_path: Path | None = None):
         self.storage_path = storage_path or Path("backend/config/key_vault.json")
-        self._encryption_key: Optional[bytes] = None
+        self._encryption_key: bytes | None = None
         self._init_encryption()
 
     def _init_encryption(self) -> None:
@@ -200,7 +201,7 @@ class SecureKeyStorage:
             logger.error(f"Failed to store key {key_id}: {e}")
             return False
 
-    def retrieve_key(self, key_id: str) -> Optional[tuple[str, KeyMetadata]]:
+    def retrieve_key(self, key_id: str) -> tuple[str, KeyMetadata] | None:
         """Retrieve a key and its metadata."""
         try:
             vault = self._load_vault()
@@ -269,7 +270,7 @@ class SecureKeyStorage:
             logger.error(f"Failed to revoke key {key_id}: {e}")
             return False
 
-    def list_keys(self, provider: Optional[KeyProvider] = None) -> list[KeyMetadata]:
+    def list_keys(self, provider: KeyProvider | None = None) -> list[KeyMetadata]:
         """List all keys, optionally filtered by provider."""
         try:
             vault = self._load_vault()
@@ -335,7 +336,7 @@ class APIKeyRotationService:
         self,
         rotation_days: int = 90,
         warning_days: int = 14,
-        storage: Optional[SecureKeyStorage] = None,
+        storage: SecureKeyStorage | None = None,
     ):
         self.rotation_days = rotation_days
         self.warning_days = warning_days
@@ -350,7 +351,7 @@ class APIKeyRotationService:
         self._usage_stats: dict[str, KeyUsageStats] = {}
 
         # Key fetchers for automatic rotation
-        self._key_fetchers: dict[KeyProvider, Callable[[], Optional[str]]] = {}
+        self._key_fetchers: dict[KeyProvider, Callable[[], str | None]] = {}
 
         logger.info(
             f"APIKeyRotationService initialized: rotation={rotation_days}d, warning={warning_days}d"
@@ -362,7 +363,7 @@ class APIKeyRotationService:
         key_value: str,
         provider: KeyProvider,
         description: str = "",
-        tags: Optional[list[str]] = None,
+        tags: list[str] | None = None,
     ) -> bool:
         """Register a new API key for rotation management."""
         now = datetime.now()
@@ -382,7 +383,7 @@ class APIKeyRotationService:
 
         return success
 
-    def get_key(self, key_id: str) -> Optional[str]:
+    def get_key(self, key_id: str) -> str | None:
         """Get a key value and update usage statistics."""
         result = self.storage.retrieve_key(key_id)
         if result:
@@ -439,7 +440,7 @@ class APIKeyRotationService:
         key_id: str,
         new_key_value: str,
         reason: str = "scheduled_rotation",
-    ) -> Optional[RotationEvent]:
+    ) -> RotationEvent | None:
         """Rotate a key with a new value."""
         result = self.storage.retrieve_key(key_id)
         if not result:
@@ -503,12 +504,12 @@ class APIKeyRotationService:
         self._warning_callbacks.append(callback)
 
     def register_key_fetcher(
-        self, provider: KeyProvider, fetcher: Callable[[], Optional[str]]
+        self, provider: KeyProvider, fetcher: Callable[[], str | None]
     ) -> None:
         """Register a function to fetch new keys for a provider."""
         self._key_fetchers[provider] = fetcher
 
-    def auto_rotate(self, provider: KeyProvider) -> Optional[RotationEvent]:
+    def auto_rotate(self, provider: KeyProvider) -> RotationEvent | None:
         """Automatically rotate keys for a provider using registered fetcher."""
         if provider not in self._key_fetchers:
             logger.error(f"No key fetcher registered for {provider}")
@@ -532,7 +533,7 @@ class APIKeyRotationService:
         return self.rotate_key(oldest_key.key_id, new_key, "auto_rotation")
 
     def get_rotation_history(
-        self, limit: int = 100, provider: Optional[KeyProvider] = None
+        self, limit: int = 100, provider: KeyProvider | None = None
     ) -> list[RotationEvent]:
         """Get rotation history."""
         history = self._rotation_history
@@ -542,7 +543,7 @@ class APIKeyRotationService:
 
         return history[-limit:]
 
-    def get_usage_stats(self, key_id: str) -> Optional[KeyUsageStats]:
+    def get_usage_stats(self, key_id: str) -> KeyUsageStats | None:
         """Get usage statistics for a key."""
         return self._usage_stats.get(key_id)
 
@@ -621,7 +622,7 @@ class APIKeyRotationService:
 
 
 # Global service instance
-_rotation_service: Optional[APIKeyRotationService] = None
+_rotation_service: APIKeyRotationService | None = None
 
 
 def get_rotation_service() -> APIKeyRotationService:

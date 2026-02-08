@@ -15,7 +15,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -356,7 +356,7 @@ class BaseRLAgent(ABC):
         pass
 
     @abstractmethod
-    def update(self, experience: Experience) -> Optional[float]:
+    def update(self, experience: Experience) -> float | None:
         """Update agent with new experience, returns loss if trained."""
         pass
 
@@ -408,7 +408,7 @@ class DQNAgent(BaseRLAgent):
         q_values = self.q_network.predict(state)
         return int(np.argmax(q_values[0]))
 
-    def update(self, experience: Experience) -> Optional[float]:
+    def update(self, experience: Experience) -> float | None:
         """Update agent with experience."""
         # Store experience
         self.replay_buffer.push(
@@ -734,7 +734,7 @@ async def train_rl_agent(
     num_episodes: int = 1000,
     max_steps_per_episode: int = 1000,
     eval_interval: int = 100,
-    save_path: Optional[str] = None,
+    save_path: str | None = None,
 ) -> dict[str, Any]:
     """
     Train RL agent on trading environment.
@@ -808,10 +808,10 @@ async def train_rl_agent(
 # Global Instance
 # ============================================================================
 
-_rl_agent: Optional[BaseRLAgent] = None
+_rl_agent: BaseRLAgent | None = None
 
 
-def get_rl_agent(config: Optional[RLConfig] = None) -> BaseRLAgent:
+def get_rl_agent(config: RLConfig | None = None) -> BaseRLAgent:
     """Get or create global RL agent."""
     global _rl_agent
     if _rl_agent is None:

@@ -14,10 +14,11 @@ Features:
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 from backend.services.live_trading.bybit_websocket import (
     BybitWebSocketClient,
@@ -50,12 +51,12 @@ class TradingSignal:
     signal_type: SignalType
     symbol: str
     price: float = 0.0
-    qty: Optional[float] = None  # None = use position sizing rules
-    stop_loss: Optional[float] = None
-    take_profit: Optional[float] = None
+    qty: float | None = None  # None = use position sizing rules
+    stop_loss: float | None = None
+    take_profit: float | None = None
     confidence: float = 1.0  # 0.0 - 1.0
     reason: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict = field(default_factory=dict)
 
 
@@ -73,8 +74,8 @@ class StrategyConfig:
     leverage: float = 1.0
 
     # Risk management
-    stop_loss_percent: Optional[float] = 2.0  # % below entry
-    take_profit_percent: Optional[float] = 4.0  # % above entry
+    stop_loss_percent: float | None = 2.0  # % below entry
+    take_profit_percent: float | None = 4.0  # % above entry
     max_daily_loss: float = 100.0  # Max daily loss in quote currency
     max_open_trades: int = 1
 
@@ -91,8 +92,8 @@ class StrategyState:
     """Runtime state of a strategy."""
 
     is_running: bool = False
-    last_signal_time: Optional[datetime] = None
-    last_trade_time: Optional[datetime] = None
+    last_signal_time: datetime | None = None
+    last_trade_time: datetime | None = None
     signals_generated: int = 0
     trades_executed: int = 0
     daily_pnl: float = 0.0
@@ -128,7 +129,7 @@ class BaseStrategy(ABC):
         self._indicators: dict[str, Any] = {}
 
     @abstractmethod
-    def on_candle(self, candle: dict) -> Optional[TradingSignal]:
+    def on_candle(self, candle: dict) -> TradingSignal | None:
         """
         Called on each new candle. Return a signal or None.
 
@@ -140,7 +141,7 @@ class BaseStrategy(ABC):
         """
         pass
 
-    def on_trade(self, trade: dict) -> Optional[TradingSignal]:
+    def on_trade(self, trade: dict) -> TradingSignal | None:
         """
         Called on each public trade tick. Override for tick-based strategies.
 
@@ -196,14 +197,14 @@ class BaseStrategy(ABC):
     # Common Indicators
     # ==========================================================================
 
-    def sma(self, period: int, prices: Optional[list[float]] = None) -> float:
+    def sma(self, period: int, prices: list[float] | None = None) -> float:
         """Simple Moving Average."""
         prices = prices or self.get_closes(period)
         if len(prices) < period:
             return 0.0
         return sum(prices[-period:]) / period
 
-    def ema(self, period: int, prices: Optional[list[float]] = None) -> float:
+    def ema(self, period: int, prices: list[float] | None = None) -> float:
         """Exponential Moving Average."""
         prices = prices or self.get_closes()
         if len(prices) < period:
@@ -217,7 +218,7 @@ class BaseStrategy(ABC):
 
         return ema_value
 
-    def rsi(self, period: int = 14, prices: Optional[list[float]] = None) -> float:
+    def rsi(self, period: int = 14, prices: list[float] | None = None) -> float:
         """Relative Strength Index."""
         prices = prices or self.get_closes()
         if len(prices) < period + 1:
@@ -243,7 +244,7 @@ class BaseStrategy(ABC):
         self,
         period: int = 20,
         std_dev: float = 2.0,
-        prices: Optional[list[float]] = None,
+        prices: list[float] | None = None,
     ) -> tuple[float, float, float]:
         """Bollinger Bands. Returns (upper, middle, lower)."""
         prices = prices or self.get_closes(period)
@@ -282,7 +283,7 @@ class BaseStrategy(ABC):
         fast: int = 12,
         slow: int = 26,
         signal: int = 9,
-        prices: Optional[list[float]] = None,
+        prices: list[float] | None = None,
     ) -> tuple[float, float, float]:
         """MACD. Returns (macd_line, signal_line, histogram)."""
         prices = prices or self.get_closes()
@@ -548,7 +549,7 @@ class LiveStrategyRunner:
         state = strategy.state
 
         state.signals_generated += 1
-        state.last_signal_time = datetime.now(timezone.utc)
+        state.last_signal_time = datetime.now(UTC)
 
         logger.info(
             f"📊 Signal: {signal.signal_type.value} {signal.symbol} "
@@ -569,7 +570,7 @@ class LiveStrategyRunner:
         # Check cooldown
         if state.last_trade_time:
             elapsed = (
-                datetime.now(timezone.utc) - state.last_trade_time
+                datetime.now(UTC) - state.last_trade_time
             ).total_seconds()
             if elapsed < config.cooldown_seconds:
                 logger.debug("Cooldown active, skipping signal")
@@ -687,7 +688,7 @@ class LiveStrategyRunner:
             del self._paper_positions[symbol]
 
         state.trades_executed += 1
-        state.last_trade_time = datetime.now(timezone.utc)
+        state.last_trade_time = datetime.now(UTC)
 
         # Notify callbacks
         for callback in self._trade_callbacks:
@@ -783,7 +784,7 @@ class LiveStrategyRunner:
 
         if result and result.success:
             state.trades_executed += 1
-            state.last_trade_time = datetime.now(timezone.utc)
+            state.last_trade_time = datetime.now(UTC)
 
             logger.info(
                 f"✅ Trade executed: {signal.signal_type.value} {symbol} "

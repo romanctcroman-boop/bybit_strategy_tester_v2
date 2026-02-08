@@ -13,8 +13,7 @@ For each test strategy:
 """
 
 import importlib.util
-import sys
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -107,7 +106,7 @@ class GeneratedCodeStrategy(BaseStrategy):
     (List[Dict]) to SignalResult format.
     """
 
-    def __init__(self, generated_code: str, strategy_name: str, params: Dict[str, Any] | None = None):
+    def __init__(self, generated_code: str, strategy_name: str, params: dict[str, Any] | None = None):
         """
         Initialize from generated code string.
 
@@ -194,7 +193,7 @@ class GeneratedCodeStrategy(BaseStrategy):
         )
 
 
-def build_rsi_strategy_graph() -> Dict[str, Any]:
+def build_rsi_strategy_graph() -> dict[str, Any]:
     """Build a simple RSI oversold strategy graph"""
     return {
         "name": "RSI Parity Test",
@@ -276,9 +275,7 @@ def build_rsi_strategy_graph() -> Dict[str, Any]:
     }
 
 
-def run_backtest_with_strategy(
-    strategy: BaseStrategy, ohlcv: pd.DataFrame, config: BacktestConfig
-) -> Dict[str, Any]:
+def run_backtest_with_strategy(strategy: BaseStrategy, ohlcv: pd.DataFrame, config: BacktestConfig) -> dict[str, Any]:
     """Run backtest with given strategy and return metrics"""
     engine = BacktestEngine()
     result = engine.run(config, ohlcv, custom_strategy=strategy, silent=True)
@@ -290,7 +287,7 @@ def run_backtest_with_strategy(
     metrics = result.metrics
     return {
         "total_return": metrics.total_return,
-        "final_capital": metrics.final_capital,
+        "net_profit": metrics.net_profit,
         "max_drawdown": metrics.max_drawdown,
         "total_trades": metrics.total_trades,
         "winning_trades": metrics.winning_trades,
@@ -300,12 +297,11 @@ def run_backtest_with_strategy(
         "sortino_ratio": metrics.sortino_ratio,
         "calmar_ratio": metrics.calmar_ratio,
         "profit_factor": metrics.profit_factor,
-        "net_profit": metrics.net_profit,
         "gross_profit": metrics.gross_profit,
         "gross_loss": metrics.gross_loss,
         "buy_hold_return": metrics.buy_hold_return,
         "cagr": metrics.cagr,
-        "avg_trade_pnl": metrics.avg_trade_pnl,
+        "avg_trade_value": metrics.avg_trade_value,
         "best_trade": metrics.best_trade,
         "worst_trade": metrics.worst_trade,
     }
@@ -367,17 +363,13 @@ class TestStrategyBuilderParity:
         strategy_name = generate_data["strategy_name"]
 
         # 4. Run backtest via Generated Code
-        generated_strategy = GeneratedCodeStrategy(
-            generated_code, strategy_name, params={}
-        )
-        generated_metrics = run_backtest_with_strategy(
-            generated_strategy, sample_ohlcv, config
-        )
+        generated_strategy = GeneratedCodeStrategy(generated_code, strategy_name, params={})
+        generated_metrics = run_backtest_with_strategy(generated_strategy, sample_ohlcv, config)
 
         # 5. Compare ALL metrics with strict equality (100% parity required)
         metric_keys = [
             "total_return",
-            "final_capital",
+            "net_profit",
             "max_drawdown",
             "total_trades",
             "winning_trades",
@@ -387,12 +379,11 @@ class TestStrategyBuilderParity:
             "sortino_ratio",
             "calmar_ratio",
             "profit_factor",
-            "net_profit",
             "gross_profit",
             "gross_loss",
             "buy_hold_return",
             "cagr",
-            "avg_trade_pnl",
+            "avg_trade_value",
             "best_trade",
             "worst_trade",
         ]
@@ -406,11 +397,7 @@ class TestStrategyBuilderParity:
             if pd.isna(adapter_val) and pd.isna(generated_val):
                 continue
             if adapter_val != generated_val:
-                mismatches.append(
-                    f"{key}: adapter={adapter_val}, generated={generated_val}"
-                )
+                mismatches.append(f"{key}: adapter={adapter_val}, generated={generated_val}")
 
         if mismatches:
-            pytest.fail(
-                f"Metrics mismatch (100% parity required):\n" + "\n".join(mismatches)
-            )
+            pytest.fail("Metrics mismatch (100% parity required):\n" + "\n".join(mismatches))

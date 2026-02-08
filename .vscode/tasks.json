@@ -1246,6 +1246,256 @@
 				"D:\\bybit_strategy_tester_v2\\test_eval_fixed.py"
 			],
 			"isBackground": false
+		},
+		{
+			"label": "Run DCA Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_dca_full_flow.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Verify DCA Engine",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\verify_dca_engine.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Verify DCA v2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\verify_dca_v2.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Debug DCA Response",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\debug_dca_response.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Debug DCA v2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\debug_dca_v2.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Debug DCA v2 Final",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\debug_dca_v2.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Debug DCA v3",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\debug_dca_v3.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Wait 15s",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-c",
+				"import time; time.sleep(15); print('Waited 15 seconds')"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Debug DCA v3 run",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\debug_dca_v3.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check Server",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-c",
+				"import requests; print(requests.get('http://localhost:8000/api/v1/health', timeout=5).status_code)"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "DCA Test Final",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\debug_dca_v3.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Wait 20s",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-c",
+				"import time; time.sleep(20); print('Waited 20 seconds')"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "DCA Debug Final",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\debug_dca_v3.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Test Signal Generation",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_signal_generation.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Test Signal Gen v2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_signal_gen_v2.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Run Manual Grid Test",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\test_manual_grid.py"
+			]
+		},
+		{
+			"label": "Quick API Test",
+			"type": "shell",
+			"command": "d:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"d:\\bybit_strategy_tester_v2\\quick_api_test.py"
+			]
+		},
+		{
+			"label": "Run Quick Test",
+			"type": "shell",
+			"command": "python quick_api_test.py",
+			"isBackground": false
+		},
+		{
+			"label": "Run Final API Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\run_api_final_test.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Run Final API Test 2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\run_api_final_test2.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Run Final API Test 3",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\run_api_final_test3.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Debug API Test",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\debug_api_test.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Check DB Direct",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\check_db_direct.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Run Final API Test 4",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\run_api_final_test4.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Simple API Backtest",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\simple_api_backtest.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Simple API Backtest 2",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\simple_api_backtest2.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Test Get Strategy",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_get_strategy.py"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Test Curl",
+			"type": "shell",
+			"command": "D:\\bybit_strategy_tester_v2\\.venv\\Scripts\\python.exe",
+			"args": [
+				"D:\\bybit_strategy_tester_v2\\test_curl.py"
+			],
+			"isBackground": false
 		}
 	]
 }

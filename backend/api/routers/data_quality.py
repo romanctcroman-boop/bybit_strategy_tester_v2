@@ -6,7 +6,7 @@ Provides REST API endpoints for market data quality monitoring.
 """
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -54,7 +54,7 @@ class DataQualityIssueResponse(BaseModel):
     timestamp: datetime
     severity: float
     description: str
-    raw_data: Optional[dict[str, Any]]
+    raw_data: dict[str, Any] | None
     auto_corrected: bool
 
 
@@ -80,7 +80,7 @@ class DataQualityMetricsResponse(BaseModel):
     spikes_detected: int
     quality_score: float
     quality_level: str
-    last_update: Optional[datetime]
+    last_update: datetime | None
     staleness_seconds: float
 
 
@@ -254,8 +254,8 @@ async def get_symbol_metrics(symbol: str, interval: str):
 @router.get("/issues", response_model=list[DataQualityIssueResponse])
 async def get_recent_issues(
     limit: int = 100,
-    symbol: Optional[str] = None,
-    issue_type: Optional[str] = None,
+    symbol: str | None = None,
+    issue_type: str | None = None,
 ):
     """Get recent data quality issues."""
     monitor = get_data_quality_monitor()

@@ -4,9 +4,9 @@ Optimization Tasks
 Celery задачи для оптимизации стратегий (grid search, walk-forward, Bayesian).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from itertools import product
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from celery import Task
 from loguru import logger
@@ -33,7 +33,7 @@ class OptimizationTask(Task):
                 if opt:
                     opt.status = "failed"
                     opt.error_message = str(exc)
-                    opt.updated_at = datetime.now(timezone.utc)
+                    opt.updated_at = datetime.now(UTC)
                     db.commit()
                 db.close()
             except Exception as e:
@@ -53,14 +53,14 @@ class OptimizationTask(Task):
 def grid_search_task(
     self,
     optimization_id: int,
-    strategy_config: Dict[str, Any],
-    param_space: Dict[str, List],
+    strategy_config: dict[str, Any],
+    param_space: dict[str, list],
     symbol: str,
     interval: str,
     start_date: str,
     end_date: str,
     metric: str = "sharpe_ratio",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Grid Search оптимизация
 
@@ -89,7 +89,7 @@ def grid_search_task(
         if not opt:
             raise ValueError(f"Optimization {optimization_id} not found")
 
-        data_service.update_optimization(optimization_id, status="running", started_at=datetime.now(timezone.utc))
+        data_service.update_optimization(optimization_id, status="running", started_at=datetime.now(UTC))
 
         # Загрузить данные
         logger.info("📥 Loading market data...")
@@ -179,7 +179,7 @@ def grid_search_task(
         data_service.update_optimization(
             optimization_id,
             status="completed",
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(UTC),
             best_params=best_params,
             best_score=best_score,
             results={
@@ -212,7 +212,7 @@ def grid_search_task(
                 optimization_id,
                 status="failed",
                 error_message=str(e),
-                completed_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(UTC),
             )
         except Exception as db_error:
             logger.error(f"Failed to update optimization status: {db_error}")
@@ -230,8 +230,8 @@ def grid_search_task(
 def walk_forward_task(
     self,
     optimization_id: int,
-    strategy_config: Dict[str, Any],
-    param_space: Dict[str, List],
+    strategy_config: dict[str, Any],
+    param_space: dict[str, list],
     symbol: str,
     interval: str,
     start_date: str,
@@ -240,7 +240,7 @@ def walk_forward_task(
     test_size: int = 60,  # Testing days (OOS window)
     step_size: int = 30,  # Step size for rolling window
     metric: str = "sharpe_ratio",  # Optimization metric
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Walk-Forward оптимизация
 
@@ -365,7 +365,7 @@ def walk_forward_task(
             },
             "results": results,
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:
@@ -388,8 +388,8 @@ def walk_forward_task(
 def bayesian_optimization_task(
     self,
     optimization_id: int,
-    strategy_config: Dict[str, Any],
-    param_space: Dict[str, Dict[str, Any]],  # {param: {type, low, high}}
+    strategy_config: dict[str, Any],
+    param_space: dict[str, dict[str, Any]],  # {param: {type, low, high}}
     symbol: str,
     interval: str,
     start_date: str,
@@ -398,8 +398,8 @@ def bayesian_optimization_task(
     metric: str = "sharpe_ratio",
     direction: str = "maximize",
     n_jobs: int = 1,
-    random_state: Optional[int] = None,
-) -> Dict[str, Any]:
+    random_state: int | None = None,
+) -> dict[str, Any]:
     """
     Bayesian Optimization используя Optuna
 
@@ -541,7 +541,7 @@ def bayesian_optimization_task(
             },
             "results": results,
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
         }
 
     except Exception as e:

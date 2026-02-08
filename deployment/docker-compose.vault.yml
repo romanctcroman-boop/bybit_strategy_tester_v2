@@ -23,7 +23,7 @@ services:
   # HashiCorp Vault - Secrets Management
   # ===========================================================================
   vault:
-    image: hashicorp/vault:1.15
+    image: hashicorp/vault:1.19
     container_name: bybit-vault
     restart: unless-stopped
     ports:
@@ -68,7 +68,7 @@ services:
   # MLflow Tracking Server
   # ===========================================================================
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.10.0
+    image: ghcr.io/mlflow/mlflow:v2.21.0
     container_name: bybit-mlflow
     restart: unless-stopped
     ports:
@@ -96,7 +96,7 @@ services:
   # PostgreSQL for MLflow (Production Alternative)
   # ===========================================================================
   mlflow-db:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     container_name: bybit-mlflow-db
     restart: unless-stopped
     profiles:

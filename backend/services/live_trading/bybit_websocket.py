@@ -19,9 +19,10 @@ import json
 import logging
 import time
 from asyncio import Queue
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 from uuid import uuid4
 
 import websockets
@@ -64,8 +65,8 @@ class SubscriptionConfig:
     """Subscription configuration."""
 
     channel: ChannelType
-    symbol: Optional[str] = None
-    interval: Optional[str] = None  # For klines: 1, 5, 15, 60, etc.
+    symbol: str | None = None
+    interval: str | None = None  # For klines: 1, 5, 15, 60, etc.
     depth: int = 50  # For orderbook: 1, 50, 200, 500
 
 
@@ -101,8 +102,8 @@ class BybitWebSocketClient:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        api_secret: Optional[str] = None,
+        api_key: str | None = None,
+        api_secret: str | None = None,
         testnet: bool = False,
         category: str = "linear",  # linear, inverse, spot, option
         max_reconnect_attempts: int = 10,
@@ -122,8 +123,8 @@ class BybitWebSocketClient:
         self.ping_interval = ping_interval
 
         # WebSocket connections
-        self._public_ws: Optional[ClientConnection] = None
-        self._private_ws: Optional[ClientConnection] = None
+        self._public_ws: ClientConnection | None = None
+        self._private_ws: ClientConnection | None = None
 
         # Message queue for consumers
         self._message_queue: Queue[WebSocketMessage] = Queue()
@@ -531,7 +532,7 @@ class BybitWebSocketClient:
             message = await self._message_queue.get()
             yield message
 
-    async def get_message(self, timeout: Optional[float] = None) -> Optional[WebSocketMessage]:
+    async def get_message(self, timeout: float | None = None) -> WebSocketMessage | None:
         """
         Get next message with optional timeout.
 
@@ -541,7 +542,7 @@ class BybitWebSocketClient:
             if timeout:
                 return await asyncio.wait_for(self._message_queue.get(), timeout=timeout)
             return await self._message_queue.get()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
 
     # ==========================================================================

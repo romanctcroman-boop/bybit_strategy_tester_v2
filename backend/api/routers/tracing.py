@@ -4,7 +4,7 @@ Provides API endpoints for monitoring OpenTelemetry traces.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -41,15 +41,15 @@ class SpanInfo(BaseModel):
 
     span_id: str
     trace_id: str
-    parent_span_id: Optional[str]
+    parent_span_id: str | None
     operation_name: str
     service_name: str
     start_time: str
-    end_time: Optional[str]
+    end_time: str | None
     duration_ms: float
     status: str
-    attributes: Dict[str, Any]
-    events: List[Dict[str, Any]]
+    attributes: dict[str, Any]
+    events: list[dict[str, Any]]
 
 
 class TraceSummary(BaseModel):
@@ -57,7 +57,7 @@ class TraceSummary(BaseModel):
 
     total_traces: int
     total_spans: int
-    traces: Dict[str, Any]
+    traces: dict[str, Any]
 
 
 class TracingStatus(BaseModel):
@@ -117,9 +117,9 @@ async def get_tracing_metrics():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/spans", response_model=List[SpanInfo])
+@router.get("/spans", response_model=list[SpanInfo])
 async def get_spans(
-    trace_id: Optional[str] = Query(None, description="Filter by trace ID"),
+    trace_id: str | None = Query(None, description="Filter by trace ID"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of spans"),
 ):
     """
@@ -182,7 +182,7 @@ async def get_trace_summary():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/traces/{trace_id}", response_model=List[SpanInfo])
+@router.get("/traces/{trace_id}", response_model=list[SpanInfo])
 async def get_trace_spans(trace_id: str):
     """
     Get all spans for a specific trace.
@@ -225,8 +225,8 @@ async def get_trace_spans(trace_id: str):
 
 @router.post("/config")
 async def update_tracing_config(
-    enabled: Optional[bool] = Query(None, description="Enable/disable tracing"),
-    sampling_rate: Optional[float] = Query(
+    enabled: bool | None = Query(None, description="Enable/disable tracing"),
+    sampling_rate: float | None = Query(
         None, ge=0.0, le=1.0, description="Sampling rate (0.0 to 1.0)"
     ),
 ):

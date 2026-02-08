@@ -19,11 +19,12 @@ import asyncio
 import hashlib
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -62,17 +63,17 @@ class MemoryItem:
     id: str
     content: str
     memory_type: MemoryType
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    accessed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    accessed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     access_count: int = 0
     importance: float = 0.5  # 0.0 to 1.0
-    embedding: Optional[List[float]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    tags: List[str] = field(default_factory=list)
-    source: Optional[str] = None
-    related_ids: List[str] = field(default_factory=list)
+    embedding: list[float] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    source: str | None = None
+    related_ids: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "id": self.id,
@@ -89,7 +90,7 @@ class MemoryItem:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MemoryItem":
+    def from_dict(cls, data: dict[str, Any]) -> MemoryItem:
         """Create from dictionary"""
         return cls(
             id=data["id"],
@@ -107,12 +108,12 @@ class MemoryItem:
 
     def is_expired(self, ttl: timedelta) -> bool:
         """Check if memory has expired based on TTL"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return (now - self.created_at) > ttl
 
     def update_access(self) -> None:
         """Update access time and count"""
-        self.accessed_at = datetime.now(timezone.utc)
+        self.accessed_at = datetime.now(UTC)
         self.access_count += 1
         # Slightly increase importance based on access
         self.importance = min(1.0, self.importance + 0.01)
@@ -153,8 +154,8 @@ class HierarchicalMemory:
 
     def __init__(
         self,
-        persist_path: Optional[str] = None,
-        embedding_fn: Optional[Callable[[str], List[float]]] = None,
+        persist_path: str | None = None,
+        embedding_fn: Callable[[str], list[float]] | None = None,
     ):
         """
         Initialize hierarchical memory
@@ -167,7 +168,7 @@ class HierarchicalMemory:
         self.embedding_fn = embedding_fn
 
         # Define memory tiers
-        self.tiers: Dict[MemoryType, MemoryTier] = {
+        self.tiers: dict[MemoryType, MemoryTier] = {
             MemoryType.WORKING: MemoryTier(
                 name="Working Memory",
                 memory_type=MemoryType.WORKING,
@@ -203,7 +204,7 @@ class HierarchicalMemory:
         }
 
         # Memory stores
-        self.stores: Dict[MemoryType, Dict[str, MemoryItem]] = {tier: {} for tier in MemoryType}
+        self.stores: dict[MemoryType, dict[str, MemoryItem]] = {tier: {} for tier in MemoryType}
 
         # Statistics
         self.stats = {
@@ -228,9 +229,9 @@ class HierarchicalMemory:
         content: str,
         memory_type: MemoryType = MemoryType.WORKING,
         importance: float = 0.5,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        source: Optional[str] = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        source: str | None = None,
     ) -> MemoryItem:
         """
         Store content in specified memory tier
@@ -292,12 +293,12 @@ class HierarchicalMemory:
     async def recall(
         self,
         query: str,
-        memory_type: Optional[MemoryType] = None,
+        memory_type: MemoryType | None = None,
         top_k: int = 5,
         min_importance: float = 0.0,
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
         use_semantic: bool = True,
-    ) -> List[MemoryItem]:
+    ) -> list[MemoryItem]:
         """
         Recall memories matching query
 
@@ -312,7 +313,7 @@ class HierarchicalMemory:
         Returns:
             List of matching MemoryItems
         """
-        results: List[tuple[float, MemoryItem]] = []
+        results: list[tuple[float, MemoryItem]] = []
 
         # Determine which tiers to search
         tiers_to_search = [memory_type] if memory_type else list(MemoryType)
@@ -361,7 +362,7 @@ class HierarchicalMemory:
 
         return top_results
 
-    async def get(self, item_id: str) -> Optional[MemoryItem]:
+    async def get(self, item_id: str) -> MemoryItem | None:
         """Get specific memory by ID"""
         for store in self.stores.values():
             if item_id in store:
@@ -380,7 +381,7 @@ class HierarchicalMemory:
                 return True
         return False
 
-    async def consolidate(self) -> Dict[str, int]:
+    async def consolidate(self) -> dict[str, int]:
         """
         Consolidate memories between tiers (like sleep consolidation)
 
@@ -429,7 +430,7 @@ class HierarchicalMemory:
         episodic_tier = self.tiers[MemoryType.EPISODIC]
 
         # Group episodic memories by tags for pattern extraction
-        tag_groups: Dict[str, List[MemoryItem]] = {}
+        tag_groups: dict[str, list[MemoryItem]] = {}
         for item in episodic_store.values():
             for tag in item.tags:
                 if tag not in tag_groups:
@@ -461,7 +462,7 @@ class HierarchicalMemory:
         logger.info(f"🧬 Consolidated memories: {consolidated}")
         return consolidated
 
-    async def forget(self) -> Dict[str, int]:
+    async def forget(self) -> dict[str, int]:
         """
         Intelligent forgetting - remove low-relevance and expired items
 
@@ -475,7 +476,7 @@ class HierarchicalMemory:
         """
         forgotten = {tier.value: 0 for tier in MemoryType}
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         for memory_type, store in self.stores.items():
             tier = self.tiers[memory_type]
@@ -527,7 +528,7 @@ class HierarchicalMemory:
         self,
         item: MemoryItem,
         query: str,
-        query_embedding: Optional[List[float]],
+        query_embedding: list[float] | None,
     ) -> float:
         """Calculate relevance score for an item"""
         score = 0.0
@@ -547,7 +548,7 @@ class HierarchicalMemory:
         score += item.importance * 0.1
 
         # Recency boost (more recent = higher score)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         age_hours = (now - item.accessed_at).total_seconds() / 3600
         recency_score = 1.0 / (1.0 + age_hours / 24)  # Decay over days
         score += recency_score * 0.1
@@ -555,7 +556,7 @@ class HierarchicalMemory:
         return score
 
     @staticmethod
-    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    def _cosine_similarity(a: list[float], b: list[float]) -> float:
         """Calculate cosine similarity between two vectors"""
         import math
 
@@ -573,9 +574,9 @@ class HierarchicalMemory:
 
     async def _create_semantic_summary(
         self,
-        items: List[MemoryItem],
+        items: list[MemoryItem],
         topic: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Create semantic summary from multiple episodic memories"""
         # Simple summary - could be enhanced with AI
         contents = [item.content for item in items]
@@ -607,7 +608,7 @@ class HierarchicalMemory:
 
             for file_path in tier_path.glob("*.json"):
                 try:
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(file_path, encoding="utf-8") as f:
                         data = json.load(f)
                         item = MemoryItem.from_dict(data)
                         self.stores[memory_type][item.id] = item
@@ -650,7 +651,7 @@ class HierarchicalMemory:
         except Exception as e:
             logger.warning(f"Failed to delete persisted memory {item_id}: {e}")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get memory system statistics"""
         tier_stats = {}
         for memory_type, store in self.stores.items():
@@ -687,7 +688,7 @@ class MemoryConsolidator:
         self.consolidation_interval = consolidation_interval
         self.forgetting_interval = forgetting_interval
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
         """Start background consolidation"""
@@ -711,11 +712,11 @@ class MemoryConsolidator:
 
     async def _run_loop(self) -> None:
         """Main consolidation loop"""
-        last_consolidation = datetime.now(timezone.utc)
-        last_forgetting = datetime.now(timezone.utc)
+        last_consolidation = datetime.now(UTC)
+        last_forgetting = datetime.now(UTC)
 
         while self._running:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             # Check if it's time to consolidate
             if (now - last_consolidation) >= self.consolidation_interval:
@@ -739,8 +740,8 @@ class MemoryConsolidator:
 
 __all__ = [
     "HierarchicalMemory",
-    "MemoryItem",
-    "MemoryType",
-    "MemoryTier",
     "MemoryConsolidator",
+    "MemoryItem",
+    "MemoryTier",
+    "MemoryType",
 ]

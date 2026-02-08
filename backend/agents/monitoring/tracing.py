@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, AsyncGenerator
+from typing import Any
 
 from loguru import logger
 
@@ -48,10 +49,10 @@ class SpanContext:
 
     trace_id: str
     span_id: str
-    parent_span_id: Optional[str] = None
-    baggage: Dict[str, str] = field(default_factory=dict)
+    parent_span_id: str | None = None
+    baggage: dict[str, str] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
@@ -60,7 +61,7 @@ class SpanContext:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SpanContext":
+    def from_dict(cls, data: dict[str, Any]) -> SpanContext:
         return cls(
             trace_id=data["trace_id"],
             span_id=data["span_id"],
@@ -73,7 +74,7 @@ class SpanContext:
         return f"00-{self.trace_id}-{self.span_id}-01"
 
     @classmethod
-    def from_header(cls, header: str) -> Optional["SpanContext"]:
+    def from_header(cls, header: str) -> SpanContext | None:
         """Parse from propagation header"""
         try:
             parts = header.split("-")
@@ -92,8 +93,8 @@ class SpanEvent:
     """Event within a span"""
 
     name: str
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    attributes: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -104,23 +105,23 @@ class Span:
     context: SpanContext
     kind: SpanKind = SpanKind.INTERNAL
     status: SpanStatus = SpanStatus.UNSET
-    start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    end_time: Optional[datetime] = None
-    attributes: Dict[str, Any] = field(default_factory=dict)
-    events: List[SpanEvent] = field(default_factory=list)
+    start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
+    end_time: datetime | None = None
+    attributes: dict[str, Any] = field(default_factory=dict)
+    events: list[SpanEvent] = field(default_factory=list)
 
     @property
     def duration_ms(self) -> float:
         """Duration in milliseconds"""
         if self.end_time:
             return (self.end_time - self.start_time).total_seconds() * 1000
-        return (datetime.now(timezone.utc) - self.start_time).total_seconds() * 1000
+        return (datetime.now(UTC) - self.start_time).total_seconds() * 1000
 
     def set_attribute(self, key: str, value: Any) -> None:
         """Set a span attribute"""
         self.attributes[key] = value
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None) -> None:
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None) -> None:
         """Add an event to the span"""
         self.events.append(SpanEvent(name=name, attributes=attributes or {}))
 
@@ -132,9 +133,9 @@ class Span:
 
     def end(self) -> None:
         """End the span"""
-        self.end_time = datetime.now(timezone.utc)
+        self.end_time = datetime.now(UTC)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "trace_id": self.context.trace_id,
@@ -162,8 +163,8 @@ class Trace:
     """A complete trace with all spans"""
 
     trace_id: str
-    spans: List[Span] = field(default_factory=list)
-    root_span: Optional[Span] = None
+    spans: list[Span] = field(default_factory=list)
+    root_span: Span | None = None
 
     @property
     def duration_ms(self) -> float:
@@ -172,11 +173,11 @@ class Trace:
             return self.root_span.duration_ms
         if self.spans:
             start = min(s.start_time for s in self.spans)
-            end = max(s.end_time or datetime.now(timezone.utc) for s in self.spans)
+            end = max(s.end_time or datetime.now(UTC) for s in self.spans)
             return (end - start).total_seconds() * 1000
         return 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "trace_id": self.trace_id,
             "duration_ms": self.duration_ms,
@@ -188,7 +189,7 @@ class Trace:
 class TraceExporter:
     """Base class for trace exporters"""
 
-    async def export(self, spans: List[Span]) -> bool:
+    async def export(self, spans: list[Span]) -> bool:
         """Export spans"""
         raise NotImplementedError
 
@@ -200,7 +201,7 @@ class TraceExporter:
 class ConsoleExporter(TraceExporter):
     """Export traces to console"""
 
-    async def export(self, spans: List[Span]) -> bool:
+    async def export(self, spans: list[Span]) -> bool:
         for span in spans:
             status_icon = (
                 "✅"
@@ -223,11 +224,11 @@ class FileExporter(TraceExporter):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-    async def export(self, spans: List[Span]) -> bool:
+    async def export(self, spans: list[Span]) -> bool:
         try:
             existing = []
             if self.path.exists():
-                with open(self.path, "r", encoding="utf-8") as f:
+                with open(self.path, encoding="utf-8") as f:
                     existing = json.load(f)
 
             existing.extend([s.to_dict() for s in spans])
@@ -268,7 +269,7 @@ class DistributedTracer:
     def __init__(
         self,
         service_name: str = "ai-agent-system",
-        exporters: Optional[List[TraceExporter]] = None,
+        exporters: list[TraceExporter] | None = None,
         sample_rate: float = 1.0,
     ):
         """
@@ -283,9 +284,9 @@ class DistributedTracer:
         self.exporters = exporters or [ConsoleExporter()]
         self.sample_rate = sample_rate
 
-        self._traces: Dict[str, Trace] = {}
-        self._active_spans: Dict[str, Span] = {}
-        self._current_context: Optional[SpanContext] = None
+        self._traces: dict[str, Trace] = {}
+        self._active_spans: dict[str, Span] = {}
+        self._current_context: SpanContext | None = None
 
         # Statistics
         self.stats = {
@@ -327,9 +328,9 @@ class DistributedTracer:
         self,
         name: str,
         kind: SpanKind = SpanKind.INTERNAL,
-        parent_context: Optional[SpanContext] = None,
-        attributes: Optional[Dict[str, Any]] = None,
-    ) -> AsyncGenerator[Span, None]:
+        parent_context: SpanContext | None = None,
+        attributes: dict[str, Any] | None = None,
+    ) -> AsyncGenerator[Span]:
         """
         Start a new span (async context manager)
 
@@ -406,9 +407,9 @@ class DistributedTracer:
         self,
         name: str,
         kind: SpanKind = SpanKind.INTERNAL,
-        parent_context: Optional[SpanContext] = None,
-        attributes: Optional[Dict[str, Any]] = None,
-    ) -> Generator[Span, None, None]:
+        parent_context: SpanContext | None = None,
+        attributes: dict[str, Any] | None = None,
+    ) -> Generator[Span]:
         """Start a new span (sync context manager)"""
         # Similar to async but without export
         if parent_context:
@@ -463,26 +464,26 @@ class DistributedTracer:
             except Exception as e:
                 logger.warning(f"Exporter failed: {e}")
 
-    def get_current_context(self) -> Optional[SpanContext]:
+    def get_current_context(self) -> SpanContext | None:
         """Get current span context"""
         return self._current_context
 
-    def get_trace(self, trace_id: str) -> Optional[Trace]:
+    def get_trace(self, trace_id: str) -> Trace | None:
         """Get a complete trace"""
         return self._traces.get(trace_id)
 
-    def get_recent_traces(self, limit: int = 10) -> List[Trace]:
+    def get_recent_traces(self, limit: int = 10) -> list[Trace]:
         """Get recent traces"""
         traces = list(self._traces.values())
         traces.sort(
             key=lambda t: t.spans[0].start_time
             if t.spans
-            else datetime.min.replace(tzinfo=timezone.utc),
+            else datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
         return traces[:limit]
 
-    def get_active_spans(self) -> List[Span]:
+    def get_active_spans(self) -> list[Span]:
         """Get currently active spans"""
         return list(self._active_spans.values())
 
@@ -495,7 +496,7 @@ class DistributedTracer:
         traces.sort(
             key=lambda t: t[1].spans[0].start_time
             if t[1].spans
-            else datetime.min.replace(tzinfo=timezone.utc)
+            else datetime.min.replace(tzinfo=UTC)
         )
 
         to_remove = len(traces) - max_traces
@@ -509,7 +510,7 @@ class DistributedTracer:
         for exporter in self.exporters:
             await exporter.shutdown()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get tracer statistics"""
         return {
             **self.stats,
@@ -519,7 +520,7 @@ class DistributedTracer:
 
 
 # Global tracer instance
-_tracer: Optional[DistributedTracer] = None
+_tracer: DistributedTracer | None = None
 
 
 def get_tracer() -> DistributedTracer:
@@ -531,15 +532,15 @@ def get_tracer() -> DistributedTracer:
 
 
 __all__ = [
+    "ConsoleExporter",
     "DistributedTracer",
+    "FileExporter",
     "Span",
     "SpanContext",
-    "SpanStatus",
-    "SpanKind",
     "SpanEvent",
+    "SpanKind",
+    "SpanStatus",
     "Trace",
     "TraceExporter",
-    "ConsoleExporter",
-    "FileExporter",
     "get_tracer",
 ]

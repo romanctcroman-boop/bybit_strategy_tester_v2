@@ -39,7 +39,6 @@ Example Usage:
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -143,7 +142,7 @@ class MarketRegimeDetector:
     and provide trading recommendations.
     """
 
-    def __init__(self, config: Optional[RegimeConfig] = None):
+    def __init__(self, config: RegimeConfig | None = None):
         """
         Initialize regime detector.
 
@@ -151,7 +150,7 @@ class MarketRegimeDetector:
             config: Configuration for thresholds
         """
         self.config = config or RegimeConfig()
-        self._cache: Dict[str, np.ndarray] = {}
+        self._cache: dict[str, np.ndarray] = {}
 
         logger.debug(
             f"MarketRegimeDetector initialized: ADX threshold={self.config.adx_trending_threshold}"
@@ -206,9 +205,9 @@ class MarketRegimeDetector:
 
     def detect(
         self,
-        high: Optional[np.ndarray] = None,
-        low: Optional[np.ndarray] = None,
-        close: Optional[np.ndarray] = None,
+        high: np.ndarray | None = None,
+        low: np.ndarray | None = None,
+        close: np.ndarray | None = None,
         idx: int = -1,
     ) -> RegimeState:
         """
@@ -289,7 +288,7 @@ class MarketRegimeDetector:
         minus_di: float,
         atr_pct: float,
         bandwidth: float,
-    ) -> Tuple[RegimeType, float, str]:
+    ) -> tuple[RegimeType, float, str]:
         """
         Classify market regime based on indicator values.
 
@@ -389,7 +388,7 @@ class MarketRegimeDetector:
 
     def _get_allowed_directions(
         self, regime: RegimeType, plus_di: float, minus_di: float
-    ) -> Tuple[bool, bool]:
+    ) -> tuple[bool, bool]:
         """
         Get allowed trade directions based on regime.
 
@@ -442,7 +441,7 @@ class MarketRegimeDetector:
         high: np.ndarray,
         low: np.ndarray,
         close: np.ndarray,
-    ) -> List[RegimeState]:
+    ) -> list[RegimeState]:
         """
         Detect regime for all bars in the dataset.
 
@@ -462,7 +461,7 @@ class MarketRegimeDetector:
 
         return regimes
 
-    def get_regime_summary(self, regimes: List[RegimeState]) -> Dict[str, float]:
+    def get_regime_summary(self, regimes: list[RegimeState]) -> dict[str, float]:
         """
         Get summary statistics of regime distribution.
 
@@ -475,7 +474,7 @@ class MarketRegimeDetector:
         if not regimes:
             return {}
 
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for r in regimes:
             key = r.regime.value
             counts[key] = counts.get(key, 0) + 1
@@ -497,8 +496,8 @@ class AdaptiveStrategy:
 
     def __init__(
         self,
-        regime_detector: Optional[MarketRegimeDetector] = None,
-        config: Optional[RegimeConfig] = None,
+        regime_detector: MarketRegimeDetector | None = None,
+        config: RegimeConfig | None = None,
     ):
         """
         Initialize adaptive strategy.
@@ -540,9 +539,7 @@ class AdaptiveStrategy:
             regime = self.detector.detect(idx=i)
 
             # Filter based on allowed directions
-            if signals[i] == 1 and not regime.allow_long:
-                filtered[i] = 0
-            elif signals[i] == -1 and not regime.allow_short:
+            if (signals[i] == 1 and not regime.allow_long) or (signals[i] == -1 and not regime.allow_short):
                 filtered[i] = 0
 
         return filtered

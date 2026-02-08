@@ -4,7 +4,7 @@ Integration tests for Backtest + Strategy integration.
 Tests the endpoints that connect saved strategies with the backtest engine.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
@@ -314,7 +314,7 @@ class TestStrategyMetricsUpdate:
         strategy.win_rate = 0.65
         strategy.total_trades = 100
         strategy.backtest_count = 1
-        strategy.last_backtest_at = datetime.now(timezone.utc)
+        strategy.last_backtest_at = datetime.now(UTC)
         db_session.commit()
 
         db_session.refresh(strategy)

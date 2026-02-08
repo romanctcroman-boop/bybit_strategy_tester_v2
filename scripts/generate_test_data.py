@@ -15,7 +15,7 @@ import os
 import random
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # Add project root to path
@@ -39,7 +39,7 @@ from backend.database.models.strategy import Strategy, StrategyStatus, StrategyT
 
 def utc_now() -> datetime:
     """Get current UTC time with timezone awareness."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # Realistic crypto symbols

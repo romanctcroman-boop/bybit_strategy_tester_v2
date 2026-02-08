@@ -14,9 +14,9 @@ from __future__ import annotations
 import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 from loguru import logger
@@ -45,7 +45,7 @@ class AnomalySeverity(Enum):
 class Anomaly:
     """Detected anomaly"""
 
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     metric_name: str = ""
     value: float = 0.0
     expected_value: float = 0.0
@@ -54,7 +54,7 @@ class Anomaly:
     severity: AnomalySeverity = AnomalySeverity.MEDIUM
     confidence: float = 0.0  # 0-1
     detector: str = ""
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
     @property
     def deviation_percent(self) -> float:
@@ -63,7 +63,7 @@ class Anomaly:
             return 100.0 if self.value != 0 else 0.0
         return abs((self.value - self.expected_value) / self.expected_value) * 100
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -94,7 +94,7 @@ class AnomalyDetector(ABC):
         pass
 
     @abstractmethod
-    def detect(self, data: np.ndarray) -> List[bool]:
+    def detect(self, data: np.ndarray) -> list[bool]:
         """Detect anomalies in data"""
         pass
 
@@ -131,7 +131,7 @@ class ZScoreDetector(AnomalyDetector):
             self.std = 1.0
         self._trained = True
 
-    def detect(self, data: np.ndarray) -> List[bool]:
+    def detect(self, data: np.ndarray) -> list[bool]:
         """Detect anomalies using z-score"""
         scores = self.score(data)
         return (np.abs(scores) > self.threshold).tolist()
@@ -178,7 +178,7 @@ class IQRDetector(AnomalyDetector):
         self.upper_bound = self.q3 + self.multiplier * self.iqr
         self._trained = True
 
-    def detect(self, data: np.ndarray) -> List[bool]:
+    def detect(self, data: np.ndarray) -> list[bool]:
         """Detect anomalies outside IQR bounds"""
         data = np.asarray(data).flatten()
         if not self._trained:
@@ -252,7 +252,7 @@ class IsolationForestDetector(AnomalyDetector):
                 "threshold_high": np.percentile(data, 100 - self.contamination * 50),
             }
 
-    def detect(self, data: np.ndarray) -> List[bool]:
+    def detect(self, data: np.ndarray) -> list[bool]:
         """Detect anomalies"""
         data = np.asarray(data)
         if data.ndim == 1:
@@ -295,8 +295,8 @@ class MovingAverageDetector(AnomalyDetector):
     def __init__(self, window_size: int = 10, threshold: float = 3.0):
         self.window_size = window_size
         self.threshold = threshold
-        self._baseline: Optional[np.ndarray] = None
-        self._std: Optional[np.ndarray] = None
+        self._baseline: np.ndarray | None = None
+        self._std: np.ndarray | None = None
 
     @property
     def name(self) -> str:
@@ -328,7 +328,7 @@ class MovingAverageDetector(AnomalyDetector):
         self._std = np.array(stds)
         self._std[self._std == 0] = 1.0
 
-    def detect(self, data: np.ndarray) -> List[bool]:
+    def detect(self, data: np.ndarray) -> list[bool]:
         """Detect anomalies"""
         data = np.asarray(data).flatten()
 
@@ -361,7 +361,7 @@ class EnsembleDetector(AnomalyDetector):
 
     def __init__(
         self,
-        detectors: Optional[List[AnomalyDetector]] = None,
+        detectors: list[AnomalyDetector] | None = None,
         voting_threshold: float = 0.5,  # Fraction of detectors that must agree
     ):
         self.detectors = detectors or [
@@ -383,7 +383,7 @@ class EnsembleDetector(AnomalyDetector):
             except Exception as e:
                 logger.warning(f"Failed to fit {detector.name}: {e}")
 
-    def detect(self, data: np.ndarray) -> List[bool]:
+    def detect(self, data: np.ndarray) -> list[bool]:
         """Detect using voting"""
         data = np.asarray(data).flatten()
 
@@ -447,9 +447,9 @@ class MLAnomalyDetector:
     """
 
     def __init__(self):
-        self._detectors: Dict[str, Dict[str, AnomalyDetector]] = {}
-        self._history: Dict[str, List[float]] = {}
-        self._anomaly_history: Dict[str, List[Anomaly]] = {}
+        self._detectors: dict[str, dict[str, AnomalyDetector]] = {}
+        self._history: dict[str, list[float]] = {}
+        self._anomaly_history: dict[str, list[Anomaly]] = {}
         self._severity_thresholds = {
             AnomalySeverity.LOW: 2.0,
             AnomalySeverity.MEDIUM: 3.0,
@@ -459,7 +459,7 @@ class MLAnomalyDetector:
 
         logger.info("🔍 MLAnomalyDetector initialized")
 
-    def _create_default_detectors(self) -> Dict[str, AnomalyDetector]:
+    def _create_default_detectors(self) -> dict[str, AnomalyDetector]:
         """Create default detector ensemble"""
         return {
             "zscore": ZScoreDetector(threshold=3.0),
@@ -472,8 +472,8 @@ class MLAnomalyDetector:
     async def train(
         self,
         metric_name: str,
-        data: List[float],
-        detector_types: Optional[List[str]] = None,
+        data: list[float],
+        detector_types: list[str] | None = None,
     ) -> None:
         """Train detectors on historical data"""
         data_array = np.array(data)
@@ -499,10 +499,10 @@ class MLAnomalyDetector:
     async def detect(
         self,
         metric_name: str,
-        values: List[float],
+        values: list[float],
         detector_type: str = "ensemble",
         return_all: bool = False,
-    ) -> List[Anomaly]:
+    ) -> list[Anomaly]:
         """
         Detect anomalies in values
 
@@ -581,7 +581,7 @@ class MLAnomalyDetector:
         self,
         metric_name: str,
         value: float,
-    ) -> Optional[Anomaly]:
+    ) -> Anomaly | None:
         """Detect anomaly for single value"""
         # Add to history
         if metric_name not in self._history:
@@ -606,12 +606,12 @@ class MLAnomalyDetector:
         self,
         metric_name: str,
         limit: int = 100,
-    ) -> List[Anomaly]:
+    ) -> list[Anomaly]:
         """Get historical anomalies for metric"""
         history = self._anomaly_history.get(metric_name, [])
         return history[-limit:]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get detector statistics"""
         return {
             "metrics_tracked": len(self._history),
@@ -623,7 +623,7 @@ class MLAnomalyDetector:
 
 
 # Global instance
-_global_detector: Optional[MLAnomalyDetector] = None
+_global_detector: MLAnomalyDetector | None = None
 
 
 def get_anomaly_detector() -> MLAnomalyDetector:
@@ -635,15 +635,15 @@ def get_anomaly_detector() -> MLAnomalyDetector:
 
 
 __all__ = [
-    "AnomalyType",
-    "AnomalySeverity",
     "Anomaly",
     "AnomalyDetector",
-    "ZScoreDetector",
+    "AnomalySeverity",
+    "AnomalyType",
+    "EnsembleDetector",
     "IQRDetector",
     "IsolationForestDetector",
-    "MovingAverageDetector",
-    "EnsembleDetector",
     "MLAnomalyDetector",
+    "MovingAverageDetector",
+    "ZScoreDetector",
     "get_anomaly_detector",
 ]

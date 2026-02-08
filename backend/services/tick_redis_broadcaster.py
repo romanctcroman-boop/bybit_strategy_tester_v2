@@ -28,9 +28,9 @@ import asyncio
 import json
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Callable, List, Optional
+from datetime import UTC, datetime
 
 import redis.asyncio as redis
 import websockets
@@ -82,12 +82,12 @@ class RedisTradeBroadcaster:
     def __init__(
         self,
         redis_url: str = "redis://localhost:6379",
-        symbols: List[str] = None,
+        symbols: list[str] = None,
     ):
         self.redis_url = redis_url
         self.symbols = symbols or ["BTCUSDT", "ETHUSDT"]
 
-        self.redis_client: Optional[redis.Redis] = None
+        self.redis_client: redis.Redis | None = None
         self._running = False
         self._ws = None
 
@@ -105,7 +105,7 @@ class RedisTradeBroadcaster:
     async def start(self):
         """Start broadcaster."""
         self._running = True
-        self._stats["started_at"] = datetime.now(timezone.utc).isoformat()
+        self._stats["started_at"] = datetime.now(UTC).isoformat()
 
         # Connect to Redis
         self.redis_client = await redis.from_url(
@@ -221,19 +221,19 @@ class RedisTickSubscriber:
     def __init__(
         self,
         redis_url: str = "redis://localhost:6379",
-        symbols: List[str] = None,
+        symbols: list[str] = None,
     ):
         self.redis_url = redis_url
         self.symbols = symbols or ["BTCUSDT"]
 
-        self.redis_client: Optional[redis.Redis] = None
+        self.redis_client: redis.Redis | None = None
         self.pubsub = None
 
         self._running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
         # Callbacks
-        self._trade_callbacks: List[Callable[[str, Trade], None]] = []
+        self._trade_callbacks: list[Callable[[str, Trade], None]] = []
 
         # Stats
         self._stats = {

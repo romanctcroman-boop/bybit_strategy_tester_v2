@@ -7,13 +7,12 @@ Auto-registered on module import.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 from loguru import logger
 
 from backend.agents.mcp.tool_registry import get_tool_registry
-
 
 # Get the global registry
 registry = get_tool_registry()
@@ -30,9 +29,9 @@ registry = get_tool_registry()
     category="indicators",
 )
 async def calculate_rsi(
-    prices: List[float],
+    prices: list[float],
     period: int = 14,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate RSI indicator.
 
@@ -82,11 +81,11 @@ async def calculate_rsi(
     category="indicators",
 )
 async def calculate_macd(
-    prices: List[float],
+    prices: list[float],
     fast_period: int = 12,
     slow_period: int = 26,
     signal_period: int = 9,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate MACD indicator.
 
@@ -162,10 +161,10 @@ async def calculate_macd(
     category="indicators",
 )
 async def calculate_bollinger_bands(
-    prices: List[float],
+    prices: list[float],
     period: int = 20,
     std_dev: float = 2.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate Bollinger Bands.
 
@@ -211,11 +210,11 @@ async def calculate_bollinger_bands(
     category="indicators",
 )
 async def calculate_atr(
-    high: List[float],
-    low: List[float],
-    close: List[float],
+    high: list[float],
+    low: list[float],
+    close: list[float],
     period: int = 14,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate ATR for volatility measurement.
 
@@ -277,10 +276,10 @@ async def calculate_atr(
     category="analysis",
 )
 async def analyze_trend(
-    prices: List[float],
-    high: Optional[List[float]] = None,
-    low: Optional[List[float]] = None,
-) -> Dict[str, Any]:
+    prices: list[float],
+    high: list[float] | None = None,
+    low: list[float] | None = None,
+) -> dict[str, Any]:
     """
     Comprehensive trend analysis.
 
@@ -362,11 +361,11 @@ async def analyze_trend(
     category="analysis",
 )
 async def find_support_resistance(
-    high: List[float],
-    low: List[float],
-    close: List[float],
+    high: list[float],
+    low: list[float],
+    close: list[float],
     num_levels: int = 3,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Find key support and resistance levels.
 
@@ -493,7 +492,7 @@ async def calculate_position_size(
     entry_price: float,
     stop_loss_price: float,
     leverage: float = 1.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate position size based on risk management rules.
 
@@ -556,7 +555,7 @@ async def calculate_risk_reward(
     entry_price: float,
     stop_loss_price: float,
     take_profit_price: float,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate risk-reward ratio.
 

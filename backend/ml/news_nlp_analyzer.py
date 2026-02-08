@@ -12,9 +12,9 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class NewsArticle:
     content: str
     source: NewsSource
     url: str = ""
-    published_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    published_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     author: str = ""
     symbols: list[str] = field(default_factory=list)
     raw_data: dict[str, Any] = field(default_factory=dict)
@@ -89,7 +89,7 @@ class SentimentResult:
     mentioned_symbols: list[str]
     key_phrases: list[str]
     impact_score: float  # 0 to 1 (potential market impact)
-    analyzed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    analyzed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -366,8 +366,8 @@ class NewsNLPAnalyzer:
         """
         self.lexicon = CryptoSentimentLexicon()
         self.use_transformers = use_transformers
-        self._transformer_model: Optional[Any] = None
-        self._tokenizer: Optional[Any] = None
+        self._transformer_model: Any | None = None
+        self._tokenizer: Any | None = None
 
         if use_transformers:
             self._load_transformer_model()
@@ -701,7 +701,7 @@ class SentimentAggregator:
                 "dominant_category": None,
             }
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         weighted_scores: list[float] = []
         weighted_confidences: list[float] = []
         category_counts: dict[NewsCategory, int] = {}
@@ -752,7 +752,7 @@ class SentimentAggregator:
 
         for symbol, results in self._results.items():
             recent_results = [
-                r for r in results if (datetime.now(timezone.utc) - r.analyzed_at).total_seconds() < 86400
+                r for r in results if (datetime.now(UTC) - r.analyzed_at).total_seconds() < 86400
             ]
 
             if recent_results:
@@ -776,8 +776,8 @@ class SentimentAggregator:
 # Global Instance
 # ============================================================================
 
-_analyzer: Optional[NewsNLPAnalyzer] = None
-_aggregator: Optional[SentimentAggregator] = None
+_analyzer: NewsNLPAnalyzer | None = None
+_aggregator: SentimentAggregator | None = None
 
 
 def get_news_analyzer(use_transformers: bool = False) -> NewsNLPAnalyzer:
