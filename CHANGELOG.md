@@ -7,6 +7,273 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **AI Self-Improvement System (Tasks 4.1, 4.2, 4.3) — 2026-02-09:**
+    - **Task 4.1 — LLM-backed Self-Reflection (`backend/agents/self_improvement/llm_reflection.py`, ~470 lines):**
+        - `LLMReflectionProvider` — connects real LLM providers to SelfReflectionEngine:
+            - 3 provider configs: deepseek (deepseek-chat), qwen (qwen-plus), perplexity (llama-3.1-sonar-small-128k-online)
+            - Lazy client initialization via `_get_client()` using `LLMClientFactory.create()`
+            - API key resolution: explicit key → KeyManager fallback
+            - `get_reflection_fn()` → async callable `(prompt, task, solution) -> str`
+            - Automatic fallback to heuristic response when no LLM available
+            - Call/error counting and statistics via `get_stats()`
+        - `LLMSelfReflectionEngine` — extends `SelfReflectionEngine`:
+            - `reflect_on_strategy()` — full strategy reflection with real LLM
+            - `batch_reflect()` — batch reflection for multiple strategies
+            - Auto-registers LLM reflection function in all 7 categories
+        - Constants: `REFLECTION_SYSTEM_PROMPT`, `REFLECTION_PROMPTS` (7 categories)
+        - **26 tests** — `tests/backend/agents/test_llm_reflection.py`
+    - **Task 4.2 — Automatic Feedback Loop (`backend/agents/self_improvement/feedback_loop.py`, ~670 lines):**
+        - `FeedbackLoop` — automatic backtest → reflect → improve → repeat cycle:
+            - Convergence detection (Sharpe change < 0.01 for 3 consecutive iterations)
+            - 8-step loop: build strategy → backtest → evaluate → reflect → adjust → repeat
+            - Configurable max_iterations, convergence_threshold, min_improvement
+            - Builds `StrategyDefinition` with proper Signal/ExitConditions models
+        - `PromptImprovementEngine` — strategy improvement via metric analysis:
+            - Metric thresholds (Sharpe < 0.5, MaxDD > 20%, WinRate < 40%, PF < 1.0)
+            - 7 adjustment templates keyed to metric failures
+            - Parameter hint generation for strategy tuning
+            - `analyze_and_improve()` → adjustments dict with reasons + parameter hints
+        - `FeedbackEntry` / `FeedbackLoopResult` — iteration tracking dataclasses
+        - **33 tests** — `tests/backend/agents/test_feedback_loop.py`
+    - **Task 4.3 — Agent Performance Tracking (`backend/agents/self_improvement/agent_tracker.py`, ~480 lines):**
+        - `AgentPerformanceTracker` — per-agent accuracy tracking for dynamic ConsensusEngine weights:
+            - Rolling window tracking (default 100 records per agent)
+            - `record_result()` — log backtest results per agent
+            - `compute_dynamic_weights()` — 3 methods: composite, sharpe, pass_rate
+            - `sync_to_consensus_engine()` — push computed weights to ConsensusEngine
+            - `get_leaderboard()` — sorted performance ranking
+            - `get_specialization_analysis()` — per-symbol/timeframe agent analysis
+        - `AgentProfile` — aggregated stats with `pass_rate`, `composite_score` properties
+        - `AgentRecord` — per-backtest record dataclass
+        - Weight computation: composite_score/50.0 with recency_factor=0.8, min_weight=0.1
+        - **35 tests** — `tests/backend/agents/test_agent_tracker.py`
+    - **Total: 94 new tests, 313 agent tests total — all passing**
+
+- **AI LangGraph Pipeline Integration — 2026-02-09:**
+    - **`backend/agents/integration/langgraph_pipeline.py`** (~660 lines) — LangGraph-based strategy pipeline:
+        - `TradingStrategyGraph` — pre-built directed graph connecting all pipeline stages:
+            - `MarketAnalysisNode` → market context via MarketContextBuilder
+            - `ParallelGenerationNode` → concurrent LLM calls across agents (deepseek/qwen/perplexity)
+            - `ConsensusNode` → multi-agent consensus via ConsensusEngine
+            - `BacktestNode` → strategy validation via BacktestBridge + FallbackEngineV4
+            - `QualityCheckNode` → conditional routing based on metrics thresholds
+            - `ReOptimizeNode` → walk-forward re-optimization loop
+            - `ReportNode` → structured pipeline report
+        - **Conditional edges** (graph-based decision routing):
+            - Sharpe < `min_sharpe` → `re_optimize` (walk-forward parameter tuning)
+            - MaxDD > `max_drawdown_pct` → `re_generate` (full strategy re-generation)
+            - Quality PASS → `report` (final output)
+        - `PipelineConfig` dataclass: min_sharpe, max_drawdown_pct, max_reoptimize_cycles, max_regenerate_cycles, agents, commission=0.0007
+        - `TradingStrategyGraph.run()` — single entry point for full pipeline execution
+        - `TradingStrategyGraph.visualize()` — ASCII graph visualization
+        - Graph auto-registered in global `_graph_registry`
+    - **Tests: 40 new tests (`tests/backend/agents/test_langgraph_pipeline.py`):**
+        - 10 test classes: PipelineConfig, GraphConstruction, MarketAnalysisNode, ConsensusNode, BacktestNode, QualityCheckNode, ConditionalRouterIntegration, ReportNode, ReOptimizeNode, FullPipeline
+        - Covers: config defaults, graph topology (7 nodes, edges, entry/exit), conditional routing (re_optimize/re_generate/report), retry exhaustion, custom thresholds, full pipeline with mocked LLM + backtest, re-optimization loop
+    - **Total AI agent test count: 219 (all passing)**
+
+- **AI Multi-Agent Deliberation — Qwen 3-Agent Integration — 2026-02-09:**
+    - **`backend/agents/consensus/real_llm_deliberation.py`** — Full 3-agent Qwen integration:
+        - `AGENT_SYSTEM_PROMPTS` class dict with specialized trading domain prompts per agent:
+            - **deepseek**: quantitative analyst — risk metrics, Sharpe optimization, conservative approach
+            - **qwen**: technical analyst — momentum, pattern recognition, indicator optimization
+            - **perplexity**: market researcher — sentiment, macro trends, regime analysis
+        - `DEFAULT_SYSTEM_PROMPT` fallback for unknown agent types
+        - `_real_ask()` updated to use agent-specific system prompts (was generic for all)
+        - `deliberate_with_llm()` defaults to all available agents (up to 3)
+        - Module docstring updated with agent specialization overview
+    - **`backend/agents/consensus/deliberation.py`** — Qwen routing fix:
+        - `_ask_agent()` fallback now uses `agent_type_map` dict supporting all 3 agents
+        - Previously only mapped deepseek/perplexity, qwen was ignored
+    - **Tests: 35 new tests (`tests/backend/agents/test_real_llm_deliberation.py`):**
+        - 7 test classes: Init, SystemPrompts, RealAsk, ThreeAgentDeliberation, DeliberateWithLlm, AskAgentQwenSupport, CloseCleanup, GetApiKey
+        - Covers: specialized prompt content, dispatch routing, fallback behavior, 3-agent deliberation flow, weighted voting, multi-round convergence
+    - **Total AI agent test count: 179 (all passing)**
+
+- **AI Strategy Pipeline — Walk-Forward Integration & Extended API — 2026-02-09:**
+    - **`backend/agents/integration/walk_forward_bridge.py`** (~470 lines) — adapter between AI StrategyDefinition and WalkForwardOptimizer:
+        - `WalkForwardBridge` class with configurable n_splits, train_ratio, gap_periods
+        - `build_strategy_runner()` — converts StrategyDefinition → callable strategy_runner for WF optimizer
+        - `build_param_grid()` — builds parameter grid from OptimizationHints, DEFAULT_PARAM_RANGES, or current params
+        - `run_walk_forward()` / `run_walk_forward_async()` — sync and async walk-forward execution
+        - `_execute_backtest()` — converts candle list → DataFrame → signals → FallbackEngineV4 → metrics dict
+        - `DEFAULT_PARAM_RANGES` for 7 strategy types (rsi, macd, ema_crossover, sma_crossover, bollinger, supertrend, stochastic)
+        - `_generate_variations()` — auto-generates +/-40% parameter variations for grid search
+    - **Walk-Forward integrated into StrategyController (Stage 7):**
+        - `PipelineStage.WALK_FORWARD` enum value
+        - `PipelineResult.walk_forward` field for walk-forward results
+        - `generate_strategy(enable_walk_forward=True)` triggers Stage 7 after evaluation
+        - `_run_walk_forward()` — loads data, creates WalkForwardBridge, runs async optimization
+    - **Extended API Endpoints (4 new routes in `ai_pipeline.py`):**
+        - `POST /ai-pipeline/analyze-market` — analyze market context (regime, trend, volatility, key levels)
+        - `POST /ai-pipeline/improve-strategy` — optimize existing strategy via walk-forward validation
+        - `GET /ai-pipeline/pipeline/{id}/status` — pipeline job progress tracking (stage-based progress %)
+        - `GET /ai-pipeline/pipeline/{id}/result` — retrieve completed pipeline results
+        - In-memory `_pipeline_jobs` store for async pipeline tracking
+        - Updated `POST /generate` with `pipeline_id` and `enable_walk_forward` support
+    - **Tests: 67 new tests (39 walk-forward bridge + 28 API endpoints):**
+        - `tests/backend/agents/test_walk_forward_bridge.py` — 10 test classes covering init, param grid, strategy runner, candle conversion, SL/TP extraction, variations, grid from hints, execute backtest, walk-forward run, async wrapper, controller integration
+        - `tests/backend/api/test_ai_pipeline_endpoints.py` — 8 test classes covering all 6 endpoints: generate, agents, analyze-market, improve-strategy, pipeline status/result, response models
+    - **Total AI agent test count: 172 (all passing)**
+
+### Fixed
+
+- Fixed `TradeDirection.LONG_ONLY` → `TradeDirection.LONG` in walk_forward_bridge.py
+- Fixed `datetime.utcnow()` deprecation → `datetime.now(UTC)` in ai_pipeline.py
+- Added missing `id` field to `Signal()` in improve-strategy endpoint
+
+- **AI Strategy Pipeline — P1: Consensus Engine & Metrics Analyzer — 2026-02-09:**
+    - **`backend/agents/consensus/consensus_engine.py`** (~840 lines) — structured strategy-level consensus aggregation:
+        - `ConsensusMethod` enum: WEIGHTED_VOTING, BAYESIAN, BEST_OF
+        - `AgentPerformance` dataclass — historical agent performance tracking with running average
+        - `ConsensusResult` dataclass — aggregated strategy + agreement score + agent weights + signal votes
+        - `ConsensusEngine.aggregate()` — main entry point: dispatches to method-specific aggregation
+        - `_weighted_voting()` — signal-level aggregation by normalized agent weight, threshold-based inclusion
+        - `_bayesian_aggregation()` — posterior proportional to prior x likelihood (signal support fraction)
+        - `_best_of()` — pick single best strategy by weight x quality
+        - `_calculate_all_weights()` / `_calculate_agent_weight()` — dynamic weight computation from history + strategy quality
+        - `_merge_params()` — median for numeric params, mode for non-numeric
+        - `_merge_filters()` — deduplicate by type, keep highest-weight
+        - `_merge_exit_conditions()` — weighted average of TP/SL values
+        - `_merge_optimization_hints()` — union of parameters, widened ranges
+        - `_calculate_agreement_score()` — Jaccard similarity between agent signal sets
+        - `update_performance()` — track agent accuracy over time for weight calculation
+    - **`backend/agents/metrics_analyzer.py`** (~480 lines) — backtest results grading & recommendations:
+        - `MetricGrade` enum: EXCELLENT, GOOD, ACCEPTABLE, POOR
+        - `OverallGrade` enum: A-F letter grades
+        - `MetricAssessment` / `AnalysisResult` dataclasses with `to_dict()`, `to_prompt_context()`
+        - `METRIC_THRESHOLDS` — configurable grading boundaries for sharpe, PF, WR, DD, calmar, trades
+        - `MetricsAnalyzer.analyze()` — grades each metric, computes weighted overall score, detects strengths/weaknesses, generates actionable recommendations
+        - `_grade_metric()` — interpolated scoring with direction awareness (higher/lower is better)
+        - `needs_optimization` / `is_deployable` properties for decision logic
+        - `_RECOMMENDATIONS` dict — actionable suggestions keyed by metric:grade
+    - **Integration with StrategyController:**
+        - `_select_best_proposal()` now uses `ConsensusEngine.aggregate()` with weighted_voting (fallback to simple scoring)
+        - New Stage 6 (Evaluation): `MetricsAnalyzer` runs after backtest, results stored in `backtest_metrics["_analysis"]`
+        - Agent weights dynamically computed from historical performance
+    - **Updated `consensus/__init__.py`** — exports: AgentPerformance, ConsensusEngine, ConsensusMethod, ConsensusResult (15 total symbols)
+    - **61 unit tests** across 2 new test files:
+        - `tests/backend/agents/test_consensus_engine.py` (31 tests): TestConsensusEngineBasic (5), TestWeightedVoting (4), TestBayesianAggregation (2), TestBestOf (2), TestAgentWeights (2), TestAgreementScore (3), TestPerformanceTracking (4), TestSignalVotes (2), TestMergingHelpers (4), TestEdgeCases (3)
+        - `tests/backend/agents/test_metrics_analyzer.py` (30 tests): TestMetricGrading (6), TestOverallScoring (4), TestStrengthsWeaknesses (3), TestRecommendations (3), TestSerialization (3), TestProperties (4), TestEdgeCases (7)
+    - **All 105 tests in tests/backend/agents/ pass** (31+30+18+26)
+
+- **AI Strategy Pipeline — P3: Self-Improvement & Strategy Evolution — 2026-02-11:**
+    - **P3: Self-Improvement (Strategy Evolution):**
+        - **`backend/agents/self_improvement/strategy_evolution.py`** (~790 lines) — центральный модуль P3, связывающий RLHF, Reflexion и стратегический пайплайн:
+            - `EvolutionStage` enum (GENERATE→BACKTEST→REFLECT→RANK→EVOLVE→CONVERGED/FAILED)
+            - `GenerationRecord` dataclass — запись одного поколения: стратегия, метрики бэктеста, рефлексия, fitness score
+            - `EvolutionResult` dataclass — итог эволюции: все поколения, лучшее, статистика RLHF, сводка рефлексии
+            - `compute_fitness(metrics, weights)` — скоринг 0-100: Sharpe (25%), Profit Factor (20%), Win Rate (15%), Net Profit (15%), Max DD penalty (15%), Trade Count (10%)
+            - `StrategyEvolution.evolve()` — главный цикл: генерация → бэктест → рефлексия → ранжирование → эволюция; convergence detection (threshold=2.0, stagnation=3), min/max generations
+            - `_create_llm_reflection_fn()` — async замыкание для LLM-powered рефлексии через DeepSeek
+            - `_rank_strategies()` — попарный RLHF фидбэк на основе fitness-сравнения
+            - `_evolve_strategy()` — LLM-генерация улучшенной стратегии на основе предыдущих метрик и инсайтов рефлексии
+            - Промпты: REFLECTION_SYSTEM_PROMPT (эксперт-трейдер), EVOLUTION_PROMPT_TEMPLATE (предыдущая стратегия + метрики + рефлексия → улучшенный JSON)
+        - **Обновлён `self_improvement/__init__.py`** — экспорт: EvolutionResult, GenerationRecord, StrategyEvolution, compute_fitness (всего 11 символов)
+        - **18 unit тестов** в `tests/backend/agents/test_strategy_evolution.py` (~330 lines):
+            - TestComputeFitness (6 тестов): good_high, bad_low, range_bounds, empty_metrics, custom_weights, trade_bonus
+            - TestRewardModel (3 теста): extract_features, predict_reward_range, training_updates_weights
+            - TestSelfReflection (3 async теста): heuristic_reflect, custom_fn, stats_updated
+            - TestStrategyEvolution (6 тестов): basic_flow (mocked LLM+backtest), convergence, backtest_failure, rlhf_ranking, record_to_dict, result_to_dict
+        - **Все 18 тестов пройдено**, 0 ошибок
+
+- **AI Strategy Pipeline — Multi-Agent LLM Strategy Generation — 2026-02-11:**
+    - **P0: Core Pipeline Components:**
+        - **`backend/agents/prompts/templates.py`** (~280 lines) — шаблоны промптов: STRATEGY_GENERATION_TEMPLATE, MARKET_ANALYSIS_TEMPLATE, OPTIMIZATION_SUGGESTIONS_TEMPLATE, STRATEGY_VALIDATION_TEMPLATE, AGENT_SPECIALIZATIONS (deepseek=quantitative_analyst, qwen=technical_analyst, perplexity=market_researcher), 2 few-shot примера
+        - **`backend/agents/prompts/context_builder.py`** (~325 lines) — MarketContext dataclass + MarketContextBuilder: детекция рыночного режима (EMA 20/50), уровни S/R, волатильность (ATR), анализ объёма, сводка индикаторов
+        - **`backend/agents/prompts/prompt_engineer.py`** (~220 lines) — PromptEngineer: create_strategy_prompt, create_market_analysis_prompt, create_optimization_prompt, create_validation_prompt, get_system_message, \_auto_detect_issues
+        - **`backend/agents/prompts/response_parser.py`** (~525 lines) — ResponseParser с Pydantic моделями: Signal, Filter, ExitConditions, EntryConditions, PositionManagement, OptimizationHints, AgentMetadata, StrategyDefinition (get_strategy_type_for_engine(), get_engine_params(), to_dict()), ValidationResult; парсинг JSON из markdown/raw, авто-фикс trailing commas и single quotes
+        - **`backend/agents/strategy_controller.py`** (~630 lines) — StrategyController: главный оркестратор пайплайна с PipelineStage enum (CONTEXT→GENERATION→PARSING→CONSENSUS→BACKTEST→EVALUATION→COMPLETE/FAILED), StageResult, PipelineResult; вызов LLM провайдеров (deepseek/qwen/perplexity), скоринг предложений, quick_generate(), generate_and_backtest()
+        - **`backend/agents/integration/backtest_bridge.py`** (~260 lines) — BacktestBridge: конвертация StrategyDefinition → BacktestInput → FallbackEngineV4, извлечение SL/TP из exit conditions, COMMISSION_RATE=0.0007, async через asyncio.to_thread()
+    - **P1: Multi-Agent Enhancements:**
+        - **Qwen в RealLLMDeliberation** — добавлен QwenClient (qwen-plus, temp 0.4) в consensus/real_llm_deliberation.py
+        - **`backend/agents/trading_strategy_graph.py`** (~340 lines) — LangGraph пайплайн с 5 нодами: AnalyzeMarketNode, GenerateStrategiesNode, ParseResponsesNode, SelectBestNode, BacktestNode; build_trading_strategy_graph(), run_strategy_pipeline()
+        - **Скоринг предложений** в StrategyController.\_score_proposal — оценка 0-10 по количеству сигналов, exit conditions, фильтрам, entry conditions, optimization hints
+    - **P2: Integration:**
+        - **`backend/api/routers/ai_pipeline.py`** (~260 lines) — REST API: POST /ai-pipeline/generate (GenerateRequest → PipelineResponse), GET /ai-pipeline/agents (→ list[AgentInfo]); загрузка OHLCV через DataService, проверка доступности агентов через KeyManager
+        - **Роутер зарегистрирован** в backend/api/app.py: `/api/v1/ai-pipeline/*`
+        - **26 unit тестов** в `tests/backend/agents/test_strategy_pipeline.py`:
+            - TestResponseParser (11 тестов): JSON extraction, trailing comma fix, validation, engine type mapping, signal normalization
+            - TestMarketContextBuilder (4 теста): context building, S/R levels, prompt vars, edge case
+            - TestPromptEngineer (3 теста): strategy prompt, system messages, optimization prompt
+            - TestBacktestBridge (4 теста): strategy_to_config, SL/TP extraction, commission rate
+            - TestStrategyController (2 теста): proposal scoring heuristic
+        - **Все 26 тестов пройдено**, 0 ошибок
+
+- **Phase 3: Strategy Builder ↔ Optimization Integration — 2026-02-09:**
+    - **`builder_optimizer.py`** (~660 lines) — новый модуль оптимизации для node-based стратегий Strategy Builder:
+        - `DEFAULT_PARAM_RANGES` — 14 типов блоков (RSI, MACD, EMA, SMA, Bollinger, SuperTrend, Stochastic, CCI, ATR, ADX, Williams %R, Static SL/TP, Trailing Stop) с типизированными диапазонами
+        - `extract_optimizable_params(graph)` — извлечение оптимизируемых параметров из графа стратегии
+        - `clone_graph_with_params(graph, overrides)` — глубокое клонирование графа с подстановкой параметров по пути `blockId.paramKey`
+        - `generate_builder_param_combinations()` — Grid/Random генерация комбинаций с merge пользовательских диапазонов
+        - `run_builder_backtest()` — одиночный бэктест через StrategyBuilderAdapter → BacktestEngine → метрики
+        - `run_builder_grid_search()` — полный grid search со скорингом, фильтрацией, early stopping, timeout
+        - `run_builder_optuna_search()` — Optuna Bayesian (TPE/Random/CmaES) с top-N re-run для полных метрик
+    - **`BuilderOptimizationRequest`** — Pydantic модель (~65 строк) для endpoint оптимизации: symbol, interval, dates, method (grid_search/random_search/bayesian), parameter_ranges, n_trials, sampler_type, timeout, metric, weights, constraints
+    - **`POST /api/v1/strategy-builder/strategies/{id}/optimize`** — переписан с mock на реальную реализацию: загрузка из БД → извлечение параметров → загрузка OHLCV → grid/random/bayesian оптимизация → ранжированные результаты
+    - **`GET /api/v1/strategy-builder/strategies/{id}/optimizable-params`** — новый endpoint для автообнаружения оптимизируемых параметров (frontend UI)
+    - **Frontend: `optimization_panels.js`** — интеллектуальная маршрутизация:
+        - `getBuilderStrategyId()` — детекция контекста Strategy Builder
+        - `startBuilderOptimization()` — отправка запроса на builder endpoint с полным payload
+        - `buildBuilderParameterRanges()` — сборка parameter_ranges в формате `blockId.paramKey`
+        - `fetchBuilderOptimizableParams()` — автозагрузка параметров из backend при открытии стратегии
+        - `startClassicOptimization()` — сохранена совместимость с классическими стратегиями
+    - **58 новых тестов** в `test_builder_optimizer.py` покрывают:
+        - DEFAULT_PARAM_RANGES валидность (8 тестов)
+        - extract_optimizable_params (11 тестов)
+        - clone_graph_with_params (9 тестов)
+        - generate_builder_param_combinations (9 тестов)
+        - \_merge_ranges (4 теста)
+        - run_builder_backtest (3 теста)
+        - run_builder_grid_search (6 тестов)
+        - run_builder_optuna_search (3 теста)
+        - Integration pipeline (3 теста)
+        - Edge cases (4 теста)
+    - **1847 тестов пройдено**, 0 ошибок, 27 skipped
+
+- **Phase 2: Универсализация стратегий и Optuna top-N — 2026-02-10:**
+    - **5 генераторов сигналов** в `signal_generators.py`: RSI, SMA crossover, EMA crossover, MACD, Bollinger Bands
+    - **`generate_signals_for_strategy()`** — универсальный диспетчер, маршрутизирует по `strategy_type` к соответствующему генератору
+    - **`combo_to_params()`** — конвертер tuple→dict для именованных параметров (связка с `param_names`)
+    - **`generate_param_combinations()`** теперь возвращает 3-tuple `(combinations, total, param_names)` — поддерживает все стратегии
+    - **SyncOptimizationRequest** расширен 9 полями: `sma_fast/slow_period_range`, `ema_fast/slow_period_range`, `macd_fast/slow/signal_period_range`, `bb_period_range`, `bb_std_dev_range`
+    - **Optuna handler** — возвращает **top-10 результатов** с полными метриками (было: 1 best trial)
+    - **Все 6 путей выполнения** в `optimizations.py` теперь strategy-agnostic (было: RSI-only hardcoded)
+    - **Inline `_run_batch_backtests`** заменена thin wrapper → `workers.run_batch_backtests()` (DRY)
+    - Все **215/215 тестов** проходят, **1788 total** passed
+
+- **Рефакторинг системы оптимизации — 2026-02-09:**
+    - **6 новых модулей** в `backend/optimization/`: `models.py`, `scoring.py`, `filters.py`, `recommendations.py`, `utils.py`, `workers.py`
+    - **`build_backtest_input()`** — единый DRY-конструктор BacktestInput, заменяет 6 дублированных блоков по 25 полей
+    - **`extract_metrics_from_output()`** — единый экстрактор 50+ метрик из bt_output, заменяет 3 блока по 50 строк
+    - **`TimeoutChecker`** — класс для принудительного timeout (теперь request.timeout_seconds реально работает)
+    - **`EarlyStopper`** — класс для ранней остановки (теперь request.early_stopping реально работает)
+    - **`split_candles()`** — train/test split (теперь request.train_split реально работает)
+    - **`parse_trade_direction()`** — DRY-конвертер string → TradeDirection enum
+    - **`_format_params()`** — теперь универсальный (RSI, EMA, MACD, Bollinger, generic)
+    - **Memory optimization** — trades хранятся только для top-10 результатов
+    - Документация: `docs/OPTIMIZATION_REFACTORING.md`
+    - Все **215/215 тестов** проходят после рефакторинга
+
+### Fixed
+
+- **Аудит панели «Критерии оценки» (Evaluation Panel) — 2026-02-09:**
+    - **BUG-1 (КРИТИЧЕСКИЙ):** `optimization_panels.js` содержал хардкод symbol='BTCUSDT', interval='1h', direction='both', initial_capital=10000, leverage=10, commission=0.0007, strategy_type='rsi' — параметры из панели «Параметры» полностью игнорировались при запуске оптимизации. Добавлен метод `getPropertiesPanelValues()`, который читает 8 параметров из DOM.
+    - **BUG-2 (ВЫСОКИЙ):** Функция `_passes_filters()` не вызывалась в 2 из 3 путей выполнения `sync_grid_search_optimization`: GPU batch и single-process. Constraints из Evaluation Panel (max_drawdown ≤ 15%, total_trades ≥ 50 и др.) применялись только в multiprocessing-пути. Добавлены вызовы в оба пропущенных пути.
+    - **BUG-3 (СРЕДНИЙ):** 13 из 20 фронтенд-метрик не поддерживались в backend-функциях скоринга (`_calculate_composite_score`, `_rank_by_multi_criteria`, `_compute_weighted_composite`). Метрики sortino_ratio, calmar_ratio, cagr, avg_drawdown, volatility, var_95, risk_adjusted_return, avg_win, avg_loss, expectancy, payoff_ratio, trades_per_month, avg_bars_in_trade возвращали дефолтные значения. Все 3 функции расширены до 20+ метрик.
+    - Документация: `docs/AUDIT_EVALUATION_PANEL.md`
+    - Тесты: `tests/backend/api/test_evaluation_panel.py` — 87 тестов (скоринг, фильтрация, ранжирование, нормализация, интеграция)
+
+- **Аудит панели «Параметры» (Properties Panel) — 2026-02-09:**
+    - **BUG-1 (КРИТИЧЕСКИЙ):** `direction` из UI (long/short/both) игнорировался при запуске бэктеста — поле отсутствовало в `BacktestRequest`. Бэкенд брал direction из сохранённого `builder_graph`, что приводило к рассогласованию UI ↔ результат. Добавлено поле `direction` в `BacktestRequest` с приоритетом request > builder_graph.
+    - **BUG-2 (КРИТИЧЕСКИЙ):** `position_size` и `position_size_type` из UI игнорировались — поля отсутствовали в `BacktestRequest`. Все бэктесты запускались с position_size=1.0 (100%), независимо от настройки. Добавлены оба поля, значение передаётся в `BacktestConfig`.
+    - **BUG-3 (СРЕДНИЙ):** `BacktestRequest` не валидировал `symbol`, `interval`, `market_type`, `direction`, `position_size_type` — любая строка принималась, ошибки вылетали позже как 500 вместо 422. Добавлены `@field_validator` для всех полей.
+    - Добавлены constraint'ы: `symbol` min=2/max=20, `commission` ge=0/le=0.01, `initial_capital` le=100M
+    - Документация: `docs/AUDIT_PROPERTIES_PANEL.md`
+    - Тесты: `tests/backend/api/test_properties_panel.py` — 46 тестов (валидация + интеграция)
+
 ### Changed
 
 - **Массовое обновление зависимостей (2026-02-08):**
