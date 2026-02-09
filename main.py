@@ -45,7 +45,7 @@ Examples:
   # Check system health
   python main.py health
 
-For more info: https://github.com/RomanCTC/bybit_strategy_tester_v2
+For more info: https://github.com/romanctcroman-boop/bybit_strategy_tester_v2
         """,
     )
 
