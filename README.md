@@ -32,7 +32,7 @@ AI-powered strategy analysis.
 
 ```powershell
 # Clone repository
-git clone https://github.com/RomanCTC/bybit_strategy_tester_v2.git
+git clone https://github.com/romanctcroman-boop/bybit_strategy_tester_v2.git
 cd bybit_strategy_tester_v2
 
 # Create virtual environment
