@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Test Coverage for 3 Untested Modules — 2026-02-09:**
+    - **`test_hierarchical_memory.py`** (~53 tests): MemoryItem, MemoryTier, Store/Recall/Get/Delete, Consolidation, Forgetting, Persistence, Relevance/Cosine similarity, Stats, MemoryConsolidator, MemoryType
+    - **`test_ai_backtest_integration.py`** (~28 tests): AIBacktestResult/AIOptimizationResult, _parse_analysis/_parse_optimization_analysis, analyze_backtest with mocked LLM, singleton accessors, _call_llm fallback, lazy deliberation init
+    - **`test_rlhf_module.py`** (~51 tests): FeedbackSample serialization, PreferenceType enum, QualityScore weighted scoring, RewardModel feature extraction/training/cross-validation/cosine LR, RLHFModule human/AI/self feedback, reward training, preference prediction, heuristic evaluation, persistence, auto-training, stats
+    - **Total agent tests: 445 (all passing)**
+    - Updated IMPLEMENTATION_PLAN.md: all modules now 100% ✅
+
 - **AI Self-Improvement System (Tasks 4.1, 4.2, 4.3) — 2026-02-09:**
     - **Task 4.1 — LLM-backed Self-Reflection (`backend/agents/self_improvement/llm_reflection.py`, ~470 lines):**
         - `LLMReflectionProvider` — connects real LLM providers to SelfReflectionEngine:
