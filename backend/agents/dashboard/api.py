@@ -309,7 +309,7 @@ async def list_traces(limit: int = 50):
                     "duration_ms": trace.duration_ms,
                     "spans": [
                         {
-                            "span_id": span.span_id,
+                            "span_id": span.context.span_id,
                             "name": span.name,
                             "duration_ms": span.duration_ms,
                             "status": span.status.value if hasattr(span, "status") else "ok",
