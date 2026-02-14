@@ -36,6 +36,7 @@ from backend.agents.unified_agent_interface import (
 # CATEGORY 1: Enums and Data Classes (12 tests)
 # =============================================================================
 
+
 class TestEnums:
     """Test enum definitions"""
 
@@ -76,7 +77,7 @@ class TestAgentMessage:
             message_type=MessageType.QUERY,
             content="test content",
             context={"key": "value"},
-            conversation_id="conv_123"
+            conversation_id="conv_123",
         )
 
         assert msg.message_id == "test_id"
@@ -106,7 +107,7 @@ class TestAgentMessage:
             max_iterations=10,
             confidence_score=0.85,
             timestamp="2024-01-15T12:00:00",
-            metadata={"custom": "data"}
+            metadata={"custom": "data"},
         )
 
         assert msg.iteration == 3
@@ -124,7 +125,7 @@ class TestAgentMessage:
             message_type=MessageType.QUERY,
             content="test",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         data = msg.to_dict()
@@ -149,7 +150,7 @@ class TestAgentMessage:
             "max_iterations": 5,
             "confidence_score": 0.7,
             "timestamp": "2024-01-15T12:00:00",
-            "metadata": {}
+            "metadata": {},
         }
 
         msg = AgentMessage.from_dict(data)
@@ -170,7 +171,7 @@ class TestAgentMessage:
             message_type=MessageType.QUERY,
             content="test",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         # Timestamp should be set automatically
@@ -191,7 +192,7 @@ class TestAgentMessage:
             content="test",
             context={},
             conversation_id="conv",
-            metadata=None  # Explicitly None
+            metadata=None,  # Explicitly None
         )
 
         # metadata should be initialized to {}
@@ -202,10 +203,11 @@ class TestAgentMessage:
 # CATEGORY 2: AgentToAgentCommunicator - Initialization (6 tests)
 # =============================================================================
 
+
 class TestAgentToAgentCommunicatorInit:
     """Test AgentToAgentCommunicator initialization"""
 
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     def test_init_creates_agent_interface(self, mock_get_agent):
         """AgentToAgentCommunicator creates agent interface"""
         mock_agent = MagicMock()
@@ -217,7 +219,7 @@ class TestAgentToAgentCommunicatorInit:
         assert comm.redis_client is None  # Lazy init
         assert comm.redis_url == "redis://localhost:6379"
 
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     def test_init_with_custom_redis_url(self, mock_get_agent):
         """AgentToAgentCommunicator accepts custom redis URL"""
         mock_get_agent.return_value = MagicMock()
@@ -226,7 +228,7 @@ class TestAgentToAgentCommunicatorInit:
 
         assert comm.redis_url == "redis://custom:6380"
 
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     def test_init_registers_message_handlers(self, mock_get_agent):
         """AgentToAgentCommunicator registers message handlers"""
         mock_get_agent.return_value = MagicMock()
@@ -235,10 +237,11 @@ class TestAgentToAgentCommunicatorInit:
 
         assert AgentType.DEEPSEEK in comm.message_handlers
         assert AgentType.PERPLEXITY in comm.message_handlers
+        assert AgentType.QWEN in comm.message_handlers
         assert AgentType.COPILOT in comm.message_handlers
         assert callable(comm.message_handlers[AgentType.DEEPSEEK])
 
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     def test_init_conversation_cache(self, mock_get_agent):
         """AgentToAgentCommunicator initializes conversation cache"""
         mock_get_agent.return_value = MagicMock()
@@ -249,7 +252,7 @@ class TestAgentToAgentCommunicatorInit:
         assert comm.max_conversation_age == timedelta(minutes=30)
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_get_redis_lazy_init(self, mock_get_agent):
         """_get_redis performs lazy initialization"""
         mock_get_agent.return_value = MagicMock()
@@ -259,15 +262,16 @@ class TestAgentToAgentCommunicatorInit:
 
         # Mock redis.from_url as AsyncMock coroutine
         mock_redis_client = AsyncMock()
-        with patch('backend.agents.agent_to_agent_communicator.redis.from_url',
-                   new=AsyncMock(return_value=mock_redis_client)):
+        with patch(
+            "backend.agents.agent_to_agent_communicator.redis.from_url", new=AsyncMock(return_value=mock_redis_client)
+        ):
             redis_client = await comm._get_redis()
 
             assert redis_client == mock_redis_client
             assert comm.redis_client == mock_redis_client
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_get_redis_reuses_existing(self, mock_get_agent):
         """_get_redis reuses existing client"""
         mock_get_agent.return_value = MagicMock()
@@ -278,8 +282,7 @@ class TestAgentToAgentCommunicatorInit:
         mock_redis_client = AsyncMock()
         mock_from_url = AsyncMock(return_value=mock_redis_client)
 
-        with patch('backend.agents.agent_to_agent_communicator.redis.from_url',
-                   new=mock_from_url):
+        with patch("backend.agents.agent_to_agent_communicator.redis.from_url", new=mock_from_url):
             # First call
             redis1 = await comm._get_redis()
             # Second call
@@ -293,11 +296,12 @@ class TestAgentToAgentCommunicatorInit:
 # CATEGORY 3: Message Routing and Handlers (15 tests)
 # =============================================================================
 
+
 class TestMessageRouting:
     """Test message routing and handlers"""
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_route_message_calls_handler(self, mock_get_agent):
         """route_message calls appropriate handler"""
         mock_get_agent.return_value = MagicMock()
@@ -305,19 +309,21 @@ class TestMessageRouting:
         comm = AgentToAgentCommunicator()
 
         # Mock handler
-        mock_handler = AsyncMock(return_value=AgentMessage(
-            message_id="response",
-            from_agent=AgentType.DEEPSEEK,
-            to_agent=AgentType.ORCHESTRATOR,
-            message_type=MessageType.RESPONSE,
-            content="test response",
-            context={},
-            conversation_id="conv"
-        ))
+        mock_handler = AsyncMock(
+            return_value=AgentMessage(
+                message_id="response",
+                from_agent=AgentType.DEEPSEEK,
+                to_agent=AgentType.ORCHESTRATOR,
+                message_type=MessageType.RESPONSE,
+                content="test response",
+                context={},
+                conversation_id="conv",
+            )
+        )
         comm.message_handlers[AgentType.DEEPSEEK] = mock_handler
 
         # Mock loop check
-        with patch.object(comm, '_check_conversation_loop', new=AsyncMock()):
+        with patch.object(comm, "_check_conversation_loop", new=AsyncMock()):
             message = AgentMessage(
                 message_id="test",
                 from_agent=AgentType.ORCHESTRATOR,
@@ -325,7 +331,7 @@ class TestMessageRouting:
                 message_type=MessageType.QUERY,
                 content="test query",
                 context={},
-                conversation_id="conv"
+                conversation_id="conv",
             )
 
             response = await comm.route_message(message)
@@ -335,7 +341,7 @@ class TestMessageRouting:
             assert response.message_type == MessageType.RESPONSE
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_route_message_no_handler_raises_error(self, mock_get_agent):
         """route_message returns error for unknown agent type"""
         mock_get_agent.return_value = MagicMock()
@@ -343,7 +349,7 @@ class TestMessageRouting:
         comm = AgentToAgentCommunicator()
         comm.message_handlers = {}  # Empty handlers
 
-        with patch.object(comm, '_check_conversation_loop', new=AsyncMock()):
+        with patch.object(comm, "_check_conversation_loop", new=AsyncMock()):
             message = AgentMessage(
                 message_id="test",
                 from_agent=AgentType.ORCHESTRATOR,
@@ -351,7 +357,7 @@ class TestMessageRouting:
                 message_type=MessageType.QUERY,
                 content="test",
                 context={},
-                conversation_id="conv"
+                conversation_id="conv",
             )
 
             response = await comm.route_message(message)
@@ -360,17 +366,19 @@ class TestMessageRouting:
             assert "No handler" in response.content
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_handle_deepseek_message_success(self, mock_get_agent):
         """_handle_deepseek_message handles successful response"""
         mock_agent = MagicMock()
-        mock_agent.send_request = AsyncMock(return_value=AgentResponse(
-            success=True,
-            content="DeepSeek response",
-            channel=AgentChannel.DIRECT_API,
-            latency_ms=100.0,
-            api_key_index=0
-        ))
+        mock_agent.send_request = AsyncMock(
+            return_value=AgentResponse(
+                success=True,
+                content="DeepSeek response",
+                channel=AgentChannel.DIRECT_API,
+                latency_ms=100.0,
+                api_key_index=0,
+            )
+        )
         mock_get_agent.return_value = mock_agent
 
         comm = AgentToAgentCommunicator()
@@ -382,7 +390,7 @@ class TestMessageRouting:
             message_type=MessageType.QUERY,
             content="test query",
             context={"key": "value"},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         response = await comm._handle_deepseek_message(message)
@@ -396,17 +404,15 @@ class TestMessageRouting:
         assert "latency_ms" in response.metadata
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_handle_deepseek_message_failure(self, mock_get_agent):
         """_handle_deepseek_message handles API failure"""
         mock_agent = MagicMock()
-        mock_agent.send_request = AsyncMock(return_value=AgentResponse(
-            success=False,
-            content="",
-            channel=AgentChannel.DIRECT_API,
-            error="API error",
-            latency_ms=50.0
-        ))
+        mock_agent.send_request = AsyncMock(
+            return_value=AgentResponse(
+                success=False, content="", channel=AgentChannel.DIRECT_API, error="API error", latency_ms=50.0
+            )
+        )
         mock_get_agent.return_value = mock_agent
 
         comm = AgentToAgentCommunicator()
@@ -418,7 +424,7 @@ class TestMessageRouting:
             message_type=MessageType.QUERY,
             content="test",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         response = await comm._handle_deepseek_message(message)
@@ -427,17 +433,19 @@ class TestMessageRouting:
         assert response.confidence_score == 0.0
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_handle_perplexity_message_success(self, mock_get_agent):
         """_handle_perplexity_message handles successful response"""
         mock_agent = MagicMock()
-        mock_agent.send_request = AsyncMock(return_value=AgentResponse(
-            success=True,
-            content="Perplexity response",
-            channel=AgentChannel.DIRECT_API,
-            latency_ms=120.0,
-            api_key_index=1
-        ))
+        mock_agent.send_request = AsyncMock(
+            return_value=AgentResponse(
+                success=True,
+                content="Perplexity response",
+                channel=AgentChannel.DIRECT_API,
+                latency_ms=120.0,
+                api_key_index=1,
+            )
+        )
         mock_get_agent.return_value = mock_agent
 
         comm = AgentToAgentCommunicator()
@@ -449,7 +457,7 @@ class TestMessageRouting:
             message_type=MessageType.QUERY,
             content="test query",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         response = await comm._handle_perplexity_message(message)
@@ -459,9 +467,9 @@ class TestMessageRouting:
         assert response.confidence_score == 0.85
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_handle_copilot_message_placeholder(self, mock_get_agent):
-        """_handle_copilot_message returns placeholder response"""
+        """_handle_copilot_message returns disabled response"""
         mock_get_agent.return_value = MagicMock()
 
         comm = AgentToAgentCommunicator()
@@ -473,17 +481,18 @@ class TestMessageRouting:
             message_type=MessageType.QUERY,
             content="test",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         response = await comm._handle_copilot_message(message)
 
         assert response.from_agent == AgentType.COPILOT
-        assert "placeholder" in response.content.lower()
-        assert response.metadata["status"] == "placeholder_response"
+        assert "disabled" in response.content.lower()
+        assert response.metadata["status"] == "disabled"
+        assert response.confidence_score == 0.0
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_check_conversation_loop_prevents_infinite_loops(self, mock_get_agent):
         """_check_conversation_loop prevents infinite loops"""
         mock_get_agent.return_value = MagicMock()
@@ -503,14 +512,14 @@ class TestMessageRouting:
             content="test",
             context={},
             conversation_id="conv_loop",
-            iteration=5
+            iteration=5,
         )
 
         with pytest.raises(ValueError, match="infinite loop"):
             await comm._check_conversation_loop(message)
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_check_conversation_loop_allows_first_iteration(self, mock_get_agent):
         """_check_conversation_loop allows first iteration"""
         mock_get_agent.return_value = MagicMock()
@@ -531,7 +540,7 @@ class TestMessageRouting:
             content="test",
             context={},
             conversation_id="conv",
-            iteration=1
+            iteration=1,
         )
 
         # Should not raise
@@ -544,11 +553,12 @@ class TestMessageRouting:
 # CATEGORY 4: Multi-turn Conversations (10 tests)
 # =============================================================================
 
+
 class TestMultiTurnConversations:
     """Test multi-turn conversation logic"""
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_multi_turn_conversation_basic_flow(self, mock_get_agent):
         """multi_turn_conversation executes basic flow"""
         mock_get_agent.return_value = MagicMock()
@@ -565,7 +575,7 @@ class TestMultiTurnConversations:
                 content=f"Response {i}",
                 context={},
                 conversation_id="conv",
-                iteration=i+1
+                iteration=i + 1,
             )
             for i in range(3)
         ]
@@ -585,23 +595,25 @@ class TestMultiTurnConversations:
             message_type=MessageType.QUERY,
             content="Start conversation",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         # Mock determine_next_message
-        comm._determine_next_message = AsyncMock(side_effect=[
-            AgentMessage(
-                message_id=f"next_{i}",
-                from_agent=AgentType.DEEPSEEK,
-                to_agent=AgentType.PERPLEXITY,
-                message_type=MessageType.QUERY,
-                content="next",
-                context={},
-                conversation_id="conv",
-                iteration=i+2
-            )
-            for i in range(3)
-        ])
+        comm._determine_next_message = AsyncMock(
+            side_effect=[
+                AgentMessage(
+                    message_id=f"next_{i}",
+                    from_agent=AgentType.DEEPSEEK,
+                    to_agent=AgentType.PERPLEXITY,
+                    message_type=MessageType.QUERY,
+                    content="next",
+                    context={},
+                    conversation_id="conv",
+                    iteration=i + 2,
+                )
+                for i in range(3)
+            ]
+        )
 
         history = await comm.multi_turn_conversation(initial_message, max_turns=5)
 
@@ -609,7 +621,7 @@ class TestMultiTurnConversations:
         assert history[0] == initial_message
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_multi_turn_stops_at_max_iterations(self, mock_get_agent):
         """multi_turn_conversation stops at max iterations"""
         mock_get_agent.return_value = MagicMock()
@@ -624,20 +636,22 @@ class TestMultiTurnConversations:
             content="test",
             context={},
             conversation_id="conv",
-            max_iterations=2  # Low max
+            max_iterations=2,  # Low max
         )
 
         # Mock route_message
-        comm.route_message = AsyncMock(return_value=AgentMessage(
-            message_id="resp",
-            from_agent=AgentType.DEEPSEEK,
-            to_agent=AgentType.ORCHESTRATOR,
-            message_type=MessageType.RESPONSE,
-            content="response",
-            context={},
-            conversation_id="conv",
-            iteration=3  # Exceeds max
-        ))
+        comm.route_message = AsyncMock(
+            return_value=AgentMessage(
+                message_id="resp",
+                from_agent=AgentType.DEEPSEEK,
+                to_agent=AgentType.ORCHESTRATOR,
+                message_type=MessageType.RESPONSE,
+                content="response",
+                context={},
+                conversation_id="conv",
+                iteration=3,  # Exceeds max
+            )
+        )
 
         history = await comm.multi_turn_conversation(initial_message, max_turns=10)
 
@@ -649,11 +663,12 @@ class TestMultiTurnConversations:
 # CATEGORY 5: Parallel Consensus (8 tests)
 # =============================================================================
 
+
 class TestParallelConsensus:
     """Test parallel consensus functionality"""
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_parallel_consensus_basic(self, mock_get_agent):
         """parallel_consensus requests from multiple agents"""
         mock_get_agent.return_value = MagicMock()
@@ -670,7 +685,7 @@ class TestParallelConsensus:
                 content=f"Response from {msg.to_agent.value}",
                 context={},
                 conversation_id=msg.conversation_id,
-                confidence_score=0.8
+                confidence_score=0.8,
             )
 
         comm.route_message = AsyncMock(side_effect=mock_route)
@@ -679,8 +694,7 @@ class TestParallelConsensus:
         comm._calculate_consensus_confidence = AsyncMock(return_value=0.75)
 
         result = await comm.parallel_consensus(
-            question="Test question",
-            agents=[AgentType.DEEPSEEK, AgentType.PERPLEXITY]
+            question="Test question", agents=[AgentType.DEEPSEEK, AgentType.PERPLEXITY]
         )
 
         assert "consensus" in result
@@ -694,11 +708,12 @@ class TestParallelConsensus:
 # CATEGORY 6: Iterative Improvement (7 tests)
 # =============================================================================
 
+
 class TestIterativeImprovement:
     """Test iterative improvement functionality"""
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_iterative_improvement_reaches_target(self, mock_get_agent):
         """iterative_improvement reaches target confidence"""
         mock_get_agent.return_value = MagicMock()
@@ -714,7 +729,7 @@ class TestIterativeImprovement:
                 message_type=MessageType.RESPONSE,
                 content=f"Improved version {i}",
                 context={},
-                conversation_id="conv"
+                conversation_id="conv",
             )
             for i in range(3)
         ]
@@ -725,15 +740,15 @@ class TestIterativeImprovement:
                 from_agent=AgentType.PERPLEXITY,
                 to_agent=AgentType.ORCHESTRATOR,
                 message_type=MessageType.RESPONSE,
-                content=f"Confidence: {0.5 + i*0.2}",
+                content=f"Confidence: {0.5 + i * 0.2}",
                 context={},
-                conversation_id="conv"
+                conversation_id="conv",
             )
             for i in range(3)
         ]
 
         all_responses = []
-        for imp, val in zip(responses, validation_responses):
+        for imp, val in zip(responses, validation_responses, strict=True):
             all_responses.extend([imp, val])
 
         comm.route_message = AsyncMock(side_effect=all_responses)
@@ -743,7 +758,7 @@ class TestIterativeImprovement:
             validator_agent=AgentType.PERPLEXITY,
             improver_agent=AgentType.DEEPSEEK,
             max_iterations=3,
-            min_confidence=0.8
+            min_confidence=0.8,
         )
 
         assert "final_content" in result
@@ -756,23 +771,25 @@ class TestValidationTelemetry:
     """Test Phase 6 validation helpers and telemetry hooks"""
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_validate_implementation_records_summary(self, mock_get_agent):
         mock_agent = MagicMock()
-        mock_agent.send_request = AsyncMock(side_effect=[
-            AgentResponse(
-                success=True,
-                content="Validated and safe to apply",
-                channel=AgentChannel.DIRECT_API,
-                latency_ms=10.0,
-            ),
-            AgentResponse(
-                success=True,
-                content="Validated ✅",
-                channel=AgentChannel.DIRECT_API,
-                latency_ms=12.0,
-            ),
-        ])
+        mock_agent.send_request = AsyncMock(
+            side_effect=[
+                AgentResponse(
+                    success=True,
+                    content="Validated and safe to apply",
+                    channel=AgentChannel.DIRECT_API,
+                    latency_ms=10.0,
+                ),
+                AgentResponse(
+                    success=True,
+                    content="Validated ✅",
+                    channel=AgentChannel.DIRECT_API,
+                    latency_ms=12.0,
+                ),
+            ]
+        )
         mock_get_agent.return_value = mock_agent
 
         telemetry = MagicMock()
@@ -788,23 +805,25 @@ class TestValidationTelemetry:
         telemetry.record_event.assert_called()
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_validate_implementation_rolls_back_on_critical(self, mock_get_agent, tmp_path):
         mock_agent = MagicMock()
-        mock_agent.send_request = AsyncMock(side_effect=[
-            AgentResponse(
-                success=True,
-                content="Critical syntax error detected",
-                channel=AgentChannel.DIRECT_API,
-                latency_ms=5.0,
-            ),
-            AgentResponse(
-                success=True,
-                content="Validated",
-                channel=AgentChannel.DIRECT_API,
-                latency_ms=6.0,
-            ),
-        ])
+        mock_agent.send_request = AsyncMock(
+            side_effect=[
+                AgentResponse(
+                    success=True,
+                    content="Critical syntax error detected",
+                    channel=AgentChannel.DIRECT_API,
+                    latency_ms=5.0,
+                ),
+                AgentResponse(
+                    success=True,
+                    content="Validated",
+                    channel=AgentChannel.DIRECT_API,
+                    latency_ms=6.0,
+                ),
+            ]
+        )
         mock_get_agent.return_value = mock_agent
 
         telemetry = MagicMock()
@@ -832,11 +851,12 @@ class TestValidationTelemetry:
 # CATEGORY 7: Helper Methods (8 tests)
 # =============================================================================
 
+
 class TestHelperMethods:
     """Test helper methods"""
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_should_end_conversation_on_completion(self, mock_get_agent):
         """_should_end_conversation ends on completion message"""
         mock_get_agent.return_value = MagicMock()
@@ -850,7 +870,7 @@ class TestHelperMethods:
             message_type=MessageType.COMPLETION,
             content="Done",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         should_end = await comm._should_end_conversation(response, [])
@@ -858,7 +878,7 @@ class TestHelperMethods:
         assert should_end is True
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_should_end_conversation_on_error(self, mock_get_agent):
         """_should_end_conversation ends on error"""
         mock_get_agent.return_value = MagicMock()
@@ -872,7 +892,7 @@ class TestHelperMethods:
             message_type=MessageType.ERROR,
             content="Error occurred",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         should_end = await comm._should_end_conversation(response, [])
@@ -880,7 +900,7 @@ class TestHelperMethods:
         assert should_end is True
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_should_end_on_repeating_responses(self, mock_get_agent):
         """_should_end_conversation ends on repeating responses"""
         mock_get_agent.return_value = MagicMock()
@@ -895,7 +915,7 @@ class TestHelperMethods:
             message_type=MessageType.RESPONSE,
             content="Same response every time",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
         history = [same_msg, same_msg, same_msg]
@@ -905,7 +925,7 @@ class TestHelperMethods:
         assert should_end is True
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_determine_next_message_collaborative(self, mock_get_agent):
         """_determine_next_message handles collaborative pattern"""
         mock_get_agent.return_value = MagicMock()
@@ -919,20 +939,16 @@ class TestHelperMethods:
             message_type=MessageType.RESPONSE,
             content="DeepSeek response",
             context={},
-            conversation_id="conv"
+            conversation_id="conv",
         )
 
-        next_msg = await comm._determine_next_message(
-            response,
-            CommunicationPattern.COLLABORATIVE,
-            []
-        )
+        next_msg = await comm._determine_next_message(response, CommunicationPattern.COLLABORATIVE, [])
 
-        # Should switch to Perplexity
-        assert next_msg.to_agent == AgentType.PERPLEXITY
+        # DeepSeek → Qwen → Perplexity → DeepSeek (round-robin)
+        assert next_msg.to_agent == AgentType.QWEN
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_calculate_consensus_confidence_empty(self, mock_get_agent):
         """_calculate_consensus_confidence handles empty responses"""
         mock_get_agent.return_value = MagicMock()
@@ -943,7 +959,7 @@ class TestHelperMethods:
 
         assert confidence == 0.0
 
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     def test_extract_confidence_score_from_text(self, mock_get_agent):
         """_extract_confidence_score extracts score from text"""
         mock_get_agent.return_value = MagicMock()
@@ -962,7 +978,7 @@ class TestHelperMethods:
         score3 = comm._extract_confidence_score("No score here")
         assert score3 == 0.5  # Default
 
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     def test_create_error_message(self, mock_get_agent):
         """_create_error_message creates error message"""
         mock_get_agent.return_value = MagicMock()
@@ -977,7 +993,7 @@ class TestHelperMethods:
             content="test",
             context={"key": "value"},
             conversation_id="conv",
-            iteration=2
+            iteration=2,
         )
 
         error_msg = comm._create_error_message(original, "Test error")
@@ -991,7 +1007,7 @@ class TestHelperMethods:
         assert "error_details" in error_msg.metadata
 
     @pytest.mark.asyncio
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     async def test_close_closes_redis(self, mock_get_agent):
         """close() closes Redis connection"""
         mock_get_agent.return_value = MagicMock()
@@ -1009,16 +1025,18 @@ class TestHelperMethods:
 # CATEGORY 8: Singleton and Module Functions (2 tests)
 # =============================================================================
 
+
 class TestSingletonAndModuleFunctions:
     """Test singleton pattern and module-level functions"""
 
-    @patch('backend.agents.agent_to_agent_communicator.get_agent_interface')
+    @patch("backend.agents.agent_to_agent_communicator.get_agent_interface")
     def test_get_communicator_singleton(self, mock_get_agent):
         """get_communicator returns singleton instance"""
         mock_get_agent.return_value = MagicMock()
 
         # Reset singleton
         import backend.agents.agent_to_agent_communicator as comm_module
+
         comm_module._communicator_instance = None
 
         comm1 = get_communicator()

@@ -1,10 +1,10 @@
 """Agent-to-agent communication orchestrator.
 
-This module wires DeepSeek, Perplexity, and Copilot style agents together so
-that they can exchange structured messages, run multi-turn conversations, build
-parallel consensus, and iterate toward better answers. It intentionally mirrors
-what the original implementation provided (see WEEK2_DAY3_AGENT_TO_AGENT_COMPLETE)
-so that the extensive pytest suite in
+This module wires DeepSeek, Qwen, Perplexity, and Copilot style agents together
+so that they can exchange structured messages, run multi-turn conversations,
+build parallel consensus, and iterate toward better answers. It intentionally
+mirrors what the original implementation provided (see
+WEEK2_DAY3_AGENT_TO_AGENT_COMPLETE) so that the extensive pytest suite in
 ``tests/backend/test_agent_to_agent_communicator.py`` keeps passing.
 """
 
@@ -120,6 +120,7 @@ class AgentToAgentCommunicator:
         self.message_handlers: dict[AgentType, MessageHandler] = {
             AgentType.DEEPSEEK: self._handle_deepseek_message,
             AgentType.PERPLEXITY: self._handle_perplexity_message,
+            AgentType.QWEN: self._handle_qwen_message,
             AgentType.COPILOT: self._handle_copilot_message,
         }
         self.conversation_cache: dict[str, list[AgentMessage]] = {}
@@ -156,9 +157,7 @@ class AgentToAgentCommunicator:
         await self._check_conversation_loop(message)
         handler = self.message_handlers.get(message.to_agent)
         if not handler:
-            error_response = self._create_error_message(
-                message, f"No handler for agent {message.to_agent.value}"
-            )
+            error_response = self._create_error_message(message, f"No handler for agent {message.to_agent.value}")
             self._record_telemetry(
                 "communicator_route",
                 {
@@ -220,9 +219,7 @@ class AgentToAgentCommunicator:
         from_mcp_tool = message.context.get("from_mcp_tool", False)
         use_file_access = message.context.get("use_file_access", False)
         force_direct = FORCE_DIRECT_AGENT_API or use_file_access or from_mcp_tool
-        preferred_channel = (
-            AgentChannel.DIRECT_API if force_direct else AgentChannel.MCP_SERVER
-        )
+        preferred_channel = AgentChannel.DIRECT_API if force_direct else AgentChannel.MCP_SERVER
         logger.info(
             "🔀 DeepSeek routing via {} (use_file_access={}, from_mcp={})",
             preferred_channel.value,
@@ -250,9 +247,7 @@ class AgentToAgentCommunicator:
     async def _handle_perplexity_message(self, message: AgentMessage) -> AgentMessage:
         from_mcp_tool = message.context.get("from_mcp_tool", False)
         force_direct = FORCE_DIRECT_AGENT_API or from_mcp_tool
-        preferred_channel = (
-            AgentChannel.DIRECT_API if force_direct else AgentChannel.MCP_SERVER
-        )
+        preferred_channel = AgentChannel.DIRECT_API if force_direct else AgentChannel.MCP_SERVER
         logger.info(
             "🔀 Perplexity routing via {} (from_mcp={})",
             preferred_channel.value,
@@ -276,21 +271,57 @@ class AgentToAgentCommunicator:
             success_confidence=0.85,
         )
 
+    async def _handle_qwen_message(self, message: AgentMessage) -> AgentMessage:
+        """Route a message to the Qwen agent via direct API.
+
+        Qwen (Alibaba Cloud Model Studio) is used for fast, cost-effective
+        analysis and as a third voice in consensus rounds.  It always uses the
+        direct API channel because there is no MCP bridge for Qwen.
+        """
+        logger.info("🔀 Qwen routing via DIRECT_API")
+        request = AgentRequest(
+            agent_type=AgentType.QWEN,
+            task_type=message.context.get("task_type", "analyze"),
+            prompt=message.content,
+            code=message.context.get("code"),
+            context=message.context,
+        )
+        agent_response = await self.agent_interface.send_request(
+            request,
+            preferred_channel=AgentChannel.DIRECT_API,
+        )
+        return self._build_agent_reply(
+            original_message=message,
+            agent_type=AgentType.QWEN,
+            agent_response=agent_response,
+            success_confidence=0.85,
+        )
+
     async def _handle_copilot_message(self, message: AgentMessage) -> AgentMessage:
-        placeholder = (
-            "Copilot placeholder — VS Code extension bridge pending integration."
+        """Handle Copilot messages - intentionally disabled.
+
+        The VS Code extension bridge is not yet integrated.  This handler
+        returns a well-structured response so callers always get a valid
+        ``AgentMessage`` rather than a cryptic error.
+        """
+        logger.warning(
+            "Copilot handler invoked but VS Code bridge is not integrated - "
+            "returning disabled response (conversation_id={})",
+            message.conversation_id,
         )
         return AgentMessage(
             message_id=str(uuid.uuid4()),
             from_agent=AgentType.COPILOT,
             to_agent=message.from_agent,
             message_type=MessageType.RESPONSE,
-            content=placeholder,
+            content=(
+                "Copilot integration is intentionally disabled. The VS Code extension bridge is pending implementation."
+            ),
             context=message.context,
             conversation_id=message.conversation_id,
             iteration=message.iteration + 1,
-            confidence_score=0.5,
-            metadata={"status": "placeholder_response"},
+            confidence_score=0.0,
+            metadata={"status": "disabled", "reason": "vscode_bridge_pending"},
         )
 
     def _build_agent_reply(
@@ -347,9 +378,7 @@ class AgentToAgentCommunicator:
             if response.iteration >= response.max_iterations:
                 break
 
-            current_message = await self._determine_next_message(
-                response, pattern, history
-            )
+            current_message = await self._determine_next_message(response, pattern, history)
 
         return history
 
@@ -385,9 +414,7 @@ class AgentToAgentCommunicator:
             }
             for resp in responses
         ]
-        combined_answer = "\n\n".join(
-            f"{resp.from_agent.value}: {resp.content}" for resp in responses
-        )
+        combined_answer = "\n\n".join(f"{resp.from_agent.value}: {resp.content}" for resp in responses)
 
         return {
             "question": question,
@@ -492,16 +519,10 @@ class AgentToAgentCommunicator:
         )
 
         ds_response = await self._run_validation_request(ds_request, AgentType.DEEPSEEK)
-        pp_response = await self._run_validation_request(
-            pp_request, AgentType.PERPLEXITY
-        )
+        pp_response = await self._run_validation_request(pp_request, AgentType.PERPLEXITY)
 
-        ds_summary = self._summarize_validation_response(
-            AgentType.DEEPSEEK, ds_response
-        )
-        pp_summary = self._summarize_validation_response(
-            AgentType.PERPLEXITY, pp_response
-        )
+        ds_summary = self._summarize_validation_response(AgentType.DEEPSEEK, ds_response)
+        pp_summary = self._summarize_validation_response(AgentType.PERPLEXITY, pp_response)
 
         validated = (
             ds_summary["verdict"] == "VALIDATED"
@@ -511,11 +532,7 @@ class AgentToAgentCommunicator:
         )
 
         rolled_back = False
-        if (
-            (ds_summary["critical_issues"] or pp_summary["critical_issues"])
-            and backup_file
-            and target_file
-        ):
+        if (ds_summary["critical_issues"] or pp_summary["critical_issues"]) and backup_file and target_file:
             rolled_back = await self._rollback_to_backup(backup_file, target_file)
 
         payload = {
@@ -540,9 +557,7 @@ class AgentToAgentCommunicator:
 
         return payload
 
-    async def _run_validation_request(
-        self, request: AgentRequest, agent_type: AgentType
-    ) -> AgentResponse:
+    async def _run_validation_request(self, request: AgentRequest, agent_type: AgentType) -> AgentResponse:
         try:
             return await self.agent_interface.send_request(request)
         except Exception as exc:  # pragma: no cover - network/agent failure
@@ -554,14 +569,10 @@ class AgentToAgentCommunicator:
                 error=str(exc),
             )
 
-    def _summarize_validation_response(
-        self, agent_type: AgentType, response: AgentResponse
-    ) -> dict[str, Any]:
+    def _summarize_validation_response(self, agent_type: AgentType, response: AgentResponse) -> dict[str, Any]:
         text = (response.content or "").strip()
         text_lower = text.lower()
-        validated = response.success and any(
-            keyword in text_lower for keyword in self._VALIDATION_KEYWORDS
-        )
+        validated = response.success and any(keyword in text_lower for keyword in self._VALIDATION_KEYWORDS)
         critical = any(keyword in text_lower for keyword in self._CRITICAL_KEYWORDS)
         verdict = "VALIDATED" if validated and not critical else "NOT_VALIDATED"
         return {
@@ -593,9 +604,7 @@ class AgentToAgentCommunicator:
             logger.error(f"Rollback failed: {exc}")
             return False
 
-    async def _should_end_conversation(
-        self, response: AgentMessage, history: list[AgentMessage]
-    ) -> bool:
+    async def _should_end_conversation(self, response: AgentMessage, history: list[AgentMessage]) -> bool:
         if response.message_type in (MessageType.COMPLETION, MessageType.ERROR):
             return True
         if response.iteration >= response.max_iterations:
@@ -616,18 +625,18 @@ class AgentToAgentCommunicator:
         next_iteration = response.iteration + 1
         next_agent = response.from_agent
 
-        if pattern == CommunicationPattern.COLLABORATIVE:
-            next_agent = (
-                AgentType.PERPLEXITY
-                if response.from_agent == AgentType.DEEPSEEK
-                else AgentType.DEEPSEEK
-            )
-        elif pattern == CommunicationPattern.SEQUENTIAL:
-            next_agent = (
-                AgentType.DEEPSEEK
-                if response.from_agent != AgentType.DEEPSEEK
-                else AgentType.PERPLEXITY
-            )
+        # Round-robin order for collaborative / sequential patterns
+        _ROTATION = {
+            AgentType.DEEPSEEK: AgentType.QWEN,
+            AgentType.QWEN: AgentType.PERPLEXITY,
+            AgentType.PERPLEXITY: AgentType.DEEPSEEK,
+        }
+
+        if pattern in (
+            CommunicationPattern.COLLABORATIVE,
+            CommunicationPattern.SEQUENTIAL,
+        ):
+            next_agent = _ROTATION.get(response.from_agent, AgentType.DEEPSEEK)
         else:
             return response
 
@@ -643,9 +652,7 @@ class AgentToAgentCommunicator:
             max_iterations=response.max_iterations,
         )
 
-    async def _calculate_consensus_confidence(
-        self, responses: list[AgentMessage]
-    ) -> float:
+    async def _calculate_consensus_confidence(self, responses: list[AgentMessage]) -> float:
         if not responses:
             return 0.0
         scores = [msg.confidence_score for msg in responses if msg.confidence_score]
