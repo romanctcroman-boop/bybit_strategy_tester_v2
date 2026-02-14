@@ -1502,13 +1502,15 @@ function tryLoadFromLocalStorage(strategyId) {
       data.connections.forEach(conn => {
         if (conn.source && conn.target) {
           connections.push({
+            id: conn.id || `conn_restored_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             source: conn.source,
             target: conn.target,
-            sourcePort: conn.sourcePort,
-            targetPort: conn.targetPort
+            type: conn.type || 'data'
           });
         }
       });
+      // Normalize to ensure canonical format (fills missing id/type/portId)
+      normalizeAllConnections();
     }
 
     // Restore UI state if available

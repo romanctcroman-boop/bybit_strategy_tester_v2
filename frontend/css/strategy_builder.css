@@ -901,6 +901,7 @@ body {
 
 .canvas .connection-line {
     fill: none;
+    stroke: var(--accent-blue);
     stroke-width: 3;
     pointer-events: stroke;
 }
