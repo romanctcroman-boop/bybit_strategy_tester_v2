@@ -4061,7 +4061,7 @@ body {
     white-space: nowrap;
 }
 
-.strategies-select-all input[type="checkbox"] {
+.strategies-select-all input[type='checkbox'] {
     width: 16px;
     height: 16px;
     accent-color: var(--accent-blue);
@@ -4085,7 +4085,7 @@ body {
     justify-content: center;
 }
 
-.strategy-card-checkbox input[type="checkbox"] {
+.strategy-card-checkbox input[type='checkbox'] {
     width: 16px;
     height: 16px;
     accent-color: var(--accent-blue);

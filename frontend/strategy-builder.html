@@ -575,8 +575,8 @@
                   <input type="checkbox" id="strategiesSelectAll" />
                   <span>All</span>
                 </label>
-                <button class="btn btn-sm btn-danger strategies-batch-delete" id="btnBatchDelete"
-                  style="display:none;" title="Delete selected">
+                <button class="btn btn-sm btn-danger strategies-batch-delete hidden" id="btnBatchDelete"
+                  title="Delete selected">
                   <i class="bi bi-trash"></i> Delete Selected (<span id="batchDeleteCount">0</span>)
                 </button>
               </div>
@@ -705,11 +705,11 @@
       <script src="./js/pages/optimization_config_panel.js?v=20260204d"></script>
 
       <!-- AI Build Modal -->
-      <div id="aiBuildModal" class="ai-build-modal" style="display:none">
+      <div id="aiBuildModal" class="ai-build-modal hidden">
         <div class="ai-build-modal-content">
           <div class="ai-build-header">
             <h3><i class="bi bi-robot"></i> AI Strategy Builder</h3>
-            <button class="btn btn-icon btn-secondary" id="btnCloseAiBuild">
+            <button class="btn btn-icon btn-secondary" id="btnCloseAiBuild" title="Close AI Builder">
               <i class="bi bi-x-lg"></i>
             </button>
           </div>
@@ -723,16 +723,16 @@
 
             <div class="ai-build-row">
               <label>Strategy Name</label>
-              <input type="text" id="aiName" value="AI RSI Strategy" class="form-control form-control-sm">
+              <input type="text" id="aiName" value="AI RSI Strategy" class="form-control form-control-sm" title="Strategy name for AI-built strategy">
             </div>
             <div class="ai-build-row-half">
               <div>
                 <label>Max Iterations</label>
-                <input type="number" id="aiMaxIter" value="3" min="1" max="10" class="form-control form-control-sm">
+                <input type="number" id="aiMaxIter" value="3" min="1" max="10" class="form-control form-control-sm" title="Maximum optimization iterations">
               </div>
               <div>
                 <label>Min Sharpe</label>
-                <input type="number" id="aiMinSharpe" value="0.5" step="0.1" class="form-control form-control-sm">
+                <input type="number" id="aiMinSharpe" value="0.5" step="0.1" class="form-control form-control-sm" title="Minimum Sharpe ratio target">
               </div>
             </div>
             <div class="ai-build-row">
@@ -743,7 +743,7 @@
             </div>
 
             <h5 class="ai-build-preset-heading">Preset Blocks</h5>
-            <select id="aiPreset" class="form-select form-select-sm">
+            <select id="aiPreset" class="form-select form-select-sm" title="Select preset strategy blocks">
               <option value="rsi">RSI Overbought/Oversold</option>
               <option value="ema_cross">EMA Crossover (9/21)</option>
               <option value="macd">MACD Signal</option>
@@ -758,7 +758,7 @@
           </div>
 
           <!-- Progress -->
-          <div id="aiBuildProgress" class="ai-build-body" style="display:none">
+          <div id="aiBuildProgress" class="ai-build-body hidden">
             <div class="ai-build-spinner">
               <div class="spinner-border text-primary" role="status"></div>
               <p id="aiBuildStage">Starting AI workflow...</p>
@@ -766,7 +766,7 @@
           </div>
 
           <!-- Results -->
-          <div id="aiBuildResults" class="ai-build-body" style="display:none">
+          <div id="aiBuildResults" class="ai-build-body hidden">
             <div id="aiBuildResultContent"></div>
             <button class="btn btn-secondary w-100 mt-2" id="btnResetAiBuild">
               <i class="bi bi-arrow-repeat"></i> Build Another

@@ -11,9 +11,7 @@ description = "Professional-grade backtesting and live trading platform for Bybi
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-authors = [
-    { name = "Roman", email = "roman@example.com" }
-]
+authors = [{ name = "Roman", email = "roman@example.com" }]
 keywords = [
     "trading",
     "backtesting",
@@ -21,7 +19,7 @@ keywords = [
     "cryptocurrency",
     "algorithmic-trading",
     "fastapi",
-    "ai-agent"
+    "ai-agent",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -73,15 +71,15 @@ fix = true
 
 [tool.ruff.lint]
 select = [
-    "E",      # pycodestyle errors
-    "F",      # pyflakes
-    "W",      # pycodestyle warnings
-    "I",      # isort
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "UP",     # pyupgrade
-    "SIM",    # flake8-simplify
-    "RUF",    # ruff-specific rules
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific rules
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
@@ -103,7 +101,13 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["backend", "frontend"]
-section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -116,12 +120,7 @@ line-ending = "auto"
 # ==============================================================================
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = [
-    "-ra",
-    "-q",
-    "--strict-markers",
-    "--tb=short",
-]
+addopts = ["-ra", "-q", "--strict-markers", "--tb=short"]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
@@ -143,12 +142,7 @@ filterwarnings = [
 [tool.coverage.run]
 branch = true
 source = ["backend"]
-omit = [
-    "*/tests/*",
-    "*/__pycache__/*",
-    "*/migrations/*",
-    "*/.venv/*",
-]
+omit = ["*/tests/*", "*/__pycache__/*", "*/migrations/*", "*/.venv/*"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -175,13 +169,7 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
-exclude = [
-    "venv",
-    ".venv",
-    "tests",
-    "scripts",
-    "node_modules",
-]
+exclude = ["venv", ".venv", "tests", "scripts", "node_modules"]
 
 [[tool.mypy.overrides]]
 module = "backend.*"
@@ -217,9 +205,9 @@ exclude = '''
 [tool.bandit]
 exclude_dirs = ["tests", "scripts", ".venv", "node_modules"]
 skips = [
-    "B101",  # assert_used - common in tests
-    "B104",  # hardcoded_bind_all_interfaces - intentional for dev
-    "B311",  # random - not used for crypto
+    "B101", # assert_used - common in tests
+    "B104", # hardcoded_bind_all_interfaces - intentional for dev
+    "B311", # random - not used for crypto
 ]
 
 [tool.bandit.assert_used]

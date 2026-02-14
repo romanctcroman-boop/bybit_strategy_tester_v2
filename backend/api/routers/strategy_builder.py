@@ -11,6 +11,10 @@ Endpoints:
 - Validation
 """
 
+# NOTE: SQLAlchemy Column[X] <-> X assignments are correct at runtime;
+# mypy/Pylance cannot resolve them without the sqlalchemy plugin.
+# Suppressed with inline # type: ignore comments where needed.
+
 import asyncio
 import logging
 import os
@@ -338,8 +342,8 @@ class BlockResponse(BaseModel):
 @router.post("/symbols/cache-refresh")
 async def refresh_symbols_cache(request: Request):
     """
-    Принудительно загрузить тикеры с Bybit (Futures + Spot) и обновить кэш.
-    Вызов по кнопке «Обновить список» в Properties.
+    Force-reload tickers from Bybit (Futures + Spot) and refresh the cache.
+    Called by the "Refresh list" button in Properties panel.
     """
     try:
         from backend.services.adapters.bybit import BybitAdapter
@@ -392,7 +396,7 @@ async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(
         }
         # Add main_strategy if provided
         if request.main_strategy:
-            builder_graph_data["main_strategy"] = request.main_strategy
+            builder_graph_data["main_strategy"] = request.main_strategy  # type: ignore[assignment]
             logger.info("CREATE STRATEGY: Added main_strategy to builder_graph_data")
 
         db_strategy = Strategy(
@@ -416,21 +420,21 @@ async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(
 
         lev = request.leverage if request.leverage is not None else params.get("_leverage")
         return StrategyResponse(
-            id=db_strategy.id,
-            name=db_strategy.name,
-            description=db_strategy.description,
-            timeframe=db_strategy.timeframe or "1h",
-            symbol=db_strategy.symbol,
+            id=db_strategy.id,  # type: ignore[arg-type]
+            name=db_strategy.name,  # type: ignore[arg-type]
+            description=db_strategy.description,  # type: ignore[arg-type]
+            timeframe=db_strategy.timeframe or "1h",  # type: ignore[arg-type]
+            symbol=db_strategy.symbol,  # type: ignore[arg-type]
             market_type=request.market_type,
             direction=request.direction,
-            initial_capital=db_strategy.initial_capital,
+            initial_capital=db_strategy.initial_capital,  # type: ignore[arg-type]
             leverage=float(lev) if lev is not None else None,
-            position_size=db_strategy.position_size,
-            parameters=db_strategy.parameters or {},
-            blocks=db_strategy.builder_blocks or [],
-            connections=db_strategy.builder_connections or [],
-            is_builder_strategy=db_strategy.is_builder_strategy,
-            version=db_strategy.version,
+            position_size=db_strategy.position_size,  # type: ignore[arg-type]
+            parameters=db_strategy.parameters or {},  # type: ignore[arg-type]
+            blocks=db_strategy.builder_blocks or [],  # type: ignore[arg-type]
+            connections=db_strategy.builder_connections or [],  # type: ignore[arg-type]
+            is_builder_strategy=db_strategy.is_builder_strategy,  # type: ignore[arg-type]
+            version=db_strategy.version,  # type: ignore[arg-type]
             created_at=db_strategy.created_at.isoformat() if db_strategy.created_at else None,
             updated_at=db_strategy.updated_at.isoformat() if db_strategy.updated_at else None,
         )
@@ -466,8 +470,8 @@ async def batch_delete_strategies(
 
     deleted_ids = []
     for s in strategies:
-        s.is_deleted = True
-        s.deleted_at = datetime.now(UTC)
+        s.is_deleted = True  # type: ignore[assignment]
+        s.deleted_at = datetime.now(UTC)  # type: ignore[assignment]
         deleted_ids.append(s.id)
 
     db.commit()
@@ -503,26 +507,26 @@ async def get_strategy(strategy_id: str, db: Session = Depends(get_db)):
         market_type = db_strategy.builder_graph.get("market_type", "linear")
         direction = db_strategy.builder_graph.get("direction", "both")
 
-    params = db_strategy.parameters or {}
+    params: dict = db_strategy.parameters or {}  # type: ignore[assignment]
     lev = params.get("_leverage")
 
     return StrategyResponse(
-        id=db_strategy.id,
-        name=db_strategy.name,
-        description=db_strategy.description,
-        timeframe=db_strategy.timeframe or "1h",
-        symbol=db_strategy.symbol,
+        id=db_strategy.id,  # type: ignore[arg-type]
+        name=db_strategy.name,  # type: ignore[arg-type]
+        description=db_strategy.description,  # type: ignore[arg-type]
+        timeframe=db_strategy.timeframe or "1h",  # type: ignore[arg-type]
+        symbol=db_strategy.symbol,  # type: ignore[arg-type]
         market_type=market_type,
         direction=direction,
-        initial_capital=db_strategy.initial_capital,
+        initial_capital=db_strategy.initial_capital,  # type: ignore[arg-type]
         leverage=float(lev) if lev is not None else None,
-        position_size=db_strategy.position_size,
+        position_size=db_strategy.position_size,  # type: ignore[arg-type]
         parameters=params,
-        blocks=db_strategy.builder_blocks or [],
-        connections=db_strategy.builder_connections or [],
-        builder_graph=db_strategy.builder_graph,
-        is_builder_strategy=db_strategy.is_builder_strategy,
-        version=db_strategy.version,
+        blocks=db_strategy.builder_blocks or [],  # type: ignore[arg-type]
+        connections=db_strategy.builder_connections or [],  # type: ignore[arg-type]
+        builder_graph=db_strategy.builder_graph,  # type: ignore[arg-type]
+        is_builder_strategy=db_strategy.is_builder_strategy,  # type: ignore[arg-type]
+        version=db_strategy.version,  # type: ignore[arg-type]
         created_at=db_strategy.created_at.isoformat() if db_strategy.created_at else None,
         updated_at=db_strategy.updated_at.isoformat() if db_strategy.updated_at else None,
     )
@@ -612,43 +616,43 @@ async def update_strategy(
         if request.leverage is not None:
             params["_leverage"] = request.leverage
 
-        db_strategy.name = request.name
-        db_strategy.description = request.description or ""
-        db_strategy.symbol = request.symbol
-        db_strategy.timeframe = request.timeframe
-        db_strategy.initial_capital = request.initial_capital
+        db_strategy.name = request.name  # type: ignore[assignment]
+        db_strategy.description = request.description or ""  # type: ignore[assignment]
+        db_strategy.symbol = request.symbol  # type: ignore[assignment]
+        db_strategy.timeframe = request.timeframe  # type: ignore[assignment]
+        db_strategy.initial_capital = request.initial_capital  # type: ignore[assignment]
         if request.position_size is not None:
-            db_strategy.position_size = request.position_size
-        db_strategy.parameters = params
-        db_strategy.builder_graph = {
+            db_strategy.position_size = request.position_size  # type: ignore[assignment]
+        db_strategy.parameters = params  # type: ignore[assignment]
+        db_strategy.builder_graph = {  # type: ignore[assignment]
             "blocks": request.blocks,
             "connections": request.connections,
             "market_type": request.market_type,
             "direction": request.direction,
         }
-        db_strategy.builder_blocks = request.blocks
-        db_strategy.builder_connections = request.connections
+        db_strategy.builder_blocks = request.blocks  # type: ignore[assignment]
+        db_strategy.builder_connections = request.connections  # type: ignore[assignment]
 
         db.commit()
         db.refresh(db_strategy)
 
         lev = request.leverage if request.leverage is not None else params.get("_leverage")
         return StrategyResponse(
-            id=db_strategy.id,
-            name=db_strategy.name,
-            description=db_strategy.description,
-            timeframe=db_strategy.timeframe or "1h",
-            symbol=db_strategy.symbol,
+            id=db_strategy.id,  # type: ignore[arg-type]
+            name=db_strategy.name,  # type: ignore[arg-type]
+            description=db_strategy.description,  # type: ignore[arg-type]
+            timeframe=db_strategy.timeframe or "1h",  # type: ignore[arg-type]
+            symbol=db_strategy.symbol,  # type: ignore[arg-type]
             market_type=request.market_type,
             direction=request.direction,
-            initial_capital=db_strategy.initial_capital,
+            initial_capital=db_strategy.initial_capital,  # type: ignore[arg-type]
             leverage=float(lev) if lev is not None else None,
-            position_size=db_strategy.position_size,
-            parameters=db_strategy.parameters or {},
-            blocks=db_strategy.builder_blocks or [],
-            connections=db_strategy.builder_connections or [],
-            is_builder_strategy=db_strategy.is_builder_strategy,
-            version=db_strategy.version,
+            position_size=db_strategy.position_size,  # type: ignore[arg-type]
+            parameters=db_strategy.parameters or {},  # type: ignore[arg-type]
+            blocks=db_strategy.builder_blocks or [],  # type: ignore[arg-type]
+            connections=db_strategy.builder_connections or [],  # type: ignore[arg-type]
+            is_builder_strategy=db_strategy.is_builder_strategy,  # type: ignore[arg-type]
+            version=db_strategy.version,  # type: ignore[arg-type]
             created_at=db_strategy.created_at.isoformat() if db_strategy.created_at else None,
             updated_at=db_strategy.updated_at.isoformat() if db_strategy.updated_at else None,
         )
@@ -729,9 +733,9 @@ async def revert_strategy_version(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Version {version_id} not found",
         )
-    db_strategy.builder_graph = ver.graph_json
-    db_strategy.builder_blocks = ver.blocks_json
-    db_strategy.builder_connections = ver.connections_json
+    db_strategy.builder_graph = ver.graph_json  # type: ignore[assignment]
+    db_strategy.builder_blocks = ver.blocks_json  # type: ignore[assignment]
+    db_strategy.builder_connections = ver.connections_json  # type: ignore[assignment]
     db.commit()
     db.refresh(db_strategy)
     return {"status": "reverted", "strategy_id": strategy_id, "version_id": version_id}
@@ -755,8 +759,8 @@ async def delete_strategy(strategy_id: str, db: Session = Depends(get_db)):
             detail=f"Strategy Builder strategy {strategy_id} not found",
         )
 
-    db_strategy.is_deleted = True
-    db_strategy.deleted_at = datetime.now(UTC)
+    db_strategy.is_deleted = True  # type: ignore[assignment]
+    db_strategy.deleted_at = datetime.now(UTC)  # type: ignore[assignment]
     db.commit()
 
     return {"status": "deleted", "strategy_id": strategy_id}
@@ -1167,14 +1171,14 @@ async def generate_code_from_db(
 
     graph = StrategyGraph(
         id=strategy_id,
-        name=db_strategy.name or f"Strategy_{strategy_id}",
-        description=db_strategy.description or "",
-        timeframe=db_strategy.timeframe or "1h",
-        symbols=[db_strategy.symbol] if db_strategy.symbol else ["BTCUSDT"],
+        name=db_strategy.name or f"Strategy_{strategy_id}",  # type: ignore[arg-type]
+        description=db_strategy.description or "",  # type: ignore[arg-type]
+        timeframe=db_strategy.timeframe or "1h",  # type: ignore[arg-type]
+        symbols=[db_strategy.symbol] if db_strategy.symbol else ["BTCUSDT"],  # type: ignore[list-item]
     )
 
     # Build blocks
-    for b in db_strategy.builder_blocks or []:
+    for b in db_strategy.builder_blocks or []:  # type: ignore[union-attr]
         raw_type = str(b.get("type", "")).lower()
         block_type = type_map.get(raw_type)
         if not block_type:
@@ -1205,15 +1209,15 @@ async def generate_code_from_db(
         graph.add_block(strategy_block)
 
     # Build connections
-    for conn in db_strategy.builder_connections or []:
+    for conn in db_strategy.builder_connections or []:  # type: ignore[union-attr]
         try:
             source = conn.get("source") or {}
             target = conn.get("target") or {}
             block_conn = BlockConnection(
                 id=conn.get("id") or "conn",
-                source_block_id=source.get("blockId"),
+                source_block_id=source.get("blockId"),  # type: ignore[arg-type]
                 source_output=source.get("portId") or "value",
-                target_block_id=target.get("blockId"),
+                target_block_id=target.get("blockId"),  # type: ignore[arg-type]
                 target_input=target.get("portId") or "input",
                 connection_type=ConnectionType.DATA_FLOW,
             )
@@ -1271,12 +1275,12 @@ async def list_templates(
     tags: str | None = None,
 ):
     """List strategy templates"""
+    import contextlib
+
     cat = None
     if category:
-        try:
+        with contextlib.suppress(ValueError):
             cat = TemplateCategory(category)
-        except ValueError:
-            pass
 
     tag_list = tags.split(",") if tags else None
 
@@ -1576,7 +1580,7 @@ async def optimize_strategy(
         )
 
     # Build strategy graph
-    strategy_graph = {
+    strategy_graph: dict[str, Any] = {
         "name": db_strategy.name,
         "description": db_strategy.description or "",
         "blocks": db_strategy.builder_blocks or [],
@@ -1585,7 +1589,7 @@ async def optimize_strategy(
         "direction": request.direction,
     }
     if db_strategy.builder_graph and db_strategy.builder_graph.get("main_strategy"):
-        strategy_graph["main_strategy"] = db_strategy.builder_graph["main_strategy"]
+        strategy_graph["main_strategy"] = db_strategy.builder_graph["main_strategy"]  # type: ignore[assignment]
 
     # Extract optimizable params from graph
     all_params = extract_optimizable_params(strategy_graph)
@@ -1743,7 +1747,7 @@ async def get_optimizable_params(
             detail=f"Strategy {strategy_id} not found",
         )
 
-    strategy_graph = {
+    strategy_graph: dict[str, Any] = {
         "blocks": db_strategy.builder_blocks or [],
         "connections": db_strategy.builder_connections or [],
     }
@@ -1825,7 +1829,7 @@ async def get_block_library():
     """Get the complete block library with categories"""
     from backend.services.strategy_builder.builder import BlockType
 
-    categories = {}
+    categories: dict[str, list[dict[str, str]]] = {}
     for block_type in BlockType:
         category = block_type.name.split("_")[0].lower()
         if category not in categories:
@@ -1870,7 +1874,7 @@ async def validate_block_config(block_config: dict[str, Any]):
     parameters = block_config.get("parameters", {})
 
     errors = []
-    warnings = []
+    warnings: list[dict[str, str]] = []
 
     if not block_type:
         errors.append({"field": "type", "message": "Block type is required"})
@@ -2140,7 +2144,7 @@ async def run_backtest_from_builder(
 
     try:
         # Build strategy graph from DB data
-        strategy_graph = {
+        strategy_graph: dict[str, Any] = {
             "name": db_strategy.name,
             "description": db_strategy.description or "",
             "blocks": db_strategy.builder_blocks or [],
@@ -2150,7 +2154,7 @@ async def run_backtest_from_builder(
         }
         # Add main_strategy from builder_graph if available
         if db_strategy.builder_graph and db_strategy.builder_graph.get("main_strategy"):
-            strategy_graph["main_strategy"] = db_strategy.builder_graph["main_strategy"]
+            strategy_graph["main_strategy"] = db_strategy.builder_graph["main_strategy"]  # type: ignore[assignment]
 
         # Create StrategyBuilderAdapter
         from backend.backtesting.strategy_builder_adapter import StrategyBuilderAdapter
@@ -2175,16 +2179,17 @@ async def run_backtest_from_builder(
                 engine_type = "dca"
             else:
                 # Check for features that require FallbackEngineV4
+                blocks_list: list[dict[str, Any]] = db_strategy.builder_blocks or []  # type: ignore[assignment]
                 has_multi_tp = any(
                     block.get("type") == "take_profit" and block.get("params", {}).get("multi_levels")
-                    for block in (db_strategy.builder_blocks or [])
+                    for block in blocks_list
                 )
                 has_atr = any(
                     block.get("type") in ["stop_loss", "take_profit"] and block.get("params", {}).get("use_atr", False)
-                    for block in (db_strategy.builder_blocks or [])
+                    for block in blocks_list
                 )
                 has_pyramiding = any(
-                    block.get("params", {}).get("pyramiding", 0) > 1 for block in (db_strategy.builder_blocks or [])
+                    block.get("params", {}).get("pyramiding", 0) > 1 for block in blocks_list
                 )
 
                 if has_multi_tp or has_atr or has_pyramiding:
@@ -2246,7 +2251,7 @@ async def run_backtest_from_builder(
         block_trailing_activation: float | None = None
         block_trailing_offset: float | None = None
 
-        for block in db_strategy.builder_blocks or []:
+        for block in db_strategy.builder_blocks or []:  # type: ignore[union-attr]
             block_type = block.get("type", "")
             block_params = block.get("params") or block.get("config") or {}
             if block_type == "static_sltp":
@@ -2697,7 +2702,7 @@ async def get_strategy_statistics(strategy_id: str):
         "block_count": len(graph.blocks),
         "connection_count": len(graph.connections),
         "created_at": graph.created_at.isoformat() if hasattr(graph, "created_at") else None,
-        "block_types_used": list(set(b.block_type.value for b in graph.blocks.values())),
+        "block_types_used": list({b.block_type.value for b in graph.blocks.values()}),
         "complexity_metrics": {
             "depth": 3,
             "branches": 2,
@@ -2728,7 +2733,7 @@ async def set_evaluation_criteria(
         db_strategy.builder_graph = {}
 
     db_strategy.builder_graph["evaluation_criteria"] = criteria.model_dump()
-    db_strategy.updated_at = datetime.now(UTC)
+    db_strategy.updated_at = datetime.now(UTC)  # type: ignore[assignment]
     db.commit()
 
     return {
@@ -2783,7 +2788,7 @@ async def set_optimization_config(
         db_strategy.builder_graph = {}
 
     db_strategy.builder_graph["optimization_config"] = config.model_dump()
-    db_strategy.updated_at = datetime.now(UTC)
+    db_strategy.updated_at = datetime.now(UTC)  # type: ignore[assignment]
     db.commit()
 
     return {

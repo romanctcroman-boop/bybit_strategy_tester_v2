@@ -13869,7 +13869,9 @@ const AI_PRESETS = {
 };
 
 function openAiBuildModal() {
-  document.getElementById('aiBuildModal').style.display = 'flex';
+  const modal = document.getElementById('aiBuildModal');
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
 
   // Populate summary from Parameters panel
   const symbol = document.getElementById('backtestSymbol')?.value || '';
@@ -13914,7 +13916,9 @@ function openAiBuildModal() {
 }
 
 function closeAiBuildModal() {
-  document.getElementById('aiBuildModal').style.display = 'none';
+  const modal = document.getElementById('aiBuildModal');
+  modal.classList.add('hidden');
+  modal.style.display = '';
 }
 
 function applyAiPreset() {
@@ -13928,9 +13932,9 @@ function applyAiPreset() {
 }
 
 function resetAiBuild() {
-  document.getElementById('aiBuildConfig').style.display = '';
-  document.getElementById('aiBuildProgress').style.display = 'none';
-  document.getElementById('aiBuildResults').style.display = 'none';
+  document.getElementById('aiBuildConfig').classList.remove('hidden');
+  document.getElementById('aiBuildProgress').classList.add('hidden');
+  document.getElementById('aiBuildResults').classList.add('hidden');
 }
 
 async function runAiBuild() {
@@ -13971,8 +13975,8 @@ async function runAiBuild() {
   };
 
   // Show progress
-  document.getElementById('aiBuildConfig').style.display = 'none';
-  document.getElementById('aiBuildProgress').style.display = '';
+  document.getElementById('aiBuildConfig').classList.add('hidden');
+  document.getElementById('aiBuildProgress').classList.remove('hidden');
   document.getElementById('aiBuildStage').textContent =
     'Building strategy with AI agent...';
 
@@ -13991,16 +13995,16 @@ async function runAiBuild() {
     await showAiBuildResults(data);
 
   } catch (err) {
-    document.getElementById('aiBuildProgress').style.display = 'none';
-    document.getElementById('aiBuildResults').style.display = '';
+    document.getElementById('aiBuildProgress').classList.add('hidden');
+    document.getElementById('aiBuildResults').classList.remove('hidden');
     document.getElementById('aiBuildResultContent').innerHTML =
       `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${err.message}</div>`;
   }
 }
 
 async function showAiBuildResults(data) {
-  document.getElementById('aiBuildProgress').style.display = 'none';
-  document.getElementById('aiBuildResults').style.display = '';
+  document.getElementById('aiBuildProgress').classList.add('hidden');
+  document.getElementById('aiBuildResults').classList.remove('hidden');
 
   const w = data.workflow || {};
   const _m = w.backtest_results?.metrics || {};
@@ -14371,7 +14375,7 @@ function updateBatchDeleteUI() {
   const selectAllCb = document.getElementById('strategiesSelectAll');
 
   const count = _selectedStrategyIds.size;
-  if (btn) btn.style.display = count > 0 ? 'flex' : 'none';
+  if (btn) btn.classList.toggle('hidden', count === 0);
   if (countEl) countEl.textContent = count;
 
   // Update select all checkbox state

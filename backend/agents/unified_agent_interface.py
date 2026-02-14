@@ -316,9 +316,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
         try:
             result = cast(
                 AgentResponse,
-                await self.circuit_manager.call_with_breaker(
-                    "mcp_server", self._execute_mcp_call, request, start_time
-                ),
+                await self.circuit_manager.call_with_breaker("mcp_server", self._execute_mcp_call, request, start_time),
             )
             return result
 
@@ -416,9 +414,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
         try:
             response = cast(
                 AgentResponse,
-                await self.circuit_manager.call_with_breaker(
-                    breaker_name, self._execute_api_call, request, start_time
-                ),
+                await self.circuit_manager.call_with_breaker(breaker_name, self._execute_api_call, request, start_time),
             )
             return response
 
