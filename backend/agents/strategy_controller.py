@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from loguru import logger
@@ -462,57 +462,42 @@ class StrategyController:
         backend.agents.llm.connections.
         """
         try:
-            from backend.agents.llm.connections import (
+            from backend.agents.llm.base_client import (
+                LLMClientFactory,
                 LLMConfig,
                 LLMMessage,
                 LLMProvider,
-                create_llm_client,
             )
             from backend.security.key_manager import get_key_manager
 
             km = get_key_manager()
 
             # Map agent name to provider config
-            provider_map = {
-                "deepseek": {
-                    "provider": LLMProvider.DEEPSEEK,
-                    "key_name": "DEEPSEEK_API_KEY",
-                    "model": "deepseek-chat",
-                    "temperature": 0.7,
-                },
-                "qwen": {
-                    "provider": LLMProvider.QWEN,
-                    "key_name": "QWEN_API_KEY",
-                    "model": "qwen-plus",
-                    "temperature": 0.4,
-                },
-                "perplexity": {
-                    "provider": LLMProvider.PERPLEXITY,
-                    "key_name": "PERPLEXITY_API_KEY",
-                    "model": "llama-3.1-sonar-small-128k-online",
-                    "temperature": 0.7,
-                },
+            provider_configs: dict[str, tuple[LLMProvider, str, str, float]] = {
+                "deepseek": (LLMProvider.DEEPSEEK, "DEEPSEEK_API_KEY", "deepseek-chat", 0.7),
+                "qwen": (LLMProvider.QWEN, "QWEN_API_KEY", "qwen-plus", 0.4),
+                "perplexity": (LLMProvider.PERPLEXITY, "PERPLEXITY_API_KEY", "llama-3.1-sonar-small-128k-online", 0.7),
             }
 
-            if agent_name not in provider_map:
+            if agent_name not in provider_configs:
                 logger.warning(f"Unknown agent '{agent_name}', skipping")
                 return None
 
-            cfg = provider_map[agent_name]
-            api_key = km.get_decrypted_key(cfg["key_name"])
+            provider, key_name, model, temperature = provider_configs[agent_name]
+            api_key = km.get_decrypted_key(key_name)
             if not api_key:
                 logger.warning(f"No API key for {agent_name}")
                 return None
 
             config = LLMConfig(
-                provider=cfg["provider"],
+                provider=provider,
                 api_key=api_key,
-                model=cfg["model"],
-                temperature=cfg["temperature"],
+                model=model,
+                temperature=temperature,
                 max_tokens=4096,
             )
 
-            client = create_llm_client(config)
+            client = LLMClientFactory.create(config)
             try:
                 messages = [
                     LLMMessage(role="system", content=system_message),
@@ -520,7 +505,7 @@ class StrategyController:
                 ]
                 response = await client.chat(messages)
                 logger.debug(f"🤖 {agent_name}: {response.total_tokens} tokens, {response.latency_ms:.0f}ms")
-                return response.content
+                return cast(str, response.content)
             finally:
                 await client.close()
 
@@ -654,13 +639,14 @@ class StrategyController:
         )
 
         perf = self._consensus_engine.get_performance(agent_name)
-        logger.info(
-            f"🔄 Feedback → {agent_name}: "
-            f"success_rate={perf.success_rate:.0%}, "
-            f"avg_sharpe={perf.avg_sharpe:.2f}, "
-            f"cumulative_score={perf.cumulative_score:.2f} "
-            f"(total={perf.total_strategies})"
-        )
+        if perf:
+            logger.info(
+                f"🔄 Feedback → {agent_name}: "
+                f"success_rate={perf.success_rate:.0%}, "
+                f"avg_sharpe={perf.avg_sharpe:.2f}, "
+                f"cumulative_score={perf.cumulative_score:.2f} "
+                f"(total={perf.total_strategies})"
+            )
 
     async def _run_backtest(
         self,

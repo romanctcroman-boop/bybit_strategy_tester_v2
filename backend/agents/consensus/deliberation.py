@@ -28,7 +28,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import Any, cast
+
+# Type alias for async ask function: (agent_type, prompt) -> str
+type AskFnType = Callable[[str, str], Any]  # Returns Awaitable[str] at runtime
 
 from loguru import logger
 
@@ -277,7 +280,7 @@ VERDICT: [REJECT if fatal flaws found, WEAKEN if significant issues, ACCEPT if r
     def __init__(
         self,
         agent_interface: Any | None = None,
-        ask_fn: Callable[[str, str], str] | None = None,
+        ask_fn: AskFnType | None = None,
         enable_parallel_calls: bool = True,
         enable_confidence_calibration: bool = True,
         enable_devils_advocate: bool = False,
@@ -404,7 +407,9 @@ VERDICT: [REJECT if fatal flaws found, WEAKEN if significant issues, ACCEPT if r
             # Run on last round to stress-test the emerging consensus
             if self.enable_devils_advocate and round_num == max_rounds:
                 current_opinions = await self._run_adversarial_challenge(
-                    question, current_opinions, agents,
+                    question,
+                    current_opinions,
+                    agents,
                 )
 
             # Calculate convergence
@@ -949,7 +954,8 @@ VERDICT: [REJECT if fatal flaws found, WEAKEN if significant issues, ACCEPT if r
     async def _ask_agent(self, agent_type: str, prompt: str) -> str:
         """Ask an agent for response"""
         if self.ask_fn:
-            return await self.ask_fn(agent_type, prompt)
+            result = cast(str, await self.ask_fn(agent_type, prompt))
+            return result
 
         if self.agent_interface:
             try:
