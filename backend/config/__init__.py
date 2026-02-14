@@ -66,16 +66,15 @@ from backend.config.database_policy import (
 
 __all__ = [
     "CONFIG",
-    "SETTINGS",
-    "_ns",
-    "_build_config",
-    # Database policy
+    "DAILY_INTERVAL",
     "DATA_START_DATE",
     "DATA_START_TIMESTAMP_MS",
-    "RETENTION_YEARS",
-    "MAX_RETENTION_DAYS",
-    "RETENTION_CHECK_DAYS",
-    "DAILY_INTERVAL",
     "DEFAULT_INITIAL_CANDLES",
     "MANDATORY_INTERVALS",
+    "MAX_RETENTION_DAYS",
+    "RETENTION_CHECK_DAYS",
+    "RETENTION_YEARS",
+    "SETTINGS",
+    "_build_config",
+    "_ns",
 ]

@@ -5,11 +5,14 @@ Provides asynchronous task queue functionality using Redis.
 Supports task scheduling, priority queues, and result tracking.
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import uuid
 from collections.abc import Callable
+from contextlib import suppress
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
@@ -44,8 +47,8 @@ class Task:
         self,
         func_name: str,
         args: tuple = (),
-        kwargs: dict = None,
-        task_id: str = None,
+        kwargs: dict | None = None,  # Fixed to explicitly declare as Optional
+        task_id: str | None = None,  # Fixed to explicitly declare as Optional
         priority: TaskPriority = TaskPriority.NORMAL,
         max_retries: int = 3,
         timeout: int = 300,
@@ -79,15 +82,13 @@ class Task:
             "status": self.status.value,
             "created_at": self.created_at.isoformat(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "result": self.result,
             "error": self.error,
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Task":
+    def from_dict(cls, data: dict[str, Any]) -> Task:
         """Deserialize task from dictionary."""
         task = cls(
             func_name=data["func_name"],
@@ -134,10 +135,10 @@ class QueueAdapter:
         self.redis_url = redis_url
         self.queue_name = queue_name
         self.result_ttl = result_ttl
-        self._redis = None
+        self._redis: Any = None
         self._connected = False
         self._handlers: dict[str, Callable] = {}
-        self._worker_task: asyncio.Task | None = None
+        self._worker_task: asyncio.Task | asyncio.Future | None = None
         self._stats = {
             "tasks_submitted": 0,
             "tasks_completed": 0,
@@ -253,9 +254,7 @@ class QueueAdapter:
                 "status": task.status.value,
                 "result": task.result,
                 "error": task.error,
-                "completed_at": task.completed_at.isoformat()
-                if task.completed_at
-                else None,
+                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
             }
         return None
 
@@ -303,9 +302,7 @@ class QueueAdapter:
             while True:
                 try:
                     # Get highest priority task
-                    result = await self._redis.zpopmax(
-                        f"{self.queue_name}:pending", count=1
-                    )
+                    result = await self._redis.zpopmax(f"{self.queue_name}:pending", count=1)
 
                     if not result:
                         await asyncio.sleep(0.1)
@@ -385,10 +382,8 @@ class QueueAdapter:
         """Stop the worker."""
         if self._worker_task:
             self._worker_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):  # Use contextlib.suppress instead of try-except-pass
                 await self._worker_task
-            except asyncio.CancelledError:
-                pass
             logger.info("Queue workers stopped")
 
     async def _update_task(self, task: Task):

@@ -35,12 +35,8 @@ class ComponentHealth(BaseModel):
 
     name: str = Field(..., description="Component name")
     status: str = Field(..., description="Status: healthy, degraded, unhealthy")
-    response_time_ms: float = Field(
-        ..., description="Component response time in milliseconds"
-    )
-    details: dict[str, Any] = Field(
-        default_factory=dict, description="Additional details"
-    )
+    response_time_ms: float = Field(..., description="Component response time in milliseconds")
+    details: dict[str, Any] = Field(default_factory=dict, description="Additional details")
     last_check: str = Field(..., description="ISO timestamp of last check")
 
 
@@ -49,9 +45,7 @@ class HealthDashboard(BaseModel):
 
     overall_status: str = Field(..., description="Overall system status")
     timestamp: str = Field(..., description="ISO timestamp")
-    components: list[ComponentHealth] = Field(
-        ..., description="Individual component health"
-    )
+    components: list[ComponentHealth] = Field(..., description="Individual component health")
     summary: dict[str, int] = Field(..., description="Summary counts by status")
     alerts: list[str] = Field(default_factory=list, description="Active alerts")
     agent_telemetry: dict[str, Any] | None = Field(
@@ -79,13 +73,11 @@ async def check_database_health() -> ComponentHealth:
             from backend.database import engine
 
             pool = engine.pool
-            pool_size = pool.size()
-            checked_out = pool.checkedout()
-            overflow = pool.overflow()
+            pool_size = pool.size()  # type: ignore[union-attr]
+            checked_out = pool.checkedout()  # type: ignore[union-attr]
+            overflow = pool.overflow()  # type: ignore[union-attr]
             total_capacity = pool_size + overflow
-            utilization = (
-                (checked_out / total_capacity * 100) if total_capacity > 0 else 0
-            )
+            utilization = (checked_out / total_capacity * 100) if total_capacity > 0 else 0
             response_time = (time.time() - start) * 1000
             if utilization > 90:
                 status = "degraded"
@@ -285,12 +277,14 @@ async def enhanced_health_check():
 
 @router.get("/dashboard", response_model=HealthDashboard)
 async def health_dashboard():
-    components = await asyncio.gather(
-        check_database_health(),
-        check_redis_health(),
-        check_celery_health(),
-        check_disk_health(),
-        check_api_health(),
+    components = list(
+        await asyncio.gather(
+            check_database_health(),
+            check_redis_health(),
+            check_celery_health(),
+            check_disk_health(),
+            check_api_health(),
+        )
     )
     statuses = [c.status for c in components]
     if "unhealthy" in statuses:
@@ -303,9 +297,7 @@ async def health_dashboard():
     for component in components:
         if component.status == "unhealthy":
             error_msg = component.details.get("error", "Component unhealthy")
-            alerts.append(
-                f"CRITICAL: {component.name.upper()} is unhealthy - {error_msg}"
-            )
+            alerts.append(f"CRITICAL: {component.name.upper()} is unhealthy - {error_msg}")
         elif component.status == "degraded":
             if component.name == "database":
                 util = component.details.get("utilization_pct", 0)

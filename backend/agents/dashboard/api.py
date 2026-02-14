@@ -7,12 +7,11 @@ Provides REST endpoints and WebSocket for real-time updates.
 
 from __future__ import annotations
 
-import asyncio
-import json
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket
 from loguru import logger
 from pydantic import BaseModel
 
@@ -63,7 +62,7 @@ router = APIRouter(prefix="/api/agents", tags=["AI Agents"])
 
 
 # In-memory state (replace with actual collectors in production)
-_dashboard_state = {
+_dashboard_state: dict[str, Any] = {
     "connected_clients": set(),
     "last_update": None,
 }
@@ -417,87 +416,8 @@ class ConnectionManager:
 
     async def broadcast(self, message: dict[str, Any]):
         for connection in self.active_connections:
-            try:
+            with suppress(Exception):
                 await connection.send_json(message)
-            except Exception:
-                pass
 
 
 manager = ConnectionManager()
-
-
-@router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time updates"""
-    await manager.connect(websocket)
-
-    try:
-        # Send initial state
-        await websocket.send_json(
-            {
-                "type": "connected",
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
-        )
-
-        # Keep connection alive and push updates
-        while True:
-            try:
-                # Wait for client message or timeout
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-
-                # Handle client messages
-                msg = json.loads(data)
-
-                if msg.get("type") == "subscribe":
-                    # Client subscribing to specific metrics
-                    await websocket.send_json(
-                        {
-                            "type": "subscribed",
-                            "metrics": msg.get("metrics", []),
-                        }
-                    )
-                elif msg.get("type") == "ping":
-                    await websocket.send_json({"type": "pong"})
-
-            except TimeoutError:
-                # Send heartbeat
-                await websocket.send_json(
-                    {
-                        "type": "heartbeat",
-                        "timestamp": datetime.now(UTC).isoformat(),
-                    }
-                )
-
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
-
-async def broadcast_metric_update(metric_name: str, value: Any):
-    """Broadcast metric update to all connected clients"""
-    await manager.broadcast(
-        {
-            "type": "metric_update",
-            "metric_name": metric_name,
-            "value": value,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-    )
-
-
-async def broadcast_alert(alert: dict[str, Any]):
-    """Broadcast alert to all connected clients"""
-    await manager.broadcast(
-        {
-            "type": "alert",
-            "alert": alert,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-    )
-
-
-__all__ = [
-    "broadcast_alert",
-    "broadcast_metric_update",
-    "router",
-]

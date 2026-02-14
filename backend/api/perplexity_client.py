@@ -19,7 +19,7 @@ import os
 import time
 from collections import OrderedDict
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any
 
 import httpx
 
@@ -47,7 +47,7 @@ class SimpleCache:
     """
 
     def __init__(self, max_size: int = 10, ttl_seconds: int = 60):
-        self.cache = OrderedDict()
+        self.cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self.max_size = max_size
         self.ttl_seconds = ttl_seconds
         self.stats = {"hits": 0, "misses": 0}
@@ -59,7 +59,7 @@ class SimpleCache:
         # Using SHA256 for cache keys (more secure than MD5)
         return hashlib.sha256(cache_str.encode()).hexdigest()[:16]  # Truncate for shorter keys
 
-    def get(self, query: str, **kwargs) -> Optional[dict]:
+    def get(self, query: str, **kwargs: Any) -> dict[str, Any] | None:
         """Get from cache"""
         key = self._compute_key(query, **kwargs)
 
@@ -77,7 +77,7 @@ class SimpleCache:
         self.stats["misses"] += 1
         return None
 
-    def set(self, query: str, response: dict, **kwargs):
+    def set(self, query: str, response: dict[str, Any], **kwargs):
         """Set to cache"""
         key = self._compute_key(query, **kwargs)
 
@@ -91,7 +91,7 @@ class SimpleCache:
         }
         self.cache.move_to_end(key)
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics"""
         total = self.stats["hits"] + self.stats["misses"]
         hit_rate = (self.stats["hits"] / total * 100) if total > 0 else 0
@@ -114,7 +114,7 @@ class PerplexityClient:
     - Circuit breaker ready (failure tracking)
     """
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize client with unified caching"""
         self.api_key = api_key or os.getenv("PERPLEXITY_API_KEY", "")
         self.base_url = os.getenv("PERPLEXITY_BASE_URL", "https://api.perplexity.ai")
@@ -125,7 +125,7 @@ class PerplexityClient:
 
         # Circuit breaker tracking
         self.failure_count = 0
-        self.last_failure_time = 0
+        self.last_failure_time: float = 0.0
 
         # Shared circuit breaker manager (covers DeepSeek/Perplexity across the app)
         self.breaker_name = "perplexity_api"
@@ -160,7 +160,7 @@ class PerplexityClient:
         # Check cache first
         cached = self.cache.get("ping", model="sonar")
         if cached:
-            return cached.get("success", False)
+            return bool(cached.get("success", False))
 
         async def _ping_request():
             async def _call():
@@ -195,7 +195,7 @@ class PerplexityClient:
                 response = await _ping_request()
 
             # Only 200 is truly healthy; 401/403 indicate auth issues
-            is_healthy = response.status_code == 200
+            is_healthy: bool = response.status_code == 200
 
             # Cache result
             self.cache.set("ping", {"success": is_healthy}, model="sonar")
@@ -218,7 +218,7 @@ class PerplexityClient:
         self.cache.set("ping", {"success": False}, model="sonar")
         return False
 
-    async def check_health(self) -> dict:
+    async def check_health(self) -> dict[str, Any]:
         """
         Check API health status
 

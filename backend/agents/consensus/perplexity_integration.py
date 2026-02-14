@@ -23,9 +23,12 @@ import os
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from backend.agents.llm.connections import PerplexityClient
 
 
 class PerplexityRelevance(Enum):
@@ -208,49 +211,51 @@ Format your response as JSON:
 }}
 """
 
-    def __init__(self, relevance_mode: PerplexityRelevance = PerplexityRelevance.AUTO):
-        self.relevance_mode = relevance_mode
-        self._perplexity_client = None
+    def __init__(self, config: dict[str, Any]):
+        self.config = config
+        self._perplexity_client: PerplexityClient | None = None  # Fixed type annotation
+        self._context_cache: dict[str, tuple[float, dict[str, Any]]] = {}  # Fixed to accept (timestamp, data) tuples
+        self.cache_ttl_seconds: int = int(config.get("perplexity_cache_ttl", 300))  # Ensuring it's an int
+        self.trigger_keywords = PERPLEXITY_TRIGGER_KEYWORDS
+
+        # Initialize relevance setting
+        relevance_str = config.get("perplexity_relevance", "auto").upper()
+        self.relevance_mode = PerplexityRelevance[relevance_str]
+
+        # Stats tracking
         self._stats = {
-            "calls_made": 0,
-            "calls_skipped": 0,
-            "enrichments": 0,
-            "cross_validations": 0,
-            "conflicts_detected": 0,
-            "conflicts_resolved": 0,
+            "consultations": 0,
             "cache_hits": 0,
+            "avg_response_time": 0.0,
+            "errors": 0,
         }
 
-        # TTL cache for market context enrichment (5 minutes)
-        # Key: (symbol, strategy_type) → (timestamp, response_dict)
-        self._context_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
-        self.cache_ttl_seconds: float = 300.0  # 5 minutes
-
-    def _get_client(self):
-        """Lazy-initialize Perplexity client."""
+    def get_client(self) -> PerplexityClient | None:
+        """Lazy initialization of Perplexity client."""
         if self._perplexity_client is None:
             try:
-                from backend.agents.llm.connections import LLMConfig, LLMProvider, PerplexityClient
-                from backend.security.key_manager import get_key_manager
+                # Try primary config first
+                api_key = self.config.get("perplexity_api_key") or os.getenv("PERPLEXITY_API_KEY")
+                if api_key and not api_key.startswith("pplx-YOUR-KEY"):
+                    from backend.agents.llm.connections import LLMConfig, LLMProvider, PerplexityClient
 
-                km = get_key_manager()
-                api_key = km.get_decrypted_key("PERPLEXITY_API_KEY")
-
-                config = LLMConfig(
-                    provider=LLMProvider.PERPLEXITY,
-                    api_key=api_key,
-                    model="sonar-pro",
-                    temperature=0.2,
-                    max_tokens=2048,
-                    timeout_seconds=30,
-                )
-                self._perplexity_client = PerplexityClient(config)
-                logger.info("🟣 Perplexity integration client initialized")
+                    config = LLMConfig(
+                        provider=LLMProvider.PERPLEXITY,
+                        api_key=api_key,
+                        model="sonar-pro",
+                        temperature=0.2,
+                        max_tokens=2048,
+                        timeout_seconds=30,
+                    )
+                    self._perplexity_client = PerplexityClient(config)
+                    logger.info("🟣 Perplexity integration client initialized")
+                else:
+                    logger.warning("No valid Perplexity API key found")
             except Exception as e:
                 logger.warning(f"Failed to initialize Perplexity client: {e}")
                 # Try fallback to env
                 api_key = os.getenv("PERPLEXITY_API_KEY")
-                if api_key and not api_key.startswith("pplx-YOUR"):
+                if api_key and not api_key.startswith("pplx-YOUR-KEY"):  # Fixed to use a default string check
                     from backend.agents.llm.connections import LLMConfig, LLMProvider, PerplexityClient
 
                     config = LLMConfig(
@@ -330,7 +335,7 @@ Format your response as JSON:
         context = dict(base_context or {})
 
         # ── TTL Cache Check ──
-        cache_key = (symbol, strategy_type)
+        cache_key = f"{symbol}:{strategy_type}"  # Using string as key instead of tuple
         cached = self._context_cache.get(cache_key)
         if cached is not None:
             cached_ts, cached_data = cached
@@ -346,7 +351,7 @@ Format your response as JSON:
                 )
                 return context
 
-        client = self._get_client()
+        client = self.get_client()
 
         if not client:
             logger.warning("Perplexity client not available, returning base context")
@@ -456,7 +461,7 @@ Format your response as JSON:
             agreement_score = avg_conf * (1 - conf_spread * 0.5)
         else:
             # Direction conflict — penalize based on how split they are
-            direction_counts = {}
+            direction_counts: dict[str, int] = {}
             for d in directions:
                 direction_counts[d] = direction_counts.get(d, 0) + 1
 
@@ -674,12 +679,12 @@ _integration: PerplexityIntegration | None = None
 
 
 def get_perplexity_integration(
-    relevance_mode: PerplexityRelevance = PerplexityRelevance.AUTO,
+    config: dict[str, Any] | None = None,
 ) -> PerplexityIntegration:
     """Get or create the global PerplexityIntegration instance."""
     global _integration
     if _integration is None:
-        _integration = PerplexityIntegration(relevance_mode=relevance_mode)
+        _integration = PerplexityIntegration(config or {})
         logger.info("🟣 PerplexityIntegration initialized")
     return _integration
 
