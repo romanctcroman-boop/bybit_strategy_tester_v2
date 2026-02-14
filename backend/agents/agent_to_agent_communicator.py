@@ -149,7 +149,7 @@ class AgentToAgentCommunicator:
         if not self.memory_manager:
             return
         try:
-            self.memory_manager.record_event(event, payload)
+            self.memory_manager.store_message(event, payload)
         except Exception as exc:  # pragma: no cover - logging best effort
             logger.debug(f"Telemetry write skipped ({event}): {exc}")
 

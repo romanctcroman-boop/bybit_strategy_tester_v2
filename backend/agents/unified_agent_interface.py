@@ -16,6 +16,7 @@ import asyncio
 import json
 import time
 import uuid
+from typing import Any, cast
 
 import httpx
 from dotenv import load_dotenv
@@ -47,9 +48,16 @@ except ImportError:
     logger.warning("⚠️ Metrics system not available - recording disabled")
     metrics_enabled = False
 
-    async def record_agent_call(*args, **kwargs):
-        """Stub for when metrics are unavailable"""
-        pass
+    async def record_agent_call(  # type: ignore[misc]
+        agent_name: str,
+        response_time_ms: float,
+        success: bool,
+        error: str | None = None,
+        tool_calls: int | None = None,
+        iterations: int | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """Stub for when metrics are unavailable."""
 
 
 # Load environment variables from .env
@@ -306,9 +314,13 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
 
         # Wrap MCP call with circuit breaker
         try:
-            return await self.circuit_manager.call_with_breaker(
-                "mcp_server", self._execute_mcp_call, request, start_time
+            result = cast(
+                AgentResponse,
+                await self.circuit_manager.call_with_breaker(
+                    "mcp_server", self._execute_mcp_call, request, start_time
+                ),
             )
+            return result
 
         except CircuitBreakerError as e:
             # Circuit breaker is open
@@ -402,8 +414,11 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
 
         # Wrap API call with circuit breaker
         try:
-            response = await self.circuit_manager.call_with_breaker(
-                breaker_name, self._execute_api_call, request, start_time
+            response = cast(
+                AgentResponse,
+                await self.circuit_manager.call_with_breaker(
+                    breaker_name, self._execute_api_call, request, start_time
+                ),
             )
             return response
 
@@ -462,7 +477,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
         # Retry configuration
         MAX_RETRIES = 3
         retry_attempt = 0
-        last_exception = None
+        last_exception: Exception | None = None
         first_error = None  # ✅ FIX: Track first error to avoid misleading logs
 
         while retry_attempt < MAX_RETRIES:
