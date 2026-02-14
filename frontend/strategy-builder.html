@@ -570,10 +570,22 @@
           </div>
           <div class="modal-body">
             <div class="strategies-list-toolbar">
-              <label for="strategiesSearch" class="visually-hidden">Search strategies</label>
-              <input type="text" class="search-input" id="strategiesSearch"
-                placeholder="Search strategies..." title="Search strategies" />
-              <span class="strategies-count" id="strategiesCount"></span>
+              <div class="strategies-toolbar-left">
+                <label class="strategies-select-all" title="Select all">
+                  <input type="checkbox" id="strategiesSelectAll" />
+                  <span>All</span>
+                </label>
+                <button class="btn btn-sm btn-danger strategies-batch-delete" id="btnBatchDelete"
+                  style="display:none;" title="Delete selected">
+                  <i class="bi bi-trash"></i> Delete Selected (<span id="batchDeleteCount">0</span>)
+                </button>
+              </div>
+              <div class="strategies-toolbar-right">
+                <label for="strategiesSearch" class="visually-hidden">Search strategies</label>
+                <input type="text" class="search-input" id="strategiesSearch"
+                  placeholder="Search strategies..." title="Search strategies" />
+                <span class="strategies-count" id="strategiesCount"></span>
+              </div>
             </div>
             <div class="strategies-list" id="strategiesList">
               <p class="text-muted text-center">Loading...</p>

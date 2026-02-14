@@ -14149,6 +14149,14 @@ function initCspCompliantListeners() {
   const strategiesSearch = document.getElementById('strategiesSearch');
   if (strategiesSearch) strategiesSearch.addEventListener('input', filterStrategiesList);
 
+  // Select All checkbox
+  const selectAllCb = document.getElementById('strategiesSelectAll');
+  if (selectAllCb) selectAllCb.addEventListener('change', toggleSelectAll);
+
+  // Batch Delete button
+  const batchDeleteBtn = document.getElementById('btnBatchDelete');
+  if (batchDeleteBtn) batchDeleteBtn.addEventListener('click', batchDeleteSelected);
+
   // Close My Strategies modal on overlay click
   const myStrategiesModal = document.getElementById('myStrategiesModal');
   if (myStrategiesModal) {
@@ -14165,6 +14173,7 @@ function initCspCompliantListeners() {
 // ============================================
 
 let _strategiesCache = [];
+const _selectedStrategyIds = new Set();
 
 /**
  * Fetch saved strategies from the backend API
@@ -14190,6 +14199,9 @@ async function openMyStrategiesModal() {
   const modal = document.getElementById('myStrategiesModal');
   if (!modal) return;
 
+  _selectedStrategyIds.clear();
+  updateBatchDeleteUI();
+
   modal.classList.add('active');
   const listEl = document.getElementById('strategiesList');
   if (listEl) listEl.innerHTML = '<p class="text-muted text-center">Loading...</p>';
@@ -14204,6 +14216,7 @@ async function openMyStrategiesModal() {
 function closeMyStrategiesModal() {
   const modal = document.getElementById('myStrategiesModal');
   if (modal) modal.classList.remove('active');
+  _selectedStrategyIds.clear();
 }
 
 /**
@@ -14223,6 +14236,7 @@ function renderStrategiesList(strategies) {
         <p>No saved strategies yet</p>
         <p class="text-sm mt-1">Use the Save button to save your first strategy</p>
       </div>`;
+    updateBatchDeleteUI();
     return;
   }
 
@@ -14233,9 +14247,13 @@ function renderStrategiesList(strategies) {
       ? new Date(s.updated_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
       : '—';
     const isCurrent = s.id === currentId;
+    const isSelected = _selectedStrategyIds.has(s.id);
 
     return `
-      <div class="strategy-card${isCurrent ? ' current' : ''}" data-strategy-id="${s.id}">
+      <div class="strategy-card${isCurrent ? ' current' : ''}${isSelected ? ' selected' : ''}" data-strategy-id="${s.id}">
+        <div class="strategy-card-checkbox" data-checkbox-id="${s.id}">
+          <input type="checkbox" ${isSelected ? 'checked' : ''} data-select-strategy="${s.id}" title="Select" />
+        </div>
         <div class="strategy-card-info">
           <div class="strategy-card-name">${escapeHtml(s.name || 'Untitled')}${isCurrent ? ' <span class="badge-current">current</span>' : ''}</div>
           <div class="strategy-card-meta">
@@ -14262,12 +14280,36 @@ function renderStrategiesList(strategies) {
   // Event delegation for card actions (remove previous to avoid duplicates)
   listEl.removeEventListener('click', handleStrategyCardAction);
   listEl.addEventListener('click', handleStrategyCardAction);
+
+  updateBatchDeleteUI();
 }
 
 /**
- * Handle click events on strategy cards (open / clone / delete)
+ * Handle click events on strategy cards (open / clone / delete / checkbox)
  */
 async function handleStrategyCardAction(e) {
+  // Handle checkbox clicks
+  const checkbox = e.target.closest('[data-select-strategy]');
+  if (checkbox) {
+    e.stopPropagation();
+    const strategyId = checkbox.dataset.selectStrategy;
+    if (checkbox.checked) {
+      _selectedStrategyIds.add(strategyId);
+    } else {
+      _selectedStrategyIds.delete(strategyId);
+    }
+    // Toggle selected class on card
+    const card = checkbox.closest('.strategy-card');
+    if (card) card.classList.toggle('selected', checkbox.checked);
+    updateBatchDeleteUI();
+    return;
+  }
+
+  // Handle checkbox container clicks (prevent card open)
+  if (e.target.closest('.strategy-card-checkbox')) {
+    return;
+  }
+
   const actionBtn = e.target.closest('[data-action]');
   if (!actionBtn) {
     // Click on the card itself — open
@@ -14293,6 +14335,79 @@ async function handleStrategyCardAction(e) {
     await cloneStrategy(id, name);
   } else if (action === 'delete') {
     await deleteStrategyById(id, name);
+  }
+}
+
+/**
+ * Toggle select all / deselect all strategies
+ */
+function toggleSelectAll() {
+  const selectAllCb = document.getElementById('strategiesSelectAll');
+  const isChecked = selectAllCb?.checked || false;
+  const visibleCards = document.querySelectorAll('.strategy-card[data-strategy-id]');
+
+  visibleCards.forEach(card => {
+    const strategyId = card.dataset.strategyId;
+    const cb = card.querySelector('[data-select-strategy]');
+    if (cb) cb.checked = isChecked;
+    if (isChecked) {
+      _selectedStrategyIds.add(strategyId);
+      card.classList.add('selected');
+    } else {
+      _selectedStrategyIds.delete(strategyId);
+      card.classList.remove('selected');
+    }
+  });
+
+  updateBatchDeleteUI();
+}
+
+/**
+ * Update the batch delete button visibility and count
+ */
+function updateBatchDeleteUI() {
+  const btn = document.getElementById('btnBatchDelete');
+  const countEl = document.getElementById('batchDeleteCount');
+  const selectAllCb = document.getElementById('strategiesSelectAll');
+
+  const count = _selectedStrategyIds.size;
+  if (btn) btn.style.display = count > 0 ? 'flex' : 'none';
+  if (countEl) countEl.textContent = count;
+
+  // Update select all checkbox state
+  if (selectAllCb) {
+    const visibleCards = document.querySelectorAll('.strategy-card[data-strategy-id]');
+    const totalVisible = visibleCards.length;
+    selectAllCb.checked = totalVisible > 0 && count >= totalVisible;
+    selectAllCb.indeterminate = count > 0 && count < totalVisible;
+  }
+}
+
+/**
+ * Batch delete selected strategies
+ */
+async function batchDeleteSelected() {
+  const count = _selectedStrategyIds.size;
+  if (count === 0) return;
+
+  if (!confirm(`Delete ${count} selected strateg${count === 1 ? 'y' : 'ies'}?\nThis action cannot be undone.`)) return;
+
+  try {
+    const resp = await fetch('/api/v1/strategy-builder/strategies/batch-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strategy_ids: Array.from(_selectedStrategyIds) })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    showNotification(`Deleted ${data.deleted_count} strateg${data.deleted_count === 1 ? 'y' : 'ies'}`, 'success');
+    _selectedStrategyIds.clear();
+    // Refresh the list
+    const strategies = await fetchStrategiesList();
+    renderStrategiesList(strategies);
+  } catch (err) {
+    console.error('[My Strategies] Batch delete failed:', err);
+    showNotification('Failed to delete strategies', 'error');
   }
 }
 
@@ -14328,6 +14443,7 @@ async function deleteStrategyById(strategyId, name) {
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     showNotification(`Strategy "${name}" deleted`, 'success');
+    _selectedStrategyIds.delete(strategyId);
     // Refresh the list
     const strategies = await fetchStrategiesList();
     renderStrategiesList(strategies);
@@ -14439,6 +14555,8 @@ window.closeMyStrategiesModal = closeMyStrategiesModal;
 window.fetchStrategiesList = fetchStrategiesList;
 window.deleteStrategyById = deleteStrategyById;
 window.cloneStrategy = cloneStrategy;
+window.batchDeleteSelected = batchDeleteSelected;
+window.toggleSelectAll = toggleSelectAll;
 
 // ============================================
 // WEBSOCKET VALIDATION INTEGRATION

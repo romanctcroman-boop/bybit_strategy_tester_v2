@@ -440,6 +440,45 @@ async def create_strategy(request: CreateStrategyRequest, db: Session = Depends(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+@router.post("/strategies/batch-delete")
+async def batch_delete_strategies(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Batch delete multiple strategy builder strategies (soft delete)"""
+    body = await request.json()
+    strategy_ids = body.get("strategy_ids", [])
+    if not strategy_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No strategy IDs provided",
+        )
+
+    strategies = (
+        db.query(Strategy)
+        .filter(
+            Strategy.id.in_(strategy_ids),
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
+        )
+        .all()
+    )
+
+    deleted_ids = []
+    for s in strategies:
+        s.is_deleted = True
+        s.deleted_at = datetime.now(UTC)
+        deleted_ids.append(s.id)
+
+    db.commit()
+
+    return {
+        "status": "deleted",
+        "deleted_count": len(deleted_ids),
+        "deleted_ids": deleted_ids,
+    }
+
+
 @router.get("/strategies/{strategy_id}", response_model=StrategyResponse)
 async def get_strategy(strategy_id: str, db: Session = Depends(get_db)):
     """Get a strategy builder strategy by ID"""
@@ -723,22 +762,68 @@ async def delete_strategy(strategy_id: str, db: Session = Depends(get_db)):
     return {"status": "deleted", "strategy_id": strategy_id}
 
 
-@router.post("/strategies/{strategy_id}/clone", response_model=StrategyResponse)
-async def clone_strategy(strategy_id: str, new_name: str | None = None):
-    """Clone a strategy"""
-    if strategy_id not in strategy_builder.strategies:
+@router.post("/strategies/{strategy_id}/clone")
+async def clone_strategy(
+    strategy_id: str,
+    new_name: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Clone a strategy builder strategy in the database"""
+    import uuid
+
+    db_strategy = (
+        db.query(Strategy)
+        .filter(
+            Strategy.id == strategy_id,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
+        )
+        .first()
+    )
+    if not db_strategy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Strategy {strategy_id} not found",
         )
 
-    original = strategy_builder.strategies[strategy_id]
-    cloned = strategy_builder.clone_strategy(original)
+    clone_name = new_name or f"{db_strategy.name} (copy)"
+    cloned = Strategy(
+        id=str(uuid.uuid4()),
+        name=clone_name,
+        description=db_strategy.description,
+        strategy_type=db_strategy.strategy_type,
+        status=StrategyStatus.DRAFT,
+        parameters=db_strategy.parameters,
+        symbol=db_strategy.symbol,
+        timeframe=db_strategy.timeframe,
+        market_type=db_strategy.market_type,
+        direction=db_strategy.direction,
+        initial_capital=db_strategy.initial_capital,
+        position_size=db_strategy.position_size,
+        stop_loss_pct=db_strategy.stop_loss_pct,
+        take_profit_pct=db_strategy.take_profit_pct,
+        max_drawdown_pct=db_strategy.max_drawdown_pct,
+        builder_graph=db_strategy.builder_graph,
+        builder_blocks=db_strategy.builder_blocks,
+        builder_connections=db_strategy.builder_connections,
+        is_builder_strategy=True,
+        tags=db_strategy.tags,
+    )
+    db.add(cloned)
+    db.commit()
+    db.refresh(cloned)
 
-    if new_name:
-        cloned.name = new_name
-
-    return cloned.to_dict()
+    return {
+        "id": cloned.id,
+        "name": cloned.name,
+        "description": cloned.description,
+        "block_count": len(cloned.builder_blocks) if cloned.builder_blocks else 0,
+        "connection_count": len(cloned.builder_connections) if cloned.builder_connections else 0,
+        "timeframe": cloned.timeframe,
+        "symbol": cloned.symbol,
+        "created_at": cloned.created_at.isoformat() if cloned.created_at else None,
+        "updated_at": cloned.updated_at.isoformat() if cloned.updated_at else None,
+    }
 
 
 # === Block Endpoints ===
