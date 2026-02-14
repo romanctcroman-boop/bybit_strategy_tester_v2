@@ -7,7 +7,7 @@ Endpoints for viewing and managing API cost tracking.
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from backend.monitoring.cost_tracker import get_cost_tracker
+from backend.agents.cost_tracker import get_cost_tracker
 
 router = APIRouter(prefix="/api/v1/costs", tags=["Cost Dashboard"])
 

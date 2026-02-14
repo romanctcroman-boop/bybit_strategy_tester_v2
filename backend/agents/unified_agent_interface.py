@@ -634,7 +634,7 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                     # Record cost for dashboard tracking
                     if token_usage and token_usage.cost_usd:
                         try:
-                            from backend.monitoring.cost_tracker import record_api_cost
+                            from backend.agents.cost_tracker import record_api_cost
 
                             record_api_cost(
                                 agent=request.agent_type.value,
