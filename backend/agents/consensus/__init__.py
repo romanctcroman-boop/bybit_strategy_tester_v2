@@ -40,6 +40,13 @@ from backend.agents.consensus.perplexity_integration import (
     PerplexityRelevance,
     get_perplexity_integration,
 )
+from backend.agents.consensus.risk_veto_guard import (
+    RiskVetoGuard,
+    VetoConfig,
+    VetoDecision,
+    VetoReason,
+    get_risk_veto_guard,
+)
 
 __all__ = [
     "AgentPerformance",
@@ -58,7 +65,12 @@ __all__ = [
     "PerplexityIntegration",
     "PerplexityRelevance",
     "RiskManagementAgent",
+    "RiskVetoGuard",
     "TradingStrategyAgent",
+    "VetoConfig",
+    "VetoDecision",
+    "VetoReason",
     "VotingStrategy",
     "get_perplexity_integration",
+    "get_risk_veto_guard",
 ]
