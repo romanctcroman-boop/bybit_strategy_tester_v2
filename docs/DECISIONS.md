@@ -12,9 +12,9 @@
 
 - Не хардкодить абсолютные пути вида `d:\bybit_strategy_tester_v2` в коде и тестах.
 - Использовать:
-  - `Path(__file__).resolve().parents[N]` для корня проекта/модуля;
-  - `os.environ.get("DATABASE_PATH", str(ROOT / "data.sqlite3"))` для БД;
-  - `os.environ.get("CACHE_DIR", ...)` для кэша.
+    - `Path(__file__).resolve().parents[N]` для корня проекта/модуля;
+    - `os.environ.get("DATABASE_PATH", str(ROOT / "data.sqlite3"))` для БД;
+    - `os.environ.get("CACHE_DIR", ...)` для кэша.
 - В скриптах: `sys.path.insert(0, str(ROOT))` вместо жёсткого пути к репозиторию.
 
 **Ссылка:** `.cursor/rules/project.mdc`, `docs/CURSOR_RULES_ANALYSIS.md`.

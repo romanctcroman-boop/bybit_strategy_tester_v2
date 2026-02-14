@@ -218,7 +218,13 @@ Format your response as JSON:
             "cross_validations": 0,
             "conflicts_detected": 0,
             "conflicts_resolved": 0,
+            "cache_hits": 0,
         }
+
+        # TTL cache for market context enrichment (5 minutes)
+        # Key: (symbol, strategy_type) → (timestamp, response_dict)
+        self._context_cache: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
+        self.cache_ttl_seconds: float = 300.0  # 5 minutes
 
     def _get_client(self):
         """Lazy-initialize Perplexity client."""
@@ -310,6 +316,9 @@ Format your response as JSON:
         Called BEFORE sending prompts to DeepSeek/Qwen so they can
         incorporate market context into their analysis.
 
+        Uses a TTL cache (default 5 minutes) to avoid duplicate API calls
+        for the same symbol+strategy_type within the cache window.
+
         Args:
             symbol: Trading symbol (e.g., "BTCUSDT")
             strategy_type: Strategy being analyzed
@@ -319,6 +328,24 @@ Format your response as JSON:
             Enriched context dict with market_context field
         """
         context = dict(base_context or {})
+
+        # ── TTL Cache Check ──
+        cache_key = (symbol, strategy_type)
+        cached = self._context_cache.get(cache_key)
+        if cached is not None:
+            cached_ts, cached_data = cached
+            age = time.time() - cached_ts
+            if age < self.cache_ttl_seconds:
+                self._stats["cache_hits"] += 1
+                context["market_context"] = cached_data
+                context["perplexity_cache_hit"] = True
+                context["perplexity_cache_age_s"] = round(age, 1)
+                logger.debug(
+                    f"🟣 Perplexity cache HIT for {symbol}/{strategy_type} "
+                    f"(age={age:.0f}s, TTL={self.cache_ttl_seconds}s)"
+                )
+                return context
+
         client = self._get_client()
 
         if not client:
@@ -368,6 +395,12 @@ Format your response as JSON:
             context["market_context"] = market_data
             context["perplexity_latency_ms"] = response.latency_ms
             context["perplexity_tokens"] = response.total_tokens
+            context["perplexity_cache_hit"] = False
+
+            # Store in TTL cache (only valid responses, not parse errors)
+            if not market_data.get("parse_error"):
+                self._context_cache[cache_key] = (time.time(), market_data)
+                self._evict_expired_cache()
 
             logger.info(
                 f"🟣 Context enriched for {symbol}: "
@@ -586,11 +619,48 @@ Format your response as JSON:
     # ─── Stats & Monitoring ───────────────────────────────────────────
 
     def get_stats(self) -> dict[str, Any]:
-        """Get integration statistics."""
-        return dict(self._stats)
+        """Get integration statistics including cache metrics."""
+        stats = dict(self._stats)
+        stats["cache_size"] = len(self._context_cache)
+        stats["cache_ttl_seconds"] = self.cache_ttl_seconds
+        return stats
+
+    # ─── Cache Management ─────────────────────────────────────────────
+
+    def _evict_expired_cache(self) -> None:
+        """Remove expired entries from the context cache."""
+        now = time.time()
+        expired_keys = [key for key, (ts, _) in self._context_cache.items() if now - ts >= self.cache_ttl_seconds]
+        for key in expired_keys:
+            del self._context_cache[key]
+
+    def invalidate_cache(self, symbol: str | None = None) -> int:
+        """
+        Invalidate cached context data.
+
+        Args:
+            symbol: If provided, only invalidate entries for this symbol.
+                    If None, clear the entire cache.
+
+        Returns:
+            Number of entries removed
+        """
+        if symbol is None:
+            count = len(self._context_cache)
+            self._context_cache.clear()
+            logger.info(f"🟣 Perplexity cache cleared ({count} entries)")
+            return count
+
+        keys_to_remove = [key for key in self._context_cache if key[0] == symbol]
+        for key in keys_to_remove:
+            del self._context_cache[key]
+        if keys_to_remove:
+            logger.info(f"🟣 Perplexity cache invalidated for {symbol} ({len(keys_to_remove)} entries)")
+        return len(keys_to_remove)
 
     async def close(self) -> None:
-        """Close Perplexity client."""
+        """Close Perplexity client and clear cache."""
+        self._context_cache.clear()
         if self._perplexity_client:
             await self._perplexity_client.close()
             self._perplexity_client = None
