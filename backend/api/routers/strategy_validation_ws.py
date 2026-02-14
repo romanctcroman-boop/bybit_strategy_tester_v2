@@ -17,7 +17,7 @@ import json
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
@@ -755,6 +755,19 @@ def validate_connection(
     return ValidationResult(valid=valid, messages=messages)
 
 
+def _get_target_port(conn: dict[str, Any]) -> str:
+    """Extract target port ID from a connection dict.
+
+    Handles two serialization formats:
+    - Nested: ``{"target": {"blockId": "...", "portId": "entry_long"}}``
+    - Flat:   ``{"target_input": "entry_long"}``
+    """
+    target = conn.get("target")
+    if isinstance(target, dict):
+        return cast(str, target.get("portId", ""))
+    return cast(str, conn.get("target_input", ""))
+
+
 def validate_strategy(
     blocks: list[dict[str, Any]],
     connections: list[dict[str, Any]],
@@ -763,46 +776,82 @@ def validate_strategy(
     messages: list[ValidationMessage] = []
 
     # Check for entry points
+    # Support two paradigms:
+    #   1. Standalone entry_long / entry_short blocks (legacy)
+    #   2. Connections targeting entry_long / entry_short *ports*
+    #      on a main strategy node (visual builder)
     has_entry_long = any(b.get("type") == "entry_long" for b in blocks)
     has_entry_short = any(b.get("type") == "entry_short" for b in blocks)
 
     if not has_entry_long and not has_entry_short:
-        messages.append(
-            ValidationMessage(
-                severity=ValidationSeverity.ERROR,
-                message="Strategy must have at least one entry block (entry_long or entry_short)",
-                code="NO_ENTRY",
+        # Check connections to entry_long / entry_short ports on strategy node
+        entry_ports = {"entry_long", "entry_short"}
+        has_entry_connection = any(_get_target_port(conn) in entry_ports for conn in connections)
+        if not has_entry_connection:
+            messages.append(
+                ValidationMessage(
+                    severity=ValidationSeverity.ERROR,
+                    message="Strategy must have at least one entry block (entry_long or entry_short)",
+                    code="NO_ENTRY",
+                )
             )
-        )
 
     # Check for exit points
     exit_block_types = [
-        "exit_long", "exit_short", "stop_loss", "take_profit", "trailing_stop",
+        "exit_long",
+        "exit_short",
+        "stop_loss",
+        "take_profit",
+        "trailing_stop",
         # DCA Close Conditions
-        "rsi_close", "stoch_close", "channel_close", "ma_close", "psar_close", "time_bars_close",
+        "rsi_close",
+        "stoch_close",
+        "channel_close",
+        "ma_close",
+        "psar_close",
+        "time_bars_close",
     ]
     has_exit = any(b.get("type") in exit_block_types for b in blocks)
 
     if not has_exit:
-        messages.append(
-            ValidationMessage(
-                severity=ValidationSeverity.WARNING,
-                message="Strategy has no exit blocks - positions may not close properly",
-                code="NO_EXIT",
+        # Also check connections targeting exit ports on strategy node
+        exit_ports = {"exit_long", "exit_short"}
+        has_exit_connection = any(_get_target_port(conn) in exit_ports for conn in connections)
+        if not has_exit_connection:
+            messages.append(
+                ValidationMessage(
+                    severity=ValidationSeverity.WARNING,
+                    message="Strategy has no exit blocks - positions may not close properly",
+                    code="NO_EXIT",
+                )
             )
-        )
 
     # Check for unconnected blocks
     connected_blocks = set()
     for conn in connections:
-        connected_blocks.add(conn.get("source_block_id"))
-        connected_blocks.add(conn.get("target_block_id"))
+        # Handle both flat and nested connection formats
+        source = conn.get("source")
+        target = conn.get("target")
+        if isinstance(source, dict):
+            connected_blocks.add(source.get("blockId"))
+        else:
+            connected_blocks.add(conn.get("source_block_id"))
+        if isinstance(target, dict):
+            connected_blocks.add(target.get("blockId"))
+        else:
+            connected_blocks.add(conn.get("target_block_id"))
 
     for block in blocks:
         block_id = block.get("id")
         block_type = block.get("type", "")
-        # Entry/exit blocks don't need to be connected to something
-        is_entry_exit = block_type in ["entry_long", "entry_short", "exit_long", "exit_short"]
+        # Entry/exit blocks and main strategy node don't need to be connected
+        is_entry_exit = block_type in [
+            "entry_long",
+            "entry_short",
+            "exit_long",
+            "exit_short",
+            "strategy",
+        ]
         if not is_entry_exit and block_id and block_id not in connected_blocks:
             messages.append(
                 ValidationMessage(
