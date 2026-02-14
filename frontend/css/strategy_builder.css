@@ -1025,25 +1025,26 @@ body {
 }
 
 .strategy-block.main-block {
-    /* Premium circular design */
-    width: 130px;
-    height: 130px;
-    min-width: 130px;
-    min-height: 130px;
-    border-radius: 50%;
+    /* Premium rectangular design */
+    width: 140px;
+    height: 160px;
+    min-width: 140px;
+    min-height: 160px;
+    border-radius: 10px;
     border: none;
-    background: 
+    background:
     /* Inner glow */
-        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
         /* Main gradient */
-        radial-gradient(
-                circle at 30% 25%,
+        linear-gradient(
+                135deg,
                 rgba(180, 50, 120, 0.6) 0%,
                 rgba(120, 30, 90, 0.7) 30%,
                 rgba(60, 15, 50, 0.85) 70%,
                 rgba(30, 10, 35, 0.95) 100%
             );
     padding: 0;
+    padding-left: 18px;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -1074,7 +1075,7 @@ body {
     left: 3px;
     right: 3px;
     bottom: 3px;
-    border-radius: 50%;
+    border-radius: 8px;
     border: 1px solid rgba(255, 150, 200, 0.2);
     pointer-events: none;
 }
@@ -1086,7 +1087,7 @@ body {
     left: -2px;
     right: -2px;
     bottom: -2px;
-    border-radius: 50%;
+    border-radius: 12px;
     border: 2px solid rgba(220, 38, 127, 0.6);
     pointer-events: none;
     transition: all 0.3s ease;
@@ -1126,48 +1127,44 @@ body {
     display: none;
 }
 
-/* Port labels inside the circle - positioned in their own space */
+/* Port labels - positioned next to ports on left side */
 .strategy-block.main-block .main-port-label {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
     white-space: nowrap;
-    letter-spacing: 1.5px;
+    letter-spacing: 1px;
     text-transform: uppercase;
     position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 20px;
 }
 
-.strategy-block.main-block .main-port-label.top-label {
-    top: 22px;
+.strategy-block.main-block .main-port-label.entry-label {
     color: #4ade80;
     text-shadow:
         0 0 8px rgba(74, 222, 128, 0.6),
         0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-.strategy-block.main-block .main-port-label.bottom-label {
-    bottom: 22px;
+.strategy-block.main-block .main-port-label.exit-label {
     color: #f87171;
     text-shadow:
         0 0 8px rgba(248, 113, 113, 0.6),
         0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-/* Ports positioned absolutely outside the circle */
-.strategy-block.main-block .main-port-top {
+/* Ports positioned absolutely on the left side of the rectangle */
+.strategy-block.main-block .main-port-left {
     position: absolute;
-    top: -10px;
-    transform: translateX(-50%);
+    left: -10px;
+    transform: translateY(-50%);
     z-index: 10;
+}
+
+.strategy-block.main-block .main-port-left.entry-port {
     animation: pulseGreen 2s ease-in-out infinite;
 }
 
-.strategy-block.main-block .main-port-bottom {
-    position: absolute;
-    bottom: -10px;
-    transform: translateX(-50%);
-    z-index: 10;
+.strategy-block.main-block .main-port-left.exit-port {
     animation: pulseRed 2s ease-in-out infinite;
 }
 
@@ -1215,7 +1212,7 @@ body {
     border-style: solid;
 }
 
-/* Entry ports - green (top) */
+/* Entry ports - green */
 .strategy-block.main-block .port[data-port-id='entry_long'],
 .strategy-block.main-block .port[data-port-id='entry_short'] {
     border-color: #4ade80;
@@ -1231,11 +1228,11 @@ body {
         0 0 25px rgba(74, 222, 128, 1),
         0 0 50px rgba(74, 222, 128, 0.6),
         inset 0 0 10px rgba(255, 255, 255, 0.5);
-    transform: translateX(-50%) scale(1.3);
+    transform: translateY(-50%) scale(1.3);
     animation: none;
 }
 
-/* Exit ports - red (bottom) */
+/* Exit ports - red */
 .strategy-block.main-block .port[data-port-id='exit_long'],
 .strategy-block.main-block .port[data-port-id='exit_short'] {
     border-color: #f87171;
@@ -1251,7 +1248,7 @@ body {
         0 0 25px rgba(248, 113, 113, 1),
         0 0 50px rgba(248, 113, 113, 0.6),
         inset 0 0 10px rgba(255, 255, 255, 0.5);
-    transform: translateX(-50%) scale(1.3);
+    transform: translateY(-50%) scale(1.3);
     animation: none;
 }
 

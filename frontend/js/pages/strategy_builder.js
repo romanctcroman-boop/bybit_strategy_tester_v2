@@ -3335,8 +3335,8 @@ function setupEventListeners() {
       blocksOriginalPositions.clear();
 
       strategyBlocks.forEach(function (block) {
-        // Get block width (main node is 130px, others ~180-280px)
-        const blockWidth = block.isMain ? 130 : 200;
+        // Get block width (main node is 140px, others ~180-280px)
+        const blockWidth = block.isMain ? 140 : 200;
         const blockRightEdge = block.x + blockWidth;
 
         // If block's right edge extends past threshold, it needs to move
@@ -8430,59 +8430,55 @@ function renderPorts(ports, direction, blockId) {
   `;
 }
 
-// Special render for main Strategy node with ports on all sides
+// Special render for main Strategy node — rectangular with ports on left side
 function renderMainStrategyNode(block, _ports) {
   return `
     <div class="strategy-block main main-block main-strategy-node"
          id="${block.id}"
          style="left: ${block.x}px; top: ${block.y}px"
          data-block-id="${block.id}">
-        <!-- Entry Long port on top-left -->
-        <div class="port condition-port main-port-top" 
+        <!-- Entry Long port -->
+        <div class="port condition-port main-port-left entry-port" 
              data-port-id="entry_long" 
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Long"
-             style="left: 30%;"></div>
+             style="top: 18%;"></div>
+        <span class="main-port-label entry-label" style="top: 18%; transform: translateY(-50%);">Entry L</span>
         
-        <!-- Entry Short port on top-right -->
-        <div class="port condition-port main-port-top" 
+        <!-- Entry Short port -->
+        <div class="port condition-port main-port-left entry-port" 
              data-port-id="entry_short" 
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Short"
-             style="left: 70%;"></div>
+             style="top: 40%;"></div>
+        <span class="main-port-label entry-label" style="top: 40%; transform: translateY(-50%);">Entry S</span>
         
-        <!-- Entry labels -->
-        <span class="main-port-label top-label" style="left: 30%; transform: translateX(-50%);">Entry L</span>
-        <span class="main-port-label top-label" style="left: 70%; transform: translateX(-50%);">Entry S</span>
-        
-        <!-- Center title -->
-        <div class="main-block-title">${block.name}</div>
-        
-        <!-- Exit labels -->
-        <span class="main-port-label bottom-label" style="left: 30%; transform: translateX(-50%);">Exit L</span>
-        <span class="main-port-label bottom-label" style="left: 70%; transform: translateX(-50%);">Exit S</span>
-        
-        <!-- Exit Long port on bottom-left -->
-        <div class="port condition-port main-port-bottom" 
+        <!-- Exit Long port -->
+        <div class="port condition-port main-port-left exit-port" 
              data-port-id="exit_long" 
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
              title="Exit Long"
-             style="left: 30%;"></div>
+             style="top: 62%;"></div>
+        <span class="main-port-label exit-label" style="top: 62%; transform: translateY(-50%);">Exit L</span>
         
-        <!-- Exit Short port on bottom-right -->
-        <div class="port condition-port main-port-bottom" 
+        <!-- Exit Short port -->
+        <div class="port condition-port main-port-left exit-port" 
              data-port-id="exit_short" 
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
              title="Exit Short"
-             style="left: 70%;"></div>
+             style="top: 82%;"></div>
+        <span class="main-port-label exit-label" style="top: 82%; transform: translateY(-50%);">Exit S</span>
+        
+        <!-- Center title -->
+        <div class="main-block-title">${block.name}</div>
     </div>
   `;
 }
