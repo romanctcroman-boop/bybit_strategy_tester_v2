@@ -4023,6 +4023,159 @@ body {
     gap: 12px;
 }
 
+/* ============================================
+   MY STRATEGIES MODAL
+   ============================================ */
+.strategies-list-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.strategies-list-toolbar .search-input {
+    flex: 1;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.strategies-list-toolbar .search-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.strategies-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.strategies-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 120px;
+}
+
+.strategy-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.strategy-card:hover {
+    border-color: var(--accent-blue);
+    background: rgba(88, 166, 255, 0.06);
+}
+
+.strategy-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.strategy-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.strategy-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.strategy-card-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.strategy-card-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.strategy-card-actions .btn-icon-sm {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+}
+
+.strategy-card-actions .btn-icon-sm:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.strategy-card-actions .btn-icon-sm.btn-danger:hover {
+    border-color: var(--accent-red, #f85149);
+    color: var(--accent-red, #f85149);
+}
+
+.strategies-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.strategies-empty i {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+}
+
+.strategies-empty p {
+    font-size: 14px;
+    margin: 0;
+}
+
+.strategy-card.current {
+    border-color: var(--accent-blue);
+    background: rgba(88, 166, 255, 0.05);
+}
+
+.badge-current {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--accent-blue);
+    color: #fff;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
 /* Zoom controls — в правом нижнем углу canvas */
 .zoom-controls {
     position: absolute;

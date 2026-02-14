@@ -49,6 +49,9 @@
         </span>
       </div>
       <div class="navbar-actions">
+        <button class="btn btn-secondary" id="btnMyStrategies" title="My saved strategies">
+          <i class="bi bi-folder2-open"></i> My Strategies
+        </button>
         <button class="btn btn-secondary hidden" id="btnVersions" title="Версии стратегии">
           <i class="bi bi-clock-history"></i> Versions
         </button>
@@ -554,6 +557,33 @@
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" id="btnCloseVersions">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Strategies Modal -->
+      <div class="modal-overlay" id="myStrategiesModal">
+        <div class="modal">
+          <div class="modal-header">
+            <h3 class="modal-title"><i class="bi bi-folder2-open"></i> My Strategies</h3>
+            <button class="modal-close" id="btnCloseMyStrategies">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="strategies-list-toolbar">
+              <label for="strategiesSearch" class="visually-hidden">Search strategies</label>
+              <input type="text" class="search-input" id="strategiesSearch"
+                placeholder="Search strategies..." title="Search strategies" />
+              <span class="strategies-count" id="strategiesCount"></span>
+            </div>
+            <div class="strategies-list" id="strategiesList">
+              <p class="text-muted text-center">Loading...</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" id="btnCloseMyStrategies2">Close</button>
+            <button class="btn btn-primary" id="btnNewStrategy">
+              <i class="bi bi-plus-lg"></i> New Strategy
+            </button>
           </div>
         </div>
       </div>

@@ -14130,7 +14130,228 @@ function initCspCompliantListeners() {
   const aiPresetSelect = document.getElementById('aiPreset');
   if (aiPresetSelect) aiPresetSelect.addEventListener('change', applyAiPreset);
 
+  // My Strategies Modal buttons
+  const myStrategiesBtn = document.getElementById('btnMyStrategies');
+  if (myStrategiesBtn) myStrategiesBtn.addEventListener('click', openMyStrategiesModal);
+
+  const closeMyStrategiesBtn = document.getElementById('btnCloseMyStrategies');
+  if (closeMyStrategiesBtn) closeMyStrategiesBtn.addEventListener('click', closeMyStrategiesModal);
+
+  const closeMyStrategiesBtn2 = document.getElementById('btnCloseMyStrategies2');
+  if (closeMyStrategiesBtn2) closeMyStrategiesBtn2.addEventListener('click', closeMyStrategiesModal);
+
+  const newStrategyBtn = document.getElementById('btnNewStrategy');
+  if (newStrategyBtn) newStrategyBtn.addEventListener('click', () => {
+    closeMyStrategiesModal();
+    clearAllAndReset();
+  });
+
+  const strategiesSearch = document.getElementById('strategiesSearch');
+  if (strategiesSearch) strategiesSearch.addEventListener('input', filterStrategiesList);
+
+  // Close My Strategies modal on overlay click
+  const myStrategiesModal = document.getElementById('myStrategiesModal');
+  if (myStrategiesModal) {
+    myStrategiesModal.addEventListener('click', (e) => {
+      if (e.target === myStrategiesModal) closeMyStrategiesModal();
+    });
+  }
+
   console.log('[Strategy Builder] CSP-compliant event listeners initialized');
+}
+
+// ============================================
+// MY STRATEGIES — List / Open / Clone / Delete
+// ============================================
+
+let _strategiesCache = [];
+
+/**
+ * Fetch saved strategies from the backend API
+ */
+async function fetchStrategiesList() {
+  try {
+    const resp = await fetch('/api/v1/strategy-builder/strategies?page=1&page_size=100');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    _strategiesCache = data.strategies || [];
+    return _strategiesCache;
+  } catch (err) {
+    console.error('[My Strategies] Failed to fetch strategies:', err);
+    showNotification('Failed to load strategies', 'error');
+    return [];
+  }
+}
+
+/**
+ * Open the My Strategies modal and populate the list
+ */
+async function openMyStrategiesModal() {
+  const modal = document.getElementById('myStrategiesModal');
+  if (!modal) return;
+
+  modal.classList.add('active');
+  const listEl = document.getElementById('strategiesList');
+  if (listEl) listEl.innerHTML = '<p class="text-muted text-center">Loading...</p>';
+
+  const strategies = await fetchStrategiesList();
+  renderStrategiesList(strategies);
+}
+
+/**
+ * Close the My Strategies modal
+ */
+function closeMyStrategiesModal() {
+  const modal = document.getElementById('myStrategiesModal');
+  if (modal) modal.classList.remove('active');
+}
+
+/**
+ * Render strategies into the list container
+ */
+function renderStrategiesList(strategies) {
+  const listEl = document.getElementById('strategiesList');
+  const countEl = document.getElementById('strategiesCount');
+  if (!listEl) return;
+
+  if (countEl) countEl.textContent = `${strategies.length} strategies`;
+
+  if (strategies.length === 0) {
+    listEl.innerHTML = `
+      <div class="strategies-empty">
+        <i class="bi bi-folder2"></i>
+        <p>No saved strategies yet</p>
+        <p class="text-sm mt-1">Use the Save button to save your first strategy</p>
+      </div>`;
+    return;
+  }
+
+  const currentId = getStrategyIdFromURL();
+
+  listEl.innerHTML = strategies.map(s => {
+    const updatedDate = s.updated_at
+      ? new Date(s.updated_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '—';
+    const isCurrent = s.id === currentId;
+
+    return `
+      <div class="strategy-card${isCurrent ? ' current' : ''}" data-strategy-id="${s.id}">
+        <div class="strategy-card-info">
+          <div class="strategy-card-name">${escapeHtml(s.name || 'Untitled')}${isCurrent ? ' <span class="badge-current">current</span>' : ''}</div>
+          <div class="strategy-card-meta">
+            ${s.symbol ? `<span><i class="bi bi-currency-exchange"></i> ${escapeHtml(s.symbol)}</span>` : ''}
+            ${s.timeframe ? `<span><i class="bi bi-clock"></i> ${escapeHtml(s.timeframe)}</span>` : ''}
+            <span><i class="bi bi-bricks"></i> ${s.block_count || 0} blocks</span>
+            <span><i class="bi bi-calendar3"></i> ${updatedDate}</span>
+          </div>
+        </div>
+        <div class="strategy-card-actions">
+          <button class="btn-icon-sm" title="Open" data-action="open" data-id="${s.id}">
+            <i class="bi bi-box-arrow-in-right"></i>
+          </button>
+          <button class="btn-icon-sm" title="Clone" data-action="clone" data-id="${s.id}" data-name="${escapeHtml(s.name || 'Untitled')}">
+            <i class="bi bi-copy"></i>
+          </button>
+          <button class="btn-icon-sm btn-danger" title="Delete" data-action="delete" data-id="${s.id}" data-name="${escapeHtml(s.name || 'Untitled')}">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Event delegation for card actions (remove previous to avoid duplicates)
+  listEl.removeEventListener('click', handleStrategyCardAction);
+  listEl.addEventListener('click', handleStrategyCardAction);
+}
+
+/**
+ * Handle click events on strategy cards (open / clone / delete)
+ */
+async function handleStrategyCardAction(e) {
+  const actionBtn = e.target.closest('[data-action]');
+  if (!actionBtn) {
+    // Click on the card itself — open
+    const card = e.target.closest('.strategy-card');
+    if (card) {
+      const id = card.dataset.strategyId;
+      if (id) {
+        closeMyStrategiesModal();
+        loadStrategy(id);
+      }
+    }
+    return;
+  }
+
+  const action = actionBtn.dataset.action;
+  const id = actionBtn.dataset.id;
+  const name = actionBtn.dataset.name || 'Untitled';
+
+  if (action === 'open') {
+    closeMyStrategiesModal();
+    loadStrategy(id);
+  } else if (action === 'clone') {
+    await cloneStrategy(id, name);
+  } else if (action === 'delete') {
+    await deleteStrategyById(id, name);
+  }
+}
+
+/**
+ * Clone a strategy via backend API
+ */
+async function cloneStrategy(strategyId, originalName) {
+  const newName = `${originalName} (copy)`;
+  try {
+    const resp = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}/clone?new_name=${encodeURIComponent(newName)}`, {
+      method: 'POST'
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    showNotification(`Strategy cloned as "${newName}"`, 'success');
+    // Refresh the list
+    const strategies = await fetchStrategiesList();
+    renderStrategiesList(strategies);
+  } catch (err) {
+    console.error('[My Strategies] Clone failed:', err);
+    showNotification('Failed to clone strategy', 'error');
+  }
+}
+
+/**
+ * Delete a strategy via backend API (with confirmation)
+ */
+async function deleteStrategyById(strategyId, name) {
+  if (!confirm(`Delete strategy "${name}"?\nThis action cannot be undone.`)) return;
+
+  try {
+    const resp = await fetch(`/api/v1/strategy-builder/strategies/${strategyId}`, {
+      method: 'DELETE'
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    showNotification(`Strategy "${name}" deleted`, 'success');
+    // Refresh the list
+    const strategies = await fetchStrategiesList();
+    renderStrategiesList(strategies);
+  } catch (err) {
+    console.error('[My Strategies] Delete failed:', err);
+    showNotification('Failed to delete strategy', 'error');
+  }
+}
+
+/**
+ * Filter strategies list by search input
+ */
+function filterStrategiesList() {
+  const query = (document.getElementById('strategiesSearch')?.value || '').toLowerCase().trim();
+  if (!query) {
+    renderStrategiesList(_strategiesCache);
+    return;
+  }
+  const filtered = _strategiesCache.filter(s =>
+    (s.name || '').toLowerCase().includes(query) ||
+    (s.symbol || '').toLowerCase().includes(query) ||
+    (s.timeframe || '').toLowerCase().includes(query)
+  );
+  renderStrategiesList(filtered);
 }
 
 // ============================================
@@ -14211,6 +14432,13 @@ window.applyAiPreset = applyAiPreset;
 window.resetAiBuild = resetAiBuild;
 window.runAiBuild = runAiBuild;
 window.showAiBuildResults = showAiBuildResults;
+
+// My Strategies functions
+window.openMyStrategiesModal = openMyStrategiesModal;
+window.closeMyStrategiesModal = closeMyStrategiesModal;
+window.fetchStrategiesList = fetchStrategiesList;
+window.deleteStrategyById = deleteStrategyById;
+window.cloneStrategy = cloneStrategy;
 
 // ============================================
 // WEBSOCKET VALIDATION INTEGRATION
