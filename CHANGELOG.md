@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Agent Skills Cleanup — 2026-02-14:**
+    - Deleted `.agent/skills/skills/` directory (232 generic skills, 19.5 MB) — 95% irrelevant to the trading project
+    - Deleted `skills_index.json` (1436-line index of generic skills)
+    - Deleted 4 duplicate skill files from `.agent/skills/` (originals remain in `.github/skills/`)
+    - Removed `.agent/skills` from `chat.agentSkillsLocations` in VS Code settings
+    - Cleaned embedded git repository left inside `.agent/skills/`
+
+### Changed
+
+- **Workflow Fixes — 2026-02-14:**
+    - `start_app.md` — replaced Claude Code `// turbo` syntax with proper VS Code task references and manual fallback
+    - `multi_agent.md` — replaced Claude Code `// turbo-all` multi-agent syntax with VS Code Agent Mode compatible phased workflow
+
+### Added
+
+- **New Project-Specific Skills — 2026-02-14:**
+    - `database-operations` — SQLite + SQLAlchemy patterns, models, sessions, async context, UoW pattern
+    - `metrics-calculator` — 166 TradingView-parity metrics, dataclass structures, Numba path, parity rules
+    - `bybit-api-integration` — Bybit API v5 adapter patterns, rate limiting, circuit breaker, testing rules
+
 ### Security
 
 - **API Key Leak Fix — 2026-02-14:**

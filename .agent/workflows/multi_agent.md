@@ -1,40 +1,53 @@
 ---
-description: Run parallel agents for complex multi-phase tasks
+description: Structured approach for complex multi-phase tasks in VS Code Agent Mode
 ---
 
-# Multi-Agent Workflow
+# Multi-Phase Task Workflow
 
-Use this workflow when a task requires multiple independent workstreams that can run in parallel.
+Use this workflow when a task requires multiple independent workstreams.
 
 ## When to Use
 
 - Complex refactoring across multiple modules
 - Simultaneous testing and documentation
 - Research + implementation + verification
+- Any task requiring 5+ file changes
 
 ## Workflow Steps
 
-// turbo-all
-
 ### Phase 1: Planning
 
-1. Define subtasks and assign to agents
-2. Create shared context in `.agent/memory/CONTEXT.md`
+1. Create a TODO list with all subtasks
+2. Map file dependencies (which files affect which)
+3. Identify safe parallelism (independent changes)
 
 ### Phase 2: Execution
 
-3. Agent 1: Primary implementation
-4. Agent 2: Tests and validation
-5. Agent 3: Documentation updates
+4. Execute changes in dependency order:
+    - **Layer 1**: Models, constants, base classes
+    - **Layer 2**: Services, engines, business logic
+    - **Layer 3**: API routers, schemas
+    - **Layer 4**: Tests
+    - **Layer 5**: Frontend (if affected)
+    - **Layer 6**: Documentation
 
-### Phase 3: Integration
+5. Run tests after each layer:
 
-6. Merge results from all agents
-7. Run integration tests
-8. Update `TODO.md` with completed items
+    ```powershell
+    .\.venv\Scripts\python.exe -m pytest tests/ -v --tb=short
+    ```
 
-## Agent Handoff Protocol
+### Phase 3: Verification
 
-- Each agent updates `CONTEXT.md` with progress
-- Use `.agent/experiments/` for intermediate results
-- Final agent consolidates and reports
+6. Run full test suite
+7. Run linting: `ruff check . --fix && ruff format .`
+8. Verify imports: `python -c "from backend.api.app import app; print('OK')"`
+9. Update CHANGELOG.md with completed items
+
+## Context Handoff
+
+If work spans multiple sessions:
+
+- Update `.agent/memory/CONTEXT.md` with progress
+- Document incomplete work in `.agent/memory/TODO.md`
+- Note any decisions made in `docs/DECISIONS.md`

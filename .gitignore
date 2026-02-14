@@ -418,6 +418,13 @@ openapi*.json
 # Agent MCP config (contains env variable references, may have had secrets)
 .agent/mcp.json
 
+# Agent backup files
+.agent/*.bak*
+.agent/*.old
+
+# One-off scripts (secrets cleanup etc.)
+scripts/remove_secrets_from_history.py
+
 # ==============================================================================
 # Additional entries (2026-01-27 cleanup)
 # ==============================================================================

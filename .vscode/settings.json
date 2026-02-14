@@ -160,8 +160,7 @@
   ],
   // Additional search locations for agent skills
   "chat.agentSkillsLocations": [
-    ".github/skills",
-    ".agent/skills"
+    ".github/skills"
   ],
   // Copilot instructions location (auto-loaded)
   // Copilot instructions are now auto-loaded from .github/instructions/ files
