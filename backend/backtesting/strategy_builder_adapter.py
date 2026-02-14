@@ -7,7 +7,6 @@ BaseStrategy instances that can be used with backtesting engines.
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import numpy as np
@@ -25,14 +24,18 @@ from backend.backtesting.strategies import BaseStrategy, SignalResult
 # Import our custom indicators for extended coverage
 from backend.core.indicators import (
     calculate_ad_line,
+    calculate_adx,
     calculate_aroon,
     calculate_atr,
+    calculate_atr_smoothed,
     calculate_atrp,
+    calculate_bollinger,
     calculate_cci,
     calculate_cmf,
     calculate_cmo,
     calculate_dema,
     calculate_donchian,
+    calculate_ema,
     calculate_hull_ma,
     calculate_ichimoku,
     calculate_keltner,
@@ -40,12 +43,13 @@ from backend.core.indicators import (
     calculate_mfi,
     calculate_obv,
     calculate_parabolic_sar,
-    calculate_pivot_points,
+    calculate_pivot_points_array,
     calculate_pvt,
     calculate_qqe,
     calculate_qqe_cross,
     calculate_roc,
     calculate_rsi,
+    calculate_sma,
     calculate_stddev,
     calculate_stoch_rsi,
     calculate_stochastic,
@@ -55,8 +59,6 @@ from backend.core.indicators import (
     calculate_williams_r,
     calculate_wma,
 )
-
-logger = logging.getLogger(__name__)
 
 
 def _param(params: dict, default: Any, *keys: str) -> Any:
@@ -157,35 +159,35 @@ class StrategyBuilderAdapter(BaseStrategy):
         """Get source block ID from connection, supporting multiple formats."""
         # Format 1: conn["source"]["blockId"] (old format)
         if "source" in conn and isinstance(conn["source"], dict):
-            return conn["source"].get("blockId", "")
+            return str(conn["source"].get("blockId", ""))
         # Format 1b: conn["source"] is a string block ID (frontend/test format)
         if "source" in conn and isinstance(conn["source"], str):
             return conn["source"]
         # Format 2: conn["source_id"] (builder_workflow / AI Build format)
         if "source_id" in conn:
-            return conn.get("source_id", "")
+            return str(conn.get("source_id", ""))
         # Format 3: conn["source_block"] (new API format)
         if "source_block" in conn:
-            return conn.get("source_block", "")
+            return str(conn.get("source_block", ""))
         # Format 4: conn["from"] (frontend/Strategy Builder format)
-        return conn.get("from", "")
+        return str(conn.get("from", ""))
 
     def _get_connection_target_id(self, conn: dict[str, Any]) -> str:
         """Get target block ID from connection, supporting multiple formats."""
         # Format 1: conn["target"]["blockId"] (old format)
         if "target" in conn and isinstance(conn["target"], dict):
-            return conn["target"].get("blockId", "")
+            return str(conn["target"].get("blockId", ""))
         # Format 1b: conn["target"] is a string block ID (frontend/test format)
         if "target" in conn and isinstance(conn["target"], str):
             return conn["target"]
         # Format 2: conn["target_id"] (builder_workflow / AI Build format)
         if "target_id" in conn:
-            return conn.get("target_id", "")
+            return str(conn.get("target_id", ""))
         # Format 3: conn["target_block"] (new API format)
         if "target_block" in conn:
-            return conn.get("target_block", "")
+            return str(conn.get("target_block", ""))
         # Format 4: conn["to"] (frontend/Strategy Builder format)
-        return conn.get("to", "")
+        return str(conn.get("to", ""))
 
     def _build_execution_order(self) -> list[str]:
         """
@@ -473,35 +475,35 @@ class StrategyBuilderAdapter(BaseStrategy):
         """Get source port ID from connection, supporting multiple formats."""
         # Format 1: conn["source"]["portId"] (old format)
         if "source" in conn and isinstance(conn["source"], dict):
-            return conn["source"].get("portId", "value")
+            return str(conn["source"].get("portId", "value"))
         # Format 2: conn["source_port"] (builder_workflow / AI Build format)
         if "source_port" in conn:
-            return conn.get("source_port", "value")
+            return str(conn.get("source_port", "value"))
         # Format 3: conn["source_output"] (new API format)
         if "source_output" in conn:
-            return conn.get("source_output", "value")
+            return str(conn.get("source_output", "value"))
         # Format 4: conn["sourcePort"] (frontend/Strategy Builder format)
         if "sourcePort" in conn:
-            return conn.get("sourcePort", "value")
+            return str(conn.get("sourcePort", "value"))
         # Format 5: conn["fromPort"] (test/API format)
-        return conn.get("fromPort", "value")
+        return str(conn.get("fromPort", "value"))
 
     def _get_connection_target_port(self, conn: dict[str, Any]) -> str:
         """Get target port ID from connection, supporting multiple formats."""
         # Format 1: conn["target"]["portId"] (old format)
         if "target" in conn and isinstance(conn["target"], dict):
-            return conn["target"].get("portId", "value")
+            return str(conn["target"].get("portId", "value"))
         # Format 2: conn["target_port"] (builder_workflow / AI Build format)
         if "target_port" in conn:
-            return conn.get("target_port", "value")
+            return str(conn.get("target_port", "value"))
         # Format 3: conn["target_input"] (new API format)
         if "target_input" in conn:
-            return conn.get("target_input", "value")
+            return str(conn.get("target_input", "value"))
         # Format 4: conn["targetPort"] (frontend/Strategy Builder format)
         if "targetPort" in conn:
-            return conn.get("targetPort", "value")
+            return str(conn.get("targetPort", "value"))
         # Format 5: conn["toPort"] (test/API format)
-        return conn.get("toPort", "value")
+        return str(conn.get("toPort", "value"))
 
     def _get_block_inputs(self, block_id: str) -> dict[str, pd.Series]:
         """Get input values for a block from connections.
@@ -643,10 +645,12 @@ class StrategyBuilderAdapter(BaseStrategy):
             stoch_period = _param(params, 14, "stoch_period", "stochPeriod")
             k_period = _param(params, 3, "k_period", "kPeriod")
             d_period = _param(params, 3, "d_period", "dPeriod")
-            result = calculate_stoch_rsi(close.values, rsi_period, stoch_period, k_period, d_period)
+            _stoch_rsi_vals, k_vals, d_vals = calculate_stoch_rsi(
+                close.values, rsi_period, stoch_period, k_period, d_period
+            )
             return {
-                "k": pd.Series(result["k"], index=ohlcv.index),
-                "d": pd.Series(result["d"], index=ohlcv.index),
+                "k": pd.Series(k_vals, index=ohlcv.index),
+                "d": pd.Series(d_vals, index=ohlcv.index),
             }
 
         elif indicator_type == "williams_r":
@@ -707,12 +711,15 @@ class StrategyBuilderAdapter(BaseStrategy):
             multiplier = params.get("multiplier", 3.0)
             high = ohlcv["high"].values
             low = ohlcv["low"].values
-            result = calculate_supertrend(high, low, close.values, period, multiplier)
+            st_line, st_direction = calculate_supertrend(high, low, close.values, period, multiplier)
+            # Derive upper/lower bands from supertrend line based on direction
+            st_upper = np.where(st_direction == -1, st_line, np.nan)
+            st_lower = np.where(st_direction == 1, st_line, np.nan)
             return {
-                "supertrend": pd.Series(result["supertrend"], index=ohlcv.index),
-                "direction": pd.Series(result["direction"], index=ohlcv.index),
-                "upper": pd.Series(result["upper_band"], index=ohlcv.index),
-                "lower": pd.Series(result["lower_band"], index=ohlcv.index),
+                "supertrend": pd.Series(st_line, index=ohlcv.index),
+                "direction": pd.Series(st_direction, index=ohlcv.index),
+                "upper": pd.Series(st_upper, index=ohlcv.index),
+                "lower": pd.Series(st_lower, index=ohlcv.index),
             }
 
         elif indicator_type == "ichimoku":
@@ -721,13 +728,13 @@ class StrategyBuilderAdapter(BaseStrategy):
             senkou_b = _param(params, 52, "senkou_b_period", "senkouB")
             high = ohlcv["high"].values
             low = ohlcv["low"].values
-            result = calculate_ichimoku(high, low, close.values, tenkan, kijun, senkou_b)
+            ichi = calculate_ichimoku(high, low, close.values, tenkan, kijun, senkou_b)
             return {
-                "tenkan_sen": pd.Series(result.tenkan_sen, index=ohlcv.index),
-                "kijun_sen": pd.Series(result.kijun_sen, index=ohlcv.index),
-                "senkou_span_a": pd.Series(result.senkou_span_a, index=ohlcv.index),
-                "senkou_span_b": pd.Series(result.senkou_span_b, index=ohlcv.index),
-                "chikou_span": pd.Series(result.chikou_span, index=ohlcv.index),
+                "tenkan_sen": pd.Series(ichi.tenkan_sen, index=ohlcv.index),
+                "kijun_sen": pd.Series(ichi.kijun_sen, index=ohlcv.index),
+                "senkou_span_a": pd.Series(ichi.senkou_span_a, index=ohlcv.index),
+                "senkou_span_b": pd.Series(ichi.senkou_span_b, index=ohlcv.index),
+                "chikou_span": pd.Series(ichi.chikou_span, index=ohlcv.index),
             }
 
         elif indicator_type == "parabolic_sar":
@@ -736,18 +743,18 @@ class StrategyBuilderAdapter(BaseStrategy):
             af_max = _param(params, 0.2, "max_value", "afMax")
             high = ohlcv["high"].values
             low = ohlcv["low"].values
-            result = calculate_parabolic_sar(high, low, af_start, af_step, af_max)
-            return {"value": pd.Series(result, index=ohlcv.index)}
+            sar_values, _sar_trend = calculate_parabolic_sar(high, low, af_start, af_step, af_max)
+            return {"value": pd.Series(sar_values, index=ohlcv.index)}
 
         elif indicator_type == "aroon":
             period = params.get("period", 25)
             high = ohlcv["high"].values
             low = ohlcv["low"].values
-            result = calculate_aroon(high, low, period)
+            aroon_result = calculate_aroon(high, low, period)
             return {
-                "up": pd.Series(result.aroon_up, index=ohlcv.index),
-                "down": pd.Series(result.aroon_down, index=ohlcv.index),
-                "oscillator": pd.Series(result.aroon_oscillator, index=ohlcv.index),
+                "up": pd.Series(aroon_result.aroon_up, index=ohlcv.index),
+                "down": pd.Series(aroon_result.aroon_down, index=ohlcv.index),
+                "oscillator": pd.Series(aroon_result.aroon_osc, index=ohlcv.index),
             }
 
         # ========== Volatility Indicators ==========
@@ -764,22 +771,22 @@ class StrategyBuilderAdapter(BaseStrategy):
             atr_period = _param(params, 10, "atr_period", "atrPeriod")
             high = ohlcv["high"].values
             low = ohlcv["low"].values
-            result = calculate_keltner(high, low, close.values, period, multiplier, atr_period)
+            kc_mid, kc_upper, kc_lower = calculate_keltner(high, low, close.values, period, atr_period, multiplier)
             return {
-                "upper": pd.Series(result["upper"], index=ohlcv.index),
-                "middle": pd.Series(result["middle"], index=ohlcv.index),
-                "lower": pd.Series(result["lower"], index=ohlcv.index),
+                "upper": pd.Series(kc_upper, index=ohlcv.index),
+                "middle": pd.Series(kc_mid, index=ohlcv.index),
+                "lower": pd.Series(kc_lower, index=ohlcv.index),
             }
 
         elif indicator_type == "donchian":
             period = params.get("period", 20)
             high = ohlcv["high"].values
             low = ohlcv["low"].values
-            result = calculate_donchian(high, low, period)
+            dc_mid, dc_upper, dc_lower = calculate_donchian(high, low, period)
             return {
-                "upper": pd.Series(result["upper"], index=ohlcv.index),
-                "middle": pd.Series(result["middle"], index=ohlcv.index),
-                "lower": pd.Series(result["lower"], index=ohlcv.index),
+                "upper": pd.Series(dc_upper, index=ohlcv.index),
+                "middle": pd.Series(dc_mid, index=ohlcv.index),
+                "lower": pd.Series(dc_lower, index=ohlcv.index),
             }
 
         elif indicator_type == "stddev":
@@ -824,15 +831,15 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif indicator_type == "pivot_points":
             high = ohlcv["high"].values
             low = ohlcv["low"].values
-            result = calculate_pivot_points(high, low, close.values)
+            pp, r1, r2, r3, s1, s2, s3 = calculate_pivot_points_array(high, low, close.values)
             return {
-                "pp": pd.Series(result.pp, index=ohlcv.index),
-                "r1": pd.Series(result.r1, index=ohlcv.index),
-                "r2": pd.Series(result.r2, index=ohlcv.index),
-                "r3": pd.Series(result.r3, index=ohlcv.index),
-                "s1": pd.Series(result.s1, index=ohlcv.index),
-                "s2": pd.Series(result.s2, index=ohlcv.index),
-                "s3": pd.Series(result.s3, index=ohlcv.index),
+                "pp": pd.Series(pp, index=ohlcv.index),
+                "r1": pd.Series(r1, index=ohlcv.index),
+                "r2": pd.Series(r2, index=ohlcv.index),
+                "r3": pd.Series(r3, index=ohlcv.index),
+                "s1": pd.Series(s1, index=ohlcv.index),
+                "s2": pd.Series(s2, index=ohlcv.index),
+                "s3": pd.Series(s3, index=ohlcv.index),
             }
 
         # ========== Multi-Timeframe ==========
@@ -856,7 +863,10 @@ class StrategyBuilderAdapter(BaseStrategy):
                 elif indicator == "rsi":
                     values = pd.Series(calculate_rsi(src.values, period=period), index=ohlcv.index)
                 elif indicator == "atr":
-                    values = pd.Series(calculate_atr(ohlcv, period=period), index=ohlcv.index)
+                    values = pd.Series(
+                        calculate_atr(ohlcv["high"].values, ohlcv["low"].values, src.values, period),
+                        index=ohlcv.index,
+                    )
                 else:
                     values = src.rolling(period).mean()
                 return {"value": values}
@@ -893,7 +903,10 @@ class StrategyBuilderAdapter(BaseStrategy):
                 elif indicator == "rsi":
                     htf_values = pd.Series(calculate_rsi(src_htf.values, period=period), index=src_htf.index)
                 elif indicator == "atr":
-                    htf_values = pd.Series(calculate_atr(ohlcv_htf, period=period), index=ohlcv_htf.index)
+                    htf_values = pd.Series(
+                        calculate_atr(ohlcv_htf["high"].values, ohlcv_htf["low"].values, src_htf.values, period),
+                        index=ohlcv_htf.index,
+                    )
                 else:
                     htf_values = src_htf.rolling(period).mean()
 
@@ -1117,8 +1130,6 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== RSI Filter ==========
         if filter_type == "rsi_filter":
-            from backend.core.indicators import calculate_rsi
-
             period = params.get("period", 14)
             oversold = params.get("oversold", 30)
             overbought = params.get("overbought", 70)
@@ -1165,24 +1176,21 @@ class StrategyBuilderAdapter(BaseStrategy):
             period = params.get("period", 10)
             multiplier = params.get("multiplier", 3.0)
 
-            result = calculate_supertrend(high, low, close, period, multiplier)
-            direction = result["direction"]
+            st_line, st_dir = calculate_supertrend(high, low, close, period, multiplier)
 
             # Buy when direction changes to 1 (uptrend), sell when -1 (downtrend)
-            buy = (direction == 1) & (np.roll(direction, 1) == -1)
-            sell = (direction == -1) & (np.roll(direction, 1) == 1)
+            buy = (st_dir == 1) & (np.roll(st_dir, 1) == -1)
+            sell = (st_dir == -1) & (np.roll(st_dir, 1) == 1)
 
             return {
                 "buy": pd.Series(buy, index=ohlcv.index),
                 "sell": pd.Series(sell, index=ohlcv.index),
-                "supertrend": pd.Series(result["supertrend"], index=ohlcv.index),
-                "direction": pd.Series(direction, index=ohlcv.index),
+                "supertrend": pd.Series(st_line, index=ohlcv.index),
+                "direction": pd.Series(st_dir, index=ohlcv.index),
             }
 
         # ========== Two MA Filter ==========
         elif filter_type == "two_ma_filter":
-            from backend.core.indicators import calculate_ema, calculate_sma
-
             fast_period = _param(params, 9, "fast_period", "fastPeriod")
             slow_period = _param(params, 21, "slow_period", "slowPeriod")
             ma_type = _param(params, "ema", "ma_type", "maType")
@@ -1245,14 +1253,12 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== MACD Filter ==========
         elif filter_type == "macd_filter":
-            from backend.core.indicators import calculate_macd
-
-            fast = _param(params, 12, "fast_period", "fast")
-            slow = _param(params, 26, "slow_period", "slow")
-            signal_period = _param(params, 9, "signal_period", "signal")
+            macd_fast_p: int = int(_param(params, 12, "fast_period", "fast"))
+            macd_slow_p: int = int(_param(params, 26, "slow_period", "slow"))
+            signal_period: int = int(_param(params, 9, "signal_period", "signal"))
             mode = params.get("mode", "signal_cross")  # signal_cross, zero_cross, histogram
 
-            macd_line, signal_line, histogram = calculate_macd(close, fast, slow, signal_period)
+            macd_line, signal_line, histogram = calculate_macd(close, macd_fast_p, macd_slow_p, signal_period)
 
             if mode == "zero_cross":
                 buy = crossover(macd_line, np.zeros(n))
@@ -1298,8 +1304,6 @@ class StrategyBuilderAdapter(BaseStrategy):
             period = params.get("period", 14)
             adx_threshold = _param(params, 25, "threshold", "adxThreshold")
 
-            from backend.core.indicators import calculate_adx
-
             adx_result = calculate_adx(high, low, close, period)
             adx = adx_result.adx
             plus_di = adx_result.plus_di
@@ -1319,7 +1323,6 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== ATR Filter ==========
         elif filter_type == "atr_filter":
-            from backend.core.indicators import calculate_atr
 
             period = params.get("period", 14)
             threshold = params.get("threshold", 1.5)  # ATR multiplier
@@ -1380,7 +1383,6 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== Trend Filter ==========
         elif filter_type == "trend_filter":
-            from backend.core.indicators import calculate_adx, calculate_ema
 
             ema_period = params.get("emaPeriod", 50)
             adx_period = params.get("adxPeriod", 14)
@@ -1409,15 +1411,14 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== Volatility Filter ==========
         elif filter_type == "volatility_filter":
-            from backend.core.indicators import calculate_atr, calculate_bollinger
 
             period = params.get("period", 20)
             mode = params.get("mode", "atr")  # atr, bb_width
             threshold = params.get("threshold", 1.0)
 
             if mode == "bb_width":
-                bb = calculate_bollinger(close, period, 2.0)
-                bb_width = (bb["upper"] - bb["lower"]) / bb["middle"]
+                bb_mid, bb_upper, bb_lower = calculate_bollinger(close, period, 2.0)
+                bb_width = (bb_upper - bb_lower) / np.where(bb_mid != 0, bb_mid, 1.0)
                 bb_width_ma = pd.Series(bb_width).rolling(period).mean().values
                 high_vol = bb_width > (threshold * bb_width_ma)
                 return {"pass": pd.Series(high_vol, index=ohlcv.index), "value": pd.Series(bb_width, index=ohlcv.index)}
@@ -1482,7 +1483,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             high_volume = volume > avg_volume * volume_mult
 
             # Price range compression (consolidation)
-            atr = pd.Series(calculate_atr(ohlcv, period=period), index=ohlcv.index)
+            atr = pd.Series(
+                calculate_atr(ohlcv["high"].values, ohlcv["low"].values, ohlcv["close"].values, period),
+                index=ohlcv.index,
+            )
             price_range = ohlcv["high"] - ohlcv["low"]
             avg_range = price_range.rolling(period).mean()
             tight_range = price_range < avg_range * range_threshold
@@ -1580,7 +1584,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 macd_line, signal_line, histogram = calculate_macd(close.values, 12, 26, 9)
                 ind_val = pd.Series(histogram, index=ohlcv.index)
             elif indicator == "obv":
-                ind_val = pd.Series(calculate_obv(ohlcv), index=ohlcv.index)
+                ind_val = pd.Series(calculate_obv(close.values, ohlcv["volume"].values), index=ohlcv.index)
             else:
                 ind_val = pd.Series(calculate_rsi(close.values, period=period), index=ohlcv.index)
 
@@ -2037,8 +2041,8 @@ class StrategyBuilderAdapter(BaseStrategy):
             period = params.get("period", 10)
             multiplier = params.get("multiplier", 3.0)
             high, low = ohlcv["high"].values, ohlcv["low"].values
-            result = calculate_supertrend(high, low, close.values, period, multiplier)
-            direction = pd.Series(result["direction"], index=ohlcv.index)
+            st_line, st_dir = calculate_supertrend(high, low, close.values, period, multiplier)
+            direction = pd.Series(st_dir, index=ohlcv.index)
 
             if signal_type == "supertrend_buy_signal":
                 # Bullish flip: direction changes from -1 to 1
@@ -2047,7 +2051,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 signal = pd.Series((direction == -1) & (direction.shift(1) == 1), index=ohlcv.index)
             return {
                 "signal": signal.fillna(False),
-                "value": pd.Series(result["supertrend"], index=ohlcv.index),
+                "value": pd.Series(st_line, index=ohlcv.index),
             }
 
         # ---- Volume smart signals ----
@@ -2278,7 +2282,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             # ATR-based stop loss
             period = params.get("period", 14)
             multiplier = params.get("multiplier", 2.0)
-            atr = calculate_atr(ohlcv, period=period)
+            atr = pd.Series(
+                calculate_atr(ohlcv["high"].values, ohlcv["low"].values, ohlcv["close"].values, period),
+                index=ohlcv.index,
+            )
             # Exit signal: price breaks below entry - ATR*multiplier
             # This needs position tracking, return empty for now
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
@@ -2300,7 +2307,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Chandelier exit - ATR-based trailing
             period = params.get("period", 22)
             multiplier = params.get("multiplier", 3.0)
-            atr = calculate_atr(ohlcv, period=period)
+            atr = pd.Series(
+                calculate_atr(ohlcv["high"].values, ohlcv["low"].values, ohlcv["close"].values, period),
+                index=ohlcv.index,
+            )
             high_n = ohlcv["high"].rolling(period).max()
             low_n = ohlcv["low"].rolling(period).min()
 
@@ -2315,7 +2325,6 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         elif exit_type == "atr_exit":
             # ATR-based TP/SL exit with separate smoothing methods and periods
-            from backend.core.indicators import calculate_atr_smoothed
 
             use_atr_sl = params.get("use_atr_sl", False)
             use_atr_tp = params.get("use_atr_tp", False)
@@ -2839,7 +2848,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             result["signal"] = bullish_div.fillna(False)
 
         elif div_type == "obv_divergence":
-            obv = pd.Series(calculate_obv(ohlcv), index=idx)
+            obv = pd.Series(calculate_obv(close.values, ohlcv["volume"].values), index=idx)
 
             price_lower_low = low < low.shift(lookback)
             obv_higher_low = obv > obv.shift(lookback)
@@ -2938,7 +2947,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             level = params.get("level", 70)
             direction = params.get("direction", "above")  # above or below
 
-            rsi = calculate_rsi(close, period=period)
+            rsi = pd.Series(calculate_rsi(close.values, period=period), index=ohlcv.index)
 
             if direction == "above":
                 result["exit"] = rsi >= level
@@ -2952,7 +2961,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             level = params.get("level", 50)
             cross_type = params.get("cross_type", "above")  # above or below
 
-            rsi = calculate_rsi(close, period=period)
+            rsi = pd.Series(calculate_rsi(close.values, period=period), index=ohlcv.index)
 
             if cross_type == "above":
                 # Cross above level
@@ -2969,7 +2978,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             level = params.get("level", 80)
             direction = params.get("direction", "above")
 
-            stoch_k, stoch_d = calculate_stochastic(ohlcv, k_period=k_period, d_period=d_period)
+            stoch_k_arr, stoch_d_arr = calculate_stochastic(
+                ohlcv["high"].values, ohlcv["low"].values, close.values, k_period=k_period, d_period=d_period
+            )
+            stoch_k = pd.Series(stoch_k_arr, index=ohlcv.index)
 
             if direction == "above":
                 result["exit"] = stoch_k >= level
@@ -2983,7 +2995,11 @@ class StrategyBuilderAdapter(BaseStrategy):
             d_period = params.get("d_period", 3)
             cross_type = params.get("cross_type", "k_above_d")
 
-            stoch_k, stoch_d = calculate_stochastic(ohlcv, k_period=k_period, d_period=d_period)
+            stoch_k_arr, stoch_d_arr = calculate_stochastic(
+                ohlcv["high"].values, ohlcv["low"].values, close.values, k_period=k_period, d_period=d_period
+            )
+            stoch_k = pd.Series(stoch_k_arr, index=ohlcv.index)
+            stoch_d = pd.Series(stoch_d_arr, index=ohlcv.index)
 
             if cross_type == "k_above_d":
                 result["exit"] = (stoch_k > stoch_d) & (stoch_k.shift(1) <= stoch_d.shift(1))
@@ -2999,7 +3015,13 @@ class StrategyBuilderAdapter(BaseStrategy):
             break_type = params.get("break_type", "above")  # above or below
 
             if channel == "keltner":
-                upper, middle, lower = calculate_keltner(ohlcv, period=period, multiplier=multiplier)
+                kc_mid, kc_upper, kc_lower = calculate_keltner(
+                    ohlcv["high"].values, ohlcv["low"].values, close.values,
+                    period, period, multiplier
+                )
+                upper = pd.Series(kc_upper, index=idx)
+                middle = pd.Series(kc_mid, index=idx)
+                lower = pd.Series(kc_lower, index=idx)
             else:
                 # Bollinger bands - use stddev
                 middle = close.rolling(period).mean()
@@ -3041,7 +3063,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             af_step = _param(params, 0.02, "af_step", "increment", "afStep")
             af_max = _param(params, 0.2, "af_max", "max_value", "afMax")
 
-            psar = calculate_parabolic_sar(ohlcv, af_start=af_start, af_step=af_step, af_max=af_max)
+            sar_vals, _sar_dir = calculate_parabolic_sar(
+                ohlcv["high"].values, ohlcv["low"].values, af_start, af_step, af_max
+            )
+            psar = pd.Series(sar_vals, index=ohlcv.index)
 
             # Long exit: price crosses below PSAR
             long_exit = (close < psar) & (close.shift(1) >= psar.shift(1))
@@ -3336,7 +3361,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Diagnostic logging for signal tracing
             if outputs:
                 for port_id, series in outputs.items():
-                    if hasattr(series, 'sum') and series.dtype == bool:
+                    if hasattr(series, "sum") and series.dtype == bool:
                         true_count = int(series.sum())
                         if true_count > 0:
                             logger.debug(

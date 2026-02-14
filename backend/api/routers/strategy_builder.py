@@ -2132,8 +2132,8 @@ async def run_backtest_from_builder(
     # =============================================
     # 3-PART VALIDATION: Parameters, Entry, Exit
     # =============================================
-    blocks = db_strategy.builder_blocks or []
-    conns = db_strategy.builder_connections or []
+    blocks: list[dict] = list(db_strategy.builder_blocks or [])
+    conns: list[dict] = list(db_strategy.builder_connections or [])
     validation_errors: list[str] = []
 
     # Part 2: Entry conditions — at least one connection to entry_long or entry_short
