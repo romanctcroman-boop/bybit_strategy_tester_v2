@@ -1323,7 +1323,6 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== ATR Filter ==========
         elif filter_type == "atr_filter":
-
             period = params.get("period", 14)
             threshold = params.get("threshold", 1.5)  # ATR multiplier
 
@@ -1383,7 +1382,6 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== Trend Filter ==========
         elif filter_type == "trend_filter":
-
             ema_period = params.get("emaPeriod", 50)
             adx_period = params.get("adxPeriod", 14)
             adx_threshold = _param(params, 25, "threshold", "adxThreshold")
@@ -1411,7 +1409,6 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== Volatility Filter ==========
         elif filter_type == "volatility_filter":
-
             period = params.get("period", 20)
             mode = params.get("mode", "atr")  # atr, bb_width
             threshold = params.get("threshold", 1.0)
@@ -3016,8 +3013,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             if channel == "keltner":
                 kc_mid, kc_upper, kc_lower = calculate_keltner(
-                    ohlcv["high"].values, ohlcv["low"].values, close.values,
-                    period, period, multiplier
+                    ohlcv["high"].values, ohlcv["low"].values, close.values, period, period, multiplier
                 )
                 upper = pd.Series(kc_upper, index=idx)
                 middle = pd.Series(kc_mid, index=idx)

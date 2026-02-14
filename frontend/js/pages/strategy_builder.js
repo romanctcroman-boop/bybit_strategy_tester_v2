@@ -8430,20 +8430,55 @@ function getBlockPorts(blockId, _category) {
     timeframe: {
       inputs: [],
       outputs: [{ id: 'value', label: '', type: 'data' }]
+    },
+
+    // Exit/Risk management blocks - output config to Strategy node
+    static_sltp: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    trailing_stop_exit: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    atr_exit: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    time_exit: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    session_exit: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    break_even_exit: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    signal_exit: {
+      inputs: [{ id: 'signal', label: '', type: 'condition' }],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    dca: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
     }
 
     // Note: 'strategy' ports are dynamic - handled below
   };
 
   // Special handling for main Strategy node
-  // 4 ports: entry_long, entry_short, exit_long, exit_short
+  // 4 ports: entry_long, entry_short, exit_long, exit_short + sl_tp config
   if (blockId === 'strategy') {
     return {
       inputs: [
         { id: 'entry_long', label: 'Entry L', type: 'condition' },
         { id: 'entry_short', label: 'Entry S', type: 'condition' },
         { id: 'exit_long', label: 'Exit L', type: 'condition' },
-        { id: 'exit_short', label: 'Exit S', type: 'condition' }
+        { id: 'exit_short', label: 'Exit S', type: 'condition' },
+        { id: 'sl_tp', label: 'SL/TP', type: 'config' }
       ],
       outputs: []
     };
@@ -8507,8 +8542,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Long"
-             style="top: 18%;"></div>
-        <span class="main-port-label entry-label" style="top: 18%; transform: translateY(-50%);">Entry L</span>
+             style="top: 15%;"></div>
+        <span class="main-port-label entry-label" style="top: 15%; transform: translateY(-50%);">Entry L</span>
         
         <!-- Entry Short port -->
         <div class="port condition-port main-port-left entry-port" 
@@ -8517,8 +8552,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Short"
-             style="top: 40%;"></div>
-        <span class="main-port-label entry-label" style="top: 40%; transform: translateY(-50%);">Entry S</span>
+             style="top: 32%;"></div>
+        <span class="main-port-label entry-label" style="top: 32%; transform: translateY(-50%);">Entry S</span>
         
         <!-- Exit Long port -->
         <div class="port condition-port main-port-left exit-port" 
@@ -8527,8 +8562,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Exit Long"
-             style="top: 62%;"></div>
-        <span class="main-port-label exit-label" style="top: 62%; transform: translateY(-50%);">Exit L</span>
+             style="top: 50%;"></div>
+        <span class="main-port-label exit-label" style="top: 50%; transform: translateY(-50%);">Exit L</span>
         
         <!-- Exit Short port -->
         <div class="port condition-port main-port-left exit-port" 
@@ -8537,8 +8572,18 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Exit Short"
-             style="top: 82%;"></div>
-        <span class="main-port-label exit-label" style="top: 82%; transform: translateY(-50%);">Exit S</span>
+             style="top: 67%;"></div>
+        <span class="main-port-label exit-label" style="top: 67%; transform: translateY(-50%);">Exit S</span>
+
+        <!-- SL/TP config port -->
+        <div class="port config-port main-port-left config-input-port" 
+             data-port-id="sl_tp" 
+             data-port-type="config"
+             data-block-id="${block.id}"
+             data-direction="input"
+             title="SL/TP Config"
+             style="top: 85%;"></div>
+        <span class="main-port-label config-label" style="top: 85%; transform: translateY(-50%);">SL/TP</span>
         
         <!-- Center title -->
         <div class="main-block-title">${block.name}</div>
@@ -12524,7 +12569,27 @@ function loadTemplateData(templateId) {
     }
   });
 
-  console.log(`[Strategy Builder] Added ${connections.length} connections`);
+  // Auto-inject SL/TP connection if template has an exit block (sltp_1, trailing_1, etc.)
+  const exitBlock = strategyBlocks.find(b =>
+    b.id === 'sltp_1' || b.category === 'exit'
+  );
+  const mainBlock = strategyBlocks.find(b => b.isMain);
+  if (exitBlock && mainBlock) {
+    const hasConfigConn = connections.some(c =>
+      c.source.blockId === exitBlock.id && c.target.portId === 'sl_tp'
+    );
+    if (!hasConfigConn) {
+      connections.push({
+        id: `conn_sltp_${Date.now()}`,
+        source: { blockId: exitBlock.id, portId: 'config' },
+        target: { blockId: mainBlock.id, portId: 'sl_tp' },
+        type: 'config'
+      });
+      console.log(`[Strategy Builder] Auto-injected SL/TP connection: ${exitBlock.id} -> ${mainBlock.id}`);
+    }
+  }
+
+  console.log(`[Strategy Builder] Total connections: ${connections.length}`);
 
   // Re-render
   renderBlocks();
