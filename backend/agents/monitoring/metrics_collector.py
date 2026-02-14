@@ -97,9 +97,7 @@ class MetricSeries:
         if self.metric.type == MetricType.HISTOGRAM and self.metric.buckets:
             for bucket in self.metric.buckets:
                 if value <= bucket:
-                    self.histogram_counts[bucket] = (
-                        self.histogram_counts.get(bucket, 0) + 1
-                    )
+                    self.histogram_counts[bucket] = self.histogram_counts.get(bucket, 0) + 1
 
     def get_aggregated(
         self,
@@ -268,9 +266,7 @@ class MetricsCollector:
             for metric in self.AGENT_METRICS:
                 self.register(metric)
 
-        logger.info(
-            f"📊 MetricsCollector initialized with {len(self._metrics)} metrics"
-        )
+        logger.info(f"📊 MetricsCollector initialized with {len(self._metrics)} metrics")
 
     def register(self, metric: Metric) -> None:
         """Register a new metric"""
@@ -366,9 +362,7 @@ class MetricsCollector:
             label_key = self._label_key(labels or {})
 
             if label_key and label_key in self._series[name]:
-                return self._series[name][label_key].get_aggregated(
-                    aggregation, window_seconds
-                )
+                return self._series[name][label_key].get_aggregated(aggregation, window_seconds)
 
             # Aggregate across all label combinations
             total = 0.0
@@ -381,7 +375,7 @@ class MetricsCollector:
         window_seconds: int = 60,
     ) -> dict[str, dict[str, Any]]:
         """Get all metrics with their values"""
-        result = {}
+        result: dict[str, dict[str, Any]] = {}
 
         with self._lock:
             for name, label_series in self._series.items():
@@ -397,10 +391,9 @@ class MetricsCollector:
                 }
 
                 for label_key, series in label_series.items():
+                    value: float | dict[str, float]
                     if metric.type == MetricType.COUNTER:
-                        value = series.get_aggregated(
-                            MetricAggregation.SUM, window_seconds
-                        )
+                        value = series.get_aggregated(MetricAggregation.SUM, window_seconds)
                     elif metric.type == MetricType.GAUGE:
                         # For gauges, get the latest value
                         value = series.values[-1].value if series.values else 0
@@ -409,15 +402,9 @@ class MetricsCollector:
                             "count": series.count,
                             "sum": series.sum_value,
                             "avg": series.sum_value / max(series.count, 1),
-                            "p50": series.get_aggregated(
-                                MetricAggregation.P50, window_seconds
-                            ),
-                            "p95": series.get_aggregated(
-                                MetricAggregation.P95, window_seconds
-                            ),
-                            "p99": series.get_aggregated(
-                                MetricAggregation.P99, window_seconds
-                            ),
+                            "p50": series.get_aggregated(MetricAggregation.P50, window_seconds),
+                            "p95": series.get_aggregated(MetricAggregation.P95, window_seconds),
+                            "p99": series.get_aggregated(MetricAggregation.P99, window_seconds),
                         }
 
                     result[name]["series"][label_key or "default"] = value
@@ -461,9 +448,7 @@ class MetricsCollector:
                     if metric.type == MetricType.HISTOGRAM:
                         # Export histogram buckets
                         for bucket, count in sorted(series.histogram_counts.items()):
-                            lines.append(
-                                f'{name}_bucket{{le="{bucket}"{label_key and "," + label_key}}} {count}'
-                            )
+                            lines.append(f'{name}_bucket{{le="{bucket}"{label_key and "," + label_key}}} {count}')
                         lines.append(f"{name}_sum{labels_str} {series.sum_value}")
                         lines.append(f"{name}_count{labels_str} {series.count}")
                     else:

@@ -70,7 +70,8 @@ class SimpleCache:
             if datetime.now() < entry["expires_at"]:
                 self.cache.move_to_end(key)  # LRU update
                 self.stats["hits"] += 1
-                return entry["response"]
+                result: dict[str, Any] = entry["response"]
+                return result
             else:
                 del self.cache[key]  # Expired
 
@@ -195,7 +196,7 @@ class PerplexityClient:
                 response = await _ping_request()
 
             # Only 200 is truly healthy; 401/403 indicate auth issues
-            is_healthy: bool = response.status_code == 200
+            is_healthy: bool = bool(response.status_code == 200)
 
             # Cache result
             self.cache.set("ping", {"success": is_healthy}, model="sonar")

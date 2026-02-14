@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, HTTPException, WebSocket
 from loguru import logger
@@ -62,10 +62,13 @@ router = APIRouter(prefix="/api/agents", tags=["AI Agents"])
 
 
 # In-memory state (replace with actual collectors in production)
-_dashboard_state: dict[str, Any] = {
-    "connected_clients": set(),
-    "last_update": None,
-}
+_dashboard_state = cast(
+    "dict[str, Any]",
+    {
+        "connected_clients": set(),
+        "last_update": None,
+    },
+)
 
 
 @router.get("/health")
@@ -129,7 +132,7 @@ async def query_metrics(query: MetricQuery):
         collector = MetricsCollector()
 
         # Get metric data
-        data = collector.get_metric(query.metric_name)
+        data = collector.get(query.metric_name)
 
         return {
             "metric_name": query.metric_name,
@@ -239,9 +242,9 @@ async def list_alerts():
                     "id": alert.id,
                     "name": alert.rule_name,
                     "severity": alert.severity.value,
-                    "value": alert.current_value,
+                    "value": alert.value,
                     "message": alert.message,
-                    "fired_at": alert.fired_at.isoformat(),
+                    "fired_at": alert.started_at.isoformat(),
                 }
                 for alert in manager.get_active_alerts()
             ]
@@ -259,17 +262,18 @@ async def create_alert(alert: AlertCreate):
             AlertManager,
             AlertRule,
             AlertSeverity,
+            ComparisonOperator,
         )
 
         manager = AlertManager()
 
         rule = AlertRule(
             name=alert.name,
+            description=alert.message or "",
             metric_name=alert.metric_name,
-            condition=alert.condition,
+            operator=ComparisonOperator(alert.condition),
             threshold=alert.threshold,
             severity=AlertSeverity(alert.severity),
-            message=alert.message,
         )
 
         manager.add_rule(rule)
@@ -295,18 +299,25 @@ async def list_traces(limit: int = 50):
 
         tracer = DistributedTracer()
 
-        spans = list(tracer._completed_spans.values())[-limit:]
+        traces = tracer.get_recent_traces(limit=limit)
 
         return {
             "traces": [
                 {
-                    "trace_id": span.trace_id,
-                    "span_id": span.span_id,
-                    "name": span.name,
-                    "duration_ms": span.duration_ms,
-                    "status": span.status.value if hasattr(span, "status") else "ok",
+                    "trace_id": trace.trace_id,
+                    "span_count": len(trace.spans),
+                    "duration_ms": trace.duration_ms,
+                    "spans": [
+                        {
+                            "span_id": span.span_id,
+                            "name": span.name,
+                            "duration_ms": span.duration_ms,
+                            "status": span.status.value if hasattr(span, "status") else "ok",
+                        }
+                        for span in trace.spans
+                    ],
                 }
-                for span in spans
+                for trace in traces
             ]
         }
     except Exception as e:

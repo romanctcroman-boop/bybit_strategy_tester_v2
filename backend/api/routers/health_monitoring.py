@@ -72,10 +72,10 @@ async def check_database_health() -> ComponentHealth:
             session.execute(text("SELECT 1"))
             from backend.database import engine
 
-            pool = engine.pool
-            pool_size = pool.size()  # type: ignore[union-attr]
-            checked_out = pool.checkedout()  # type: ignore[union-attr]
-            overflow = pool.overflow()  # type: ignore[union-attr]
+            pool: Any = engine.pool
+            pool_size: int = getattr(pool, "size", lambda: 5)()
+            checked_out: int = getattr(pool, "checkedout", lambda: 0)()
+            overflow: int = getattr(pool, "overflow", lambda: 0)()
             total_capacity = pool_size + overflow
             utilization = (checked_out / total_capacity * 100) if total_capacity > 0 else 0
             response_time = (time.time() - start) * 1000

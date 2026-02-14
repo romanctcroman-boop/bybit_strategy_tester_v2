@@ -235,9 +235,10 @@ Format your response as JSON:
         if self._perplexity_client is None:
             try:
                 # Try primary config first
-                api_key = self.config.get("perplexity_api_key") or os.getenv("PERPLEXITY_API_KEY")
+                api_key: str | None = self.config.get("perplexity_api_key") or os.getenv("PERPLEXITY_API_KEY")
                 if api_key and not api_key.startswith("pplx-YOUR-KEY"):
-                    from backend.agents.llm.connections import LLMConfig, LLMProvider, PerplexityClient
+                    from backend.agents.llm.connections import LLMConfig, LLMProvider
+                    from backend.agents.llm.connections import PerplexityClient as PClient
 
                     config = LLMConfig(
                         provider=LLMProvider.PERPLEXITY,
@@ -247,25 +248,26 @@ Format your response as JSON:
                         max_tokens=2048,
                         timeout_seconds=30,
                     )
-                    self._perplexity_client = PerplexityClient(config)
+                    self._perplexity_client = PClient(config)
                     logger.info("🟣 Perplexity integration client initialized")
                 else:
                     logger.warning("No valid Perplexity API key found")
             except Exception as e:
                 logger.warning(f"Failed to initialize Perplexity client: {e}")
                 # Try fallback to env
-                api_key = os.getenv("PERPLEXITY_API_KEY")
-                if api_key and not api_key.startswith("pplx-YOUR-KEY"):  # Fixed to use a default string check
-                    from backend.agents.llm.connections import LLMConfig, LLMProvider, PerplexityClient
+                fallback_key: str | None = os.getenv("PERPLEXITY_API_KEY")
+                if fallback_key and not fallback_key.startswith("pplx-YOUR-KEY"):
+                    from backend.agents.llm.connections import LLMConfig, LLMProvider
+                    from backend.agents.llm.connections import PerplexityClient as PClient
 
                     config = LLMConfig(
                         provider=LLMProvider.PERPLEXITY,
-                        api_key=api_key,
+                        api_key=fallback_key,
                         model="sonar-pro",
                         temperature=0.2,
                         max_tokens=2048,
                     )
-                    self._perplexity_client = PerplexityClient(config)
+                    self._perplexity_client = PClient(config)
         return self._perplexity_client
 
     # ─── Adaptive Routing ─────────────────────────────────────────────

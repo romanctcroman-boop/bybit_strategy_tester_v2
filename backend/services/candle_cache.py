@@ -44,9 +44,7 @@ class CandleCache:
         """Generate cache key from symbol and interval."""
         return f"{symbol}:{interval}"
 
-    def get_working_set(
-        self, symbol: str, interval: str, ensure_loaded: bool = True
-    ) -> list[dict] | None:
+    def get_working_set(self, symbol: str, interval: str, ensure_loaded: bool = True) -> list[dict] | None:
         """
         Get working set of candles from cache.
 
@@ -63,9 +61,7 @@ class CandleCache:
         data = self._store.get(key)
 
         if data is None and ensure_loaded:
-            logger.info(
-                "Cache miss for %s, loading initial data (ensure_loaded=True)", key
-            )
+            logger.info("Cache miss for %s, loading initial data (ensure_loaded=True)", key)
             return self.load_initial(symbol, interval, persist=True)
 
         if data:
@@ -118,9 +114,7 @@ class CandleCache:
 
             # Fetch from Bybit API
             client = BybitAdapter()
-            candles = client.get_klines(
-                symbol=symbol, interval=interval, limit=min(load_limit, self.LOAD_LIMIT)
-            )
+            candles = client.get_klines(symbol=symbol, interval=interval, limit=min(load_limit, self.LOAD_LIMIT))
 
             if not candles:
                 logger.warning("No candles returned from Bybit for %s", key)
@@ -138,9 +132,7 @@ class CandleCache:
                     # Continue even if persistence fails
 
             # Keep only last RAM_LIMIT candles in memory
-            working_set = (
-                candles[-self.RAM_LIMIT :] if len(candles) > self.RAM_LIMIT else candles
-            )
+            working_set = candles[-self.RAM_LIMIT :] if len(candles) > self.RAM_LIMIT else candles
             self._store[key] = working_set
 
             logger.info(
@@ -158,9 +150,7 @@ class CandleCache:
             self._store[key] = []
             return []
 
-    def reset(
-        self, symbol: str, interval: str, reload: bool = False
-    ) -> list[dict] | None:
+    def reset(self, symbol: str, interval: str, reload: bool = False) -> list[dict] | None:
         """
         Clear cache for symbol+interval.
 
@@ -213,9 +203,7 @@ class CandleCache:
                     if isinstance(open_time, float):
                         open_time = int(open_time * 1000)  # Convert seconds to ms
                     elif open_time < 1e12:
-                        open_time = int(
-                            open_time * 1000
-                        )  # Likely seconds, convert to ms
+                        open_time = int(open_time * 1000)  # Likely seconds, convert to ms
 
                     # Check if already exists
                     exists = (
@@ -234,9 +222,7 @@ class CandleCache:
                     record = BybitKlineAudit(
                         symbol=symbol,
                         open_time=open_time,
-                        open_time_dt=datetime.fromtimestamp(
-                            open_time / 1000, tz=UTC
-                        ),
+                        open_time_dt=datetime.fromtimestamp(open_time / 1000, tz=UTC),
                         open_price=float(candle.get("open", 0)),
                         high_price=float(candle.get("high", 0)),
                         low_price=float(candle.get("low", 0)),
