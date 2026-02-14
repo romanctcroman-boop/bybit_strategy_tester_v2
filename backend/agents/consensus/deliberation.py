@@ -246,6 +246,32 @@ CONFIDENCE: [0.0-1.0]
 REASONING: [Your updated reasoning]
 MAINTAINED_POINTS: [Points you stand by]
 """,
+        "devils_advocate": """
+You are the DEVIL'S ADVOCATE. Your job is to ATTACK the leading position.
+
+Question: {question}
+Leading Position: {position}
+Confidence: {confidence}
+Reasoning: {reasoning}
+Evidence: {evidence}
+
+Find EVERY possible weakness:
+1. What market conditions would make this strategy FAIL?
+2. What edge cases or black swan scenarios are not accounted for?
+3. What hidden assumptions could be wrong?
+4. What data/evidence is missing or cherry-picked?
+5. Is the confidence level justified, or overconfident?
+
+Be AGGRESSIVE and specific. Name concrete failure scenarios.
+
+Format your response as:
+FATAL_FLAWS: [Comma-separated critical weaknesses that could cause total failure]
+EDGE_CASES: [Comma-separated scenarios not covered]
+HIDDEN_ASSUMPTIONS: [Comma-separated assumptions that may be wrong]
+MISSING_EVIDENCE: [What data would be needed to validate this position]
+CONFIDENCE_SHOULD_BE: [0.0-1.0 — what the confidence SHOULD be after considering flaws]
+VERDICT: [REJECT if fatal flaws found, WEAKEN if significant issues, ACCEPT if robust]
+""",
     }
 
     def __init__(
@@ -254,6 +280,7 @@ MAINTAINED_POINTS: [Points you stand by]
         ask_fn: Callable[[str, str], str] | None = None,
         enable_parallel_calls: bool = True,
         enable_confidence_calibration: bool = True,
+        enable_devils_advocate: bool = False,
     ):
         """
         Initialize deliberation system
@@ -263,11 +290,13 @@ MAINTAINED_POINTS: [Points you stand by]
             ask_fn: Optional custom function (agent_type, prompt) -> response
             enable_parallel_calls: Run agent calls in parallel with asyncio.gather
             enable_confidence_calibration: Apply Platt scaling to calibrate confidences
+            enable_devils_advocate: Run adversarial challenge phase after cross-examination
         """
         self.agent_interface = agent_interface
         self.ask_fn = ask_fn
         self.enable_parallel_calls = enable_parallel_calls
         self.enable_confidence_calibration = enable_confidence_calibration
+        self.enable_devils_advocate = enable_devils_advocate
 
         self.deliberation_history: list[DeliberationResult] = []
 
@@ -371,6 +400,13 @@ MAINTAINED_POINTS: [Points you stand by]
             # Phase 2: Cross-examination
             critiques = await self._cross_examine(question, current_opinions)
 
+            # Phase 2.5: Adversarial challenge (devil's advocate)
+            # Run on last round to stress-test the emerging consensus
+            if self.enable_devils_advocate and round_num == max_rounds:
+                current_opinions = await self._run_adversarial_challenge(
+                    question, current_opinions, agents,
+                )
+
             # Calculate convergence
             convergence = self._calculate_convergence(current_opinions)
             consensus_emerging = convergence >= convergence_threshold
@@ -453,6 +489,139 @@ MAINTAINED_POINTS: [Points you stand by]
             f"🎭 Deliberation complete: decision='{decision[:50]}...', "
             f"confidence={confidence:.2%}, rounds={len(rounds)}"
         )
+
+        return result
+
+    async def _run_adversarial_challenge(
+        self,
+        question: str,
+        opinions: list[AgentVote],
+        agents: list[str],
+    ) -> list[AgentVote]:
+        """
+        Devil's Advocate phase: one agent attacks the leading position.
+
+        Selects the agent with the LOWEST confidence in the leading position
+        (or the dissenter) to mount an adversarial challenge. The challenge
+        identifies fatal flaws, edge cases, and hidden assumptions.
+
+        If the challenge finds fatal flaws (VERDICT=REJECT), the leading
+        position's confidence is penalized. This prevents groupthink and
+        overconfidence in consensus decisions.
+
+        Args:
+            question: The deliberation question
+            opinions: Current agent opinions after cross-examination
+            agents: Available agent types
+
+        Returns:
+            Updated opinions with confidence adjustments from the challenge
+        """
+        if len(opinions) < 2:
+            return opinions
+
+        # Find the leading position (highest confidence)
+        leader = max(opinions, key=lambda o: o.confidence)
+
+        # Select devil's advocate — the agent that disagrees most or has lowest confidence
+        # Prefer an agent OTHER than the leader
+        non_leaders = [o for o in opinions if o.agent_id != leader.agent_id]
+        if not non_leaders:
+            return opinions
+
+        # Pick the agent with lowest confidence as devil's advocate
+        devils_advocate = min(non_leaders, key=lambda o: o.confidence)
+
+        prompt = self.PHASE_PROMPTS["devils_advocate"].format(
+            question=question,
+            position=leader.position,
+            confidence=leader.confidence,
+            reasoning=leader.reasoning,
+            evidence=", ".join(leader.evidence),
+        )
+
+        response = await self._ask_agent(devils_advocate.agent_type, prompt)
+        challenge = self._parse_adversarial_challenge(response)
+
+        self._audit_event(
+            "adversarial_challenge",
+            {
+                "challenger": devils_advocate.agent_type,
+                "target": leader.agent_type,
+                "verdict": challenge["verdict"],
+                "fatal_flaws": challenge["fatal_flaws"],
+                "recommended_confidence": challenge["confidence_should_be"],
+            },
+        )
+
+        # Apply confidence penalty based on verdict
+        updated_opinions = []
+        for opinion in opinions:
+            if opinion.agent_id == leader.agent_id:
+                if challenge["verdict"] == "REJECT":
+                    # Severe penalty — fatal flaws found
+                    penalty = 0.3
+                    new_conf = max(0.1, opinion.confidence - penalty)
+                    logger.warning(
+                        f"⚔️ Devil's advocate REJECTS {leader.agent_type}'s position "
+                        f"(confidence {opinion.confidence:.2f} → {new_conf:.2f})"
+                    )
+                    opinion.confidence = new_conf
+                    opinion.evidence.append(f"[CHALLENGED: {', '.join(challenge['fatal_flaws'][:3])}]")
+                elif challenge["verdict"] == "WEAKEN":
+                    # Moderate penalty — significant issues
+                    penalty = 0.15
+                    new_conf = max(0.2, opinion.confidence - penalty)
+                    logger.info(
+                        f"⚔️ Devil's advocate WEAKENS {leader.agent_type}'s position "
+                        f"(confidence {opinion.confidence:.2f} → {new_conf:.2f})"
+                    )
+                    opinion.confidence = new_conf
+                else:
+                    # ACCEPT — position is robust, slight confidence boost
+                    opinion.confidence = min(1.0, opinion.confidence + 0.05)
+                    logger.info(
+                        f"⚔️ Devil's advocate ACCEPTS {leader.agent_type}'s position "
+                        f"(robust under adversarial challenge)"
+                    )
+            updated_opinions.append(opinion)
+
+        return updated_opinions
+
+    def _parse_adversarial_challenge(self, response: str) -> dict[str, Any]:
+        """Parse devil's advocate response into structured challenge."""
+        lines = response.strip().split("\n")
+
+        result: dict[str, Any] = {
+            "fatal_flaws": [],
+            "edge_cases": [],
+            "hidden_assumptions": [],
+            "missing_evidence": "",
+            "confidence_should_be": 0.5,
+            "verdict": "ACCEPT",
+        }
+
+        for line in lines:
+            line = line.strip()
+            if line.startswith("FATAL_FLAWS:"):
+                result["fatal_flaws"] = [f.strip() for f in line.replace("FATAL_FLAWS:", "").split(",") if f.strip()]
+            elif line.startswith("EDGE_CASES:"):
+                result["edge_cases"] = [e.strip() for e in line.replace("EDGE_CASES:", "").split(",") if e.strip()]
+            elif line.startswith("HIDDEN_ASSUMPTIONS:"):
+                result["hidden_assumptions"] = [
+                    a.strip() for a in line.replace("HIDDEN_ASSUMPTIONS:", "").split(",") if a.strip()
+                ]
+            elif line.startswith("MISSING_EVIDENCE:"):
+                result["missing_evidence"] = line.replace("MISSING_EVIDENCE:", "").strip()
+            elif line.startswith("CONFIDENCE_SHOULD_BE:"):
+                try:
+                    result["confidence_should_be"] = float(line.replace("CONFIDENCE_SHOULD_BE:", "").strip())
+                except ValueError:
+                    result["confidence_should_be"] = 0.5
+            elif line.startswith("VERDICT:"):
+                verdict = line.replace("VERDICT:", "").strip().upper()
+                if verdict in ("REJECT", "WEAKEN", "ACCEPT"):
+                    result["verdict"] = verdict
 
         return result
 

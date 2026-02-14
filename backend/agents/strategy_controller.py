@@ -318,6 +318,14 @@ class StrategyController:
                         f"grade={analysis.grade.value}, "
                         f"deployable={analysis.is_deployable}"
                     )
+
+                    # ── Feedback: update ConsensusEngine agent weights ──
+                    self._update_agent_performance(
+                        selected=selected,
+                        bt_result=bt_result,
+                        analysis=analysis,
+                    )
+
                 except Exception as e:
                     logger.warning(f"Metrics analysis failed: {e}")
 
@@ -605,6 +613,54 @@ class StrategyController:
         score += validation.quality_score  # 0-1
 
         return min(10.0, score)
+
+    def _update_agent_performance(
+        self,
+        selected: StrategyDefinition,
+        bt_result: dict[str, Any],
+        analysis: Any,
+    ) -> None:
+        """
+        Feed backtest results back to ConsensusEngine for adaptive weighting.
+
+        After a strategy is backtested, this updates the generating agent's
+        performance record so future consensus rounds use historical accuracy
+        as a weight factor (not just uniform weights).
+
+        Args:
+            selected: The strategy that was backtested
+            bt_result: Raw backtest metrics dict from BacktestBridge
+            analysis: MetricsAnalysis with overall_score, is_deployable, grade
+        """
+        agent_name = "unknown"
+        if selected.agent_metadata and selected.agent_metadata.agent_name:
+            agent_name = selected.agent_metadata.agent_name
+
+        if agent_name == "unknown":
+            logger.debug("Cannot update performance — agent_name not available")
+            return
+
+        sharpe = float(bt_result.get("sharpe_ratio", 0.0) or 0.0)
+        profit_factor = float(bt_result.get("profit_factor", 0.0) or 0.0)
+        win_rate = float(bt_result.get("win_rate", 0.0) or 0.0)
+        backtest_passed = analysis.is_deployable
+
+        self._consensus_engine.update_performance(
+            agent_name=agent_name,
+            sharpe=sharpe,
+            profit_factor=profit_factor,
+            win_rate=win_rate,
+            backtest_passed=backtest_passed,
+        )
+
+        perf = self._consensus_engine.get_performance(agent_name)
+        logger.info(
+            f"🔄 Feedback → {agent_name}: "
+            f"success_rate={perf.success_rate:.0%}, "
+            f"avg_sharpe={perf.avg_sharpe:.2f}, "
+            f"cumulative_score={perf.cumulative_score:.2f} "
+            f"(total={perf.total_strategies})"
+        )
 
     async def _run_backtest(
         self,
