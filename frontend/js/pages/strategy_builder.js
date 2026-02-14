@@ -1128,8 +1128,8 @@ const templates = [
     desc: 'Buy when RSI is oversold, sell when overbought',
     icon: 'graph-up',
     iconColor: 'var(--accent-blue)',
-    blocks: 4,
-    connections: 3,
+    blocks: 6,
+    connections: 8,
     category: 'Mean Reversion',
     difficulty: 'Beginner',
     expectedWinRate: '45-55%'
@@ -1141,7 +1141,7 @@ const templates = [
     icon: 'arrow-up-down',
     iconColor: 'var(--accent-green)',
     blocks: 6,
-    connections: 7,
+    connections: 8,
     category: 'Mean Reversion',
     difficulty: 'Beginner',
     expectedWinRate: '40-50%'
@@ -1152,8 +1152,8 @@ const templates = [
     desc: 'Trade bounces off Bollinger Band boundaries',
     icon: 'distribute-vertical',
     iconColor: 'var(--accent-yellow)',
-    blocks: 6,
-    connections: 5,
+    blocks: 5,
+    connections: 8,
     category: 'Mean Reversion',
     difficulty: 'Intermediate',
     expectedWinRate: '50-60%'
@@ -1180,8 +1180,8 @@ const templates = [
     desc: 'Trade MACD line crossovers with signal line',
     icon: 'bar-chart',
     iconColor: 'var(--accent-purple)',
-    blocks: 5,
-    connections: 4,
+    blocks: 4,
+    connections: 8,
     category: 'Trend Following',
     difficulty: 'Beginner',
     expectedWinRate: '40-50%'
@@ -1192,8 +1192,8 @@ const templates = [
     desc: 'Classic dual EMA crossover strategy',
     icon: 'graph-up-arrow',
     iconColor: 'var(--accent-green)',
-    blocks: 4,
-    connections: 3,
+    blocks: 5,
+    connections: 8,
     category: 'Trend Following',
     difficulty: 'Beginner',
     expectedWinRate: '35-45%'
@@ -11218,6 +11218,16 @@ const templateData = {
         x: 350,
         y: 350,
         params: {}
+      },
+      {
+        id: 'sltp_1',
+        type: 'static_sltp',
+        category: 'exit',
+        name: 'Static SL/TP',
+        icon: 'shield-check',
+        x: 600,
+        y: 450,
+        params: { take_profit_percent: 1.5, stop_loss_percent: 1.5 }
       }
     ],
     connections: [
@@ -11302,6 +11312,16 @@ const templateData = {
         x: 350,
         y: 350,
         params: {}
+      },
+      {
+        id: 'sltp_1',
+        type: 'static_sltp',
+        category: 'exit',
+        name: 'Static SL/TP',
+        icon: 'shield-check',
+        x: 600,
+        y: 450,
+        params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 }
       }
     ],
     connections: [
@@ -11396,6 +11416,16 @@ const templateData = {
         x: 350,
         y: 350,
         params: {}
+      },
+      {
+        id: 'sltp_1',
+        type: 'static_sltp',
+        category: 'exit',
+        name: 'Static SL/TP',
+        icon: 'shield-check',
+        x: 600,
+        y: 450,
+        params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 }
       }
     ],
     connections: [
@@ -11490,6 +11520,16 @@ const templateData = {
         x: 300,
         y: 350,
         params: {}
+      },
+      {
+        id: 'sltp_1',
+        type: 'static_sltp',
+        category: 'exit',
+        name: 'Static SL/TP',
+        icon: 'shield-check',
+        x: 600,
+        y: 450,
+        params: { take_profit_percent: 1.5, stop_loss_percent: 1.5 }
       }
     ],
     connections: [
@@ -11527,6 +11567,18 @@ const templateData = {
         id: 'conn_6',
         source: { blockId: 'greater_than_1', portId: 'result' },
         target: { blockId: 'main_strategy', portId: 'exit_long' },
+        type: 'condition'
+      },
+      {
+        id: 'conn_7',
+        source: { blockId: 'greater_than_1', portId: 'result' },
+        target: { blockId: 'main_strategy', portId: 'entry_short' },
+        type: 'condition'
+      },
+      {
+        id: 'conn_8',
+        source: { blockId: 'less_than_1', portId: 'result' },
+        target: { blockId: 'main_strategy', portId: 'exit_short' },
         type: 'condition'
       }
     ]
@@ -11582,6 +11634,16 @@ const templateData = {
         x: 400,
         y: 400,
         params: {}
+      },
+      {
+        id: 'sltp_1',
+        type: 'static_sltp',
+        category: 'exit',
+        name: 'Static SL/TP',
+        icon: 'shield-check',
+        x: 650,
+        y: 500,
+        params: { take_profit_percent: 1.5, stop_loss_percent: 1.5 }
       }
     ],
     connections: [
