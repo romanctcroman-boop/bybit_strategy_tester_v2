@@ -269,7 +269,7 @@ async def enhanced_health_check():
     response = {
         "overall_status": overall_status,
         "timestamp": utc_now().isoformat().replace("+00:00", "Z"),
-        "components": [c.dict() for c in components],
+        "components": [c.model_dump() for c in components],
         "summary": {
             "healthy": statuses.count("healthy"),
             "degraded": statuses.count("degraded"),
@@ -329,7 +329,7 @@ async def health_dashboard():
         agent_telemetry=get_agent_breaker_snapshot(),
     )
     if overall_status == "unhealthy":
-        raise HTTPException(status_code=503, detail=dashboard.dict())
+        raise HTTPException(status_code=503, detail=dashboard.model_dump())
     return dashboard
 
 

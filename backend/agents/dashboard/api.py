@@ -135,7 +135,7 @@ async def query_metrics(query: MetricQuery):
         return {
             "metric_name": query.metric_name,
             "data": data,
-            "query": query.dict(),
+            "query": query.model_dump(),
         }
     except Exception as e:
         logger.error(f"Error querying metrics: {e}")

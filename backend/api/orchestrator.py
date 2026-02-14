@@ -48,7 +48,7 @@ class OrchestratorRouter:
     async def get_status(self) -> dict[str, Any]:
         """Get orchestrator status"""
         status = get_orchestrator_status()
-        return status.dict()
+        return status.model_dump()
 
     async def get_dashboard_data(self) -> dict[str, Any]:
         """Get dashboard data"""
