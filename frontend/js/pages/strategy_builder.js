@@ -1164,8 +1164,8 @@ const templates = [
     desc: 'Trade oversold/overbought with K/D crossover confirmation',
     icon: 'percent',
     iconColor: 'var(--accent-cyan)',
-    blocks: 5,
-    connections: 4,
+    blocks: 10,
+    connections: 16,
     category: 'Mean Reversion',
     difficulty: 'Intermediate',
     expectedWinRate: '45-55%'
@@ -1205,7 +1205,7 @@ const templates = [
     icon: 'arrow-up-right-circle',
     iconColor: 'var(--accent-teal)',
     blocks: 5,
-    connections: 4,
+    connections: 8,
     category: 'Trend Following',
     difficulty: 'Beginner',
     expectedWinRate: '40-50%'
@@ -1216,8 +1216,8 @@ const templates = [
     desc: 'EMA 9/21/55 with trend confirmation',
     icon: 'layers',
     iconColor: 'var(--accent-indigo)',
-    blocks: 7,
-    connections: 6,
+    blocks: 10,
+    connections: 16,
     category: 'Trend Following',
     difficulty: 'Intermediate',
     expectedWinRate: '45-55%'
@@ -1228,8 +1228,8 @@ const templates = [
     desc: 'Trade with Ichimoku cloud, TK cross and Chikou confirmation',
     icon: 'cloud',
     iconColor: 'var(--accent-pink)',
-    blocks: 8,
-    connections: 7,
+    blocks: 9,
+    connections: 16,
     category: 'Trend Following',
     difficulty: 'Advanced',
     expectedWinRate: '50-60%'
@@ -1244,8 +1244,8 @@ const templates = [
     desc: 'Trade breakouts from consolidation ranges',
     icon: 'arrows-expand',
     iconColor: 'var(--accent-orange)',
-    blocks: 7,
-    connections: 6,
+    blocks: 5,
+    connections: 8,
     category: 'Momentum',
     difficulty: 'Intermediate',
     expectedWinRate: '35-45%'
@@ -1256,8 +1256,8 @@ const templates = [
     desc: 'Classic turtle trading - buy 20-day high, sell 10-day low',
     icon: 'box-arrow-up',
     iconColor: 'var(--accent-amber)',
-    blocks: 6,
-    connections: 5,
+    blocks: 8,
+    connections: 12,
     category: 'Momentum',
     difficulty: 'Intermediate',
     expectedWinRate: '35-45%'
@@ -1268,8 +1268,8 @@ const templates = [
     desc: 'Enter on price breakout with volume confirmation',
     icon: 'bar-chart-steps',
     iconColor: 'var(--accent-lime)',
-    blocks: 6,
-    connections: 5,
+    blocks: 11,
+    connections: 16,
     category: 'Momentum',
     difficulty: 'Intermediate',
     expectedWinRate: '40-50%'
@@ -1284,8 +1284,8 @@ const templates = [
     desc: 'Dollar cost averaging with safety orders on price drops',
     icon: 'grid-3x3',
     iconColor: 'var(--accent-blue)',
-    blocks: 8,
-    connections: 7,
+    blocks: 6,
+    connections: 8,
     category: 'DCA',
     difficulty: 'Intermediate',
     expectedWinRate: '65-75%'
@@ -1297,7 +1297,7 @@ const templates = [
     icon: 'plus-circle',
     iconColor: 'var(--accent-green)',
     blocks: 9,
-    connections: 8,
+    connections: 12,
     category: 'DCA',
     difficulty: 'Intermediate',
     expectedWinRate: '60-70%'
@@ -1309,7 +1309,7 @@ const templates = [
     icon: 'grid',
     iconColor: 'var(--accent-purple)',
     blocks: 7,
-    connections: 6,
+    connections: 12,
     category: 'Grid',
     difficulty: 'Advanced',
     expectedWinRate: '55-65%'
@@ -1324,8 +1324,8 @@ const templates = [
     desc: 'Combine multiple indicators for confirmation',
     icon: 'layers',
     iconColor: 'var(--accent-red)',
-    blocks: 10,
-    connections: 9,
+    blocks: 17,
+    connections: 24,
     category: 'Advanced',
     difficulty: 'Advanced',
     expectedWinRate: '50-60%'
@@ -1336,8 +1336,8 @@ const templates = [
     desc: 'Find RSI/MACD divergences with price',
     icon: 'arrow-left-right',
     iconColor: 'var(--accent-violet)',
-    blocks: 8,
-    connections: 7,
+    blocks: 12,
+    connections: 16,
     category: 'Advanced',
     difficulty: 'Advanced',
     expectedWinRate: '55-65%'
@@ -1348,8 +1348,8 @@ const templates = [
     desc: 'Trade order blocks, FVG and liquidity sweeps',
     icon: 'bank',
     iconColor: 'var(--accent-gold)',
-    blocks: 12,
-    connections: 11,
+    blocks: 18,
+    connections: 24,
     category: 'Advanced',
     difficulty: 'Expert',
     expectedWinRate: '50-60%'
@@ -1360,8 +1360,8 @@ const templates = [
     desc: 'Quick entries with tight stops on small timeframes',
     icon: 'lightning',
     iconColor: 'var(--accent-yellow)',
-    blocks: 9,
-    connections: 8,
+    blocks: 17,
+    connections: 24,
     category: 'Scalping',
     difficulty: 'Expert',
     expectedWinRate: '55-65%'
@@ -1376,8 +1376,8 @@ const templates = [
     desc: 'Enter when volatility expands beyond threshold',
     icon: 'arrows-fullscreen',
     iconColor: 'var(--accent-orange)',
-    blocks: 6,
-    connections: 5,
+    blocks: 10,
+    connections: 14,
     category: 'Volatility',
     difficulty: 'Intermediate',
     expectedWinRate: '40-50%'
@@ -1388,8 +1388,8 @@ const templates = [
     desc: 'Trade breakout after BB width contraction',
     icon: 'arrows-collapse',
     iconColor: 'var(--accent-cyan)',
-    blocks: 7,
-    connections: 6,
+    blocks: 9,
+    connections: 14,
     category: 'Volatility',
     difficulty: 'Intermediate',
     expectedWinRate: '45-55%'
@@ -8243,6 +8243,69 @@ function getBlockPorts(blockId, _category) {
       ]
     },
     adx: { inputs: [], outputs: [{ id: 'value', label: 'ADX', type: 'data' }] },
+    supertrend: {
+      inputs: [],
+      outputs: [
+        { id: 'supertrend', label: 'ST', type: 'data' },
+        { id: 'direction', label: 'Dir', type: 'data' },
+        { id: 'upper', label: 'Up', type: 'data' },
+        { id: 'lower', label: 'Lo', type: 'data' }
+      ]
+    },
+    ichimoku: {
+      inputs: [],
+      outputs: [
+        { id: 'tenkan_sen', label: 'TK', type: 'data' },
+        { id: 'kijun_sen', label: 'KJ', type: 'data' },
+        { id: 'senkou_span_a', label: 'SpA', type: 'data' },
+        { id: 'senkou_span_b', label: 'SpB', type: 'data' },
+        { id: 'chikou_span', label: 'Chi', type: 'data' }
+      ]
+    },
+    donchian: {
+      inputs: [],
+      outputs: [
+        { id: 'upper', label: 'Up', type: 'data' },
+        { id: 'middle', label: 'Mid', type: 'data' },
+        { id: 'lower', label: 'Lo', type: 'data' }
+      ]
+    },
+    keltner: {
+      inputs: [],
+      outputs: [
+        { id: 'upper', label: 'Up', type: 'data' },
+        { id: 'middle', label: 'Mid', type: 'data' },
+        { id: 'lower', label: 'Lo', type: 'data' }
+      ]
+    },
+    obv: { inputs: [], outputs: [{ id: 'value', label: 'OBV', type: 'data' }] },
+    vwap: { inputs: [], outputs: [{ id: 'value', label: 'VWAP', type: 'data' }] },
+    cmf: { inputs: [], outputs: [{ id: 'value', label: 'CMF', type: 'data' }] },
+    cci: { inputs: [], outputs: [{ id: 'value', label: 'CCI', type: 'data' }] },
+    williams_r: { inputs: [], outputs: [{ id: 'value', label: 'W%R', type: 'data' }] },
+    mfi: { inputs: [], outputs: [{ id: 'value', label: 'MFI', type: 'data' }] },
+    roc: { inputs: [], outputs: [{ id: 'value', label: 'ROC', type: 'data' }] },
+    stoch_rsi: {
+      inputs: [],
+      outputs: [
+        { id: 'k', label: '%K', type: 'data' },
+        { id: 'd', label: '%D', type: 'data' }
+      ]
+    },
+    wma: { inputs: [], outputs: [{ id: 'value', label: 'WMA', type: 'data' }] },
+    dema: { inputs: [], outputs: [{ id: 'value', label: 'DEMA', type: 'data' }] },
+    tema: { inputs: [], outputs: [{ id: 'value', label: 'TEMA', type: 'data' }] },
+    hull_ma: { inputs: [], outputs: [{ id: 'value', label: 'HMA', type: 'data' }] },
+    parabolic_sar: { inputs: [], outputs: [{ id: 'value', label: 'SAR', type: 'data' }] },
+    aroon: {
+      inputs: [],
+      outputs: [
+        { id: 'up', label: 'Up', type: 'data' },
+        { id: 'down', label: 'Dn', type: 'data' },
+        { id: 'oscillator', label: 'Osc', type: 'data' }
+      ]
+    },
+    stddev: { inputs: [], outputs: [{ id: 'value', label: 'StD', type: 'data' }] },
 
     // Conditions - input data, output bool
     crossover: {
@@ -11703,6 +11766,675 @@ const templateData = {
         target: { blockId: 'main_strategy', portId: 'exit_short' },
         type: 'condition'
       }
+    ]
+  },
+
+  // =============================================
+  // STOCHASTIC REVERSAL — %K/%D crossover at oversold/overbought
+  // =============================================
+  stochastic_oversold: {
+    blocks: [
+      { id: 'stoch_1', type: 'stochastic', category: 'indicator', name: 'Stochastic', icon: 'percent', x: 80, y: 150, params: { k_period: 14, d_period: 3, smooth: 3 } },
+      { id: 'const_20', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 350, params: { value: 20 } },
+      { id: 'const_80', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 450, params: { value: 80 } },
+      { id: 'crossover_1', type: 'crossover', category: 'condition', name: 'K cross D up', icon: 'intersect', x: 320, y: 120, params: {} },
+      { id: 'crossunder_1', type: 'crossunder', category: 'condition', name: 'K cross D down', icon: 'intersect', x: 320, y: 280, params: {} },
+      { id: 'less_than_1', type: 'less_than', category: 'condition', name: 'K < 20', icon: 'chevron-double-down', x: 320, y: 420, params: {} },
+      { id: 'greater_than_1', type: 'greater_than', category: 'condition', name: 'K > 80', icon: 'chevron-double-up', x: 320, y: 540, params: {} },
+      { id: 'and_entry_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 170, params: {} },
+      { id: 'and_entry_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 380, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 700, y: 500, params: { take_profit_percent: 1.5, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      // K crossover D (bullish)
+      { id: 'conn_1', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'crossover_1', portId: 'a' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'stoch_1', portId: 'd' }, target: { blockId: 'crossover_1', portId: 'b' }, type: 'data' },
+      // K crossunder D (bearish)
+      { id: 'conn_3', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'crossunder_1', portId: 'a' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'stoch_1', portId: 'd' }, target: { blockId: 'crossunder_1', portId: 'b' }, type: 'data' },
+      // K < 20 (oversold zone)
+      { id: 'conn_5', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'less_than_1', portId: 'left' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'const_20', portId: 'value' }, target: { blockId: 'less_than_1', portId: 'right' }, type: 'data' },
+      // K > 80 (overbought zone)
+      { id: 'conn_7', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'greater_than_1', portId: 'left' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'const_80', portId: 'value' }, target: { blockId: 'greater_than_1', portId: 'right' }, type: 'data' },
+      // AND: crossover + oversold → entry long
+      { id: 'conn_9', source: { blockId: 'crossover_1', portId: 'result' }, target: { blockId: 'and_entry_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'less_than_1', portId: 'result' }, target: { blockId: 'and_entry_long', portId: 'b' }, type: 'condition' },
+      // AND: crossunder + overbought → entry short
+      { id: 'conn_11', source: { blockId: 'crossunder_1', portId: 'result' }, target: { blockId: 'and_entry_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'greater_than_1', portId: 'result' }, target: { blockId: 'and_entry_short', portId: 'b' }, type: 'condition' },
+      // Strategy connections
+      { id: 'conn_13', source: { blockId: 'and_entry_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'and_entry_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_15', source: { blockId: 'and_entry_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_16', source: { blockId: 'and_entry_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // SUPERTREND FOLLOWER — direction flips
+  // =============================================
+  supertrend_follow: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 80, y: 150, params: {} },
+      { id: 'st_1', type: 'supertrend', category: 'indicator', name: 'SuperTrend', icon: 'arrow-up-right-circle', x: 80, y: 320, params: { period: 10, multiplier: 3.0 } },
+      { id: 'crossover_1', type: 'crossover', category: 'condition', name: 'Price cross above ST', icon: 'intersect', x: 340, y: 150, params: {} },
+      { id: 'crossunder_1', type: 'crossunder', category: 'condition', name: 'Price cross below ST', icon: 'intersect', x: 340, y: 350, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 600, y: 450, params: { take_profit_percent: 2.5, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossover_1', portId: 'a' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'st_1', portId: 'supertrend' }, target: { blockId: 'crossover_1', portId: 'b' }, type: 'data' },
+      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossunder_1', portId: 'a' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'st_1', portId: 'supertrend' }, target: { blockId: 'crossunder_1', portId: 'b' }, type: 'data' },
+      { id: 'conn_5', source: { blockId: 'crossover_1', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_6', source: { blockId: 'crossunder_1', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_7', source: { blockId: 'crossunder_1', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_8', source: { blockId: 'crossover_1', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // TRIPLE EMA — EMA 9/21/55 alignment
+  // =============================================
+  triple_ema: {
+    blocks: [
+      { id: 'ema_9', type: 'ema', category: 'indicator', name: 'EMA 9', icon: 'graph-up-arrow', x: 80, y: 100, params: { period: 9 } },
+      { id: 'ema_21', type: 'ema', category: 'indicator', name: 'EMA 21', icon: 'graph-up-arrow', x: 80, y: 250, params: { period: 21 } },
+      { id: 'ema_55', type: 'ema', category: 'indicator', name: 'EMA 55', icon: 'graph-up-arrow', x: 80, y: 400, params: { period: 55 } },
+      { id: 'crossover_fast', type: 'crossover', category: 'condition', name: 'EMA9 cross EMA21 up', icon: 'intersect', x: 320, y: 120, params: {} },
+      { id: 'gt_trend', type: 'greater_than', category: 'condition', name: 'EMA21 > EMA55', icon: 'chevron-double-up', x: 320, y: 280, params: {} },
+      { id: 'crossunder_fast', type: 'crossunder', category: 'condition', name: 'EMA9 cross EMA21 down', icon: 'intersect', x: 320, y: 420, params: {} },
+      { id: 'lt_trend', type: 'less_than', category: 'condition', name: 'EMA21 < EMA55', icon: 'chevron-double-down', x: 320, y: 560, params: {} },
+      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 180, params: {} },
+      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 470, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 720, y: 500, params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      // EMA9 crossover EMA21
+      { id: 'conn_1', source: { blockId: 'ema_9', portId: 'value' }, target: { blockId: 'crossover_fast', portId: 'a' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'ema_21', portId: 'value' }, target: { blockId: 'crossover_fast', portId: 'b' }, type: 'data' },
+      // EMA21 > EMA55 (uptrend)
+      { id: 'conn_3', source: { blockId: 'ema_21', portId: 'value' }, target: { blockId: 'gt_trend', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'ema_55', portId: 'value' }, target: { blockId: 'gt_trend', portId: 'right' }, type: 'data' },
+      // EMA9 crossunder EMA21
+      { id: 'conn_5', source: { blockId: 'ema_9', portId: 'value' }, target: { blockId: 'crossunder_fast', portId: 'a' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'ema_21', portId: 'value' }, target: { blockId: 'crossunder_fast', portId: 'b' }, type: 'data' },
+      // EMA21 < EMA55 (downtrend)
+      { id: 'conn_7', source: { blockId: 'ema_21', portId: 'value' }, target: { blockId: 'lt_trend', portId: 'left' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'ema_55', portId: 'value' }, target: { blockId: 'lt_trend', portId: 'right' }, type: 'data' },
+      // AND: crossover + uptrend → entry long
+      { id: 'conn_9', source: { blockId: 'crossover_fast', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'gt_trend', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
+      // AND: crossunder + downtrend → entry short
+      { id: 'conn_11', source: { blockId: 'crossunder_fast', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'lt_trend', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
+      // Strategy
+      { id: 'conn_13', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_15', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_16', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // ICHIMOKU CLOUD — TK cross + price above/below cloud
+  // =============================================
+  ichimoku_cloud: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 80, params: {} },
+      { id: 'ich_1', type: 'ichimoku', category: 'indicator', name: 'Ichimoku', icon: 'cloud', x: 60, y: 250, params: { tenkan: 9, kijun: 26, senkou_b: 52 } },
+      { id: 'crossover_tk', type: 'crossover', category: 'condition', name: 'TK cross up', icon: 'intersect', x: 310, y: 80, params: {} },
+      { id: 'gt_cloud', type: 'greater_than', category: 'condition', name: 'Close > SpanA', icon: 'chevron-double-up', x: 310, y: 230, params: {} },
+      { id: 'crossunder_tk', type: 'crossunder', category: 'condition', name: 'TK cross down', icon: 'intersect', x: 310, y: 380, params: {} },
+      { id: 'lt_cloud', type: 'less_than', category: 'condition', name: 'Close < SpanB', icon: 'chevron-double-down', x: 310, y: 520, params: {} },
+      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 140, params: {} },
+      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 430, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 720, y: 500, params: { take_profit_percent: 2.5, stop_loss_percent: 2.0 } }
+    ],
+    connections: [
+      // Tenkan crossover Kijun
+      { id: 'conn_1', source: { blockId: 'ich_1', portId: 'tenkan_sen' }, target: { blockId: 'crossover_tk', portId: 'a' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'ich_1', portId: 'kijun_sen' }, target: { blockId: 'crossover_tk', portId: 'b' }, type: 'data' },
+      // Close > Senkou Span A (above cloud)
+      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_cloud', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'ich_1', portId: 'senkou_span_a' }, target: { blockId: 'gt_cloud', portId: 'right' }, type: 'data' },
+      // Tenkan crossunder Kijun
+      { id: 'conn_5', source: { blockId: 'ich_1', portId: 'tenkan_sen' }, target: { blockId: 'crossunder_tk', portId: 'a' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'ich_1', portId: 'kijun_sen' }, target: { blockId: 'crossunder_tk', portId: 'b' }, type: 'data' },
+      // Close < Senkou Span B (below cloud)
+      { id: 'conn_7', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_cloud', portId: 'left' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'ich_1', portId: 'senkou_span_b' }, target: { blockId: 'lt_cloud', portId: 'right' }, type: 'data' },
+      // AND: TK cross up + above cloud → entry long
+      { id: 'conn_9', source: { blockId: 'crossover_tk', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'gt_cloud', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
+      // AND: TK cross down + below cloud → entry short
+      { id: 'conn_11', source: { blockId: 'crossunder_tk', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'lt_cloud', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
+      // Strategy
+      { id: 'conn_13', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_15', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_16', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // BREAKOUT — Price breaks above/below Donchian channel
+  // =============================================
+  breakout: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 80, y: 150, params: {} },
+      { id: 'dc_1', type: 'donchian', category: 'indicator', name: 'Donchian 20', icon: 'distribute-vertical', x: 80, y: 320, params: { period: 20 } },
+      { id: 'gt_upper', type: 'greater_than', category: 'condition', name: 'Close > Upper', icon: 'chevron-double-up', x: 340, y: 150, params: {} },
+      { id: 'lt_lower', type: 'less_than', category: 'condition', name: 'Close < Lower', icon: 'chevron-double-down', x: 340, y: 350, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 600, y: 450, params: { take_profit_percent: 3.0, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_upper', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'dc_1', portId: 'upper' }, target: { blockId: 'gt_upper', portId: 'right' }, type: 'data' },
+      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_lower', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'dc_1', portId: 'lower' }, target: { blockId: 'lt_lower', portId: 'right' }, type: 'data' },
+      { id: 'conn_5', source: { blockId: 'gt_upper', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_6', source: { blockId: 'lt_lower', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_7', source: { blockId: 'lt_lower', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_8', source: { blockId: 'gt_upper', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // DONCHIAN CHANNEL BREAKOUT — Classic turtle: buy 20-day high, sell 10-day low
+  // =============================================
+  donchian_breakout: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
+      { id: 'dc_entry', type: 'donchian', category: 'indicator', name: 'Donchian Entry (20)', icon: 'distribute-vertical', x: 60, y: 270, params: { period: 20 } },
+      { id: 'dc_exit', type: 'donchian', category: 'indicator', name: 'Donchian Exit (10)', icon: 'distribute-vertical', x: 60, y: 440, params: { period: 10 } },
+      { id: 'gt_entry', type: 'greater_than', category: 'condition', name: 'Close > DC20 Upper', icon: 'chevron-double-up', x: 330, y: 100, params: {} },
+      { id: 'lt_exit_long', type: 'less_than', category: 'condition', name: 'Close < DC10 Lower', icon: 'chevron-double-down', x: 330, y: 260, params: {} },
+      { id: 'lt_entry_short', type: 'less_than', category: 'condition', name: 'Close < DC20 Lower', icon: 'chevron-double-down', x: 330, y: 400, params: {} },
+      { id: 'gt_exit_short', type: 'greater_than', category: 'condition', name: 'Close > DC10 Upper', icon: 'chevron-double-up', x: 330, y: 540, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 620, y: 500, params: { take_profit_percent: 3.0, stop_loss_percent: 2.0 } }
+    ],
+    connections: [
+      // Entry long: Close > DC20 upper
+      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_entry', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'dc_entry', portId: 'upper' }, target: { blockId: 'gt_entry', portId: 'right' }, type: 'data' },
+      // Exit long: Close < DC10 lower
+      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_exit_long', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'dc_exit', portId: 'lower' }, target: { blockId: 'lt_exit_long', portId: 'right' }, type: 'data' },
+      // Entry short: Close < DC20 lower
+      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_entry_short', portId: 'left' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'dc_entry', portId: 'lower' }, target: { blockId: 'lt_entry_short', portId: 'right' }, type: 'data' },
+      // Exit short: Close > DC10 upper
+      { id: 'conn_7', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_exit_short', portId: 'left' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'dc_exit', portId: 'upper' }, target: { blockId: 'gt_exit_short', portId: 'right' }, type: 'data' },
+      // Strategy
+      { id: 'conn_9', source: { blockId: 'gt_entry', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'lt_exit_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_11', source: { blockId: 'lt_entry_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'gt_exit_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // VOLUME BREAKOUT — Price breakout + OBV confirmation
+  // =============================================
+  volume_breakout: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
+      { id: 'bb_1', type: 'bollinger', category: 'indicator', name: 'Bollinger', icon: 'distribute-vertical', x: 60, y: 270, params: { period: 20, stdDev: 2 } },
+      { id: 'obv_1', type: 'obv', category: 'indicator', name: 'OBV', icon: 'bar-chart-steps', x: 60, y: 440, params: {} },
+      { id: 'obv_sma', type: 'sma', category: 'indicator', name: 'OBV SMA', icon: 'graph-up-arrow', x: 60, y: 580, params: { period: 20 } },
+      { id: 'gt_bb', type: 'greater_than', category: 'condition', name: 'Close > BB Upper', icon: 'chevron-double-up', x: 320, y: 100, params: {} },
+      { id: 'gt_obv', type: 'greater_than', category: 'condition', name: 'OBV > OBV SMA', icon: 'chevron-double-up', x: 320, y: 280, params: {} },
+      { id: 'lt_bb', type: 'less_than', category: 'condition', name: 'Close < BB Lower', icon: 'chevron-double-down', x: 320, y: 420, params: {} },
+      { id: 'lt_obv', type: 'less_than', category: 'condition', name: 'OBV < OBV SMA', icon: 'chevron-double-down', x: 320, y: 560, params: {} },
+      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 540, y: 170, params: {} },
+      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 540, y: 470, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 720, y: 520, params: { take_profit_percent: 2.5, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      // Close > BB Upper
+      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_bb', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'bb_1', portId: 'upper' }, target: { blockId: 'gt_bb', portId: 'right' }, type: 'data' },
+      // OBV > OBV SMA (volume confirming)
+      { id: 'conn_3', source: { blockId: 'obv_1', portId: 'value' }, target: { blockId: 'gt_obv', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'obv_sma', portId: 'value' }, target: { blockId: 'gt_obv', portId: 'right' }, type: 'data' },
+      // Close < BB Lower
+      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_bb', portId: 'left' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'bb_1', portId: 'lower' }, target: { blockId: 'lt_bb', portId: 'right' }, type: 'data' },
+      // OBV < OBV SMA
+      { id: 'conn_7', source: { blockId: 'obv_1', portId: 'value' }, target: { blockId: 'lt_obv', portId: 'left' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'obv_sma', portId: 'value' }, target: { blockId: 'lt_obv', portId: 'right' }, type: 'data' },
+      // AND long
+      { id: 'conn_9', source: { blockId: 'gt_bb', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'gt_obv', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
+      // AND short
+      { id: 'conn_11', source: { blockId: 'lt_bb', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'lt_obv', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
+      // Strategy
+      { id: 'conn_13', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_15', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_16', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // SIMPLE DCA — RSI-based DCA entries with TP
+  // =============================================
+  simple_dca: {
+    blocks: [
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 80, y: 150, params: { period: 14, overbought: 70, oversold: 30 } },
+      { id: 'const_40', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 320, params: { value: 40 } },
+      { id: 'const_60', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 440, params: { value: 60 } },
+      { id: 'lt_entry', type: 'less_than', category: 'condition', name: 'RSI < 40', icon: 'chevron-double-down', x: 330, y: 180, params: {} },
+      { id: 'gt_exit', type: 'greater_than', category: 'condition', name: 'RSI > 60', icon: 'chevron-double-up', x: 330, y: 380, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 600, y: 450, params: { take_profit_percent: 1.0, stop_loss_percent: 3.0 } }
+    ],
+    connections: [
+      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_entry', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'const_40', portId: 'value' }, target: { blockId: 'lt_entry', portId: 'right' }, type: 'data' },
+      { id: 'conn_3', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_exit', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'const_60', portId: 'value' }, target: { blockId: 'gt_exit', portId: 'right' }, type: 'data' },
+      { id: 'conn_5', source: { blockId: 'lt_entry', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_6', source: { blockId: 'gt_exit', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_7', source: { blockId: 'gt_exit', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_8', source: { blockId: 'lt_entry', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // RSI DCA — RSI oversold entries with mean reversion exit
+  // =============================================
+  rsi_dca: {
+    blocks: [
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 80, y: 150, params: { period: 14, overbought: 70, oversold: 30 } },
+      { id: 'const_25', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 320, params: { value: 25 } },
+      { id: 'const_50', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 440, params: { value: 50 } },
+      { id: 'const_75', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 560, params: { value: 75 } },
+      { id: 'lt_25', type: 'less_than', category: 'condition', name: 'RSI < 25', icon: 'chevron-double-down', x: 330, y: 180, params: {} },
+      { id: 'gt_50', type: 'greater_than', category: 'condition', name: 'RSI > 50', icon: 'chevron-double-up', x: 330, y: 350, params: {} },
+      { id: 'gt_75', type: 'greater_than', category: 'condition', name: 'RSI > 75', icon: 'chevron-double-up', x: 330, y: 500, params: {} },
+      { id: 'lt_50', type: 'less_than', category: 'condition', name: 'RSI < 50', icon: 'chevron-double-down', x: 330, y: 640, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 620, y: 550, params: { take_profit_percent: 1.5, stop_loss_percent: 3.0 } }
+    ],
+    connections: [
+      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_25', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'const_25', portId: 'value' }, target: { blockId: 'lt_25', portId: 'right' }, type: 'data' },
+      { id: 'conn_3', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_50', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'const_50', portId: 'value' }, target: { blockId: 'gt_50', portId: 'right' }, type: 'data' },
+      { id: 'conn_5', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_75', portId: 'left' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'const_75', portId: 'value' }, target: { blockId: 'gt_75', portId: 'right' }, type: 'data' },
+      { id: 'conn_7', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_50', portId: 'left' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'const_50', portId: 'value' }, target: { blockId: 'lt_50', portId: 'right' }, type: 'data' },
+      // Entry/Exit
+      { id: 'conn_9', source: { blockId: 'lt_25', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'gt_50', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_11', source: { blockId: 'gt_75', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'lt_50', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // GRID TRADING — Bollinger Band grid using upper/lower/middle
+  // =============================================
+  grid_trading: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
+      { id: 'bb_1', type: 'bollinger', category: 'indicator', name: 'Bollinger Bands', icon: 'distribute-vertical', x: 60, y: 280, params: { period: 20, stdDev: 2 } },
+      { id: 'lt_lower', type: 'less_than', category: 'condition', name: 'Close < BB Lower', icon: 'chevron-double-down', x: 320, y: 100, params: {} },
+      { id: 'crossover_mid', type: 'crossover', category: 'condition', name: 'Close cross Mid up', icon: 'intersect', x: 320, y: 260, params: {} },
+      { id: 'gt_upper', type: 'greater_than', category: 'condition', name: 'Close > BB Upper', icon: 'chevron-double-up', x: 320, y: 400, params: {} },
+      { id: 'crossunder_mid', type: 'crossunder', category: 'condition', name: 'Close cross Mid down', icon: 'intersect', x: 320, y: 540, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 620, y: 480, params: { take_profit_percent: 1.0, stop_loss_percent: 2.0 } }
+    ],
+    connections: [
+      // Close < BB Lower → entry long
+      { id: 'conn_1', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_lower', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'bb_1', portId: 'lower' }, target: { blockId: 'lt_lower', portId: 'right' }, type: 'data' },
+      // Close crossover middle → exit long
+      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossover_mid', portId: 'a' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'bb_1', portId: 'middle' }, target: { blockId: 'crossover_mid', portId: 'b' }, type: 'data' },
+      // Close > BB Upper → entry short
+      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_upper', portId: 'left' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'bb_1', portId: 'upper' }, target: { blockId: 'gt_upper', portId: 'right' }, type: 'data' },
+      // Close crossunder middle → exit short
+      { id: 'conn_7', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossunder_mid', portId: 'a' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'bb_1', portId: 'middle' }, target: { blockId: 'crossunder_mid', portId: 'b' }, type: 'data' },
+      // Strategy
+      { id: 'conn_9', source: { blockId: 'lt_lower', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'crossover_mid', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_11', source: { blockId: 'gt_upper', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'crossunder_mid', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // MULTI-INDICATOR CONFLUENCE — RSI + MACD + EMA
+  // =============================================
+  multi_indicator: {
+    blocks: [
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 60, y: 80, params: { period: 14, overbought: 70, oversold: 30 } },
+      { id: 'macd_1', type: 'macd', category: 'indicator', name: 'MACD', icon: 'bar-chart', x: 60, y: 220, params: { fast: 12, slow: 26, signal: 9 } },
+      { id: 'ema_fast', type: 'ema', category: 'indicator', name: 'EMA 9', icon: 'graph-up-arrow', x: 60, y: 380, params: { period: 9 } },
+      { id: 'ema_slow', type: 'ema', category: 'indicator', name: 'EMA 21', icon: 'graph-up-arrow', x: 60, y: 500, params: { period: 21 } },
+      { id: 'const_30', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 620, params: { value: 30 } },
+      { id: 'const_70', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 720, params: { value: 70 } },
+      // Conditions
+      { id: 'lt_rsi', type: 'less_than', category: 'condition', name: 'RSI < 30', icon: 'chevron-double-down', x: 300, y: 80, params: {} },
+      { id: 'crossover_macd', type: 'crossover', category: 'condition', name: 'MACD cross signal up', icon: 'intersect', x: 300, y: 220, params: {} },
+      { id: 'gt_ema', type: 'greater_than', category: 'condition', name: 'EMA9 > EMA21', icon: 'chevron-double-up', x: 300, y: 380, params: {} },
+      { id: 'gt_rsi', type: 'greater_than', category: 'condition', name: 'RSI > 70', icon: 'chevron-double-up', x: 300, y: 520, params: {} },
+      { id: 'crossunder_macd', type: 'crossunder', category: 'condition', name: 'MACD cross signal down', icon: 'intersect', x: 300, y: 640, params: {} },
+      { id: 'lt_ema', type: 'less_than', category: 'condition', name: 'EMA9 < EMA21', icon: 'chevron-double-down', x: 300, y: 760, params: {} },
+      // Logic
+      { id: 'and_rsi_macd_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 140, params: {} },
+      { id: 'and_full_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 700, y: 220, params: {} },
+      { id: 'and_rsi_macd_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 560, params: {} },
+      { id: 'and_full_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 700, y: 640, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 880, y: 500, params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      // RSI < 30
+      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'const_30', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'right' }, type: 'data' },
+      // MACD crossover signal
+      { id: 'conn_3', source: { blockId: 'macd_1', portId: 'macd' }, target: { blockId: 'crossover_macd', portId: 'a' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'macd_1', portId: 'signal' }, target: { blockId: 'crossover_macd', portId: 'b' }, type: 'data' },
+      // EMA9 > EMA21
+      { id: 'conn_5', source: { blockId: 'ema_fast', portId: 'value' }, target: { blockId: 'gt_ema', portId: 'left' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'ema_slow', portId: 'value' }, target: { blockId: 'gt_ema', portId: 'right' }, type: 'data' },
+      // RSI > 70
+      { id: 'conn_7', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'left' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'const_70', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'right' }, type: 'data' },
+      // MACD crossunder signal
+      { id: 'conn_9', source: { blockId: 'macd_1', portId: 'macd' }, target: { blockId: 'crossunder_macd', portId: 'a' }, type: 'data' },
+      { id: 'conn_10', source: { blockId: 'macd_1', portId: 'signal' }, target: { blockId: 'crossunder_macd', portId: 'b' }, type: 'data' },
+      // EMA9 < EMA21
+      { id: 'conn_11', source: { blockId: 'ema_fast', portId: 'value' }, target: { blockId: 'lt_ema', portId: 'left' }, type: 'data' },
+      { id: 'conn_12', source: { blockId: 'ema_slow', portId: 'value' }, target: { blockId: 'lt_ema', portId: 'right' }, type: 'data' },
+      // AND: RSI oversold + MACD cross up
+      { id: 'conn_13', source: { blockId: 'lt_rsi', portId: 'result' }, target: { blockId: 'and_rsi_macd_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'crossover_macd', portId: 'result' }, target: { blockId: 'and_rsi_macd_long', portId: 'b' }, type: 'condition' },
+      // AND: (RSI+MACD) + EMA bullish
+      { id: 'conn_15', source: { blockId: 'and_rsi_macd_long', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_16', source: { blockId: 'gt_ema', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'b' }, type: 'condition' },
+      // AND: RSI overbought + MACD cross down
+      { id: 'conn_17', source: { blockId: 'gt_rsi', portId: 'result' }, target: { blockId: 'and_rsi_macd_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_18', source: { blockId: 'crossunder_macd', portId: 'result' }, target: { blockId: 'and_rsi_macd_short', portId: 'b' }, type: 'condition' },
+      // AND: (RSI+MACD) + EMA bearish
+      { id: 'conn_19', source: { blockId: 'and_rsi_macd_short', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_20', source: { blockId: 'lt_ema', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'b' }, type: 'condition' },
+      // Strategy
+      { id: 'conn_21', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_22', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_23', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_24', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // DIVERGENCE HUNTER — RSI divergence via RSI slope vs price slope
+  // =============================================
+  divergence_hunter: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 60, y: 260, params: { period: 14, overbought: 70, oversold: 30 } },
+      { id: 'const_30', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 420, params: { value: 30 } },
+      { id: 'const_70', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 530, params: { value: 70 } },
+      { id: 'ema_price', type: 'ema', category: 'indicator', name: 'EMA Price', icon: 'graph-up-arrow', x: 60, y: 640, params: { period: 14 } },
+      // RSI oversold + price crossing EMA = bullish divergence signal
+      { id: 'lt_rsi', type: 'less_than', category: 'condition', name: 'RSI < 30', icon: 'chevron-double-down', x: 310, y: 100, params: {} },
+      { id: 'crossover_price', type: 'crossover', category: 'condition', name: 'Close cross EMA up', icon: 'intersect', x: 310, y: 260, params: {} },
+      { id: 'gt_rsi', type: 'greater_than', category: 'condition', name: 'RSI > 70', icon: 'chevron-double-up', x: 310, y: 420, params: {} },
+      { id: 'crossunder_price', type: 'crossunder', category: 'condition', name: 'Close cross EMA down', icon: 'intersect', x: 310, y: 560, params: {} },
+      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 160, params: {} },
+      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 530, y: 470, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 720, y: 500, params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      // RSI < 30
+      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'const_30', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'right' }, type: 'data' },
+      // Price crossover EMA
+      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossover_price', portId: 'a' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'ema_price', portId: 'value' }, target: { blockId: 'crossover_price', portId: 'b' }, type: 'data' },
+      // RSI > 70
+      { id: 'conn_5', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'left' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'const_70', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'right' }, type: 'data' },
+      // Price crossunder EMA
+      { id: 'conn_7', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossunder_price', portId: 'a' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'ema_price', portId: 'value' }, target: { blockId: 'crossunder_price', portId: 'b' }, type: 'data' },
+      // AND long: RSI oversold + price bounce
+      { id: 'conn_9', source: { blockId: 'lt_rsi', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'crossover_price', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
+      // AND short: RSI overbought + price rejection
+      { id: 'conn_11', source: { blockId: 'gt_rsi', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'crossunder_price', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
+      // Strategy
+      { id: 'conn_13', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_15', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_16', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // SMART MONEY CONCEPT — OBV + RSI + SuperTrend confluence
+  // =============================================
+  smart_money: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 40, y: 80, params: {} },
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 40, y: 220, params: { period: 14, overbought: 70, oversold: 30 } },
+      { id: 'obv_1', type: 'obv', category: 'indicator', name: 'OBV', icon: 'bar-chart-steps', x: 40, y: 370, params: {} },
+      { id: 'obv_ema', type: 'ema', category: 'indicator', name: 'OBV EMA', icon: 'graph-up-arrow', x: 40, y: 510, params: { period: 21 } },
+      { id: 'st_1', type: 'supertrend', category: 'indicator', name: 'SuperTrend', icon: 'arrow-up-right-circle', x: 40, y: 650, params: { period: 10, multiplier: 3.0 } },
+      { id: 'const_40', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 40, y: 780, params: { value: 40 } },
+      { id: 'const_60', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 40, y: 870, params: { value: 60 } },
+      // Conditions
+      { id: 'lt_rsi', type: 'less_than', category: 'condition', name: 'RSI < 40', icon: 'chevron-double-down', x: 280, y: 80, params: {} },
+      { id: 'gt_obv', type: 'greater_than', category: 'condition', name: 'OBV > OBV EMA', icon: 'chevron-double-up', x: 280, y: 220, params: {} },
+      { id: 'gt_st', type: 'greater_than', category: 'condition', name: 'Close > ST', icon: 'chevron-double-up', x: 280, y: 370, params: {} },
+      { id: 'gt_rsi', type: 'greater_than', category: 'condition', name: 'RSI > 60', icon: 'chevron-double-up', x: 280, y: 510, params: {} },
+      { id: 'lt_obv', type: 'less_than', category: 'condition', name: 'OBV < OBV EMA', icon: 'chevron-double-down', x: 280, y: 650, params: {} },
+      { id: 'lt_st', type: 'less_than', category: 'condition', name: 'Close < ST', icon: 'chevron-double-down', x: 280, y: 780, params: {} },
+      // Logic
+      { id: 'and_rsi_obv_l', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 500, y: 140, params: {} },
+      { id: 'and_full_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 680, y: 240, params: {} },
+      { id: 'and_rsi_obv_s', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 500, y: 560, params: {} },
+      { id: 'and_full_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 680, y: 660, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 860, y: 500, params: { take_profit_percent: 2.5, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      // RSI < 40
+      { id: 'conn_1', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'const_40', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'right' }, type: 'data' },
+      // OBV > OBV EMA
+      { id: 'conn_3', source: { blockId: 'obv_1', portId: 'value' }, target: { blockId: 'gt_obv', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'obv_ema', portId: 'value' }, target: { blockId: 'gt_obv', portId: 'right' }, type: 'data' },
+      // Close > SuperTrend
+      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_st', portId: 'left' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'st_1', portId: 'supertrend' }, target: { blockId: 'gt_st', portId: 'right' }, type: 'data' },
+      // RSI > 60
+      { id: 'conn_7', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'left' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'const_60', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'right' }, type: 'data' },
+      // OBV < OBV EMA
+      { id: 'conn_9', source: { blockId: 'obv_1', portId: 'value' }, target: { blockId: 'lt_obv', portId: 'left' }, type: 'data' },
+      { id: 'conn_10', source: { blockId: 'obv_ema', portId: 'value' }, target: { blockId: 'lt_obv', portId: 'right' }, type: 'data' },
+      // Close < SuperTrend
+      { id: 'conn_11', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_st', portId: 'left' }, type: 'data' },
+      { id: 'conn_12', source: { blockId: 'st_1', portId: 'supertrend' }, target: { blockId: 'lt_st', portId: 'right' }, type: 'data' },
+      // AND: RSI low + OBV rising
+      { id: 'conn_13', source: { blockId: 'lt_rsi', portId: 'result' }, target: { blockId: 'and_rsi_obv_l', portId: 'a' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'gt_obv', portId: 'result' }, target: { blockId: 'and_rsi_obv_l', portId: 'b' }, type: 'condition' },
+      // AND: (RSI+OBV) + SuperTrend bullish
+      { id: 'conn_15', source: { blockId: 'and_rsi_obv_l', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_16', source: { blockId: 'gt_st', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'b' }, type: 'condition' },
+      // AND: RSI high + OBV falling
+      { id: 'conn_17', source: { blockId: 'gt_rsi', portId: 'result' }, target: { blockId: 'and_rsi_obv_s', portId: 'a' }, type: 'condition' },
+      { id: 'conn_18', source: { blockId: 'lt_obv', portId: 'result' }, target: { blockId: 'and_rsi_obv_s', portId: 'b' }, type: 'condition' },
+      // AND: (RSI+OBV) + SuperTrend bearish
+      { id: 'conn_19', source: { blockId: 'and_rsi_obv_s', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_20', source: { blockId: 'lt_st', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'b' }, type: 'condition' },
+      // Strategy
+      { id: 'conn_21', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_22', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_23', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_24', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // SCALPING PRO — EMA + RSI + Stochastic quick entries
+  // =============================================
+  scalping_pro: {
+    blocks: [
+      { id: 'ema_5', type: 'ema', category: 'indicator', name: 'EMA 5', icon: 'graph-up-arrow', x: 50, y: 80, params: { period: 5 } },
+      { id: 'ema_13', type: 'ema', category: 'indicator', name: 'EMA 13', icon: 'graph-up-arrow', x: 50, y: 210, params: { period: 13 } },
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 50, y: 350, params: { period: 7, overbought: 70, oversold: 30 } },
+      { id: 'stoch_1', type: 'stochastic', category: 'indicator', name: 'Stochastic', icon: 'percent', x: 50, y: 500, params: { k_period: 5, d_period: 3, smooth: 3 } },
+      { id: 'const_30', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 50, y: 640, params: { value: 30 } },
+      { id: 'const_70', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 50, y: 730, params: { value: 70 } },
+      // Conditions
+      { id: 'crossover_ema', type: 'crossover', category: 'condition', name: 'EMA5 cross EMA13 up', icon: 'intersect', x: 290, y: 80, params: {} },
+      { id: 'lt_rsi', type: 'less_than', category: 'condition', name: 'RSI < 30', icon: 'chevron-double-down', x: 290, y: 230, params: {} },
+      { id: 'crossover_stoch', type: 'crossover', category: 'condition', name: 'K cross D up', icon: 'intersect', x: 290, y: 370, params: {} },
+      { id: 'crossunder_ema', type: 'crossunder', category: 'condition', name: 'EMA5 cross EMA13 dn', icon: 'intersect', x: 290, y: 510, params: {} },
+      { id: 'gt_rsi', type: 'greater_than', category: 'condition', name: 'RSI > 70', icon: 'chevron-double-up', x: 290, y: 650, params: {} },
+      { id: 'crossunder_stoch', type: 'crossunder', category: 'condition', name: 'K cross D down', icon: 'intersect', x: 290, y: 770, params: {} },
+      // Logic
+      { id: 'and_ema_rsi_l', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 500, y: 140, params: {} },
+      { id: 'and_full_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 680, y: 220, params: {} },
+      { id: 'and_ema_rsi_s', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 500, y: 560, params: {} },
+      { id: 'and_full_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 680, y: 650, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 860, y: 450, params: { take_profit_percent: 0.8, stop_loss_percent: 0.5 } }
+    ],
+    connections: [
+      // EMA5 crossover EMA13
+      { id: 'conn_1', source: { blockId: 'ema_5', portId: 'value' }, target: { blockId: 'crossover_ema', portId: 'a' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'ema_13', portId: 'value' }, target: { blockId: 'crossover_ema', portId: 'b' }, type: 'data' },
+      // RSI < 30
+      { id: 'conn_3', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'const_30', portId: 'value' }, target: { blockId: 'lt_rsi', portId: 'right' }, type: 'data' },
+      // Stochastic K crossover D
+      { id: 'conn_5', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'crossover_stoch', portId: 'a' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'stoch_1', portId: 'd' }, target: { blockId: 'crossover_stoch', portId: 'b' }, type: 'data' },
+      // EMA5 crossunder EMA13
+      { id: 'conn_7', source: { blockId: 'ema_5', portId: 'value' }, target: { blockId: 'crossunder_ema', portId: 'a' }, type: 'data' },
+      { id: 'conn_8', source: { blockId: 'ema_13', portId: 'value' }, target: { blockId: 'crossunder_ema', portId: 'b' }, type: 'data' },
+      // RSI > 70
+      { id: 'conn_9', source: { blockId: 'rsi_1', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'left' }, type: 'data' },
+      { id: 'conn_10', source: { blockId: 'const_70', portId: 'value' }, target: { blockId: 'gt_rsi', portId: 'right' }, type: 'data' },
+      // Stochastic K crossunder D
+      { id: 'conn_11', source: { blockId: 'stoch_1', portId: 'k' }, target: { blockId: 'crossunder_stoch', portId: 'a' }, type: 'data' },
+      { id: 'conn_12', source: { blockId: 'stoch_1', portId: 'd' }, target: { blockId: 'crossunder_stoch', portId: 'b' }, type: 'data' },
+      // AND: EMA cross + RSI oversold
+      { id: 'conn_13', source: { blockId: 'crossover_ema', portId: 'result' }, target: { blockId: 'and_ema_rsi_l', portId: 'a' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'lt_rsi', portId: 'result' }, target: { blockId: 'and_ema_rsi_l', portId: 'b' }, type: 'condition' },
+      // AND: (EMA+RSI) + Stoch bullish
+      { id: 'conn_15', source: { blockId: 'and_ema_rsi_l', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_16', source: { blockId: 'crossover_stoch', portId: 'result' }, target: { blockId: 'and_full_long', portId: 'b' }, type: 'condition' },
+      // AND: EMA cross down + RSI overbought
+      { id: 'conn_17', source: { blockId: 'crossunder_ema', portId: 'result' }, target: { blockId: 'and_ema_rsi_s', portId: 'a' }, type: 'condition' },
+      { id: 'conn_18', source: { blockId: 'gt_rsi', portId: 'result' }, target: { blockId: 'and_ema_rsi_s', portId: 'b' }, type: 'condition' },
+      // AND: (EMA+RSI) + Stoch bearish
+      { id: 'conn_19', source: { blockId: 'and_ema_rsi_s', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_20', source: { blockId: 'crossunder_stoch', portId: 'result' }, target: { blockId: 'and_full_short', portId: 'b' }, type: 'condition' },
+      // Strategy
+      { id: 'conn_21', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_22', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_23', source: { blockId: 'and_full_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_24', source: { blockId: 'and_full_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // ATR VOLATILITY BREAKOUT — ATR threshold + price break
+  // =============================================
+  atr_breakout: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
+      { id: 'atr_1', type: 'atr', category: 'indicator', name: 'ATR', icon: 'arrows-fullscreen', x: 60, y: 260, params: { period: 14 } },
+      { id: 'sma_atr', type: 'sma', category: 'indicator', name: 'ATR SMA', icon: 'graph-up-arrow', x: 60, y: 400, params: { period: 20 } },
+      { id: 'ema_1', type: 'ema', category: 'indicator', name: 'EMA 20', icon: 'graph-up-arrow', x: 60, y: 540, params: { period: 20 } },
+      // ATR > ATR SMA (volatility expanding)
+      { id: 'gt_atr', type: 'greater_than', category: 'condition', name: 'ATR > ATR SMA', icon: 'chevron-double-up', x: 310, y: 100, params: {} },
+      // Price > EMA (bullish)
+      { id: 'gt_ema', type: 'greater_than', category: 'condition', name: 'Close > EMA', icon: 'chevron-double-up', x: 310, y: 260, params: {} },
+      // Price < EMA (bearish)
+      { id: 'lt_ema', type: 'less_than', category: 'condition', name: 'Close < EMA', icon: 'chevron-double-down', x: 310, y: 420, params: {} },
+      // Logic
+      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 160, params: {} },
+      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 380, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 700, y: 460, params: { take_profit_percent: 3.0, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      // ATR > ATR SMA
+      { id: 'conn_1', source: { blockId: 'atr_1', portId: 'value' }, target: { blockId: 'gt_atr', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'sma_atr', portId: 'value' }, target: { blockId: 'gt_atr', portId: 'right' }, type: 'data' },
+      // Close > EMA
+      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'gt_ema', portId: 'left' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'ema_1', portId: 'value' }, target: { blockId: 'gt_ema', portId: 'right' }, type: 'data' },
+      // Close < EMA
+      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'lt_ema', portId: 'left' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'ema_1', portId: 'value' }, target: { blockId: 'lt_ema', portId: 'right' }, type: 'data' },
+      // AND: volatility expanding + bullish
+      { id: 'conn_7', source: { blockId: 'gt_atr', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_8', source: { blockId: 'gt_ema', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
+      // AND: volatility expanding + bearish
+      { id: 'conn_9', source: { blockId: 'gt_atr', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'lt_ema', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
+      // Strategy
+      { id: 'conn_11', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_13', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
+    ]
+  },
+
+  // =============================================
+  // BOLLINGER SQUEEZE — BB width contraction then breakout
+  // =============================================
+  bb_squeeze: {
+    blocks: [
+      { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 50, y: 80, params: {} },
+      { id: 'bb_1', type: 'bollinger', category: 'indicator', name: 'Bollinger', icon: 'distribute-vertical', x: 50, y: 240, params: { period: 20, stdDev: 2 } },
+      { id: 'kc_1', type: 'keltner', category: 'indicator', name: 'Keltner', icon: 'distribute-vertical', x: 50, y: 410, params: { period: 20, multiplier: 1.5 } },
+      // BB upper < KC upper = squeeze (BB inside KC)
+      { id: 'lt_squeeze', type: 'less_than', category: 'condition', name: 'BB Up < KC Up', icon: 'chevron-double-down', x: 300, y: 80, params: {} },
+      // Price breaks above BB upper after squeeze = bullish
+      { id: 'crossover_bb', type: 'crossover', category: 'condition', name: 'Close cross BB Up', icon: 'intersect', x: 300, y: 240, params: {} },
+      // Price breaks below BB lower after squeeze = bearish
+      { id: 'crossunder_bb', type: 'crossunder', category: 'condition', name: 'Close cross BB Lo', icon: 'intersect', x: 300, y: 400, params: {} },
+      // Logic
+      { id: 'and_long', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 140, params: {} },
+      { id: 'and_short', type: 'and', category: 'logic', name: 'AND', icon: 'diagram-3', x: 520, y: 350, params: {} },
+      { id: 'sltp_1', type: 'static_sltp', category: 'exit', name: 'Static SL/TP', icon: 'shield-check', x: 700, y: 430, params: { take_profit_percent: 2.5, stop_loss_percent: 1.5 } }
+    ],
+    connections: [
+      // BB upper < KC upper (squeeze active)
+      { id: 'conn_1', source: { blockId: 'bb_1', portId: 'upper' }, target: { blockId: 'lt_squeeze', portId: 'left' }, type: 'data' },
+      { id: 'conn_2', source: { blockId: 'kc_1', portId: 'upper' }, target: { blockId: 'lt_squeeze', portId: 'right' }, type: 'data' },
+      // Close crossover BB upper
+      { id: 'conn_3', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossover_bb', portId: 'a' }, type: 'data' },
+      { id: 'conn_4', source: { blockId: 'bb_1', portId: 'upper' }, target: { blockId: 'crossover_bb', portId: 'b' }, type: 'data' },
+      // Close crossunder BB lower
+      { id: 'conn_5', source: { blockId: 'price_1', portId: 'close' }, target: { blockId: 'crossunder_bb', portId: 'a' }, type: 'data' },
+      { id: 'conn_6', source: { blockId: 'bb_1', portId: 'lower' }, target: { blockId: 'crossunder_bb', portId: 'b' }, type: 'data' },
+      // AND: squeeze + bullish breakout
+      { id: 'conn_7', source: { blockId: 'lt_squeeze', portId: 'result' }, target: { blockId: 'and_long', portId: 'a' }, type: 'condition' },
+      { id: 'conn_8', source: { blockId: 'crossover_bb', portId: 'result' }, target: { blockId: 'and_long', portId: 'b' }, type: 'condition' },
+      // AND: squeeze + bearish breakout
+      { id: 'conn_9', source: { blockId: 'lt_squeeze', portId: 'result' }, target: { blockId: 'and_short', portId: 'a' }, type: 'condition' },
+      { id: 'conn_10', source: { blockId: 'crossunder_bb', portId: 'result' }, target: { blockId: 'and_short', portId: 'b' }, type: 'condition' },
+      // Strategy
+      { id: 'conn_11', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_long' }, type: 'condition' },
+      { id: 'conn_12', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_long' }, type: 'condition' },
+      { id: 'conn_13', source: { blockId: 'and_short', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'entry_short' }, type: 'condition' },
+      { id: 'conn_14', source: { blockId: 'and_long', portId: 'result' }, target: { blockId: 'main_strategy', portId: 'exit_short' }, type: 'condition' }
     ]
   }
 };
