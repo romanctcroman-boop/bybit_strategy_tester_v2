@@ -232,61 +232,126 @@ class StrategyBuilderAdapter(BaseStrategy):
     # Block type → category mapping for auto-inference when blocks lack 'category'
     _BLOCK_CATEGORY_MAP: dict[str, str] = {
         # Input blocks
-        "price": "input", "volume": "input", "constant": "input", "candle_data": "input",
+        "price": "input",
+        "volume": "input",
+        "constant": "input",
+        "candle_data": "input",
         # Indicator blocks
-        "rsi": "indicator", "ema": "indicator", "sma": "indicator", "wma": "indicator",
-        "dema": "indicator", "tema": "indicator", "hull_ma": "indicator",
-        "macd": "indicator", "bollinger": "indicator", "atr": "indicator",
-        "stochastic": "indicator", "stoch_rsi": "indicator", "adx": "indicator",
-        "cci": "indicator", "mfi": "indicator", "obv": "indicator",
-        "williams_r": "indicator", "roc": "indicator", "supertrend": "indicator",
-        "ichimoku": "indicator", "keltner": "indicator", "donchian": "indicator",
-        "vwap": "indicator", "parabolic_sar": "indicator", "pivot_points": "indicator",
-        "cmf": "indicator", "cmo": "indicator", "pvt": "indicator", "ad_line": "indicator",
-        "aroon": "indicator", "stddev": "indicator", "atrp": "indicator",
-        "qqe": "indicator", "qqe_cross": "indicator", "momentum": "indicator",
+        "rsi": "indicator",
+        "ema": "indicator",
+        "sma": "indicator",
+        "wma": "indicator",
+        "dema": "indicator",
+        "tema": "indicator",
+        "hull_ma": "indicator",
+        "macd": "indicator",
+        "bollinger": "indicator",
+        "atr": "indicator",
+        "stochastic": "indicator",
+        "stoch_rsi": "indicator",
+        "adx": "indicator",
+        "cci": "indicator",
+        "mfi": "indicator",
+        "obv": "indicator",
+        "williams_r": "indicator",
+        "roc": "indicator",
+        "supertrend": "indicator",
+        "ichimoku": "indicator",
+        "keltner": "indicator",
+        "donchian": "indicator",
+        "vwap": "indicator",
+        "parabolic_sar": "indicator",
+        "pivot_points": "indicator",
+        "cmf": "indicator",
+        "cmo": "indicator",
+        "pvt": "indicator",
+        "ad_line": "indicator",
+        "aroon": "indicator",
+        "stddev": "indicator",
+        "atrp": "indicator",
+        "qqe": "indicator",
+        "qqe_cross": "indicator",
+        "momentum": "indicator",
         # Condition blocks
-        "crossover": "condition", "crossunder": "condition",
-        "greater_than": "condition", "less_than": "condition",
-        "between": "condition", "equals": "condition",
-        "threshold": "condition", "compare": "condition", "cross": "condition",
+        "crossover": "condition",
+        "crossunder": "condition",
+        "greater_than": "condition",
+        "less_than": "condition",
+        "between": "condition",
+        "equals": "condition",
+        "threshold": "condition",
+        "compare": "condition",
+        "cross": "condition",
         # Logic blocks
-        "and": "logic", "or": "logic", "not": "logic",
-        "delay": "logic", "filter": "logic", "comparison": "logic",
+        "and": "logic",
+        "or": "logic",
+        "not": "logic",
+        "delay": "logic",
+        "filter": "logic",
+        "comparison": "logic",
         # Action blocks
-        "buy": "action", "buy_market": "action", "buy_limit": "action",
-        "sell": "action", "sell_market": "action", "sell_limit": "action",
-        "close_long": "action", "close_short": "action", "close_all": "action",
-        "stop_loss": "action", "take_profit": "action", "trailing_stop": "action",
-        "break_even": "action", "profit_lock": "action", "scale_out": "action",
-        "multi_tp": "action", "atr_stop": "action", "chandelier_stop": "action",
+        "buy": "action",
+        "buy_market": "action",
+        "buy_limit": "action",
+        "sell": "action",
+        "sell_market": "action",
+        "sell_limit": "action",
+        "close_long": "action",
+        "close_short": "action",
+        "close_all": "action",
+        "stop_loss": "action",
+        "take_profit": "action",
+        "trailing_stop": "action",
+        "break_even": "action",
+        "profit_lock": "action",
+        "scale_out": "action",
+        "multi_tp": "action",
+        "atr_stop": "action",
+        "chandelier_stop": "action",
         "static_sltp": "action",
         # Filter blocks
-        "rsi_filter": "filter", "supertrend_filter": "filter",
-        "two_ma_filter": "filter", "volume_filter": "filter",
-        "time_filter": "filter", "volatility_filter": "filter",
-        "adx_filter": "filter", "session_filter": "filter",
+        "rsi_filter": "filter",
+        "supertrend_filter": "filter",
+        "two_ma_filter": "filter",
+        "volume_filter": "filter",
+        "time_filter": "filter",
+        "volatility_filter": "filter",
+        "adx_filter": "filter",
+        "session_filter": "filter",
         # Exit blocks
-        "trailing_stop_exit": "exit", "atr_exit": "atr_exit", "multi_tp_exit": "multiple_tp",
+        "trailing_stop_exit": "exit",
+        "atr_exit": "atr_exit",
+        "multi_tp_exit": "multiple_tp",
         # Position sizing
-        "fixed_size": "sizing", "percent_balance": "sizing", "risk_percent": "sizing",
+        "fixed_size": "sizing",
+        "percent_balance": "sizing",
+        "risk_percent": "sizing",
         # Signal blocks
-        "long_entry": "signal", "short_entry": "signal",
-        "long_exit": "signal", "short_exit": "signal",
-        "buy_signal": "signal", "sell_signal": "signal",
+        "long_entry": "signal",
+        "short_entry": "signal",
+        "long_exit": "signal",
+        "short_exit": "signal",
+        "buy_signal": "signal",
+        "sell_signal": "signal",
         # Smart signals
-        "smart_rsi": "smart_signals", "smart_macd": "smart_signals",
-        "smart_bollinger": "smart_signals", "smart_stochastic": "smart_signals",
+        "smart_rsi": "smart_signals",
+        "smart_macd": "smart_signals",
+        "smart_bollinger": "smart_signals",
+        "smart_stochastic": "smart_signals",
         "smart_supertrend": "smart_signals",
         # Strategy aggregator
         "strategy": "strategy",
         # DCA/Grid
-        "dca_grid": "dca_grid", "dca": "dca_grid",
+        "dca_grid": "dca_grid",
+        "dca": "dca_grid",
         # Price action
-        "engulfing": "price_action", "hammer": "price_action",
-        "doji": "price_action", "pinbar": "price_action",
+        "engulfing": "price_action",
+        "hammer": "price_action",
+        "doji": "price_action",
+        "pinbar": "price_action",
         # Divergence
-        "divergence": "divergence", "rsi_divergence": "divergence",
+        "divergence": "divergence",
+        "rsi_divergence": "divergence",
     }
 
     @classmethod
@@ -296,8 +361,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             return cls._BLOCK_CATEGORY_MAP[block_type]
         # Heuristic fallback for prefixed types
         for prefix, cat in [
-            ("indicator_", "indicator"), ("condition_", "condition"),
-            ("action_", "action"), ("filter_", "filter"),
+            ("indicator_", "indicator"),
+            ("condition_", "condition"),
+            ("action_", "action"),
+            ("filter_", "filter"),
             ("smart_", "smart_signals"),
         ]:
             if block_type.startswith(prefix):
@@ -851,34 +918,39 @@ class StrategyBuilderAdapter(BaseStrategy):
     def _execute_condition(
         self, condition_type: str, params: dict[str, Any], inputs: dict[str, pd.Series]
     ) -> dict[str, pd.Series]:
-        """Execute a condition block"""
+        """Execute a condition block.
+
+        Supports port name variants from different frontend versions:
+        - 'a'/'b' (legacy)
+        - 'left'/'right' (current frontend port IDs for greater_than/less_than)
+        """
         if condition_type == "crossover":
-            a = inputs.get("a", pd.Series([False] * 100))
-            b = inputs.get("b", pd.Series([False] * 100))
+            a = inputs.get("a", inputs.get("left", pd.Series([False] * 100)))
+            b = inputs.get("b", inputs.get("right", pd.Series([False] * 100)))
             result = (a > b) & (a.shift(1) <= b.shift(1))
             return {"result": result}
 
         elif condition_type == "crossunder":
-            a = inputs.get("a", pd.Series([False] * 100))
-            b = inputs.get("b", pd.Series([False] * 100))
+            a = inputs.get("a", inputs.get("left", pd.Series([False] * 100)))
+            b = inputs.get("b", inputs.get("right", pd.Series([False] * 100)))
             result = (a < b) & (a.shift(1) >= b.shift(1))
             return {"result": result}
 
         elif condition_type == "greater_than":
-            a = inputs.get("a", pd.Series([0] * 100))
-            b = inputs.get("b", pd.Series([0] * 100))
+            a = inputs.get("a", inputs.get("left", pd.Series([0] * 100)))
+            b = inputs.get("b", inputs.get("right", pd.Series([0] * 100)))
             result = a > b
             return {"result": result}
 
         elif condition_type == "less_than":
-            a = inputs.get("a", pd.Series([0] * 100))
-            b = inputs.get("b", pd.Series([0] * 100))
+            a = inputs.get("a", inputs.get("left", pd.Series([0] * 100)))
+            b = inputs.get("b", inputs.get("right", pd.Series([0] * 100)))
             result = a < b
             return {"result": result}
 
         elif condition_type == "equals":
-            a = inputs.get("a", pd.Series([0] * 100))
-            b = inputs.get("b", pd.Series([0] * 100))
+            a = inputs.get("a", inputs.get("left", pd.Series([0] * 100)))
+            b = inputs.get("b", inputs.get("right", pd.Series([0] * 100)))
             result = a == b
             return {"result": result}
 
@@ -3261,6 +3333,17 @@ class StrategyBuilderAdapter(BaseStrategy):
             outputs = self._execute_block(block_id, ohlcv)
             self._value_cache[block_id] = outputs
 
+            # Diagnostic logging for signal tracing
+            if outputs:
+                for port_id, series in outputs.items():
+                    if hasattr(series, 'sum') and series.dtype == bool:
+                        true_count = int(series.sum())
+                        if true_count > 0:
+                            logger.debug(
+                                f"[SignalTrace] Block '{block_type}' ({block_id}) "
+                                f"port '{port_id}': {true_count} True signals"
+                            )
+
         # Find main strategy node and collect entry/exit signals
         main_node_id = None
         main_node = None
@@ -3426,6 +3509,13 @@ class StrategyBuilderAdapter(BaseStrategy):
                     extra_data["trailing_percent"] = float(trail_dist)
                     extra_data["trail_type"] = cached.get("trail_type", "percent")
                 break  # Only one trailing_stop_exit block expected
+
+        logger.info(
+            f"[SignalSummary] Strategy '{self.name}': "
+            f"entries={int(entries.sum())}, exits={int(exits.sum())}, "
+            f"short_entries={int(short_entries.sum())}, short_exits={int(short_exits.sum())}, "
+            f"blocks={len(self.blocks)}, connections={len(self.connections)}"
+        )
 
         return SignalResult(
             entries=entries,
