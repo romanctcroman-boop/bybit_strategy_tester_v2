@@ -12047,6 +12047,75 @@ function updateZoom() {
   document.getElementById('blocksContainer').style.transformOrigin = '0 0';
 }
 
+// =============================================
+// EXIT BLOCK TYPES (standalone — backend reads from builder_blocks, no connections needed)
+// =============================================
+const EXIT_BLOCK_TYPES = new Set([
+  'static_sltp', 'trailing_stop_exit', 'atr_exit', 'time_exit',
+  'session_exit', 'break_even_exit', 'chandelier_exit',
+  'partial_close', 'multi_tp_exit',
+  'tp_percent', 'sl_percent',
+  'rsi_close', 'stoch_close', 'channel_close', 'ma_close',
+  'psar_close', 'time_bars_close'
+]);
+
+/**
+ * Quick 3-part validation for pre-backtest check.
+ * Returns { valid, errors[], warnings[] } without updating UI panels.
+ *
+ * Part 1: Parameters (symbol, dates, capital)
+ * Part 2: Entry conditions (connections to entry_long/entry_short)
+ * Part 3: Exit conditions (exit blocks OR connections to exit_long/exit_short)
+ */
+function validateStrategyCompleteness() {
+  const result = { valid: true, errors: [], warnings: [] };
+
+  const mainNode = strategyBlocks.find((b) => b.isMain);
+  if (!mainNode) {
+    result.valid = false;
+    result.errors.push('Main strategy node is missing');
+    return result;
+  }
+
+  // Part 1: Parameters
+  const symbol = document.getElementById('backtestSymbol')?.value?.trim();
+  const startDate = document.getElementById('backtestStartDate')?.value?.trim();
+  const endDate = document.getElementById('backtestEndDate')?.value?.trim();
+  const capital = parseFloat(document.getElementById('backtestCapital')?.value);
+  if (!symbol) { result.valid = false; result.errors.push('⚙️ Параметры: не выбран Symbol'); }
+  if (!startDate || !endDate) { result.valid = false; result.errors.push('⚙️ Параметры: не заданы даты'); }
+  if (!capital || capital <= 0) { result.valid = false; result.errors.push('⚙️ Параметры: Capital должен быть > 0'); }
+
+  // Part 2: Entry conditions
+  const hasEntryLong = connections.some((c) =>
+    c.target.blockId === mainNode.id && c.target.portId === 'entry_long'
+  );
+  const hasEntryShort = connections.some((c) =>
+    c.target.blockId === mainNode.id && c.target.portId === 'entry_short'
+  );
+  if (!hasEntryLong && !hasEntryShort) {
+    result.valid = false;
+    result.errors.push('🟢 Вход: нет условий входа (подключите сигналы к Entry Long или Entry Short)');
+  }
+
+  // Part 3: Exit conditions
+  const hasExitBlocks = strategyBlocks.some((b) =>
+    !b.isMain && EXIT_BLOCK_TYPES.has(b.type)
+  );
+  const hasExitSignals = connections.some((c) =>
+    c.target.blockId === mainNode.id &&
+    (c.target.portId === 'exit_long' || c.target.portId === 'exit_short')
+  );
+  if (!hasExitBlocks && !hasExitSignals) {
+    result.valid = false;
+    result.errors.push('🔴 Выход: нет условий выхода (добавьте блок SL/TP или подключите сигналы к Exit Long/Exit Short)');
+  } else if (!hasExitBlocks) {
+    result.warnings.push('🔴 Выход: нет блока SL/TP — нет защиты стоп-лоссом');
+  }
+
+  return result;
+}
+
 // Strategy actions
 async function validateStrategy() {
   try {
@@ -12062,6 +12131,10 @@ async function validateStrategy() {
       warnings: []
     };
 
+    // =============================================
+    // PART 0: BASIC STRUCTURE
+    // =============================================
+
     // Check for blocks
     if (strategyBlocks.length === 0) {
       result.valid = false;
@@ -12073,36 +12146,117 @@ async function validateStrategy() {
     if (!mainNode) {
       result.valid = false;
       result.errors.push('Main strategy node is missing');
-    } else {
-      // Check for connections to main strategy node
-      const hasConnections = connections.some((c) =>
-        c.target.blockId === mainNode.id || c.source.blockId === mainNode.id
-      );
-      if (!hasConnections) {
-        result.warnings.push('Strategy node has no connections');
-      }
+    }
 
-      // Check for entry signals (connected to main strategy)
-      const entryConnections = connections.filter((c) => c.target.blockId === mainNode.id);
-      if (entryConnections.length === 0) {
-        result.warnings.push('No signals connected to strategy node');
+    // =============================================
+    // PART 1: PARAMETERS (Properties panel)
+    // =============================================
+    const symbol = document.getElementById('backtestSymbol')?.value?.trim();
+    const startDate = document.getElementById('backtestStartDate')?.value?.trim();
+    const endDate = document.getElementById('backtestEndDate')?.value?.trim();
+    const capital = parseFloat(document.getElementById('backtestCapital')?.value);
+
+    if (!symbol) {
+      result.valid = false;
+      result.errors.push('⚙️ Parameters: Symbol not selected');
+    }
+    if (!startDate || !endDate) {
+      result.valid = false;
+      result.errors.push('⚙️ Parameters: Start/End date not set');
+    }
+    if (!capital || capital <= 0) {
+      result.valid = false;
+      result.errors.push('⚙️ Parameters: Initial capital must be > 0');
+    }
+
+    // =============================================
+    // PART 2: ENTRY CONDITIONS
+    // =============================================
+    if (mainNode) {
+      const entryLongConns = connections.filter((c) =>
+        c.target.blockId === mainNode.id && c.target.portId === 'entry_long'
+      );
+      const entryShortConns = connections.filter((c) =>
+        c.target.blockId === mainNode.id && c.target.portId === 'entry_short'
+      );
+
+      const hasEntryLong = entryLongConns.length > 0;
+      const hasEntryShort = entryShortConns.length > 0;
+
+      if (!hasEntryLong && !hasEntryShort) {
+        result.valid = false;
+        result.errors.push('🟢 Entry: No entry conditions connected (connect signals to Entry Long or Entry Short)');
       } else {
-        // Check if at least one connection comes from a condition block
-        const hasConditionSignals = entryConnections.some((c) => {
+        // Check that connected sources are condition/logic blocks
+        const allEntryConns = [...entryLongConns, ...entryShortConns];
+        const hasConditionSignals = allEntryConns.some((c) => {
           const sourceBlock = strategyBlocks.find((b) => b.id === c.source.blockId);
           return sourceBlock && (
-            sourceBlock.type === 'less_than' ||
-            sourceBlock.type === 'greater_than' ||
-            sourceBlock.type === 'crossover' ||
-            sourceBlock.type === 'and' ||
-            sourceBlock.type === 'or'
+            sourceBlock.category === 'condition' ||
+            sourceBlock.category === 'logic' ||
+            ['less_than', 'greater_than', 'crossover', 'crossunder', 'equals', 'between', 'and', 'or', 'not'].includes(sourceBlock.type)
           );
         });
         if (!hasConditionSignals) {
-          result.warnings.push('No condition blocks connected to strategy node');
+          result.warnings.push('🟢 Entry: Entry ports connected but no condition blocks detected');
+        }
+
+        // Info about which entries are connected
+        if (hasEntryLong && !hasEntryShort) {
+          result.warnings.push('🟢 Entry: Only Long entries — consider adding Short for "both" direction');
+        } else if (!hasEntryLong && hasEntryShort) {
+          result.warnings.push('🟢 Entry: Only Short entries — consider adding Long for "both" direction');
         }
       }
     }
+
+    // =============================================
+    // PART 3: EXIT CONDITIONS
+    // =============================================
+    // Check for exit blocks (standalone — backend reads them from builder_blocks)
+    const exitBlocks = strategyBlocks.filter((b) =>
+      !b.isMain && EXIT_BLOCK_TYPES.has(b.type)
+    );
+    const hasExitBlocks = exitBlocks.length > 0;
+
+    // Check for signal-based exits (connections to exit_long/exit_short)
+    let hasExitSignals = false;
+    if (mainNode) {
+      const exitLongConns = connections.filter((c) =>
+        c.target.blockId === mainNode.id && c.target.portId === 'exit_long'
+      );
+      const exitShortConns = connections.filter((c) =>
+        c.target.blockId === mainNode.id && c.target.portId === 'exit_short'
+      );
+      hasExitSignals = exitLongConns.length > 0 || exitShortConns.length > 0;
+    }
+
+    if (!hasExitBlocks && !hasExitSignals) {
+      result.valid = false;
+      result.errors.push('🔴 Exit: No exit conditions (add SL/TP block or connect signals to Exit Long/Exit Short)');
+    } else {
+      // Detailed info about exits
+      const exitInfo = [];
+      if (hasExitBlocks) {
+        const exitNames = exitBlocks.map((b) => b.name || b.type).join(', ');
+        exitInfo.push(`blocks: ${exitNames}`);
+      }
+      if (hasExitSignals) {
+        exitInfo.push('signal exits connected');
+      }
+
+      // Warn if no SL/TP specifically (risk management)
+      const hasSLTP = exitBlocks.some((b) =>
+        b.type === 'static_sltp' || b.type === 'tp_percent' || b.type === 'sl_percent' || b.type === 'atr_exit'
+      );
+      if (!hasSLTP) {
+        result.warnings.push('🔴 Exit: No SL/TP block — trades have no stop-loss protection');
+      }
+    }
+
+    // =============================================
+    // DISCONNECTED BLOCKS CHECK
+    // =============================================
 
     // Check for disconnected blocks (blocks without connections)
     const connectedBlockIds = new Set();
@@ -12110,12 +12264,18 @@ async function validateStrategy() {
       connectedBlockIds.add(c.source.blockId);
       connectedBlockIds.add(c.target.blockId);
     });
-    const disconnectedBlocks = strategyBlocks.filter((b) => !b.isMain && !connectedBlockIds.has(b.id));
+    // Exit blocks don't need connections (backend reads them from builder_blocks)
+    const disconnectedBlocks = strategyBlocks.filter((b) =>
+      !b.isMain && !connectedBlockIds.has(b.id) && !EXIT_BLOCK_TYPES.has(b.type)
+    );
     if (disconnectedBlocks.length > 0) {
       result.warnings.push(`${disconnectedBlocks.length} block(s) are not connected`);
     }
 
-    // NEW: Validate block parameters
+    // =============================================
+    // BLOCK PARAMETER VALIDATION
+    // =============================================
+
     let blocksWithInvalidParams = 0;
     strategyBlocks.forEach((block) => {
       if (block.isMain) return; // Skip main strategy node
@@ -13293,6 +13453,24 @@ async function runBacktest() {
   if (strategyBlocks.length === 0) {
     showNotification('Добавьте блоки в стратегию перед бэктестом', 'warning');
     return;
+  }
+
+  // =============================================
+  // PRE-BACKTEST VALIDATION (3-part check)
+  // =============================================
+  const preCheck = validateStrategyCompleteness();
+  if (!preCheck.valid) {
+    const errorMsg = preCheck.errors.join('\n');
+    showNotification(`Стратегия не готова к бэктесту:\n${errorMsg}`, 'error');
+    // Also trigger full validation panel
+    await validateStrategy();
+    const vPanel = document.querySelector('.validation-panel');
+    if (vPanel) { vPanel.classList.remove('closing'); vPanel.classList.add('visible'); }
+    return;
+  }
+  // Show warnings but allow backtest to proceed
+  if (preCheck.warnings.length > 0) {
+    console.log('[Strategy Builder] Backtest warnings:', preCheck.warnings);
   }
 
   const symbol = document.getElementById('backtestSymbol')?.value?.trim();

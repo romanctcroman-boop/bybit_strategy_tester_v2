@@ -2129,6 +2129,51 @@ async def run_backtest_from_builder(
             detail="Strategy has no blocks. Add blocks before running backtest.",
         )
 
+    # =============================================
+    # 3-PART VALIDATION: Parameters, Entry, Exit
+    # =============================================
+    blocks = db_strategy.builder_blocks or []
+    conns = db_strategy.builder_connections or []
+    validation_errors: list[str] = []
+
+    # Part 2: Entry conditions — at least one connection to entry_long or entry_short
+    entry_ports = {"entry_long", "entry_short"}
+    has_entry = any(c.get("target", {}).get("portId") in entry_ports for c in conns)
+    if not has_entry:
+        validation_errors.append("No entry conditions: connect signals to Entry Long or Entry Short ports.")
+
+    # Part 3: Exit conditions — exit block present OR connection to exit_long/exit_short
+    exit_block_types = {
+        "static_sltp",
+        "trailing_stop_exit",
+        "atr_exit",
+        "time_exit",
+        "session_exit",
+        "break_even_exit",
+        "chandelier_exit",
+        "partial_close",
+        "multi_tp_exit",
+        "tp_percent",
+        "sl_percent",
+        "rsi_close",
+        "stoch_close",
+        "channel_close",
+        "ma_close",
+        "psar_close",
+        "time_bars_close",
+    }
+    has_exit_block = any(b.get("type") in exit_block_types for b in blocks)
+    exit_ports = {"exit_long", "exit_short"}
+    has_exit_signal = any(c.get("target", {}).get("portId") in exit_ports for c in conns)
+    if not has_exit_block and not has_exit_signal:
+        validation_errors.append("No exit conditions: add SL/TP block or connect signals to Exit Long/Exit Short.")
+
+    if validation_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Strategy incomplete: " + " | ".join(validation_errors),
+        )
+
     # Extract market_type and direction
     # Priority: request > builder_graph > default
     market_type = request.market_type or "linear"
