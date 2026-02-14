@@ -4,7 +4,7 @@ description: "Execute code changes with full editing capabilities. Implements fe
 tools: ["search", "read", "edit", "create", "listDir", "grep", "semanticSearch", "listCodeUsages", "terminalCommand", "runTests", "getErrors", "fetch"]
 model:
     - "Claude Sonnet 4 (copilot)"
-    - "Claude Sonnet 4.5 (copilot)"
+    - "Claude Opus 4 (copilot)"
 handoffs:
     - label: "✅ Run Tests"
       agent: tdd

@@ -4,7 +4,7 @@ description: "Run backtests, analyze metrics, compare with TradingView, and gene
 tools: ["search", "read", "edit", "create", "listDir", "grep", "terminalCommand", "fetch", "getErrors"]
 model:
     - "Claude Sonnet 4 (copilot)"
-    - "Claude Sonnet 4.5 (copilot)"
+    - "Claude Opus 4 (copilot)"
 handoffs:
     - label: "📋 Review Results"
       agent: reviewer

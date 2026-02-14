@@ -15,12 +15,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Deleted 4 duplicate skill files from `.agent/skills/` (originals remain in `.github/skills/`)
     - Removed `.agent/skills` from `chat.agentSkillsLocations` in VS Code settings
     - Cleaned embedded git repository left inside `.agent/skills/`
+    - Deleted backup files (`Claude.md.bak`, `.bak.old`, `.bak2`) and empty directories (`experiments/`, `reports/`)
 
 ### Changed
 
 - **Workflow Fixes — 2026-02-14:**
     - `start_app.md` — replaced Claude Code `// turbo` syntax with proper VS Code task references and manual fallback
     - `multi_agent.md` — replaced Claude Code `// turbo-all` multi-agent syntax with VS Code Agent Mode compatible phased workflow
+- **Model Name Corrections — 2026-02-14:**
+    - Fixed all references from "Claude Opus 4.5 / Sonnet 4.5" → "Claude Opus 4 / Sonnet 4" across 12 files
+    - Updated all 5 custom agents (`backtester`, `tdd`, `reviewer`, `planner`, `implementer`) with correct model names
+    - Updated `AGENTS.MD` — fixed model table, skills paths (`.agent/skills` → `.github/skills`), engine reference (V2→V4)
+    - Updated `Gemini.md` v1.0 → v1.1 with project-specific rules, critical constraints, and Russian language requirement
+    - Updated `CONTEXT.md` — complete rewrite with accurate file structure, counts, and session history
+    - Updated `TODO.md` — replaced generic placeholders with project-relevant tasks
+    - Updated `docs/ai-context.md` — FallbackEngineV2 → FallbackEngineV4 as gold standard
+    - Updated `docs/DECISIONS.md` — corrected engine reference in ADR-002
 
 ### Added
 

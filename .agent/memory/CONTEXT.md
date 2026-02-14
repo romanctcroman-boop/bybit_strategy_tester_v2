@@ -3,7 +3,7 @@
 ## Bybit Strategy Tester v2
 
 > Auto-generated context for agent sessions.
-> Last updated: 2026-02-08
+> Last updated: 2026-02-14
 
 ---
 
@@ -15,19 +15,20 @@
 - **Language**: Python 3.14 + JavaScript
 - **Framework**: FastAPI + SQLAlchemy
 - **Database**: SQLite
-- **Agent Model**: Claude Sonnet 4.5 / Opus 4.5
+- **Agent Models**: Claude Sonnet 4 / Opus 4, Gemini 3 Pro
 
 ### Key Commands
 
 ```powershell
-# Start all services
+# Start all services (VS Code task or script)
 .\start_all.ps1
 
 # Run tests
 pytest tests/ -v
 
 # Lint code
-ruff check .
+ruff check . --fix
+ruff format .
 
 # Run backtest
 py -3.14 scripts/calibrate_166_metrics.py
@@ -35,48 +36,45 @@ py -3.14 scripts/calibrate_166_metrics.py
 
 ### Critical Files
 
-- `backend/core/metrics_calculator.py` - 166 metrics
-- `backend/backtesting/engines/fallback_engine_v4.py` - Gold standard (V4)
-- `backend/services/adapters/bybit.py` - API integration
+- `backend/core/metrics_calculator.py` — 166 TradingView-parity metrics
+- `backend/backtesting/engines/fallback_engine_v4.py` — Gold standard engine (V4)
+- `backend/services/adapters/bybit.py` — Bybit API v5 integration
+- `backend/config/database_policy.py` — Data retention constants
 
 ### TradingView Parity
 
-- Commission: 0.07% (MUST match)
+- Commission: 0.07% (0.0007) — MUST match
 - 100% parity achieved on core metrics
 - Bar Magnifier supported
 
 ---
 
-## Agent Configuration (v2.0)
+## Agent Configuration (v3.1)
 
 ### Files Structure
 
 ```
 .agent/
-├── Claude.md               — Claude 4.5 specific rules (v2.0)
-├── Gemini.md               — Gemini 3 Pro rules
-├── mcp.json                — MCP server configuration
+├── Claude.md               — Claude Sonnet 4 / Opus 4 rules (v3.1)
+├── Gemini.md               — Gemini 3 Pro rules (v1.1)
+├── mcp.json                — MCP server config (gitignored, uses env vars)
 ├── memory/
 │   ├── CONTEXT.md          — This file (session state)
-│   └── TODO.md             — Pending work
-├── rules/                  — Autonomy & operation rules
+│   └── TODO.md             — Pending work items
+├── docs/                   — Architecture docs (16 files)
+├── rules/                  — Autonomy & operation rules (5 files)
 │   ├── autonomy-guidelines.md
 │   ├── enhanced-autonomy.md
 │   ├── innovation-mode.md
 │   ├── session-handoff.md
 │   └── memory-first.md
-├── skills/                 — Reusable agent skills
-│   ├── backtest-execution.md
-│   ├── safe-refactoring.md
-│   ├── strategy-development.md
-│   └── api-endpoint-development.md
 └── workflows/
-    ├── start_app.md
-    └── multi_agent.md
+    ├── start_app.md        — Service startup (VS Code tasks)
+    └── multi_agent.md      — Multi-agent orchestration
 
 .github/
-├── copilot-instructions.md — Main rules (auto-loaded)
-├── instructions/           — Path-specific rules (7 files)
+├── copilot-instructions.md — Main rules (auto-loaded by VS Code)
+├── instructions/           — Path-specific rules (8 files)
 │   ├── api-connectors.instructions.md
 │   ├── api-endpoints.instructions.md
 │   ├── backtester.instructions.md
@@ -85,7 +83,21 @@ py -3.14 scripts/calibrate_166_metrics.py
 │   ├── services.instructions.md
 │   ├── strategies.instructions.md
 │   └── tests.instructions.md
-└── prompts/                — Reusable prompts (12 files)
+├── skills/                 — Project-specific agent skills (7 skills)
+│   ├── api-endpoint/SKILL.md
+│   ├── backtest-execution/SKILL.md
+│   ├── bybit-api-integration/SKILL.md
+│   ├── database-operations/SKILL.md
+│   ├── metrics-calculator/SKILL.md
+│   ├── safe-refactoring/SKILL.md
+│   └── strategy-development/SKILL.md
+├── agents/                 — Custom agents (5 agents)
+│   ├── planner.agent.md
+│   ├── implementer.agent.md
+│   ├── reviewer.agent.md
+│   ├── backtester.agent.md
+│   └── tdd.agent.md
+└── prompts/                — Reusable prompts (13 files)
     ├── add-api-endpoint.prompt.md
     ├── add-strategy.prompt.md
     ├── analyze-task.prompt.md
@@ -96,6 +108,7 @@ py -3.14 scripts/calibrate_166_metrics.py
     ├── implement-feature.prompt.md
     ├── performance-audit.prompt.md
     ├── safe-refactor.prompt.md
+    ├── tdd-workflow.prompt.md
     ├── tradingview-parity-check.prompt.md
     └── walk-forward-optimization.prompt.md
 ```
@@ -104,68 +117,48 @@ py -3.14 scripts/calibrate_166_metrics.py
 
 - `chat.agent.maxRequests`: 30
 - `chat.agent.runTasks`: true
-- Code generation instructions linked to Claude.md
-- Test generation instructions linked to tests.instructions.md
-- Code review instructions linked to code-review.prompt.md
-
----
-
-## Recent Work
-
-### Session 2026-02-08 (Phase 2 — Advanced Agent Features)
-
-- **Custom Agents** (`.github/agents/`):
-    - `planner.agent.md` — Read-only planning/research agent with handoffs
-    - `implementer.agent.md` — Full-capability implementation agent
-    - `reviewer.agent.md` — Code review with TradingView parity checklist
-    - `backtester.agent.md` — Backtest execution and metrics analysis
-    - `tdd.agent.md` — Test-Driven Development (Red/Green/Refactor)
-
-- **Official Agent Skills** (`.github/skills/`):
-    - `backtest-execution/SKILL.md` — API and engine usage with metrics
-    - `strategy-development/SKILL.md` — BaseStrategy template and pandas_ta
-    - `api-endpoint/SKILL.md` — FastAPI router patterns and async DB
-    - `safe-refactoring/SKILL.md` — Incremental refactoring with test verification
-
-- **VS Code Settings** enhanced:
-    - `chat.promptFiles: true` — Enables `.github/prompts/` folder
-    - `chat.agentFilesLocations` — Points to `.github/agents` and `.agent`
-    - `chat.agentSkillsLocations` — Points to `.github/skills` and `.agent/skills`
-    - `github.copilot.chat.organizationCustomAgents.enabled: true`
-
-- **New Prompt**: `tdd-workflow.prompt.md` — Red/Green/Refactor cycle
-
-### Session 2026-02-08 (Phase 1 — Foundation)
-
-- Rewrote `.agent/Claude.md` for Claude 4.5 (v2.0)
-- Created 5 reusable prompts (full-stack-debug, performance-audit, etc.)
-- Created 4 agent skills in `.agent/skills/`
-- Added 3 path-specific instructions (frontend, database, services)
-- Updated VS Code settings with Copilot Agent Mode maximization
+- `chat.agentSkillsLocations`: `[".github/skills"]`
+- `chat.agentFilesLocations`: `[".github/agents", ".agent"]`
+- Code generation instructions → Claude.md
+- Test generation instructions → tests.instructions.md
+- Code review instructions → code-review.prompt.md
 
 ---
 
 ## Agent Capabilities Summary
 
-| Feature         | Location                | Count |
-| --------------- | ----------------------- | ----- |
-| Custom Agents   | `.github/agents/`       | 5     |
-| Official Skills | `.github/skills/`       | 4     |
-| Legacy Skills   | `.agent/skills/`        | 4     |
-| Prompts         | `.github/prompts/`      | 13    |
-| Instructions    | `.github/instructions/` | 8     |
-| Rules           | `.agent/rules/`         | 5     |
-| Workflows       | `.agent/workflows/`     | 2     |
+| Feature    | Location                | Count |
+| ---------- | ----------------------- | ----- |
+| Agents     | `.github/agents/`       | 5     |
+| Skills     | `.github/skills/`       | 7     |
+| Prompts    | `.github/prompts/`      | 13    |
+| Path Rules | `.github/instructions/` | 8     |
+| Rules      | `.agent/rules/`         | 5     |
+| Workflows  | `.agent/workflows/`     | 2     |
 
-## Next Session Hints
+---
 
-- Convert `.agent/skills/` to YAML frontmatter format (agentskills.io standard)
-- Explore subagent orchestration with `agents:` restriction
-- Add community skills from `github/awesome-copilot`
-- Performance profiling skill with cProfile integration
-- E2E testing skill with Playwright
+## Recent Work
+
+### Session 2026-02-14 — Agent Config Audit & Cleanup
+
+- Removed 19.5 MB of irrelevant generic skills (232 dirs in `.agent/skills/`)
+- Fixed `.agent/Claude.md` v2.0 → v3.1 for Claude Sonnet 4 / Opus 4
+- Fixed workflows (replaced Claude Code `// turbo` syntax with VS Code tasks)
+- Created 3 new project-specific skills (database-operations, metrics-calculator, bybit-api-integration)
+- Security: replaced hardcoded API keys with `${env:...}` in MCP config
+- Security: gitignored `.agent/mcp.json`, cleaned git history
+- Updated Gemini.md to v1.1
+- Cleaned up backup files and empty directories
+
+### Session 2026-02-08 — Advanced Agent Features
+
+- Created 5 custom agents in `.github/agents/`
+- Created 4 skills in `.github/skills/`
+- Created 13 reusable prompts
+- Enhanced VS Code settings for Copilot Agent Mode
 
 ---
 
 _This file is auto-updated by the agent after each session._
-_Last updated: 2026-02-08 (Phase 2)_
+_Last updated: 2026-02-14_

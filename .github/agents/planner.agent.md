@@ -4,7 +4,7 @@ description: "Research and plan before implementation. Read-only analysis, archi
 tools: ["search", "read", "listDir", "grep", "semanticSearch", "listCodeUsages", "fetch", "getErrors"]
 model:
     - "Claude Sonnet 4 (copilot)"
-    - "Claude Sonnet 4.5 (copilot)"
+    - "Claude Opus 4 (copilot)"
 handoffs:
     - label: "🚀 Start Implementation"
       agent: implementer

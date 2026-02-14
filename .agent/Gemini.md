@@ -1,10 +1,18 @@
-# 🚀 Gemini Global Rules
+# 🚀 Gemini 3 Pro — Agent Rules
 
 ## Bybit Strategy Tester v2
 
 > **Model**: Gemini 3 Pro
 > **Mode**: Fast (simple tasks) / Planning (complex)
 > **Autonomy Level**: Maximum
+> **Version**: 1.1
+> **Last Updated**: 2026-02-14
+
+---
+
+## 🌐 Язык общения
+
+**Вывод беседы в чат на Русском языке.** Все ответы, объяснения, комментарии к задачам и отчёты о проделанной работе — на русском. Код, имена переменных и комментарии в коде остаются на английском (Google-style docstrings, etc.).
 
 ---
 
@@ -24,6 +32,17 @@
 
 ---
 
+## ⚠️ Critical Project Rules
+
+### NEVER violate:
+
+- **Commission Rate** = `0.0007` (0.07%) — TradingView parity
+- **Engine** = `FallbackEngineV4` is the gold standard
+- **Data Policy** = No data before `2025-01-01` (import from `backend/config/database_policy.py`)
+- **Timeframes** = Only 9 supported: `1, 5, 15, 30, 60, 240, D, W, M`
+
+---
+
 ## Terminal Autonomy
 
 Maximum permissions for autonomous work:
@@ -38,7 +57,7 @@ mypy, black, isort         # Type checking & formatting
 
 # Git (local operations)
 git add                     # Staging changes
-git commit                  # Committing (with messages)
+git commit --no-verify     # Committing (hooks broken on Windows)
 git checkout -b             # Creating branches
 git merge                   # Local merges
 git pull, fetch             # Updating
@@ -55,38 +74,29 @@ cat, head, tail, find, grep # Reading/searching
 
 # Code Quality
 ruff check --fix .          # Auto-fix linting
-black .                     # Format code
-isort .                     # Organize imports
+ruff format .               # Format code
 
 # Testing & Analysis
-pytest -v --cov            # Tests with coverage
-cProfile, memory_profiler  # Profiling
-
-# Documentation
-# Updating CHANGELOG.md
-# Adding docstrings
-# Creating/updating .md files
-
-# Refactoring (Safe)
-# Renaming (non-public)
-# Extracting methods/classes
-# Removing dead code
-# Simplifying logic
-
-# Bug Fixes (Low Risk)
-# Syntax errors, type hints
-# Import errors, linter warnings
-# Obvious bugs (with tests)
+pytest -v --cov            # Tests with coverage (80% minimum)
 ```
+
+### Ask Before:
+
+- `git push` (especially to main)
+- Database migrations / schema changes
+- Installing new dependencies
+- Changing `commission_rate` or engine selection
+- Modifying `.env` or secrets
 
 ---
 
 ## Memory Priority
 
 1. Check Knowledge Items first
-2. Read .agent/docs/
-3. Check applicable Skills
-4. Then do independent research
+2. Read `.agent/docs/` for architecture context
+3. Check applicable Skills in `.github/skills/`
+4. Check `.github/instructions/` for path-specific rules
+5. Then do independent research
 
 ---
 
@@ -94,11 +104,11 @@ cProfile, memory_profiler  # Profiling
 
 After every task:
 
-- Update CHANGELOG.md
+- Update `CHANGELOG.md`
 - Add inline comments for complex logic
-- Document decisions in DECISIONS.md
+- Document decisions in `docs/DECISIONS.md`
 
 ---
 
-_Version: 1.0_
-_Last Updated: 2026-01-24_
+_Version: 1.1_
+_Last Updated: 2026-02-14_

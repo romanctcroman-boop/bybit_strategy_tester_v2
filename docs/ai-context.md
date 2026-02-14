@@ -1,6 +1,6 @@
 # AI Context - Bybit Strategy Tester v2
 
-**Last Updated:** 2026-01-30 18:30 MSK
+**Last Updated:** 2026-02-14
 **Current Phase:** Development - Strategy Builder & Backtesting
 **Project Version:** 2.x
 
@@ -16,11 +16,11 @@
 
 - `frontend/js/pages/strategy_builder.js` - Visual strategy constructor
 - `backend/services/strategy_builder/` - Strategy builder backend
-- `backend/backtesting/engines/fallback_engine_v2.py` - Gold standard backtest engine
+- `backend/backtesting/engines/fallback_engine_v4.py` - Gold standard backtest engine (V4)
 
 ### Recent Completions
 
-- ✅ FallbackEngineV2 with TradingView parity (commission 0.07%)
+- ✅ FallbackEngineV4 with TradingView parity (commission 0.07%)
 - ✅ 166-metric calculation suite
 - ✅ MFE/MAE analysis for trades
 - ✅ Walk-forward optimization
@@ -61,7 +61,7 @@
 
 ### Production Ready ✅
 
-- ✅ FallbackEngineV2 (gold standard)
+- ✅ FallbackEngineV4 (gold standard, V2 deprecated)
 - ✅ MetricsCalculator (166 metrics)
 - ✅ DataService (SQLite + Bybit)
 - ✅ RSI Strategy
@@ -96,7 +96,7 @@ DataService (caches in SQLite: bybit_klines_15m.db)
     ↓
 Strategy (generates signals from indicators)
     ↓ uses: strategy_params dict
-BacktestEngine/FallbackEngineV2 (executes trades)
+BacktestEngine/FallbackEngineV4 (executes trades)
     ↓ uses: initial_capital, commission_rate=0.0007
 MetricsCalculator (calculates 166 metrics)
     ↓

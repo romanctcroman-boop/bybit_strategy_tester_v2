@@ -141,7 +141,7 @@
     "tests"
   ],
   // ═══════════════════════════════════════════════════════════
-  // GitHub Copilot — Maximum Agent Autonomy for Claude 4.5
+  // GitHub Copilot — Maximum Agent Autonomy for Claude Sonnet 4 / Opus 4
   // ═══════════════════════════════════════════════════════════
   // Core Agent Mode
   "github.copilot.chat.agent.enabled": true,

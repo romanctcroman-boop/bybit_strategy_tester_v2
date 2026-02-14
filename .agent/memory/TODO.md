@@ -3,6 +3,7 @@
 ## Bybit Strategy Tester v2
 
 > Pending tasks and improvements.
+> Last updated: 2026-02-14
 
 ---
 
@@ -16,89 +17,63 @@ _None currently_
 
 ### High Priority
 
-- [ ] Documentation improvements
-- [ ] Frontend performance optimization
+- [ ] Frontend performance optimization (strategy_builder.js ~3000 lines)
+- [ ] Walk-forward optimization end-to-end testing
+- [ ] E2E testing skill with Playwright
 
 ### Medium Priority
 
-- [ ] Additional visualization features
+- [ ] Performance profiling skill (cProfile integration)
 - [ ] Multi-asset portfolio backtesting
+- [ ] DCA engine comprehensive test coverage
 
 ### Low Priority
 
-- [ ] Real-time streaming data support
-- [ ] ML-based strategy optimization
+- [ ] Real-time streaming data support (WebSocket)
+- [ ] ML-based strategy optimization (scikit-learn/PyTorch)
+- [ ] Subagent orchestration with `agents:` restriction
 
 ---
+
+## Completed (2026-02-14)
+
+### Agent Configuration Audit & Cleanup
+
+- [x] Removed 19.5 MB generic skills (232 dirs) from `.agent/skills/`
+- [x] Created 3 project-specific skills (database-operations, metrics-calculator, bybit-api-integration)
+- [x] Fixed workflows (start_app.md, multi_agent.md) — removed Claude Code syntax
+- [x] Updated Claude.md v2.0 → v3.1 for Sonnet 4 / Opus 4
+- [x] Updated Gemini.md v1.0 → v1.1
+- [x] Updated CONTEXT.md with current state
+- [x] Security: replaced hardcoded API keys with `${env:...}`
+- [x] Security: gitignored `.agent/mcp.json`, cleaned git history
+- [x] Deleted backup files and empty directories
 
 ## Completed (2026-01-26)
 
 ### Type Safety & Testing Sprint
 
-- [x] **engine.py Mypy fixes** — 8 type errors fixed
-    - Fixed `pnl_distribution` Optional type
-    - Added None check for `result.metrics` logging
-    - Added `trades: list[TradeRecord]` annotation
-    - Fixed `has_custom_sltp` None comparisons
-    - Fixed `entry_time` fallback for TradeRecord
-- [x] **models.py Schema updates**
-    - Added `id` field to TradeRecord
-    - Added `sqn` to PerformanceMetrics
-    - Added long/short_largest_win/loss_value fields
-    - Removed duplicate field definitions
-- [x] **bybit.py Type improvements**
-    - Added mypy override in pyproject.toml
-    - Fixed Optional[int] types for time parameters
-    - Added missing return statement
-- [x] **CI/CD verified** — workflows already exist
-    - ci-cd.yml (lint, test, build, deploy)
-    - pytest.yml (unit tests)
-    - integration.yml (integration tests)
-- [x] **GPU Acceleration Testing** — 11 tests passed
-    - CuPy integration verified
-    - CUDA availability detection
-    - Memory management tests
-    - Performance benchmarks
-- [x] **Backtest API Integration Tests** — 17 tests passed
-    - E2E tests for /api/v1/backtests/ endpoints
-    - Run, list, get, delete operations
-    - Metrics validation
-- [x] **Optimizer Error Handling** — 28 tests passed
-    - Custom exceptions module created
-    - Parameter grid validation
-    - Price data validation
-- [x] **Mypy fixes in backtests.py** — 100+ type errors fixed
-    - Added helper functions (\_safe_float, \_safe_int, \_safe_str, \_get_side_value)
-    - Fixed SQLAlchemy Column type mismatches
-    - Fixed stop_loss/take_profit parameter names
-    - Added TradeDirection import and conversion
-- [x] Bollinger Bands filter (mean_reversion, breakout, squeeze modes)
-- [x] ADX filter (trend_only, direction, combined modes)
+- [x] engine.py Mypy fixes — 8 type errors fixed
+- [x] models.py Schema updates (TradeRecord, PerformanceMetrics)
+- [x] bybit.py Type improvements
+- [x] GPU Acceleration Testing — 11 tests passed
+- [x] Backtest API Integration Tests — 17 tests passed
+- [x] Optimizer Error Handling — 28 tests passed
+- [x] Mypy fixes in backtests.py — 100+ type errors fixed
+- [x] Bollinger Bands filter, ADX filter
 - [x] Monte Carlo Simulation module
-- [x] Market Regime Detection (trending/ranging/volatile)
+- [x] Market Regime Detection
 - [x] Performance Profiler with cProfile integration
-- [x] 40 new tests (10 BB/ADX + 16 Monte Carlo + 14 Regime)
+- [x] 40 new tests
 
 ## Completed (2026-01-25)
 
 - [x] MTF Phase 6-8 (Frontend UI, HTF Filters, Optimizer, Walk-Forward)
-- [x] Audit project structure and documentation
-- [x] Verify metrics calculator integration in engine.py
-- [x] Update optimizer documentation (formulas synchronized)
-- [x] Add 30 tests for metrics_calculator.py (all passed)
-- [x] Update CHANGELOG.md with v2.1.1
-
-## Completed Previously
-
-- [x] MCP Infrastructure setup (mcp.json, bybit_mcp_server.py)
-- [x] Multi-agent workflow added
-- [x] Browser UI testing skill created
+- [x] Metrics calculator integration in engine.py
+- [x] 30 tests for metrics_calculator.py
+- [x] MCP Infrastructure setup
 - [x] Bar Magnifier testing with 1m data
-- [x] Claude Opus 4.5 autonomy configuration
-- [x] Agent Skills setup (234+)
-- [x] Innovation mode rules
-- [x] Session handoff protocol
 
 ---
 
-_Last Updated: 2026-01-26_
+_Last Updated: 2026-02-14_

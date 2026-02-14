@@ -4,7 +4,7 @@ description: "Test-Driven Development workflow: write failing tests first, then 
 tools: ["search", "read", "edit", "create", "listDir", "grep", "terminalCommand", "getErrors", "runTests"]
 model:
     - "Claude Sonnet 4 (copilot)"
-    - "Claude Sonnet 4.5 (copilot)"
+    - "Claude Opus 4 (copilot)"
 handoffs:
     - label: "📝 Plan Implementation"
       agent: planner

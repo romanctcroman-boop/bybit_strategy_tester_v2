@@ -9,15 +9,15 @@
 
 ### Model-Specific Configuration Files
 
-| Model               | Config File             | Mode                         |
-| ------------------- | ----------------------- | ---------------------------- |
-| **Claude Opus 4.5** | `.agent/Claude.md`      | Planning (Extended Thinking) |
-| **Gemini 3 Pro**    | `.agent/Gemini.md`      | Auto                         |
-| **Any Model**       | `AGENTS.MD` (this file) | Universal                    |
+| Model             | Config File             | Mode                         |
+| ----------------- | ----------------------- | ---------------------------- |
+| **Claude Opus 4** | `.agent/Claude.md`      | Planning (Extended Thinking) |
+| **Gemini 3 Pro**  | `.agent/Gemini.md`      | Auto                         |
+| **Any Model**     | `AGENTS.MD` (this file) | Universal                    |
 
 ### Optimizations by Model
 
-- **Claude Opus 4.5**: Use Planning mode, extended thinking for complex tasks
+- **Claude Opus 4**: Use Planning mode, extended thinking for complex tasks
 - **Gemini 3 Pro**: Use Fast mode for quick tasks, Planning for complex
 - **Both**: Maximum terminal autonomy, auto-documentation
 
@@ -25,7 +25,7 @@
 
 1. Model-specific file (`.agent/Claude.md` or `.agent/Gemini.md`)
 2. Global rules (`AGENTS.MD`)
-3. Project skills (`.agent/skills/`)
+3. Project skills (`.github/skills/`)
 4. Knowledge Items
 
 ---
@@ -103,13 +103,13 @@
 
 ### Always Check Skills First:
 
-- Before implementing common patterns, check `.agent/skills/`
+- Before implementing common patterns, check `.github/skills/`
 - Use existing skills instead of reinventing
 - Suggest new skills for reusable patterns
 
 ### Skill Locations:
 
-- `.agent/skills/skills/` - Pre-built superpowers
+- `.github/skills/` - Project-specific skills (7 skills)
 - `.agent/workflows/` - Step-by-step procedures
 
 ---
@@ -170,7 +170,7 @@
 ### TradingView Parity:
 
 - Commission MUST be 0.07% for parity
-- Use FallbackEngineV2 as gold standard
+- Use FallbackEngineV4 as gold standard
 - Check calibration script for metric verification
 
 ### Database:

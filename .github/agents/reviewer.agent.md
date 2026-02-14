@@ -4,7 +4,7 @@ description: "Code review focused on quality, security, performance, and Trading
 tools: ["search", "read", "listDir", "grep", "semanticSearch", "listCodeUsages", "getErrors"]
 model:
     - "Claude Sonnet 4 (copilot)"
-    - "Claude Sonnet 4.5 (copilot)"
+    - "Claude Opus 4 (copilot)"
 handoffs:
     - label: "🛠️ Fix Issues"
       agent: implementer

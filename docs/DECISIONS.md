@@ -27,7 +27,7 @@
 **Статус:** Принято
 
 - Комиссия **0.07%** используется для сравнения с TradingView.
-- Эталон точности: FallbackEngineV2 (и FallbackV4 для сценариев Multi-TP/DCA).
+- Эталон точности: FallbackEngineV4 (gold standard). FallbackEngineV2 deprecated, оставлен для parity тестов.
 - Калибровка: `scripts/calibrate_166_metrics.py`, `scripts/compare_*`.
 
 **Ссылка:** `.cursor/rules/backtesting.mdc`, `docs/architecture/ENGINE_PARITY.md`.
