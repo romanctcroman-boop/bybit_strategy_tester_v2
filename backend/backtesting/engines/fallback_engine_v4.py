@@ -1281,9 +1281,7 @@ class FallbackEngineV4(BaseBacktestEngine):
             )
 
             # Calculate effective slippage (dynamic if advanced model enabled)
-            effective_slippage = (
-                slippage * slippage_multipliers[i] if use_advanced_slippage else slippage
-            )
+            effective_slippage = slippage * slippage_multipliers[i] if use_advanced_slippage else slippage
 
             # === MARKET REGIME DETECTOR UPDATE ===
             # Обновляем детектор на каждом баре

@@ -9,6 +9,7 @@ Additional endpoints for:
 """
 
 import asyncio
+import contextlib
 import random
 from datetime import datetime, timedelta
 from typing import Any
@@ -251,9 +252,7 @@ async def get_portfolio_history(
 
     except Exception as e:
         logger.error(f"Failed to get portfolio history: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve portfolio history: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve portfolio history: {e!s}")
     finally:
         db.close()
 
@@ -287,9 +286,7 @@ class AIRecommendationsResponse(BaseModel):
 @router.get("/ai/recommendations")
 async def get_ai_recommendations(
     limit: int = Query(5, ge=1, le=20, description="Number of recommendations"),
-    include_types: str | None = Query(
-        None, description="Filter by types: optimization,risk,opportunity,alert"
-    ),
+    include_types: str | None = Query(None, description="Filter by types: optimization,risk,opportunity,alert"),
 ) -> AIRecommendationsResponse:
     """
     🤖 AI-powered trading recommendations
@@ -441,21 +438,20 @@ async def get_ai_recommendations(
             .count()
         )
 
-        if recent_failures > 0:
-            if not type_filter or "alert" in type_filter:
-                recommendations.append(
-                    AIRecommendation(
-                        id="alert_failures",
-                        type="alert",
-                        title=f"{recent_failures} failed backtests today",
-                        description="Some backtests failed in the last 24 hours. "
-                        "Check logs for data quality or strategy errors.",
-                        priority="medium" if recent_failures < 5 else "high",
-                        confidence=0.95,
-                        action="/backtests?status=failed",
-                        metadata={"failure_count": recent_failures},
-                    )
+        if recent_failures > 0 and (not type_filter or "alert" in type_filter):
+            recommendations.append(
+                AIRecommendation(
+                    id="alert_failures",
+                    type="alert",
+                    title=f"{recent_failures} failed backtests today",
+                    description="Some backtests failed in the last 24 hours. "
+                    "Check logs for data quality or strategy errors.",
+                    priority="medium" if recent_failures < 5 else "high",
+                    confidence=0.95,
+                    action="/backtests?status=failed",
+                    metadata={"failure_count": recent_failures},
                 )
+            )
 
         # 5. Suggest diversification if concentrated
         symbol_counts = (
@@ -469,23 +465,22 @@ async def get_ai_recommendations(
             total = sum(c for _, c in symbol_counts)
             for symbol, count in symbol_counts:
                 concentration = count / total if total > 0 else 0
-                if concentration > 0.6:  # More than 60% on one symbol
-                    if not type_filter or "risk" in type_filter:
-                        recommendations.append(
-                            AIRecommendation(
-                                id=f"div_{symbol}",
-                                type="risk",
-                                title="Portfolio concentration warning",
-                                description=f"{concentration * 100:.0f}% of backtests are on {symbol}. "
-                                f"Consider diversifying to other trading pairs.",
-                                priority="medium",
-                                confidence=0.80,
-                                metadata={
-                                    "symbol": symbol,
-                                    "concentration": concentration,
-                                },
-                            )
+                if concentration > 0.6 and (not type_filter or "risk" in type_filter):  # More than 60% on one symbol
+                    recommendations.append(
+                        AIRecommendation(
+                            id=f"div_{symbol}",
+                            type="risk",
+                            title="Portfolio concentration warning",
+                            description=f"{concentration * 100:.0f}% of backtests are on {symbol}. "
+                            f"Consider diversifying to other trading pairs.",
+                            priority="medium",
+                            confidence=0.80,
+                            metadata={
+                                "symbol": symbol,
+                                "concentration": concentration,
+                            },
                         )
+                    )
 
         # Limit and sort by priority
         priority_order = {"high": 0, "medium": 1, "low": 2}
@@ -500,9 +495,7 @@ async def get_ai_recommendations(
 
     except Exception as e:
         logger.error(f"Failed to generate AI recommendations: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to generate recommendations: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommendations: {e!s}")
     finally:
         db.close()
 
@@ -541,9 +534,7 @@ class LeaderboardResponse(BaseModel):
 @router.get("/strategies/leaderboard")
 async def get_strategy_leaderboard(
     period: str = Query("30d", description="Period: 7d, 30d, 90d, all"),
-    metric: str = Query(
-        "sharpe", description="Ranking metric: sharpe, return, win_rate, consistency"
-    ),
+    metric: str = Query("sharpe", description="Ranking metric: sharpe, return, win_rate, consistency"),
     limit: int = Query(10, ge=1, le=50, description="Number of entries"),
 ) -> LeaderboardResponse:
     """
@@ -577,8 +568,8 @@ async def get_strategy_leaderboard(
         delta = period_map.get(period)
         time_filter = (now - delta) if delta else None
 
-        # Query strategies with aggregated metrics
-        base_query = (
+        # First try: query via Strategy JOIN (for backtests linked to strategies)
+        strategy_query = (
             db.query(
                 Strategy.id,
                 Strategy.name,
@@ -592,13 +583,16 @@ async def get_strategy_leaderboard(
                 func.max(Backtest.completed_at).label("last_run"),
             )
             .join(Backtest, Strategy.id == Backtest.strategy_id)
-            .filter(Backtest.status == BacktestStatus.COMPLETED)
+            .filter(
+                Backtest.status == BacktestStatus.COMPLETED,
+                Backtest.total_trades > 0,
+            )
         )
 
         if time_filter:
-            base_query = base_query.filter(Backtest.completed_at >= time_filter)
+            strategy_query = strategy_query.filter(Backtest.completed_at >= time_filter)
 
-        base_query = base_query.group_by(Strategy.id)
+        strategy_query = strategy_query.group_by(Strategy.id)
 
         # Order by selected metric
         metric_columns = {
@@ -609,11 +603,74 @@ async def get_strategy_leaderboard(
         }
         order_col = metric_columns.get(metric, "avg_sharpe")
 
-        results = base_query.order_by(desc(order_col)).limit(limit).all()
+        results = strategy_query.order_by(desc(order_col)).limit(limit).all()
 
+        # Fallback: if no Strategy-linked backtests, group by strategy_type
+        if not results:
+            fallback_query = db.query(
+                Backtest.strategy_type.label("strategy_type"),
+                func.count(Backtest.id).label("total_backtests"),
+                func.avg(Backtest.total_return).label("avg_return"),
+                func.avg(Backtest.sharpe_ratio).label("avg_sharpe"),
+                func.avg(Backtest.win_rate).label("avg_win_rate"),
+                func.max(Backtest.total_return).label("best_return"),
+                func.min(Backtest.max_drawdown).label("worst_drawdown"),
+                func.max(Backtest.completed_at).label("last_run"),
+            ).filter(
+                Backtest.status == BacktestStatus.COMPLETED,
+                Backtest.total_trades > 0,
+                Backtest.strategy_type.isnot(None),
+            )
+
+            if time_filter:
+                fallback_query = fallback_query.filter(Backtest.completed_at >= time_filter)
+
+            fallback_query = fallback_query.group_by(Backtest.strategy_type)
+            fallback_results = fallback_query.order_by(desc(order_col)).limit(limit).all()
+
+            entries = []
+            for rank, row in enumerate(fallback_results, 1):
+                st = row.strategy_type or "unknown"
+                # Trend from recent 7d vs overall
+                trend = "stable"
+                if delta and delta > timedelta(days=7):
+                    recent_avg = (
+                        db.query(func.avg(Backtest.sharpe_ratio))
+                        .filter(
+                            Backtest.strategy_type == st,
+                            Backtest.status == BacktestStatus.COMPLETED,
+                            Backtest.completed_at >= now - timedelta(days=7),
+                        )
+                        .scalar()
+                    )
+                    if recent_avg and row.avg_sharpe:
+                        if recent_avg > float(row.avg_sharpe) * 1.1:
+                            trend = "up"
+                        elif recent_avg < float(row.avg_sharpe) * 0.9:
+                            trend = "down"
+
+                entries.append(
+                    LeaderboardEntry(
+                        rank=rank,
+                        strategy_id=st,
+                        strategy_name=st.replace("_", " ").title(),
+                        strategy_type=st,
+                        total_backtests=row.total_backtests,
+                        avg_return=round(float(row.avg_return or 0), 2),
+                        avg_sharpe=round(float(row.avg_sharpe or 0), 2),
+                        avg_win_rate=round(float(row.avg_win_rate or 0), 3),
+                        best_return=round(float(row.best_return or 0), 2),
+                        worst_drawdown=round(float(row.worst_drawdown or 0), 2),
+                        last_run=row.last_run,
+                        trend=trend,
+                    )
+                )
+
+            return LeaderboardResponse(period=period, metric=metric, entries=entries, updated_at=utc_now())
+
+        # Strategy-linked path (original logic)
         entries = []
         for rank, row in enumerate(results, 1):
-            # Calculate trend (compare recent 7d vs previous)
             trend = "stable"
             if delta and delta > timedelta(days=7):
                 recent_avg = (
@@ -639,9 +696,7 @@ async def get_strategy_leaderboard(
                     rank=rank,
                     strategy_id=row.id,
                     strategy_name=row.name,
-                    strategy_type=row.strategy_type.value
-                    if row.strategy_type
-                    else None,
+                    strategy_type=row.strategy_type.value if row.strategy_type else None,
                     total_backtests=row.total_backtests,
                     avg_return=round(row.avg_return or 0, 2),
                     avg_sharpe=round(row.avg_sharpe or 0, 2),
@@ -653,15 +708,11 @@ async def get_strategy_leaderboard(
                 )
             )
 
-        return LeaderboardResponse(
-            period=period, metric=metric, entries=entries, updated_at=utc_now()
-        )
+        return LeaderboardResponse(period=period, metric=metric, entries=entries, updated_at=utc_now())
 
     except Exception as e:
         logger.error(f"Failed to get strategy leaderboard: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve leaderboard: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve leaderboard: {e!s}")
     finally:
         db.close()
 
@@ -680,16 +731,12 @@ class PnLConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-        logger.info(
-            f"💰 P&L WebSocket connected. Total: {len(self.active_connections)}"
-        )
+        logger.info(f"💰 P&L WebSocket connected. Total: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            logger.info(
-                f"💰 P&L WebSocket disconnected. Remaining: {len(self.active_connections)}"
-            )
+            logger.info(f"💰 P&L WebSocket disconnected. Remaining: {len(self.active_connections)}")
 
     async def broadcast_pnl(self, data: dict):
         """Broadcast P&L update to all clients"""
@@ -759,10 +806,8 @@ async def pnl_websocket(websocket: WebSocket):
             logger.info("P&L WebSocket client disconnected")
         finally:
             stream_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await stream_task
-            except asyncio.CancelledError:
-                pass
     except Exception as e:
         logger.error(f"P&L WebSocket error: {e}")
     finally:
@@ -830,9 +875,7 @@ async def _stream_pnl_updates(websocket: WebSocket):
 @router.get("/ai-recommendations")
 async def get_ai_recommendations_alias(
     limit: int = Query(5, ge=1, le=20, description="Number of recommendations"),
-    include_types: str | None = Query(
-        None, description="Filter by types: optimization,risk,opportunity,alert"
-    ),
+    include_types: str | None = Query(None, description="Filter by types: optimization,risk,opportunity,alert"),
 ) -> AIRecommendationsResponse:
     """Alias for /ai/recommendations for frontend compatibility"""
     return await get_ai_recommendations(limit=limit, include_types=include_types)
@@ -1007,12 +1050,30 @@ async def get_current_pnl() -> dict[str, Any]:
         },
     ]
 
+    today_pnl = round(random.uniform(100, 1000), 2)
+    week_pnl = round(random.uniform(-2000, 5000), 2)
+    month_pnl = round(random.uniform(-5000, 15000), 2)
+
+    # Generate hourly P&L sparkline (last 24 data points)
+    hourly_pnl = []
+    cumulative = 0.0
+    for _ in range(24):
+        cumulative += random.gauss(0, 50)
+        hourly_pnl.append(round(cumulative, 2))
+
     return {
         "total_equity": round(equity, 2),
         "unrealized_pnl": round(pnl_change, 2),
-        "realized_pnl_today": round(random.uniform(100, 1000), 2),
+        "realized_pnl_today": today_pnl,
         "pnl_pct": round(pnl_pct, 3),
         "positions": positions,
+        # Keys expected by frontend JS
+        "current_pnl": round(pnl_change, 2),
+        "today_pnl": today_pnl,
+        "week_pnl": week_pnl,
+        "month_pnl": month_pnl,
+        "open_positions": len(positions),
+        "hourly_pnl": hourly_pnl,
         "timestamp": utc_now().isoformat(),
     }
 
@@ -1031,16 +1092,12 @@ class MarketDataConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-        logger.info(
-            f"📊 MarketData WebSocket connected. Total: {len(self.active_connections)}"
-        )
+        logger.info(f"📊 MarketData WebSocket connected. Total: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-        logger.info(
-            f"📊 MarketData WebSocket disconnected. Remaining: {len(self.active_connections)}"
-        )
+        logger.info(f"📊 MarketData WebSocket disconnected. Remaining: {len(self.active_connections)}")
 
 
 marketdata_ws_manager = MarketDataConnectionManager()
@@ -1104,10 +1161,8 @@ async def marketdata_websocket(websocket: WebSocket):
             logger.info("MarketData WebSocket client disconnected")
         finally:
             stream_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await stream_task
-            except asyncio.CancelledError:
-                pass
     except Exception as e:
         logger.error(f"MarketData WebSocket error: {e}")
     finally:

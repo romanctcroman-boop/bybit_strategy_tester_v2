@@ -13,7 +13,6 @@ Tests cover:
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -27,7 +26,6 @@ from backend.agents.consensus.real_llm_deliberation import (
     RealLLMDeliberation,
     _get_api_key,
     deliberate_with_llm,
-    get_real_deliberation,
 )
 
 # =============================================================================
@@ -389,7 +387,9 @@ class TestDeliberateWithLlm:
         """Defaults to all available agents."""
         mock_delib = AsyncMock(spec=RealLLMDeliberation)
         mock_delib._clients = {"deepseek": MagicMock(), "qwen": MagicMock(), "perplexity": MagicMock()}
-        mock_delib.deliberate.return_value = MagicMock(spec=DeliberationResult)
+        mock_result = MagicMock(spec=DeliberationResult)
+        mock_result.metadata = {}
+        mock_delib.deliberate.return_value = mock_result
         mock_get.return_value = mock_delib
 
         await deliberate_with_llm("Test question")
@@ -403,7 +403,9 @@ class TestDeliberateWithLlm:
         """Falls back to deepseek when no clients available."""
         mock_delib = AsyncMock(spec=RealLLMDeliberation)
         mock_delib._clients = {}
-        mock_delib.deliberate.return_value = MagicMock(spec=DeliberationResult)
+        mock_result = MagicMock(spec=DeliberationResult)
+        mock_result.metadata = {}
+        mock_delib.deliberate.return_value = mock_result
         mock_get.return_value = mock_delib
 
         await deliberate_with_llm("Test question")
@@ -416,7 +418,9 @@ class TestDeliberateWithLlm:
         """Explicit agents list overrides defaults."""
         mock_delib = AsyncMock(spec=RealLLMDeliberation)
         mock_delib._clients = {"deepseek": MagicMock(), "qwen": MagicMock()}
-        mock_delib.deliberate.return_value = MagicMock(spec=DeliberationResult)
+        mock_result = MagicMock(spec=DeliberationResult)
+        mock_result.metadata = {}
+        mock_delib.deliberate.return_value = mock_result
         mock_get.return_value = mock_delib
 
         await deliberate_with_llm("Test", agents=["qwen"])

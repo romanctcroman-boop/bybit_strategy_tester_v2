@@ -1,7 +1,8 @@
 """
 FULL Perplexity API consultation about VectorBT limitations
-Uses sonar-reasoning-pro model for deep analysis with web search capabilities
+Uses sonar-pro model for analysis with web search capabilities
 """
+
 import sys
 from pathlib import Path
 
@@ -107,6 +108,7 @@ Please provide:
 6. **Links to relevant documentation or research papers**
 """
 
+
 def main():
     print("=" * 70)
     print("PERPLEXITY FULL CONSULTATION: VectorBT Limitations")
@@ -122,13 +124,13 @@ def main():
 
     print("✅ API key loaded")
 
-    # Use sonar-reasoning-pro for deep analysis with web search
+    # Use sonar-pro for analysis with web search
     payload = {
-        "model": "sonar-reasoning-pro",  # DeepSeek-R1 + Chain-of-Thought
+        "model": "sonar-pro",  # Cost-effective model
         "messages": [
             {
                 "role": "system",
-                "content": "You are an expert in quantitative finance, algorithmic trading, backtesting engines, and high-performance computing. You have deep knowledge of VectorBT, Numba, NumPy, and vectorized computation. Provide technical, actionable advice with code examples."
+                "content": "You are an expert in quantitative finance, algorithmic trading, backtesting engines, and high-performance computing. You have deep knowledge of VectorBT, Numba, NumPy, and vectorized computation. Provide technical, actionable advice with code examples.",
             },
             {"role": "user", "content": FULL_PROMPT},
         ],
@@ -136,7 +138,7 @@ def main():
         "temperature": 0.2,
         "web_search_options": {
             "search_recency_filter": "month"  # Recent results
-        }
+        },
     }
 
     print("\n📤 Sending FULL request to Perplexity...")
@@ -151,10 +153,7 @@ def main():
             response = client.post(
                 "https://api.perplexity.ai/chat/completions",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             )
 
         print(f"\n📥 Response received: {response.status_code}")
@@ -210,7 +209,9 @@ def main():
     except Exception as e:
         print(f"❌ Exception: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

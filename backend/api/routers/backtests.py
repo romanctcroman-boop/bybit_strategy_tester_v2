@@ -74,6 +74,21 @@ def _safe_str(val: Any, default: str = "") -> str:
     return str(val)
 
 
+def _ensure_utc(dt: Any) -> datetime:
+    """Ensure a datetime value is timezone-aware (UTC).
+
+    Handles strings, naive datetimes, and already-aware datetimes.
+    Prevents 'can't compare offset-naive and offset-aware datetimes' errors.
+    """
+    if dt is None:
+        return datetime.now(UTC)
+    if isinstance(dt, str):
+        dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+    if isinstance(dt, datetime) and dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return cast(datetime, dt)
+
+
 def downsample_list(data: list, max_points: int = 500) -> list:
     """Evenly downsample a list to max_points, keeping first and last."""
     if not data or len(data) <= max_points:
@@ -103,6 +118,8 @@ def build_equity_curve_response(
     drawdown = equity_curve.drawdown or []
     bh_equity = equity_curve.bh_equity or []
     bh_drawdown = equity_curve.bh_drawdown or []
+    returns = equity_curve.returns or []
+    runup = equity_curve.runup or []
 
     n = len(timestamps)
     if n == 0:
@@ -119,6 +136,8 @@ def build_equity_curve_response(
             "drawdown": [float(drawdown[0]), float(drawdown[-1])] if drawdown else [],
             "bh_equity": [float(bh_equity[0]), float(bh_equity[-1])] if bh_equity else [],
             "bh_drawdown": [float(bh_drawdown[0]), float(bh_drawdown[-1])] if bh_drawdown else [],
+            "returns": [float(returns[0]), float(returns[-1])] if returns else [],
+            "runup": [float(runup[0]), float(runup[-1])] if runup else [],
         }
 
     # Create timestamp -> index mapping for fast lookup
@@ -157,6 +176,8 @@ def build_equity_curve_response(
             "drawdown": [float(drawdown[0]), float(drawdown[-1])] if drawdown else [],
             "bh_equity": [],
             "bh_drawdown": [],
+            "returns": [float(returns[0]), float(returns[-1])] if returns else [],
+            "runup": [float(runup[0]), float(runup[-1])] if runup else [],
         }
 
     # Sort indices chronologically
@@ -172,6 +193,8 @@ def build_equity_curve_response(
         "drawdown": [float(drawdown[i]) for i in indices if i < len(drawdown)],
         "bh_equity": [float(bh_equity[i]) for i in indices if i < len(bh_equity)] if bh_equity else [],
         "bh_drawdown": [float(bh_drawdown[i]) for i in indices if i < len(bh_drawdown)] if bh_drawdown else [],
+        "returns": [float(returns[i]) for i in indices if i < len(returns)] if returns else [],
+        "runup": [float(runup[i]) for i in indices if i < len(runup)] if runup else [],
     }
 
 
@@ -560,6 +583,7 @@ async def create_backtest(request: BacktestCreateRequest):
                 exposure_time=getattr(m, "exposure_time", None),
                 trades=trades_list,
                 equity_curve=equity_payload,
+                completed_at=datetime.now(UTC),
             )
             db.add(db_backtest)
             db.commit()
@@ -683,7 +707,7 @@ async def list_backtests(
             if winning_trades_count == 0 and total_trades_count > 0 and win_rate_val > 0:
                 # Determine if win_rate is in percentage (>1) or decimal (<1) format
                 win_rate_decimal = win_rate_val / 100.0 if win_rate_val > 1 else win_rate_val
-                winning_trades_count = int(round(total_trades_count * win_rate_decimal))
+                winning_trades_count = round(total_trades_count * win_rate_decimal)
                 losing_trades_count = total_trades_count - winning_trades_count
 
             metrics = PerformanceMetrics(
@@ -861,7 +885,7 @@ async def list_backtests(
             result = BacktestResult(
                 id=str(bt.id) if bt.id else "",
                 status=BacktestStatus.COMPLETED if bt.status == DBBacktestStatus.COMPLETED else BacktestStatus.FAILED,
-                created_at=cast(datetime, bt.created_at) if bt.created_at else datetime.now(UTC),
+                created_at=_ensure_utc(bt.created_at) if bt.created_at else datetime.now(UTC),
                 config=config,
                 metrics=metrics,
                 trades=cast(list[TradeRecord], list(trades_data)) if trades_data else [],
@@ -877,7 +901,9 @@ async def list_backtests(
 
     # Combine and sort by created_at
     all_results = memory_results + db_results
-    all_results.sort(key=lambda x: x.created_at, reverse=True)
+
+    # Use _ensure_utc to normalize tz-naive/aware mix before comparison
+    all_results.sort(key=lambda x: _ensure_utc(x.created_at), reverse=True)
 
     # Paginate
     start_idx = (page - 1) * limit
@@ -1007,7 +1033,7 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
         if winning_trades_count == 0 and total_trades_count > 0 and win_rate_val > 0:
             # Determine if win_rate is in percentage (>1) or decimal (<1) format
             win_rate_decimal = win_rate_val / 100.0 if win_rate_val > 1 else win_rate_val
-            winning_trades_count = int(round(total_trades_count * win_rate_decimal))
+            winning_trades_count = round(total_trades_count * win_rate_decimal)
             losing_trades_count = total_trades_count - winning_trades_count
 
         metrics = PerformanceMetrics(
@@ -1108,6 +1134,7 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
             long_max_consec_losses=_safe_int(opt_metrics.get("long_max_consec_losses", 0)),
             short_max_consec_wins=_safe_int(opt_metrics.get("short_max_consec_wins", 0)),
             short_max_consec_losses=_safe_int(opt_metrics.get("short_max_consec_losses", 0)),
+            avg_win_loss_ratio=_safe_float(opt_metrics.get("avg_win_loss_ratio", 0)),
             long_payoff_ratio=_safe_float(opt_metrics.get("long_payoff_ratio", 0)),
             short_payoff_ratio=_safe_float(opt_metrics.get("short_payoff_ratio", 0)),
             long_expectancy=_safe_float(opt_metrics.get("long_expectancy", 0)),
@@ -1142,6 +1169,43 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
             avg_bars_in_winning_short=_safe_float(opt_metrics.get("avg_bars_in_winning_short", 0)),
             avg_bars_in_losing_long=_safe_float(opt_metrics.get("avg_bars_in_losing_long", 0)),
             avg_bars_in_losing_short=_safe_float(opt_metrics.get("avg_bars_in_losing_short", 0)),
+            # Additional metrics from metrics_json
+            volatility=_safe_float(opt_metrics.get("volatility", 0)),
+            ulcer_index=_safe_float(opt_metrics.get("ulcer_index", 0)),
+            sqn=_safe_float(opt_metrics.get("sqn", 0)),
+            kelly_percent=_safe_float(opt_metrics.get("kelly_percent", 0)),
+            kelly_percent_long=_safe_float(opt_metrics.get("kelly_percent_long", 0)),
+            kelly_percent_short=_safe_float(opt_metrics.get("kelly_percent_short", 0)),
+            open_trades=_safe_int(opt_metrics.get("open_trades", 0)),
+            breakeven_trades=_safe_int(opt_metrics.get("breakeven_trades", 0)),
+            closed_trades=_safe_int(opt_metrics.get("closed_trades", 0)),
+            best_trade=_safe_float(opt_metrics.get("best_trade", 0)),
+            worst_trade=_safe_float(opt_metrics.get("worst_trade", 0)),
+            largest_win_pct_of_gross=_safe_float(opt_metrics.get("largest_win_pct_of_gross", 0)),
+            largest_loss_pct_of_gross=_safe_float(opt_metrics.get("largest_loss_pct_of_gross", 0)),
+            max_drawdown_intrabar=_safe_float(opt_metrics.get("max_drawdown_intrabar", 0)),
+            max_drawdown_intrabar_value=_safe_float(opt_metrics.get("max_drawdown_intrabar_value", 0)),
+            max_runup_intrabar=_safe_float(opt_metrics.get("max_runup_intrabar", 0)),
+            max_runup_intrabar_value=_safe_float(opt_metrics.get("max_runup_intrabar_value", 0)),
+            avg_runup=_safe_float(opt_metrics.get("avg_runup", 0)),
+            avg_runup_value=_safe_float(opt_metrics.get("avg_runup_value", 0)),
+            account_size_required=_safe_float(opt_metrics.get("account_size_required", 0)),
+            return_on_account_size=_safe_float(opt_metrics.get("return_on_account_size", 0)),
+            total_slippage=_safe_float(opt_metrics.get("total_slippage", 0)),
+            max_contracts_held=_safe_float(opt_metrics.get("max_contracts_held", 0)),
+            avg_margin_used=_safe_float(opt_metrics.get("avg_margin_used", 0)),
+            max_margin_used=_safe_float(opt_metrics.get("max_margin_used", 0)),
+            margin_efficiency=_safe_float(opt_metrics.get("margin_efficiency", 0)),
+            net_profit_to_largest_loss=_safe_float(opt_metrics.get("net_profit_to_largest_loss", 0)),
+            quick_reversals=_safe_int(opt_metrics.get("quick_reversals", 0)),
+            expectancy_ratio=_safe_float(opt_metrics.get("expectancy_ratio", 0)),
+            max_drawdown_duration_bars=_safe_float(opt_metrics.get("max_drawdown_duration_bars", 0)),
+            gross_profit_pct=_safe_float(opt_metrics.get("gross_profit_pct", 0)),
+            gross_loss_pct=_safe_float(opt_metrics.get("gross_loss_pct", 0)),
+            long_largest_win_pct=_safe_float(opt_metrics.get("long_largest_win_pct", 0)),
+            long_largest_loss_pct=_safe_float(opt_metrics.get("long_largest_loss_pct", 0)),
+            short_largest_win_pct=_safe_float(opt_metrics.get("short_largest_win_pct", 0)),
+            short_largest_loss_pct=_safe_float(opt_metrics.get("short_largest_loss_pct", 0)),
         )
 
         # Get trades and equity curve from DB if available
@@ -1237,7 +1301,7 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
         return BacktestResult(
             id=str(bt.id) if bt.id else "",
             status=BacktestStatus.COMPLETED if bt.status == DBBacktestStatus.COMPLETED else BacktestStatus.FAILED,
-            created_at=cast(datetime, bt.created_at) if bt.created_at else datetime.now(UTC),
+            created_at=_ensure_utc(bt.created_at) if bt.created_at else datetime.now(UTC),
             config=config,
             metrics=metrics,
             trades=cast(list[TradeRecord], trades_data) if trades_data else [],
@@ -1783,10 +1847,7 @@ async def save_optimization_result(
 
                     # Determine strategy type
                     strategy_type_str = config.get("strategy_type", "rsi").lower()
-                    if strategy_type_str == "rsi":
-                        strategy_type_enum = StrategyType.RSI
-                    else:
-                        strategy_type_enum = StrategyType.SMA_CROSSOVER
+                    strategy_type_enum = StrategyType.RSI if strategy_type_str == "rsi" else StrategyType.SMA_CROSSOVER
 
                     # Build BacktestConfig
                     # IMPORTANT: Use best_params from optimization results, NOT config.strategy_params!
@@ -1853,7 +1914,7 @@ async def save_optimization_result(
                             logger.info(f"Truncated trades to metric total_trades={metric_total}")
 
                         # CRITICAL: Update ALL summary metrics from full_result.metrics
-                        # This ensures "ВСЕ" column matches "ДЛИННАЯ/КОРОТКАЯ" columns
+                        # This ensures "ALL" column matches "LONG/SHORT" columns
                         logger.info(
                             f"[save_optimization_result] full_result.metrics exists: {full_result.metrics is not None}, type: {type(full_result.metrics) if full_result.metrics else 'None'}"
                         )
@@ -2034,7 +2095,7 @@ async def save_optimization_result(
                                     "equity": v,
                                     "drawdown": d,
                                 }
-                                for t, v, d in zip(ec.timestamps, ec.equity, drawdowns)
+                                for t, v, d in zip(ec.timestamps, ec.equity, drawdowns, strict=False)
                             ]
                             logger.info("Got %s equity curve points", len(equity_curve_data))
                         else:
@@ -2541,7 +2602,11 @@ async def run_mtf_backtest(request: MTFBacktestRequest):
                     "exit_price": float(t.exit_price),
                     "pnl": float(t.pnl),
                     "pnl_pct": float(t.pnl_pct),
-                    "exit_reason": str(t.exit_reason) if t.exit_reason else None,
+                    "exit_reason": str(t.exit_reason.value)
+                    if hasattr(t.exit_reason, "value")
+                    else str(t.exit_reason)
+                    if t.exit_reason
+                    else None,
                 }
             )
 

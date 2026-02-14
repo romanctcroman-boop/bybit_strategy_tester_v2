@@ -1894,32 +1894,18 @@ async def sync_all_timeframes_stream(
         "M": 2 * 30 * 86400000,
     }
 
-    # Timeout per TF (optimized for faster sync)
-    tf_timeouts = {
-        "1": 15.0,  # 1m: reduced - only incremental sync, not full backfill
-        "5": 20.0,  # 5m: reduced
-        "15": 20.0,
-        "30": 20.0,
-        "60": 20.0,
-        "240": 30.0,
-        "D": 30.0,
-        "W": 30.0,
-        "M": 45.0,
-    }
-
-    # Max backfill depth per TF (to avoid slow initial loads)
-    # For 1m, only backfill 7 days max (10,080 candles)
-    # For higher TFs, allow full history
-    max_backfill_ms = {
-        "1": 7 * 24 * 60 * 60 * 1000,  # 7 days max for 1m
-        "5": 30 * 24 * 60 * 60 * 1000,  # 30 days for 5m
-        "15": 90 * 24 * 60 * 60 * 1000,  # 90 days for 15m
-        "30": 180 * 24 * 60 * 60 * 1000,  # 180 days for 30m
-        "60": 365 * 24 * 60 * 60 * 1000,  # 1 year for 60m
-    }
-
     async def event_generator():
-        """Generate SSE events for each TF sync."""
+        """Generate SSE events for each TF sync.
+
+        Uses chunked persistence (get_historical_klines_chunked) to:
+        - Save data progressively (every 5000 candles) — no data loss on timeout
+        - Stream real-time progress per-TF to the client via asyncio.Queue
+        - No hard per-TF timeouts — full load always completes
+
+        Key architecture: chunked fetch runs as asyncio.Task while this generator
+        polls progress_queue and yields SSE events in parallel. This prevents
+        the generator from blocking on long-running downloads (e.g. 1m TF = 570K candles).
+        """
         from backend.database import SessionLocal
 
         results = {}
@@ -1927,13 +1913,16 @@ async def sync_all_timeframes_stream(
 
         logger.info(f"[SYNC-STREAM] Starting sync for {symbol}")
 
-        # Сразу отправить первый прогресс, чтобы клиент не ждал (первая загрузка не «зависала»)
-        yield f"data: {json.dumps({'event': 'progress', 'tf': '1', 'tfName': '1 минута', 'step': 0, 'totalSteps': total_steps, 'percent': 0, 'message': 'Синхронизация 1m...'})}\n\n"
+        # Send initial keepalive so client knows stream is alive
+        yield f"data: {json.dumps({'event': 'progress', 'tf': '1', 'tfName': '1 минута', 'step': 0, 'totalSteps': total_steps, 'percent': 0, 'message': 'Начинаем синхронизацию...'})}\n\n"
         await asyncio.sleep(0.01)
 
         try:
             adapter = get_bybit_adapter()
             db = SessionLocal()
+
+            # Queue for progress events from chunked loader
+            progress_queue: asyncio.Queue = asyncio.Queue()
 
             try:
                 for step, tf in enumerate(ALL_TIMEFRAMES, 1):
@@ -1945,24 +1934,12 @@ async def sync_all_timeframes_stream(
                     tf_name = tf_names.get(tf, tf)
                     percent = int((step - 1) / total_steps * 100)
 
-                    # Send progress for starting TF
-                    event_data = json.dumps(
-                        {
-                            "event": "progress",
-                            "tf": tf,
-                            "tfName": tf_name,
-                            "step": step,
-                            "totalSteps": total_steps,
-                            "percent": percent,
-                            "message": f"Синхронизация {tf_name}...",
-                        }
-                    )
-                    logger.debug(f"[SYNC-STREAM] Yielding: {event_data[:100]}")
-                    yield f"data: {event_data}\n\n"
-                    await asyncio.sleep(0.01)  # Small delay to ensure flush
+                    # Send "starting TF" event
+                    yield f"data: {json.dumps({'event': 'start', 'timeframe': tf, 'tf': tf, 'tfName': tf_name, 'step': step, 'totalSteps': total_steps, 'percent': percent, 'message': f'Синхронизация {tf_name}...'})}\n\n"
+                    await asyncio.sleep(0.01)
 
                     try:
-                        # Check current state (filter by market_type for spot/linear)
+                        # Check current state in DB
                         latest_row = (
                             db.query(BybitKlineAudit)
                             .filter(
@@ -1995,140 +1972,130 @@ async def sync_all_timeframes_stream(
 
                         new_candles = 0
 
+                        # Cancellation flag (set by drain loop on disconnect)
+                        client_disconnected = False
+
+                        def sync_cancel_check():
+                            return client_disconnected
+
                         if needs_full_load:
-                            # Full load with timeout
-                            try:
-                                rows = await asyncio.wait_for(
-                                    adapter.get_historical_klines(
-                                        symbol=symbol,
-                                        interval=tf,
-                                        start_time=data_start_ts,
-                                        end_time=now_ts,
-                                        limit=1000,
-                                        market_type=market_type,
-                                    ),
-                                    timeout=tf_timeouts.get(tf, 45.0),
+                            logger.info(f"[SYNC-STREAM] Full load {symbol}/{tf} from {data_start_ts}")
+
+                            # Bind loop vars for on_progress callback
+                            _tf, _tf_name, _step = tf, tf_name, step
+
+                            def _on_progress(fetched, estimated, _tf=_tf, _tf_name=_tf_name, _step=_step):
+                                if fetched % 2000 < 1000:
+                                    progress_queue.put_nowait(("progress", _tf, _tf_name, _step, fetched, estimated))
+
+                            task = asyncio.create_task(
+                                adapter.get_historical_klines_chunked(
+                                    symbol=symbol,
+                                    interval=tf,
+                                    start_time=data_start_ts,
+                                    end_time=now_ts,
+                                    limit=1000,
+                                    market_type=market_type,
+                                    persist_every=5000,
+                                    on_progress=_on_progress,
+                                    cancel_check=sync_cancel_check,
                                 )
-                                if rows:
-                                    rows_with_interval = [{**r, "interval": tf} for r in rows]
-                                    adapter._persist_klines_to_db(symbol, rows_with_interval, market_type=market_type)
-                                    new_candles = len(rows)
-                                results[tf] = {"status": "loaded", "new_candles": new_candles}
-                            except TimeoutError:
-                                logger.warning(f"[SYNC-STREAM] Timeout loading {symbol}/{tf}")
-                                results[tf] = {"status": "timeout", "new_candles": 0}
+                            )
+
+                            # Stream progress while task runs
+                            while not task.done():
+                                if await request.is_disconnected():
+                                    client_disconnected = True
+                                # Drain all progress events from queue
+                                while not progress_queue.empty():
+                                    item = progress_queue.get_nowait()
+                                    if item[0] == "progress":
+                                        _, p_tf, p_name, p_step, p_fetched, p_estimated = item
+                                        sub_msg = f"{p_name}: загружено {p_fetched}"
+                                        if p_estimated > 0:
+                                            sub_pct = min(99, int(p_fetched / p_estimated * 100))
+                                            sub_msg += f" из ~{p_estimated} ({sub_pct}%)"
+                                        yield f"data: {json.dumps({'event': 'progress', 'tf': p_tf, 'tfName': p_name, 'step': p_step, 'totalSteps': total_steps, 'percent': percent, 'message': sub_msg, 'candles_loaded': p_fetched, 'total_expected': p_estimated})}\n\n"
+                                # Send keepalive comment to prevent connection timeout
+                                yield ": keepalive\n\n"
+                                await asyncio.sleep(1.0)
+
+                            new_candles = task.result()
+                            results[tf] = {"status": "loaded", "new_candles": new_candles}
 
                         elif needs_backfill:
-                            # Backfill with timeout - use limited depth for lower TFs
-                            try:
-                                # Limit backfill depth for low TFs (1m, 5m) to avoid 45s timeouts
-                                backfill_start = data_start_ts
-                                if tf in max_backfill_ms:
-                                    max_depth = max_backfill_ms[tf]
-                                    limited_start = earliest_ts - max_depth
-                                    backfill_start = max(data_start_ts, limited_start)
-                                    if backfill_start > data_start_ts:
-                                        logger.info(
-                                            f"[SYNC-STREAM] Limited backfill for {symbol}/{tf}: {max_depth // (24 * 60 * 60 * 1000)} days"
-                                        )
+                            backfill_start = data_start_ts
+                            logger.info(f"[SYNC-STREAM] Backfill {symbol}/{tf} from {backfill_start} to {earliest_ts}")
 
-                                rows = await asyncio.wait_for(
-                                    adapter.get_historical_klines(
-                                        symbol=symbol,
-                                        interval=tf,
-                                        start_time=backfill_start,
-                                        end_time=earliest_ts - 1,
-                                        limit=1000,
-                                        market_type=market_type,
-                                    ),
-                                    timeout=tf_timeouts.get(tf, 30.0),
-                                )
-                                if rows:
-                                    rows_with_interval = [{**r, "interval": tf} for r in rows]
-                                    adapter._persist_klines_to_db(symbol, rows_with_interval, market_type=market_type)
-                                    new_candles += len(rows)
+                            backfill_candles = await adapter.get_historical_klines_chunked(
+                                symbol=symbol,
+                                interval=tf,
+                                start_time=backfill_start,
+                                end_time=earliest_ts - 1,
+                                limit=1000,
+                                market_type=market_type,
+                                persist_every=5000,
+                                cancel_check=sync_cancel_check,
+                            )
+                            new_candles += backfill_candles
 
-                                if needs_update:
-                                    interval_ms = interval_ms_map.get(tf, 3600000)
-                                    overlap = OVERLAP_CANDLES.get(tf, 3)
-                                    start_ts = latest_ts - (interval_ms * overlap)
-                                    rows = await asyncio.wait_for(
-                                        adapter.get_historical_klines(
-                                            symbol=symbol,
-                                            interval=tf,
-                                            start_time=start_ts,
-                                            end_time=now_ts,
-                                            limit=1000,
-                                            market_type=market_type,
-                                        ),
-                                        timeout=tf_timeouts.get(tf, 30.0),
-                                    )
-                                    if rows:
-                                        rows_with_interval = [{**r, "interval": tf} for r in rows]
-                                        adapter._persist_klines_to_db(
-                                            symbol, rows_with_interval, market_type=market_type
-                                        )
-                                        new_candles += len(rows)
-                                results[tf] = {"status": "backfilled", "new_candles": new_candles}
-                            except TimeoutError:
-                                logger.warning(f"[SYNC-STREAM] Timeout backfilling {symbol}/{tf}")
-                                results[tf] = {"status": "timeout", "new_candles": new_candles}
-
-                        elif needs_update:
-                            # Just update with timeout (переменный нахлёст)
-                            try:
+                            # Also update to latest if needed
+                            if needs_update and not client_disconnected:
                                 interval_ms = interval_ms_map.get(tf, 3600000)
                                 overlap = OVERLAP_CANDLES.get(tf, 3)
                                 start_ts = latest_ts - (interval_ms * overlap)
-                                rows = await asyncio.wait_for(
-                                    adapter.get_historical_klines(
-                                        symbol=symbol,
-                                        interval=tf,
-                                        start_time=start_ts,
-                                        end_time=now_ts,
-                                        limit=1000,
-                                        market_type=market_type,
-                                    ),
-                                    timeout=tf_timeouts.get(tf, 30.0),
+                                update_candles = await adapter.get_historical_klines_chunked(
+                                    symbol=symbol,
+                                    interval=tf,
+                                    start_time=start_ts,
+                                    end_time=now_ts,
+                                    limit=1000,
+                                    market_type=market_type,
+                                    persist_every=5000,
+                                    cancel_check=sync_cancel_check,
                                 )
-                                if rows:
-                                    rows_with_interval = [{**r, "interval": tf} for r in rows]
-                                    adapter._persist_klines_to_db(symbol, rows_with_interval, market_type=market_type)
-                                    new_candles = len(rows)
-                                results[tf] = {"status": "updated", "new_candles": new_candles}
-                            except TimeoutError:
-                                logger.warning(f"[SYNC-STREAM] Timeout updating {symbol}/{tf}")
-                                results[tf] = {"status": "timeout", "new_candles": 0}
+                                new_candles += update_candles
+
+                            results[tf] = {"status": "backfilled", "new_candles": new_candles}
+
+                        elif needs_update:
+                            interval_ms = interval_ms_map.get(tf, 3600000)
+                            overlap = OVERLAP_CANDLES.get(tf, 3)
+                            start_ts = latest_ts - (interval_ms * overlap)
+
+                            new_candles = await adapter.get_historical_klines_chunked(
+                                symbol=symbol,
+                                interval=tf,
+                                start_time=start_ts,
+                                end_time=now_ts,
+                                limit=1000,
+                                market_type=market_type,
+                                persist_every=5000,
+                                cancel_check=sync_cancel_check,
+                            )
+                            results[tf] = {"status": "updated", "new_candles": new_candles}
                         else:
                             results[tf] = {"status": "fresh", "new_candles": 0}
 
+                        if client_disconnected:
+                            logger.info(f"[SYNC-STREAM] Client disconnected during {symbol}/{tf}")
+                            yield f"data: {json.dumps({'event': 'complete', 'totalNew': total_new + new_candles, 'results': results, 'message': 'Синхронизация прервана (клиент отключился)', 'cancelled': True})}\n\n"
+                            return
+
                         total_new += new_candles
 
-                        # Send progress after completing TF
+                        # Send TF completion event
                         percent = int(step / total_steps * 100)
                         status_msg = "✓" if new_candles == 0 else f"+{new_candles}"
-                        event_data = json.dumps(
-                            {
-                                "event": "progress",
-                                "tf": tf,
-                                "tfName": tf_name,
-                                "step": step,
-                                "totalSteps": total_steps,
-                                "percent": percent,
-                                "message": f"{tf_name}: {status_msg}",
-                                "newCandles": new_candles,
-                                "totalNew": total_new,
-                            }
-                        )
+                        yield f"data: {json.dumps({'event': 'tf_complete', 'tf': tf, 'tfName': tf_name, 'step': step, 'totalSteps': total_steps, 'percent': percent, 'message': f'{tf_name}: {status_msg}', 'newCandles': new_candles, 'candles_saved': new_candles, 'totalNew': total_new})}\n\n"
                         logger.info(f"[SYNC-STREAM] TF {tf} done: {status_msg}")
-                        yield f"data: {event_data}\n\n"
                         await asyncio.sleep(0.01)
 
                     except Exception as e:
                         logger.error(f"[SYNC-STREAM] Error syncing {symbol}/{tf}: {e}")
                         results[tf] = {"status": "error", "error": str(e)}
                         err_percent = int(step / total_steps * 100)
-                        yield f"data: {json.dumps({'event': 'progress', 'tf': tf, 'tfName': tf_name, 'step': step, 'totalSteps': total_steps, 'percent': err_percent, 'message': f'{tf_name}: ошибка', 'error': str(e)})}\n\n"
+                        yield f"data: {json.dumps({'event': 'error', 'tf': tf, 'tfName': tf_name, 'step': step, 'totalSteps': total_steps, 'percent': err_percent, 'message': f'{tf_name}: ошибка', 'error': str(e)})}\n\n"
 
             finally:
                 db.close()

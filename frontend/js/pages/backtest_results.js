@@ -11,12 +11,12 @@
 /* global Tabulator */
 
 // Import shared utilities
-import { formatDate as _formatDate } from "../utils.js";
+import { formatDate as _formatDate } from '../utils.js';
 
 // ============================
 // Configuration
 // ============================
-const API_BASE = "/api/v1";
+const API_BASE = '/api/v1';
 let currentBacktest = null;
 let allResults = [];
 let selectedForCompare = [];
@@ -25,6 +25,9 @@ let compareMode = false;
 // Track recently deleted IDs to filter them from API responses
 // This prevents "ghost" items from reappearing due to backend sync delay
 const recentlyDeletedIds = new Set();
+
+// Multi-select for bulk delete
+const selectedForDelete = new Set();
 
 // Charts
 let equityChart = null;
@@ -44,12 +47,12 @@ let benchmarkingChart = null;
 
 // Draw discrete trade outcome markers just above the x-axis (instead of a continuous strip)
 const equityTradeMarkersPlugin = {
-  id: "equityTradeMarkers",
+  id: 'equityTradeMarkers',
   afterDatasetsDraw(chart, _args, pluginOptions) {
     try {
       if (!pluginOptions?.enabled) return;
-      if (!chart || chart.config?.type !== "line") return;
-      if (chart.canvas?.id !== "equityChart") return;
+      if (!chart || chart.config?.type !== 'line') return;
+      if (chart.canvas?.id !== 'equityChart') return;
 
       const tradeMap = chart._tradeMap;
       if (!tradeMap || Object.keys(tradeMap).length === 0) return;
@@ -65,7 +68,7 @@ const equityTradeMarkersPlugin = {
       // Position markers on a thin "lane" right above the x-axis (TradingView-like)
       const laneY = Math.min(
         chartArea.bottom - 10,
-        yScale.getPixelForValue(yScale.min) - 6,
+        yScale.getPixelForValue(yScale.min) - 6
       );
       const size = pluginOptions.size ?? 7; // triangle size
       const offsetY = pluginOptions.offsetY ?? 0;
@@ -75,7 +78,7 @@ const equityTradeMarkersPlugin = {
       const maxX = chartArea.right - size - 1;
       const y = Math.max(
         chartArea.top + size + 1,
-        Math.min(chartArea.bottom - size - 1, laneY + offsetY),
+        Math.min(chartArea.bottom - size - 1, laneY + offsetY)
       );
 
       // Iterate deterministically by index
@@ -93,10 +96,10 @@ const equityTradeMarkersPlugin = {
         x = Math.max(minX, Math.min(maxX, x));
 
         const pnl = Number(info.pnl ?? 0);
-        const side = (info.side || "long").toLowerCase();
-        const isShort = side === "short";
+        const side = (info.side || 'long').toLowerCase();
+        const isShort = side === 'short';
 
-        const fill = pnl > 0 ? "#26a69a" : pnl < 0 ? "#ef5350" : "#78909c";
+        const fill = pnl > 0 ? '#26a69a' : pnl < 0 ? '#ef5350' : '#78909c';
 
         // Draw marker: triangle up for long, triangle down for short (TV-like)
         ctx.beginPath();
@@ -117,19 +120,19 @@ const equityTradeMarkersPlugin = {
 
         // subtle outline like TV
         ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.stroke();
       }
 
       ctx.restore();
     } catch (e) {
       // Never let a paint helper break the chart
-      console.warn("[equityTradeMarkersPlugin] error:", e?.message || e);
+      console.warn('[equityTradeMarkersPlugin] error:', e?.message || e);
     }
-  },
+  }
 };
 
-if (typeof Chart !== "undefined") {
+if (typeof Chart !== 'undefined') {
   Chart.register(equityTradeMarkersPlugin);
 }
 
@@ -139,11 +142,11 @@ if (typeof Chart !== "undefined") {
 // Two layers: light (full excursion) and dark (realized P&L)
 // ============================
 const tradeExcursionBarsPlugin = {
-  id: "tradeExcursionBars",
+  id: 'tradeExcursionBars',
   afterDatasetsDraw(chart, _args, pluginOptions) {
     try {
       if (!pluginOptions?.enabled) return;
-      if (!chart || chart.canvas?.id !== "equityChart") return;
+      if (!chart || chart.canvas?.id !== 'equityChart') return;
 
       const tradeRanges = chart._tradeRanges;
       const tradeMap = chart._tradeMap;
@@ -158,10 +161,10 @@ const tradeExcursionBarsPlugin = {
       ctx.save();
 
       // Colors
-      const greenLight = "rgba(38, 166, 154, 0.35)";
-      const greenDark = "rgba(38, 166, 154, 0.9)";
-      const redLight = "rgba(239, 83, 80, 0.35)";
-      const redDark = "rgba(239, 83, 80, 0.9)";
+      const greenLight = 'rgba(38, 166, 154, 0.35)';
+      const greenDark = 'rgba(38, 166, 154, 0.9)';
+      const redLight = 'rgba(239, 83, 80, 0.35)';
+      const redDark = 'rgba(239, 83, 80, 0.9)';
 
       // Get y=0 pixel position
       const y0 = yScale.getPixelForValue(0);
@@ -203,7 +206,7 @@ const tradeExcursionBarsPlugin = {
 
         // Get trade P&L for realized portion
         const tradeInfo = Object.values(tradeMap || {}).find(
-          (ti) => ti.tradeNum === idx + 1,
+          (ti) => ti.tradeNum === idx + 1
         );
         const tradePnL = tradeInfo?.pnl || 0;
         const realizedProfit = tradePnL > 0 ? Math.min(tradePnL, mfe) : 0;
@@ -249,12 +252,12 @@ const tradeExcursionBarsPlugin = {
 
       ctx.restore();
     } catch (e) {
-      console.warn("[tradeExcursionBarsPlugin] error:", e?.message || e);
+      console.warn('[tradeExcursionBarsPlugin] error:', e?.message || e);
     }
-  },
+  }
 };
 
-if (typeof Chart !== "undefined") {
+if (typeof Chart !== 'undefined') {
   Chart.register(tradeExcursionBarsPlugin);
 }
 
@@ -264,7 +267,7 @@ let tradesTable = null;
 // ============================
 // Initialization
 // ============================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener('DOMContentLoaded', () => {
   initCharts();
   initTradingViewTabs();
   loadBacktestResults();
@@ -272,28 +275,105 @@ document.addEventListener("DOMContentLoaded", () => {
   setDefaultDates();
   setupFilters();
   setupChartResize();
+  setupResultsListDelegation();
+  setupBulkDeleteToolbar();
 });
 
 // Handle URL changes (back/forward navigation or redirect with ?id=)
-window.addEventListener("popstate", () => {
+window.addEventListener('popstate', () => {
   loadBacktestResults();
 });
 
 // Handle backtest loaded from inline fallback script
-window.addEventListener("backtestLoaded", (event) => {
+window.addEventListener('backtestLoaded', (event) => {
   const backtest = event.detail;
   if (backtest) {
     console.log(
-      "[backtestLoaded event] Received backtest data, updating charts",
+      '[backtestLoaded event] Received backtest data, updating charts'
     );
     currentBacktest = backtest;
     updateCharts(backtest);
   }
 });
 
+/**
+ * Event delegation for #resultsList container.
+ * Handles click/delete on dynamically rendered backtest items
+ * without relying on inline onclick attributes.
+ */
+function setupResultsListDelegation() {
+  const container = document.getElementById('resultsList');
+  if (!container) return;
+
+  container.addEventListener('click', (e) => {
+    // Delete button clicked (button or its <i> icon child)
+    const deleteBtn = e.target.closest('.delete-btn');
+    if (deleteBtn) {
+      e.stopPropagation();
+      const item = deleteBtn.closest('.result-item');
+      if (item && item.dataset.id) {
+        deleteBacktest(item.dataset.id);
+      }
+      return;
+    }
+
+    // Bulk-select checkbox clicked
+    const bulkCheckbox = e.target.closest('.bulk-select-checkbox');
+    if (bulkCheckbox) {
+      e.stopPropagation();
+      const item = bulkCheckbox.closest('.result-item');
+      if (item && item.dataset.id) {
+        toggleBulkSelectItem(item.dataset.id);
+      }
+      return;
+    }
+
+    // Compare checkbox clicked
+    const compareCheckbox = e.target.closest('.compare-checkbox');
+    if (compareCheckbox) {
+      const item = compareCheckbox.closest('.result-item');
+      if (item && item.dataset.id) {
+        toggleCompareSelect(e, item.dataset.id);
+      }
+      return;
+    }
+
+    // Result content clicked — select backtest
+    const content = e.target.closest('.result-content');
+    if (content) {
+      const item = content.closest('.result-item');
+      if (item && item.dataset.id) {
+        selectBacktest(item.dataset.id);
+      }
+      return;
+    }
+  });
+}
+
+/**
+ * Bind click listeners for bulk-delete toolbar buttons.
+ * Uses addEventListener instead of inline onclick (CSP-safe).
+ */
+function setupBulkDeleteToolbar() {
+  const selectAllCb = document.getElementById('selectAllCheckbox');
+  if (selectAllCb) {
+    selectAllCb.addEventListener('click', () => {
+      selectAllForDelete();
+    });
+  }
+
+  const deleteBtn = document.getElementById('bulkDeleteBtn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', () => {
+      console.log('[BulkDeleteBtn] Clicked! selectedForDelete size:', selectedForDelete.size);
+      deleteSelectedBacktests();
+    });
+  }
+}
+
 // Setup chart container resize observer
 function setupChartResize() {
-  const chartContainer = document.querySelector(".tv-equity-chart-container");
+  const chartContainer = document.querySelector('.tv-equity-chart-container');
   if (chartContainer && equityChart) {
     const resizeObserver = new ResizeObserver(() => {
       if (equityChart) {
@@ -313,50 +393,50 @@ function initCharts() {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        labels: { color: "#8b949e" },
-      },
+        labels: { color: '#8b949e' }
+      }
     },
     scales: {
       x: {
-        grid: { color: "#30363d" },
+        grid: { color: '#30363d' },
         ticks: {
-          color: "#8b949e",
+          color: '#8b949e',
           maxTicksLimit: 12,
           maxRotation: 45,
-          minRotation: 0,
-        },
+          minRotation: 0
+        }
       },
       y: {
-        grid: { color: "#30363d" },
-        ticks: { color: "#8b949e" },
-      },
-    },
+        grid: { color: '#30363d' },
+        ticks: { color: '#8b949e' }
+      }
+    }
   };
-  const equityCanvas = document.getElementById("equityChart");
+  const equityCanvas = document.getElementById('equityChart');
   if (equityCanvas) {
     equityChart = new Chart(equityCanvas, {
-      type: "line",
+      type: 'line',
       data: {
         labels: [],
         datasets: [
           {
-            label: "Капитал стратегии",
+            label: 'Капитал стратегии',
             data: [],
-            type: "line",
-            yAxisID: "y",
-            borderColor: "#26a69a",
+            type: 'line',
+            yAxisID: 'y',
+            borderColor: '#26a69a',
             segment: {
               borderColor: (ctx) => {
                 const y0 = ctx?.p0?.parsed?.y;
                 const y1 = ctx?.p1?.parsed?.y;
                 const y = (y0 + y1) / 2;
-                return y >= 0 ? "#26a69a" : "#ef5350";
-              },
+                return y >= 0 ? '#26a69a' : '#ef5350';
+              }
             },
             backgroundColor: (ctx) => {
               const chart = ctx.chart;
               const { chartArea, scales } = chart;
-              if (!chartArea || !scales?.y) return "rgba(38, 166, 154, 0.12)";
+              if (!chartArea || !scales?.y) return 'rgba(38, 166, 154, 0.12)';
 
               const zeroY = scales.y.getPixelForValue(0);
               const top = chartArea.top;
@@ -369,7 +449,7 @@ function initCharts() {
                 !Number.isFinite(bottom) ||
                 bottom <= top
               ) {
-                return "rgba(38, 166, 154, 0.12)";
+                return 'rgba(38, 166, 154, 0.12)';
               }
 
               // Two-part gradient: green above 0, red below 0 (TV-like)
@@ -377,7 +457,7 @@ function initCharts() {
                 0,
                 top,
                 0,
-                bottom,
+                bottom
               );
               let t = (zeroY - top) / (bottom - top);
 
@@ -385,80 +465,80 @@ function initCharts() {
               if (!Number.isFinite(t)) t = 0.5;
               t = Math.min(1, Math.max(0, t));
 
-              gradient.addColorStop(0, "rgba(38, 166, 154, 0.18)");
+              gradient.addColorStop(0, 'rgba(38, 166, 154, 0.18)');
               gradient.addColorStop(
                 Math.max(0, Math.min(0.999, t - 0.001)),
-                "rgba(38, 166, 154, 0.04)",
+                'rgba(38, 166, 154, 0.04)'
               );
               gradient.addColorStop(
                 Math.max(0.001, Math.min(1, t + 0.001)),
-                "rgba(239, 83, 80, 0.04)",
+                'rgba(239, 83, 80, 0.04)'
               );
-              gradient.addColorStop(1, "rgba(239, 83, 80, 0.14)");
+              gradient.addColorStop(1, 'rgba(239, 83, 80, 0.14)');
               return gradient;
             },
             fill: {
-              target: { value: 0 },
+              target: { value: 0 }
             },
             tension: 0,
             pointRadius: 0,
             pointHoverRadius: 0,
             pointHitRadius: 8,
             borderWidth: 4,
-            order: 1,
+            order: 1
           },
           {
-            label: "Покупка и удержание",
+            label: 'Покупка и удержание',
             data: [],
-            type: "line",
-            yAxisID: "y",
-            borderColor: "#ef5350",
-            backgroundColor: "#ef5350",
+            type: 'line',
+            yAxisID: 'y',
+            borderColor: '#ef5350',
+            backgroundColor: '#ef5350',
             fill: false,
             tension: 0,
             pointRadius: 0,
             pointHoverRadius: 0,
             borderWidth: 2,
             borderDash: [4, 6],
-            borderCapStyle: "round",
-            order: 2,
-          },
+            borderCapStyle: 'round',
+            order: 2
+          }
           // TradingView-style Trade Excursion Bars are drawn by custom plugin
           // (tradeExcursionBarsPlugin) instead of Chart.js datasets
           // This allows unified bars with MFE up + MAE down in single bar
-        ],
+        ]
       },
       options: {
         ...chartOptions,
         responsive: true,
         maintainAspectRatio: false,
         interaction: {
-          mode: "index",
-          intersect: false,
+          mode: 'index',
+          intersect: false
         },
         plugins: {
           legend: {
-            display: false,
+            display: false
           },
           equityTradeMarkers: {
             enabled: false,
             size: 7,
-            offsetY: 0,
+            offsetY: 0
           },
           tradeExcursionBars: {
-            enabled: true, // Draw unified MFE+MAE bars via custom plugin
+            enabled: true // Draw unified MFE+MAE bars via custom plugin
           },
           annotation: {
             annotations: {
               zeroLine: {
-                type: "line",
+                type: 'line',
                 yMin: 0,
                 yMax: 0,
-                borderColor: "#787b86",
+                borderColor: '#787b86',
                 borderWidth: 1,
-                drawTime: "afterDatasetsDraw",
-              },
-            },
+                drawTime: 'afterDatasetsDraw'
+              }
+            }
           },
           datalabels: {
             display: (context) => {
@@ -468,34 +548,34 @@ function initCharts() {
                 context.dataIndex === context.dataset.data.length - 1
               );
             },
-            align: "left",
-            anchor: "end",
+            align: 'left',
+            anchor: 'end',
             offset: 8,
             backgroundColor: (context) => {
               const value = context.dataset.data[context.dataIndex];
-              return value >= 0 ? "#26a69a" : "#ef5350";
+              return value >= 0 ? '#26a69a' : '#ef5350';
             },
             borderRadius: 6,
-            color: "white",
-            font: { weight: "bold", size: 13 },
+            color: 'white',
+            font: { weight: 'bold', size: 13 },
             padding: { left: 10, right: 10, top: 6, bottom: 6 },
             formatter: (value) => {
-              const sign = value > 0 ? "+" : "";
+              const sign = value > 0 ? '+' : '';
               return (
                 sign +
-                value.toLocaleString("ru-RU", {
+                value.toLocaleString('ru-RU', {
                   minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
+                  maximumFractionDigits: 2
                 })
               );
-            },
+            }
           },
           tooltip: {
             enabled: true,
-            backgroundColor: "rgba(30, 30, 30, 0.95)",
-            titleColor: "#ffffff",
-            bodyColor: "#c9d1d9",
-            borderColor: "#404040",
+            backgroundColor: 'rgba(30, 30, 30, 0.95)',
+            titleColor: '#ffffff',
+            bodyColor: '#c9d1d9',
+            borderColor: '#404040',
             borderWidth: 1,
             padding: 12,
             cornerRadius: 8,
@@ -505,19 +585,19 @@ function initCharts() {
                 const idx = context[0].dataIndex;
                 const tradeInfo = equityChart._tradeMap?.[idx];
                 if (tradeInfo) {
-                  const side = tradeInfo.side === "short" ? "Short" : "Long";
-                  return `Trade #${tradeInfo.tradeNum} вЂў ${side}`;
+                  const side = tradeInfo.side === 'short' ? 'Short' : 'Long';
+                  return `Trade #${tradeInfo.tradeNum} • ${side}`;
                 }
                 const data = equityChart._equityData;
                 if (data && data[idx]) {
                   const d = new Date(data[idx].timestamp);
-                  return d.toLocaleDateString("ru-RU", {
-                    weekday: "short",
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
+                  return d.toLocaleDateString('ru-RU', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
                   });
                 }
                 return context[0].label;
@@ -527,29 +607,29 @@ function initCharts() {
                 const idx = context.dataIndex;
                 const value = context.parsed.y;
 
-                const sign = value >= 0 ? "+" : "";
-                const color = value >= 0 ? "🟢" : "🔴";
+                const sign = value >= 0 ? '+' : '';
+                const color = value >= 0 ? '🟢' : '🔴';
 
                 // Trade-specific lines (prefer TV-like fields when hovering around a trade)
                 const tradeInfo = equityChart._tradeMap?.[idx];
-                if (tradeInfo && datasetLabel === "Капитал стратегии") {
+                if (tradeInfo && datasetLabel === 'Капитал стратегии') {
                   const cumPnL = Number(tradeInfo.cumulativePnL ?? 0);
-                  const cumSign = cumPnL >= 0 ? "+" : "";
+                  const cumSign = cumPnL >= 0 ? '+' : '';
 
                   const exitStr = tradeInfo.exitTime
-                    ? new Date(tradeInfo.exitTime).toLocaleString("ru-RU", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })
+                    ? new Date(tradeInfo.exitTime).toLocaleString('ru-RU', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })
                     : null;
 
                   const lines = [];
                   lines.push(
-                    `Cumulative P&L: ${cumSign}${cumPnL.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} USDT`,
+                    `Cumulative P&L: ${cumSign}${cumPnL.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USDT`
                   );
 
                   // Show MFE/MAE (Trades excursions) in TradingView style
@@ -558,12 +638,12 @@ function initCharts() {
 
                   if (mfeValue !== null && mfeValue !== undefined) {
                     lines.push(
-                      `Favorable excursion: ${Number(mfeValue).toFixed(2)} USDT`,
+                      `Favorable excursion: ${Number(mfeValue).toFixed(2)} USDT`
                     );
                   }
                   if (maeValue !== null && maeValue !== undefined) {
                     lines.push(
-                      `Adverse excursion: ${Number(maeValue).toFixed(2)} USDT`,
+                      `Adverse excursion: ${Number(maeValue).toFixed(2)} USDT`
                     );
                   }
 
@@ -572,395 +652,395 @@ function initCharts() {
                 }
 
                 // Default: show series value
-                if (datasetLabel === "Капитал стратегии") {
-                  return `${color} Совокупные ПР/УБ  ${sign}${value.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} USD`;
+                if (datasetLabel === 'Капитал стратегии') {
+                  return `${color} Совокупные ПР/УБ  ${sign}${value.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
                 }
 
                 // Buy & Hold should only appear if enabled in legend
-                if (datasetLabel === "Покупка и удержание") {
+                if (datasetLabel === 'Покупка и удержание') {
                   const buyHoldCheckbox =
-                    document.getElementById("legendBuyHold");
+                    document.getElementById('legendBuyHold');
                   if (buyHoldCheckbox && !buyHoldCheckbox.checked) return null;
-                  return `   B&H ПР/УБ     ${sign}${value.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} USD`;
+                  return `   B&H ПР/УБ     ${sign}${value.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
                 }
 
                 // Skip Excursion/Realized bars in tooltip (they show in trade info above)
                 if (
-                  datasetLabel.includes("Excursion") ||
-                  datasetLabel.includes("Realized")
+                  datasetLabel.includes('Excursion') ||
+                  datasetLabel.includes('Realized')
                 ) {
                   return null;
                 }
 
                 return null;
-              },
+              }
             },
             filter: function (tooltipItem) {
               // Hide excursion bars from tooltip list
               const label = tooltipItem.dataset.label;
               return (
-                !label.includes("Excursion") && !label.includes("Realized")
+                !label.includes('Excursion') && !label.includes('Realized')
               );
-            },
-          },
+            }
+          }
         },
         scales: {
           x: {
             offset: true, // Add padding at edges so bars don't touch boundaries
             grid: {
-              color: "#2a2e39",
+              color: '#2a2e39',
               drawOnChartArea: true,
-              drawTicks: false,
+              drawTicks: false
             },
             ticks: {
-              color: "#787b86",
+              color: '#787b86',
               maxTicksLimit: 12,
               maxRotation: 0,
               font: { size: 11 },
-              padding: 8,
+              padding: 8
             },
             border: {
-              color: "#2a2e39",
-            },
+              color: '#2a2e39'
+            }
           },
           y: {
-            position: "right",
-            grace: "10%",
+            position: 'right',
+            grace: '10%',
             grid: {
-              color: "#2a2e39",
+              color: '#2a2e39',
               drawOnChartArea: true,
-              drawTicks: false,
+              drawTicks: false
             },
             ticks: {
-              color: "#787b86",
+              color: '#787b86',
               font: { size: 11 },
               padding: 8,
               maxTicksLimit: 15,
               callback: (v) => {
                 if (v > 0)
                   return (
-                    "+" +
-                    v.toLocaleString("ru-RU", { minimumFractionDigits: 2 })
+                    '+' +
+                    v.toLocaleString('ru-RU', { minimumFractionDigits: 2 })
                   );
                 if (v < 0)
-                  return v.toLocaleString("ru-RU", {
-                    minimumFractionDigits: 2,
+                  return v.toLocaleString('ru-RU', {
+                    minimumFractionDigits: 2
                   });
-                return "0";
-              },
+                return '0';
+              }
             },
             border: {
-              display: false,
-            },
+              display: false
+            }
           },
           y2: {
             display: false,
-            position: "left",
+            position: 'left',
             grid: { display: false },
             // MFE/MAE bars - each bar starts from 0
             stacked: false,
-            beginAtZero: true,
-          },
-        },
-      },
+            beginAtZero: true
+          }
+        }
+      }
     });
   }
 
   // Drawdown Chart
-  const drawdownCanvas = document.getElementById("drawdownChart");
+  const drawdownCanvas = document.getElementById('drawdownChart');
   if (drawdownCanvas) {
     drawdownChart = new Chart(drawdownCanvas, {
-      type: "line",
+      type: 'line',
       data: {
         labels: [],
         datasets: [
           {
-            label: "Drawdown %",
+            label: 'Drawdown %',
             data: [],
-            borderColor: "#f85149",
-            backgroundColor: "rgba(248, 81, 73, 0.1)",
+            borderColor: '#f85149',
+            backgroundColor: 'rgba(248, 81, 73, 0.1)',
             fill: true,
-            tension: 0.4,
-          },
-        ],
+            tension: 0.4
+          }
+        ]
       },
-      options: chartOptions,
+      options: chartOptions
     });
   }
 
   // Returns Distribution
-  const returnsCanvas = document.getElementById("returnsChart");
+  const returnsCanvas = document.getElementById('returnsChart');
   if (returnsCanvas) {
     returnsChart = new Chart(returnsCanvas, {
-      type: "bar",
+      type: 'bar',
       data: {
         labels: [],
         datasets: [
           {
-            label: "Trade Returns",
+            label: 'Trade Returns',
             data: [],
-            backgroundColor: [],
-          },
-        ],
+            backgroundColor: []
+          }
+        ]
       },
       options: {
         ...chartOptions,
         plugins: {
           ...chartOptions.plugins,
-          legend: { display: false },
-        },
-      },
+          legend: { display: false }
+        }
+      }
     });
   }
 
   // Monthly P&L
-  const monthlyCanvas = document.getElementById("monthlyChart");
+  const monthlyCanvas = document.getElementById('monthlyChart');
   if (monthlyCanvas) {
     monthlyChart = new Chart(monthlyCanvas, {
-      type: "bar",
+      type: 'bar',
       data: {
         labels: [],
         datasets: [
           {
-            label: "Monthly P&L",
+            label: 'Monthly P&L',
             data: [],
-            backgroundColor: [],
-          },
-        ],
+            backgroundColor: []
+          }
+        ]
       },
-      options: chartOptions,
+      options: chartOptions
     });
   }
 
   // Trade Distribution Chart (in Trade Analysis tab)
-  const tradeDistCanvas = document.getElementById("tradeDistributionChart");
+  const tradeDistCanvas = document.getElementById('tradeDistributionChart');
   if (tradeDistCanvas) {
     tradeDistributionChart = new Chart(tradeDistCanvas, {
-      type: "bar",
+      type: 'bar',
       data: {
         labels: [],
-        datasets: [],
+        datasets: []
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         interaction: {
-          mode: "index",
-          intersect: false,
+          mode: 'index',
+          intersect: false
         },
         plugins: {
           legend: {
             display: true,
-            position: "bottom",
+            position: 'bottom',
             labels: {
-              color: "#ffffff",
+              color: '#ffffff',
               usePointStyle: true,
-              pointStyle: "circle",
+              pointStyle: 'circle',
               padding: 15,
-              font: { size: 12 },
-            },
+              font: { size: 12 }
+            }
           },
           tooltip: {
-            backgroundColor: "rgba(22, 27, 34, 0.95)",
-            titleColor: "#c9d1d9",
-            bodyColor: "#c9d1d9",
-            borderColor: "#30363d",
-            borderWidth: 1,
-          },
+            backgroundColor: 'rgba(22, 27, 34, 0.95)',
+            titleColor: '#c9d1d9',
+            bodyColor: '#c9d1d9',
+            borderColor: '#30363d',
+            borderWidth: 1
+          }
         },
         scales: {
           x: {
             stacked: true,
             grid: { display: false },
             ticks: {
-              color: "#e6edf3",
+              color: '#e6edf3',
               font: { size: 11 },
               maxRotation: 45,
-              minRotation: 45,
-            },
+              minRotation: 45
+            }
           },
           y: {
-            position: "right",
-            grid: { color: "#30363d" },
-            ticks: { color: "#e6edf3", font: { size: 11 } },
-            beginAtZero: true,
-          },
+            position: 'right',
+            grid: { color: '#30363d' },
+            ticks: { color: '#e6edf3', font: { size: 11 } },
+            beginAtZero: true
+          }
         },
         layout: {
           padding: {
-            bottom: 10,
-          },
-        },
-      },
+            bottom: 10
+          }
+        }
+      }
     });
   }
 
   // Win/Loss Donut Chart (in Trade Analysis tab)
-  const winLossCanvas = document.getElementById("winLossDonutChart");
+  const winLossCanvas = document.getElementById('winLossDonutChart');
   if (winLossCanvas) {
     winLossDonutChart = new Chart(winLossCanvas, {
-      type: "doughnut",
+      type: 'doughnut',
       data: {
-        labels: ["Победы", "Убытки", "Безубыточность"],
+        labels: ['Победы', 'Убытки', 'Безубыточность'],
         datasets: [
           {
             data: [0, 0, 0],
-            backgroundColor: ["#26a69a", "#ef5350", "#78909c"],
-            borderWidth: 0,
-          },
-        ],
+            backgroundColor: ['#26a69a', '#ef5350', '#78909c'],
+            borderWidth: 0
+          }
+        ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: true,
         aspectRatio: 1,
-        cutout: "60%",
+        cutout: '60%',
         layout: {
-          padding: 5,
+          padding: 5
         },
         plugins: {
           legend: {
-            display: false, // Use custom HTML legend
+            display: false // Use custom HTML legend
           },
           tooltip: {
-            backgroundColor: "rgba(22, 27, 34, 0.95)",
+            backgroundColor: 'rgba(22, 27, 34, 0.95)',
             callbacks: {
               label: function (context) {
                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
                 const pct =
                   total > 0 ? ((context.raw / total) * 100).toFixed(2) : 0;
                 return `${context.label}: ${context.raw} (${pct}%)`;
-              },
-            },
+              }
+            }
           },
           centerLabel: {
-            text: "0",
-            subText: "Всего сделок",
-          },
-        },
-      },
+            text: '0',
+            subText: 'Всего сделок'
+          }
+        }
+      }
     });
   }
 
   // Waterfall Chart (in Dynamics tab)
-  const waterfallCanvas = document.getElementById("waterfallChart");
+  const waterfallCanvas = document.getElementById('waterfallChart');
   if (waterfallCanvas) {
     waterfallChart = new Chart(waterfallCanvas, {
-      type: "bar",
+      type: 'bar',
       data: {
         labels: [
-          "Итого прибыль",
-          "Открытые ПР/УБ",
-          "Итого убыток",
-          "Комиссия",
-          "Общие ПР/УБ",
+          'Итого прибыль',
+          'Открытые ПР/УБ',
+          'Итого убыток',
+          'Комиссия',
+          'Общие ПР/УБ'
         ],
-        datasets: [],
+        datasets: []
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        indexAxis: "x",
+        indexAxis: 'x',
         plugins: {
           legend: {
             display: true,
-            position: "bottom",
+            position: 'bottom',
             labels: {
-              color: "#ffffff",
+              color: '#ffffff',
               usePointStyle: true,
-              pointStyle: "rect",
+              pointStyle: 'rect',
               padding: 15,
               font: { size: 11 },
-              filter: (item) => item.text !== "_base",
-            },
+              filter: (item) => item.text !== '_base'
+            }
           },
           tooltip: {
-            backgroundColor: "rgba(22, 27, 34, 0.95)",
-            titleColor: "#c9d1d9",
-            bodyColor: "#c9d1d9",
-            borderColor: "#30363d",
+            backgroundColor: 'rgba(22, 27, 34, 0.95)',
+            titleColor: '#c9d1d9',
+            bodyColor: '#c9d1d9',
+            borderColor: '#30363d',
             borderWidth: 1,
-            filter: (tooltipItem) => tooltipItem.dataset.label !== "_base",
+            filter: (tooltipItem) => tooltipItem.dataset.label !== '_base',
             callbacks: {
               label: function (context) {
                 const val = context.raw;
                 if (!val || val === 0) return null;
-                return `${context.dataset.label}: ${val.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} USD`;
-              },
-            },
-          },
+                return `${context.dataset.label}: ${val.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
+              }
+            }
+          }
         },
         scales: {
           x: {
             stacked: true,
             grid: { display: false },
-            ticks: { color: "#e6edf3", font: { size: 11 } },
+            ticks: { color: '#e6edf3', font: { size: 11 } }
           },
           y: {
             stacked: true,
-            position: "right",
-            grid: { color: "#30363d" },
+            position: 'right',
+            grid: { color: '#30363d' },
             ticks: {
-              color: "#e6edf3",
+              color: '#e6edf3',
               callback: (v) =>
-                v >= 1000 ? (v / 1000).toFixed(2) + " K" : v.toFixed(0),
-            },
-          },
-        },
-      },
+                v >= 1000 ? (v / 1000).toFixed(2) + ' K' : v.toFixed(0)
+            }
+          }
+        }
+      }
     });
   }
 
   // Benchmarking Chart (in Dynamics tab)
-  const benchmarkingCanvas = document.getElementById("benchmarkingChart");
+  const benchmarkingCanvas = document.getElementById('benchmarkingChart');
   if (benchmarkingCanvas) {
     benchmarkingChart = new Chart(benchmarkingCanvas, {
-      type: "bar",
+      type: 'bar',
       data: {
-        labels: ["Прибыль при покупке и удержании", "Прибыльность стратегии"],
-        datasets: [],
+        labels: ['Прибыль при покупке и удержании', 'Прибыльность стратегии'],
+        datasets: []
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        indexAxis: "y",
+        indexAxis: 'y',
         plugins: {
           legend: {
             display: true,
-            position: "bottom",
+            position: 'bottom',
             labels: {
-              color: "#ffffff",
+              color: '#ffffff',
               usePointStyle: true,
-              pointStyle: "rect",
+              pointStyle: 'rect',
               padding: 15,
-              font: { size: 11 },
-            },
+              font: { size: 11 }
+            }
           },
           tooltip: {
-            backgroundColor: "rgba(22, 27, 34, 0.95)",
-            titleColor: "#c9d1d9",
-            bodyColor: "#c9d1d9",
+            backgroundColor: 'rgba(22, 27, 34, 0.95)',
+            titleColor: '#c9d1d9',
+            bodyColor: '#c9d1d9',
             callbacks: {
               label: function (context) {
                 return `${context.dataset.label}: ${context.raw.toFixed(2)}%`;
-              },
-            },
-          },
+              }
+            }
+          }
         },
         scales: {
           x: {
-            grid: { color: "#30363d" },
+            grid: { color: '#30363d' },
             ticks: {
-              color: "#e6edf3",
-              callback: (v) => v + "%",
-            },
+              color: '#e6edf3',
+              callback: (v) => v + '%'
+            }
           },
           y: {
             grid: { display: false },
-            ticks: { color: "#e6edf3", font: { size: 11 } },
-          },
-        },
-      },
+            ticks: { color: '#e6edf3', font: { size: 11 } }
+          }
+        }
+      }
     });
   }
 }
@@ -969,22 +1049,22 @@ function initCharts() {
 // TradingView Style Tabs
 // ============================
 function initTradingViewTabs() {
-  const tabs = document.querySelectorAll(".tv-report-tab");
-  const contents = document.querySelectorAll(".tv-report-tab-content");
+  const tabs = document.querySelectorAll('.tv-report-tab');
+  const contents = document.querySelectorAll('.tv-report-tab-content');
 
   tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
+    tab.addEventListener('click', () => {
       const targetTab = tab.dataset.tab;
 
       // Remove active from all tabs and contents
-      tabs.forEach((t) => t.classList.remove("active"));
-      contents.forEach((c) => c.classList.remove("active"));
+      tabs.forEach((t) => t.classList.remove('active'));
+      contents.forEach((c) => c.classList.remove('active'));
 
       // Activate clicked tab and its content
-      tab.classList.add("active");
+      tab.classList.add('active');
       const content = document.getElementById(`tab-${targetTab}`);
       if (content) {
-        content.classList.add("active");
+        content.classList.add('active');
       }
     });
   });
@@ -998,17 +1078,17 @@ function initTradingViewTabs() {
 
 // Chart legend checkbox controls
 function initChartLegendControls() {
-  const legendBuyHold = document.getElementById("legendBuyHold");
+  const legendBuyHold = document.getElementById('legendBuyHold');
   const legendTradesExcursions = document.getElementById(
-    "legendTradesExcursions",
+    'legendTradesExcursions'
   );
 
   if (legendBuyHold) {
-    legendBuyHold.addEventListener("change", () => {
+    legendBuyHold.addEventListener('change', () => {
       if (equityChart) {
         // Dataset 1 is "Покупка и удержание"
         equityChart.data.datasets[1].hidden = !legendBuyHold.checked;
-        equityChart.update("none");
+        equityChart.update('none');
       }
     });
   }
@@ -1016,8 +1096,8 @@ function initChartLegendControls() {
   // Trades excursions (MFE/MAE) toggle - now uses custom plugin
   if (legendTradesExcursions) {
     // Restore persisted state (default is checked)
-    const saved = localStorage.getItem("tv_trades_excursions");
-    if (saved === "0") {
+    const saved = localStorage.getItem('tv_trades_excursions');
+    if (saved === '0') {
       legendTradesExcursions.checked = false;
     }
 
@@ -1029,13 +1109,13 @@ function initChartLegendControls() {
         window.tvEquityChart.options.showTradeExcursions =
           legendTradesExcursions.checked;
       }
-      equityChart.update("none");
+      equityChart.update('none');
     }
 
-    legendTradesExcursions.addEventListener("change", () => {
+    legendTradesExcursions.addEventListener('change', () => {
       localStorage.setItem(
-        "tv_trades_excursions",
-        legendTradesExcursions.checked ? "1" : "0",
+        'tv_trades_excursions',
+        legendTradesExcursions.checked ? '1' : '0'
       );
       if (equityChart) {
         equityChart._showTradeExcursions = legendTradesExcursions.checked;
@@ -1044,14 +1124,14 @@ function initChartLegendControls() {
           window.tvEquityChart.options.showTradeExcursions =
             legendTradesExcursions.checked;
         }
-        equityChart.update("none");
+        equityChart.update('none');
       }
     });
   }
 
-  const legendRegimeOverlay = document.getElementById("legendRegimeOverlay");
+  const legendRegimeOverlay = document.getElementById('legendRegimeOverlay');
   if (legendRegimeOverlay) {
-    legendRegimeOverlay.addEventListener("change", () => {
+    legendRegimeOverlay.addEventListener('change', () => {
       if (equityChart && currentBacktest) {
         if (legendRegimeOverlay.checked) {
           loadAndApplyRegimeOverlay(currentBacktest);
@@ -1067,19 +1147,19 @@ function clearRegimeOverlay() {
   if (!equityChart?.options?.plugins?.annotation?.annotations) return;
   const ann = equityChart.options.plugins.annotation.annotations;
   Object.keys(ann).forEach((k) => {
-    if (k.startsWith("regime_")) delete ann[k];
+    if (k.startsWith('regime_')) delete ann[k];
   });
-  equityChart.update("none");
+  equityChart.update('none');
 }
 
 async function loadAndApplyRegimeOverlay(backtest) {
   if (!equityChart || !equityChart._equityData?.length) return;
   const symbol = backtest.symbol || backtest.config?.symbol;
-  const rawInterval = backtest.interval || backtest.config?.interval || "60";
+  const rawInterval = backtest.interval || backtest.config?.interval || '60';
   if (!symbol) return;
   const s = String(rawInterval);
-  const intervalMap = { 1: "1m", 5: "5m", 15: "15m", 30: "30m", 60: "1h", 120: "2h", 240: "4h", 360: "6h", 720: "12h", D: "1d", W: "1w" };
-  const interval = intervalMap[s] || (/^(\d+[mhdw]|[mhdw])$/i.test(s) ? s : "1h");
+  const intervalMap = { 1: '1m', 5: '5m', 15: '15m', 30: '30m', 60: '1h', 120: '2h', 240: '4h', 360: '6h', 720: '12h', D: '1d', W: '1w' };
+  const interval = intervalMap[s] || (/^(\d+[mhdw]|[mhdw])$/i.test(s) ? s : '1h');
 
   const equityData = equityChart._equityData;
   const firstTs = equityData[0]?.timestamp;
@@ -1093,13 +1173,13 @@ async function loadAndApplyRegimeOverlay(backtest) {
     if (!data?.history?.length) return;
 
     const toMs = (t) => {
-      if (typeof t === "number") return t < 1e12 ? t * 1000 : t;
+      if (typeof t === 'number') return t < 1e12 ? t * 1000 : t;
       const d = new Date(t);
       return isNaN(d) ? 0 : d.getTime();
     };
-    const regimeColors = { trending_up: "rgba(38,166,154,0.15)", trending_down: "rgba(239,83,80,0.15)", ranging: "rgba(120,144,156,0.15)", volatile: "rgba(255,167,38,0.2)", breakout_up: "rgba(102,187,106,0.12)", breakout_down: "rgba(244,67,54,0.12)", unknown: "rgba(158,158,158,0.08)" };
+    const regimeColors = { trending_up: 'rgba(38,166,154,0.15)', trending_down: 'rgba(239,83,80,0.15)', ranging: 'rgba(120,144,156,0.15)', volatile: 'rgba(255,167,38,0.2)', breakout_up: 'rgba(102,187,106,0.12)', breakout_down: 'rgba(244,67,54,0.12)', unknown: 'rgba(158,158,158,0.08)' };
 
-    const regHist = data.history.map((h) => ({ ts: toMs(h.timestamp), regime: h.regime || "unknown" })).sort((a, b) => a.ts - b.ts);
+    const regHist = data.history.map((h) => ({ ts: toMs(h.timestamp), regime: h.regime || 'unknown' })).sort((a, b) => a.ts - b.ts);
     if (regHist.length === 0) return;
 
     const getRegimeAt = (eqTs) => {
@@ -1113,7 +1193,7 @@ async function loadAndApplyRegimeOverlay(backtest) {
       return best.regime;
     };
 
-    const regimePerIdx = equityData.map((p, i) => getRegimeAt(p.timestamp));
+    const regimePerIdx = equityData.map((p, _i) => getRegimeAt(p.timestamp));
     const segments = [];
     let start = 0;
     for (let i = 1; i <= regimePerIdx.length; i++) {
@@ -1124,52 +1204,52 @@ async function loadAndApplyRegimeOverlay(backtest) {
     }
 
     const ann = equityChart.options.plugins.annotation.annotations;
-    Object.keys(ann).forEach((k) => { if (k.startsWith("regime_")) delete ann[k]; });
+    Object.keys(ann).forEach((k) => { if (k.startsWith('regime_')) delete ann[k]; });
     segments.forEach((seg, idx) => {
       if (seg.end < seg.start) return;
       ann[`regime_${idx}`] = {
-        type: "box",
+        type: 'box',
         xMin: seg.start - 0.5,
         xMax: seg.end + 0.5,
-        yMin: "chartMin",
-        yMax: "chartMax",
+        yMin: 'chartMin',
+        yMax: 'chartMax',
         backgroundColor: regimeColors[seg.regime] || regimeColors.unknown,
         borderWidth: 0,
-        drawTime: "beforeDatasetsDraw",
+        drawTime: 'beforeDatasetsDraw'
       };
     });
-    equityChart.update("none");
+    equityChart.update('none');
   } catch (e) {
-    console.warn("[Regime overlay] Failed to load:", e.message);
+    console.warn('[Regime overlay] Failed to load:', e.message);
   }
 }
 
 // Chart mode toggle (Absolute / Percent)
-let chartDisplayMode = "absolute";
+let chartDisplayMode = 'absolute';
 let originalEquityData = null;
 let originalBuyHoldData = null;
 
 function initChartModeToggle() {
-  const btnAbsolute = document.getElementById("btnAbsoluteMode");
-  const btnPercent = document.getElementById("btnPercentMode");
+  const btnAbsolute = document.getElementById('btnAbsoluteMode');
+  const btnPercent = document.getElementById('btnPercentMode');
 
   if (btnAbsolute) {
-    btnAbsolute.addEventListener("click", () => {
-      if (chartDisplayMode !== "absolute") {
-        chartDisplayMode = "absolute";
-        btnAbsolute.classList.add("active");
-        btnPercent?.classList.remove("active");
+    btnAbsolute.addEventListener('click', () => {
+      if (chartDisplayMode !== 'absolute') {
+        chartDisplayMode = 'absolute';
+        btnAbsolute.classList.add('active');
+        btnPercent?.classList.remove('active');
         updateChartDisplayMode();
       }
     });
   }
 
   if (btnPercent) {
-    btnPercent.addEventListener("click", () => {
-      if (chartDisplayMode !== "percent") {
-        chartDisplayMode = "percent";
-        btnPercent.classList.add("active");
-        btnAbsolute?.classList.remove("active");
+    btnPercent.addEventListener('click', () => {
+      if (chartDisplayMode !== 'percent') {
+        chartDisplayMode = 'percent';
+        btnPercent.classList.add('active');
+        btnAbsolute?.classList.remove('active');
         updateChartDisplayMode();
       }
     });
@@ -1185,7 +1265,7 @@ function updateChartDisplayMode() {
   // We need to store initial capital separately
   const initialCapital = equityChart._initialCapital || 10000;
 
-  if (chartDisplayMode === "percent") {
+  if (chartDisplayMode === 'percent') {
     // Convert P&L to percentage of initial capital
     const equityPct = originalEquityData.map((v) => (v / initialCapital) * 100);
     const buyHoldPct =
@@ -1196,9 +1276,9 @@ function updateChartDisplayMode() {
 
     // Update Y axis for percent display
     equityChart.options.scales.y.ticks.callback = (value) => {
-      if (value > 0) return "+" + value.toFixed(2) + "%";
-      if (value < 0) return value.toFixed(2) + "%";
-      return "0%";
+      if (value > 0) return '+' + value.toFixed(2) + '%';
+      if (value < 0) return value.toFixed(2) + '%';
+      return '0%';
     };
   } else {
     // Restore absolute P&L values
@@ -1210,23 +1290,23 @@ function updateChartDisplayMode() {
     // Reset Y axis for absolute display
     equityChart.options.scales.y.ticks.callback = (v) => {
       if (v > 0)
-        return "+" + v.toLocaleString("ru-RU", { minimumFractionDigits: 2 });
-      if (v < 0) return v.toLocaleString("ru-RU", { minimumFractionDigits: 2 });
-      return "0";
+        return '+' + v.toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+      if (v < 0) return v.toLocaleString('ru-RU', { minimumFractionDigits: 2 });
+      return '0';
     };
   }
 
   // MFE/MAE bars use main Y axis now, so they automatically align with zero line
 
-  equityChart.update("none");
+  equityChart.update('none');
 }
 // Format TradingView style currency value with percentage
 function formatTVCurrency(value, pct, showSign = true) {
-  if (value === null || value === undefined) return "--";
-  const sign = showSign && value >= 0 ? "+" : "";
-  const dollarVal = `${sign}${value.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  if (value === null || value === undefined) return '--';
+  const sign = showSign && value >= 0 ? '+' : '';
+  const dollarVal = `${sign}${value.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
   if (pct !== undefined && pct !== null) {
-    const pctSign = showSign && pct >= 0 ? "+" : "";
+    const pctSign = showSign && pct >= 0 ? '+' : '';
     return `<div class="tv-dual-value"><span class="tv-main-value">${dollarVal}</span><span class="tv-pct-value">${pctSign}${pct.toFixed(2)}%</span></div>`;
   }
   return dollarVal;
@@ -1234,8 +1314,8 @@ function formatTVCurrency(value, pct, showSign = true) {
 
 // Format percentage value
 function formatTVPercent(value, showSign = true) {
-  if (value === null || value === undefined) return "--";
-  const sign = showSign && value >= 0 ? "+" : "";
+  if (value === null || value === undefined) return '--';
+  const sign = showSign && value >= 0 ? '+' : '';
   return `${sign}${value.toFixed(2)}%`;
 }
 
@@ -1244,24 +1324,24 @@ function updateTVSummaryCards(metrics) {
   if (!metrics) return;
 
   // Net Profit
-  const netProfit = document.getElementById("tvNetProfit");
-  const netProfitPct = document.getElementById("tvNetProfitPct");
+  const netProfit = document.getElementById('tvNetProfit');
+  const netProfitPct = document.getElementById('tvNetProfitPct');
   if (netProfit) {
     const val = metrics.net_profit || 0;
-    netProfit.textContent = `${val >= 0 ? "+" : ""}${val.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} USD`;
-    netProfit.className = `tv-summary-card-value ${val >= 0 ? "tv-value-positive" : "tv-value-negative"}`;
+    netProfit.textContent = `${val >= 0 ? '+' : ''}${val.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
+    netProfit.className = `tv-summary-card-value ${val >= 0 ? 'tv-value-positive' : 'tv-value-negative'}`;
   }
   if (netProfitPct) {
     const pct = metrics.net_profit_pct || metrics.total_return || 0;
-    netProfitPct.textContent = `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`;
+    netProfitPct.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
   }
 
   // Max Drawdown
-  const maxDD = document.getElementById("tvMaxDrawdown");
-  const maxDDPct = document.getElementById("tvMaxDrawdownPct");
+  const maxDD = document.getElementById('tvMaxDrawdown');
+  const maxDDPct = document.getElementById('tvMaxDrawdownPct');
   if (maxDD) {
     const val = metrics.max_drawdown_value || 0;
-    maxDD.textContent = `${Math.abs(val).toLocaleString("ru-RU", { minimumFractionDigits: 2 })} USD`;
+    maxDD.textContent = `${Math.abs(val).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} USD`;
   }
   if (maxDDPct) {
     const pct = metrics.max_drawdown || 0;
@@ -1269,14 +1349,14 @@ function updateTVSummaryCards(metrics) {
   }
 
   // Total Trades
-  const totalTrades = document.getElementById("tvTotalTrades");
+  const totalTrades = document.getElementById('tvTotalTrades');
   if (totalTrades) {
     totalTrades.textContent = metrics.total_trades || 0;
   }
 
   // Winning Trades
-  const winningTrades = document.getElementById("tvWinningTrades");
-  const winRate = document.getElementById("tvWinRate");
+  const winningTrades = document.getElementById('tvWinningTrades');
+  const winRate = document.getElementById('tvWinRate');
   if (winningTrades) {
     winningTrades.textContent = metrics.winning_trades || 0;
   }
@@ -1285,7 +1365,7 @@ function updateTVSummaryCards(metrics) {
   }
 
   // Profit Factor
-  const profitFactor = document.getElementById("tvProfitFactor");
+  const profitFactor = document.getElementById('tvProfitFactor');
   if (profitFactor) {
     profitFactor.textContent = (metrics.profit_factor || 0).toFixed(3);
   }
@@ -1295,45 +1375,45 @@ function updateTVSummaryCards(metrics) {
 function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
   if (!metrics) return;
 
-  const setValue = (id, value, format = "currency") => {
+  const setValue = (id, value, format = 'currency') => {
     const el = document.getElementById(id);
     if (!el) return;
 
     if (value === null || value === undefined) {
-      el.textContent = "--";
+      el.textContent = '--';
       return;
     }
 
-    if (format === "currency") {
+    if (format === 'currency') {
       el.innerHTML = formatTVCurrency(value, null, true);
       el.className =
         value > 0
-          ? "tv-value-positive"
+          ? 'tv-value-positive'
           : value < 0
-            ? "tv-value-negative"
-            : "tv-value-neutral";
-    } else if (format === "currency-pct") {
+            ? 'tv-value-negative'
+            : 'tv-value-neutral';
+    } else if (format === 'currency-pct') {
       el.innerHTML = formatTVCurrency(value.val, value.pct, true);
       el.className =
         value.val > 0
-          ? "tv-value-positive"
+          ? 'tv-value-positive'
           : value.val < 0
-            ? "tv-value-negative"
-            : "tv-value-neutral";
-    } else if (format === "percent") {
+            ? 'tv-value-negative'
+            : 'tv-value-neutral';
+    } else if (format === 'percent') {
       el.textContent = formatTVPercent(value, true);
       el.className =
         value > 0
-          ? "tv-value-positive"
+          ? 'tv-value-positive'
           : value < 0
-            ? "tv-value-negative"
-            : "tv-value-neutral";
-    } else if (format === "number") {
-      el.textContent = value.toLocaleString("ru-RU");
-      el.className = "tv-value-neutral";
-    } else if (format === "days") {
+            ? 'tv-value-negative'
+            : 'tv-value-neutral';
+    } else if (format === 'number') {
+      el.textContent = value.toLocaleString('ru-RU');
+      el.className = 'tv-value-neutral';
+    } else if (format === 'days') {
       el.textContent = `${value} дня`;
-      el.className = "tv-value-neutral";
+      el.className = 'tv-value-neutral';
     } else {
       el.textContent = value;
     }
@@ -1345,125 +1425,125 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
   const initialCapital = config?.initial_capital || 10000;
 
   // Log metrics source for debugging
-  console.log("[Dynamics Tab] Using backend metrics directly");
+  console.log('[Dynamics Tab] Using backend metrics directly');
   console.log(
-    "[Dynamics Tab] Long: " +
-      (metrics.long_trades || 0) +
-      " trades, Short: " +
-      (metrics.short_trades || 0) +
-      " trades",
+    '[Dynamics Tab] Long: ' +
+    (metrics.long_trades || 0) +
+    ' trades, Short: ' +
+    (metrics.short_trades || 0) +
+    ' trades'
   );
   console.log(
-    "[Dynamics Tab] GP=" +
-      (metrics.gross_profit || 0).toFixed(2) +
-      ", GL=" +
-      (metrics.gross_loss || 0).toFixed(2) +
-      ", Comm=" +
-      (metrics.total_commission || 0).toFixed(2),
+    '[Dynamics Tab] GP=' +
+    (metrics.gross_profit || 0).toFixed(2) +
+    ', GL=' +
+    (metrics.gross_loss || 0).toFixed(2) +
+    ', Comm=' +
+    (metrics.total_commission || 0).toFixed(2)
   );
 
   // Initial Capital
-  setValue("dyn-initial-capital", config?.initial_capital || 10000, "number");
+  setValue('dyn-initial-capital', config?.initial_capital || 10000, 'number');
 
   // Unrealized P&L (Open position at end of backtest)
   setValue(
-    "dyn-unrealized",
+    'dyn-unrealized',
     { val: metrics.open_pnl || 0, pct: metrics.open_pnl_pct || 0 },
-    "currency-pct",
+    'currency-pct'
   );
 
   // Net Profit - All, Long, Short (using backend _pct fields - NO frontend calculation!)
   setValue(
-    "dyn-net-profit",
+    'dyn-net-profit',
     { val: metrics.net_profit || 0, pct: metrics.net_profit_pct || 0 },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "dyn-net-profit-long",
+    'dyn-net-profit-long',
     { val: metrics.long_net_profit || 0, pct: metrics.long_pnl_pct || 0 },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "dyn-net-profit-short",
+    'dyn-net-profit-short',
     { val: metrics.short_net_profit || 0, pct: metrics.short_pnl_pct || 0 },
-    "currency-pct",
+    'currency-pct'
   );
 
   // Gross Profit/Loss - All, Long, Short (using backend _pct fields - NO frontend calculation!)
   setValue(
-    "dyn-gross-profit",
+    'dyn-gross-profit',
     { val: metrics.gross_profit || 0, pct: metrics.gross_profit_pct || 0 },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "dyn-gross-profit-long",
+    'dyn-gross-profit-long',
     {
       val: metrics.long_gross_profit || 0,
-      pct: metrics.long_gross_profit_pct || 0,
+      pct: metrics.long_gross_profit_pct || 0
     },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "dyn-gross-profit-short",
+    'dyn-gross-profit-short',
     {
       val: metrics.short_gross_profit || 0,
-      pct: metrics.short_gross_profit_pct || 0,
+      pct: metrics.short_gross_profit_pct || 0
     },
-    "currency-pct",
+    'currency-pct'
   );
 
   setValue(
-    "dyn-gross-loss",
+    'dyn-gross-loss',
     { val: -(metrics.gross_loss || 0), pct: -(metrics.gross_loss_pct || 0) },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "dyn-gross-loss-long",
+    'dyn-gross-loss-long',
     {
       val: -(metrics.long_gross_loss || 0),
-      pct: -(metrics.long_gross_loss_pct || 0),
+      pct: -(metrics.long_gross_loss_pct || 0)
     },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "dyn-gross-loss-short",
+    'dyn-gross-loss-short',
     {
       val: -(metrics.short_gross_loss || 0),
-      pct: -(metrics.short_gross_loss_pct || 0),
+      pct: -(metrics.short_gross_loss_pct || 0)
     },
-    "currency-pct",
+    'currency-pct'
   );
 
   // Profit Factor - All, Long, Short (from backend metrics)
   const profitFactor = metrics.profit_factor || 0;
-  setValue("dyn-profit-factor", profitFactor, "number");
+  setValue('dyn-profit-factor', profitFactor, 'number');
   setValue(
-    "dyn-profit-factor-long",
+    'dyn-profit-factor-long',
     metrics.long_profit_factor === Infinity
-      ? "в€ћ"
+      ? '∞'
       : metrics.long_profit_factor || 0,
-    "number",
+    'number'
   );
   setValue(
-    "dyn-profit-factor-short",
+    'dyn-profit-factor-short',
     metrics.short_profit_factor === Infinity
-      ? "в€ћ"
+      ? '∞'
       : metrics.short_profit_factor || 0,
-    "number",
+    'number'
   );
 
   // Commission - All, Long, Short (from backend metrics)
-  setValue("dyn-commission", metrics.total_commission || 0, "currency");
-  setValue("dyn-commission-long", metrics.long_commission || 0, "currency");
-  setValue("dyn-commission-short", metrics.short_commission || 0, "currency");
+  setValue('dyn-commission', metrics.total_commission || 0, 'currency');
+  setValue('dyn-commission-long', metrics.long_commission || 0, 'currency');
+  setValue('dyn-commission-short', metrics.short_commission || 0, 'currency');
 
   // Expectancy - All, Long, Short (using backend-computed values)
   const expectancy = metrics.expectancy || 0;
   const longExpectancy = metrics.long_expectancy || 0;
   const shortExpectancy = metrics.short_expectancy || 0;
-  setValue("dyn-expectancy", expectancy, "currency");
-  setValue("dyn-expectancy-long", longExpectancy, "currency");
-  setValue("dyn-expectancy-short", shortExpectancy, "currency");
+  setValue('dyn-expectancy', expectancy, 'currency');
+  setValue('dyn-expectancy-long', longExpectancy, 'currency');
+  setValue('dyn-expectancy-short', shortExpectancy, 'currency');
 
   // Buy & Hold
   const buyHoldValue = metrics.buy_hold_return || 0;
@@ -1473,9 +1553,9 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
     buyHoldPct = (buyHoldValue / initialCapital) * 100;
   }
   setValue(
-    "dyn-buy-hold",
+    'dyn-buy-hold',
     { val: buyHoldValue, pct: buyHoldPct },
-    "currency-pct",
+    'currency-pct'
   );
 
   // Strategy vs Buy & Hold (outperformance)
@@ -1487,17 +1567,17 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
       ((metrics.net_profit || 0) / initialCapital) * 100;
     strategyOutperformance = strategyReturn - buyHoldPct;
   }
-  setValue("dyn-strategy-vs-bh", strategyOutperformance, "percent");
+  setValue('dyn-strategy-vs-bh', strategyOutperformance, 'percent');
 
   // CAGR - All, Long, Short
-  setValue("dyn-cagr", metrics.cagr || 0, "percent");
-  setValue("dyn-cagr-long", metrics.cagr_long || 0, "percent");
-  setValue("dyn-cagr-short", metrics.cagr_short || 0, "percent");
+  setValue('dyn-cagr', metrics.cagr || 0, 'percent');
+  setValue('dyn-cagr-long', metrics.cagr_long || 0, 'percent');
+  setValue('dyn-cagr-short', metrics.cagr_short || 0, 'percent');
 
   // Return on Capital - All, Long, Short (using backend _pct fields - NO frontend calculation!)
-  setValue("dyn-return-capital", metrics.total_return || 0, "percent");
-  setValue("dyn-return-capital-long", metrics.long_pnl_pct || 0, "percent");
-  setValue("dyn-return-capital-short", metrics.short_pnl_pct || 0, "percent");
+  setValue('dyn-return-capital', metrics.total_return || 0, 'percent');
+  setValue('dyn-return-capital-long', metrics.long_pnl_pct || 0, 'percent');
+  setValue('dyn-return-capital-short', metrics.short_pnl_pct || 0, 'percent');
 
   // Calculate Avg Growth/Drawdown Duration and Runup values from equity curve if backend didn't provide
   let avgGrowthDuration = metrics.avg_runup_duration_bars || 0;
@@ -1596,12 +1676,12 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
     // Calculate averages for duration
     if (avgGrowthDuration === 0 && growthPeriods.length > 0) {
       avgGrowthDuration = Math.round(
-        growthPeriods.reduce((a, b) => a + b, 0) / growthPeriods.length,
+        growthPeriods.reduce((a, b) => a + b, 0) / growthPeriods.length
       );
     }
     if (avgDrawdownDuration === 0 && drawdownPeriods.length > 0) {
       avgDrawdownDuration = Math.round(
-        drawdownPeriods.reduce((a, b) => a + b, 0) / drawdownPeriods.length,
+        drawdownPeriods.reduce((a, b) => a + b, 0) / drawdownPeriods.length
       );
     }
 
@@ -1625,34 +1705,34 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
   }
 
   // Equity Growth (Runup) metrics
-  setValue("dyn-avg-growth-duration", avgGrowthDuration, "number");
+  setValue('dyn-avg-growth-duration', avgGrowthDuration, 'number');
   setValue(
-    "dyn-avg-equity-growth",
+    'dyn-avg-equity-growth',
     { val: avgRunupValue, pct: avgRunupPct },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "dyn-max-equity-growth",
+    'dyn-max-equity-growth',
     { val: maxRunupValue, pct: maxRunupPct },
-    "currency-pct",
+    'currency-pct'
   );
 
   // Drawdown Duration metrics
-  setValue("dyn-avg-dd-duration", avgDrawdownDuration, "number");
+  setValue('dyn-avg-dd-duration', avgDrawdownDuration, 'number');
 
   // Drawdown
   setValue(
-    "dyn-max-drawdown",
+    'dyn-max-drawdown',
     {
       val: -(metrics.max_drawdown_value || 0),
-      pct: -(metrics.max_drawdown || 0),
+      pct: -(metrics.max_drawdown || 0)
     },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "dyn-avg-drawdown",
+    'dyn-avg-drawdown',
     { val: -avgDrawdownValue, pct: -avgDrawdownPct },
-    "currency-pct",
+    'currency-pct'
   );
 
   // Intrabar drawdown - use data from backend (MAE-based calculation)
@@ -1663,52 +1743,52 @@ function updateTVDynamicsTab(metrics, config, trades, equityCurve) {
   if (intrabarValue > 0 || intrabarPct > 0) {
     // We have actual intrabar data from backend
     setValue(
-      "dyn-max-dd-intrabar",
+      'dyn-max-dd-intrabar',
       { val: -intrabarValue, pct: -intrabarPct },
-      "currency-pct",
+      'currency-pct'
     );
   } else {
     // No intrabar data available (no trades or Bar Magnifier not used)
-    const intrabarEl = document.getElementById("dyn-max-dd-intrabar");
+    const intrabarEl = document.getElementById('dyn-max-dd-intrabar');
     if (intrabarEl) {
-      intrabarEl.textContent = "--";
-      intrabarEl.className = "tv-value-neutral";
+      intrabarEl.textContent = '--';
+      intrabarEl.className = 'tv-value-neutral';
       intrabarEl.title =
-        "Нет данных (сделки отсутствуют или Bar Magnifier не использовался)";
+        'Нет данных (сделки отсутствуют или Bar Magnifier не использовался)';
     }
   }
 
   // Recovery / Return on Drawdown - All, Long, Short
-  setValue("dyn-return-on-dd", metrics.recovery_factor || 0, "number");
+  setValue('dyn-return-on-dd', metrics.recovery_factor || 0, 'number');
   const longRecovery =
     metrics.max_drawdown > 0 && metrics.long_net_profit
       ? metrics.long_net_profit /
-        ((initialCapital * metrics.max_drawdown) / 100)
+      ((initialCapital * metrics.max_drawdown) / 100)
       : 0;
   const shortRecovery =
     metrics.max_drawdown > 0 && metrics.short_net_profit
       ? metrics.short_net_profit /
-        ((initialCapital * metrics.max_drawdown) / 100)
+      ((initialCapital * metrics.max_drawdown) / 100)
       : 0;
-  setValue("dyn-return-on-dd-long", longRecovery, "number");
-  setValue("dyn-return-on-dd-short", shortRecovery, "number");
+  setValue('dyn-return-on-dd-long', longRecovery, 'number');
+  setValue('dyn-return-on-dd-short', shortRecovery, 'number');
 
   // Net Profit vs Max Loss - All, Long, Short
   const maxLoss = Math.abs(metrics.largest_loss || metrics.worst_trade || 1);
   setValue(
-    "dyn-profit-vs-max-loss",
+    'dyn-profit-vs-max-loss',
     maxLoss > 0 ? (metrics.net_profit || 0) / maxLoss : 0,
-    "number",
+    'number'
   );
   setValue(
-    "dyn-profit-vs-max-loss-long",
+    'dyn-profit-vs-max-loss-long',
     maxLoss > 0 ? (metrics.long_net_profit || 0) / maxLoss : 0,
-    "number",
+    'number'
   );
   setValue(
-    "dyn-profit-vs-max-loss-short",
+    'dyn-profit-vs-max-loss-short',
     maxLoss > 0 ? (metrics.short_net_profit || 0) / maxLoss : 0,
-    "number",
+    'number'
   );
 }
 
@@ -1719,239 +1799,239 @@ function updateTVTradeAnalysisTab(metrics, config, _trades) {
 
   const _initialCapital = config?.initial_capital || 10000; // Reserved for future use
 
-  const setValue = (id, value, format = "number") => {
+  const setValue = (id, value, format = 'number') => {
     const el = document.getElementById(id);
     if (!el) return;
 
     if (value === null || value === undefined) {
-      el.textContent = "--";
+      el.textContent = '--';
       return;
     }
 
-    if (format === "currency") {
+    if (format === 'currency') {
       el.innerHTML = formatTVCurrency(value, null, true);
-      el.className = value >= 0 ? "tv-value-positive" : "tv-value-negative";
-    } else if (format === "currency-pct") {
+      el.className = value >= 0 ? 'tv-value-positive' : 'tv-value-negative';
+    } else if (format === 'currency-pct') {
       el.innerHTML = formatTVCurrency(value.val, value.pct, true);
-      el.className = value.val >= 0 ? "tv-value-positive" : "tv-value-negative";
-    } else if (format === "percent") {
+      el.className = value.val >= 0 ? 'tv-value-positive' : 'tv-value-negative';
+    } else if (format === 'percent') {
       el.textContent = formatTVPercent(value, false);
-      el.className = "tv-value-neutral";
-    } else if (format === "decimal") {
+      el.className = 'tv-value-neutral';
+    } else if (format === 'decimal') {
       el.textContent =
-        typeof value === "number"
-          ? value.toLocaleString("ru-RU", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })
+        typeof value === 'number'
+          ? value.toLocaleString('ru-RU', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })
           : value;
-      el.className = "tv-value-neutral";
+      el.className = 'tv-value-neutral';
     } else {
       el.textContent = value.toLocaleString
-        ? value.toLocaleString("ru-RU")
+        ? value.toLocaleString('ru-RU')
         : value;
-      el.className = "tv-value-neutral";
+      el.className = 'tv-value-neutral';
     }
   };
 
   // Trade counts - All
-  setValue("ta-open-trades", metrics.open_trades || 0);
-  setValue("ta-total-trades", metrics.total_trades || 0);
-  setValue("ta-winning-trades", metrics.winning_trades || 0);
-  setValue("ta-losing-trades", metrics.losing_trades || 0);
-  setValue("ta-breakeven-trades", metrics.breakeven_trades || 0);
+  setValue('ta-open-trades', metrics.open_trades || 0);
+  setValue('ta-total-trades', metrics.total_trades || 0);
+  setValue('ta-winning-trades', metrics.winning_trades || 0);
+  setValue('ta-losing-trades', metrics.losing_trades || 0);
+  setValue('ta-breakeven-trades', metrics.breakeven_trades || 0);
 
   // Trade counts - Long (from backend)
-  setValue("ta-open-trades-long", 0);
-  setValue("ta-total-trades-long", metrics.long_trades || 0);
-  setValue("ta-winning-trades-long", metrics.long_winning_trades || 0);
-  setValue("ta-losing-trades-long", metrics.long_losing_trades || 0);
-  setValue("ta-breakeven-trades-long", metrics.long_breakeven_trades || 0);
+  setValue('ta-open-trades-long', 0);
+  setValue('ta-total-trades-long', metrics.long_trades || 0);
+  setValue('ta-winning-trades-long', metrics.long_winning_trades || 0);
+  setValue('ta-losing-trades-long', metrics.long_losing_trades || 0);
+  setValue('ta-breakeven-trades-long', metrics.long_breakeven_trades || 0);
 
   // Trade counts - Short (from backend)
-  setValue("ta-open-trades-short", 0);
-  setValue("ta-total-trades-short", metrics.short_trades || 0);
-  setValue("ta-winning-trades-short", metrics.short_winning_trades || 0);
-  setValue("ta-losing-trades-short", metrics.short_losing_trades || 0);
-  setValue("ta-breakeven-trades-short", metrics.short_breakeven_trades || 0);
+  setValue('ta-open-trades-short', 0);
+  setValue('ta-total-trades-short', metrics.short_trades || 0);
+  setValue('ta-winning-trades-short', metrics.short_winning_trades || 0);
+  setValue('ta-losing-trades-short', metrics.short_losing_trades || 0);
+  setValue('ta-breakeven-trades-short', metrics.short_breakeven_trades || 0);
 
   // Win rate - All/Long/Short (from backend)
-  setValue("ta-win-rate", metrics.win_rate || 0, "percent");
-  setValue("ta-win-rate-long", metrics.long_win_rate || 0, "percent");
-  setValue("ta-win-rate-short", metrics.short_win_rate || 0, "percent");
+  setValue('ta-win-rate', metrics.win_rate || 0, 'percent');
+  setValue('ta-win-rate-long', metrics.long_win_rate || 0, 'percent');
+  setValue('ta-win-rate-short', metrics.short_win_rate || 0, 'percent');
 
   // Avg P&L - All
   // Use avg_trade_value (calculated mean) instead of expectancy (which might be 0) to ensure data is likely present
   setValue(
-    "ta-avg-pnl",
+    'ta-avg-pnl',
     { val: metrics.avg_trade_value || 0, pct: metrics.avg_trade_pct || 0 },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "ta-avg-win",
+    'ta-avg-win',
     { val: metrics.avg_win_value || 0, pct: metrics.avg_win || 0 },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "ta-avg-loss",
-    { val: -(metrics.avg_loss_value || 0), pct: -(metrics.avg_loss || 0) },
-    "currency-pct",
+    'ta-avg-loss',
+    { val: metrics.avg_loss_value || 0, pct: metrics.avg_loss || 0 },
+    'currency-pct'
   );
 
   // Avg P&L - Long (backend sends: long_avg_win, long_avg_loss as values)
   setValue(
-    "ta-avg-pnl-long",
+    'ta-avg-pnl-long',
     {
       val: metrics.long_avg_trade_value || metrics.long_avg_trade || 0,
-      pct: metrics.long_avg_trade_pct || 0,
+      pct: metrics.long_avg_trade_pct || 0
     },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "ta-avg-win-long",
+    'ta-avg-win-long',
     {
       val: metrics.long_avg_win_value || metrics.long_avg_win || 0,
-      pct: metrics.long_avg_win_pct || 0,
+      pct: metrics.long_avg_win_pct || 0
     },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "ta-avg-loss-long",
+    'ta-avg-loss-long',
     {
       val: metrics.long_avg_loss_value || metrics.long_avg_loss || 0,
-      pct: metrics.long_avg_loss_pct || 0,
+      pct: metrics.long_avg_loss_pct || 0
     },
-    "currency-pct",
+    'currency-pct'
   );
 
   // Avg P&L - Short (backend sends: short_avg_win, short_avg_loss as values)
   setValue(
-    "ta-avg-pnl-short",
+    'ta-avg-pnl-short',
     {
       val: metrics.short_avg_trade_value || metrics.short_avg_trade || 0,
-      pct: metrics.short_avg_trade_pct || 0,
+      pct: metrics.short_avg_trade_pct || 0
     },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "ta-avg-win-short",
+    'ta-avg-win-short',
     {
       val: metrics.short_avg_win_value || metrics.short_avg_win || 0,
-      pct: metrics.short_avg_win_pct || 0,
+      pct: metrics.short_avg_win_pct || 0
     },
-    "currency-pct",
+    'currency-pct'
   );
   setValue(
-    "ta-avg-loss-short",
+    'ta-avg-loss-short',
     {
       val: metrics.short_avg_loss_value || metrics.short_avg_loss || 0,
-      pct: metrics.short_avg_loss_pct || 0,
+      pct: metrics.short_avg_loss_pct || 0
     },
-    "currency-pct",
+    'currency-pct'
   );
 
   // Payoff ratio (from backend)
   setValue(
-    "ta-payoff-ratio",
+    'ta-payoff-ratio',
     metrics.avg_win_loss_ratio || metrics.payoff_ratio || 0,
-    "number",
+    'number'
   );
-  setValue("ta-payoff-ratio-long", metrics.long_payoff_ratio || 0, "number");
-  setValue("ta-payoff-ratio-short", metrics.short_payoff_ratio || 0, "number");
+  setValue('ta-payoff-ratio-long', metrics.long_payoff_ratio || 0, 'number');
+  setValue('ta-payoff-ratio-short', metrics.short_payoff_ratio || 0, 'number');
 
   // Largest trades - All (backend sends: largest_win = %, largest_win_value = $)
   // NO MORE FRONTEND CALCULATIONS - single source of truth!
   setValue(
-    "ta-largest-win",
+    'ta-largest-win',
     metrics.largest_win_value || metrics.best_trade || 0,
-    "currency",
+    'currency'
   );
-  setValue("ta-largest-win-pct", metrics.largest_win || 0, "percent");
+  setValue('ta-largest-win-pct', metrics.largest_win || 0, 'percent');
   setValue(
-    "ta-largest-loss",
-    -(metrics.largest_loss_value || Math.abs(metrics.worst_trade) || 0),
-    "currency",
+    'ta-largest-loss',
+    metrics.largest_loss_value || metrics.worst_trade || 0,
+    'currency'
   );
-  setValue("ta-largest-loss-pct", -(metrics.largest_loss || 0), "percent");
+  setValue('ta-largest-loss-pct', metrics.largest_loss || 0, 'percent');
 
   // Largest trades - Long (backend sends: long_largest_win = %, long_largest_win_value = $)
   // NO MORE FRONTEND CALCULATIONS - single source of truth!
   setValue(
-    "ta-largest-win-long",
+    'ta-largest-win-long',
     metrics.long_largest_win_value || 0,
-    "currency",
+    'currency'
   );
-  setValue("ta-largest-win-pct-long", metrics.long_largest_win || 0, "percent");
+  setValue('ta-largest-win-pct-long', metrics.long_largest_win || 0, 'percent');
   setValue(
-    "ta-largest-loss-long",
+    'ta-largest-loss-long',
     metrics.long_largest_loss_value || 0,
-    "currency",
+    'currency'
   );
   setValue(
-    "ta-largest-loss-pct-long",
-    -(metrics.long_largest_loss || 0),
-    "percent",
+    'ta-largest-loss-pct-long',
+    metrics.long_largest_loss || 0,
+    'percent'
   );
 
   // Largest trades - Short (backend sends: short_largest_win = %, short_largest_win_value = $)
   // NO MORE FRONTEND CALCULATIONS - single source of truth!
   setValue(
-    "ta-largest-win-short",
+    'ta-largest-win-short',
     metrics.short_largest_win_value || 0,
-    "currency",
+    'currency'
   );
   setValue(
-    "ta-largest-win-pct-short",
+    'ta-largest-win-pct-short',
     metrics.short_largest_win || 0,
-    "percent",
+    'percent'
   );
   setValue(
-    "ta-largest-loss-short",
+    'ta-largest-loss-short',
     metrics.short_largest_loss_value || 0,
-    "currency",
+    'currency'
   );
   setValue(
-    "ta-largest-loss-pct-short",
-    -(metrics.short_largest_loss || 0),
-    "percent",
+    'ta-largest-loss-pct-short',
+    metrics.short_largest_loss || 0,
+    'percent'
   );
 
   // Bars in trade - All (from backend)
-  setValue("ta-avg-bars", metrics.avg_bars_in_trade || 0, "decimal");
-  setValue("ta-avg-bars-win", metrics.avg_bars_in_winning || 0, "decimal");
-  setValue("ta-avg-bars-loss", metrics.avg_bars_in_losing || 0, "decimal");
+  setValue('ta-avg-bars', metrics.avg_bars_in_trade || 0, 'decimal');
+  setValue('ta-avg-bars-win', metrics.avg_bars_in_winning || 0, 'decimal');
+  setValue('ta-avg-bars-loss', metrics.avg_bars_in_losing || 0, 'decimal');
 
   // Bars in trade - Long/Short (from backend)
-  setValue("ta-avg-bars-long", metrics.avg_bars_in_long || 0, "decimal");
-  setValue("ta-avg-bars-short", metrics.avg_bars_in_short || 0, "decimal");
+  setValue('ta-avg-bars-long', metrics.avg_bars_in_long || 0, 'decimal');
+  setValue('ta-avg-bars-short', metrics.avg_bars_in_short || 0, 'decimal');
   setValue(
-    "ta-avg-bars-win-long",
+    'ta-avg-bars-win-long',
     metrics.avg_bars_in_winning_long || 0,
-    "decimal",
+    'decimal'
   );
   setValue(
-    "ta-avg-bars-win-short",
+    'ta-avg-bars-win-short',
     metrics.avg_bars_in_winning_short || 0,
-    "decimal",
+    'decimal'
   );
   setValue(
-    "ta-avg-bars-loss-long",
+    'ta-avg-bars-loss-long',
     metrics.avg_bars_in_losing_long || 0,
-    "decimal",
+    'decimal'
   );
   setValue(
-    "ta-avg-bars-loss-short",
+    'ta-avg-bars-loss-short',
     metrics.avg_bars_in_losing_short || 0,
-    "decimal",
+    'decimal'
   );
 
   // Consecutive - All, Long, Short (from backend)
-  setValue("ta-max-consec-wins", metrics.max_consecutive_wins || 0);
-  setValue("ta-max-consec-losses", metrics.max_consecutive_losses || 0);
-  setValue("ta-max-consec-wins-long", metrics.long_max_consec_wins || 0);
-  setValue("ta-max-consec-wins-short", metrics.short_max_consec_wins || 0);
-  setValue("ta-max-consec-losses-long", metrics.long_max_consec_losses || 0);
-  setValue("ta-max-consec-losses-short", metrics.short_max_consec_losses || 0);
+  setValue('ta-max-consec-wins', metrics.max_consecutive_wins || 0);
+  setValue('ta-max-consec-losses', metrics.max_consecutive_losses || 0);
+  setValue('ta-max-consec-wins-long', metrics.long_max_consec_wins || 0);
+  setValue('ta-max-consec-wins-short', metrics.short_max_consec_wins || 0);
+  setValue('ta-max-consec-losses-long', metrics.long_max_consec_losses || 0);
+  setValue('ta-max-consec-losses-short', metrics.short_max_consec_losses || 0);
 }
 
 // Update Risk-Return Tab (Tab 4)
@@ -1964,55 +2044,55 @@ function updateTVRiskReturnTab(metrics, _trades, _config) {
     if (!el) return;
 
     if (value === null || value === undefined || isNaN(value)) {
-      el.textContent = "--";
-      el.className = "tv-value-neutral";
+      el.textContent = '--';
+      el.className = 'tv-value-neutral';
       return;
     }
 
     el.textContent = value.toFixed(3);
-    el.className = "tv-value-neutral";
+    el.className = 'tv-value-neutral';
   };
 
   // All - use backend values
-  setValue("rr-sharpe", metrics.sharpe_ratio);
-  setValue("rr-sortino", metrics.sortino_ratio);
-  setValue("rr-profit-factor", metrics.profit_factor);
-  setValue("rr-calmar", metrics.calmar_ratio);
-  setValue("rr-recovery", metrics.recovery_factor);
+  setValue('rr-sharpe', metrics.sharpe_ratio);
+  setValue('rr-sortino', metrics.sortino_ratio);
+  setValue('rr-profit-factor', metrics.profit_factor);
+  setValue('rr-calmar', metrics.calmar_ratio);
+  setValue('rr-recovery', metrics.recovery_factor);
 
   // New Advanced Metrics
-  setValue("rr-ulcer", metrics.ulcer_index);
-  setValue("rr-ulcer-long", metrics.ulcer_index_long || null); // Placeholder - requires per-direction equity curve
-  setValue("rr-ulcer-short", metrics.ulcer_index_short || null);
-  setValue("rr-margin-eff", metrics.margin_efficiency);
-  setValue("rr-margin-eff-long", metrics.margin_efficiency_long || null); // Placeholder
-  setValue("rr-margin-eff-short", metrics.margin_efficiency_short || null);
-  setValue("rr-stability", metrics.stability);
-  setValue("rr-stability-long", metrics.stability_long || null); // Placeholder
-  setValue("rr-stability-short", metrics.stability_short || null);
-  setValue("rr-sqn", metrics.sqn);
-  setValue("rr-sqn-long", metrics.sqn_long || null); // Placeholder
-  setValue("rr-sqn-short", metrics.sqn_short || null);
+  setValue('rr-ulcer', metrics.ulcer_index);
+  setValue('rr-ulcer-long', metrics.ulcer_index_long || null); // Placeholder - requires per-direction equity curve
+  setValue('rr-ulcer-short', metrics.ulcer_index_short || null);
+  setValue('rr-margin-eff', metrics.margin_efficiency);
+  setValue('rr-margin-eff-long', metrics.margin_efficiency_long || null); // Placeholder
+  setValue('rr-margin-eff-short', metrics.margin_efficiency_short || null);
+  setValue('rr-stability', metrics.stability);
+  setValue('rr-stability-long', metrics.stability_long || null); // Placeholder
+  setValue('rr-stability-short', metrics.stability_short || null);
+  setValue('rr-sqn', metrics.sqn);
+  setValue('rr-sqn-long', metrics.sqn_long || null); // Placeholder
+  setValue('rr-sqn-short', metrics.sqn_short || null);
 
   // Long - use backend values
-  setValue("rr-sharpe-long", metrics.sharpe_long);
-  setValue("rr-sortino-long", metrics.sortino_long);
-  setValue("rr-profit-factor-long", metrics.long_profit_factor);
-  setValue("rr-calmar-long", metrics.calmar_long);
-  setValue("rr-recovery-long", metrics.recovery_long);
+  setValue('rr-sharpe-long', metrics.sharpe_long);
+  setValue('rr-sortino-long', metrics.sortino_long);
+  setValue('rr-profit-factor-long', metrics.long_profit_factor);
+  setValue('rr-calmar-long', metrics.calmar_long);
+  setValue('rr-recovery-long', metrics.recovery_long);
 
   // Short - use backend values
-  setValue("rr-sharpe-short", metrics.sharpe_short);
-  setValue("rr-sortino-short", metrics.sortino_short);
-  setValue("rr-profit-factor-short", metrics.short_profit_factor);
-  setValue("rr-calmar-short", metrics.calmar_short);
-  setValue("rr-recovery-short", metrics.recovery_short);
+  setValue('rr-sharpe-short', metrics.sharpe_short);
+  setValue('rr-sortino-short', metrics.sortino_short);
+  setValue('rr-profit-factor-short', metrics.short_profit_factor);
+  setValue('rr-calmar-short', metrics.calmar_short);
+  setValue('rr-recovery-short', metrics.recovery_short);
 
   // Additional metrics (Kelly, Payoff, Consecutive)
   const kellyValue = metrics.kelly_percent || 0;
-  setValue("rr-kelly", kellyValue * 100); // Convert to percentage
-  setValue("rr-kelly-long", (metrics.kelly_percent_long || 0) * 100);
-  setValue("rr-kelly-short", (metrics.kelly_percent_short || 0) * 100);
+  setValue('rr-kelly', kellyValue * 100); // Convert to percentage
+  setValue('rr-kelly-long', (metrics.kelly_percent_long || 0) * 100);
+  setValue('rr-kelly-short', (metrics.kelly_percent_short || 0) * 100);
 
   // Payoff Ratio = Avg Win / |Avg Loss|
   const payoff =
@@ -2020,36 +2100,36 @@ function updateTVRiskReturnTab(metrics, _trades, _config) {
     (metrics.avg_win && metrics.avg_loss
       ? Math.abs(metrics.avg_win / metrics.avg_loss)
       : 0);
-  setValue("rr-payoff", payoff);
-  setValue("rr-payoff-long", metrics.long_payoff_ratio || 0);
-  setValue("rr-payoff-short", metrics.short_payoff_ratio || 0);
+  setValue('rr-payoff', payoff);
+  setValue('rr-payoff-long', metrics.long_payoff_ratio || 0);
+  setValue('rr-payoff-short', metrics.short_payoff_ratio || 0);
 
   // Max Consecutive Wins/Losses - use integer values
   const setIntValue = (id, value) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.textContent = value !== null && value !== undefined ? value : "--";
-    el.className = "tv-value-neutral";
+    el.textContent = value !== null && value !== undefined ? value : '--';
+    el.className = 'tv-value-neutral';
   };
-  setIntValue("rr-max-consec-wins", metrics.max_consecutive_wins);
-  setIntValue("rr-max-consec-wins-long", metrics.long_max_consec_wins);
-  setIntValue("rr-max-consec-wins-short", metrics.short_max_consec_wins);
-  setIntValue("rr-max-consec-losses", metrics.max_consecutive_losses);
-  setIntValue("rr-max-consec-losses-long", metrics.long_max_consec_losses);
-  setIntValue("rr-max-consec-losses-short", metrics.short_max_consec_losses);
+  setIntValue('rr-max-consec-wins', metrics.max_consecutive_wins);
+  setIntValue('rr-max-consec-wins-long', metrics.long_max_consec_wins);
+  setIntValue('rr-max-consec-wins-short', metrics.short_max_consec_wins);
+  setIntValue('rr-max-consec-losses', metrics.max_consecutive_losses);
+  setIntValue('rr-max-consec-losses-long', metrics.long_max_consec_losses);
+  setIntValue('rr-max-consec-losses-short', metrics.short_max_consec_losses);
 }
 
 // Update Trades List Tab (Tab 5) - TradingView Style
 function updateTVTradesListTab(trades, config) {
-  const tbody = document.getElementById("tvTradesListBody");
-  const countEl = document.getElementById("tvTradesCount");
+  const tbody = document.getElementById('tvTradesListBody');
+  const countEl = document.getElementById('tvTradesCount');
 
   if (!tbody) return;
 
   if (!trades || trades.length === 0) {
     tbody.innerHTML =
       '<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:2rem;">Нет сделок для отображения</td></tr>';
-    if (countEl) countEl.textContent = "0";
+    if (countEl) countEl.textContent = '0';
     return;
   }
 
@@ -2059,32 +2139,32 @@ function updateTVTradesListTab(trades, config) {
 
   // Helper to detect Long trades
   const isLongTrade = (t) => {
-    if (t.direction === "long" || t.direction === "Long") return true;
+    if (t.direction === 'long' || t.direction === 'Long') return true;
     if (
-      t.side === "long" ||
-      t.side === "Long" ||
-      t.side === "Buy" ||
-      t.side === "buy"
+      t.side === 'long' ||
+      t.side === 'Long' ||
+      t.side === 'Buy' ||
+      t.side === 'buy'
     )
       return true;
-    if (t.type === "Длинная" || t.type === "long") return true;
+    if (t.type === 'Длинная' || t.type === 'long') return true;
     return false;
   };
 
   // Format date like TradingView: "Nov 17, 2025, 21:15"
   const formatDate = (dateStr) => {
-    if (!dateStr) return "--";
+    if (!dateStr) return '--';
     const d = new Date(dateStr);
     return d
-      .toLocaleString("en-US", {
-        month: "short",
-        day: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
+      .toLocaleString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
       })
-      .replace(",", "");
+      .replace(',', '');
   };
 
   // Calculate cumulative P&L in reverse order first
@@ -2109,15 +2189,15 @@ function updateTVTradesListTab(trades, config) {
     const cumulativePnLPct = (cumulativePnL / initialCapital) * 100;
 
     const isLong = isLongTrade(trade);
-    const typeText = isLong ? "Long" : "Short";
-    const typeClass = isLong ? "tv-trade-long" : "tv-trade-short";
+    const typeText = isLong ? 'Long' : 'Short';
+    const typeClass = isLong ? 'tv-trade-long' : 'tv-trade-short';
 
     // Signal text
     const exitSignal =
       trade.exit_reason ||
       trade.exit_signal ||
-      (isLong ? "Long SL/TP" : "Short SL/TP");
-    const entrySignal = isLong ? "Long" : "Short";
+      (isLong ? 'Long SL/TP' : 'Short SL/TP');
+    const entrySignal = isLong ? 'Long' : 'Short';
 
     // Position size
     const positionValue = (trade.size || 0) * (trade.entry_price || 0);
@@ -2142,25 +2222,25 @@ function updateTVTradesListTab(trades, config) {
                 <td class="tv-trade-type-cell">Exit</td>
                 <td>${formatDate(trade.exit_time)}</td>
                 <td>${exitSignal}</td>
-                <td>${(trade.exit_price || 0).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <small>USD</small></td>
+                <td>${(trade.exit_price || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <small>USD</small></td>
                 <td>
-                    <div>${trade.size?.toFixed(2) || "0.01"}</div>
+                    <div>${trade.size?.toFixed(2) || '0.01'}</div>
                     <div class="tv-trade-secondary">${positionDisplay}</div>
                 </td>
-                <td class="${pnl >= 0 ? "tv-value-positive" : "tv-value-negative"}">
-                    <div>${pnl >= 0 ? "+" : ""}${pnl.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
-                    <div class="tv-trade-secondary">${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%</div>
+                <td class="${pnl >= 0 ? 'tv-value-positive' : 'tv-value-negative'}">
+                    <div>${pnl >= 0 ? '+' : ''}${pnl.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
+                    <div class="tv-trade-secondary">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%</div>
                 </td>
                 <td class="tv-value-neutral">
-                    <div>${mfe.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
+                    <div>${mfe.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
                     <div class="tv-trade-secondary">${mfePct.toFixed(2)}%</div>
                 </td>
-                <td class="${mae < 0 ? "tv-value-negative" : "tv-value-neutral"}">
-                    <div>${mae.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
+                <td class="${mae < 0 ? 'tv-value-negative' : 'tv-value-neutral'}">
+                    <div>${mae.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
                     <div class="tv-trade-secondary">${maePct.toFixed(2)}%</div>
                 </td>
-                <td class="${cumulativePnL >= 0 ? "tv-value-positive" : "tv-value-negative"}">
-                    <div>${cumulativePnL.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
+                <td class="${cumulativePnL >= 0 ? 'tv-value-positive' : 'tv-value-negative'}">
+                    <div>${cumulativePnL.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <small>USD</small></div>
                     <div class="tv-trade-secondary">${cumulativePnLPct.toFixed(2)}%</div>
                 </td>
             </tr>
@@ -2168,39 +2248,39 @@ function updateTVTradesListTab(trades, config) {
                 <td class="tv-trade-type-cell">Entry</td>
                 <td>${formatDate(trade.entry_time)}</td>
                 <td>${entrySignal}</td>
-                <td>${(trade.entry_price || 0).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <small>USD</small></td>
+                <td>${(trade.entry_price || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <small>USD</small></td>
                 <td colspan="5"></td>
             </tr>
         `);
   }
 
-  tbody.innerHTML = rows.join("");
+  tbody.innerHTML = rows.join('');
 }
 
 // Update Report Header
 function updateTVReportHeader(backtest) {
-  const strategyName = document.getElementById("tvReportStrategyName");
-  const dateRange = document.getElementById("tvReportDateRange");
+  const strategyName = document.getElementById('tvReportStrategyName');
+  const dateRange = document.getElementById('tvReportDateRange');
 
   if (strategyName && backtest?.config) {
-    strategyName.textContent = `Стратегия ${backtest.config.strategy_type || "Unknown"} Отчёт`;
+    strategyName.textContent = `Стратегия ${backtest.config.strategy_type || 'Unknown'} Отчёт`;
   }
 
   if (dateRange && backtest?.config) {
     const start = backtest.config.start_date
-      ? new Date(backtest.config.start_date).toLocaleDateString("ru-RU", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : "--";
+      ? new Date(backtest.config.start_date).toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      })
+      : '--';
     const end = backtest.config.end_date
-      ? new Date(backtest.config.end_date).toLocaleDateString("ru-RU", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : "--";
+      ? new Date(backtest.config.end_date).toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      })
+      : '--';
     dateRange.textContent = `${start} – ${end}`;
   }
 }
@@ -2209,63 +2289,63 @@ function updateTVReportHeader(backtest) {
 function initTradesTable() {
   // Tabulator table is deprecated, using TradingView style table instead
   // Kept for backward compatibility
-  const tradesTableEl = document.getElementById("tradesTable");
-  if (tradesTableEl && typeof Tabulator !== "undefined") {
-    tradesTable = new Tabulator("#tradesTable", {
+  const tradesTableEl = document.getElementById('tradesTable');
+  if (tradesTableEl && typeof Tabulator !== 'undefined') {
+    tradesTable = new Tabulator('#tradesTable', {
       height: 300,
-      layout: "fitColumns",
-      placeholder: "No trades to display",
+      layout: 'fitColumns',
+      placeholder: 'No trades to display',
       columns: [
-        { title: "#", field: "id", width: 50 },
-        { title: "Entry Time", field: "entry_time", sorter: "datetime" },
-        { title: "Exit Time", field: "exit_time", sorter: "datetime" },
+        { title: '#', field: 'id', width: 50 },
+        { title: 'Entry Time', field: 'entry_time', sorter: 'datetime' },
+        { title: 'Exit Time', field: 'exit_time', sorter: 'datetime' },
         {
-          title: "Side",
-          field: "side",
+          title: 'Side',
+          field: 'side',
           width: 80,
           formatter: (cell) => {
             const val = cell.getValue();
-            const color = val === "long" ? "#3fb950" : "#f85149";
+            const color = val === 'long' ? '#3fb950' : '#f85149';
             return `<span style="color: ${color}">${val?.toUpperCase()}</span>`;
-          },
+          }
         },
         {
-          title: "Entry Price",
-          field: "entry_price",
-          formatter: "money",
-          formatterParams: { precision: 2 },
+          title: 'Entry Price',
+          field: 'entry_price',
+          formatter: 'money',
+          formatterParams: { precision: 2 }
         },
         {
-          title: "Exit Price",
-          field: "exit_price",
-          formatter: "money",
-          formatterParams: { precision: 2 },
+          title: 'Exit Price',
+          field: 'exit_price',
+          formatter: 'money',
+          formatterParams: { precision: 2 }
         },
         {
-          title: "Size",
-          field: "size",
-          formatter: "money",
-          formatterParams: { precision: 4 },
+          title: 'Size',
+          field: 'size',
+          formatter: 'money',
+          formatterParams: { precision: 4 }
         },
         {
-          title: "P&L",
-          field: "pnl",
+          title: 'P&L',
+          field: 'pnl',
           formatter: (cell) => {
             const val = cell.getValue();
-            const color = val >= 0 ? "#3fb950" : "#f85149";
+            const color = val >= 0 ? '#3fb950' : '#f85149';
             return `<span style="color: ${color}">$${val?.toFixed(2)}</span>`;
-          },
+          }
         },
         {
-          title: "Return %",
-          field: "return_pct",
+          title: 'Return %',
+          field: 'return_pct',
           formatter: (cell) => {
             const val = cell.getValue();
-            const color = val >= 0 ? "#3fb950" : "#f85149";
+            const color = val >= 0 ? '#3fb950' : '#f85149';
             return `<span style="color: ${color}">${val?.toFixed(2)}%</span>`;
-          },
-        },
-      ],
+          }
+        }
+      ]
     });
   }
 }
@@ -2275,45 +2355,45 @@ function setDefaultDates() {
   const startDate = new Date();
   startDate.setMonth(startDate.getMonth() - 6);
 
-  document.getElementById("btEndDate").value = endDate
+  document.getElementById('btEndDate').value = endDate
     .toISOString()
-    .split("T")[0];
-  document.getElementById("btStartDate").value = startDate
+    .split('T')[0];
+  document.getElementById('btStartDate').value = startDate
     .toISOString()
-    .split("T")[0];
+    .split('T')[0];
 }
 
 function setupFilters() {
-  ["filterStrategy", "filterSymbol", "filterPnL", "filterSearch"].forEach(
+  ['filterStrategy', 'filterSymbol', 'filterPnL', 'filterSearch'].forEach(
     (id) => {
-      document.getElementById(id).addEventListener("change", applyFilters);
-    },
+      document.getElementById(id).addEventListener('change', applyFilters);
+    }
   );
   document
-    .getElementById("filterSearch")
-    .addEventListener("input", applyFilters);
+    .getElementById('filterSearch')
+    .addEventListener('input', applyFilters);
 }
 
 // ============================
 // Data Loading
 // ============================
 async function loadBacktestResults() {
-  console.log("[loadBacktestResults] Loading backtests...");
+  console.log('[loadBacktestResults] Loading backtests...');
 
   // PRIORITY: Check URL for specific backtest ID first (from optimization/backtest redirect)
   const urlParams = new URLSearchParams(window.location.search);
-  const targetId = urlParams.get("id");
+  const targetId = urlParams.get('id');
 
   if (targetId) {
-    console.log("[loadBacktestResults] URL contains targetId:", targetId);
+    console.log('[loadBacktestResults] URL contains targetId:', targetId);
     try {
       // Load the specific backtest directly - don't depend on list endpoint
       const directResponse = await fetch(`${API_BASE}/backtests/${targetId}`);
       if (directResponse.ok) {
         const backtestData = await directResponse.json();
         console.log(
-          "[loadBacktestResults] Loaded backtest directly by ID:",
-          targetId,
+          '[loadBacktestResults] Loaded backtest directly by ID:',
+          targetId
         );
 
         // Initialize UI with this single backtest
@@ -2321,15 +2401,15 @@ async function loadBacktestResults() {
           {
             ...backtestData,
             backtest_id: backtestData.id || targetId,
-            symbol: backtestData.config?.symbol || "Unknown",
-            interval: backtestData.config?.interval || "--",
-            strategy_type: backtestData.config?.strategy_type || "Unknown",
-            metrics: backtestData.metrics || {},
-          },
+            symbol: backtestData.config?.symbol || 'Unknown',
+            interval: backtestData.config?.interval || '--',
+            strategy_type: backtestData.config?.strategy_type || 'Unknown',
+            metrics: backtestData.metrics || {}
+          }
         ];
 
-        document.getElementById("resultsCount").textContent = "1";
-        document.getElementById("emptyState").classList.add("d-none");
+        document.getElementById('resultsCount').textContent = '1';
+        document.getElementById('emptyState').classList.add('d-none');
         renderResultsList(allResults);
         selectBacktest(targetId);
 
@@ -2338,11 +2418,11 @@ async function loadBacktestResults() {
         return;
       } else {
         console.warn(
-          "[loadBacktestResults] Direct load failed, falling back to list",
+          '[loadBacktestResults] Direct load failed, falling back to list'
         );
       }
     } catch (err) {
-      console.warn("[loadBacktestResults] Direct load error:", err);
+      console.warn('[loadBacktestResults] Direct load error:', err);
     }
   }
 
@@ -2356,13 +2436,13 @@ async function loadBacktestListBackground() {
     // Add cache buster to prevent browser caching stale data
     const url = `${API_BASE}/backtests/?limit=100&_t=${Date.now()}`;
     const response = await fetch(url, {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
     });
     if (!response.ok) {
       console.warn(
-        "[loadBacktestListBackground] List endpoint returned",
-        response.status,
+        '[loadBacktestListBackground] List endpoint returned',
+        response.status
       );
       return;
     }
@@ -2373,32 +2453,32 @@ async function loadBacktestListBackground() {
     const newResults = (data.items || [])
       .filter(
         (item) =>
-          !existingIds.has(item.id) && !existingIds.has(item.backtest_id),
+          !existingIds.has(item.id) && !existingIds.has(item.backtest_id)
       )
       .filter(
         (item) =>
           !recentlyDeletedIds.has(item.id) &&
-          !recentlyDeletedIds.has(item.backtest_id),
+          !recentlyDeletedIds.has(item.backtest_id)
       )
       .map((item) => ({
         ...item,
         backtest_id: item.id || item.backtest_id,
-        symbol: item.symbol || item.config?.symbol || "Unknown",
-        interval: item.interval || item.config?.interval || "--",
+        symbol: item.symbol || item.config?.symbol || 'Unknown',
+        interval: item.interval || item.config?.interval || '--',
         strategy_type:
-          item.strategy_type || item.config?.strategy_type || "Unknown",
+          item.strategy_type || item.config?.strategy_type || 'Unknown'
       }));
 
     if (newResults.length > 0) {
       allResults = [...allResults, ...newResults];
-      document.getElementById("resultsCount").textContent = allResults.length;
+      document.getElementById('resultsCount').textContent = allResults.length;
       renderResultsList(allResults);
       populateFilters();
     }
   } catch (err) {
     console.warn(
-      "[loadBacktestListBackground] Background list load failed:",
-      err,
+      '[loadBacktestListBackground] Background list load failed:',
+      err
     );
   }
 }
@@ -2409,8 +2489,8 @@ async function loadBacktestListFromAPI() {
     // Add cache buster to prevent browser caching stale data
     const url = `${API_BASE}/backtests/?limit=100&_t=${Date.now()}`;
     const response = await fetch(url, {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
     });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -2423,28 +2503,28 @@ async function loadBacktestListFromAPI() {
       .filter(
         (item) =>
           !recentlyDeletedIds.has(item.id) &&
-          !recentlyDeletedIds.has(item.backtest_id),
+          !recentlyDeletedIds.has(item.backtest_id)
       )
       .map((item) => ({
         ...item,
         backtest_id: item.id || item.backtest_id,
-        symbol: item.symbol || item.config?.symbol || "Unknown",
-        interval: item.interval || item.config?.interval || "--",
+        symbol: item.symbol || item.config?.symbol || 'Unknown',
+        interval: item.interval || item.config?.interval || '--',
         strategy_type:
-          item.strategy_type || item.config?.strategy_type || "Unknown",
+          item.strategy_type || item.config?.strategy_type || 'Unknown'
       }));
     console.log(
-      "[loadBacktestListFromAPI] Loaded",
+      '[loadBacktestListFromAPI] Loaded',
       allResults.length,
-      "backtests",
+      'backtests'
     );
-    document.getElementById("resultsCount").textContent = allResults.length;
+    document.getElementById('resultsCount').textContent = allResults.length;
 
     if (allResults.length === 0) {
-      document.getElementById("emptyState").classList.remove("d-none");
-      document.getElementById("resultsList").innerHTML = "";
+      document.getElementById('emptyState').classList.remove('d-none');
+      document.getElementById('resultsList').innerHTML = '';
     } else {
-      document.getElementById("emptyState").classList.add("d-none");
+      document.getElementById('emptyState').classList.add('d-none');
       renderResultsList(allResults);
 
       // Auto-select first result
@@ -2453,27 +2533,206 @@ async function loadBacktestListFromAPI() {
 
     populateFilters();
   } catch (error) {
-    console.error("Failed to load backtest results:", error);
-    showToast("Ошибка загрузки списка бэктестов", "error");
+    console.error('Failed to load backtest results:', error);
+    showToast('Ошибка загрузки списка бэктестов', 'error');
 
     // Show empty state with error message
-    document.getElementById("emptyState").classList.remove("d-none");
-    document.getElementById("resultsList").innerHTML = "";
+    document.getElementById('emptyState').classList.remove('d-none');
+    document.getElementById('resultsList').innerHTML = '';
+  }
+}
+
+// ============================
+// Bulk Select & Delete
+// ============================
+
+/**
+ * Toggle a single item in the bulk-select set.
+ * Updates visual state and toolbar without full re-render.
+ */
+function toggleBulkSelectItem(backtestId) {
+  console.log('[BulkSelect] Toggle:', backtestId);
+  if (selectedForDelete.has(backtestId)) {
+    selectedForDelete.delete(backtestId);
+  } else {
+    selectedForDelete.add(backtestId);
+  }
+
+  // Update visual state for this item
+  const item = document.querySelector(
+    `.result-item[data-id="${backtestId}"]`
+  );
+  if (item) {
+    item.classList.toggle(
+      'marked-for-delete',
+      selectedForDelete.has(backtestId)
+    );
+    const cb = item.querySelector('.bulk-select-checkbox');
+    if (cb) cb.checked = selectedForDelete.has(backtestId);
+  }
+
+  updateBulkDeleteToolbar();
+}
+
+/**
+ * Select All / Deselect All toggle.
+ * If all currently visible items are selected, deselect all.
+ * Otherwise, select all visible items.
+ */
+function selectAllForDelete() {
+  const visibleItems = document.querySelectorAll(
+    '.result-item[data-id]'
+  );
+  const allSelected =
+    visibleItems.length > 0 &&
+    [...visibleItems].every((el) => selectedForDelete.has(el.dataset.id));
+
+  if (allSelected) {
+    // Deselect all
+    selectedForDelete.clear();
+  } else {
+    // Select all visible
+    visibleItems.forEach((el) => selectedForDelete.add(el.dataset.id));
+  }
+
+  // Update visual state
+  visibleItems.forEach((el) => {
+    const isChecked = selectedForDelete.has(el.dataset.id);
+    el.classList.toggle('marked-for-delete', isChecked);
+    const cb = el.querySelector('.bulk-select-checkbox');
+    if (cb) cb.checked = isChecked;
+  });
+
+  updateBulkDeleteToolbar();
+}
+
+/**
+ * Delete all selected backtests in bulk.
+ * Uses sequential API calls with optimistic UI updates.
+ */
+async function deleteSelectedBacktests() {
+  const count = selectedForDelete.size;
+  console.log('[BulkDelete] Called, selected count:', count, 'ids:', [...selectedForDelete]);
+  if (count === 0) {
+    showToast('Не выбрано ни одного бэктеста', 'warning');
+    return;
+  }
+
+  if (!confirm(`Удалить ${count} бэктест(ов)?`)) {
+    console.log('[BulkDelete] User cancelled');
+    return;
+  }
+
+  console.log('[BulkDelete] User confirmed, starting deletion...');
+  const idsToDelete = [...selectedForDelete];
+  let deleted = 0;
+  let errors = 0;
+
+  for (const id of idsToDelete) {
+    try {
+      console.log('[BulkDelete] Deleting:', id);
+      const response = await fetch(`${API_BASE}/backtests/${id}`, {
+        method: 'DELETE'
+      });
+      console.log('[BulkDelete] Response for', id, ':', response.status);
+      if (response.ok) {
+        deleted++;
+        recentlyDeletedIds.add(id);
+        setTimeout(() => recentlyDeletedIds.delete(id), 30000);
+        allResults = allResults.filter((r) => r.backtest_id !== id);
+      } else {
+        errors++;
+      }
+    } catch {
+      errors++;
+    }
+  }
+
+  // Clear selection
+  selectedForDelete.clear();
+
+  // If deleted current backtest, clear selection
+  if (
+    currentBacktest &&
+    idsToDelete.includes(currentBacktest.backtest_id)
+  ) {
+    currentBacktest = null;
+    if (equityChart) {
+      equityChart.data.labels = [];
+      equityChart.data.datasets.forEach((ds) => (ds.data = []));
+      equityChart.update('none');
+    }
+  }
+
+  // Re-render
+  renderResultsList(allResults);
+  document.getElementById('resultsCount').textContent = allResults.length;
+  updateBulkDeleteToolbar();
+
+  // Select first remaining
+  if (allResults.length > 0 && !currentBacktest) {
+    selectBacktest(allResults[0].backtest_id);
+  } else if (allResults.length === 0) {
+    document.getElementById('emptyState').classList.remove('d-none');
+  }
+
+  // Toast summary
+  if (errors === 0) {
+    showToast(`Удалено ${deleted} бэктест(ов)`, 'success');
+  } else {
+    showToast(
+      `Удалено ${deleted}, ошибок: ${errors}`,
+      errors > deleted ? 'error' : 'warning'
+    );
+  }
+}
+
+/**
+ * Update the bulk-delete toolbar visibility and count.
+ */
+function updateBulkDeleteToolbar() {
+  const toolbar = document.getElementById('bulkDeleteToolbar');
+  if (!toolbar) return;
+
+  const count = selectedForDelete.size;
+  const badge = document.getElementById('bulkDeleteCount');
+  const selectAllCb = document.getElementById('selectAllCheckbox');
+
+  if (count > 0) {
+    toolbar.classList.remove('d-none');
+    if (badge) badge.textContent = count;
+  } else {
+    toolbar.classList.add('d-none');
+  }
+
+  // Update "Select All" checkbox state
+  if (selectAllCb) {
+    const visibleItems = document.querySelectorAll(
+      '.result-item[data-id]'
+    );
+    const allSelected =
+      visibleItems.length > 0 &&
+      [...visibleItems].every((el) =>
+        selectedForDelete.has(el.dataset.id)
+      );
+    selectAllCb.checked = allSelected;
+    selectAllCb.indeterminate =
+      count > 0 && !allSelected;
   }
 }
 
 async function deleteBacktest(backtestId) {
-  if (!confirm("Удалить этот бэктест?")) {
+  if (!confirm('Удалить этот бэктест?')) {
     return;
   }
 
   try {
     const response = await fetch(`${API_BASE}/backtests/${backtestId}`, {
-      method: "DELETE",
+      method: 'DELETE'
     });
 
     if (response.ok) {
-      showToast("Бэктест удалён", "success");
+      showToast('Бэктест удалён', 'success');
 
       // Add to recently deleted blacklist to prevent ghost items on refresh
       recentlyDeletedIds.add(backtestId);
@@ -2491,7 +2750,7 @@ async function deleteBacktest(backtestId) {
         if (equityChart) {
           equityChart.data.labels = [];
           equityChart.data.datasets.forEach((ds) => (ds.data = []));
-          equityChart.update("none");
+          equityChart.update('none');
         }
       }
 
@@ -2499,25 +2758,25 @@ async function deleteBacktest(backtestId) {
       renderResultsList(allResults);
 
       // Update count
-      document.getElementById("resultsCount").textContent = allResults.length;
+      document.getElementById('resultsCount').textContent = allResults.length;
 
       // If there are remaining results, select the first one
       if (allResults.length > 0 && !currentBacktest) {
         selectBacktest(allResults[0].backtest_id);
       } else if (allResults.length === 0) {
         // Show empty state
-        document.getElementById("emptyState").classList.remove("d-none");
+        document.getElementById('emptyState').classList.remove('d-none');
       }
 
       // NO background refresh - local state is already correct
       // Background refresh was causing "ghost" items to reappear from browser cache
     } else {
       const error = await response.json();
-      showToast(`Ошибка: ${error.detail}`, "error");
+      showToast(`Ошибка: ${error.detail}`, 'error');
     }
   } catch (error) {
-    console.error("Failed to delete backtest:", error);
-    showToast("Ошибка удаления", "error");
+    console.error('Failed to delete backtest:', error);
+    showToast('Ошибка удаления', 'error');
   }
 }
 
@@ -2529,17 +2788,17 @@ async function loadStrategies() {
     // Handle both array and paginated response
     const strategies = Array.isArray(data) ? data : data.items || [];
 
-    const select = document.getElementById("btStrategy");
+    const select = document.getElementById('btStrategy');
     if (!select) return;
 
     strategies.forEach((s) => {
-      const option = document.createElement("option");
+      const option = document.createElement('option');
       option.value = s.id;
       option.textContent = s.name;
       select.appendChild(option);
     });
   } catch (error) {
-    console.error("Failed to load strategies:", error);
+    console.error('Failed to load strategies:', error);
   }
 }
 
@@ -2547,17 +2806,17 @@ function populateFilters() {
   const strategies = [...new Set(allResults.map((r) => r.strategy_type))];
   const symbols = [...new Set(allResults.map((r) => r.symbol))];
 
-  const strategySelect = document.getElementById("filterStrategy");
+  const strategySelect = document.getElementById('filterStrategy');
   strategies.forEach((s) => {
-    const option = document.createElement("option");
+    const option = document.createElement('option');
     option.value = s;
     option.textContent = s;
     strategySelect.appendChild(option);
   });
 
-  const symbolSelect = document.getElementById("filterSymbol");
+  const symbolSelect = document.getElementById('filterSymbol');
   symbols.forEach((s) => {
-    const option = document.createElement("option");
+    const option = document.createElement('option');
     option.value = s;
     option.textContent = s;
     symbolSelect.appendChild(option);
@@ -2568,7 +2827,7 @@ function populateFilters() {
 // Rendering
 // ============================
 function renderResultsList(results) {
-  const container = document.getElementById("resultsList");
+  const container = document.getElementById('resultsList');
   container.innerHTML = results
     .map((r) => {
       const isProfitable = (r.metrics?.total_return || 0) >= 0;
@@ -2580,12 +2839,12 @@ function renderResultsList(results) {
         r.config?.direction ||
         r.config?.strategy_params?._direction ||
         r.direction ||
-        "both";
-      let directionBadge = "";
-      if (direction === "long") {
+        'both';
+      let directionBadge = '';
+      if (direction === 'long') {
         directionBadge =
           '<span class="direction-badge direction-long">L</span>';
-      } else if (direction === "short") {
+      } else if (direction === 'short') {
         directionBadge =
           '<span class="direction-badge direction-short">S</span>';
       } else {
@@ -2593,22 +2852,25 @@ function renderResultsList(results) {
           '<span class="direction-badge direction-both">L&S</span>';
       }
 
+      const isCheckedForDelete = selectedForDelete.has(r.backtest_id);
+
       return `
-                    <div class="result-item ${isSelected ? "selected" : ""}" 
+                    <div class="result-item ${isSelected ? 'selected' : ''} ${isCheckedForDelete ? 'marked-for-delete' : ''}" 
                          data-id="${r.backtest_id}">
-                        ${
-                          compareMode
-                            ? `
-                            <input type="checkbox" class="form-check-input me-2" 
-                                   ${isCompareSelected ? "checked" : ""}
-                                   onclick="toggleCompareSelect(event, '${r.backtest_id}')">
+                        ${compareMode
+          ? `
+                            <input type="checkbox" class="form-check-input compare-checkbox me-2" 
+                                   ${isCompareSelected ? 'checked' : ''}>
                         `
-                            : ""
-                        }
-                        <div class="result-content" onclick="selectBacktest('${r.backtest_id}')">
+          : `
+                            <input type="checkbox" class="form-check-input bulk-select-checkbox"
+                                   ${isCheckedForDelete ? 'checked' : ''}>
+                        `
+        }
+                        <div class="result-content">
                             <div class="result-row">
-                                <span class="result-pnl-value ${isProfitable ? "text-success" : "text-danger"}">
-                                    ${isProfitable ? "+" : ""}${(r.metrics?.total_return || 0).toFixed(2)}%
+                                <span class="result-pnl-value ${isProfitable ? 'text-success' : 'text-danger'}">
+                                    ${isProfitable ? '+' : ''}${(r.metrics?.total_return || 0).toFixed(2)}%
                                 </span>
                                 ${directionBadge}
                                 <span class="result-trades">${r.metrics?.total_trades || 0} trades</span>
@@ -2618,21 +2880,20 @@ function renderResultsList(results) {
                             </div>
                         </div>
                         <button class="btn btn-sm delete-btn" 
-                                onclick="event.stopPropagation(); deleteBacktest('${r.backtest_id}')"
                                 title="Удалить">
                             <i class="bi bi-x-lg"></i>
                         </button>
                     </div>
                 `;
     })
-    .join("");
+    .join('');
 }
 
 async function selectBacktest(backtestId) {
   try {
     // Mark as selected in list
-    document.querySelectorAll(".result-item").forEach((item) => {
-      item.classList.toggle("selected", item.dataset.id === backtestId);
+    document.querySelectorAll('.result-item').forEach((item) => {
+      item.classList.toggle('selected', item.dataset.id === backtestId);
     });
 
     // Fetch full details
@@ -2646,17 +2907,17 @@ async function selectBacktest(backtestId) {
       currentBacktest.metrics,
       currentBacktest.config,
       currentBacktest.trades,
-      currentBacktest.equity_curve,
+      currentBacktest.equity_curve
     );
     updateTVTradeAnalysisTab(
       currentBacktest.metrics,
       currentBacktest.config,
-      currentBacktest.trades,
+      currentBacktest.trades
     );
     updateTVRiskReturnTab(
       currentBacktest.metrics,
       currentBacktest.trades,
-      currentBacktest.config,
+      currentBacktest.config
     );
     updateTVTradesListTab(currentBacktest.trades, currentBacktest.config);
 
@@ -2668,19 +2929,19 @@ async function selectBacktest(backtestId) {
     updateAIAnalysis(currentBacktest);
 
     // Enable AI buttons
-    const btnAI = document.getElementById("btnAIAnalysis");
+    const btnAI = document.getElementById('btnAIAnalysis');
     if (btnAI) btnAI.disabled = false;
 
     // Dispatch backtestLoaded event for AI integration
     window.dispatchEvent(
-      new CustomEvent("backtestLoaded", { detail: currentBacktest }),
+      new CustomEvent('backtestLoaded', { detail: currentBacktest })
     );
     console.log(
-      "[selectBacktest] Dispatched backtestLoaded event for AI Analysis",
+      '[selectBacktest] Dispatched backtestLoaded event for AI Analysis'
     );
   } catch (error) {
-    console.error("Failed to load backtest details:", error);
-    showToast("Failed to load backtest details", "error");
+    console.error('Failed to load backtest details:', error);
+    showToast('Failed to load backtest details', 'error');
   }
 }
 
@@ -2688,24 +2949,24 @@ function updateMetrics(metrics) {
   if (!metrics) return;
 
   // Helper for single value format
-  const setMetric = (id, value, format = "number", threshold = 0) => {
+  const setMetric = (id, value, format = 'number', threshold = 0) => {
     const el = document.getElementById(id);
     if (!el) return;
 
-    let formatted = "--";
-    let className = "neutral";
+    let formatted = '--';
+    let className = 'neutral';
 
     if (value !== null && value !== undefined) {
-      if (format === "percent") {
-        formatted = `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
-      } else if (format === "ratio") {
+      if (format === 'percent') {
+        formatted = `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+      } else if (format === 'ratio') {
         formatted = value.toFixed(2);
       } else {
         formatted = value.toLocaleString();
       }
 
-      if (typeof threshold === "number") {
-        className = value >= threshold ? "positive" : "negative";
+      if (typeof threshold === 'number') {
+        className = value >= threshold ? 'positive' : 'negative';
       }
     }
 
@@ -2718,8 +2979,8 @@ function updateMetrics(metrics) {
     const el = document.getElementById(id);
     if (!el) return;
 
-    let formatted = "--";
-    let className = "neutral";
+    let formatted = '--';
+    let className = 'neutral';
 
     if (
       dollarValue !== null &&
@@ -2727,12 +2988,12 @@ function updateMetrics(metrics) {
       percentValue !== null &&
       percentValue !== undefined
     ) {
-      const dollarSign = dollarValue >= 0 ? "" : "-";
-      const pctSign = percentValue >= 0 ? "" : "-";
-      formatted = `${dollarSign}$${Math.abs(dollarValue).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${pctSign}${Math.abs(percentValue).toFixed(2)}%)`;
+      const dollarSign = dollarValue >= 0 ? '' : '-';
+      const pctSign = percentValue >= 0 ? '' : '-';
+      formatted = `${dollarSign}$${Math.abs(dollarValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${pctSign}${Math.abs(percentValue).toFixed(2)}%)`;
 
-      if (typeof threshold === "number") {
-        className = dollarValue >= threshold ? "positive" : "negative";
+      if (typeof threshold === 'number') {
+        className = dollarValue >= threshold ? 'positive' : 'negative';
       }
     }
 
@@ -2741,74 +3002,74 @@ function updateMetrics(metrics) {
   };
 
   // Core metrics
-  setMetric("metricReturn", metrics.total_return, "percent", 0);
-  setMetric("metricWinRate", metrics.win_rate, "percent", 50);
-  setMetric("metricProfitFactor", metrics.profit_factor, "ratio", 1);
-  setMetric("metricSharpe", metrics.sharpe_ratio, "ratio", 1);
-  setMetric("metricTrades", metrics.total_trades, "number");
+  setMetric('metricReturn', metrics.total_return, 'percent', 0);
+  setMetric('metricWinRate', metrics.win_rate, 'percent', 50);
+  setMetric('metricProfitFactor', metrics.profit_factor, 'ratio', 1);
+  setMetric('metricSharpe', metrics.sharpe_ratio, 'ratio', 1);
+  setMetric('metricTrades', metrics.total_trades, 'number');
 
   // Dual format metrics (TradingView style)
   setDualMetric(
-    "metricDrawdown",
+    'metricDrawdown',
     -(metrics.max_drawdown_value || 0),
     -(metrics.max_drawdown || 0),
-    0,
+    0
   );
   setDualMetric(
-    "metricNetProfit",
+    'metricNetProfit',
     metrics.net_profit || 0,
     metrics.net_profit_pct || 0,
-    0,
+    0
   );
   setDualMetric(
-    "metricGrossProfit",
+    'metricGrossProfit',
     metrics.gross_profit || 0,
     metrics.gross_profit_pct || 0,
-    0,
+    0
   );
   setDualMetric(
-    "metricGrossLoss",
+    'metricGrossLoss',
     -(metrics.gross_loss || 0),
     -(metrics.gross_loss_pct || 0),
-    0,
+    0
   );
   setDualMetric(
-    "metricAvgWin",
+    'metricAvgWin',
     metrics.avg_win_value || 0,
     metrics.avg_win || 0,
-    0,
+    0
   );
   setDualMetric(
-    "metricAvgLoss",
+    'metricAvgLoss',
     -(metrics.avg_loss_value || 0),
     metrics.avg_loss || 0,
-    0,
+    0
   );
   setDualMetric(
-    "metricLargestWin",
+    'metricLargestWin',
     metrics.largest_win_value || 0,
     metrics.largest_win || 0,
-    0,
+    0
   );
   setDualMetric(
-    "metricLargestLoss",
+    'metricLargestLoss',
     -(metrics.largest_loss_value || 0),
     metrics.largest_loss || 0,
-    0,
+    0
   );
 
   // Additional TradingView metrics
-  setMetric("metricAvgBars", metrics.avg_bars_in_trade, "ratio", 0);
-  setMetric("metricRecoveryFactor", metrics.recovery_factor, "ratio", 1);
-  setMetric("metricExpectancy", metrics.expectancy, "ratio", 0);
-  setMetric("metricSortino", metrics.sortino_ratio, "ratio", 1);
-  setMetric("metricCalmar", metrics.calmar_ratio, "ratio", 1);
-  setMetric("metricMaxConsecWins", metrics.max_consecutive_wins, "number", 0);
+  setMetric('metricAvgBars', metrics.avg_bars_in_trade, 'ratio', 0);
+  setMetric('metricRecoveryFactor', metrics.recovery_factor, 'ratio', 1);
+  setMetric('metricExpectancy', metrics.expectancy, 'ratio', 0);
+  setMetric('metricSortino', metrics.sortino_ratio, 'ratio', 1);
+  setMetric('metricCalmar', metrics.calmar_ratio, 'ratio', 1);
+  setMetric('metricMaxConsecWins', metrics.max_consecutive_wins, 'number', 0);
   setMetric(
-    "metricMaxConsecLosses",
+    'metricMaxConsecLosses',
     metrics.max_consecutive_losses,
-    "number",
-    0,
+    'number',
+    0
   );
 }
 
@@ -2878,20 +3139,20 @@ function findClosestIndex(sortedData, targetTime, getTime) {
 
 function updateCharts(backtest) {
   console.log(
-    "[updateCharts] called with backtest:",
-    backtest?.id || backtest?.backtest_id,
+    '[updateCharts] called with backtest:',
+    backtest?.id || backtest?.backtest_id
   );
   if (!backtest) return;
 
   // Debug: log backtest structure
-  console.log("[updateCharts] backtest keys:", Object.keys(backtest));
-  console.log("[updateCharts] equity_curve exists:", !!backtest.equity_curve);
-  console.log("[updateCharts] trades count:", backtest.trades?.length || 0);
+  console.log('[updateCharts] backtest keys:', Object.keys(backtest));
+  console.log('[updateCharts] equity_curve exists:', !!backtest.equity_curve);
+  console.log('[updateCharts] trades count:', backtest.trades?.length || 0);
 
   // Check if charts are initialized and canvas still exists
   if (!equityChart || !equityChart.canvas) {
     console.warn(
-      "[updateCharts] equityChart not initialized or canvas missing",
+      '[updateCharts] equityChart not initialized or canvas missing'
     );
     return;
   }
@@ -2899,17 +3160,17 @@ function updateCharts(backtest) {
   // Equity Chart
   if (backtest.equity_curve) {
     console.log(
-      "[updateCharts] equity_curve found, type:",
-      Array.isArray(backtest.equity_curve) ? "array" : "object",
+      '[updateCharts] equity_curve found, type:',
+      Array.isArray(backtest.equity_curve) ? 'array' : 'object'
     );
 
     // Short date format for chart labels (like TradingView)
     const formatShortDate = (ts) => {
-      if (!ts) return "";
+      if (!ts) return '';
       const d = new Date(ts);
       return d
-        .toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
-        .replace(".", "");
+        .toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+        .replace('.', '');
     };
 
     // Support both formats:
@@ -2929,7 +3190,7 @@ function updateCharts(backtest) {
       rawEquityData = timestamps.map((t, i) => ({
         timestamp: t,
         equity: equities[i],
-        drawdown: drawdowns[i] || 0,
+        drawdown: drawdowns[i] || 0
       }));
     }
 
@@ -2937,7 +3198,7 @@ function updateCharts(backtest) {
     const MAX_CHART_POINTS = 2000;
     if (rawEquityData.length > MAX_CHART_POINTS) {
       console.log(
-        `[updateCharts] Downsampling from ${rawEquityData.length} to ${MAX_CHART_POINTS} points`,
+        `[updateCharts] Downsampling from ${rawEquityData.length} to ${MAX_CHART_POINTS} points`
       );
       equityData = downsampleData(rawEquityData, MAX_CHART_POINTS);
     } else {
@@ -2949,16 +3210,16 @@ function updateCharts(backtest) {
     const drawdown = equityData.map((p) => p.drawdown || 0);
 
     console.log(
-      "[updateCharts] labels:",
+      '[updateCharts] labels:',
       labels?.length,
-      "values:",
-      values?.length,
+      'values:',
+      values?.length
     );
     console.log(
-      "[updateCharts] values sample:",
+      '[updateCharts] values sample:',
       values?.slice(0, 5),
-      "...",
-      values?.slice(-3),
+      '...',
+      values?.slice(-3)
     );
 
     try {
@@ -2973,12 +3234,12 @@ function updateCharts(backtest) {
         const pnlValues = values.map((v) => v - initialEquity);
 
         console.log(
-          "[updateCharts] initialEquity:",
+          '[updateCharts] initialEquity:',
           initialEquity,
-          "pnlValues sample:",
+          'pnlValues sample:',
           pnlValues?.slice(0, 3),
-          "...",
-          pnlValues?.slice(-3),
+          '...',
+          pnlValues?.slice(-3)
         );
 
         // Dataset 0: Strategy P&L line (green)
@@ -3018,7 +3279,7 @@ function updateCharts(backtest) {
         if (backtest.trades && backtest.trades.length > 0) {
           let cumulativePnL = 0;
 
-          // Use binary search for O(n log n) instead of O(nВІ)
+          // Use binary search for O(n log n) instead of O(n²)
           const getTimestamp = (point) => point.timestamp;
 
           backtest.trades.forEach((trade, tradeIdx) => {
@@ -3031,18 +3292,18 @@ function updateCharts(backtest) {
             const entryIdx = findClosestIndex(
               equityData,
               entryTime,
-              getTimestamp,
+              getTimestamp
             );
             const exitIdx = findClosestIndex(
               equityData,
               exitTime,
-              getTimestamp,
+              getTimestamp
             );
 
             if (exitIdx >= 0) {
               tradeMap[exitIdx] = {
                 tradeNum: tradeIdx + 1,
-                side: trade.side || "long",
+                side: trade.side || 'long',
                 pnl: tradePnL,
                 cumulativePnL,
                 // MFE/MAE: absolute values (USDT) and percentages
@@ -3050,7 +3311,7 @@ function updateCharts(backtest) {
                 mae_value: trade.mae ?? trade.mae_value ?? null,
                 mfe_pct: trade.mfe_pct ?? null,
                 mae_pct: trade.mae_pct ?? null,
-                exitTime: exitTime,
+                exitTime: exitTime
               };
             }
 
@@ -3060,7 +3321,7 @@ function updateCharts(backtest) {
                 entryIdx: Math.min(entryIdx, exitIdx),
                 exitIdx: Math.max(entryIdx, exitIdx),
                 mfe: trade.mfe ?? trade.mfe_value ?? 0,
-                mae: trade.mae ?? trade.mae_value ?? 0,
+                mae: trade.mae ?? trade.mae_value ?? 0
               });
             }
           });
@@ -3110,10 +3371,10 @@ function updateCharts(backtest) {
         // Trade Excursion Bars are now drawn by tradeExcursionBarsPlugin
         // using _tradeRanges and _tradeMap stored above
 
-        equityChart.update("none");
-        console.log("[updateCharts] equityChart updated with P&L values");
+        equityChart.update('none');
+        console.log('[updateCharts] equityChart updated with P&L values');
 
-        const legendRegimeOverlay = document.getElementById("legendRegimeOverlay");
+        const legendRegimeOverlay = document.getElementById('legendRegimeOverlay');
         if (legendRegimeOverlay?.checked) {
           loadAndApplyRegimeOverlay(backtest);
         } else {
@@ -3122,11 +3383,11 @@ function updateCharts(backtest) {
 
         // Update current value badge in header
         const lastPnL = pnlValues[pnlValues.length - 1] || 0;
-        const valueBadge = document.getElementById("tvEquityCurrentValue");
+        const valueBadge = document.getElementById('tvEquityCurrentValue');
         if (valueBadge) {
-          const sign = lastPnL >= 0 ? "+" : "";
-          valueBadge.textContent = `${sign}$${Math.abs(lastPnL).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-          valueBadge.classList.toggle("negative", lastPnL < 0);
+          const sign = lastPnL >= 0 ? '+' : '';
+          valueBadge.textContent = `${sign}$${Math.abs(lastPnL).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          valueBadge.classList.toggle('negative', lastPnL < 0);
         }
       }
 
@@ -3134,10 +3395,10 @@ function updateCharts(backtest) {
       if (drawdownChart && drawdownChart.canvas) {
         drawdownChart.data.labels = labels;
         drawdownChart.data.datasets[0].data = drawdown;
-        drawdownChart.update("none");
+        drawdownChart.update('none');
       }
     } catch (chartError) {
-      console.warn("[updateCharts] Chart update error:", chartError.message);
+      console.warn('[updateCharts] Chart update error:', chartError.message);
     }
   }
 
@@ -3151,16 +3412,16 @@ function updateCharts(backtest) {
     try {
       // Support both return_pct and pnl_pct fields
       const returns = backtest.trades.map(
-        (t) => t.return_pct || t.pnl_pct || 0,
+        (t) => t.return_pct || t.pnl_pct || 0
       );
-      const colors = returns.map((r) => (r >= 0 ? "#3fb950" : "#f85149"));
+      const colors = returns.map((r) => (r >= 0 ? '#3fb950' : '#f85149'));
 
       returnsChart.data.labels = returns.map((_, i) => `Trade ${i + 1}`);
       returnsChart.data.datasets[0].data = returns;
       returnsChart.data.datasets[0].backgroundColor = colors;
-      returnsChart.update("none");
+      returnsChart.update('none');
     } catch (e) {
-      console.warn("[updateCharts] returnsChart error:", e.message);
+      console.warn('[updateCharts] returnsChart error:', e.message);
     }
   }
 
@@ -3175,10 +3436,10 @@ function updateCharts(backtest) {
       const monthlyPnL = {};
       backtest.trades.forEach((t) => {
         // Support both timestamp (ms) and string date formats
-        let month = "Unknown";
-        if (typeof t.exit_time === "number") {
+        let month = 'Unknown';
+        if (typeof t.exit_time === 'number') {
           month = new Date(t.exit_time).toISOString().substring(0, 7);
-        } else if (typeof t.exit_time === "string") {
+        } else if (typeof t.exit_time === 'string') {
           month = t.exit_time.substring(0, 7);
         }
         monthlyPnL[month] = (monthlyPnL[month] || 0) + (t.pnl || 0);
@@ -3186,14 +3447,14 @@ function updateCharts(backtest) {
 
       const months = Object.keys(monthlyPnL).sort();
       const values = months.map((m) => monthlyPnL[m]);
-      const colors = values.map((v) => (v >= 0 ? "#3fb950" : "#f85149"));
+      const colors = values.map((v) => (v >= 0 ? '#3fb950' : '#f85149'));
 
       monthlyChart.data.labels = months;
       monthlyChart.data.datasets[0].data = values;
       monthlyChart.data.datasets[0].backgroundColor = colors;
-      monthlyChart.update("none");
+      monthlyChart.update('none');
     } catch (e) {
-      console.warn("[updateCharts] monthlyChart error:", e.message);
+      console.warn('[updateCharts] monthlyChart error:', e.message);
     }
   }
 
@@ -3259,93 +3520,93 @@ function updateCharts(backtest) {
       tradeDistributionChart.data.labels = labels;
       tradeDistributionChart.data.datasets = [
         {
-          label: "Убыток",
+          label: 'Убыток',
           data: binKeys.map((k) => (parseFloat(k) < 0 ? bins[k] : 0)),
-          backgroundColor: "#ef5350",
+          backgroundColor: '#ef5350',
           barPercentage: 0.5,
-          categoryPercentage: 0.95,
+          categoryPercentage: 0.95
         },
         {
-          label: "Прибыль",
+          label: 'Прибыль',
           data: binKeys.map((k) => (parseFloat(k) >= 0 ? bins[k] : 0)),
-          backgroundColor: "#26a69a",
+          backgroundColor: '#26a69a',
           barPercentage: 0.5,
-          categoryPercentage: 0.95,
-        },
+          categoryPercentage: 0.95
+        }
       ];
 
       // Add annotation lines for averages
       tradeDistributionChart.options.plugins.annotation = {
         annotations: {
           avgLossLine: {
-            type: "line",
+            type: 'line',
             xMin: avgLossBinIdx,
             xMax: avgLossBinIdx,
-            borderColor: "#ef5350",
+            borderColor: '#ef5350',
             borderWidth: 2,
             borderDash: [6, 4],
             label: {
-              display: false,
-            },
+              display: false
+            }
           },
           avgProfitLine: {
-            type: "line",
+            type: 'line',
             xMin: avgProfitBinIdx,
             xMax: avgProfitBinIdx,
-            borderColor: "#26a69a",
+            borderColor: '#26a69a',
             borderWidth: 2,
             borderDash: [6, 4],
             label: {
-              display: false,
-            },
-          },
-        },
+              display: false
+            }
+          }
+        }
       };
 
-      tradeDistributionChart.options.plugins.legend.labels.color = "#ffffff";
+      tradeDistributionChart.options.plugins.legend.labels.color = '#ffffff';
       tradeDistributionChart.options.plugins.legend.labels.font = { size: 12 };
       tradeDistributionChart.options.plugins.legend.labels.generateLabels =
         () => [
           {
-            text: "Убыток",
-            fillStyle: "#ef5350",
-            strokeStyle: "#ef5350",
-            pointStyle: "circle",
+            text: 'Убыток',
+            fillStyle: '#ef5350',
+            strokeStyle: '#ef5350',
+            pointStyle: 'circle',
             hidden: false,
-            fontColor: "#ffffff",
+            fontColor: '#ffffff'
           },
           {
-            text: "Прибыль",
-            fillStyle: "#26a69a",
-            strokeStyle: "#26a69a",
-            pointStyle: "circle",
+            text: 'Прибыль',
+            fillStyle: '#26a69a',
+            strokeStyle: '#26a69a',
+            pointStyle: 'circle',
             hidden: false,
-            fontColor: "#ffffff",
+            fontColor: '#ffffff'
           },
           {
             text: `Средний убыток  ${avgLoss.toFixed(2)}%`,
-            fillStyle: "transparent",
-            strokeStyle: "#ef5350",
+            fillStyle: 'transparent',
+            strokeStyle: '#ef5350',
             lineWidth: 2,
             lineDash: [6, 4],
-            pointStyle: "line",
+            pointStyle: 'line',
             hidden: false,
-            fontColor: "#ffffff",
+            fontColor: '#ffffff'
           },
           {
             text: `Средняя прибыль  ${avgProfit.toFixed(2)}%`,
-            fillStyle: "transparent",
-            strokeStyle: "#26a69a",
+            fillStyle: 'transparent',
+            strokeStyle: '#26a69a',
             lineWidth: 2,
             lineDash: [6, 4],
-            pointStyle: "line",
+            pointStyle: 'line',
             hidden: false,
-            fontColor: "#ffffff",
-          },
+            fontColor: '#ffffff'
+          }
         ];
-      tradeDistributionChart.update("none");
+      tradeDistributionChart.update('none');
     } catch (e) {
-      console.warn("[updateCharts] tradeDistributionChart error:", e.message);
+      console.warn('[updateCharts] tradeDistributionChart error:', e.message);
     }
   }
 
@@ -3373,24 +3634,24 @@ function updateCharts(backtest) {
       const total = wins + losses + breakeven;
       winLossDonutChart.options.plugins.centerLabel = {
         text: total.toString(),
-        subText: "Всего сделок",
+        subText: 'Всего сделок'
       };
 
       // Update HTML legend
-      const winPct = total > 0 ? ((wins / total) * 100).toFixed(2) : "0.00";
-      const lossPct = total > 0 ? ((losses / total) * 100).toFixed(2) : "0.00";
-      const bePct = total > 0 ? ((breakeven / total) * 100).toFixed(2) : "0.00";
+      const winPct = total > 0 ? ((wins / total) * 100).toFixed(2) : '0.00';
+      const lossPct = total > 0 ? ((losses / total) * 100).toFixed(2) : '0.00';
+      const bePct = total > 0 ? ((breakeven / total) * 100).toFixed(2) : '0.00';
 
       const getUnit = (n) =>
-        n === 1 ? "сделка" : n >= 2 && n <= 4 ? "сделки" : "сделок";
+        n === 1 ? 'сделка' : n >= 2 && n <= 4 ? 'сделки' : 'сделок';
 
-      const legendWins = document.getElementById("legend-wins");
-      const legendWinsPct = document.getElementById("legend-wins-pct");
-      const legendLosses = document.getElementById("legend-losses");
-      const legendLossesPct = document.getElementById("legend-losses-pct");
-      const legendBreakeven = document.getElementById("legend-breakeven");
+      const legendWins = document.getElementById('legend-wins');
+      const legendWinsPct = document.getElementById('legend-wins-pct');
+      const legendLosses = document.getElementById('legend-losses');
+      const legendLossesPct = document.getElementById('legend-losses-pct');
+      const legendBreakeven = document.getElementById('legend-breakeven');
       const legendBreakevenPct = document.getElementById(
-        "legend-breakeven-pct",
+        'legend-breakeven-pct'
       );
 
       if (legendWins) legendWins.textContent = `${wins} ${getUnit(wins)}`;
@@ -3402,9 +3663,9 @@ function updateCharts(backtest) {
         legendBreakeven.textContent = `${breakeven} ${getUnit(breakeven)}`;
       if (legendBreakevenPct) legendBreakevenPct.textContent = `${bePct}%`;
 
-      winLossDonutChart.update("none");
+      winLossDonutChart.update('none');
     } catch (e) {
-      console.warn("[updateCharts] winLossDonutChart error:", e.message);
+      console.warn('[updateCharts] winLossDonutChart error:', e.message);
     }
   }
 
@@ -3424,7 +3685,7 @@ function updateCharts(backtest) {
           return sum + Math.abs(t.fees || t.fee || t.commission || 0);
         }, 0);
         console.log(
-          `[Waterfall] Recalculated commission from trades: ${commission.toFixed(2)}`,
+          `[Waterfall] Recalculated commission from trades: ${commission.toFixed(2)}`
         );
       }
 
@@ -3437,11 +3698,11 @@ function updateCharts(backtest) {
       if (hasOpenPnL) {
         // 5 columns with Open P&L - TradingView waterfall using FLOATING BARS
         labels = [
-          "Итого прибыль",
-          "Открытые ПР/УБ",
-          "Итого убыток",
-          "Комиссия",
-          "Общие ПР/УБ",
+          'Итого прибыль',
+          'Открытые ПР/УБ',
+          'Итого убыток',
+          'Комиссия',
+          'Общие ПР/УБ'
         ];
 
         // Calculate waterfall levels
@@ -3453,57 +3714,57 @@ function updateCharts(backtest) {
 
         datasets = [
           {
-            label: "РС‚РѕРіРѕ РїСЂРёР±С‹Р»СЊ",
+            label: 'Итого прибыль',
             data: [[level0, level1], null, null, null, null],
-            backgroundColor: "#26a69a",
+            backgroundColor: '#26a69a',
             barPercentage: 0.5,
-            categoryPercentage: 0.95,
+            categoryPercentage: 0.95
           },
           {
-            label: "Открытые ПР/УБ",
+            label: 'Открытые ПР/УБ',
             data: [
               null,
               openPnL >= 0 ? [level1, level2] : [level2, level1],
               null,
               null,
-              null,
+              null
             ],
-            backgroundColor: openPnL >= 0 ? "#4dd0e1" : "#ff8a65",
+            backgroundColor: openPnL >= 0 ? '#4dd0e1' : '#ff8a65',
             barPercentage: 0.5,
-            categoryPercentage: 0.95,
+            categoryPercentage: 0.95
           },
           {
-            label: "РС‚РѕРіРѕ СѓР±С‹С‚РѕРє",
+            label: 'Итого убыток',
             data: [null, null, [level3, level2], null, null],
-            backgroundColor: "#ef5350",
+            backgroundColor: '#ef5350',
             barPercentage: 0.5,
-            categoryPercentage: 0.95,
+            categoryPercentage: 0.95
           },
           {
-            label: "Комиссия",
+            label: 'Комиссия',
             data: [null, null, null, [level4, level3], null],
-            backgroundColor: "#ffa726",
+            backgroundColor: '#ffa726',
             barPercentage: 0.5,
-            categoryPercentage: 0.95,
+            categoryPercentage: 0.95
           },
           {
-            label: "Общие ПР/УБ",
+            label: 'Общие ПР/УБ',
             data: [
               null,
               null,
               null,
               null,
-              netProfit >= 0 ? [level0, netProfit] : [netProfit, level0],
+              netProfit >= 0 ? [level0, netProfit] : [netProfit, level0]
             ],
-            backgroundColor: netProfit >= 0 ? "#42a5f5" : "#ff7043",
+            backgroundColor: netProfit >= 0 ? '#42a5f5' : '#ff7043',
             barPercentage: 0.5,
-            categoryPercentage: 0.95,
-          },
+            categoryPercentage: 0.95
+          }
         ];
       } else {
         // 4 columns without Open P&L - TradingView waterfall using FLOATING BARS
         // Each bar is [bottom, top] to create hanging effect
-        labels = ["Итого прибыль", "Итого убыток", "Комиссия", "Общие ПР/УБ"];
+        labels = ['Итого прибыль', 'Итого убыток', 'Комиссия', 'Общие ПР/УБ'];
 
         // Calculate waterfall levels (like a waterfall flowing down)
         const level0 = 0; // Start
@@ -3514,53 +3775,53 @@ function updateCharts(backtest) {
         // Each dataset has data as [bottom, top] arrays for floating bars
         datasets = [
           {
-            label: "Итого прибыль",
+            label: 'Итого прибыль',
             data: [
               [level0, level1], // Bar 0: Profit from 0 UP to grossProfit
               null,
               null,
-              null,
+              null
             ],
-            backgroundColor: "#26a69a",
+            backgroundColor: '#26a69a',
             barPercentage: 0.5,
-            categoryPercentage: 0.95,
+            categoryPercentage: 0.95
           },
           {
-            label: "Итого убыток",
+            label: 'Итого убыток',
             data: [
               null,
               [level2, level1], // Bar 1: Loss HANGS from level1 DOWN to level2
               null,
-              null,
+              null
             ],
-            backgroundColor: "#ef5350",
+            backgroundColor: '#ef5350',
             barPercentage: 0.5,
-            categoryPercentage: 0.95,
+            categoryPercentage: 0.95
           },
           {
-            label: "Комиссия",
+            label: 'Комиссия',
             data: [
               null,
               null,
               [level3, level2], // Bar 2: Commission HANGS from level2 DOWN to level3
-              null,
+              null
             ],
-            backgroundColor: "#ffa726",
+            backgroundColor: '#ffa726',
             barPercentage: 0.5,
-            categoryPercentage: 0.95,
+            categoryPercentage: 0.95
           },
           {
-            label: "Общие ПР/УБ",
+            label: 'Общие ПР/УБ',
             data: [
               null,
               null,
               null,
-              netProfit >= 0 ? [level0, netProfit] : [netProfit, level0], // Bar 3: Net from 0
+              netProfit >= 0 ? [level0, netProfit] : [netProfit, level0] // Bar 3: Net from 0
             ],
-            backgroundColor: netProfit >= 0 ? "#42a5f5" : "#ff7043",
+            backgroundColor: netProfit >= 0 ? '#42a5f5' : '#ff7043',
             barPercentage: 0.5,
-            categoryPercentage: 0.95,
-          },
+            categoryPercentage: 0.95
+          }
         ];
       }
 
@@ -3581,7 +3842,7 @@ function updateCharts(backtest) {
       // Legend: hide Open P&L if not present (no more _base to filter)
       waterfallChart.options.plugins.legend.display = true;
       waterfallChart.options.plugins.legend.labels.filter = (item) =>
-        hasOpenPnL || item.text !== "Открытые ПР/УБ";
+        hasOpenPnL || item.text !== 'Открытые ПР/УБ';
 
       // Add datalabels plugin for values on bars - handle floating bars [min, max]
       waterfallChart.options.plugins.datalabels = {
@@ -3590,18 +3851,18 @@ function updateCharts(backtest) {
           // Show if it's an array with two values (floating bar)
           return Array.isArray(raw) && raw.length === 2;
         },
-        anchor: "end",
-        align: "top",
-        color: "#ffffff",
-        font: { size: 11, weight: "bold" },
+        anchor: 'end',
+        align: 'top',
+        color: '#ffffff',
+        font: { size: 11, weight: 'bold' },
         formatter: (value) => {
           // Value is [min, max], display the height (difference)
-          if (!Array.isArray(value)) return "";
+          if (!Array.isArray(value)) return '';
           const height = Math.abs(value[1] - value[0]);
-          if (height >= 1000) return (height / 1000).toFixed(1) + "K";
+          if (height >= 1000) return (height / 1000).toFixed(1) + 'K';
           if (height >= 100) return height.toFixed(0);
           return height.toFixed(2);
-        },
+        }
       };
 
       // Add dashed connector lines (adjusted for 4 or 5 columns)
@@ -3614,9 +3875,9 @@ function updateCharts(backtest) {
       const profitTopLevel = grossProfit; // Top of profit bar
       const lossBottomLevel = hasOpenPnL
         ? grossProfit +
-          (openPnL > 0 ? openPnL : 0) -
-          (openPnL < 0 ? Math.abs(openPnL) : 0) -
-          grossLoss
+        (openPnL > 0 ? openPnL : 0) -
+        (openPnL < 0 ? Math.abs(openPnL) : 0) -
+        grossLoss
         : grossProfit - grossLoss; // Bottom of loss bar
       const commBottomLevel = lossBottomLevel - commission; // Bottom of commission bar
 
@@ -3624,43 +3885,43 @@ function updateCharts(backtest) {
         annotations: {
           // Line from right edge of Profit to left edge of Loss (at grossProfit level)
           line1: {
-            type: "line",
+            type: 'line',
             yMin: profitTopLevel,
             yMax: profitTopLevel,
             xMin: 0.45,
             xMax: lossIdx - 0.45,
-            borderColor: "#8b949e",
+            borderColor: '#8b949e',
             borderWidth: 1,
-            borderDash: [5, 3],
+            borderDash: [5, 3]
           },
           // Line from right edge of Loss to left edge of Commission (at lossBottomLevel)
           line2: {
-            type: "line",
+            type: 'line',
             yMin: lossBottomLevel,
             yMax: lossBottomLevel,
             xMin: lossIdx + 0.45,
             xMax: commIdx - 0.45,
-            borderColor: "#8b949e",
+            borderColor: '#8b949e',
             borderWidth: 1,
-            borderDash: [5, 3],
+            borderDash: [5, 3]
           },
           // Line from right edge of Commission to left edge of Net P&L (at commBottomLevel)
           line3: {
-            type: "line",
+            type: 'line',
             yMin: commBottomLevel,
             yMax: commBottomLevel,
             xMin: commIdx + 0.45,
             xMax: netIdx - 0.45,
-            borderColor: "#8b949e",
+            borderColor: '#8b949e',
             borderWidth: 1,
-            borderDash: [5, 3],
-          },
-        },
+            borderDash: [5, 3]
+          }
+        }
       };
 
-      waterfallChart.update("none");
+      waterfallChart.update('none');
     } catch (e) {
-      console.warn("[updateCharts] waterfallChart error:", e.message);
+      console.warn('[updateCharts] waterfallChart error:', e.message);
     }
   }
 
@@ -3683,7 +3944,7 @@ function updateCharts(backtest) {
 
       if (backtest.equity_curve && backtest.equity_curve.length > 0) {
         const equityValues = backtest.equity_curve.map(
-          (e) => e.equity || e.value || e,
+          (e) => e.equity || e.value || e
         );
         const minEquity = Math.min(...equityValues);
         const maxEquity = Math.max(...equityValues);
@@ -3693,37 +3954,37 @@ function updateCharts(backtest) {
 
       benchmarkingChart.data.datasets = [
         {
-          label: "Min",
+          label: 'Min',
           data: [
             [0, bhMin < 0 ? bhMin : 0],
-            [0, stratMin < 0 ? stratMin : 0],
+            [0, stratMin < 0 ? stratMin : 0]
           ],
-          backgroundColor: "rgba(239, 83, 80, 0.6)",
-          barPercentage: 0.5,
+          backgroundColor: 'rgba(239, 83, 80, 0.6)',
+          barPercentage: 0.5
         },
         {
-          label: "Диапазон",
+          label: 'Диапазон',
           data: [
             [Math.min(bhMin, 0), Math.max(bhMax, 0)],
-            [Math.min(stratMin, 0), Math.max(stratMax, 0)],
+            [Math.min(stratMin, 0), Math.max(stratMax, 0)]
           ],
-          backgroundColor: ["#ff9800", "#42a5f5"],
-          barPercentage: 0.5,
+          backgroundColor: ['#ff9800', '#42a5f5'],
+          barPercentage: 0.5
         },
         {
-          label: "Текущ. цена",
+          label: 'Текущ. цена',
           data: [
             [bhReturn - 0.5, bhReturn + 0.5],
-            [strategyReturn - 0.5, strategyReturn + 0.5],
+            [strategyReturn - 0.5, strategyReturn + 0.5]
           ],
-          backgroundColor: ["#8d6e63", "#26a69a"],
-          barPercentage: 0.3,
-        },
+          backgroundColor: ['#8d6e63', '#26a69a'],
+          barPercentage: 0.3
+        }
       ];
 
-      benchmarkingChart.update("none");
+      benchmarkingChart.update('none');
     } catch (e) {
-      console.warn("[updateCharts] benchmarkingChart error:", e.message);
+      console.warn('[updateCharts] benchmarkingChart error:', e.message);
     }
   }
 }
@@ -3739,23 +4000,23 @@ function updateTradesTable(trades) {
     id: i + 1,
     entry_time: formatDateTime(t.entry_time),
     exit_time: formatDateTime(t.exit_time),
-    side: t.side || "long",
+    side: t.side || 'long',
     entry_price: t.entry_price,
     exit_price: t.exit_price,
     size: t.size,
     pnl: t.pnl,
-    return_pct: t.return_pct,
+    return_pct: t.return_pct
   }));
 
   tradesTable.setData(formattedTrades);
 }
 
 function updateAIAnalysis(backtest) {
-  const content = document.getElementById("aiAnalysisContent");
+  const content = document.getElementById('aiAnalysisContent');
 
   if (!backtest || !backtest.metrics) {
     content.textContent =
-      "Select a backtest result to get AI-powered analysis and recommendations.";
+      'Select a backtest result to get AI-powered analysis and recommendations.';
     return;
   }
 
@@ -3764,90 +4025,90 @@ function updateAIAnalysis(backtest) {
 
   // Generate quick insights
   if (m.total_return > 20) {
-    insights.push("✅ Excellent returns! Strategy shows strong profitability.");
+    insights.push('✅ Excellent returns! Strategy shows strong profitability.');
   } else if (m.total_return > 0) {
     insights.push(
-      "🔶 Positive returns, but there may be room for optimization.",
+      '🔶 Positive returns, but there may be room for optimization.'
     );
   } else {
     insights.push(
-      "⚠️ Negative returns. Consider adjusting strategy parameters.",
+      '⚠️ Negative returns. Consider adjusting strategy parameters.'
     );
   }
 
   if (m.win_rate >= 60) {
-    insights.push("✅ High win rate indicates consistent signal quality.");
+    insights.push('✅ High win rate indicates consistent signal quality.');
   } else if (m.win_rate < 40) {
-    insights.push("⚠️ Low win rate. Review entry/exit conditions.");
+    insights.push('⚠️ Low win rate. Review entry/exit conditions.');
   }
 
   if (m.profit_factor >= 2) {
-    insights.push("✅ Strong profit factor (> 2x) shows good risk/reward.");
+    insights.push('✅ Strong profit factor (> 2x) shows good risk/reward.');
   } else if (m.profit_factor < 1) {
-    insights.push("🔴 Profit factor below 1 means losses exceed gains.");
+    insights.push('🔴 Profit factor below 1 means losses exceed gains.');
   }
 
   if (m.max_drawdown < -30) {
-    insights.push("⚠️ High drawdown risk. Consider tighter stop losses.");
+    insights.push('⚠️ High drawdown risk. Consider tighter stop losses.');
   }
 
   if (m.sharpe_ratio >= 2) {
-    insights.push("✅ Excellent risk-adjusted returns (Sharpe > 2).");
+    insights.push('✅ Excellent risk-adjusted returns (Sharpe > 2).');
   } else if (m.sharpe_ratio < 1) {
     insights.push(
-      "🔶 Consider reducing volatility for better risk-adjusted returns.",
+      '🔶 Consider reducing volatility for better risk-adjusted returns.'
     );
   }
 
-  content.innerHTML = insights.join("<br>");
+  content.innerHTML = insights.join('<br>');
 }
 
 // ============================
 // Actions
 // ============================
 function toggleFilters() {
-  document.getElementById("filtersPanel").classList.toggle("d-none");
+  document.getElementById('filtersPanel').classList.toggle('d-none');
 }
 
 function toggleResultsPanel() {
-  const panel = document.getElementById("resultsPanel");
+  const panel = document.getElementById('resultsPanel');
 
-  panel.classList.toggle("collapsed");
+  panel.classList.toggle('collapsed');
 
   // Save state to localStorage
-  const isCollapsed = panel.classList.contains("collapsed");
-  localStorage.setItem("resultsPanelCollapsed", isCollapsed);
+  const isCollapsed = panel.classList.contains('collapsed');
+  localStorage.setItem('resultsPanelCollapsed', isCollapsed);
 
   // Trigger chart resize after animation
   setTimeout(() => {
-    window.dispatchEvent(new Event("resize"));
+    window.dispatchEvent(new Event('resize'));
   }, 350);
 }
 // Make available globally for onclick
 window.toggleResultsPanel = toggleResultsPanel;
 
 // Restore panel state on page load
-document.addEventListener("DOMContentLoaded", function () {
-  const savedState = localStorage.getItem("resultsPanelCollapsed");
-  if (savedState === "true") {
-    const panel = document.getElementById("resultsPanel");
+document.addEventListener('DOMContentLoaded', function () {
+  const savedState = localStorage.getItem('resultsPanelCollapsed');
+  if (savedState === 'true') {
+    const panel = document.getElementById('resultsPanel');
     if (panel) {
-      panel.classList.add("collapsed");
+      panel.classList.add('collapsed');
     }
   }
 });
 
 function applyFilters() {
-  const strategy = document.getElementById("filterStrategy").value;
-  const symbol = document.getElementById("filterSymbol").value;
-  const pnl = document.getElementById("filterPnL").value;
-  const search = document.getElementById("filterSearch").value.toLowerCase();
+  const strategy = document.getElementById('filterStrategy').value;
+  const symbol = document.getElementById('filterSymbol').value;
+  const pnl = document.getElementById('filterPnL').value;
+  const search = document.getElementById('filterSearch').value.toLowerCase();
 
   const filtered = allResults.filter((r) => {
     if (strategy && r.strategy_type !== strategy) return false;
     if (symbol && r.symbol !== symbol) return false;
-    if (pnl === "profit" && (r.metrics?.total_return || 0) < 0) return false;
-    if (pnl === "loss" && (r.metrics?.total_return || 0) >= 0) return false;
+    if (pnl === 'profit' && (r.metrics?.total_return || 0) < 0) return false;
+    if (pnl === 'loss' && (r.metrics?.total_return || 0) >= 0) return false;
     if (search && !JSON.stringify(r).toLowerCase().includes(search))
       return false;
     return true;
@@ -3860,9 +4121,9 @@ function toggleCompareMode() {
   compareMode = !compareMode;
   selectedForCompare = [];
 
-  const btn = document.getElementById("btnCompare");
-  btn.classList.toggle("btn-primary", compareMode);
-  btn.classList.toggle("btn-outline-secondary", !compareMode);
+  const btn = document.getElementById('btnCompare');
+  btn.classList.toggle('btn-primary', compareMode);
+  btn.classList.toggle('btn-outline-secondary', !compareMode);
   btn.innerHTML = compareMode
     ? '<i class="bi bi-x-lg me-1"></i>Cancel Compare'
     : '<i class="bi bi-columns-gap me-1"></i>Compare Selected';
@@ -3879,24 +4140,24 @@ function toggleCompareSelect(event, backtestId) {
     selectedForCompare.push(backtestId);
   }
 
-  document.getElementById("btnCompare").disabled =
+  document.getElementById('btnCompare').disabled =
     selectedForCompare.length < 2;
-  document.getElementById("btnAICompare").disabled =
+  document.getElementById('btnAICompare').disabled =
     selectedForCompare.length < 2;
 }
 
 function showNewBacktestModal() {
-  new bootstrap.Modal(document.getElementById("newBacktestModal")).show();
+  new bootstrap.Modal(document.getElementById('newBacktestModal')).show();
 }
 
 /**
  * Toggle MTF settings panel visibility
  */
 function toggleMtfSettings() {
-  const checkbox = document.getElementById("btMtfEnabled");
-  const panel = document.getElementById("mtfSettingsPanel");
+  const checkbox = document.getElementById('btMtfEnabled');
+  const panel = document.getElementById('mtfSettingsPanel');
   if (panel) {
-    panel.style.display = checkbox?.checked ? "block" : "none";
+    panel.style.display = checkbox?.checked ? 'block' : 'none';
   }
 }
 
@@ -3904,91 +4165,71 @@ function toggleMtfSettings() {
  * Toggle ML Optimizer settings panel visibility
  */
 function toggleOptimizeSettings() {
-  const checkbox = document.getElementById("btOptimizeEnabled");
-  const panel = document.getElementById("optimizeSettingsPanel");
+  const checkbox = document.getElementById('btOptimizeEnabled');
+  const panel = document.getElementById('optimizeSettingsPanel');
   if (panel) {
-    panel.style.display = checkbox?.checked ? "block" : "none";
+    panel.style.display = checkbox?.checked ? 'block' : 'none';
   }
 }
 
 async function runBacktest() {
-  const strategyId = document.getElementById("btStrategy").value;
-  const symbol = document.getElementById("btSymbol").value;
-  const interval = document.getElementById("btInterval").value;
-  const capital = document.getElementById("btCapital").value;
-  const startDate = document.getElementById("btStartDate").value;
-  const endDate = document.getElementById("btEndDate").value;
+  const strategyId = document.getElementById('btStrategy').value;
+  const symbol = document.getElementById('btSymbol').value;
+  const interval = document.getElementById('btInterval').value;
+  const capital = document.getElementById('btCapital').value;
+  const startDate = document.getElementById('btStartDate').value;
+  const endDate = document.getElementById('btEndDate').value;
 
-  // MTF settings
-  const mtfEnabled = document.getElementById("btMtfEnabled")?.checked || false;
-  const htfInterval = document.getElementById("btHtfInterval")?.value || "D";
-  const htfFilterType =
-    document.getElementById("btHtfFilterType")?.value || "sma";
-  const htfPeriod = parseInt(
-    document.getElementById("btHtfPeriod")?.value || "200",
-  );
-  const btcFilterEnabled =
-    document.getElementById("btBtcFilterEnabled")?.checked || false;
-  const btcSmaPeriod = parseInt(
-    document.getElementById("btBtcSmaPeriod")?.value || "50",
-  );
-  const btcMinDistance = parseFloat(
-    document.getElementById("btBtcMinDistance")?.value || "0.5",
-  );
+  // MTF check — from-strategy endpoint does not support MTF filtering
+  const mtfEnabled = document.getElementById('btMtfEnabled')?.checked || false;
 
   if (!strategyId) {
-    showToast("Please select a strategy", "error");
+    showToast('Please select a strategy', 'error');
     return;
   }
 
-  try {
-    showToast("Running backtest...", "info");
+  // MTF not supported via from-strategy endpoint — warn user
+  if (mtfEnabled) {
+    showToast(
+      'MTF filtering is not supported when running from strategy. Use the MTF backtest page instead.',
+      'warning'
+    );
+  }
 
-    // Build request body
+  try {
+    showToast('Running backtest...', 'info');
+
+    // Build request body (only fields accepted by RunFromStrategyRequest)
     const requestBody = {
       symbol,
       interval,
       initial_capital: parseFloat(capital),
       start_date: new Date(startDate).toISOString(),
       end_date: new Date(endDate).toISOString(),
-      save_result: true,
+      save_result: true
     };
-
-    // Add MTF settings if enabled
-    if (mtfEnabled) {
-      requestBody.mtf_enabled = true;
-      requestBody.htf_interval = htfInterval;
-      requestBody.htf_filter_type = htfFilterType;
-      requestBody.htf_filter_period = htfPeriod;
-
-      if (btcFilterEnabled) {
-        requestBody.use_btc_filter = true;
-        requestBody.btc_sma_period = btcSmaPeriod;
-        requestBody.btc_min_distance_pct = btcMinDistance;
-      }
-    }
 
     const response = await fetch(
       `${API_BASE}/backtests/from-strategy/${strategyId}`,
       {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
     );
 
-    if (!response.ok) throw new Error("Backtest failed");
+    if (!response.ok) throw new Error('Backtest failed');
 
     await response.json(); // Consume response
     bootstrap.Modal.getInstance(
-      document.getElementById("newBacktestModal"),
+      document.getElementById('newBacktestModal')
     ).hide();
 
-    showToast("Backtest completed successfully!", "success");
+    showToast('Backtest completed successfully!', 'success');
     loadBacktestResults();
   } catch (error) {
-    console.error("Backtest error:", error);
-    showToast("Backtest failed: " + error.message, "error");
+    console.error('Backtest error:', error);
+    showToast('Backtest failed: ' + error.message, 'error');
   }
 }
 
@@ -3996,81 +4237,81 @@ async function requestAIAnalysis() {
   if (!currentBacktest) return;
 
   try {
-    showToast("Generating AI analysis...", "info");
+    showToast('Generating AI analysis...', 'info');
 
     const response = await fetch(`${API_BASE}/agents/backtest/ai-analyze`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify([currentBacktest]),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([currentBacktest])
     });
 
     const analysis = await response.json();
 
-    document.getElementById("aiAnalysisContent").innerHTML = `
+    document.getElementById('aiAnalysisContent').innerHTML = `
                     <strong>AI Recommendation:</strong><br>
-                    ${analysis.recommendation || analysis.analysis || "No detailed analysis available."}
+                    ${analysis.recommendation || analysis.analysis || 'No detailed analysis available.'}
                 `;
 
-    showToast("AI analysis complete", "success");
+    showToast('AI analysis complete', 'success');
   } catch (error) {
-    console.error("AI analysis failed:", error);
-    showToast("AI analysis failed", "error");
+    console.error('AI analysis failed:', error);
+    showToast('AI analysis failed', 'error');
   }
 }
 
 async function compareWithAI() {
   if (selectedForCompare.length < 2) {
-    showToast("Select at least 2 backtests to compare", "warning");
+    showToast('Select at least 2 backtests to compare', 'warning');
     return;
   }
 
   try {
-    showToast("Comparing strategies with AI...", "info");
+    showToast('Comparing strategies with AI...', 'info');
 
     const results = await Promise.all(
       selectedForCompare.map((id) =>
-        fetch(`${API_BASE}/backtests/${id}`).then((r) => r.json()),
-      ),
+        fetch(`${API_BASE}/backtests/${id}`).then((r) => r.json())
+      )
     );
 
     const response = await fetch(`${API_BASE}/agents/backtest/ai-analyze`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(results),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(results)
     });
 
     const analysis = await response.json();
 
-    document.getElementById("aiAnalysisContent").innerHTML = `
+    document.getElementById('aiAnalysisContent').innerHTML = `
                     <strong>Comparison Result:</strong><br>
-                    ${analysis.recommendation || analysis.comparison || "Comparison complete."}
+                    ${analysis.recommendation || analysis.comparison || 'Comparison complete.'}
                 `;
 
-    showToast("AI comparison complete", "success");
+    showToast('AI comparison complete', 'success');
   } catch (error) {
-    console.error("AI comparison failed:", error);
-    showToast("AI comparison failed", "error");
+    console.error('AI comparison failed:', error);
+    showToast('AI comparison failed', 'error');
   }
 }
 
 function exportResults() {
   if (allResults.length === 0) {
-    showToast("No results to export", "warning");
+    showToast('No results to export', 'warning');
     return;
   }
 
   const csv = [
     [
-      "ID",
-      "Strategy",
-      "Symbol",
-      "Interval",
-      "Return %",
-      "Win Rate",
-      "Sharpe",
-      "Trades",
-      "Date",
-    ].join(","),
+      'ID',
+      'Strategy',
+      'Symbol',
+      'Interval',
+      'Return %',
+      'Win Rate',
+      'Sharpe',
+      'Trades',
+      'Date'
+    ].join(','),
     ...allResults.map((r) =>
       [
         r.backtest_id,
@@ -4081,32 +4322,32 @@ function exportResults() {
         r.metrics?.win_rate?.toFixed(2) || 0,
         r.metrics?.sharpe_ratio?.toFixed(2) || 0,
         r.metrics?.total_trades || 0,
-        r.config?.start_date || "",
-      ].join(","),
-    ),
-  ].join("\n");
+        r.config?.start_date || ''
+      ].join(',')
+    )
+  ].join('\n');
 
-  downloadFile(csv, "backtest_results.csv", "text/csv");
+  downloadFile(csv, 'backtest_results.csv', 'text/csv');
 }
 
 function exportTrades() {
   if (!currentBacktest?.trades) {
-    showToast("No trades to export", "warning");
+    showToast('No trades to export', 'warning');
     return;
   }
 
   const csv = [
     [
-      "#",
-      "Entry Time",
-      "Exit Time",
-      "Side",
-      "Entry Price",
-      "Exit Price",
-      "Size",
-      "P&L",
-      "Return %",
-    ].join(","),
+      '#',
+      'Entry Time',
+      'Exit Time',
+      'Side',
+      'Entry Price',
+      'Exit Price',
+      'Size',
+      'P&L',
+      'Return %'
+    ].join(','),
     ...currentBacktest.trades.map((t, i) =>
       [
         i + 1,
@@ -4117,17 +4358,17 @@ function exportTrades() {
         t.exit_price,
         t.size,
         t.pnl?.toFixed(2),
-        t.return_pct?.toFixed(2),
-      ].join(","),
-    ),
-  ].join("\n");
+        t.return_pct?.toFixed(2)
+      ].join(',')
+    )
+  ].join('\n');
 
-  downloadFile(csv, `trades_${currentBacktest.backtest_id}.csv`, "text/csv");
+  downloadFile(csv, `trades_${currentBacktest.backtest_id}.csv`, 'text/csv');
 }
 
 function refreshData() {
   loadBacktestResults();
-  showToast("Data refreshed", "success");
+  showToast('Data refreshed', 'success');
 }
 
 // ============================
@@ -4136,34 +4377,34 @@ function refreshData() {
 // formatDate - using imported version from utils.js
 
 function formatDateTime(dateStr) {
-  if (!dateStr) return "--";
+  if (!dateStr) return '--';
   const date = new Date(dateStr);
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   });
 }
 
 function downloadFile(content, filename, type) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-function showToast(message, type = "info") {
+function showToast(message, type = 'info') {
   // Simple toast implementation
-  const toast = document.createElement("div");
-  toast.className = `alert alert-${type === "error" ? "danger" : type === "success" ? "success" : "info"} position-fixed`;
+  const toast = document.createElement('div');
+  toast.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} position-fixed`;
   toast.style.cssText =
-    "top: 80px; right: 20px; z-index: 9999; min-width: 250px;";
+    'top: 80px; right: 20px; z-index: 9999; min-width: 250px;';
   toast.innerHTML = `
-                <i class="bi bi-${type === "error" ? "x-circle" : type === "success" ? "check-circle" : "info-circle"} me-2"></i>
+                <i class="bi bi-${type === 'error' ? 'x-circle' : type === 'success' ? 'check-circle' : 'info-circle'} me-2"></i>
                 ${message}
             `;
   document.body.appendChild(toast);
@@ -4178,7 +4419,7 @@ function showToast(message, type = "info") {
 // Exported functions: initCharts, initTradesTable, setDefaultDates, setupFilters, loadBacktestResults
 
 // Attach to window for HTML onclick handlers
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
   window.toggleFilters = toggleFilters;
   window.toggleCompareMode = toggleCompareMode;
   window.toggleCompareSelect = toggleCompareSelect;
@@ -4193,11 +4434,15 @@ if (typeof window !== "undefined") {
   window.refreshData = refreshData;
   window.selectBacktest = selectBacktest;
   window.deleteBacktest = deleteBacktest;
+  window.selectAllForDelete = selectAllForDelete;
+  window.deleteSelectedBacktests = deleteSelectedBacktests;
+  window.toggleBulkSelectItem = toggleBulkSelectItem;
 
   window.backtestresultsPage = {
     loadBacktestResults,
     selectBacktest,
     deleteBacktest,
-    refreshData,
+    deleteSelectedBacktests,
+    refreshData
   };
 }

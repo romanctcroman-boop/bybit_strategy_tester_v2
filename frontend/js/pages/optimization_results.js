@@ -761,10 +761,10 @@ class OptimizationResultsViewer {
         const metricSel = document.getElementById('heatmapMetric');
         if (!paramX || !paramY || !metricSel) return;
 
-        paramX.innerHTML = this.paramColumns.map(c => 
+        paramX.innerHTML = this.paramColumns.map(c =>
             `<option value="${c}">${this.formatParamName(c)}</option>`
         ).join('');
-        paramY.innerHTML = this.paramColumns.map(c => 
+        paramY.innerHTML = this.paramColumns.map(c =>
             `<option value="${c}">${this.formatParamName(c)}</option>`
         ).join('');
         if (this.paramColumns.length >= 2) {
@@ -1322,7 +1322,69 @@ document.addEventListener('DOMContentLoaded', () => {
     optResultsViewer = new OptimizationResultsViewer();
 });
 
+// ── Global wrappers for HTML onclick/onchange handlers ──
+// These delegate to the class instance so inline event attributes work correctly.
+// eslint-disable-next-line no-unused-vars
+function sortResults() {
+    if (!optResultsViewer) return;
+    const sel = document.getElementById('sortMetric');
+    if (sel) optResultsViewer.sortBy = sel.value;
+    optResultsViewer.applySortAndFilter();
+}
+
+// eslint-disable-next-line no-unused-vars
+function toggleSortDirection() {
+    if (optResultsViewer) optResultsViewer.toggleSortDirection();
+}
+
+// eslint-disable-next-line no-unused-vars
+function switchView(view) {
+    if (optResultsViewer) optResultsViewer.switchView(view);
+}
+
+// eslint-disable-next-line no-unused-vars
+function applyFilters() {
+    if (optResultsViewer) optResultsViewer.applyFilters();
+}
+
+// eslint-disable-next-line no-unused-vars
+function refreshResults() {
+    if (optResultsViewer) optResultsViewer.loadOptimizationData();
+}
+
+// eslint-disable-next-line no-unused-vars
+function exportResults(format) {
+    if (optResultsViewer) optResultsViewer.exportResults(format || 'csv');
+}
+
+// eslint-disable-next-line no-unused-vars
+function applyBestParams() {
+    if (optResultsViewer) optResultsViewer.applyBestParams();
+}
+
+// eslint-disable-next-line no-unused-vars
+function runSecondaryBacktest() {
+    if (optResultsViewer) optResultsViewer.runBacktestWithBest();
+}
+
+// eslint-disable-next-line no-unused-vars
+function compareSelected() {
+    if (optResultsViewer) optResultsViewer.compareSelected();
+}
+
+// eslint-disable-next-line no-unused-vars
+function prevPage() {
+    if (optResultsViewer) optResultsViewer.goToPage(optResultsViewer.currentPage - 1);
+}
+
+// eslint-disable-next-line no-unused-vars
+function nextPage() {
+    if (optResultsViewer) optResultsViewer.goToPage(optResultsViewer.currentPage + 1);
+}
+
 // Export for module usage
+// eslint-disable-next-line no-undef
 if (typeof module !== 'undefined' && module.exports) {
+    // eslint-disable-next-line no-undef
     module.exports = { OptimizationResultsViewer };
 }

@@ -13,6 +13,12 @@ Based on research:
 - "Swarm Intelligence" patterns
 """
 
+from backend.agents.consensus.consensus_engine import (
+    AgentPerformance,
+    ConsensusEngine,
+    ConsensusMethod,
+    ConsensusResult,
+)
 from backend.agents.consensus.deliberation import (
     AgentVote,
     DeliberationResult,
@@ -27,16 +33,32 @@ from backend.agents.consensus.domain_agents import (
     RiskManagementAgent,
     TradingStrategyAgent,
 )
+from backend.agents.consensus.perplexity_integration import (
+    AgentSignal,
+    CrossValidationResult,
+    PerplexityIntegration,
+    PerplexityRelevance,
+    get_perplexity_integration,
+)
 
 __all__ = [
+    "AgentPerformance",
+    "AgentSignal",
     "AgentVote",
     "CodeAuditAgent",
+    "ConsensusEngine",
+    "ConsensusMethod",
+    "ConsensusResult",
+    "CrossValidationResult",
     "DeliberationResult",
     "DomainAgent",
     "DomainAgentRegistry",
     "MarketResearchAgent",
     "MultiAgentDeliberation",
+    "PerplexityIntegration",
+    "PerplexityRelevance",
     "RiskManagementAgent",
     "TradingStrategyAgent",
     "VotingStrategy",
+    "get_perplexity_integration",
 ]

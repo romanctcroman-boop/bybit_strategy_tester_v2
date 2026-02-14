@@ -161,10 +161,13 @@ class StrategyBuilderAdapter(BaseStrategy):
         # Format 1b: conn["source"] is a string block ID (frontend/test format)
         if "source" in conn and isinstance(conn["source"], str):
             return conn["source"]
-        # Format 2: conn["source_block"] (new API format)
+        # Format 2: conn["source_id"] (builder_workflow / AI Build format)
+        if "source_id" in conn:
+            return conn.get("source_id", "")
+        # Format 3: conn["source_block"] (new API format)
         if "source_block" in conn:
             return conn.get("source_block", "")
-        # Format 3: conn["from"] (frontend/Strategy Builder format)
+        # Format 4: conn["from"] (frontend/Strategy Builder format)
         return conn.get("from", "")
 
     def _get_connection_target_id(self, conn: dict[str, Any]) -> str:
@@ -175,10 +178,13 @@ class StrategyBuilderAdapter(BaseStrategy):
         # Format 1b: conn["target"] is a string block ID (frontend/test format)
         if "target" in conn and isinstance(conn["target"], str):
             return conn["target"]
-        # Format 2: conn["target_block"] (new API format)
+        # Format 2: conn["target_id"] (builder_workflow / AI Build format)
+        if "target_id" in conn:
+            return conn.get("target_id", "")
+        # Format 3: conn["target_block"] (new API format)
         if "target_block" in conn:
             return conn.get("target_block", "")
-        # Format 3: conn["to"] (frontend/Strategy Builder format)
+        # Format 4: conn["to"] (frontend/Strategy Builder format)
         return conn.get("to", "")
 
     def _build_execution_order(self) -> list[str]:
@@ -189,7 +195,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             List of block IDs in execution order
         """
         # Build dependency graph
-        dependencies: dict[str, list[str]] = {block_id: [] for block_id in self.blocks.keys()}
+        dependencies: dict[str, list[str]] = {block_id: [] for block_id in self.blocks}
 
         for conn in self.connections:
             source_id = self._get_connection_source_id(conn)
@@ -217,11 +223,87 @@ class StrategyBuilderAdapter(BaseStrategy):
                             queue.append(target_id)
 
         # Add any remaining blocks (disconnected)
-        for block_id in self.blocks.keys():
+        for block_id in self.blocks:
             if block_id not in result:
                 result.append(block_id)
 
         return result
+
+    # Block type → category mapping for auto-inference when blocks lack 'category'
+    _BLOCK_CATEGORY_MAP: dict[str, str] = {
+        # Input blocks
+        "price": "input", "volume": "input", "constant": "input", "candle_data": "input",
+        # Indicator blocks
+        "rsi": "indicator", "ema": "indicator", "sma": "indicator", "wma": "indicator",
+        "dema": "indicator", "tema": "indicator", "hull_ma": "indicator",
+        "macd": "indicator", "bollinger": "indicator", "atr": "indicator",
+        "stochastic": "indicator", "stoch_rsi": "indicator", "adx": "indicator",
+        "cci": "indicator", "mfi": "indicator", "obv": "indicator",
+        "williams_r": "indicator", "roc": "indicator", "supertrend": "indicator",
+        "ichimoku": "indicator", "keltner": "indicator", "donchian": "indicator",
+        "vwap": "indicator", "parabolic_sar": "indicator", "pivot_points": "indicator",
+        "cmf": "indicator", "cmo": "indicator", "pvt": "indicator", "ad_line": "indicator",
+        "aroon": "indicator", "stddev": "indicator", "atrp": "indicator",
+        "qqe": "indicator", "qqe_cross": "indicator", "momentum": "indicator",
+        # Condition blocks
+        "crossover": "condition", "crossunder": "condition",
+        "greater_than": "condition", "less_than": "condition",
+        "between": "condition", "equals": "condition",
+        "threshold": "condition", "compare": "condition", "cross": "condition",
+        # Logic blocks
+        "and": "logic", "or": "logic", "not": "logic",
+        "delay": "logic", "filter": "logic", "comparison": "logic",
+        # Action blocks
+        "buy": "action", "buy_market": "action", "buy_limit": "action",
+        "sell": "action", "sell_market": "action", "sell_limit": "action",
+        "close_long": "action", "close_short": "action", "close_all": "action",
+        "stop_loss": "action", "take_profit": "action", "trailing_stop": "action",
+        "break_even": "action", "profit_lock": "action", "scale_out": "action",
+        "multi_tp": "action", "atr_stop": "action", "chandelier_stop": "action",
+        "static_sltp": "action",
+        # Filter blocks
+        "rsi_filter": "filter", "supertrend_filter": "filter",
+        "two_ma_filter": "filter", "volume_filter": "filter",
+        "time_filter": "filter", "volatility_filter": "filter",
+        "adx_filter": "filter", "session_filter": "filter",
+        # Exit blocks
+        "trailing_stop_exit": "exit", "atr_exit": "atr_exit", "multi_tp_exit": "multiple_tp",
+        # Position sizing
+        "fixed_size": "sizing", "percent_balance": "sizing", "risk_percent": "sizing",
+        # Signal blocks
+        "long_entry": "signal", "short_entry": "signal",
+        "long_exit": "signal", "short_exit": "signal",
+        "buy_signal": "signal", "sell_signal": "signal",
+        # Smart signals
+        "smart_rsi": "smart_signals", "smart_macd": "smart_signals",
+        "smart_bollinger": "smart_signals", "smart_stochastic": "smart_signals",
+        "smart_supertrend": "smart_signals",
+        # Strategy aggregator
+        "strategy": "strategy",
+        # DCA/Grid
+        "dca_grid": "dca_grid", "dca": "dca_grid",
+        # Price action
+        "engulfing": "price_action", "hammer": "price_action",
+        "doji": "price_action", "pinbar": "price_action",
+        # Divergence
+        "divergence": "divergence", "rsi_divergence": "divergence",
+    }
+
+    @classmethod
+    def _infer_category(cls, block_type: str) -> str:
+        """Infer block category from block type when category field is missing."""
+        if block_type in cls._BLOCK_CATEGORY_MAP:
+            return cls._BLOCK_CATEGORY_MAP[block_type]
+        # Heuristic fallback for prefixed types
+        for prefix, cat in [
+            ("indicator_", "indicator"), ("condition_", "condition"),
+            ("action_", "action"), ("filter_", "filter"),
+            ("smart_", "smart_signals"),
+        ]:
+            if block_type.startswith(prefix):
+                return cat
+        logger.warning(f"Cannot infer category for block type '{block_type}', defaulting to 'indicator'")
+        return "indicator"
 
     def _execute_block(self, block_id: str, ohlcv: pd.DataFrame) -> dict[str, pd.Series]:
         """
@@ -237,6 +319,10 @@ class StrategyBuilderAdapter(BaseStrategy):
         block = self.blocks[block_id]
         block_type = block["type"]
         category = block.get("category", "")
+        # Auto-infer category if missing (blocks saved via API may lack it)
+        if not category:
+            category = self._infer_category(block_type)
+            block["category"] = category  # Cache for next use
         # Support both "params" and "config" keys (frontend sends "config", some tests send "params")
         params = block.get("params") or block.get("config") or {}
 
@@ -305,6 +391,9 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif category == "visualization":
             # Visualization blocks - config-only, no signals
             return {}
+        elif category == "smart_signals":
+            # Smart signal blocks — composite nodes (indicator + condition in one block)
+            return self._execute_smart_signal(block_type, params, ohlcv)
         elif category == "signal":
             # Signal blocks (long_entry, short_entry, long_exit, short_exit)
             # These pass through condition input to output
@@ -318,13 +407,16 @@ class StrategyBuilderAdapter(BaseStrategy):
         # Format 1: conn["source"]["portId"] (old format)
         if "source" in conn and isinstance(conn["source"], dict):
             return conn["source"].get("portId", "value")
-        # Format 2: conn["source_output"] (new API format)
+        # Format 2: conn["source_port"] (builder_workflow / AI Build format)
+        if "source_port" in conn:
+            return conn.get("source_port", "value")
+        # Format 3: conn["source_output"] (new API format)
         if "source_output" in conn:
             return conn.get("source_output", "value")
-        # Format 3: conn["sourcePort"] (frontend/Strategy Builder format)
+        # Format 4: conn["sourcePort"] (frontend/Strategy Builder format)
         if "sourcePort" in conn:
             return conn.get("sourcePort", "value")
-        # Format 4: conn["fromPort"] (test/API format)
+        # Format 5: conn["fromPort"] (test/API format)
         return conn.get("fromPort", "value")
 
     def _get_connection_target_port(self, conn: dict[str, Any]) -> str:
@@ -332,17 +424,33 @@ class StrategyBuilderAdapter(BaseStrategy):
         # Format 1: conn["target"]["portId"] (old format)
         if "target" in conn and isinstance(conn["target"], dict):
             return conn["target"].get("portId", "value")
-        # Format 2: conn["target_input"] (new API format)
+        # Format 2: conn["target_port"] (builder_workflow / AI Build format)
+        if "target_port" in conn:
+            return conn.get("target_port", "value")
+        # Format 3: conn["target_input"] (new API format)
         if "target_input" in conn:
             return conn.get("target_input", "value")
-        # Format 3: conn["targetPort"] (frontend/Strategy Builder format)
+        # Format 4: conn["targetPort"] (frontend/Strategy Builder format)
         if "targetPort" in conn:
             return conn.get("targetPort", "value")
-        # Format 4: conn["toPort"] (test/API format)
+        # Format 5: conn["toPort"] (test/API format)
         return conn.get("toPort", "value")
 
     def _get_block_inputs(self, block_id: str) -> dict[str, pd.Series]:
-        """Get input values for a block from connections"""
+        """Get input values for a block from connections.
+
+        Supports port name aliases: "output" ↔ "value", "result" ↔ "signal".
+        This allows connections to use either canonical or alias port names.
+        """
+        # Port alias map: if requested port not found, try the alias
+        _PORT_ALIASES: dict[str, list[str]] = {
+            "output": ["value", "close"],
+            "value": ["output", "close"],
+            "result": ["signal", "output"],
+            "signal": ["result", "output"],
+            "input": ["value", "close"],
+        }
+
         inputs = {}
         for conn in self.connections:
             target_id = self._get_connection_target_id(conn)
@@ -356,6 +464,17 @@ class StrategyBuilderAdapter(BaseStrategy):
                     source_outputs = self._value_cache[source_id]
                     if source_port in source_outputs:
                         inputs[target_port] = source_outputs[source_port]
+                    else:
+                        # Try port aliases (e.g. "output" → "value")
+                        resolved = False
+                        for alias in _PORT_ALIASES.get(source_port, []):
+                            if alias in source_outputs:
+                                inputs[target_port] = source_outputs[alias]
+                                resolved = True
+                                break
+                        if not resolved and len(source_outputs) == 1:
+                            # Last resort: if block has only one output, use it
+                            inputs[target_port] = next(iter(source_outputs.values()))
         return inputs
 
     def _execute_indicator(
@@ -660,6 +779,20 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             # Get source data
             src = ohlcv[source] if source in ohlcv.columns else close
+
+            # 'Chart' / 'chart' means current timeframe — no resampling needed
+            if htf.lower() == "chart":
+                if indicator == "ema":
+                    values = src.ewm(span=period, adjust=False).mean()
+                elif indicator == "sma":
+                    values = src.rolling(period).mean()
+                elif indicator == "rsi":
+                    values = pd.Series(calculate_rsi(src.values, period=period), index=ohlcv.index)
+                elif indicator == "atr":
+                    values = pd.Series(calculate_atr(ohlcv, period=period), index=ohlcv.index)
+                else:
+                    values = src.rolling(period).mean()
+                return {"value": values}
 
             # Resample to higher timeframe
             # Map timeframe string to pandas resample rule
@@ -1198,11 +1331,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif filter_type == "price_filter":
             level = params.get("level", 0)
             mode = params.get("mode", "above")  # above, below
-
-            if mode == "above":
-                result = close > level
-            else:
-                result = close < level
+            result = close > level if mode == "above" else close < level
 
             return {"pass": pd.Series(result, index=ohlcv.index)}
 
@@ -1566,28 +1695,28 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Check for entry_long input
             if "entry_long" in inputs:
                 sig = inputs["entry_long"]
-                if not sig.dtype == bool:
+                if sig.dtype != bool:
                     sig = sig.astype(bool)
                 result["entry_long"] = sig
 
             # Check for exit_long input
             if "exit_long" in inputs:
                 sig = inputs["exit_long"]
-                if not sig.dtype == bool:
+                if sig.dtype != bool:
                     sig = sig.astype(bool)
                 result["exit_long"] = sig
 
             # Check for entry_short input
             if "entry_short" in inputs:
                 sig = inputs["entry_short"]
-                if not sig.dtype == bool:
+                if sig.dtype != bool:
                     sig = sig.astype(bool)
                 result["entry_short"] = sig
 
             # Check for exit_short input
             if "exit_short" in inputs:
                 sig = inputs["exit_short"]
-                if not sig.dtype == bool:
+                if sig.dtype != bool:
                     sig = sig.astype(bool)
                 result["exit_short"] = sig
 
@@ -1595,7 +1724,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             for key in ["signal", "condition", "result", "input", "output"]:
                 if key in inputs and key not in ["entry_long", "exit_long", "entry_short", "exit_short"]:
                     sig = inputs[key]
-                    if not sig.dtype == bool:
+                    if sig.dtype != bool:
                         sig = sig.astype(bool)
                     result["signal"] = sig
                     break
@@ -1621,7 +1750,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"signal": pd.Series([False] * n)}
 
         # Ensure it's a boolean series
-        if not input_signal.dtype == bool:
+        if input_signal.dtype != bool:
             input_signal = input_signal.astype(bool)
 
         result = {"signal": input_signal}
@@ -1638,6 +1767,233 @@ class StrategyBuilderAdapter(BaseStrategy):
             logger.warning(f"Unknown signal type: {signal_type}")
 
         return result
+
+    # =========================================================================
+    # SMART SIGNALS — Composite nodes (indicator + condition in one block)
+    # =========================================================================
+    def _execute_smart_signal(
+        self, signal_type: str, params: dict[str, Any], ohlcv: pd.DataFrame
+    ) -> dict[str, pd.Series]:
+        """
+        Execute smart signal blocks — composite nodes that combine
+        an indicator calculation with a condition check in a single block.
+
+        Each smart signal computes an indicator internally and applies a
+        condition (crossover, threshold comparison, etc.) to produce a
+        boolean signal output.
+
+        Supported signal families:
+            - RSI: overbought/oversold/cross_up/cross_down
+            - Stochastic: overbought/oversold/K-D cross
+            - MACD: signal cross, zero cross
+            - Moving Average: golden/death cross, price above/below MA
+            - Bollinger: upper/lower touch, squeeze
+            - SuperTrend: buy/sell flip
+            - Volume: spike/dry
+
+        Args:
+            signal_type: Smart signal block type ID
+            params: Block parameters (period, threshold, etc.)
+            ohlcv: OHLCV DataFrame
+
+        Returns:
+            Dictionary with 'signal' (bool Series) and 'value' (indicator Series)
+        """
+        close = ohlcv["close"]
+        n = len(close)
+        empty = pd.Series([False] * n, index=ohlcv.index)
+
+        # ---- RSI-based smart signals ----
+        if signal_type in (
+            "rsi_overbought_signal",
+            "rsi_oversold_signal",
+            "rsi_cross_up_signal",
+            "rsi_cross_down_signal",
+        ):
+            period = params.get("period", 14)
+            threshold = params.get("threshold", 70)
+            rsi = vbt.RSI.run(close, window=period).rsi if vbt else empty
+
+            if signal_type == "rsi_overbought_signal":
+                signal = pd.Series(rsi > threshold, index=ohlcv.index)
+            elif signal_type == "rsi_oversold_signal":
+                signal = pd.Series(rsi < threshold, index=ohlcv.index)
+            elif signal_type == "rsi_cross_up_signal":
+                signal = pd.Series((rsi > threshold) & (rsi.shift(1) <= threshold), index=ohlcv.index)
+            else:  # rsi_cross_down_signal
+                signal = pd.Series((rsi < threshold) & (rsi.shift(1) >= threshold), index=ohlcv.index)
+            return {"signal": signal.fillna(False), "value": rsi}
+
+        # ---- Stochastic-based smart signals ----
+        if signal_type in (
+            "stoch_overbought_signal",
+            "stoch_oversold_signal",
+            "stoch_k_cross_d_up",
+            "stoch_k_cross_d_down",
+        ):
+            k_period = params.get("k_period", 14)
+            d_period = params.get("d_period", 3)
+            threshold = params.get("threshold", 80)
+            high, low = ohlcv["high"], ohlcv["low"]
+
+            if vbt:
+                stoch = vbt.STOCH.run(high, low, close, k_window=k_period, d_window=d_period)
+                k_line, d_line = stoch.k, stoch.d
+            else:
+                k_line = d_line = empty
+
+            if signal_type == "stoch_overbought_signal":
+                signal = pd.Series(k_line > threshold, index=ohlcv.index)
+            elif signal_type == "stoch_oversold_signal":
+                signal = pd.Series(k_line < threshold, index=ohlcv.index)
+            elif signal_type == "stoch_k_cross_d_up":
+                signal = pd.Series(
+                    (k_line > d_line) & (k_line.shift(1) <= d_line.shift(1)),
+                    index=ohlcv.index,
+                )
+            else:  # stoch_k_cross_d_down
+                signal = pd.Series(
+                    (k_line < d_line) & (k_line.shift(1) >= d_line.shift(1)),
+                    index=ohlcv.index,
+                )
+            return {"signal": signal.fillna(False), "value": k_line}
+
+        # ---- MACD-based smart signals ----
+        if signal_type in (
+            "macd_cross_signal_up",
+            "macd_cross_signal_down",
+            "macd_cross_zero_up",
+            "macd_cross_zero_down",
+        ):
+            fast = params.get("fast_period", 12)
+            slow = params.get("slow_period", 26)
+            sig_p = params.get("signal_period", 9)
+
+            if vbt:
+                macd_r = vbt.MACD.run(close, fast_window=fast, slow_window=slow, signal_window=sig_p)
+                macd_line, sig_line = macd_r.macd, macd_r.signal
+            else:
+                macd_line = sig_line = empty
+
+            if signal_type == "macd_cross_signal_up":
+                signal = pd.Series(
+                    (macd_line > sig_line) & (macd_line.shift(1) <= sig_line.shift(1)),
+                    index=ohlcv.index,
+                )
+            elif signal_type == "macd_cross_signal_down":
+                signal = pd.Series(
+                    (macd_line < sig_line) & (macd_line.shift(1) >= sig_line.shift(1)),
+                    index=ohlcv.index,
+                )
+            elif signal_type == "macd_cross_zero_up":
+                signal = pd.Series((macd_line > 0) & (macd_line.shift(1) <= 0), index=ohlcv.index)
+            else:  # macd_cross_zero_down
+                signal = pd.Series((macd_line < 0) & (macd_line.shift(1) >= 0), index=ohlcv.index)
+            return {"signal": signal.fillna(False), "value": macd_line}
+
+        # ---- Moving Average smart signals ----
+        if signal_type in (
+            "golden_cross_signal",
+            "death_cross_signal",
+            "price_above_ma_signal",
+            "price_below_ma_signal",
+        ):
+            fast_period = params.get("fast_period", 50)
+            slow_period = params.get("slow_period", 200)
+            period = params.get("period", 20)
+            ma_type = params.get("ma_type", "ema")
+
+            def _calc_ma(src: pd.Series, length: int, kind: str) -> pd.Series:
+                if kind == "sma":
+                    return src.rolling(length).mean()
+                return src.ewm(span=length, adjust=False).mean()
+
+            if signal_type == "golden_cross_signal":
+                fast_ma = _calc_ma(close, fast_period, ma_type)
+                slow_ma = _calc_ma(close, slow_period, ma_type)
+                signal = pd.Series(
+                    (fast_ma > slow_ma) & (fast_ma.shift(1) <= slow_ma.shift(1)),
+                    index=ohlcv.index,
+                )
+                return {"signal": signal.fillna(False), "value": fast_ma}
+
+            elif signal_type == "death_cross_signal":
+                fast_ma = _calc_ma(close, fast_period, ma_type)
+                slow_ma = _calc_ma(close, slow_period, ma_type)
+                signal = pd.Series(
+                    (fast_ma < slow_ma) & (fast_ma.shift(1) >= slow_ma.shift(1)),
+                    index=ohlcv.index,
+                )
+                return {"signal": signal.fillna(False), "value": fast_ma}
+
+            elif signal_type == "price_above_ma_signal":
+                ma = _calc_ma(close, period, ma_type)
+                signal = pd.Series(close > ma, index=ohlcv.index)
+                return {"signal": signal.fillna(False), "value": ma}
+
+            else:  # price_below_ma_signal
+                ma = _calc_ma(close, period, ma_type)
+                signal = pd.Series(close < ma, index=ohlcv.index)
+                return {"signal": signal.fillna(False), "value": ma}
+
+        # ---- Bollinger Bands smart signals ----
+        if signal_type in ("bb_upper_touch_signal", "bb_lower_touch_signal", "bb_squeeze_signal"):
+            period = params.get("period", 20)
+            std_dev = params.get("std_dev", 2.0)
+
+            if vbt:
+                bb = vbt.BBANDS.run(close, window=period, num_std=std_dev)
+                upper, lower, middle = bb.upper, bb.lower, bb.middle
+            else:
+                middle = close.rolling(period).mean()
+                std = close.rolling(period).std()
+                upper = middle + std_dev * std
+                lower = middle - std_dev * std
+
+            if signal_type == "bb_upper_touch_signal":
+                signal = pd.Series(close >= upper, index=ohlcv.index)
+            elif signal_type == "bb_lower_touch_signal":
+                signal = pd.Series(close <= lower, index=ohlcv.index)
+            else:  # bb_squeeze_signal
+                bb_width = (upper - lower) / middle
+                squeeze_threshold = params.get("squeeze_threshold", 0.02)
+                signal = pd.Series(bb_width < squeeze_threshold, index=ohlcv.index)
+            return {"signal": signal.fillna(False), "value": middle}
+
+        # ---- SuperTrend smart signals ----
+        if signal_type in ("supertrend_buy_signal", "supertrend_sell_signal"):
+            period = params.get("period", 10)
+            multiplier = params.get("multiplier", 3.0)
+            high, low = ohlcv["high"].values, ohlcv["low"].values
+            result = calculate_supertrend(high, low, close.values, period, multiplier)
+            direction = pd.Series(result["direction"], index=ohlcv.index)
+
+            if signal_type == "supertrend_buy_signal":
+                # Bullish flip: direction changes from -1 to 1
+                signal = pd.Series((direction == 1) & (direction.shift(1) == -1), index=ohlcv.index)
+            else:  # supertrend_sell_signal
+                signal = pd.Series((direction == -1) & (direction.shift(1) == 1), index=ohlcv.index)
+            return {
+                "signal": signal.fillna(False),
+                "value": pd.Series(result["supertrend"], index=ohlcv.index),
+            }
+
+        # ---- Volume smart signals ----
+        if signal_type in ("volume_spike_signal", "volume_dry_signal"):
+            vol = ohlcv["volume"]
+            ma_period = params.get("ma_period", 20)
+            multiplier = params.get("multiplier", 2.0)
+            vol_ma = vol.rolling(ma_period).mean()
+
+            if signal_type == "volume_spike_signal":
+                signal = pd.Series(vol > vol_ma * multiplier, index=ohlcv.index)
+            else:  # volume_dry_signal
+                signal = pd.Series(vol < vol_ma * multiplier, index=ohlcv.index)
+            return {"signal": signal.fillna(False), "value": vol}
+
+        # Fallback — unknown smart signal type
+        logger.warning(f"Unknown smart signal type: {signal_type}")
+        return {"signal": empty}
 
     def _execute_action(
         self, action_type: str, params: dict[str, Any], inputs: dict[str, pd.Series]
@@ -2050,31 +2406,19 @@ class StrategyBuilderAdapter(BaseStrategy):
         if time_type == "trading_hours":
             start_hour = params.get("start_hour", 9)
             end_hour = params.get("end_hour", 17)
-
-            if hasattr(idx, "hour"):
-                hours = idx.hour
-            else:
-                hours = pd.to_datetime(idx).hour
+            hours = idx.hour if hasattr(idx, "hour") else pd.to_datetime(idx).hour
 
             result["allow"] = pd.Series((hours >= start_hour) & (hours < end_hour), index=idx)
 
         elif time_type == "trading_days":
             allowed_days = params.get("days", [0, 1, 2, 3, 4])  # Mon-Fri
-
-            if hasattr(idx, "dayofweek"):
-                dow = idx.dayofweek
-            else:
-                dow = pd.to_datetime(idx).dayofweek
+            dow = idx.dayofweek if hasattr(idx, "dayofweek") else pd.to_datetime(idx).dayofweek
 
             result["allow"] = pd.Series([d in allowed_days for d in dow], index=idx)
 
         elif time_type == "session_filter":
             session = params.get("session", "all")
-
-            if hasattr(idx, "hour"):
-                hours = idx.hour
-            else:
-                hours = pd.to_datetime(idx).hour
+            hours = idx.hour if hasattr(idx, "hour") else pd.to_datetime(idx).hour
 
             if session == "asia":
                 # Asia session: 00:00 - 09:00 UTC
@@ -2717,7 +3061,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             "grid_trailing_percent": 0.0,
         }
 
-        for block_id, block in self.blocks.items():
+        for _block_id, block in self.blocks.items():
             category = block.get("category", "")
             block_type = block.get("type", "")
             params = block.get("params") or block.get("config") or {}
@@ -2796,7 +3140,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # Close Conditions (Session 5.5): extract from exit blocks
         close_conditions: dict[str, Any] = {}
-        for block_id, block in self.blocks.items():
+        for _block_id, block in self.blocks.items():
             block_type = block.get("type", "")
             params = block.get("params") or block.get("config") or {}
             if block_type == "rsi_close":
@@ -2854,7 +3198,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # Indent Order (Session 5.5): extract from action block
         indent_order: dict[str, Any] = {}
-        for block_id, block in self.blocks.items():
+        for _block_id, block in self.blocks.items():
             block_type = block.get("type", "")
             params = block.get("params") or block.get("config") or {}
             if block_type == "indent_order":
@@ -2883,11 +3227,10 @@ class StrategyBuilderAdapter(BaseStrategy):
                 return True
 
             # Old format: dca_grid category
-            if category == "dca_grid":
-                if block_type == "dca_grid_enable":
-                    params = block.get("params") or block.get("config") or {}
-                    if params.get("enabled", True):
-                        return True
+            if category == "dca_grid" and block_type == "dca_grid_enable":
+                params = block.get("params") or block.get("config") or {}
+                if params.get("enabled", True):
+                    return True
         return False
 
     def generate_signals(self, ohlcv: pd.DataFrame) -> SignalResult:
@@ -2977,14 +3320,15 @@ class StrategyBuilderAdapter(BaseStrategy):
                             signal = source_outputs[source_port]
 
                             # Map to appropriate signal series
-                            # Support both old format (entry_long/entry_short) and new (entry/exit)
-                            if target_port == "entry_long":
+                            # Support old format (entry_long/entry_short),
+                            # new (entry/exit), and action aliases (buy/sell)
+                            if target_port in ("entry_long", "buy"):
                                 entries = entries | signal
-                            elif target_port == "exit_long":
+                            elif target_port in ("exit_long", "close_long"):
                                 exits = exits | signal
-                            elif target_port == "entry_short":
+                            elif target_port in ("entry_short", "sell"):
                                 short_entries = short_entries | signal
-                            elif target_port == "exit_short":
+                            elif target_port in ("exit_short", "close_short"):
                                 short_exits = short_exits | signal
                             elif target_port == "entry":
                                 # Universal entry - applies to both long and short based on direction
@@ -3028,6 +3372,30 @@ class StrategyBuilderAdapter(BaseStrategy):
                             short_exits = short_exits | outputs["signal"]
                         if "exit_short" in outputs:
                             short_exits = short_exits | outputs["exit_short"]
+
+                # Also check action blocks (buy, sell, close) if no signal blocks found
+                elif category == "action" and block_id in self._value_cache:
+                    outputs = self._value_cache[block_id]
+                    if block_type in ["buy", "buy_market", "buy_limit"]:
+                        if "entry_long" in outputs:
+                            entries = entries | outputs["entry_long"]
+                        elif "signal" in outputs:
+                            entries = entries | outputs["signal"]
+                    elif block_type in ["sell", "sell_market", "sell_limit"]:
+                        if "entry_short" in outputs:
+                            short_entries = short_entries | outputs["entry_short"]
+                        elif "signal" in outputs:
+                            short_entries = short_entries | outputs["signal"]
+                    elif block_type == "close_long":
+                        if "exit_long" in outputs:
+                            exits = exits | outputs["exit_long"]
+                        elif "signal" in outputs:
+                            exits = exits | outputs["signal"]
+                    elif block_type == "close_short":
+                        if "exit_short" in outputs:
+                            short_exits = short_exits | outputs["exit_short"]
+                        elif "signal" in outputs:
+                            short_exits = short_exits | outputs["signal"]
 
         # ========== Collect ATR exit data for engine ==========
         extra_data: dict = {}

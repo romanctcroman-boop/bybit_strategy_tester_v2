@@ -14,12 +14,12 @@
 | Unified Agent Interface       | `agents/unified_agent_interface.py`                                      | 80%        | Работает, ключи, fallback, health ✅                              |
 | Domain Agents                 | `agents/consensus/domain_agents.py`                                      | 70%        | 4 агента (Trading, Risk, Code, Market) ✅                         |
 | Real LLM Deliberation         | `agents/consensus/real_llm_deliberation.py`                              | **100%**   | **✅ DeepSeek + Perplexity + Qwen, 35 тестов**                    |
-| LangGraph Orchestrator        | `agents/langgraph_orchestrator.py`                                       | **100%**   | **✅ StateGraph pipeline, 40 тестов**                              |
-| AI Backtest Integration       | `agents/integration/ai_backtest_integration.py`                          | **100%**   | **✅ AIBacktestAnalyzer + AIOptimizationAnalyzer, 28 тестов**      |
-| Hierarchical Memory           | `agents/memory/hierarchical_memory.py`                                   | **100%**   | **✅ 4-tier memory, persistence, consolidation, 53 тестов**        |
+| LangGraph Orchestrator        | `agents/langgraph_orchestrator.py`                                       | **100%**   | **✅ StateGraph pipeline, 40 тестов**                             |
+| AI Backtest Integration       | `agents/integration/ai_backtest_integration.py`                          | **100%**   | **✅ AIBacktestAnalyzer + AIOptimizationAnalyzer, 28 тестов**     |
+| Hierarchical Memory           | `agents/memory/hierarchical_memory.py`                                   | **100%**   | **✅ 4-tier memory, persistence, consolidation, 53 тестов**       |
 | Self-Reflection               | `agents/self_improvement/self_reflection.py`                             | **100%**   | **✅ LLMReflectionProvider + LLMSelfReflectionEngine, 26 тестов** |
-| RLHF Module                   | `agents/self_improvement/rlhf_module.py`                                 | **100%**   | **✅ RewardModel + RLHFModule, 51 тест**                           |
-| Walk-Forward                  | `services/walk_forward.py` + `agents/integration/walk_forward_bridge.py` | **100%**   | **✅ WalkForwardBridge, Stage 7 в pipeline, 39 тестов**            |
+| RLHF Module                   | `agents/self_improvement/rlhf_module.py`                                 | **100%**   | **✅ RewardModel + RLHFModule, 51 тест**                          |
+| Walk-Forward                  | `services/walk_forward.py` + `agents/integration/walk_forward_bridge.py` | **100%**   | **✅ WalkForwardBridge, Stage 7 в pipeline, 39 тестов**           |
 | **Strategy Controller**       | **`agents/strategy_controller.py`**                                      | **100%**   | **✅ 7-stage pipeline, WF интеграция, 26 тестов**                 |
 | **Prompt Engineer**           | **`agents/prompts/prompt_engineer.py`**                                  | **100%**   | **✅ PromptEngineer + TemplateLibrary**                           |
 | **Response Parser**           | **`agents/prompts/response_parser.py`**                                  | **100%**   | **✅ StrategyDefinition, Signal, ExitConditions**                 |

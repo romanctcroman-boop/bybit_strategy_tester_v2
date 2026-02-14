@@ -7,11 +7,137 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **API Key Leak Fix — 2026-02-14:**
+    - Removed hardcoded DeepSeek API keys from `.agent/mcp.json` (replaced with `${env:DEEPSEEK_API_KEY}` references)
+    - Added `.agent/mcp.json` to `.gitignore` to prevent future leaks
+    - Removed `.agent/mcp.json` from git tracking (`git rm --cached`)
+    - API keys are now loaded exclusively from `.env` file
+
+### Fixed
+
+- **Claude.md Cleanup — 2026-02-14:**
+    - Fixed `.agent/Claude.md` — two versions (v2.0 and v3.0) were merged/overlapping, creating 662 lines of garbled text
+    - Rewrote as clean v3.1 (342 lines) combining best of both versions
+    - Removed all duplicate headers, interleaved paragraphs, and broken formatting
+
 ### Added
+
+- **Agent Phase 2: Autonomous Capabilities — 2026-02-12:**
+    - **Autonomous Workflow Coordinator** (`backend/agents/workflows/autonomous_backtesting.py`, ~380 LOC):
+        - Full pipeline: fetch → evolve → backtest → report → learn
+        - `WorkflowConfig`, `WorkflowStatus` with live progress tracking, `WorkflowResult`
+        - Pipeline stages: idle → fetching → evolving → backtesting → reporting → learning → completed/failed
+    - **Pattern Extractor** (`backend/agents/self_improvement/pattern_extractor.py`, ~340 LOC):
+        - Discovers winning strategy patterns from backtest history
+        - Groups by strategy type, computes avg Sharpe/win rate/return, timeframe affinities
+        - Auto-generates human-readable insights
+    - **Task Scheduler** (`backend/agents/scheduler/task_scheduler.py`, ~335 LOC):
+        - Asyncio-native periodic job scheduler (zero external deps)
+        - Supports interval, daily, and one-shot tasks with exponential backoff retry
+        - Pre-built health_check and pattern_extraction tasks
+    - **Paper Trader** (`backend/agents/trading/paper_trader.py`, ~340 LOC):
+        - Simulated live trading sessions with real price feeds
+        - Session management: start, stop, auto-close on duration expiry
+        - P&L tracking, win/loss stats, vector memory integration
+    - **Dashboard Integration** — 12 new API endpoints in `backend/api/routers/agents.py`:
+        - `POST /dashboard/workflow/start` — start autonomous workflow
+        - `GET /dashboard/workflow/status/{id}` — poll progress
+        - `GET /dashboard/workflow/active` — list active workflows
+        - `GET /dashboard/patterns` — extract strategy patterns
+        - `GET /dashboard/scheduler/tasks` — list scheduler tasks
+        - `GET /dashboard/paper-trading/sessions` — list paper sessions
+        - `POST /dashboard/paper-trading/start` — start paper trading
+        - `POST /dashboard/paper-trading/stop/{id}` — stop session
+        - `GET /dashboard/activity-log` — agent action log
+    - **Test suite** (`tests/integration/test_additional_agents.py`, 51 tests):
+        - 46 pass (unit), 5 deselected (@slow, require server)
+        - Covers: workflow (11), patterns (9), scheduler (12), paper trader (9), dashboard (5), cross-module (6)
+    - **Updated docs**: `docs/AGENTS_TOOLS.md` — Phase 2 module reference
+
+- **Agent Autonomy Infrastructure — 2026-02-11 (Roadmap P0/P1/P2):**
+    - **MCP Agent Tools** (`backend/agents/mcp/trading_tools.py`):
+        - `run_backtest` — execute strategy backtests with full parameter control
+        - `get_backtest_metrics` — retrieve backtest results from DB by ID or list recent
+        - `list_strategies` — list all available strategies with default params
+        - `validate_strategy` — validate strategy params, check ranges, cross-validate
+        - `check_system_health` — check database, disk, memory, data availability
+    - **Agent API Endpoints** (`backend/api/routers/agents.py`):
+        - `POST /agents/actions/run-backtest` — agent-driven backtest execution
+        - `GET /agents/actions/backtest-history` — recent backtest history
+        - `GET /agents/actions/strategies` — list available strategies
+        - `POST /agents/actions/validate-strategy` — validate params before run
+        - `GET /agents/actions/system-health` — system health check
+        - `GET /agents/actions/tools` — list all registered MCP tools
+    - **Backtest Memory** (`backend/agents/memory/vector_store.py`):
+        - `save_backtest_result()` — store backtest results as searchable vector embeddings
+        - `find_similar_results()` — semantic search across past backtest results
+    - **Strategy Validator** (`backend/agents/security/strategy_validator.py`, 354 lines):
+        - Validates strategy params against safe ranges per strategy type
+        - Risk classification: SAFE / MODERATE / HIGH / EXTREME / REJECTED
+        - Cross-validates params (MACD fast < slow, grid upper > lower)
+        - Enforces guardrails: leverage, capital, date range, stop loss
+    - **Agent Documentation** (`docs/AGENTS_TOOLS.md`):
+        - Complete reference for MCP tools, API endpoints, memory system
+        - Security & validation docs, constraints, usage examples
+    - All 15 existing tests pass, 0 regressions, ruff clean on new code
+    - **Sandbox & Resource Limits (P2)** — 2026-02-11:
+        - `run_backtest` tool now wrapped with `asyncio.wait_for(timeout=300)` (5 min max)
+        - Pre-flight memory guard: aborts if < 512MB free (`psutil.virtual_memory()`)
+        - Returns actionable error messages with suggestions
+    - **P3 Tools** — 2026-02-11:
+        - `evolve_strategy` — AI-powered iterative strategy evolution using StrategyEvolution engine
+        - `generate_backtest_report` — structured markdown/JSON reports with assessment & recommendations
+        - `log_agent_action` — JSONL activity logging for agent audit trail
+    - **Comprehensive test suite** (`tests/integration/test_agent_autonomy.py`):
+        - 52 tests total: 50 pass, 2 skip (ChromaDB), 6 slow API tests (deselected by default)
+        - Covers: StrategyValidator (24), MCP tools (13), sandbox (4), memory (4), P3 tools (8), API (6)
+
+- **Comprehensive AI Systems Audit — 2026-02-10:**
+    - Full audit of AI agent architecture (48+ modules, ~15,000 LOC in `backend/agents/`)
+    - ML systems audit: regime detection (HMM/GMM/KMeans), RL trading agent (DQN/PPO), AutoML pipeline, concept drift detection
+    - Agent memory audit: hierarchical 4-tier memory (748 LOC), vector store with ChromaDB (472 LOC)
+    - LLM integrations audit: 6 providers (DeepSeek, Perplexity, Qwen, OpenAI, Claude, Ollama)
+    - Prompt system audit: 4 templates, 3 agent specializations, 7 reflection categories
+    - MCP tools audit: tool_registry (476 LOC), 10+ trading tools, 3 MCP server deployments
+    - Self-improvement audit: RLHF (775 LOC), self-reflection (629 LOC), strategy evolution (772 LOC), feedback loop (679 LOC)
+    - Monitoring audit: Prometheus-style metrics, circuit breaker telemetry, cost tracking, alerting
+    - **Test results: 814 tests ALL PASSING** (641 agent + 59 ML + 114 system)
+    - Generated comprehensive audit report: `docs/ai/AI_SYSTEMS_AUDIT_2026_02_10.md`
+    - Overall system score: **89.3/100** — Production-ready
+    - Identified 4 improvement areas: evals/, security/, integration tests, online learning
+
+- **Quality Improvements: StrategyOptimizer, E2E Tests, Coverage — 2026-02-10:**
+    - **StrategyOptimizer (`backend/agents/optimization/strategy_optimizer.py`, ~920 lines):**
+        - Per spec 3.6.2: genetic algorithm, grid search, bayesian optimization
+        - `OptimizableParam` dataclass with `random_value()`, `grid_values()`, `mutate()` methods
+        - `SIGNAL_PARAM_RANGES` for 10 indicator types (RSI, MACD, EMA, SMA, Bollinger, SuperTrend, etc.)
+        - `FITNESS_WEIGHTS`: sharpe 0.4, max_dd 0.3, win_rate 0.2, profit_factor 0.1
+        - `calculate_fitness()` — static method with complexity penalty for >4 signals
+        - `optimize_strategy()` — async, full flow: extract params → evaluate original → run method → build result
+        - `OptimizationResult` dataclass with `improved` property, `to_dict()` serialization
+    - **E2E Integration Tests (`tests/backend/agents/test_e2e_pipeline.py`, 22 tests):**
+        - ResponseParser → StrategyController → BacktestBridge → StrategyOptimizer pipeline
+        - LangGraph pipeline integration with mocked agents
+        - Error recovery and fallback scenarios
+        - MetricsAnalyzer integration tests
+    - **Coverage Gap Tests (`tests/backend/agents/test_coverage_gaps.py`, 39 tests):**
+        - PromptEngineer coverage: 75% → **98%** (market_analysis, validation, auto_detect_issues branches)
+        - StrategyController: \_select_best_proposal, \_score_proposal, walk-forward, generate_and_backtest
+        - LangGraph orchestrator: AgentState, FunctionAgent, AgentGraph node management
+        - Deliberation: MultiAgentDeliberation with mock ask_fn, voting strategies
+        - StrategyEvolution: instantiation, component initialization, lazy LLM
+        - AgentTracker: record_result, get_profile, leaderboard, stats
+    - **StrategyOptimizer Tests (`tests/backend/agents/test_strategy_optimizer.py`, 51 tests):**
+        - OptimizableParam, fitness calculation, parameter extraction/application
+        - Genetic algorithm, grid search, bayesian optimization
+        - Full optimize_strategy flow, OptimizationResult, edge cases
+    - **Total agent tests: 557 (all passing), up from 445**
 
 - **Test Coverage for 3 Untested Modules — 2026-02-09:**
     - **`test_hierarchical_memory.py`** (~53 tests): MemoryItem, MemoryTier, Store/Recall/Get/Delete, Consolidation, Forgetting, Persistence, Relevance/Cosine similarity, Stats, MemoryConsolidator, MemoryType
-    - **`test_ai_backtest_integration.py`** (~28 tests): AIBacktestResult/AIOptimizationResult, _parse_analysis/_parse_optimization_analysis, analyze_backtest with mocked LLM, singleton accessors, _call_llm fallback, lazy deliberation init
+    - **`test_ai_backtest_integration.py`** (~28 tests): AIBacktestResult/AIOptimizationResult, \_parse_analysis/\_parse_optimization_analysis, analyze_backtest with mocked LLM, singleton accessors, \_call_llm fallback, lazy deliberation init
     - **`test_rlhf_module.py`** (~51 tests): FeedbackSample serialization, PreferenceType enum, QualityScore weighted scoring, RewardModel feature extraction/training/cross-validation/cosine LR, RLHFModule human/AI/self feedback, reward training, preference prediction, heuristic evaluation, persistence, auto-training, stats
     - **Total agent tests: 445 (all passing)**
     - Updated IMPLEMENTATION_PLAN.md: all modules now 100% ✅

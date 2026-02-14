@@ -18,14 +18,14 @@ import { allCoreTests } from './CoreTests.js';
  */
 export async function runAllTests(options = {}) {
     console.log('🧪 Running Frontend Tests...\n');
-    console.log('=' .repeat(50));
+    console.log('='.repeat(50));
 
     const allSuites = [
         ...allCoreTests,
         ...allComponentTests
     ];
 
-    const { allPassed, total } = await runTests(allSuites, options);
+    const { allPassed, results, total } = await runTests(allSuites, options);
 
     console.log('\n' + '='.repeat(50));
 
@@ -35,7 +35,7 @@ export async function runAllTests(options = {}) {
         console.log('💥 Some tests failed.');
     }
 
-    return { allPassed, total };
+    return { allPassed, results, total };
 }
 
 /**

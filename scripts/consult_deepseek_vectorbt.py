@@ -2,6 +2,7 @@
 Consultation with DeepSeek AI about VectorBT limitations and possible solutions.
 Uses the project's UnifiedAgentInterface with encrypted API keys.
 """
+
 import asyncio
 import sys
 from pathlib import Path
@@ -96,6 +97,7 @@ STAGE 2: Fallback (последовательный)
 4. Приоритетность: какие проблемы стоит решать в первую очередь
 """
 
+
 async def main():
     print("=" * 70)
     print("DEEPSEEK CONSULTATION: VectorBT Limitations")
@@ -122,15 +124,15 @@ async def main():
         agent_type=AgentType.DEEPSEEK,
         task_type="analyze",
         prompt=PROMPT,
-        thinking_mode=True,  # Enable Chain-of-Thought
+        thinking_mode=False,  # Disabled: deepseek-reasoner is 6-8x more expensive
         context={
             "project": "Bybit Strategy Tester",
             "focus": "VectorBT optimization limitations",
-        }
+        },
     )
 
     print("\n📤 Sending request to DeepSeek...")
-    print("   Model: deepseek-reasoner (thinking mode)")
+    print("   Model: deepseek-chat (cost-optimized)")
     print(f"   Prompt length: {len(PROMPT)} chars")
 
     # Send request
@@ -172,7 +174,9 @@ async def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

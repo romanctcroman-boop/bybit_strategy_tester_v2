@@ -1,6 +1,7 @@
 """
 FULL DeepSeek API call for VectorBT consultation with complete context
 """
+
 import sys
 from pathlib import Path
 
@@ -114,6 +115,7 @@ STAGE 2: Fallback (последовательный)
 5. **Архитектурные рекомендации** для нашего Two-Stage подхода
 """
 
+
 def main():
     print("=" * 70)
     print("DEEPSEEK FULL CONSULTATION: VectorBT Limitations")
@@ -129,17 +131,17 @@ def main():
 
     print("✅ API key loaded")
 
-    # Use deepseek-reasoner for deep thinking
+    # Use deepseek-chat (reasoner is 6-8x more expensive and burns tokens fast)
     payload = {
-        "model": "deepseek-reasoner",  # Full reasoning model
+        "model": "deepseek-chat",  # Was deepseek-reasoner — cost protection
         "messages": [
             {
                 "role": "system",
-                "content": "You are an expert Python developer specializing in quantitative finance, algorithmic trading, backtesting engines, and vectorized computation. You have deep knowledge of VectorBT, Numba, NumPy, and high-performance computing."
+                "content": "You are an expert Python developer specializing in quantitative finance, algorithmic trading, backtesting engines, and vectorized computation. You have deep knowledge of VectorBT, Numba, NumPy, and high-performance computing.",
             },
             {"role": "user", "content": FULL_PROMPT},
         ],
-        "max_tokens": 16000,  # More tokens for detailed response
+        "max_tokens": 8000,  # Reduced from 16000 for cost control
     }
 
     print("\n📤 Sending FULL request to DeepSeek...")
@@ -154,10 +156,7 @@ def main():
             response = client.post(
                 "https://api.deepseek.com/v1/chat/completions",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             )
 
         print(f"\n📥 Response received: {response.status_code}")
@@ -212,7 +211,9 @@ def main():
     except Exception as e:
         print(f"❌ Exception: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,886 @@
+﻿F                                                                        [100%]
+================================== FAILURES ===================================
+_____________ TestTimeoutHandling.test_cascade_failure_prevention _____________
+
+self = <test_chaos_engineering.TestTimeoutHandling object at 0x000001F4AE77B110>
+client = <starlette.testclient.TestClient object at 0x000001F4AE812900>
+
+    def test_cascade_failure_prevention(self, client):
+        """Test that one slow service doesn't cascade failures."""
+        # Multiple endpoints should work independently
+        responses = []
+        for endpoint in [
+            "/api/v1/health",
+            "/api/v1/risk/summary",
+            "/api/v1/tracing/status",
+        ]:
+            start = time.time()
+            response = client.get(endpoint)
+            elapsed = time.time() - start
+            responses.append(
+                {
+                    "endpoint": endpoint,
+                    "status": response.status_code,
+                    "elapsed": elapsed,
+                }
+            )
+    
+        # All should complete reasonably quickly
+        for r in responses:
+>           assert r["elapsed"] < 10.0
+E           assert 11.59721827507019 < 10.0
+
+tests\chaos\test_chaos_engineering.py:402: AssertionError
+---------------------------- Captured stdout setup ----------------------------
+2026-02-11 23:12:36 | INFO     | backend.services.candle_cache:__init__:37 - CandleCache initialized (LOAD_LIMIT=1000, RAM_LIMIT=500)
+2026-02-11 23:12:37 | INFO     | backend.services.mtf_manager:__init__:35 - MTF Manager initialized
+2026-02-11 23:12:37 | INFO     | backend.services.smart_kline_service:__init__:155 - SmartKlineService initialized
+2026-02-11 23:12:41 | WARNING  | backend.api.websocket_auth:<module>:46 - WS_SECRET_KEY not set, using random key (development only). Set WS_SECRET_KEY in production!
+2026-02-11 23:12:41 | INFO     | uvicorn.error:<module>:178 - [FRONTEND] Dir check: D:\bybit_strategy_tester_v2\frontend, exists=True
+2026-02-11 23:12:41 | INFO     | uvicorn.error:<module>:187 - [FRONTEND] MOUNTED at /frontend
+2026-02-11 23:12:41 | INFO     | backend.api.mcp.tools.agent_tools:register_agent_tools:293 - тЬЕ MCP Agent tools registered
+2026-02-11 23:12:41 | INFO     | backend.api.mcp.tools.file_tools:register_file_tools:429 - тЬЕ MCP File tools registered
+2026-02-11 23:12:41 | INFO     | uvicorn.error:<module>:294 - тЬЕ Modular MCP tools registered
+2026-02-11 23:12:41 | INFO     | uvicorn.error:configure_middleware:118 - CORS configured: origins=['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000']...
+2026-02-11 23:12:41 | INFO     | uvicorn.error:configure_middleware:141 - тЬЕ All middleware configured successfully
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:692 - ╤В╨м╨Х OpenAPI schema cache reset - will regenerate with all routes
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:705 - ROUTE_REGISTRY_START (779 routes)
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET', 'HEAD']:/openapi.json:openapi
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET', 'HEAD']:/docs:swagger_ui_html
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET', 'HEAD']:/docs/oauth2-redirect:swagger_ui_redirect
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET', 'HEAD']:/redoc:redoc_html
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE []:/frontend:frontend
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/:root_redirect
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/frontend/:frontend_redirect
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/frontend:frontend_redirect
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/strategy-builder:strategy_builder_redirect
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/healthz:root_healthz
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/readyz:root_readyz
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/livez:root_livez
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/mcp/health:mcp_health_native
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/audit/status:get_audit_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/audit/summary:get_audit_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/audit/log:log_key_access
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/audit/events:get_audit_events
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/audit/anomalies:get_anomalies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/audit/anomalies/{anomaly_id}/acknowledge:acknowledge_anomaly
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/audit/stats/{key_id}:get_key_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/audit/compliance-report:generate_compliance_report
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/ip/status:get_ip_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/ip/summary:get_ip_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/ip/check:check_ip
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/ip/rules:add_ip_rule
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/ip/rules:get_ip_rules
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/security/ip/rules/{rule_id}:remove_ip_rule
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/ip/rules/{rule_id}/enable:enable_ip_rule
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/ip/rules/{rule_id}/disable:disable_ip_rule
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/ip/blocked:get_blocked_requests
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/ip/auto-blocked:get_auto_blocked
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/ip/unblock/{ip_address}:unblock_ip
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/config/status:get_config_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/config/load:load_env_file
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/config/validate:validate_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/config/masked:get_masked_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/config/template:get_env_template
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/security/config/variables:add_variable_definition
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/config/variables/{name}:get_variable_info
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/config/issues:get_config_issues
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/config/checksum:get_config_checksum
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/security/health:security_health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategies/:list_strategies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategies/types:get_strategy_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategies/{strategy_id}:get_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategies/:create_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PUT']:/api/v1/strategies/{strategy_id}:update_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/strategies/{strategy_id}:delete_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategies/{strategy_id}/duplicate:duplicate_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategies/{strategy_id}/activate:activate_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategies/{strategy_id}/pause:pause_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/backtests/engines:list_available_engines
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/backtests/:create_backtest
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/backtests/:list_backtests
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/backtests/strategies:list_strategies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/backtests/{backtest_id}:get_backtest
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/backtests/{backtest_id}/trades:get_backtest_trades
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/backtests/{backtest_id}/equity:get_backtest_equity
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/backtests/{backtest_id}/metrics:get_backtest_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/backtests/from-strategy/{strategy_id}:run_backtest_from_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/backtests/by-strategy/{strategy_id}:list_backtests_for_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/backtests/save-optimization:save_optimization_result
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/backtests/mtf:run_mtf_backtest
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/backtests/{backtest_id}:delete_backtest
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/backtests/:delete_all_backtests
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/upload:upload_market_data
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/uploads:list_uploads
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/marketdata/uploads/{upload_id}:delete_upload
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/uploads/{upload_id}/ingest:ingest_upload
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/bybit/prime:prime_working_sets
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/bybit/reset:reset_working_sets
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/symbols/local:get_local_symbols
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/symbols/db-groups:get_db_groups
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/marketdata/symbols/db-groups:delete_db_group
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/symbols/blocked:get_blocked_tickers
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/symbols/blocked:add_blocked_ticker
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/marketdata/symbols/blocked/{symbol}:remove_blocked_ticker
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/klines:get_bybit_klines
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/volatility:get_volatility
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/bybit/volatility/refresh-all:refresh_all_daily_data
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/klines/fetch:fetch_klines
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/klines/history:fetch_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/recent-trades:fetch_recent_trades
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/klines/working:fetch_working_set
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/mtf:fetch_mtf
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/bybit/symbol/initialize:initialize_symbol
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/symbol/status:get_symbol_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/symbol/loading-progress:get_loading_progress
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/klines/smart:get_smart_klines
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/klines/smart-history:get_smart_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/bybit/data-quality/check:check_data_quality
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/bybit/data-quality/repair:repair_data_issues
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/tickers:get_all_tickers
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/orderbook:get_orderbook
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/symbols/cache-refresh:refresh_symbols_cache
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/symbols/top:get_top_symbols
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/symbols/check-data:check_symbol_data
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/symbols/refresh-data:refresh_symbol_data
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/symbols/sync-all-tf:sync_all_timeframes
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/symbols/sync-all-tf-stream:sync_all_timeframes_stream
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/symbols/refresh-data-stream:refresh_symbol_data_stream
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/symbols/{symbol}/instrument-info:get_instrument_info
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/symbols-list:get_symbols_list
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/refresh-tickers:refresh_tickers
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/ticks/candles:get_tick_candles
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/ticks/candles/current:get_current_candle
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/ticks/trades:get_recent_trades
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/ticks/status:get_tick_service_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketdata/ticks/health:tick_service_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/ticks/start:start_tick_service
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketdata/ticks/stop:stop_tick_service
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE []:/api/v1/marketdata/ticks/ws/{symbol}:tick_websocket
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/admin/status:get_system_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/admin/maintenance:enable_maintenance_mode
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/admin/maintenance:disable_maintenance_mode
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/admin/logs:get_system_logs
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/optimizations/:create_optimization
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/optimizations/:list_optimizations
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/optimizations/{optimization_id}:get_optimization
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/optimizations/{optimization_id}/status:get_optimization_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/optimizations/{optimization_id}/results:get_optimization_results
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/optimizations/{optimization_id}/charts/convergence:get_convergence_data
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/optimizations/{optimization_id}/charts/sensitivity/{param_name}:get_sensitivity_data
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/optimizations/{optimization_id}/apply/{result_rank}:apply_optimization_result
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/optimizations/{optimization_id}/results/paginated:get_paginated_results
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/optimizations/{optimization_id}:cancel_optimization
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/optimizations/{optimization_id}/rerun:rerun_optimization
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/optimizations/stats/summary:get_optimization_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/optimizations/sync/grid-search:sync_grid_search_optimization
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/optimizations/sync/optuna-search:sync_optuna_optimization
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/optimizations/vectorbt/grid-search:vectorbt_grid_search_optimization
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/optimizations/vectorbt/grid-search-stream:vectorbt_grid_search_stream
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/optimizations/two-stage/optimize:two_stage_optimization
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/live/order:place_order
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/live/order/{order_id}:cancel_order
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/live/orders:cancel_all_orders
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/live/orders:get_open_orders
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/live/orders/history:get_order_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/live/positions:get_positions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/live/positions/close/{symbol}:close_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/live/positions/close-all:close_all_positions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/live/positions/sl-tp:set_position_sl_tp
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/live/balance:get_balance
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/live/leverage:set_leverage
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/live/status:get_trading_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/live/start:start_trading
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/live/stop:stop_trading
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/live/paper/balance:set_paper_balance
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/live/paper/balance:get_paper_balance
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE []:/api/v1/live/ws:live_trading_websocket
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/sizing/calculate:calculate_position_size
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk-management/sizing/methods:get_sizing_methods
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/validate/trade:validate_trade
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/assess:assess_trade_risk
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk-management/exposure:get_exposure_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk-management/status:get_risk_engine_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk-management/snapshot:get_risk_snapshot
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk-management/history:get_risk_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/equity/update:update_equity
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/trade/register:register_trade
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/position/close/{symbol}:close_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/price/update:update_price
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/trading/pause:pause_trading
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/trading/resume:resume_trading
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/daily/reset:reset_daily_tracking
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk-management/config:get_risk_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PUT']:/api/v1/risk-management/limits:update_risk_limits
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk-management/engine/reset:reset_risk_engine
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/bots/:list_bots
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/:list_strategies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/categories:get_categories
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/{strategy_id}:get_strategy_details
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/{strategy_id}/parameters:get_strategy_parameters
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/{strategy_id}/optimization-space:get_optimization_space
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/by-category/{category}:list_strategies_by_category
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/by-risk/{risk_level}:list_strategies_by_risk
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-library/validate-parameters:validate_parameters
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/tags/all:get_all_tags
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/stats/summary:get_library_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-library/recommendations:get_strategy_recommendations
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/symbols/cache-refresh:refresh_symbols_cache
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies:create_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies/{strategy_id}:get_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies:list_strategies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PUT']:/api/v1/strategy-builder/strategies/{strategy_id}:update_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies/{strategy_id}/versions:get_strategy_versions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/revert/{version_id}:revert_strategy_version
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/strategy-builder/strategies/{strategy_id}:delete_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/clone:clone_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/blocks/types:list_block_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/blocks:add_block
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PUT']:/api/v1/strategy-builder/blocks:update_block
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/strategy-builder/blocks/{strategy_id}/{block_id}:delete_block
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/connections:connect_blocks
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/strategy-builder/connections/{strategy_id}/{connection_id}:disconnect_blocks
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/validate/{strategy_id}:validate_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/validate/execution-order/{strategy_id}:get_execution_order
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/generate:generate_code
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/generate-code:generate_code_from_db
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/templates/code:list_code_templates
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/templates:list_templates
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/templates/{template_id}:get_template
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/templates/instantiate:instantiate_template
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/templates/categories:list_template_categories
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/indicators:list_indicators
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/indicators/{indicator_type}:get_indicator_info
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/import:import_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/export/{strategy_id}:export_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/preview/{strategy_id}:preview_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/version:create_strategy_version
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies/{strategy_id}/versions:list_strategy_versions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/restore/{version_id}:restore_strategy_version
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies/{strategy_id}/diff/{version_id_1}/{version_id_2}:diff_strategy_versions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/optimize:optimize_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies/{strategy_id}/optimizable-params:get_optimizable_params
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies/{strategy_id}/analyze:analyze_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/simulate:simulate_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/blocks/library:get_block_library
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/blocks/{block_id}/parameters:get_block_parameters
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/blocks/validate:validate_block_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/backtest:run_backtest_from_builder
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/templates/create:create_template_from_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/strategy-builder/templates/{template_id}:delete_template
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PUT']:/api/v1/strategy-builder/templates/{template_id}:update_template
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/share:share_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/shared/{share_token}:get_shared_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/shared/{share_token}/clone:clone_shared_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/statistics:get_builder_statistics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies/{strategy_id}/statistics:get_strategy_statistics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/criteria:set_evaluation_criteria
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies/{strategy_id}/criteria:get_evaluation_criteria
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-builder/strategies/{strategy_id}/optimization-config:set_optimization_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/strategies/{strategy_id}/optimization-config:get_optimization_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-builder/metrics/available:get_available_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE []:/api/v1/strategy-builder/ws/validate:validation_websocket
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-isolation/status:get_manager_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-isolation/strategies:list_strategies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-isolation/strategies/{strategy_id}:get_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-isolation/strategies:register_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/strategy-isolation/strategies/{strategy_id}:unregister_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-isolation/strategies/{strategy_id}/start:start_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-isolation/strategies/{strategy_id}/stop:stop_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-isolation/strategies/{strategy_id}/pause:pause_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-isolation/strategies/{strategy_id}/quota:get_strategy_quota
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PUT']:/api/v1/strategy-isolation/strategies/{strategy_id}/quota:update_strategy_quota
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-isolation/strategies/{strategy_id}/check-quota:check_strategy_quota
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-isolation/strategies/{strategy_id}/record-error:record_strategy_error
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-isolation/strategies/{strategy_id}/update-usage:update_resource_usage
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-isolation/reset-daily-counters:reset_daily_counters
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-isolation/states:get_available_states
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-isolation/default-quota:get_default_quota
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/strategy-isolation/strategies/{strategy_id}/circuit-breaker:get_circuit_breaker_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/strategy-isolation/strategies/{strategy_id}/reset-circuit-breaker:reset_circuit_breaker
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/active-deals/active-deals/:get_active_deals
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/active-deals/active-deals/{deal_id}:get_deal
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/livez:liveness_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/liveness:liveness_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/readyz:readiness_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/readiness:readiness_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/healthz:startup_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/startup:startup_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health:health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/bybit:bybit_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/ready:readiness_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/live:liveness_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/db_pool:database_pool_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/metrics:metrics_endpoint
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/phase2:phase2_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/database:database_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/database/metrics:database_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/database/metrics/prometheus:database_metrics_prometheus
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/comprehensive:comprehensive_health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/comprehensive/{component}:component_health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/livez:liveness_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/liveness:liveness_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/readyz:readiness_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/readiness:readiness_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/healthz:startup_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/startup:startup_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health:health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/bybit:bybit_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/ready:readiness_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/live:liveness_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/db_pool:database_pool_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/metrics:metrics_endpoint
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/phase2:phase2_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/database:database_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/database/metrics:database_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/database/metrics/prometheus:database_metrics_prometheus
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/comprehensive:comprehensive_health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/health/comprehensive/{component}:component_health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/alerts/status:get_alerting_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/alerts/send:send_alert
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/alerts/test:test_alerting
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/alerts/levels:list_alert_levels
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/alerts/critical:send_critical_alert
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/monte-carlo/analyze:run_monte_carlo_analysis
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/monte-carlo/probability:calculate_probability
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/monte-carlo/robustness:run_robustness_analysis
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/monte-carlo/risk-metrics:calculate_risk_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/monte-carlo/methods:list_methods
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/monte-carlo/quick-analysis:quick_analysis
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/monte-carlo/kelly:calculate_kelly
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/monte-carlo/enhanced-analysis:enhanced_monte_carlo
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/monte-carlo/quick-kelly:quick_kelly_from_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketplace/strategies:list_strategies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketplace/strategies/{strategy_id}:get_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketplace/strategies:publish_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketplace/strategies/{strategy_id}/download:download_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketplace/strategies/{strategy_id}/review:review_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/marketplace/strategies/{strategy_id}/like:like_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketplace/stats:get_marketplace_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/marketplace/categories:get_categories
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/market-regime/detect:detect_market_regime
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/market-regime/history/{symbol}:get_regime_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/market-regime/stats/{symbol}:get_regime_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/market-regime/types:list_regime_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/paper-trading/account:get_account
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/paper-trading/account/reset:reset_account
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/paper-trading/positions:get_positions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/paper-trading/positions/{symbol}:get_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/paper-trading/positions/{symbol}/close:close_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/paper-trading/positions/{symbol}/sltp:set_position_sltp
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/paper-trading/orders:place_order
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/paper-trading/orders:get_orders
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/paper-trading/orders/pending:get_pending_orders
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/paper-trading/orders/{order_id}:cancel_order
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/paper-trading/trades:get_trades
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/paper-trading/equity-curve:get_equity_curve
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/paper-trading/summary:get_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/paper-trading/price:update_price
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/paper-trading/prices/bulk:update_prices_bulk
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/walk-forward/optimize:run_walk_forward_optimization
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/walk-forward/quick-validate:quick_validation
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/walk-forward/config:get_default_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/walk-forward/analyze-robustness:analyze_robustness
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/slo/status:get_slo_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/slo/definitions:list_slo_definitions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/slo/budgets:get_all_budgets
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/slo/budgets/{slo_name}:get_budget
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/slo/record/latency:record_latency
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/slo/record/event:record_event
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/slo/dashboard:get_dashboard
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/slo/types:list_slo_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/slo/statuses:list_budget_statuses
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/slo/alerts:clear_alerts
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/slo/simulate:simulate_data
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/enhanced:enhanced_health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/dashboard:health_dashboard
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/components/{component_name}:get_component_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/health/summary:health_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/monitoring/health:health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/monitoring/metrics:prometheus_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/monitoring/metrics/json:metrics_json
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/monitoring/cache/stats:cache_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/monitoring/ai-agents/status:ai_agents_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/monitoring/cache/clear:clear_cache
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/export/backtest/{backtest_id}/pdf:export_backtest_pdf
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/export/backtest/{backtest_id}/excel:export_backtest_excel
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/export/backtest/{backtest_id}/csv:export_backtest_csv
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/export/formats:get_available_formats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/:get_context
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/status:file_ops_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/exports:list_exports
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/advanced-backtest/run:run_advanced_backtest
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/advanced-backtest/portfolio:run_portfolio_backtest_endpoint
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/advanced-backtest/strategy-portfolio:run_strategy_portfolio_backtest_endpoint
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/advanced-backtest/analyze:analyze_backtest_endpoint
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/advanced-backtest/metrics:calculate_metrics_endpoint
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/advanced-backtest/slippage/estimate:estimate_slippage
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/advanced-backtest/slippage/models:list_slippage_models
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/advanced-backtest/allocation/methods:list_allocation_methods
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/advanced-backtest/rebalance/frequencies:list_rebalance_frequencies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/advanced-backtest/fill-models:list_fill_models
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/advanced-backtest/health:health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/analyze:analyze
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/stats:get_agent_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/query/deepseek:query_deepseek
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/query/perplexity:query_perplexity
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/query/auto:query_auto
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/cache/stats:get_cache_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/cache/clear:clear_cache
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/ml/suggest-features:suggest_features
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/ml/generate-code:generate_feature_code
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/ml/design-strategy:design_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/backtest/ai-generate-strategy:generate_backtest_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/backtest/ai-execute-series:execute_backtest_series
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/backtest/ai-analyze:analyze_backtest_results_endpoint
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/dashboard/workflow/start:dashboard_start_workflow
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/dashboard/workflow/status/{workflow_id}:dashboard_workflow_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/dashboard/workflow/active:dashboard_active_workflows
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/dashboard/patterns:dashboard_patterns
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/dashboard/scheduler/tasks:dashboard_scheduler_tasks
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/dashboard/paper-trading/sessions:dashboard_paper_sessions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/dashboard/paper-trading/start:dashboard_start_paper_trading
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/dashboard/paper-trading/stop/{session_id}:dashboard_stop_paper_trading
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/dashboard/activity-log:dashboard_activity_log
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/actions/run-backtest:agent_run_backtest
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/actions/backtest-history:agent_backtest_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/actions/strategies:agent_list_strategies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/actions/validate-strategy:agent_validate_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/actions/system-health:agent_system_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/actions/tools:agent_list_tools
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/advanced/deliberate:deliberate
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/domain-agents:list_domain_agents
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/advanced/memory/store:store_memory
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/advanced/memory/recall:recall_memory
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/memory/stats:get_memory_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/advanced/memory/consolidate:consolidate_memory
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/advanced/improvement/feedback:submit_feedback
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/advanced/improvement/evaluate:evaluate_response
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/improvement/stats:get_improvement_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/mcp/tools:list_mcp_tools
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/advanced/mcp/tools/call:call_mcp_tool
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/mcp/resources:list_mcp_resources
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/monitoring/metrics:get_agent_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/monitoring/traces:get_agent_traces
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/monitoring/alerts:get_agent_alerts
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/monitoring/anomalies:get_detected_anomalies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/advanced/system/overview:get_system_overview
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/advanced/analyze-backtest:analyze_backtest_with_ai
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/advanced/analyze-optimization:analyze_optimization_with_ai
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ai-strategy-generator/pattern-types:get_pattern_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ai-strategy-generator/indicators:get_indicators
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ai-strategy-generator/generate:generate_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ai-strategy-generator/{strategy_id}:get_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ai-strategy-generator/:list_strategies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ai-strategy-generator/validate:validate_strategy_code
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/ai-strategy-generator/{strategy_id}:delete_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ai-strategy-generator/{strategy_id}/save:save_strategy_to_library
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ai-strategy-generator/{strategy_id}/backtest:run_strategy_backtest
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ai-pipeline/generate:generate_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ai-pipeline/agents:list_agents
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ai-pipeline/analyze-market:analyze_market
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ai-pipeline/improve-strategy:improve_strategy
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ai-pipeline/pipeline/{pipeline_id}/status:get_pipeline_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ai-pipeline/pipeline/{pipeline_id}/result:get_pipeline_result
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/monitoring/metrics:get_monitoring_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/monitoring/metrics/{metric_name}/history:get_metric_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/monitoring/reset:reset_monitoring
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/reports/generate:generate_report
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/drift/detect:detect_drift
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/drift/multivariate:detect_multivariate_drift
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/drift/methods:get_drift_methods
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/registry/models:register_model
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/registry/models:list_models
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/registry/models/{name}:get_model_details
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/registry/promote:promote_model
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/registry/rollback/{name}:rollback_model
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/registry/ab-test:create_ab_test
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/registry/ab-test/{test_id}:get_ab_test_results
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/registry/degradation/{name}:check_model_degradation
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/automl/run:run_automl
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/automl/model-types:get_automl_model_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/online/create:create_online_learner
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/online/update:update_online_model
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/online/predict/{model_id}:online_predict
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/online/stats/{model_id}:get_online_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/online/retrain/{model_id}:retrain_on_window
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/features/register:register_feature
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/features:list_features
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/features/groups:create_feature_group
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/features/groups:list_feature_groups
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/features/compute:compute_features
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/features/lineage/{feature_name}:get_feature_lineage
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/features/computations:list_available_computations
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/features/version:create_feature_version
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/features/cache/clear:clear_feature_cache
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/ensemble/create:create_ensemble
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/ensemble/{ensemble_name}:get_ensemble
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/ensemble:list_ensembles
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/ensemble/predict:ensemble_predict
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/ml/ensemble/{ensemble_name}:delete_ensemble
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/models/compare:compare_models
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/models/statistical-test:statistical_significance_test
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/models/{name}/learning-curve:get_learning_curve
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/hyperparameters/search:hyperparameter_search
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/hyperparameters/search/{search_id}:get_search_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/hyperparameters/search/{search_id}/trials:get_search_trials
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/hyperparameters/schedule:create_hyperparameter_schedule
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/explainability/feature-importance:get_feature_importance
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/explainability/shap:compute_shap_values
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ml/explainability/lime:compute_lime_explanation
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/explainability/partial-dependence:get_partial_dependence
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ml/explainability/interaction:get_feature_interaction
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/costs/summary:get_cost_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/costs/daily:get_daily_breakdown
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/costs/recent:get_recent_records
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/costs/dashboard:get_dashboard
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/costs/session/{session_id}:reset_session_costs
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE []:/ws/v1/stream/agent/{client_id}:streaming_agent_websocket
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/ws/v1/stream/test:test_streaming_endpoint
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/ws/v1/stream/health:websocket_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/ws/v1/stream/chat:streaming_chat_ui
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limits/summary:get_rate_limit_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limits/agent/{agent_name}:get_agent_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/rate-limits/agent/{agent_name}/reset-cooling:reset_key_cooling
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limits/rate-limit-events:get_rate_limit_events
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limits/health:rate_limit_health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/circuit-breakers/status:get_circuit_breakers_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/circuit-breakers/metrics:get_circuit_breaker_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/circuit-breakers/extended-status:get_extended_circuit_breaker_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/circuit-breakers/{name}:get_circuit_breaker_by_name
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/circuit-breakers/reset:reset_all_circuit_breakers
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/circuit-breakers/{name}/reset:reset_circuit_breaker
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/tracing/status:get_tracing_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/tracing/metrics:get_tracing_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/tracing/spans:get_spans
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/tracing/traces/summary:get_trace_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/tracing/traces/{trace_id}:get_trace_spans
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/tracing/config:update_tracing_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/tracing/spans:clear_spans
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/tracing/prometheus:get_prometheus_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/orchestration/status:get_orchestrator_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/orchestration/graphs:list_registered_graphs
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/orchestration/graphs/{graph_name}:get_graph_info
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/orchestration/graphs/{graph_name}/visualize:visualize_graph
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/orchestration/execute:execute_graph
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/orchestration/graphs/{graph_name}/nodes:get_graph_nodes
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/orchestration/graphs/{graph_name}/metrics:get_graph_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/degradation/status:get_degradation_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/degradation/services:list_services
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/degradation/services/{service_name}:get_service_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/degradation/cache/stats:get_cache_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/degradation/cache/entries:list_cache_entries
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/degradation/cache/{key}:invalidate_cache_entry
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/degradation/cache:clear_cache
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/degradation/services/{service_name}/reset:reset_service_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/degradation/fallbacks:list_fallbacks
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/degradation/test-fallback/{key}:test_fallback
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk/summary:get_risk_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk/portfolio:get_portfolio_risk
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk/positions:get_positions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk/positions:update_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/risk/positions/{symbol}:remove_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk/equity:update_equity
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk/trades:record_trade
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk/alerts:get_alerts
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk/alerts/{alert_id}/acknowledge:acknowledge_alert
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/risk/check-alerts:check_portfolio_alerts
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk/thresholds:get_thresholds
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PUT']:/api/v1/risk/thresholds:update_thresholds
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/risk/metrics:get_service_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/chaos/status:get_chaos_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/chaos/enable:enable_chaos
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/chaos/disable:disable_chaos
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/chaos/templates:list_templates
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/chaos/experiments:create_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/chaos/experiments/from-template/{template_name}:create_from_template
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/chaos/experiments/{experiment_id}/run:run_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/chaos/quick-test:run_quick_test
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/chaos/faults:get_active_faults
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/chaos/faults:clear_all_faults
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/chaos/history:get_experiment_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/chaos/experiments/{experiment_id}:get_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/anomaly-detection/status:get_detector_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/anomaly-detection/data-point:add_data_point
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/anomaly-detection/batch:add_batch_data_points
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/anomaly-detection/check-multivariate:check_multivariate_anomaly
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/anomaly-detection/anomalies:get_recent_anomalies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/anomaly-detection/statistics:get_anomaly_statistics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/anomaly-detection/rolling-stats/{symbol}/{metric_type}:get_rolling_statistics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/anomaly-detection/acknowledge/{anomaly_id}:acknowledge_anomaly
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/anomaly-detection/types:list_anomaly_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/anomaly-detection/metrics-tracked:list_tracked_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/anomaly-detection/config:update_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/anomaly-detection/train-isolation-forest:train_isolation_forest
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/anomaly-detection/summary:get_anomaly_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/key-rotation/status:get_service_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/key-rotation/keys:register_key
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/key-rotation/keys:list_keys
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/key-rotation/keys/{key_id}:get_key_info
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/key-rotation/keys/{key_id}/rotate:rotate_key
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/key-rotation/keys/{key_id}/revoke:revoke_key
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/key-rotation/check-rotation:check_rotation_needed
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/key-rotation/history:get_rotation_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/key-rotation/usage/{key_id}:get_key_usage
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/key-rotation/usage:get_all_usage_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/key-rotation/providers:list_providers
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/key-rotation/summary:get_rotation_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/data-quality/summary:get_quality_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/data-quality/validate:validate_candle
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/data-quality/validate-batch:validate_batch
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/data-quality/metrics:get_all_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/data-quality/metrics/{symbol}/{interval}:get_symbol_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/data-quality/issues:get_recent_issues
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/data-quality/check-staleness:check_staleness
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/data-quality/issue-types:list_issue_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/data-quality/health:get_data_quality_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/status:get_monitor_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/synthetic-monitoring/start:start_monitoring
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/synthetic-monitoring/stop:stop_monitoring
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/probes:list_probes
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/probes/{probe_id}:get_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/synthetic-monitoring/probes/{probe_id}/run:run_probe
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/synthetic-monitoring/run-all:run_all_probes
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/metrics:get_all_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/metrics/{probe_id}:get_probe_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/history/{probe_id}:get_probe_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/sla:get_sla_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/summary:get_monitoring_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/probe-types:list_probe_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/synthetic-monitoring/health:get_monitoring_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/property-testing/status:get_service_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/property-testing/properties:list_properties
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/property-testing/properties/{property_name}:get_property
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/property-testing/run:run_property_test
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/property-testing/run-all:run_all_tests
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/property-testing/test-strategy:test_strategy_invariants
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/property-testing/edge-cases:generate_edge_cases
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/property-testing/edge-cases/{property_name}/run:run_edge_case_tests
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/property-testing/history:get_test_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/property-testing/failures:get_failure_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/property-testing/summary:get_testing_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/property-testing/property-types:list_property_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/status:get_service_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/rules:list_rules
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/rules/{rule_name}:get_rule
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/rate-limiting/rules:create_rule
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/rate-limiting/rules/{rule_name}:delete_rule
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/rate-limiting/check:check_rate_limit
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/check-endpoint:check_endpoint_limit
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/blocked-ips:get_blocked_ips
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/rate-limiting/blocked-ips/{ip}/unblock:unblock_ip
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/is-blocked/{ip}:is_ip_blocked
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/metrics:get_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/rate-limiting/metrics/reset:reset_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/rate-limiting/cleanup:cleanup_expired
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/summary:get_rate_limit_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/strategies:list_strategies
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/rate-limiting/scopes:list_scopes
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/trading-halt/status:get_trading_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/trading-halt/emergency-stop:emergency_stop
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/trading-halt/halt:halt_trading
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/trading-halt/resume:resume_trading
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/trading-halt/validate-trade:validate_trade
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/trading-halt/can-trade:can_trade
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/trading-halt/config:get_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PUT']:/api/v1/trading-halt/config:update_config
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/trading-halt/events:get_events
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/trading-halt/events/active:get_active_events
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/trading-halt/risk-metrics:get_risk_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/trading-halt/risk-metrics:update_risk_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/trading-halt/halt-reasons:list_halt_reasons
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/trading-halt/halt-levels:list_halt_levels
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/trading-halt/summary:get_trading_halt_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/status:get_service_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/stats:get_query_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/pool:get_pool_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/slow-queries:get_slow_queries
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/patterns:get_query_patterns
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/table-stats:get_table_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/type-stats:get_type_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/recommendations:get_recommendations
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/db-metrics/reset:reset_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/summary:get_db_metrics_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/db-metrics/query-types:list_query_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/kms/status:get_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/kms/metrics:get_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/kms/initialize:initialize_service
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/kms/shutdown:shutdown_service
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/kms/keys:create_key
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/kms/keys:list_keys
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/kms/keys/{key_id}:get_key
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/kms/keys/{key_id}/rotate:rotate_key
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/kms/keys/{key_id}:delete_key
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/kms/encrypt:encrypt_data
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/kms/decrypt:decrypt_data
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/kms/api-keys/encrypt:encrypt_api_key
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/kms/api-keys/decrypt:decrypt_api_key
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/kms/audit-log:get_audit_log
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/kms/providers:list_providers
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/kms/key-types:list_key_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/kms/algorithms:list_algorithms
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/kms/health:health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/secrets-scanner/status:get_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/secrets-scanner/statistics:get_statistics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/secrets-scanner/scan/directory:scan_directory
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/secrets-scanner/scan/history:scan_git_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/secrets-scanner/scan/file:scan_single_file
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/secrets-scanner/scans:get_scan_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/secrets-scanner/scans/{scan_id}:get_scan
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/secrets-scanner/scans/{scan_id}/report:get_scan_report
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/secrets-scanner/patterns:list_patterns
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/secrets-scanner/patterns:add_pattern
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/secrets-scanner/patterns/{pattern_name}:remove_pattern
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/secrets-scanner/false-positives:mark_false_positive
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/secrets-scanner/secret-types:list_secret_types
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/secrets-scanner/severity-levels:list_severity_levels
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/secrets-scanner/health:health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/state/orders:create_order
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/state/orders:list_orders
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/state/orders/{order_id}:get_order
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PATCH']:/api/v1/state/orders/{order_id}:update_order
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/state/orders/{order_id}/cancel:cancel_order
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/state/positions:open_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/state/positions:list_positions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/state/positions/{position_id}:get_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PATCH']:/api/v1/state/positions/{position_id}:update_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/state/positions/{position_id}/close:close_position
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/state/sync:sync_state
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/state/metrics:get_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/state/conflicts:get_conflicts
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/state/audit-log:get_audit_log
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/state/health:get_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/state/start:start_manager
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/state/stop:stop_manager
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/cache-warming/status:get_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/cache-warming/health:get_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/cache-warming/metrics:get_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/cache-warming/cache-stats:get_cache_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/cache-warming/targets:get_targets
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/targets:add_target
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/cache-warming/targets/{symbol}/{interval}:remove_target
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/targets/{symbol}/{interval}/enable:enable_target
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/targets/{symbol}/{interval}/disable:disable_target
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/warm/{symbol}/{interval}:warm_single
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/warm-all:warm_all
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/warm-critical:warm_critical
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/cache-warming/results:get_results
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/start:start_service
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/stop:stop_service
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/record-hit:record_cache_hit
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/cache-warming/record-miss:record_cache_miss
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ab-testing/experiments:create_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ab-testing/experiments/quick:create_quick_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ab-testing/experiments:list_experiments
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ab-testing/experiments/{experiment_id}:get_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ab-testing/experiments/{experiment_id}/start:start_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ab-testing/experiments/{experiment_id}/stop:stop_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ab-testing/experiments/{experiment_id}/pause:pause_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ab-testing/experiments/{experiment_id}/resume:resume_experiment
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ab-testing/experiments/{experiment_id}/results:get_experiment_results
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ab-testing/experiments/{experiment_id}/metrics:record_metric
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/ab-testing/experiments/{experiment_id}/trades:record_trade
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/ab-testing/allocate:allocate_variant
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/predict:run_prediction
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/metrics/summary:get_metrics_summary
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/metrics/top-performers:get_top_performers
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/metrics/strategy/{strategy_id}:get_strategy_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/metrics/system-health:get_system_health
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE []:/api/v1/dashboard/ws:dashboard_websocket
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/portfolio/history:get_portfolio_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/ai/recommendations:get_ai_recommendations
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/strategies/leaderboard:get_strategy_leaderboard
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE []:/api/v1/dashboard/ws/pnl:pnl_websocket
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/ai-recommendations:get_ai_recommendations_alias
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/strategy-leaderboard:get_strategy_leaderboard_alias
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/market/tickers:get_market_tickers
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/dashboard/pnl/current:get_current_pnl
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE []:/api/v1/dashboard/ws/marketdata:marketdata_websocket
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/stats:get_cache_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/:clear_cache
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/chat/history:list_conversations
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/chat/history/{conversation_id}:get_conversation
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/chat/history:create_conversation
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['PUT']:/api/v1/chat/history/{conversation_id}:update_conversation
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/chat/history/clear:clear_history
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['DELETE']:/api/v1/chat/history/{conversation_id}:delete_conversation
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/chat/history/sync:sync_conversations
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/chat/history/stats:get_history_stats
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/executions/:submit_execution
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/executions/{execution_id}:get_execution
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/executions/:list_executions
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/executions/{execution_id}/cancel:cancel_execution
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/executions/metrics:execution_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/api/v1/agent/send:send_to_agent
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/api/v1/agent/broadcast:broadcast_to_agents
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/api/v1/agent/conversation:start_agent_conversation
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/api/v1/agent/consensus:get_multi_agent_consensus
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/api/v1/agent/iterative-improvement:iterative_code_improvement
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE []:/api/v1/agents/api/v1/agent/ws/{client_id}:websocket_endpoint
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/api/v1/agent/health:health_check
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/api/v1/agent/stats:get_statistics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/api/v1/agent/metrics/{agent_name}:get_agent_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/agents/api/v1/agent/metrics:get_all_metrics
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['POST']:/api/v1/agents/api/v1/agent/file-edit:edit_file_with_agent
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/orchestrator/status:get_status
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:707 - ROUTE ['GET']:/api/v1/orchestrator/dashboard:get_dashboard
+2026-02-11 23:12:42 | INFO     | uvicorn.error:<module>:708 - ROUTE_REGISTRY_END
+2026-02-11 23:12:42 | INFO     | backend.monitoring.prometheus_metrics:get_metrics_collector:442 - [METRICS] Metrics collector initialized
+2026-02-11 23:12:42 | INFO     | root:<module>:839 - [OK] Monitoring metrics collector initialized
+---------------------------- Captured stderr setup ----------------------------
+2026-02-11 23:12:36.381 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:122 - тЬЕ DeepSeek key registered (pool size: 1)
+2026-02-11 23:12:36.381 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:122 - тЬЕ DeepSeek key registered (pool size: 2)
+2026-02-11 23:12:36.381 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:122 - тЬЕ DeepSeek key registered (pool size: 3)
+2026-02-11 23:12:36.381 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:122 - тЬЕ DeepSeek key registered (pool size: 4)
+2026-02-11 23:12:36.381 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:122 - тЬЕ DeepSeek key registered (pool size: 5)
+2026-02-11 23:12:36.381 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:122 - тЬЕ DeepSeek key registered (pool size: 6)
+2026-02-11 23:12:36.381 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:122 - тЬЕ DeepSeek key registered (pool size: 7)
+2026-02-11 23:12:36.381 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:122 - тЬЕ DeepSeek key registered (pool size: 8)
+2026-02-11 23:12:36.381 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:140 - тЬЕ Perplexity key registered (pool size: 1)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:140 - тЬЕ Perplexity key registered (pool size: 2)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:140 - тЬЕ Perplexity key registered (pool size: 3)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:140 - тЬЕ Perplexity key registered (pool size: 4)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:140 - тЬЕ Perplexity key registered (pool size: 5)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:140 - тЬЕ Perplexity key registered (pool size: 6)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:140 - тЬЕ Perplexity key registered (pool size: 7)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:140 - тЬЕ Perplexity key registered (pool size: 8)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:157 - тЬЕ Qwen key registered (pool size: 1)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:157 - тЬЕ Qwen key registered (pool size: 2)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:157 - тЬЕ Qwen key registered (pool size: 3)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:157 - тЬЕ Qwen key registered (pool size: 4)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:157 - тЬЕ Qwen key registered (pool size: 5)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:157 - тЬЕ Qwen key registered (pool size: 6)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:157 - тЬЕ Qwen key registered (pool size: 7)
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.unified_agent_interface:_load_keys:157 - тЬЕ Qwen key registered (pool size: 8)
+2026-02-11 23:12:36.382 | INFO     | backend.agents.unified_agent_interface:_load_keys:161 - ЁЯФС Loaded 8 DeepSeek + 8 Qwen + 8 Perplexity keys
+2026-02-11 23:12:36.382 | INFO     | backend.agents.unified_agent_interface:__init__:433 - MCP bridge disabled via MCP_DISABLED flag; using direct API mode
+2026-02-11 23:12:36.382 | DEBUG    | backend.agents.health_monitor:__init__:168 - MCP health monitoring disabled via MCP_DISABLED flag
+2026-02-11 23:12:36.382 | INFO     | backend.agents.health_monitor:__init__:170 - ЁЯПе Health Monitor initialized
+2026-02-11 23:12:36.383 | INFO     | backend.agents.health_monitor:register_health_check:198 - тЬЕ Health check registered for 'deepseek_api' (recovery: yes)
+2026-02-11 23:12:36.383 | INFO     | backend.agents.health_monitor:register_health_check:198 - тЬЕ Health check registered for 'perplexity_api' (recovery: yes)
+2026-02-11 23:12:36.383 | INFO     | backend.agents.health_monitor:register_health_check:198 - тЬЕ Health check registered for 'mcp_server' (recovery: yes)
+2026-02-11 23:12:36.383 | INFO     | backend.agents.unified_agent_interface:__init__:461 - ЁЯЪА Unified Agent Interface initialized
+2026-02-11 23:12:36.383 | INFO     | backend.agents.unified_agent_interface:__init__:462 - ЁЯЫбя╕П Circuit breakers registered: deepseek_api, perplexity_api, mcp_server
+2026-02-11 23:12:36.383 | INFO     | backend.agents.unified_agent_interface:__init__:463 - ЁЯПе Health monitoring ready (will start with event loop)
+----------------------------- Captured log setup ------------------------------
+WARNING  backend.security.master_key_manager:master_key_manager.py:33 тЪая╕П ENCRYPTION_KEY not set - encryption disabled
+WARNING  backend.security.crypto:crypto.py:118 тЪая╕П CryptoManager: No encryption key available, encryption disabled
+---------------------------- Captured stdout call -----------------------------
+2026-02-11 23:12:42 | WARNING  | backend.middleware.rate_limiter:__init__:325 - Redis rate limiter failed to connect - using in-memory
+2026-02-11 23:12:42 | INFO     | backend.middleware.rate_limiter:__init__:334 - Rate limiter initialized: enabled=True, backend=in-memory, default=100/60s, agent=30/60s
+2026-02-11 23:12:42 | INFO     | backend.middleware.cache_headers:__init__:34 - CacheHeadersMiddleware initialized (max_age=60, etag=True, last_modified=True)
+2026-02-11 23:12:42 | INFO     | backend.api.mcp_middleware:__init__:46 - UnifiedMcpMiddleware initialized (require_auth=False)
+2026-02-11 23:12:54 | INFO     | httpx:_send_single_request:1025 - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-02-11 23:12:54 | INFO     | httpx:_send_single_request:1025 - HTTP Request: GET http://testserver/api/v1/risk/summary "HTTP/1.1 200 OK"
+2026-02-11 23:12:54 | INFO     | httpx:_send_single_request:1025 - HTTP Request: GET http://testserver/api/v1/tracing/status "HTTP/1.1 200 OK"
+------------------------------ Captured log call ------------------------------
+WARNING  backend.middleware.rate_limiter:rate_limiter.py:325 Redis rate limiter failed to connect - using in-memory
+INFO     backend.middleware.rate_limiter:rate_limiter.py:334 Rate limiter initialized: enabled=True, backend=in-memory, default=100/60s, agent=30/60s
+INFO     backend.middleware.cache_headers:cache_headers.py:34 CacheHeadersMiddleware initialized (max_age=60, etag=True, last_modified=True)
+INFO     backend.api.mcp_middleware:mcp_middleware.py:46 UnifiedMcpMiddleware initialized (require_auth=False)
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/risk/summary "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1025 HTTP Request: GET http://testserver/api/v1/tracing/status "HTTP/1.1 200 OK"
+=========================== short test summary info ===========================
+FAILED tests/chaos/test_chaos_engineering.py::TestTimeoutHandling::test_cascade_failure_prevention
+1 failed in 21.75s

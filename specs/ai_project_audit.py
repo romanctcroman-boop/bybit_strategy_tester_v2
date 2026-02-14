@@ -72,7 +72,7 @@ async def run_project_audit():
 
     deepseek_response = await agent.query_deepseek(
         prompt=deepseek_prompt,
-        model="deepseek-reasoner",
+        model="deepseek-chat",  # Was deepseek-reasoner — 6-8x cheaper
         max_tokens=4000,
     )
 

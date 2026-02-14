@@ -85,6 +85,12 @@ class PromptEngineer:
                 "initial_capital": platform_config.get("initial_capital", 10000),
                 "start_date": platform_config.get("start_date", "2025-01-01"),
                 "end_date": platform_config.get("end_date", "2025-06-01"),
+                # Configurable strategy generation thresholds
+                "primary_metric": platform_config.get("primary_metric", "Sharpe Ratio"),
+                "max_drawdown_target": platform_config.get("max_drawdown_target", 15),
+                "min_indicators": platform_config.get("min_indicators", 2),
+                "max_indicators": platform_config.get("max_indicators", 4),
+                "min_filters": platform_config.get("min_filters", 1),
             }
         )
 

@@ -14,7 +14,12 @@ Write-Host ""
 function Stop-PortProcess {
     param([int]$Port)
     # Only target LISTENING connections - TIME_WAIT will expire on their own
-    $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+    try {
+        $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue 2>$null
+    }
+    catch {
+        $connections = $null
+    }
     if ($connections) {
         foreach ($conn in $connections) {
             $process = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
@@ -61,13 +66,21 @@ Write-Host "[INFO] Force releasing ports..." -ForegroundColor Cyan
 
 # Port 8000 (Uvicorn)
 Stop-PortProcess -Port 8000
-if (-not (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)) {
+try {
+    $listening8000 = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue 2>$null
+}
+catch { $listening8000 = $null }
+if (-not $listening8000) {
     Write-Host "[OK] Port 8000 is free" -ForegroundColor Green
 }
 
 # Port 8001 (DB Maintenance)
 Stop-PortProcess -Port 8001
-if (-not (Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue)) {
+try {
+    $listening8001 = Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue 2>$null
+}
+catch { $listening8001 = $null }
+if (-not $listening8001) {
     Write-Host "[OK] Port 8001 is free" -ForegroundColor Green
 }
 
@@ -86,36 +99,47 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  ALL SERVICES STOPPED" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 
+# Stop project Python processes (skip VS Code extensions)
 Write-Host ""
-Write-Host "[INFO] Stopping AI Agent processes..." -ForegroundColor Yellow
-$pythonProcesses = Get-Process -Name "python*" -ErrorAction SilentlyContinue | Where-Object {
-    $_.Path -like "*bybit_strategy_tester*"
-}
-if ($pythonProcesses) {
-    foreach ($proc in $pythonProcesses) {
-        Write-Host "  Stopping PID $($proc.Id) ($($proc.ProcessName))" -ForegroundColor Gray
-        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-    }
-    Write-Host "[OK] Agent processes stopped" -ForegroundColor Green
-}
-else {
-    Write-Host "[INFO] No agent processes found" -ForegroundColor Gray
-}
+Write-Host "[INFO] Stopping project Python processes..." -ForegroundColor Yellow
 
-# 5. Clean Python Cache (optional but recommended)
+# Only stop processes tracked by PID files
+$runDir = Join-Path $ProjectRoot ".run"
+if (Test-Path $runDir) {
+    $pidFiles = Get-ChildItem -Path $runDir -Filter "*.pid" -ErrorAction SilentlyContinue
+    foreach ($pidFile in $pidFiles) {
+        try {
+            $pid_value = [int](Get-Content $pidFile.FullName -ErrorAction SilentlyContinue)
+            $proc = Get-Process -Id $pid_value -ErrorAction SilentlyContinue
+            if ($proc -and $proc.ProcessName -like "python*") {
+                Write-Host "  Stopping $($pidFile.BaseName) (PID: $pid_value)" -ForegroundColor Gray
+                Stop-Process -Id $pid_value -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Item $pidFile.FullName -Force -ErrorAction SilentlyContinue
+        }
+        catch {
+            # Skip invalid PID files
+        }
+    }
+}
+Write-Host "[OK] Project processes stopped" -ForegroundColor Green
+
+# Clean Python Cache (skip .venv to avoid locking issues with VS Code)
 Write-Host ""
-Write-Host "[INFO] Clearing Python cache (__pycache__)..." -ForegroundColor Yellow
-$cacheDirs = Get-ChildItem -Path $ProjectRoot -Directory -Recurse -Filter "__pycache__" -ErrorAction SilentlyContinue
-if ($cacheDirs) {
-    $cacheCount = ($cacheDirs | Measure-Object).Count
-    $cacheDirs | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host "[OK] Cleared $cacheCount __pycache__ directories" -ForegroundColor Green
+Write-Host "[INFO] Clearing Python cache..." -ForegroundColor Yellow
+$cacheCount = 0
+Get-ChildItem -Path $ProjectRoot -Directory -Recurse -Filter "__pycache__" -ErrorAction SilentlyContinue |
+Where-Object { $_.FullName -notlike "*\.venv\*" -and $_.FullName -notlike "*node_modules\*" } |
+ForEach-Object {
+    try { Remove-Item $_.FullName -Recurse -Force -ErrorAction Stop; $cacheCount++ }
+    catch { <# skip locked #> }
 }
-else {
-    Write-Host "[OK] No Python cache to clear" -ForegroundColor Green
-}
+Write-Host "[OK] Cleared $cacheCount cache directories" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  All services stopped" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
+
+# Reset $LASTEXITCODE for both & (shared scope) and -File (separate process) modes
+cmd /c "exit 0"

@@ -1213,6 +1213,9 @@ class MetricsCalculator:
         ls_m = MetricsCalculator.calculate_long_short_metrics(trades, initial_capital, years)
 
         # Expectancy and SQN
+        kelly_percent = 0.0
+        kelly_percent_long = 0.0
+        kelly_percent_short = 0.0
         if trade_m.total_trades > 0:
             win_frac = trade_m.winning_trades / trade_m.total_trades
             expectancy, expectancy_ratio = calculate_expectancy(win_frac, trade_m.avg_win, trade_m.avg_loss)
@@ -1228,6 +1231,25 @@ class MetricsCalculator:
             if len(pnl_values) > 1:
                 std_pnl = float(np.std(pnl_values, ddof=1))
                 risk_m.sqn = calculate_sqn(trade_m.total_trades, trade_m.avg_trade, std_pnl)
+
+            # Kelly Criterion: K% = W - (1 - W) / R
+            # W = win rate (as fraction), R = payoff ratio (avg_win / avg_loss)
+            if trade_m.payoff_ratio > 0:
+                kelly_percent = win_frac - (1 - win_frac) / trade_m.payoff_ratio
+                kelly_percent = max(0.0, min(1.0, kelly_percent))
+            else:
+                kelly_percent = 0.0
+
+            # Kelly per direction
+            if ls_m.long_trades > 0 and ls_m.long_payoff_ratio > 0:
+                long_win_frac = ls_m.long_winning / ls_m.long_trades
+                kelly_percent_long = long_win_frac - (1 - long_win_frac) / ls_m.long_payoff_ratio
+                kelly_percent_long = max(0.0, min(1.0, kelly_percent_long))
+
+            if ls_m.short_trades > 0 and ls_m.short_payoff_ratio > 0:
+                short_win_frac = ls_m.short_winning / ls_m.short_trades
+                kelly_percent_short = short_win_frac - (1 - short_win_frac) / ls_m.short_payoff_ratio
+                kelly_percent_short = max(0.0, min(1.0, kelly_percent_short))
 
         else:
             expectancy, expectancy_ratio = 0.0, 0.0
@@ -1248,6 +1270,7 @@ class MetricsCalculator:
             "avg_win": trade_m.avg_win_pct,
             "avg_loss": trade_m.avg_loss_pct,
             "avg_trade": trade_m.avg_trade_pct,
+            "avg_trade_pct": trade_m.avg_trade_pct,  # Alias for frontend compatibility
             "largest_win": trade_m.largest_win_pct,
             "largest_loss": trade_m.largest_loss_pct,
             "avg_win_value": trade_m.avg_win,
@@ -1279,6 +1302,10 @@ class MetricsCalculator:
             "margin_efficiency": risk_m.margin_efficiency,
             "stability": risk_m.stability,
             "sqn": risk_m.sqn,
+            "kelly_percent": kelly_percent,
+            "kelly_percent_long": kelly_percent_long,
+            "kelly_percent_short": kelly_percent_short,
+            "open_trades": 0,  # All trades are closed in backtests
             "expectancy": expectancy,
             "expectancy_ratio": expectancy_ratio,
             "cagr": risk_m.cagr,

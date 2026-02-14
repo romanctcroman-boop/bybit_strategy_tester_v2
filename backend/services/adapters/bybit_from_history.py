@@ -7,11 +7,13 @@ Behavior:
 This module focuses on a small subset used by the strategy tester: fetching klines (candles) and recent trades.
 """
 
+import contextlib
 import json
 import logging
 import os
 import re
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -32,9 +34,9 @@ try:
 except ImportError:
     _HAS_RETRY = False
 
-    def requests_retry(operation_name: str, func):
+    def requests_retry(name: str, call: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Fallback: just call the function directly."""
-        return func()
+        return call()
 
 
 try:
@@ -163,6 +165,8 @@ class BybitAdapter:
 
         # Prefer perpetual/linear futures (category='linear') — discover available instruments first
         v5_url_info = "https://api.bybit.com/v5/market/instruments-info"
+        available_meta: dict[str, dict] = {}
+        available: set[str] = set()
 
         try:
             r = requests.get(v5_url_info, params={"category": "linear"}, timeout=self.timeout)
@@ -175,7 +179,7 @@ class BybitAdapter:
             )
             # Build a mapping of symbol -> instrument metadata for smarter selection
             available_meta = {
-                itm.get("symbol"): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
+                str(itm.get("symbol")): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
             }
             available = set(available_meta.keys())
         except Exception:
@@ -183,8 +187,6 @@ class BybitAdapter:
                 "Could not discover linear instruments via instruments-info; will still try kline endpoints",
                 exc_info=True,
             )
-            available = set()
-            available_meta = {}
 
         candidates = [symbol, symbol.upper()]
         # common heuristics: add USDT suffix if missing (most linear perpetuals are SYMBOLUSDT)
@@ -213,7 +215,7 @@ class BybitAdapter:
             pattern = re.compile(r"^[A-Z]{3,}USDT$")
             for sym, meta in available_meta.items():
                 try:
-                    if meta.get("status") == "Trading" and not meta.get("isPreListing") and pattern.match(sym):
+                    if meta.get("status") == "Trading" and not meta.get("isPreListing") and pattern.match(str(sym)):
                         chosen = sym
                         break
                 except Exception:
@@ -283,7 +285,7 @@ class BybitAdapter:
                     normalized = [self._normalize_kline_row(d) for d in data]
                     # attempt to persist normalized candles to audit table (best-effort)
                     try:
-                        self._persist_klines_to_db(chosen, normalized)
+                        self._persist_klines_to_db(chosen, normalized, interval=interval_norm)
                     except Exception:
                         logger.exception("Failed to persist klines to DB")
                     return normalized
@@ -309,7 +311,7 @@ class BybitAdapter:
             if data:
                 normalized = [self._normalize_kline_row(d) for d in data]
                 try:
-                    self._persist_klines_to_db(symbol, normalized)
+                    self._persist_klines_to_db(symbol, normalized, interval=interval_norm)
                 except Exception:
                     logger.exception("Failed to persist klines to DB")
                 return normalized
@@ -616,7 +618,7 @@ class BybitAdapter:
 
         elif isinstance(row, dict):
             raw = dict(row)
-            parsed: dict[str, Any] = {"raw": raw}
+            parsed = {"raw": raw}
             # Common key aliases used across Bybit responses
             start_candidates = [
                 raw.get("startTime"),
@@ -639,9 +641,7 @@ class BybitAdapter:
                         continue
 
             parsed["open_time"] = start_ms
-            parsed["open_time_dt"] = (
-                datetime.fromtimestamp(start_ms / 1000.0, tz=UTC) if start_ms is not None else None
-            )
+            parsed["open_time_dt"] = datetime.fromtimestamp(start_ms / 1000.0, tz=UTC) if start_ms is not None else None
 
             def get_str(*keys) -> str | None:
                 for k in keys:
@@ -671,12 +671,24 @@ class BybitAdapter:
         self,
         symbol: str,
         normalized_rows: list[dict],
-        db: object | None = None,
-        engine: object | None = None,
+        db: Any = None,
+        engine: Any = None,
+        market_type: str = "linear",
+        interval: str | None = None,
     ) -> None:
         """Persist normalized klines into audit table.
 
-        Behaviour: best-effort; uses UNIQUE(symbol, open_time) to avoid duplicates.
+        Args:
+            symbol: Trading pair symbol (e.g. BTCUSDT).
+            normalized_rows: List of normalized kline dicts.
+            db: Optional SQLAlchemy session for deterministic behavior in tests.
+            engine: Optional SQLAlchemy engine.
+            market_type: Market type (linear/spot).
+            interval: Timeframe interval (e.g. "15", "60", "D"). If not provided,
+                      extracted from each row's 'interval' key; rows without valid
+                      interval are skipped to prevent "UNKNOWN" pollution.
+
+        Behaviour: best-effort; uses UNIQUE(symbol, interval, market_type, open_time) to avoid duplicates.
         """
         # import DB objects lazily to avoid import-time circular dependencies in tests
         from sqlalchemy import text
@@ -709,15 +721,29 @@ class BybitAdapter:
                 raw_val = str(row)
 
             # Accept both styles: 'open'/'close' or 'open_price'/'close_price'.
-            def _pick(*keys):
+            def _pick(*keys, _row=row):
                 for k in keys:
-                    if k in row and row.get(k) is not None:
-                        return row.get(k)
+                    if k in _row and _row.get(k) is not None:
+                        return _row.get(k)
                 return None
+
+            # Extract interval from row, or use explicit parameter.
+            # NEVER fall back to "UNKNOWN" — skip rows without valid interval.
+            VALID_INTERVALS = {"1", "5", "15", "30", "60", "240", "D", "W", "M"}
+            row_interval = interval or _pick("interval")
+            if not row_interval or row_interval not in VALID_INTERVALS:
+                logger.debug(
+                    "Skipping persist for %s: invalid interval '%s'",
+                    symbol,
+                    row_interval,
+                )
+                continue
 
             params_list.append(
                 {
                     "symbol": symbol,
+                    "interval": row_interval,
+                    "market_type": market_type,
                     "open_time": open_time,
                     "open_time_dt": row.get("open_time_dt") or _to_dt(open_time),
                     "open_price": _pick("open", "open_price", "open_price_str"),
@@ -762,16 +788,12 @@ class BybitAdapter:
         try:
             target_bind = None
             if db is not None and hasattr(db, "get_bind"):
-                try:
+                with contextlib.suppress(Exception):
                     target_bind = db.get_bind()
-                except Exception:
-                    pass
             if target_bind is None:
                 target_bind = _engine
-            try:
+            with contextlib.suppress(Exception):
                 BybitKlineAudit.__table__.create(bind=target_bind, checkfirst=True)
-            except Exception:
-                pass
         except Exception:
             pass
 
@@ -807,12 +829,12 @@ class BybitAdapter:
             if dialect in ("postgres", "postgresql"):
                 sql = text("""
                     INSERT INTO bybit_kline_audit
-                        (symbol, open_time, open_time_dt, open_price, high_price,
+                        (symbol, interval, market_type, open_time, open_time_dt, open_price, high_price,
                          low_price, close_price, volume, turnover, raw)
                     VALUES
-                        (:symbol, :open_time, :open_time_dt, :open_price, :high_price,
+                        (:symbol, :interval, :market_type, :open_time, :open_time_dt, :open_price, :high_price,
                          :low_price, :close_price, :volume, :turnover, :raw)
-                    ON CONFLICT (symbol, open_time) DO UPDATE SET
+                    ON CONFLICT (symbol, interval, market_type, open_time) DO UPDATE SET
                         open_time_dt = EXCLUDED.open_time_dt,
                         open_price = EXCLUDED.open_price,
                         high_price = EXCLUDED.high_price,
@@ -836,12 +858,12 @@ class BybitAdapter:
             elif dialect.startswith("sqlite"):
                 sql = text("""
                     INSERT INTO bybit_kline_audit
-                        (symbol, open_time, open_time_dt, open_price, high_price,
+                        (symbol, interval, market_type, open_time, open_time_dt, open_price, high_price,
                          low_price, close_price, volume, turnover, raw)
                     VALUES
-                        (:symbol, :open_time, :open_time_dt, :open_price, :high_price,
+                        (:symbol, :interval, :market_type, :open_time, :open_time_dt, :open_price, :high_price,
                          :low_price, :close_price, :volume, :turnover, :raw)
-                    ON CONFLICT(symbol, open_time) DO UPDATE SET
+                    ON CONFLICT(symbol, interval, market_type, open_time) DO UPDATE SET
                         open_time_dt = excluded.open_time_dt,
                         open_price = excluded.open_price,
                         high_price = excluded.high_price,
@@ -881,7 +903,7 @@ class BybitAdapter:
                         existing.close_price = p["close_price"]
                         existing.volume = p["volume"]
                         existing.turnover = p["turnover"]
-                        existing.raw = p["raw"]
+                        existing.raw = p["raw"]  # type: ignore[assignment]
                         continue
                     obj = BybitKlineAudit(
                         symbol=p["symbol"],
@@ -895,17 +917,15 @@ class BybitAdapter:
                         turnover=p["turnover"],
                     )
                     try:
-                        obj.raw = p["raw"]
+                        obj.raw = p["raw"]  # type: ignore[assignment]
                     except Exception:
-                        obj.raw = str(p["raw"])
+                        obj.raw = str(p["raw"])  # type: ignore[assignment]
                     db.add(obj)
                 db.commit()
 
         except Exception:
-            try:
+            with contextlib.suppress(Exception):
                 db.rollback()
-            except Exception:
-                pass
             raise
         finally:
             try:
@@ -940,7 +960,7 @@ class BybitAdapter:
                 else info.get("result") or []
             )
             self._instruments_cache = {
-                itm.get("symbol"): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
+                str(itm.get("symbol")): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
             }
             self._instruments_cache_at = now
         except Exception:

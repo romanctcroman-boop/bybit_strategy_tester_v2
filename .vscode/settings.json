@@ -71,12 +71,66 @@
   "git.ignoredRepositories": [
     "${workspaceFolder}/mcp-server"
   ],
-  // Exclude nested repo from file watching and search to reduce noise
+  // Exclude heavy directories from file watching (saves CPU + RAM)
   "files.watcherExclude": {
-    "mcp-server/**": true
+    "mcp-server/**": true,
+    "**/.venv/**": true,
+    "**/.mypy_cache/**": true,
+    "**/.ruff_cache/**": true,
+    "**/.pytest_cache/**": true,
+    "**/node_modules/**": true,
+    "**/logs/**": true,
+    "**/build/**": true,
+    "**/mcp-deepseek/**": true,
+    "**/__pycache__/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/vscode-extension/**": true,
+    "**/.cursor/**": true,
+    "**/.vs/**": true,
+    "**/bybit_strategy_tester.egg-info/**": true,
+    "test_e2e_test_*/**": true,
+    "test_eval_test_*/**": true,
+    "test_memory_test_*/**": true,
+    "**/agent_memory/**": true,
+    "**/journal/**": true
   },
+  // Hide non-essential directories from Explorer sidebar
+  "files.exclude": {
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true,
+    "**/.pytest_cache": true,
+    "**/mcp-deepseek": true,
+    "**/__pycache__": true,
+    "**/.cursor": true,
+    "**/.vs": true,
+    "**/bybit_strategy_tester.egg-info": true,
+    "**/.cache": true,
+    "test_e2e_test_*": true,
+    "test_eval_test_*": true,
+    "test_memory_test_*": true
+  },
+  // Exclude from search results (Ctrl+Shift+F)
   "search.exclude": {
-    "mcp-server/**": true
+    "mcp-server/**": true,
+    "**/.venv/**": true,
+    "**/.mypy_cache/**": true,
+    "**/.ruff_cache/**": true,
+    "**/.pytest_cache/**": true,
+    "**/node_modules/**": true,
+    "**/logs/**": true,
+    "**/build/**": true,
+    "**/mcp-deepseek/**": true,
+    "**/__pycache__/**": true,
+    "**/*.sqlite3": true,
+    "**/*.sqlite3-wal": true,
+    "**/*.sqlite3-shm": true,
+    "**/vscode-extension/**": true,
+    "**/.cursor/**": true,
+    "**/.vs/**": true,
+    "test_e2e_test_*/**": true,
+    "test_eval_test_*/**": true,
+    "test_memory_test_*/**": true
   },
   // Auto-run tasks on folder open
   "task.allowAutomaticTasks": "on",
@@ -110,26 +164,8 @@
     ".agent/skills"
   ],
   // Copilot instructions location (auto-loaded)
-  "github.copilot.chat.codeGeneration.instructions": [
-    {
-      "file": ".github/copilot-instructions.md"
-    },
-    {
-      "file": ".agent/Claude.md"
-    }
-  ],
-  // Test generation instructions
-  "github.copilot.chat.testGeneration.instructions": [
-    {
-      "file": ".github/instructions/tests.instructions.md"
-    }
-  ],
-  // Code review instructions
-  "github.copilot.chat.reviewSelection.instructions": [
-    {
-      "file": ".github/prompts/code-review.prompt.md"
-    }
-  ],
+  // Copilot instructions are now auto-loaded from .github/instructions/ files
+  // and .github/copilot-instructions.md (no manual config needed)
   // Copilot completions tuning
   "github.copilot.enable": {
     "*": true,

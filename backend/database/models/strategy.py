@@ -27,6 +27,7 @@ class StrategyType(str, enum.Enum):
     MARTINGALE = "martingale"
     CUSTOM = "custom"
     ADVANCED = "advanced"
+    BUILDER = "builder"
 
 
 class StrategyStatus(str, enum.Enum):

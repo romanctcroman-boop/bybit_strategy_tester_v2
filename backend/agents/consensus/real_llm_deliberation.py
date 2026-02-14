@@ -12,6 +12,8 @@ Agent Specializations:
 
 P2 Fix (2026-01-28): Now uses KeyManager for secure API key access instead of os.environ.
 P2 Update (2026-02-09): Full 3-agent Qwen integration with specialized system prompts.
+P2 Update (2026-02-11): Deep Perplexity integration — context enrichment,
+    cross-validation, structured data exchange between agents.
 """
 
 from __future__ import annotations
@@ -57,6 +59,10 @@ from backend.agents.consensus.deliberation import (
     MultiAgentDeliberation,
     VotingStrategy,
 )
+from backend.agents.consensus.perplexity_integration import (
+    AgentSignal,
+    get_perplexity_integration,
+)
 from backend.agents.llm.connections import (
     DeepSeekClient,
     LLMConfig,
@@ -69,11 +75,21 @@ from backend.agents.llm.connections import (
 
 class RealLLMDeliberation(MultiAgentDeliberation):
     """
-    Multi-Agent Deliberation with real LLM API calls.
+    Multi-Agent Deliberation with real LLM API calls and deep Perplexity integration.
 
     Extends MultiAgentDeliberation to use actual DeepSeek/Qwen/Perplexity APIs
     instead of simulated responses. Each agent has a specialized system prompt
     matching its domain expertise.
+
+    Deep Perplexity Integration (v2):
+        - **Context Enrichment**: Perplexity is called first to gather real-time
+          market data, then DeepSeek/Qwen receive enriched prompts.
+        - **Structured Signals**: Agents exchange structured AgentSignal objects
+          instead of raw text, enabling cross-validation.
+        - **Cross-Validation**: After all agents respond, signals are cross-validated
+          to detect conflicts and calculate agreement scores.
+        - **Adaptive Routing**: Perplexity is only consulted when the task benefits
+          from web-search context (saves costs for pure backtest tasks).
 
     Agent Roles:
         - **deepseek**: Quantitative analyst — risk metrics, statistical validation,
@@ -120,6 +136,7 @@ class RealLLMDeliberation(MultiAgentDeliberation):
             "volatility cycles, and event-driven strategy adjustments. "
             "You bring real-time market context and broader economic perspective. "
             "Consider market conditions, correlation shifts, and regime changes. "
+            "When providing signals, always include current market regime and sentiment direction. "
             "Follow the exact format specified in the prompt."
         ),
     }
@@ -131,17 +148,34 @@ class RealLLMDeliberation(MultiAgentDeliberation):
         "Follow the exact format specified in the prompt."
     )
 
-    def __init__(self):
-        """Initialize with real LLM clients"""
+    def __init__(self, enable_perplexity_enrichment: bool = True):
+        """
+        Initialize with real LLM clients and Perplexity integration.
+
+        Args:
+            enable_perplexity_enrichment: If True, Perplexity is called first
+                to enrich context before DeepSeek/Qwen analyze. Adaptive routing
+                still applies (skips pure backtest tasks).
+        """
         super().__init__()
 
         self._clients: dict[str, Any] = {}
         self._initialize_clients()
 
+        # Perplexity deep integration
+        self._perplexity_integration = get_perplexity_integration()
+        self._enable_enrichment = enable_perplexity_enrichment
+        self._last_market_context: dict[str, Any] | None = None
+        self._last_cross_validation: dict[str, Any] | None = None
+        self._agent_signals: list[AgentSignal] = []
+
         # Override ask_fn to use real LLM
         self.ask_fn = self._real_ask
 
-        logger.info("🤖 RealLLMDeliberation initialized with actual LLM APIs")
+        logger.info(
+            "🤖 RealLLMDeliberation initialized with actual LLM APIs "
+            f"(perplexity_enrichment={enable_perplexity_enrichment})"
+        )
 
     def _initialize_clients(self) -> None:
         """Initialize LLM clients using KeyManager for secure key access"""
@@ -160,18 +194,19 @@ class RealLLMDeliberation(MultiAgentDeliberation):
         else:
             logger.warning("⚠️ DEEPSEEK_API_KEY not found in KeyManager or environment")
 
-        # Perplexity - use KeyManager
+        # Perplexity - use KeyManager, upgraded model for deeper analysis
         perplexity_key = _get_api_key("PERPLEXITY_API_KEY")
         if perplexity_key:
+            perplexity_model = os.getenv("PERPLEXITY_MODEL", "sonar-pro")
             config = LLMConfig(
                 provider=LLMProvider.PERPLEXITY,
                 api_key=perplexity_key,
-                model="llama-3.1-sonar-small-128k-online",
-                temperature=0.7,
+                model=perplexity_model,
+                temperature=0.4,
                 max_tokens=2048,
             )
             self._clients["perplexity"] = PerplexityClient(config)
-            logger.info("✅ Perplexity client ready (via KeyManager)")
+            logger.info(f"✅ Perplexity client ready (model={perplexity_model}, via KeyManager)")
         else:
             logger.warning("⚠️ PERPLEXITY_API_KEY not found in KeyManager or environment")
 
@@ -194,9 +229,9 @@ class RealLLMDeliberation(MultiAgentDeliberation):
         """
         Ask real LLM for response with agent-specific system prompt.
 
-        Each agent receives a specialized system prompt matching its domain
-        expertise (quantitative, technical, or market research). Falls back
-        to simulated response if the client is unavailable.
+        Enhanced with Perplexity context enrichment: if market context is
+        available from a prior enrich_for_deliberation() call, DeepSeek and
+        Qwen receive enriched prompts automatically.
 
         Args:
             agent_type: Agent name — "deepseek", "qwen", or "perplexity"
@@ -215,9 +250,19 @@ class RealLLMDeliberation(MultiAgentDeliberation):
             # Use agent-specific system prompt for domain specialization
             system_prompt = self.AGENT_SYSTEM_PROMPTS.get(agent_type.lower(), self.DEFAULT_SYSTEM_PROMPT)
 
+            # Enrich prompt for DeepSeek/Qwen with Perplexity market context
+            enriched_prompt = prompt
+            if agent_type.lower() in ("deepseek", "qwen") and self._last_market_context:
+                enriched_prompt = self._perplexity_integration.build_enriched_prompt(
+                    agent_type=agent_type.lower(),
+                    base_prompt=prompt,
+                    market_context=self._last_market_context,
+                    peer_signals=self._agent_signals if self._agent_signals else None,
+                )
+
             messages = [
                 LLMMessage(role="system", content=system_prompt),
-                LLMMessage(role="user", content=prompt),
+                LLMMessage(role="user", content=enriched_prompt),
             ]
 
             response = await client.chat(messages)
@@ -225,6 +270,7 @@ class RealLLMDeliberation(MultiAgentDeliberation):
             logger.debug(
                 f"🤖 {agent_type} response: {len(response.content)} chars, "
                 f"{response.total_tokens} tokens, {response.latency_ms:.0f}ms"
+                f"{' [enriched]' if enriched_prompt != prompt else ''}"
             )
 
             return response.content
@@ -233,8 +279,150 @@ class RealLLMDeliberation(MultiAgentDeliberation):
             logger.error(f"LLM request failed for {agent_type}: {e}")
             return self._simulate_response(agent_type, prompt)
 
+    async def enrich_for_deliberation(
+        self,
+        question: str,
+        symbol: str = "BTCUSDT",
+        strategy_type: str = "general",
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Pre-enrich context with Perplexity before starting deliberation.
+
+        Call this BEFORE deliberate() to give DeepSeek/Qwen real-time
+        market context. The enriched context is stored internally and
+        automatically injected into agent prompts.
+
+        Args:
+            question: The deliberation question (used to determine relevance)
+            symbol: Trading symbol for market context
+            strategy_type: Strategy type for context
+            context: Additional context dict
+
+        Returns:
+            Market context dict if enrichment occurred, None if skipped
+        """
+        if not self._enable_enrichment:
+            logger.debug("Perplexity enrichment disabled")
+            return None
+
+        # Check if Perplexity should be consulted for this task
+        if not self._perplexity_integration.should_consult_perplexity(question):
+            logger.debug(f"Perplexity skipped (task doesn't need web context): {question[:60]}")
+            return None
+
+        try:
+            enriched = await self._perplexity_integration.enrich_context(
+                symbol=symbol,
+                strategy_type=strategy_type,
+                base_context=context or {},
+            )
+
+            self._last_market_context = enriched.get("market_context")
+
+            logger.info(
+                f"🟣 Deliberation enriched with Perplexity context for {symbol} "
+                f"(regime={self._last_market_context.get('regime', '?') if self._last_market_context else '?'})"
+            )
+
+            return self._last_market_context
+
+        except Exception as e:
+            logger.warning(f"Perplexity enrichment failed (non-fatal): {e}")
+            return None
+
+    def record_agent_signal(
+        self,
+        agent: str,
+        signal_type: str,
+        direction: str,
+        confidence: float,
+        reasoning: str,
+        data: dict[str, Any] | None = None,
+    ) -> AgentSignal:
+        """
+        Record a structured signal from an agent for cross-validation.
+
+        Call this after each agent responds during deliberation to build
+        a structured signal log. Signals are automatically cross-validated
+        and shared with subsequent agents.
+
+        Args:
+            agent: Agent name (e.g., "deepseek")
+            signal_type: Signal domain ("quantitative", "technical", "sentiment")
+            direction: Signal direction ("bullish", "bearish", "neutral")
+            confidence: Confidence level (0.0 - 1.0)
+            reasoning: Brief reasoning string
+            data: Optional additional data dict
+
+        Returns:
+            Created AgentSignal
+        """
+        signal = AgentSignal(
+            agent=agent,
+            signal_type=signal_type,
+            direction=direction,
+            confidence=confidence,
+            reasoning=reasoning,
+            data=data or {},
+        )
+        self._agent_signals.append(signal)
+
+        logger.debug(f"📊 Signal recorded: {agent} → {direction} (conf={confidence:.0%}, type={signal_type})")
+
+        return signal
+
+    def cross_validate(self) -> dict[str, Any] | None:
+        """
+        Cross-validate all recorded agent signals.
+
+        Detects conflicts between agents and provides resolution
+        recommendations. Call after all agents have responded.
+
+        Returns:
+            Cross-validation result dict, or None if < 2 signals
+        """
+        if len(self._agent_signals) < 2:
+            logger.debug("Not enough signals for cross-validation")
+            return None
+
+        result = self._perplexity_integration.cross_validate_signals(self._agent_signals)
+        self._last_cross_validation = result.to_dict()
+
+        if not result.agents_agree:
+            logger.warning(
+                f"⚠️ Agent conflict detected! Agreement score: {result.agreement_score:.0%}. "
+                f"Conflicts: {len(result.conflicts)}"
+            )
+        else:
+            logger.info(f"✅ Agents agree (score={result.agreement_score:.0%})")
+
+        return self._last_cross_validation
+
+    def get_integration_stats(self) -> dict[str, Any]:
+        """
+        Get combined stats from deliberation and Perplexity integration.
+
+        Returns:
+            Dict with deliberation stats + Perplexity integration stats
+        """
+        return {
+            "deliberation": dict(self.stats),
+            "perplexity_integration": self._perplexity_integration.get_stats(),
+            "signals_recorded": len(self._agent_signals),
+            "last_cross_validation": self._last_cross_validation,
+            "market_context_available": self._last_market_context is not None,
+        }
+
+    def clear_session(self) -> None:
+        """Clear session-specific state (signals, context) for a new deliberation."""
+        self._agent_signals.clear()
+        self._last_market_context = None
+        self._last_cross_validation = None
+        logger.debug("🔄 Deliberation session cleared")
+
     async def close(self) -> None:
-        """Close all LLM clients"""
+        """Close all LLM clients and Perplexity integration"""
         for name, client in self._clients.items():
             try:
                 await client.close()
@@ -243,6 +431,12 @@ class RealLLMDeliberation(MultiAgentDeliberation):
                 logger.warning(f"Error closing {name}: {e}")
 
         self._clients.clear()
+
+        # Close Perplexity integration
+        try:
+            await self._perplexity_integration.close()
+        except Exception as e:
+            logger.warning(f"Error closing Perplexity integration: {e}")
 
 
 # Global instance
@@ -263,11 +457,18 @@ async def deliberate_with_llm(
     max_rounds: int = 2,
     min_confidence: float = 0.7,
     voting_strategy: VotingStrategy = VotingStrategy.WEIGHTED,
+    symbol: str = "BTCUSDT",
+    strategy_type: str = "general",
+    enrich_with_perplexity: bool = True,
 ) -> DeliberationResult:
     """
-    Convenience function for real LLM deliberation.
+    Convenience function for real LLM deliberation with Perplexity enrichment.
 
-    Automatically uses all available agents (up to 3: deepseek, qwen, perplexity).
+    Automatically:
+    1. Uses all available agents (up to 3: deepseek, qwen, perplexity)
+    2. Enriches context with Perplexity web-search (if relevant to the task)
+    3. Cross-validates signals after deliberation
+
     Falls back to deepseek-only if no agents have API keys configured.
 
     Args:
@@ -276,18 +477,32 @@ async def deliberate_with_llm(
         max_rounds: Max deliberation rounds
         min_confidence: Min confidence for consensus
         voting_strategy: Voting strategy to use
+        symbol: Trading symbol for Perplexity context
+        strategy_type: Strategy type for context enrichment
+        enrich_with_perplexity: Whether to pre-enrich with Perplexity
 
     Returns:
         DeliberationResult with real AI responses
     """
     deliberation = get_real_deliberation()
 
+    # Clear previous session state
+    deliberation.clear_session()
+
     # Default to all available agents (up to 3)
     if agents is None:
         available = list(deliberation._clients.keys())
         agents = available if available else ["deepseek"]
 
-    return await deliberation.deliberate(
+    # Pre-enrich context with Perplexity (adaptive — may skip for backtest tasks)
+    if enrich_with_perplexity and "perplexity" in agents:
+        await deliberation.enrich_for_deliberation(
+            question=question,
+            symbol=symbol,
+            strategy_type=strategy_type,
+        )
+
+    result = await deliberation.deliberate(
         question=question,
         agents=agents,
         max_rounds=max_rounds,
@@ -295,8 +510,16 @@ async def deliberate_with_llm(
         voting_strategy=voting_strategy,
     )
 
+    # Post-deliberation cross-validation
+    cross_val = deliberation.cross_validate()
+    if cross_val:
+        result.metadata["cross_validation"] = cross_val
+
+    return result
+
 
 __all__ = [
+    "AgentSignal",
     "RealLLMDeliberation",
     "deliberate_with_llm",
     "get_real_deliberation",

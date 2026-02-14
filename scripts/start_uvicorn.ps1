@@ -32,13 +32,19 @@ function Get-UvicornProcess {
         if ($pidContent) {
             $procId = [int]$pidContent
             $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
-            if ($proc) {
+            # Verify it's actually a python/uvicorn process, not a reused PID
+            if ($proc -and $proc.ProcessName -like "python*") {
                 return $proc
             }
+            # PID file is stale — remove it
+            Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
         }
     }
     # Fallback: check port 8000
-    $conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+    try {
+        $conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue 2>$null
+    }
+    catch { $conn = $null }
     if ($conn) {
         return Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
     }

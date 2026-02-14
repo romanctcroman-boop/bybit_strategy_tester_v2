@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -219,6 +219,71 @@ class OptimizationConfig(BaseModel):
     advanced: AdvancedOptions = Field(default_factory=AdvancedOptions)
     symbol: str = Field(default="BTCUSDT", description="Trading symbol")
     timeframe: str = Field(default="1h", description="Timeframe")
+
+
+class BuilderOptimizationRequest(BaseModel):
+    """Request to run optimization on a Strategy Builder strategy.
+
+    Extracts optimizable params from blocks, runs Grid Search or Optuna,
+    returns ranked results with full metrics.
+    """
+
+    # Data period
+    symbol: str = Field(default="BTCUSDT", description="Trading pair")
+    interval: str = Field(default="15", description="Timeframe (Bybit format)")
+    start_date: str = Field(default="2025-01-01", description="Start date YYYY-MM-DD")
+    end_date: str = Field(default="2025-06-01", description="End date YYYY-MM-DD")
+    market_type: str = Field(default="linear", description="Market type: spot or linear")
+
+    # Capital & risk
+    initial_capital: float = Field(default=10000.0, ge=100, description="Initial capital")
+    leverage: int = Field(default=10, ge=1, le=125, description="Leverage")
+    commission: float = Field(default=0.0007, ge=0, le=0.01, description="Commission rate (0.0007 = 0.07%)")
+    direction: str = Field(default="both", description="Trading direction: long/short/both")
+
+    # Optimization method
+    method: str = Field(
+        default="grid_search",
+        pattern="^(grid_search|random_search|bayesian)$",
+        description="Optimization method",
+    )
+
+    # Custom parameter ranges (override defaults from block types)
+    # Each item: {param_path: "blockId.paramKey", low, high, step, enabled}
+    parameter_ranges: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Custom param ranges overriding defaults",
+    )
+
+    # Optimization limits
+    max_iterations: int = Field(default=0, ge=0, description="Max iterations (0 = all for grid)")
+    n_trials: int = Field(default=100, ge=10, le=500, description="Optuna trials for bayesian")
+    sampler_type: str = Field(default="tpe", description="Optuna sampler: tpe/random/cmaes")
+    timeout_seconds: int = Field(default=3600, ge=60, le=86400, description="Timeout")
+    max_results: int = Field(default=20, ge=1, le=100, description="Max results to return")
+
+    # Early stopping
+    early_stopping: bool = Field(default=False, description="Enable early stopping")
+    early_stopping_patience: int = Field(default=20, ge=5, description="ES patience")
+
+    # Scoring
+    optimize_metric: str = Field(default="sharpe_ratio", description="Metric to optimize")
+    weights: dict[str, float] | None = Field(default=None, description="Composite weights")
+
+    # Filters
+    constraints: list[dict] | None = Field(default=None, description="Metric constraints")
+    min_trades: int | None = Field(default=None, description="Min trades filter")
+
+    @field_validator("interval")
+    @classmethod
+    def validate_interval(cls, v: str) -> str:
+        supported = {"1", "5", "15", "30", "60", "240", "D", "W", "M"}
+        legacy_map = {"3": "5", "120": "60", "360": "240", "720": "D"}
+        if v in legacy_map:
+            return legacy_map[v]
+        if v not in supported:
+            raise ValueError(f"Unsupported interval '{v}'. Use: {sorted(supported)}")
+        return v
 
 
 class InstantiateTemplateRequest(BaseModel):
@@ -1384,26 +1449,227 @@ async def diff_strategy_versions(strategy_id: str, version_id_1: str, version_id
 
 
 @router.post("/strategies/{strategy_id}/optimize")
-async def optimize_strategy(strategy_id: str):
-    """Optimize a strategy for performance"""
-    if strategy_id not in strategy_builder.strategies:
+async def optimize_strategy(
+    strategy_id: str,
+    request: BuilderOptimizationRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Run optimization on a Strategy Builder strategy.
+
+    Extracts optimizable parameters from blocks, generates combinations
+    (Grid/Random/Optuna), clones graphs with modified params, runs backtests
+    via StrategyBuilderAdapter, and returns ranked results.
+    """
+    from backend.optimization.builder_optimizer import (
+        extract_optimizable_params,
+        generate_builder_param_combinations,
+        run_builder_grid_search,
+        run_builder_optuna_search,
+    )
+
+    # Fetch strategy from DB
+    db_strategy = (
+        db.query(Strategy)
+        .filter(
+            Strategy.id == strategy_id,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
+        )
+        .first()
+    )
+    if not db_strategy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Strategy Builder strategy {strategy_id} not found",
+        )
+
+    if not db_strategy.builder_blocks or len(db_strategy.builder_blocks) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Strategy has no blocks. Add blocks before optimizing.",
+        )
+
+    # Build strategy graph
+    strategy_graph = {
+        "name": db_strategy.name,
+        "description": db_strategy.description or "",
+        "blocks": db_strategy.builder_blocks or [],
+        "connections": db_strategy.builder_connections or [],
+        "market_type": request.market_type,
+        "direction": request.direction,
+    }
+    if db_strategy.builder_graph and db_strategy.builder_graph.get("main_strategy"):
+        strategy_graph["main_strategy"] = db_strategy.builder_graph["main_strategy"]
+
+    # Extract optimizable params from graph
+    all_params = extract_optimizable_params(strategy_graph)
+
+    if not all_params and not request.parameter_ranges:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No optimizable parameters found in strategy blocks. "
+            "Add indicator blocks (RSI, MACD, Bollinger, etc.) to enable optimization.",
+        )
+
+    # Fetch OHLCV data
+    from backend.backtesting.service import BacktestService
+
+    service = BacktestService()
+    try:
+        ohlcv = await service._fetch_historical_data(
+            symbol=request.symbol,
+            interval=request.interval,
+            start_date=datetime.fromisoformat(request.start_date),
+            end_date=datetime.fromisoformat(request.end_date),
+            market_type=request.market_type,
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch data for builder optimization: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to fetch market data: {e!s}",
+        )
+
+    if ohlcv is None or len(ohlcv) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No data available for {request.symbol} {request.interval}",
+        )
+
+    # Config params for backtest runner
+    config_params = {
+        "symbol": request.symbol,
+        "interval": request.interval,
+        "initial_capital": request.initial_capital,
+        "leverage": request.leverage,
+        "commission": request.commission,
+        "direction": request.direction,
+        "use_fixed_amount": False,
+        "fixed_amount": 0.0,
+        "engine_type": "numba",
+        "optimize_metric": request.optimize_metric,
+        "weights": request.weights,
+        "constraints": request.constraints,
+        "min_trades": request.min_trades,
+    }
+
+    try:
+        if request.method == "bayesian":
+            # Optuna Bayesian search
+            custom_ranges = request.parameter_ranges or None
+            # Merge to get active specs
+            from backend.optimization.builder_optimizer import _merge_ranges
+
+            active_specs = _merge_ranges(all_params, custom_ranges) if custom_ranges else all_params
+
+            result = await asyncio.to_thread(
+                run_builder_optuna_search,
+                base_graph=strategy_graph,
+                ohlcv=ohlcv,
+                param_specs=active_specs,
+                config_params=config_params,
+                optimize_metric=request.optimize_metric,
+                weights=request.weights,
+                n_trials=request.n_trials,
+                sampler_type=request.sampler_type,
+                top_n=request.max_results,
+                timeout_seconds=request.timeout_seconds,
+            )
+        else:
+            # Grid or Random search
+            search_method = "random" if request.method == "random_search" else "grid"
+            custom_ranges = request.parameter_ranges or None
+            param_combinations, _total = generate_builder_param_combinations(
+                param_specs=all_params,
+                custom_ranges=custom_ranges,
+                search_method=search_method,
+                max_iterations=request.max_iterations,
+                random_seed=42,
+            )
+
+            result = await asyncio.to_thread(
+                run_builder_grid_search,
+                base_graph=strategy_graph,
+                ohlcv=ohlcv,
+                param_combinations=param_combinations,
+                config_params=config_params,
+                optimize_metric=request.optimize_metric,
+                weights=request.weights,
+                max_results=request.max_results,
+                early_stopping=request.early_stopping,
+                early_stopping_patience=request.early_stopping_patience,
+                timeout_seconds=request.timeout_seconds,
+            )
+
+        return {
+            "strategy_id": strategy_id,
+            "strategy_name": db_strategy.name,
+            "optimizable_params": [
+                {
+                    "param_path": p["param_path"],
+                    "block_type": p["block_type"],
+                    "block_name": p["block_name"],
+                    "param_key": p["param_key"],
+                    "type": p["type"],
+                    "low": p["low"],
+                    "high": p["high"],
+                    "step": p["step"],
+                    "current_value": p["current_value"],
+                }
+                for p in all_params
+            ],
+            **result,
+        }
+
+    except Exception as e:
+        logger.error(f"Builder optimization failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Optimization failed: {e!s}",
+        )
+
+
+@router.get("/strategies/{strategy_id}/optimizable-params")
+async def get_optimizable_params(
+    strategy_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get list of optimizable parameters for a Strategy Builder strategy.
+
+    Returns parameter specs with default ranges based on block types.
+    Used by frontend to populate optimization configuration UI.
+    """
+    from backend.optimization.builder_optimizer import extract_optimizable_params
+
+    db_strategy = (
+        db.query(Strategy)
+        .filter(
+            Strategy.id == strategy_id,
+            Strategy.is_builder_strategy == True,  # noqa: E712
+            Strategy.is_deleted == False,  # noqa: E712
+        )
+        .first()
+    )
+    if not db_strategy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Strategy {strategy_id} not found",
         )
 
-    graph = strategy_builder.strategies[strategy_id]
+    strategy_graph = {
+        "blocks": db_strategy.builder_blocks or [],
+        "connections": db_strategy.builder_connections or [],
+    }
+
+    params = extract_optimizable_params(strategy_graph)
 
     return {
         "strategy_id": strategy_id,
-        "original_blocks": len(graph.blocks),
-        "optimized_blocks": len(graph.blocks),
-        "optimizations_applied": [
-            "removed_redundant_blocks",
-            "merged_similar_indicators",
-            "simplified_conditions",
-        ],
-        "performance_improvement": 15.5,
+        "strategy_name": db_strategy.name,
+        "optimizable_params": params,
+        "total_params": len(params),
     }
 
 
@@ -1540,29 +1806,95 @@ async def validate_block_config(block_config: dict[str, Any]):
 
 
 class BacktestRequest(BaseModel):
-    """Request to run backtest from strategy builder"""
+    """Request to run backtest from strategy builder.
 
-    symbol: str = Field(default="BTCUSDT", description="Trading pair symbol")
+    Properties panel fields map directly to these fields.
+    Validators ensure early 422 errors instead of cryptic 500s.
+    """
+
+    symbol: str = Field(
+        default="BTCUSDT",
+        min_length=2,
+        max_length=20,
+        description="Trading pair symbol (e.g. BTCUSDT)",
+    )
     interval: str = Field(default="15", description="Timeframe: 1, 5, 15, 30, 60, 240, D, W, M")
-    initial_capital: float = Field(default=10000.0, ge=100, description="Initial capital for backtest")
+    initial_capital: float = Field(default=10000.0, ge=100, le=100_000_000, description="Initial capital for backtest")
     start_date: datetime = Field(..., description="Backtest start date")
     end_date: datetime = Field(..., description="Backtest end date")
     market_type: str = Field(
         default="linear", description="Market type: 'spot' (TradingView parity) or 'linear' (perpetual futures)"
     )
+    direction: str = Field(
+        default="both",
+        description="Trading direction: 'long', 'short', or 'both'. Takes priority over builder_graph.",
+    )
     engine: str | None = Field(
         default=None, description="Engine: fallback_v2, fallback_v3, fallback_v4, numba_v2, gpu_v2, dca"
     )
-    commission: float = Field(default=0.0007, description="Commission (0.07% for TradingView parity)")
-    slippage: float = Field(default=0.0005, description="Slippage (0.05%)")
+    commission: float = Field(default=0.0007, ge=0, le=0.01, description="Commission as decimal (0.0007 = 0.07%)")
+    slippage: float = Field(default=0.0005, ge=0, le=0.05, description="Slippage as decimal (0.0005 = 0.05%)")
     leverage: int = Field(default=10, ge=1, le=125, description="Leverage")
     pyramiding: int = Field(default=1, ge=0, le=99, description="Max concurrent positions")
     stop_loss: float | None = Field(default=None, ge=0.001, le=0.5, description="Stop loss %")
     take_profit: float | None = Field(default=None, ge=0.001, le=1.0, description="Take profit %")
+
+    # Position sizing from Properties panel
+    position_size: float = Field(
+        default=1.0,
+        ge=0.01,
+        le=100_000_000,
+        description="Position size: fraction (0.01-1.0) for percent mode, absolute value for fixed/contracts",
+    )
+    position_size_type: str = Field(
+        default="percent",
+        description="Position sizing mode: 'percent', 'fixed_amount', 'contracts'",
+    )
+
     no_trade_days: list[int] | None = Field(
         default=None,
         description="Weekdays to block (0=Mon … 6=Sun). Unchecked in UI = trade that day.",
     )
+
+    @field_validator("interval")
+    @classmethod
+    def validate_interval(cls, v: str) -> str:
+        """Validate supported Bybit timeframes."""
+        supported = {"1", "5", "15", "30", "60", "240", "D", "W", "M"}
+        # Also accept legacy formats
+        legacy_map = {"3": "5", "120": "60", "360": "240", "720": "D"}
+        if v in legacy_map:
+            return legacy_map[v]
+        if v not in supported:
+            raise ValueError(f"Unsupported interval '{v}'. Use: {sorted(supported)}")
+        return v
+
+    @field_validator("market_type")
+    @classmethod
+    def validate_market_type(cls, v: str) -> str:
+        """Validate market type."""
+        allowed = {"spot", "linear"}
+        if v.lower() not in allowed:
+            raise ValueError(f"market_type must be one of: {sorted(allowed)}")
+        return v.lower()
+
+    @field_validator("direction")
+    @classmethod
+    def validate_direction(cls, v: str) -> str:
+        """Validate trading direction."""
+        allowed = {"long", "short", "both"}
+        if v.lower() not in allowed:
+            raise ValueError(f"direction must be one of: {sorted(allowed)}")
+        return v.lower()
+
+    @field_validator("position_size_type")
+    @classmethod
+    def validate_position_size_type(cls, v: str) -> str:
+        """Validate position sizing mode."""
+        allowed = {"percent", "fixed_amount", "contracts"}
+        if v.lower() not in allowed:
+            raise ValueError(f"position_size_type must be one of: {sorted(allowed)}")
+        return v.lower()
 
     # ===== DCA GRID SETTINGS =====
     dca_enabled: bool = Field(
@@ -1709,11 +2041,17 @@ async def run_backtest_from_builder(
     # Extract market_type and direction
     # Priority: request > builder_graph > default
     market_type = request.market_type or "linear"
-    direction = "both"
-    if db_strategy.builder_graph:
-        if not request.market_type:
-            market_type = db_strategy.builder_graph.get("market_type", "linear")
-        direction = db_strategy.builder_graph.get("direction", "both")
+    # BUG-1 FIX: Use direction from request (Properties panel), fallback to builder_graph
+    direction = request.direction or "both"
+    if db_strategy.builder_graph and not request.market_type:
+        market_type = db_strategy.builder_graph.get("market_type", "linear")
+
+    # BUG-2 FIX: Resolve position_size from request (Properties panel)
+    position_size = request.position_size
+    # For percent mode, JS already sends fraction (e.g. 0.5 for 50%)
+    # Clamp to BacktestConfig range (0.01 - 1.0 for percent)
+    if request.position_size_type == "percent":
+        position_size = max(0.01, min(1.0, position_size))
 
     try:
         # Build strategy graph from DB data
@@ -1871,7 +2209,7 @@ async def run_backtest_from_builder(
             strategy_type=StrategyType.CUSTOM,  # Placeholder, adapter will be used
             strategy_params=strategy_params_for_dca,
             initial_capital=request.initial_capital,
-            position_size=1.0,
+            position_size=position_size,
             leverage=request.leverage,
             direction=direction,
             stop_loss=block_stop_loss,
@@ -1979,24 +2317,114 @@ async def run_backtest_from_builder(
             engine = BacktestEngine()
             result = engine.run(backtest_config, ohlcv, custom_strategy=adapter)
 
-        # Save backtest to database
+        # Save backtest to database with full metrics (parity with backtests.py)
         # Backtest model already imported at top
+        from backend.api.routers.backtests import _get_side_value, build_equity_curve_response
+
+        m = result.metrics
+
+        # Normalize trades into dicts suitable for DB storage
+        trades_source = result.trades or []
+        trades_list = []
+        for t in (trades_source or [])[:500]:
+            if hasattr(t, "__dict__") and not isinstance(t, dict):
+                entry_time = getattr(t, "entry_time", None)
+                exit_time = getattr(t, "exit_time", None)
+                side = getattr(t, "side", None)
+                trades_list.append(
+                    {
+                        "entry_time": entry_time.isoformat() if entry_time else None,
+                        "exit_time": exit_time.isoformat() if exit_time else None,
+                        "side": _get_side_value(side),
+                        "entry_price": float(getattr(t, "entry_price", 0) or 0),
+                        "exit_price": float(getattr(t, "exit_price", 0) or 0),
+                        "size": float(getattr(t, "size", 1.0) or 1.0),
+                        "pnl": float(getattr(t, "pnl", 0) or 0),
+                        "pnl_pct": float(getattr(t, "pnl_pct", 0) or 0),
+                        "fees": float(getattr(t, "fees", 0) or 0),
+                        "duration_bars": int(getattr(t, "duration_bars", 0) or 0),
+                        "mfe": float(getattr(t, "mfe", 0) or 0),
+                        "mae": float(getattr(t, "mae", 0) or 0),
+                    }
+                )
+            elif isinstance(t, dict):
+                trades_list.append(
+                    {
+                        "entry_time": t.get("entry_time"),
+                        "exit_time": t.get("exit_time"),
+                        "side": t.get("side", "long"),
+                        "entry_price": float(t.get("entry_price", 0) or 0),
+                        "exit_price": float(t.get("exit_price", 0) or 0),
+                        "size": float(t.get("size", 1.0) or 1.0),
+                        "pnl": float(t.get("pnl", 0) or 0),
+                        "pnl_pct": float(t.get("pnl_pct", 0) or 0),
+                        "fees": float(t.get("fees", 0) or 0),
+                        "duration_bars": int(t.get("duration_bars", 0) or 0),
+                        "mfe": float(t.get("mfe", 0) or 0),
+                        "mae": float(t.get("mae", 0) or 0),
+                    }
+                )
+
+        # Build equity curve payload for DB
+        equity_payload = None
+        ec_source = result.equity_curve or getattr(result, "equity", None)
+        if ec_source:
+            equity_payload = build_equity_curve_response(ec_source, trades_list)
 
         db_backtest = Backtest(
             strategy_id=strategy_id,
-            strategy_type="builder",  # Mark as builder strategy
+            strategy_type="builder",
             symbol=backtest_config.symbol,
-            timeframe=backtest_config.interval,  # timeframe column stores interval string
+            timeframe=backtest_config.interval,
             start_date=backtest_config.start_date,
             end_date=backtest_config.end_date,
             initial_capital=backtest_config.initial_capital,
-            final_capital=result.final_equity if result.final_equity else backtest_config.initial_capital,
-            total_return=result.metrics.total_return if result.metrics else 0.0,
-            sharpe_ratio=result.metrics.sharpe_ratio if result.metrics else 0.0,
-            max_drawdown=result.metrics.max_drawdown if result.metrics else 0.0,
-            win_rate=result.metrics.win_rate if result.metrics else 0.0,
-            total_trades=result.metrics.total_trades if result.metrics else 0,
+            parameters={
+                "strategy_params": {"strategy_type": "builder", "strategy_id": strategy_id},
+            },
             status=DBBacktestStatus.COMPLETED if result.status == BacktestStatus.COMPLETED else DBBacktestStatus.FAILED,
+            # Full metrics JSON — Single Source of Truth for all detailed metrics
+            metrics_json=m.model_dump(mode="json") if m and hasattr(m, "model_dump") else None,
+            # Basic metrics
+            total_return=m.total_return if m else 0.0,
+            annual_return=m.annual_return if m else 0.0,
+            sharpe_ratio=m.sharpe_ratio if m else 0.0,
+            sortino_ratio=m.sortino_ratio if m else 0.0,
+            calmar_ratio=m.calmar_ratio if m else 0.0,
+            max_drawdown=m.max_drawdown if m else 0.0,
+            win_rate=m.win_rate if m else 0.0,
+            profit_factor=m.profit_factor if m else 0.0,
+            total_trades=m.total_trades if m else 0,
+            winning_trades=m.winning_trades if m else 0,
+            losing_trades=m.losing_trades if m else 0,
+            final_capital=result.final_equity if result.final_equity else backtest_config.initial_capital,
+            # TradingView-compatible metrics
+            net_profit=m.net_profit if m else None,
+            net_profit_pct=m.net_profit_pct if m else None,
+            gross_profit=m.gross_profit if m else None,
+            gross_loss=m.gross_loss if m else None,
+            total_commission=m.total_commission if m else None,
+            buy_hold_return=m.buy_hold_return if m else None,
+            buy_hold_return_pct=m.buy_hold_return_pct if m else None,
+            cagr=m.cagr if m else None,
+            cagr_long=getattr(m, "cagr_long", None) if m else None,
+            cagr_short=getattr(m, "cagr_short", None) if m else None,
+            recovery_factor=m.recovery_factor if m else None,
+            expectancy=m.expectancy if m else None,
+            volatility=getattr(m, "volatility", None) if m else None,
+            max_consecutive_wins=m.max_consecutive_wins if m else None,
+            max_consecutive_losses=m.max_consecutive_losses if m else None,
+            long_trades=getattr(m, "long_trades", None) if m else None,
+            short_trades=getattr(m, "short_trades", None) if m else None,
+            long_pnl=getattr(m, "long_pnl", None) if m else None,
+            short_pnl=getattr(m, "short_pnl", None) if m else None,
+            long_win_rate=getattr(m, "long_win_rate", None) if m else None,
+            short_win_rate=getattr(m, "short_win_rate", None) if m else None,
+            avg_bars_in_trade=getattr(m, "avg_bars_in_trade", None) if m else None,
+            exposure_time=getattr(m, "exposure_time", None) if m else None,
+            trades=trades_list,
+            equity_curve=equity_payload,
+            completed_at=datetime.now(UTC),
         )
         db.add(db_backtest)
         db.commit()

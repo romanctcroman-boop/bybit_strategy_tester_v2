@@ -54,6 +54,7 @@ from backend.api.routers import (
 )
 from backend.api.routers import agents as agents_router
 from backend.api.routers import ai as ai_router
+from backend.api.routers import ai_pipeline as ai_pipeline_router
 from backend.api.routers import (
     ai_strategy_generator as ai_strategy_generator_router,
 )
@@ -503,6 +504,29 @@ app.include_router(
     prefix="/api/v1",
     tags=["ai-strategy-generator"],
 )  # NEW: AI Strategy Generator - LLM-based strategy creation
+app.include_router(
+    ai_pipeline_router.router,
+    prefix="/api/v1",
+    tags=["ai-pipeline"],
+)  # NEW: AI Strategy Pipeline - multi-agent strategy generation with backtest
+
+# Agent Monitoring API
+from backend.api.routers import agent_monitoring as agent_monitoring_router
+
+app.include_router(
+    agent_monitoring_router.router,
+    prefix="/api/v1/agents",
+    tags=["agent-monitoring"],
+)  # NEW: Agent Monitoring - SystemMonitor metrics & alerts
+
+# Reports API
+from backend.api.routers import reports as reports_router
+
+app.include_router(
+    reports_router.router,
+    tags=["reports"],
+)  # NEW: Report Generator - strategy performance reports (JSON/HTML)
+
 app.include_router(
     enhanced_ml_router.router, tags=["machine-learning"]
 )  # NEW: Enhanced ML - drift detection, model registry, AutoML, online learning

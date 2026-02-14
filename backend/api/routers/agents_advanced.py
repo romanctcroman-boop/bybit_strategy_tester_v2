@@ -32,12 +32,8 @@ class DeliberationRequest(BaseModel):
         default=["deepseek", "perplexity"],
         description="List of agent IDs to participate",
     )
-    max_rounds: int = Field(
-        default=3, ge=1, le=10, description="Maximum deliberation rounds"
-    )
-    min_confidence: float = Field(
-        default=0.7, ge=0.0, le=1.0, description="Minimum confidence to reach consensus"
-    )
+    max_rounds: int = Field(default=3, ge=1, le=10, description="Maximum deliberation rounds")
+    min_confidence: float = Field(default=0.7, ge=0.0, le=1.0, description="Minimum confidence to reach consensus")
     voting_strategy: str = Field(
         default="weighted",
         description="Voting strategy: majority, weighted, unanimous, or ranked_choice",
@@ -88,9 +84,7 @@ class MemoryStoreRequest(BaseModel):
         default="semantic",
         description="Memory type: working, episodic, semantic, or procedural",
     )
-    importance: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="Importance score"
-    )
+    importance: float = Field(default=0.5, ge=0.0, le=1.0, description="Importance score")
     tags: list[str] = Field(default=[], description="Tags for categorization")
 
 
@@ -99,9 +93,7 @@ class MemoryRecallRequest(BaseModel):
 
     query: str = Field(..., description="Query to search for")
     top_k: int = Field(default=5, ge=1, le=50, description="Number of results")
-    memory_types: list[str] | None = Field(
-        default=None, description="Filter by memory types"
-    )
+    memory_types: list[str] | None = Field(default=None, description="Filter by memory types")
 
 
 class SelfImprovementFeedbackRequest(BaseModel):
@@ -109,12 +101,8 @@ class SelfImprovementFeedbackRequest(BaseModel):
 
     prompt: str = Field(..., description="Original prompt")
     response: str = Field(..., description="Agent response")
-    feedback_type: str = Field(
-        default="human", description="Feedback type: human or ai"
-    )
-    score: float | None = Field(
-        None, ge=0.0, le=1.0, description="Quality score (for human feedback)"
-    )
+    feedback_type: str = Field(default="human", description="Feedback type: human or ai")
+    score: float | None = Field(None, ge=0.0, le=1.0, description="Quality score (for human feedback)")
     reasoning: str | None = Field(None, description="Reasoning for the score")
 
 
@@ -155,9 +143,7 @@ async def deliberate(request: DeliberationRequest) -> DeliberationResponse:
             "unanimous": VotingStrategy.UNANIMOUS,
             "ranked_choice": VotingStrategy.RANKED_CHOICE,
         }
-        voting_strategy = strategy_map.get(
-            request.voting_strategy, VotingStrategy.WEIGHTED
-        )
+        voting_strategy = strategy_map.get(request.voting_strategy, VotingStrategy.WEIGHTED)
 
         result = await deliberation.deliberate(
             question=request.question,
@@ -174,15 +160,11 @@ async def deliberate(request: DeliberationRequest) -> DeliberationResponse:
 
         # Extract dissenting views
         dissenting_views = [
-            f"{vote.agent_id}: {vote.reasoning or vote.position}"
-            for vote in result.dissenting_opinions
+            f"{vote.agent_id}: {vote.reasoning or vote.position}" for vote in result.dissenting_opinions
         ]
 
         # Extract evidence chain as strings
-        evidence_chain = [
-            e.get("evidence", str(e)) if isinstance(e, dict) else str(e)
-            for e in result.evidence_chain
-        ]
+        evidence_chain = [e.get("evidence", str(e)) if isinstance(e, dict) else str(e) for e in result.evidence_chain]
 
         return DeliberationResponse(
             decision=result.decision,
@@ -307,9 +289,7 @@ async def recall_memory(request: MemoryRecallRequest):
                 {
                     "id": r.id,
                     "content": r.content,
-                    "memory_type": r.memory_type.value
-                    if hasattr(r.memory_type, "value")
-                    else str(r.memory_type),
+                    "memory_type": r.memory_type.value if hasattr(r.memory_type, "value") else str(r.memory_type),
                     "importance": r.importance,
                     "similarity": getattr(r, "similarity", None),
                 }
@@ -799,4 +779,279 @@ async def analyze_optimization_with_ai(request: OptimizationAnalysisRequest):
 
     except Exception as e:
         logger.error(f"Optimization analysis error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# KEY VALIDATION & AGENT HEALTH ENDPOINTS
+# ============================================================================
+
+
+@router.get("/keys/preflight")
+async def preflight_key_validation():
+    """
+    Run pre-flight validation of all API keys.
+
+    Sends minimal requests to each provider to verify keys are valid.
+    Returns per-provider status: valid/invalid/unknown.
+    """
+    try:
+        from backend.agents.api_key_pool import APIKeyPoolManager
+
+        pool = APIKeyPoolManager()
+        results = await pool.validate_keys_preflight()
+
+        return {
+            "success": True,
+            "providers": results,
+            "all_valid": all(r.get("valid") is True for r in results.values()),
+            "summary": {
+                "total": len(results),
+                "valid": sum(1 for r in results.values() if r.get("valid") is True),
+                "invalid": sum(1 for r in results.values() if r.get("valid") is False),
+                "unknown": sum(1 for r in results.values() if r.get("valid") is None),
+            },
+        }
+
+    except Exception as e:
+        logger.error(f"Pre-flight validation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/keys/pool-metrics")
+async def get_key_pool_metrics():
+    """
+    Get key pool health metrics for all providers.
+
+    Shows pool size, healthy/cooling/disabled counts per provider.
+    """
+    try:
+        from backend.agents.api_key_pool import APIKeyPoolManager
+        from backend.agents.models import AgentType
+
+        pool = APIKeyPoolManager()
+        metrics = {}
+        for agent_type in [AgentType.DEEPSEEK, AgentType.PERPLEXITY, AgentType.QWEN]:
+            metrics[agent_type.value] = pool.get_pool_metrics(agent_type)
+
+        return {"success": True, "providers": metrics}
+
+    except Exception as e:
+        logger.error(f"Pool metrics error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# AGENT ACCURACY & DELIBERATION AUDIT
+# ============================================================================
+
+
+@router.get("/deliberation/accuracy")
+async def get_agent_accuracy():
+    """
+    Get adaptive accuracy weights for all agents.
+
+    Shows historical accuracy and current voting weight per agent.
+    Weights are used in weighted deliberation voting.
+    """
+    try:
+        from backend.agents.consensus.real_llm_deliberation import (
+            get_real_deliberation,
+        )
+
+        deliberation = get_real_deliberation()
+        report = deliberation.get_agent_accuracy_report()
+        stats = deliberation.get_stats()
+
+        return {
+            "success": True,
+            "accuracy": report,
+            "deliberation_stats": stats,
+        }
+
+    except Exception as e:
+        logger.error(f"Agent accuracy error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/deliberation/audit-log")
+async def get_deliberation_audit_log(last_n: int = 50):
+    """
+    Get decision chain audit log from deliberation system.
+
+    Provides full traceability of intermediate deliberation steps:
+    start, round completions, voting details, outcome recordings.
+    """
+    try:
+        from backend.agents.consensus.real_llm_deliberation import (
+            get_real_deliberation,
+        )
+
+        deliberation = get_real_deliberation()
+        log = deliberation.get_audit_log(last_n=last_n)
+
+        return {
+            "success": True,
+            "entries": log,
+            "total": len(deliberation.audit_log),
+            "returned": len(log),
+        }
+
+    except Exception as e:
+        logger.error(f"Audit log error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/deliberation/history")
+async def get_deliberation_history(limit: int = 20):
+    """
+    Get recent deliberation results.
+
+    Returns decision, confidence, agents involved, and duration
+    for each recent deliberation.
+    """
+    try:
+        from backend.agents.consensus.real_llm_deliberation import (
+            get_real_deliberation,
+        )
+
+        deliberation = get_real_deliberation()
+        history = deliberation.deliberation_history[-limit:]
+
+        return {
+            "success": True,
+            "deliberations": [
+                {
+                    "id": d.id,
+                    "question": d.question[:200],
+                    "decision": d.decision[:200],
+                    "confidence": d.confidence,
+                    "voting_strategy": d.voting_strategy.value,
+                    "rounds": len(d.rounds),
+                    "agents": d.metadata.get("agents", []),
+                    "duration_seconds": round(d.duration_seconds, 2),
+                    "timestamp": d.timestamp.isoformat(),
+                    "dissenting_count": len(d.dissenting_opinions),
+                }
+                for d in reversed(history)
+            ],
+            "total": len(deliberation.deliberation_history),
+        }
+
+    except Exception as e:
+        logger.error(f"Deliberation history error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# STRATEGY BUILDER — AI Agent Integration
+# ============================================================================
+
+
+class BuilderTaskRequest(BaseModel):
+    """Request for AI agent to build a strategy through the Strategy Builder."""
+
+    name: str = Field(default="Agent Strategy", description="Strategy name")
+    symbol: str = Field(default="BTCUSDT", description="Trading pair")
+    timeframe: str = Field(default="15", description="Candle timeframe (1,5,15,30,60,240,D,W,M)")
+    direction: str = Field(default="both", description="Trade direction (long/short/both)")
+    initial_capital: float = Field(default=10000.0, description="Starting capital")
+    leverage: float = Field(default=10.0, description="Leverage multiplier")
+    start_date: str = Field(default="2025-01-01", description="Backtest start date")
+    end_date: str = Field(default="2025-06-01", description="Backtest end date")
+    blocks: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Blocks to add: [{type, params, id, name}]",
+    )
+    connections: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Connections: [{source, source_port, target, target_port}]",
+    )
+    stop_loss: float | None = Field(default=None, description="Stop loss fraction")
+    take_profit: float | None = Field(default=None, description="Take profit fraction")
+    max_iterations: int = Field(default=3, description="Max iteration attempts")
+    min_sharpe: float = Field(default=0.5, description="Minimum acceptable Sharpe ratio")
+    min_win_rate: float = Field(default=0.4, description="Minimum acceptable win rate")
+    enable_deliberation: bool = Field(
+        default=False,
+        description="Use AI multi-agent deliberation (DeepSeek+Perplexity) for planning",
+    )
+
+
+@router.post("/builder/task")
+async def run_builder_task(request: BuilderTaskRequest):
+    """
+    Run a full Strategy Builder workflow — create strategy, add blocks,
+    connect them, validate, generate code, and backtest.
+
+    The agent uses the SAME API endpoints as the frontend UI,
+    so all actions are visible to the user in real-time.
+    """
+    try:
+        from backend.agents.workflows.builder_workflow import (
+            BuilderWorkflow,
+            BuilderWorkflowConfig,
+        )
+
+        config = BuilderWorkflowConfig(
+            name=request.name,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            direction=request.direction,
+            initial_capital=request.initial_capital,
+            leverage=request.leverage,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            commission=0.0007,  # NEVER change — TradingView parity
+            stop_loss=request.stop_loss,
+            take_profit=request.take_profit,
+            blocks=request.blocks,
+            connections=request.connections,
+            max_iterations=request.max_iterations,
+            min_acceptable_sharpe=request.min_sharpe,
+            min_acceptable_win_rate=request.min_win_rate,
+            enable_deliberation=request.enable_deliberation,
+        )
+
+        workflow = BuilderWorkflow()
+        result = await workflow.run(config)
+
+        return {
+            "success": result.status.value == "completed",
+            "workflow": result.to_dict(),
+        }
+
+    except Exception as e:
+        logger.error(f"Builder task error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/builder/block-library")
+async def get_builder_block_library():
+    """
+    Get the Strategy Builder block library — all available blocks
+    that agents can use to build strategies.
+    """
+    try:
+        from backend.agents.mcp.tools.strategy_builder import builder_get_block_library
+
+        library = await builder_get_block_library()
+        return {"success": True, "library": library}
+
+    except Exception as e:
+        logger.error(f"Block library error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/builder/strategies")
+async def list_builder_strategies(page: int = 1, page_size: int = 20):
+    """List all strategies in the Strategy Builder."""
+    try:
+        from backend.agents.mcp.tools.strategy_builder import builder_list_strategies
+
+        strategies = await builder_list_strategies(page=page, page_size=page_size)
+        return {"success": True, "data": strategies}
+
+    except Exception as e:
+        logger.error(f"List strategies error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

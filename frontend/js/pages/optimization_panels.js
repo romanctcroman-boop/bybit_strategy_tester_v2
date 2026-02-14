@@ -58,6 +58,13 @@ class OptimizationPanels {
         // Listen for block changes from strategy_builder.js
         this.setupBlockIntegration();
 
+        // Auto-fetch optimizable params for builder strategies
+        const builderStrategyId = this.getBuilderStrategyId();
+        if (builderStrategyId) {
+            // Delay slightly so DOM is ready
+            setTimeout(() => this.fetchBuilderOptimizableParams(builderStrategyId), 1500);
+        }
+
         // Listen for startOptimization event from optimization_config_panel.js
         document.addEventListener('startOptimization', (e) => {
             console.log('[OptPanels] Received startOptimization event:', e.detail);
@@ -66,6 +73,22 @@ class OptimizationPanels {
                 this.state.method = e.detail.method || this.state.method;
                 this.state.maxTrials = e.detail.limits?.maxTrials || this.state.maxTrials;
                 this.state.workers = e.detail.limits?.workers || this.state.workers;
+                this.state.timeoutSeconds = e.detail.limits?.timeoutSeconds || this.state.timeoutSeconds;
+
+                // Advanced optimization settings
+                if (e.detail.advanced) {
+                    this.state.earlyStopping = e.detail.advanced.earlyStopping ?? false;
+                    this.state.earlyStoppingPatience = e.detail.advanced.earlyStoppingPatience ?? 20;
+                    this.state.warmStart = e.detail.advanced.warmStart ?? false;
+                    this.state.pruneInfeasible = e.detail.advanced.pruneInfeasible ?? true;
+                    this.state.randomSeed = e.detail.advanced.randomSeed ?? null;
+                }
+
+                // Data period settings (train/test split)
+                if (e.detail.data_period) {
+                    this.state.trainSplit = e.detail.data_period.train_split ?? 0.8;
+                }
+
                 // Parameter ranges from config panel
                 if (e.detail.parameter_ranges && e.detail.parameter_ranges.length > 0) {
                     this.state.parameterRanges = e.detail.parameter_ranges.map(p => ({
@@ -124,6 +147,60 @@ class OptimizationPanels {
 
         // Update parameter ranges list
         this.updateParameterRangesFromBlocks(params);
+    }
+
+    /**
+     * Read trading parameters from Properties panel DOM elements.
+     * These values must match what the user configured in the "Параметры" panel.
+     */
+    getPropertiesPanelValues() {
+        const symbolEl = document.getElementById('backtestSymbol');
+        const timeframeEl = document.getElementById('strategyTimeframe');
+        const directionEl = document.getElementById('builderDirection');
+        const capitalEl = document.getElementById('backtestCapital');
+        const leverageEl = document.getElementById('backtestLeverageRange') || document.getElementById('backtestLeverage');
+        const commissionEl = document.getElementById('backtestCommission');
+        const marketTypeEl = document.getElementById('builderMarketType');
+
+        // Map Bybit timeframe codes to API-friendly format
+        const tfMap = {
+            '1': '1m', '5': '5m', '15': '15m', '30': '30m',
+            '60': '1h', '240': '4h', 'D': '1d', 'W': '1w', 'M': '1M'
+        };
+        const rawTf = timeframeEl?.value || '15';
+        const interval = tfMap[rawTf] || rawTf;
+
+        // Commission: UI shows percentage (0.07), API expects fraction (0.0007)
+        const commissionPct = parseFloat(commissionEl?.value) || 0.07;
+        const commission = commissionPct / 100;
+
+        // Detect strategy_type from blocks
+        let strategyType = 'rsi'; // default
+        if (window.strategyBlocks && Array.isArray(window.strategyBlocks)) {
+            const mainBlock = window.strategyBlocks.find(b => b.isMain);
+            if (mainBlock) {
+                const blockType = (mainBlock.type || mainBlock.id || '').toLowerCase();
+                if (blockType.includes('sma') || blockType.includes('crossover')) {
+                    strategyType = 'sma_crossover';
+                } else if (blockType.includes('macd')) {
+                    strategyType = 'macd';
+                } else if (blockType.includes('bb') || blockType.includes('bollinger')) {
+                    strategyType = 'bollinger_bands';
+                }
+                // else default 'rsi'
+            }
+        }
+
+        return {
+            symbol: (symbolEl?.value || 'BTCUSDT').trim().toUpperCase(),
+            interval,
+            direction: directionEl?.value || 'both',
+            initial_capital: parseFloat(capitalEl?.value) || 10000,
+            leverage: parseInt(leverageEl?.value, 10) || 10,
+            commission,
+            strategy_type: strategyType,
+            market_type: marketTypeEl?.value || 'linear'
+        };
     }
 
     /**
@@ -688,14 +765,15 @@ class OptimizationPanels {
         try {
             this.setRunningState(true, 'single');
 
+            const props = this.getPropertiesPanelValues();
             const { startDate: sd, endDate: ed } = this.getBacktestDates();
             const payload = {
                 start_date: sd + 'T00:00:00Z',
                 end_date: ed + 'T23:59:59Z',
                 engine: 'single', // FallbackEngineV4
-                commission: 0.0007,
+                commission: props.commission,
                 slippage: 0.0005,
-                leverage: 10,
+                leverage: props.leverage,
                 pyramiding: 1
             };
 
@@ -728,7 +806,21 @@ class OptimizationPanels {
     }
 
     /**
-     * Start optimization with NumbaEngineV2
+     * Detect if we are in Strategy Builder context (has saved strategy with builder blocks)
+     * @returns {string|null} Strategy ID if in builder context, null otherwise
+     */
+    getBuilderStrategyId() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const strategyId = urlParams.get('id');
+        // Strategy Builder page always has /strategy-builder in path
+        const isBuilderPage = window.location.pathname.includes('strategy-builder');
+        return (isBuilderPage && strategyId) ? strategyId : null;
+    }
+
+    /**
+     * Start optimization — routes to Builder endpoint or classic endpoint
+     * - Builder strategies: POST /api/v1/strategy-builder/strategies/{id}/optimize
+     * - Classic strategies: POST /api/v1/optimizations/sync/grid-search or optuna-search
      */
     async startOptimization() {
         // Validate
@@ -746,6 +838,136 @@ class OptimizationPanels {
             return;
         }
 
+        // Detect context: Builder strategy or classic strategy
+        const builderStrategyId = this.getBuilderStrategyId();
+
+        if (builderStrategyId) {
+            await this.startBuilderOptimization(builderStrategyId);
+        } else {
+            await this.startClassicOptimization(strategyId);
+        }
+    }
+
+    /**
+     * Start optimization for Strategy Builder strategies.
+     * Uses POST /api/v1/strategy-builder/strategies/{id}/optimize
+     * with BuilderOptimizationRequest payload.
+     */
+    async startBuilderOptimization(strategyId) {
+        try {
+            this.setRunningState(true, 'optimization');
+
+            // Get evaluation criteria from EvaluationCriteriaPanel
+            const evalCriteria = window.evaluationCriteriaPanel?.getCriteria() || {
+                primary_metric: this.state.primaryMetric,
+                secondary_metrics: this.state.secondaryMetrics,
+                constraints: [],
+                sort_order: [],
+                use_composite: false,
+                weights: null
+            };
+
+            const props = this.getPropertiesPanelValues();
+            const { startDate: sd, endDate: ed } = this.getBacktestDates();
+
+            // Build parameter_ranges from collected UI state (block_id.param_key format)
+            const parameterRanges = this.buildBuilderParameterRanges();
+
+            // Map method name for backend
+            const methodMap = {
+                'grid_search': 'grid_search',
+                'random_search': 'random_search',
+                'bayesian': 'bayesian',
+                'walk_forward': 'grid_search'
+            };
+
+            const payload = {
+                symbol: props.symbol,
+                interval: props.interval,
+                start_date: sd,
+                end_date: ed,
+                market_type: props.market_type || 'linear',
+                initial_capital: props.initial_capital,
+                leverage: props.leverage,
+                commission: props.commission,
+                direction: props.direction,
+                method: methodMap[this.state.method] || 'grid_search',
+                parameter_ranges: parameterRanges.length > 0 ? parameterRanges : null,
+                max_iterations: this.state.maxTrials,
+                n_trials: this.state.maxTrials,
+                sampler_type: 'tpe',
+                timeout_seconds: this.state.timeoutSeconds || 3600,
+                max_results: 20,
+                early_stopping: this.state.earlyStopping ?? false,
+                early_stopping_patience: this.state.earlyStoppingPatience ?? 20,
+                optimize_metric: evalCriteria.primary_metric || 'sharpe_ratio',
+                weights: evalCriteria.weights || null,
+                constraints: evalCriteria.constraints || null,
+                min_trades: 5
+            };
+
+            const endpoint = `/api/v1/strategy-builder/strategies/${strategyId}/optimize`;
+            console.log(`[OptPanels] Builder optimization → ${endpoint}`, payload);
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            const data = await response.json();
+            this.handleOptimizationComplete(data);
+
+        } catch (error) {
+            console.error('[OptPanels] Builder optimization failed:', error);
+            this.showNotification(`Error: ${error.message}`, 'error');
+            this.setRunningState(false);
+        }
+    }
+
+    /**
+     * Build parameter ranges array for Builder optimization API.
+     * Converts UI state (blockId_paramKey min/max/step) to backend format:
+     * [{param_path: "blockId.paramKey", low, high, step, enabled}]
+     */
+    buildBuilderParameterRanges() {
+        const ranges = [];
+
+        document.querySelectorAll('.param-range-item').forEach(item => {
+            const blockId = item.dataset.blockId;
+            const paramKey = item.dataset.paramKey;
+            if (!blockId || !paramKey) return;
+
+            // Check if toggle checkbox exists and is unchecked
+            const toggle = item.querySelector('.param-range-toggle');
+            if (toggle && !toggle.checked) return;
+
+            const min = parseFloat(item.querySelector('input[data-type="min"]')?.value) || 0;
+            const max = parseFloat(item.querySelector('input[data-type="max"]')?.value) || 100;
+            const step = parseFloat(item.querySelector('input[data-type="step"]')?.value) || 1;
+
+            ranges.push({
+                param_path: `${blockId}.${paramKey}`,
+                low: min,
+                high: max,
+                step: step,
+                enabled: true
+            });
+        });
+
+        return ranges;
+    }
+
+    /**
+     * Start optimization for classic (non-builder) strategies.
+     * Uses POST /api/v1/optimizations/sync/grid-search or optuna-search.
+     */
+    async startClassicOptimization(_strategyId) {
         try {
             this.setRunningState(true, 'optimization');
 
@@ -762,17 +984,19 @@ class OptimizationPanels {
                 weights: null
             };
 
+            const props = this.getPropertiesPanelValues();
             const { startDate: sd, endDate: ed } = this.getBacktestDates();
             const payload = {
-                symbol: 'BTCUSDT', // TODO: get from strategy
-                interval: '1h',   // TODO: get from strategy
+                symbol: props.symbol,
+                interval: props.interval,
                 start_date: sd,
                 end_date: ed,
-                strategy_type: 'rsi', // TODO: detect from blocks
-                initial_capital: 10000,
-                leverage: 10,
-                direction: 'both',
-                commission: 0.0007,
+                strategy_type: props.strategy_type,
+                initial_capital: props.initial_capital,
+                leverage: props.leverage,
+                direction: props.direction,
+                commission: props.commission,
+                market_type: props.market_type,
                 // Engine: NumbaEngineV2 for optimization (fast)
                 engine_type: 'optimization',
                 // Parameter ranges
@@ -784,13 +1008,42 @@ class OptimizationPanels {
                 sort_order: evalCriteria.sort_order,
                 use_composite: evalCriteria.use_composite,
                 weights: evalCriteria.weights,
-                max_trials: this.state.maxTrials
+                max_trials: this.state.maxTrials,
+                // Optimization config fields from OptimizationConfigPanel
+                workers: this.state.workers || 4,
+                timeout_seconds: this.state.timeoutSeconds || 3600,
+                train_split: this.state.trainSplit ?? 0.8,
+                early_stopping: this.state.earlyStopping ?? false,
+                early_stopping_patience: this.state.earlyStoppingPatience ?? 20,
+                warm_start: this.state.warmStart ?? false,
+                prune_infeasible: this.state.pruneInfeasible ?? true,
+                random_seed: this.state.randomSeed ?? null
             };
 
-            console.log('[OptPanels] Starting optimization with:', payload);
+            console.log('[OptPanels] Classic optimization with:', payload);
 
-            // Use sync grid-search endpoint (returns JSON, not SSE)
-            const response = await fetch('/api/v1/optimizations/sync/grid-search', {
+            // Route to correct endpoint based on optimization method
+            const methodEndpoints = {
+                'grid_search': '/api/v1/optimizations/sync/grid-search',
+                'bayesian': '/api/v1/optimizations/sync/optuna-search',
+                'random_search': '/api/v1/optimizations/sync/grid-search',
+                'walk_forward': '/api/v1/optimizations/sync/grid-search'
+            };
+            const endpoint = methodEndpoints[this.state.method] || '/api/v1/optimizations/sync/grid-search';
+
+            // For random search, set search_method in payload
+            if (this.state.method === 'random_search') {
+                payload.search_method = 'random';
+                payload.max_iterations = this.state.maxTrials;
+            }
+            // For bayesian, map to optuna fields
+            if (this.state.method === 'bayesian') {
+                payload.n_trials = this.state.maxTrials;
+            }
+
+            console.log(`[OptPanels] Using endpoint: ${endpoint} (method: ${this.state.method})`);
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -813,13 +1066,63 @@ class OptimizationPanels {
     }
 
     /**
+     * Fetch optimizable params from backend for a builder strategy.
+     * Populates the parameter ranges list with params extracted from the graph.
+     * Called when Strategy Builder loads a saved strategy.
+     */
+    async fetchBuilderOptimizableParams(strategyId) {
+        if (!strategyId) return;
+
+        try {
+            const response = await fetch(
+                `/api/v1/strategy-builder/strategies/${strategyId}/optimizable-params`
+            );
+            if (!response.ok) {
+                console.warn('[OptPanels] Failed to fetch optimizable params:', response.status);
+                return;
+            }
+
+            const data = await response.json();
+            const params = data.optimizable_params || [];
+
+            if (params.length === 0) {
+                console.log('[OptPanels] No optimizable params found in strategy');
+                return;
+            }
+
+            // Convert backend params to UI format and render
+            const uiParams = params.map(p => ({
+                blockId: p.param_path.split('.')[0],
+                paramKey: p.param_key,
+                name: p.param_path.replace('.', '_'),
+                label: `${p.block_name} ${this.formatParamName(p.param_key)}`,
+                currentValue: p.current_value,
+                min: p.low,
+                max: p.high,
+                step: p.step,
+                enabled: true
+            }));
+
+            this.updateParameterRangesFromBlocks(uiParams);
+            console.log(`[OptPanels] Loaded ${uiParams.length} optimizable params from backend`);
+
+        } catch (error) {
+            console.warn('[OptPanels] Error fetching optimizable params:', error);
+        }
+    }
+
+    /**
      * Build parameter ranges for optimization API
      */
     buildParameterRangesForAPI() {
         const ranges = {};
 
         this.state.parameterRanges.forEach(param => {
-            const [_blockId, paramKey] = param.name.split('_');
+            // Split on LAST underscore to handle blockIds with underscores
+            // e.g. 'stoch_rsi_period' → blockId='stoch_rsi', paramKey='period'
+            // e.g. 'rsi_period' → blockId='rsi', paramKey='period'
+            const lastUnderscore = param.name.lastIndexOf('_');
+            const paramKey = lastUnderscore >= 0 ? param.name.substring(lastUnderscore + 1) : param.name;
 
             // Convert to API format (e.g., rsi_period_range: [10, 12, 14, ...])
             const values = [];

@@ -285,6 +285,7 @@ class StrategyTypeEnum(str, Enum):
     DCA = "dca"
     MARTINGALE = "martingale"
     CUSTOM = "custom"
+    BUILDER = "builder"
 
 
 class StrategyStatusEnum(str, Enum):

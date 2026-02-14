@@ -260,35 +260,35 @@ const blockLibrary = {
       desc: 'Close all positions',
       icon: 'x-octagon'
     },
-    // Risk Management
+    // Risk Management (conditional — triggered by node signal)
     {
       id: 'stop_loss',
       name: 'Stop Loss',
-      desc: 'Set stop loss level',
+      desc: 'Conditional SL by signal/node',
       icon: 'shield-x'
     },
     {
       id: 'take_profit',
       name: 'Take Profit',
-      desc: 'Set take profit level',
+      desc: 'Conditional TP by signal/node',
       icon: 'trophy'
     },
     {
       id: 'trailing_stop',
       name: 'Trailing Stop',
-      desc: 'Dynamic trailing stop',
+      desc: 'Conditional trailing by signal',
       icon: 'arrow-bar-down'
     },
     {
       id: 'atr_stop',
       name: 'ATR Stop',
-      desc: 'ATR-based stop loss',
+      desc: 'Conditional ATR SL by signal',
       icon: 'shield-exclamation'
     },
     {
       id: 'chandelier_stop',
       name: 'Chandelier Stop',
-      desc: 'From highest high - ATR',
+      desc: 'Conditional Chandelier by signal',
       icon: 'lamp'
     },
     // Break-even & Protection
@@ -318,24 +318,24 @@ const blockLibrary = {
       icon: 'stack'
     }
   ],
-  // NEW CATEGORY: Close Conditions (Exit Rules)
+  // Exits: Standard exit rules (SL/TP, trailing, ATR, session, DCA close)
   exits: [
     {
       id: 'static_sltp',
       name: 'Static SL/TP',
-      desc: 'Fixed % Stop Loss & Take Profit with breakeven',
+      desc: 'Auto % SL/TP from entry price',
       icon: 'shield-check'
     },
     {
       id: 'trailing_stop_exit',
       name: 'Trailing Stop',
-      desc: 'Dynamic trailing exit',
+      desc: 'Auto trailing % from entry',
       icon: 'arrow-bar-down'
     },
     {
       id: 'atr_exit',
       name: 'ATR Exit',
-      desc: 'ATR-based TP/SL',
+      desc: 'Auto ATR-based SL/TP',
       icon: 'arrows-expand'
     },
     {
@@ -383,10 +383,10 @@ const blockLibrary = {
     {
       id: 'chandelier_exit',
       name: 'Chandelier Exit',
-      desc: 'ATR from highest/lowest',
+      desc: 'Auto ATR from high/low',
       icon: 'lamp'
     },
-    // ===== DCA CLOSE CONDITIONS =====
+    // ===== DCA CLOSE CONDITIONS (combined indicator blocks) =====
     {
       id: 'rsi_close',
       name: 'RSI Close',
@@ -791,7 +791,9 @@ const blockLibrary = {
       icon: 'lightning'
     }
   ],
-  // NEW CATEGORY: Close Conditions (from TradingView)
+  // Close Conditions: Indicator-based close rules with profit filter (TradingView-style)
+  // NOTE: These use separate block IDs (close_rsi_reach, close_stoch_reach, etc.)
+  // vs exits category which has combined blocks (rsi_close, stoch_close)
   close_conditions: [
     {
       id: 'close_by_time',
@@ -1977,9 +1979,9 @@ function renderBlockLibrary() {
       groupIcon: 'box-arrow-right',
       groupColor: '#f0883e',
       categories: [
-        { key: 'exits', name: 'Условия выхода', iconType: 'exit' },
+        { key: 'exits', name: 'Выходы (SL/TP/ATR/DCA)', iconType: 'exit' },
         { key: 'multiple_tp', name: 'Multiple TP', iconType: 'action' },
-        { key: 'close_conditions', name: 'TradingView Close', iconType: 'exit' }
+        { key: 'close_conditions', name: 'Закрытие по индикатору', iconType: 'exit' }
       ]
     },
     {
@@ -2217,18 +2219,24 @@ async function fetchTickersData(category = 'linear') {
   }
 }
 
-/** Загрузить список символов с локальными данными. */
-async function fetchLocalSymbols() {
-  // Return cached data if already loaded successfully
-  if (localSymbolsCache !== null && localSymbolsCache.symbols && localSymbolsCache.symbols.length > 0) {
+/** Загрузить список символов с локальными данными.
+ *  @param {boolean} [force=false] — принудительно обновить с сервера, игнорируя кэш.
+ */
+async function fetchLocalSymbols(force = false) {
+  // Return cached data if already loaded successfully and not forced
+  // Note: cache empty results too (symbols: []) to avoid unnecessary API calls after all tickers are deleted
+  if (!force && localSymbolsCache !== null && localSymbolsCache.symbols) {
     return localSymbolsCache;
   }
   try {
     const base = typeof window !== 'undefined' && window.location && window.location.origin
       ? window.location.origin
       : '';
-    const url = `${base}/api/v1/marketdata/symbols/local`;
-    const res = await fetch(url);
+    const url = `${base}/api/v1/marketdata/symbols/local?_=${Date.now()}`;
+    const res = await fetch(url, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
+    });
     if (!res.ok) {
       console.error('[Strategy Builder] fetchLocalSymbols not ok:', res.statusText);
       // Don't cache error - allow retry
@@ -2499,8 +2507,14 @@ function initSymbolPicker() {
   }
 
   async function loadAndShow() {
-    showSymbolDropdown(input.value, { loading: true });
     const cat = getCategory();
+    const cachedList = bybitSymbolsCache[cat] || [];
+    // If cache is warm, show immediately without loading spinner
+    if (cachedList.length > 0 && blockedSymbolsCache !== null) {
+      showSymbolDropdown(input.value);
+      return;
+    }
+    showSymbolDropdown(input.value, { loading: true });
     try {
       // Load Bybit symbols, local symbols, and tickers data in parallel
       await Promise.all([
@@ -2515,14 +2529,21 @@ function initSymbolPicker() {
     }
   }
 
+  // Debounce helper for input filtering (150ms)
+  let _symbolInputTimer = null;
+
   input.addEventListener('focus', function () {
     loadAndShow();
   });
   input.addEventListener('input', function () {
-    const cat = getCategory();
-    const list = bybitSymbolsCache[cat] || [];
-    if (list.length > 0 && blockedSymbolsCache !== null) showSymbolDropdown(input.value);
-    else loadAndShow();
+    // Debounce input to avoid excessive re-renders during fast typing
+    clearTimeout(_symbolInputTimer);
+    _symbolInputTimer = setTimeout(function () {
+      const cat = getCategory();
+      const list = bybitSymbolsCache[cat] || [];
+      if (list.length > 0 && blockedSymbolsCache !== null) showSymbolDropdown(input.value);
+      else loadAndShow();
+    }, 150);
   });
   input.addEventListener('click', function () {
     const cat = getCategory();
@@ -2626,9 +2647,14 @@ function initSymbolPicker() {
     }
   });
 
-  // Предзагрузка тикеров и списка блокировок
-  fetchBybitSymbols(getCategory()).catch(() => { });
-  fetchBlockedSymbols().catch(() => { });
+  // Предзагрузка тикеров, цен и списка блокировок (прогрев кэша при загрузке страницы)
+  const _preloadCat = getCategory();
+  Promise.all([
+    fetchBybitSymbols(_preloadCat),
+    fetchTickersData(_preloadCat),
+    fetchLocalSymbols(),
+    fetchBlockedSymbols()
+  ]).catch(() => { });
 }
 
 /** База данных: инициализация панели групп тикеров в БД. */
@@ -2701,10 +2727,10 @@ function initDunnahBasePanel() {
           try {
             const r = await fetch(`${API_BASE}/marketdata/symbols/db-groups?symbol=${encodeURIComponent(symbol)}&market_type=${encodeURIComponent(market)}`, { method: 'DELETE' });
             if (!r.ok) throw new Error(await r.text());
-            // Invalidate caches and reload in parallel
+            // Invalidate caches and force-reload from server
             localSymbolsCache = null;
             blockedSymbolsCache = null;
-            await Promise.all([fetchLocalSymbols(), loadAndRender()]);
+            await Promise.all([fetchLocalSymbols(true), fetchBlockedSymbols(), loadAndRender()]);
           } catch (e) {
             console.error(e);
             alert('Ошибка удаления: ' + e.message);
@@ -2720,10 +2746,10 @@ function initDunnahBasePanel() {
           try {
             const r = await fetch(`${API_BASE}/marketdata/symbols/blocked?symbol=${encodeURIComponent(symbol)}`, { method: 'POST' });
             if (!r.ok) throw new Error(await r.text());
-            // Invalidate caches and reload - loadAndRender fetches blocked data already
+            // Invalidate caches and force-reload from server
             localSymbolsCache = null;
             blockedSymbolsCache = null;
-            await loadAndRender();
+            await Promise.all([fetchLocalSymbols(true), fetchBlockedSymbols(), loadAndRender()]);
           } catch (e) {
             console.error(e);
             alert('Ошибка: ' + e.message);
@@ -2739,10 +2765,10 @@ function initDunnahBasePanel() {
           try {
             const r = await fetch(`${API_BASE}/marketdata/symbols/blocked/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
             if (!r.ok) throw new Error(await r.text());
-            // Invalidate caches and reload - loadAndRender fetches blocked data already
+            // Invalidate caches and force-reload from server
             localSymbolsCache = null;
             blockedSymbolsCache = null;
-            await loadAndRender();
+            await Promise.all([fetchLocalSymbols(true), fetchBlockedSymbols(), loadAndRender()]);
           } catch (e) {
             console.error(e);
             alert('Ошибка: ' + e.message);
@@ -2759,7 +2785,21 @@ function initDunnahBasePanel() {
 
   if (btnRefresh) btnRefresh.addEventListener('click', loadAndRender);
   refreshDunnahBasePanel = loadAndRender;
-  loadAndRender();
+
+  // Lazy-load: загружаем данные только при первом открытии окна "База данных"
+  let _dunnahPanelLoaded = false;
+  document.addEventListener('floatingWindowToggle', function (e) {
+    if (e.detail.windowId === 'floatingWindowDatabase' && e.detail.isOpen && !_dunnahPanelLoaded) {
+      _dunnahPanelLoaded = true;
+      loadAndRender();
+    }
+  });
+  // Also mark as loaded when refreshDunnahBasePanel is called externally (e.g. after sync)
+  const _origRefresh = loadAndRender;
+  refreshDunnahBasePanel = function () {
+    _dunnahPanelLoaded = true;
+    return _origRefresh();
+  };
 }
 
 function updatePropertiesProgressBar(visible, options = {}) {
@@ -2809,7 +2849,14 @@ function renderPropertiesDataStatus(state, data = {}) {
     statusIndicator.innerHTML = `<span class="status-icon">🔒</span><span class="status-text">${message || 'Тикер заблокирован для догрузки'}<br><small>Разблокируйте в «База данных»</small></span>`;
   } else if (state === 'error') {
     statusIndicator.className = 'data-status error';
-    statusIndicator.innerHTML = `<span class="status-icon">⚠️</span><span class="status-text">Ошибка синхронизации<br><small>${message || 'Проверьте соединение'}</small></span>`;
+    statusIndicator.style.cursor = 'pointer';
+    statusIndicator.innerHTML = `<span class="status-icon">⚠️</span><span class="status-text">Ошибка синхронизации<br><small>${message || 'Проверьте соединение'}. Кликните для повтора.</small></span>`;
+    // Add click-to-retry handler
+    statusIndicator.onclick = function () {
+      statusIndicator.onclick = null;
+      statusIndicator.style.cursor = '';
+      syncSymbolData(true);
+    };
   }
 }
 
@@ -2901,13 +2948,21 @@ async function syncSymbolData(forceRefresh = false) {
   // Show global loading indicator
   showGlobalLoading(`Синхронизация ${symbol}...`);
 
-  // Таймаут 60 с: бэкенд возвращает ответ ~45 с при таймауте 1m; дольше ждать не нужно
+  // Динамический таймаут: сбрасывается при каждом полученном SSE event.
+  // Если данные приходят — процесс жив. Таймаут срабатывает только если
+  // сервер молчит > 90 секунд (например, потеря соединения).
   const controller = new AbortController();
   currentSyncAbortController = controller;
   currentSyncSymbol = symbol;
   currentSyncStartTime = Date.now();
-  const SYNC_REQUEST_TIMEOUT_MS = 60000;
-  const timeoutId = setTimeout(() => controller.abort(), SYNC_REQUEST_TIMEOUT_MS);
+  const SYNC_INACTIVITY_TIMEOUT_MS = 90000; // 90 сек без SSE events = таймаут
+  let timeoutId = setTimeout(() => controller.abort(), SYNC_INACTIVITY_TIMEOUT_MS);
+
+  // Helper: сброс таймаута при получении данных
+  const resetSyncTimeout = () => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => controller.abort(), SYNC_INACTIVITY_TIMEOUT_MS);
+  };
 
   try {
     // Прогресс по TF: 1 → 5 → 15 → 30 → 60 → 240 → D → W → M
@@ -2939,6 +2994,8 @@ async function syncSymbolData(forceRefresh = false) {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
+      // Данные пришли — сброс таймаута неактивности
+      resetSyncTimeout();
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n\n');
       buffer = lines.pop() || '';
@@ -3021,11 +3078,11 @@ async function syncSymbolData(forceRefresh = false) {
     }
 
     if (e.name === 'AbortError') {
-      console.log('[DataSync] Sync timeout — sync interrupted (frontend 1 min timeout)');
-      symbolSyncCache[symbol] = Date.now();
+      console.log('[DataSync] Sync timeout — no SSE events for 90s');
+      // Don't cache timeout — allow immediate retry
       updatePropertiesProgressBar(false);
       renderPropertiesDataStatus('error', {
-        message: 'Синхронизация заняла слишком много времени (таймаут 1 мин). Кликните для повторной попытки.'
+        message: 'Потеря связи с сервером (нет данных 90 сек). Кликните для повторной попытки.'
       });
       hideGlobalLoading();
       return;
@@ -3265,7 +3322,7 @@ function setupEventListeners() {
     if (!canvasContainer) return;
 
     const canvasWidth = canvasContainer.offsetWidth;
-    const floatingWindowWidth = 480; // Width of floating panels
+    const floatingWindowWidth = 560; // Width of floating panels
     const spineWidth = 35; // Width of panel spines/tabs
     const margin = 15; // Small margin from spines
 
@@ -8144,7 +8201,11 @@ function getBlockPorts(blockId, _category) {
     // Indicators - output data
     rsi: {
       inputs: [],
-      outputs: [{ id: 'value', label: 'Value', type: 'data' }]
+      outputs: [
+        { id: 'value', label: 'Value', type: 'data' },
+        { id: 'oversold', label: 'OS', type: 'data' },
+        { id: 'overbought', label: 'OB', type: 'data' }
+      ]
     },
     macd: {
       inputs: [],
@@ -8228,29 +8289,29 @@ function getBlockPorts(blockId, _category) {
       outputs: [{ id: 'result', label: '', type: 'condition' }]
     },
 
-    // Actions - input condition, output flow
+    // Actions - input condition, output signal
     buy: {
-      inputs: [{ id: 'trigger', label: '', type: 'condition' }],
-      outputs: [{ id: 'exec', label: '', type: 'flow' }]
+      inputs: [{ id: 'signal', label: '', type: 'condition' }],
+      outputs: [{ id: 'signal', label: '', type: 'condition' }]
     },
     sell: {
-      inputs: [{ id: 'trigger', label: '', type: 'condition' }],
-      outputs: [{ id: 'exec', label: '', type: 'flow' }]
+      inputs: [{ id: 'signal', label: '', type: 'condition' }],
+      outputs: [{ id: 'signal', label: '', type: 'condition' }]
     },
     close: {
-      inputs: [{ id: 'trigger', label: '', type: 'condition' }],
-      outputs: [{ id: 'exec', label: '', type: 'flow' }]
+      inputs: [{ id: 'signal', label: '', type: 'condition' }],
+      outputs: [{ id: 'signal', label: '', type: 'condition' }]
     },
     stop_loss: {
-      inputs: [{ id: 'trigger', label: '', type: 'flow' }],
+      inputs: [{ id: 'signal', label: '', type: 'condition' }],
       outputs: []
     },
     take_profit: {
-      inputs: [{ id: 'trigger', label: '', type: 'flow' }],
+      inputs: [{ id: 'signal', label: '', type: 'condition' }],
       outputs: []
     },
     trailing_stop: {
-      inputs: [{ id: 'trigger', label: '', type: 'flow' }],
+      inputs: [{ id: 'signal', label: '', type: 'condition' }],
       outputs: []
     },
 
@@ -8311,28 +8372,15 @@ function getBlockPorts(blockId, _category) {
     // Note: 'strategy' ports are dynamic - handled below
   };
 
-  // Special handling for main Strategy node - ports depend on direction setting
-  // Always 2 ports: Entry and Exit (direction determines which signals are used)
+  // Special handling for main Strategy node
+  // 4 ports: entry_long, entry_short, exit_long, exit_short
   if (blockId === 'strategy') {
-    const direction = document.getElementById('builderDirection')?.value || 'both';
-    let entryLabel, exitLabel;
-
-    if (direction === 'long') {
-      entryLabel = 'Entry';
-      exitLabel = 'Exit';
-    } else if (direction === 'short') {
-      entryLabel = 'Entry';
-      exitLabel = 'Exit';
-    } else {
-      // both - universal ports
-      entryLabel = 'Entry';
-      exitLabel = 'Exit';
-    }
-
     return {
       inputs: [
-        { id: 'entry', label: entryLabel, type: 'condition' },
-        { id: 'exit', label: exitLabel, type: 'condition' }
+        { id: 'entry_long', label: 'Entry L', type: 'condition' },
+        { id: 'entry_short', label: 'Entry S', type: 'condition' },
+        { id: 'exit_long', label: 'Exit L', type: 'condition' },
+        { id: 'exit_short', label: 'Exit S', type: 'condition' }
       ],
       outputs: []
     };
@@ -8382,40 +8430,59 @@ function renderPorts(ports, direction, blockId) {
   `;
 }
 
-// Special render for main Strategy node with ports on top and bottom
-function renderMainStrategyNode(block, ports) {
-  const entryPort = ports.inputs.find(p => p.id === 'entry');
-  const exitPort = ports.inputs.find(p => p.id === 'exit');
-
+// Special render for main Strategy node with ports on all sides
+function renderMainStrategyNode(block, _ports) {
   return `
     <div class="strategy-block main main-block main-strategy-node"
          id="${block.id}"
          style="left: ${block.x}px; top: ${block.y}px"
          data-block-id="${block.id}">
-        <!-- Entry port on top (outside circle) -->
+        <!-- Entry Long port on top-left -->
         <div class="port condition-port main-port-top" 
-             data-port-id="entry" 
+             data-port-id="entry_long" 
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
-             title="Entry Signal"></div>
+             title="Entry Long"
+             style="left: 30%;"></div>
         
-        <!-- Entry label inside circle, under top port -->
-        <span class="main-port-label top-label">${entryPort?.label || 'Entry'}</span>
+        <!-- Entry Short port on top-right -->
+        <div class="port condition-port main-port-top" 
+             data-port-id="entry_short" 
+             data-port-type="condition"
+             data-block-id="${block.id}"
+             data-direction="input"
+             title="Entry Short"
+             style="left: 70%;"></div>
+        
+        <!-- Entry labels -->
+        <span class="main-port-label top-label" style="left: 30%; transform: translateX(-50%);">Entry L</span>
+        <span class="main-port-label top-label" style="left: 70%; transform: translateX(-50%);">Entry S</span>
         
         <!-- Center title -->
         <div class="main-block-title">${block.name}</div>
         
-        <!-- Exit label inside circle, above bottom port -->
-        <span class="main-port-label bottom-label">${exitPort?.label || 'Exit'}</span>
+        <!-- Exit labels -->
+        <span class="main-port-label bottom-label" style="left: 30%; transform: translateX(-50%);">Exit L</span>
+        <span class="main-port-label bottom-label" style="left: 70%; transform: translateX(-50%);">Exit S</span>
         
-        <!-- Exit port on bottom (outside circle) -->
+        <!-- Exit Long port on bottom-left -->
         <div class="port condition-port main-port-bottom" 
-             data-port-id="exit" 
+             data-port-id="exit_long" 
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
-             title="Exit Signal"></div>
+             title="Exit Long"
+             style="left: 30%;"></div>
+        
+        <!-- Exit Short port on bottom-right -->
+        <div class="port condition-port main-port-bottom" 
+             data-port-id="exit_short" 
+             data-port-type="condition"
+             data-block-id="${block.id}"
+             data-direction="input"
+             title="Exit Short"
+             style="left: 70%;"></div>
     </div>
   `;
 }
@@ -10031,7 +10098,7 @@ function updateBlockParam(blockId, param, value) {
     }
 
     // WebSocket validation (server-side, debounced)
-    if (wsValidation && wsValidation.isConnected()) {
+    if (wsValidation && wsValidation.isWsConnected()) {
       wsValidation.validateParam(blockId, block.type, param, parsedValue, (result) => {
         if (!result.fallback && !result.valid) {
           // Server found additional errors - update UI
@@ -10821,6 +10888,65 @@ function cancelConnection() {
   clearPortHighlights();
 }
 
+/**
+ * Normalize a connection object to the canonical internal format:
+ *   { id, source: { blockId, portId }, target: { blockId, portId }, type }
+ *
+ * Handles 3 backend formats:
+ * 1. { source: { blockId, portId }, target: { blockId, portId } }  — builder_connect_blocks
+ * 2. { from, to }                                                  — legacy/test
+ * 3. { source_block, source_output, target_block, target_input }   — old manual
+ */
+function normalizeConnection(conn) {
+  // Already in canonical format
+  if (conn.source && typeof conn.source === 'object' && conn.source.blockId) {
+    return {
+      id: conn.id || `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      source: { blockId: conn.source.blockId, portId: conn.source.portId || 'out' },
+      target: { blockId: conn.target.blockId, portId: conn.target.portId || 'in' },
+      type: conn.type || 'data'
+    };
+  }
+
+  // Format 3: { source_block, source_output, target_block, target_input }
+  if (conn.source_block && conn.target_block) {
+    return {
+      id: conn.id || `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      source: { blockId: conn.source_block, portId: conn.source_output || 'out' },
+      target: { blockId: conn.target_block, portId: conn.target_input || 'in' },
+      type: conn.type || 'data'
+    };
+  }
+
+  // Format 2: { from, to } — legacy, no port info
+  if (conn.from && conn.to) {
+    return {
+      id: conn.id || `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      source: { blockId: conn.from, portId: 'out' },
+      target: { blockId: conn.to, portId: 'in' },
+      type: conn.type || 'data'
+    };
+  }
+
+  // Unknown format — log and return as-is with defaults
+  console.warn('[Strategy Builder] Unknown connection format:', conn);
+  return {
+    id: conn.id || `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    source: { blockId: conn.source || '', portId: 'out' },
+    target: { blockId: conn.target || '', portId: 'in' },
+    type: conn.type || 'data'
+  };
+}
+
+/**
+ * Normalize all connections in-place. Called after loading from API.
+ */
+function normalizeAllConnections() {
+  for (let i = 0; i < connections.length; i++) {
+    connections[i] = normalizeConnection(connections[i]);
+  }
+}
+
 function renderConnections() {
   const svg = document.getElementById('connectionsCanvas');
   // Clear existing connections (except temp)
@@ -10832,7 +10958,15 @@ function renderConnections() {
     const sourceBlock = document.getElementById(conn.source.blockId);
     const targetBlock = document.getElementById(conn.target.blockId);
 
-    if (!sourceBlock || !targetBlock) return;
+    if (!sourceBlock || !targetBlock) {
+      console.warn('[renderConnections] Block not found:', {
+        sourceBlockId: conn.source.blockId,
+        targetBlockId: conn.target.blockId,
+        sourceFound: !!sourceBlock,
+        targetFound: !!targetBlock
+      });
+      return;
+    }
 
     // Find ports
     const sourcePort = sourceBlock.querySelector(
@@ -10841,6 +10975,19 @@ function renderConnections() {
     const targetPort = targetBlock.querySelector(
       `[data-port-id="${conn.target.portId}"][data-direction="input"]`
     );
+
+    if (!sourcePort || !targetPort) {
+      console.warn('[renderConnections] Port not found:', {
+        sourceBlockId: conn.source.blockId,
+        sourcePortId: conn.source.portId,
+        targetBlockId: conn.target.blockId,
+        targetPortId: conn.target.portId,
+        sourcePortFound: !!sourcePort,
+        targetPortFound: !!targetPort,
+        availableSourcePorts: Array.from(sourceBlock.querySelectorAll('[data-direction="output"]')).map(p => p.dataset.portId),
+        availableTargetPorts: Array.from(targetBlock.querySelectorAll('[data-direction="input"]')).map(p => p.dataset.portId)
+      });
+    }
 
     if (!sourcePort || !targetPort) return;
 
@@ -12235,7 +12382,7 @@ async function saveStrategy() {
   }
 
   // WebSocket server-side validation before save
-  if (wsValidation && wsValidation.isConnected()) {
+  if (wsValidation && wsValidation.isWsConnected()) {
     console.log('[Strategy Builder] Running server-side validation before save...');
     const wsValidationResult = await new Promise((resolve) => {
       wsValidation.validateStrategy(strategy.blocks, strategy.connections, (result) => {
@@ -12397,10 +12544,10 @@ function buildStrategyPayload() {
       optimizationParams: b.optimizationParams || {}
     })),
     connections: connections.map(c => ({
+      id: c.id,
       source: c.source,
       target: c.target,
-      sourcePort: c.sourcePort,
-      targetPort: c.targetPort
+      type: c.type || 'data'
     })),
     // UI state for restoration
     uiState: {
@@ -12599,21 +12746,77 @@ async function loadStrategy(strategyId) {
 
     // Восстановить блоки и соединения
     pushUndo();
-    // Сохранить main_strategy node если он есть
-    const mainNode = strategyBlocks.find((b) => b.isMain);
-    strategyBlocks = mainNode ? [mainNode] : [];
+    strategyBlocks.length = 0; // Clear all existing blocks
 
-    // Добавить загруженные блоки (with legacy migration)
+    // Добавить загруженные блоки (with legacy migration + enrichment)
     if (strategy.blocks && Array.isArray(strategy.blocks)) {
       const migratedBlocks = migrateLegacyBlocks(strategy.blocks);
-      strategyBlocks.push(...migratedBlocks);
+
+      // First, handle main_strategy node
+      const mainBlock = migratedBlocks.find(b => b.isMain || b.id === 'main_strategy' || b.type === 'strategy');
+      if (mainBlock) {
+        strategyBlocks.push({
+          id: mainBlock.id || 'main_strategy',
+          type: mainBlock.type || 'strategy',
+          category: 'main',
+          name: mainBlock.name || 'Strategy',
+          icon: mainBlock.icon || 'diagram-3',
+          x: mainBlock.x || 800,
+          y: mainBlock.y || 300,
+          isMain: true,
+          params: mainBlock.params || {}
+        });
+      } else {
+        // No main node from API — create default
+        createMainStrategyNode();
+      }
+
+      // Then add other blocks with icon enrichment from blockLibrary
+      migratedBlocks.forEach(block => {
+        if (block.isMain || block.id === 'main_strategy' || block.type === 'strategy') return;
+
+        // Look up icon from blockLibrary
+        let icon = block.icon;
+        if (!icon) {
+          for (const categoryBlocks of Object.values(blockLibrary)) {
+            const def = categoryBlocks.find(b => b.id === block.type);
+            if (def) {
+              icon = def.icon;
+              break;
+            }
+          }
+        }
+
+        strategyBlocks.push({
+          id: block.id,
+          type: block.type,
+          category: block.category || 'indicator',
+          name: block.name || block.type,
+          icon: icon || 'box',
+          x: block.x || 100,
+          y: block.y || 100,
+          params: block.params || {},
+          optimizationParams: block.optimizationParams || {}
+        });
+      });
     }
+
+    console.log('[Strategy Builder] Blocks loaded and enriched:', strategyBlocks.map(b => ({
+      id: b.id, type: b.type, category: b.category, icon: b.icon, isMain: b.isMain
+    })));
 
     // Восстановить соединения
     connections.length = 0;
     if (strategy.connections && Array.isArray(strategy.connections)) {
       connections.push(...strategy.connections);
     }
+    normalizeAllConnections();
+
+    console.log('[Strategy Builder] Connections normalized:', connections.map(c => ({
+      id: c.id,
+      src: `${c.source.blockId}:${c.source.portId}`,
+      tgt: `${c.target.blockId}:${c.target.portId}`
+    })));
 
     // Перерисовать canvas
     renderBlocks();
@@ -13577,6 +13780,360 @@ function toggleRightSidebar() {
 window.toggleRightSidebar = toggleRightSidebar;
 
 // ============================================
+// AI BUILD MODAL — Strategy Builder integration
+// Calls POST /api/v1/agents/advanced/builder/task
+// ============================================
+
+const AI_PRESETS = {
+  rsi: {
+    blocks: [
+      { type: 'rsi', params: { period: 14, overbought: 70, oversold: 30 } },
+      { type: 'constant', id: 'const_oversold', params: { value: 30 } },
+      { type: 'constant', id: 'const_overbought', params: { value: 70 } },
+      { type: 'crossover', id: 'cross_up' },
+      { type: 'crossunder', id: 'cross_down' },
+      { type: 'buy' },
+      { type: 'sell' }
+    ],
+    connections: [
+      // RSI value crosses above oversold (30) → buy signal
+      { source: 'rsi', source_port: 'value', target: 'cross_up', target_port: 'a' },
+      { source: 'const_oversold', source_port: 'value', target: 'cross_up', target_port: 'b' },
+      // RSI value crosses below overbought (70) → sell signal
+      { source: 'rsi', source_port: 'value', target: 'cross_down', target_port: 'a' },
+      { source: 'const_overbought', source_port: 'value', target: 'cross_down', target_port: 'b' },
+      // Condition → Action wiring
+      { source: 'cross_up', source_port: 'result', target: 'buy', target_port: 'signal' },
+      { source: 'cross_down', source_port: 'result', target: 'sell', target_port: 'signal' }
+    ]
+  },
+  ema_cross: {
+    blocks: [
+      { type: 'ema', params: { period: 9 }, id: 'ema_fast' },
+      { type: 'ema', params: { period: 21 }, id: 'ema_slow' },
+      { type: 'crossover', id: 'cross_up' },
+      { type: 'crossunder', id: 'cross_down' },
+      { type: 'buy' },
+      { type: 'sell' }
+    ],
+    connections: [
+      { source: 'ema_fast', source_port: 'value', target: 'cross_up', target_port: 'a' },
+      { source: 'ema_slow', source_port: 'value', target: 'cross_up', target_port: 'b' },
+      { source: 'ema_fast', source_port: 'value', target: 'cross_down', target_port: 'a' },
+      { source: 'ema_slow', source_port: 'value', target: 'cross_down', target_port: 'b' },
+      // Condition → Action wiring
+      { source: 'cross_up', source_port: 'result', target: 'buy', target_port: 'signal' },
+      { source: 'cross_down', source_port: 'result', target: 'sell', target_port: 'signal' }
+    ]
+  },
+  macd: {
+    blocks: [
+      { type: 'macd', params: { fast_period: 12, slow_period: 26, signal_period: 9 } },
+      { type: 'crossover', id: 'cross_up' },
+      { type: 'crossunder', id: 'cross_down' },
+      { type: 'buy' },
+      { type: 'sell' }
+    ],
+    connections: [
+      { source: 'macd', source_port: 'macd', target: 'cross_up', target_port: 'a' },
+      { source: 'macd', source_port: 'signal', target: 'cross_up', target_port: 'b' },
+      { source: 'macd', source_port: 'macd', target: 'cross_down', target_port: 'a' },
+      { source: 'macd', source_port: 'signal', target: 'cross_down', target_port: 'b' },
+      // Condition → Action wiring
+      { source: 'cross_up', source_port: 'result', target: 'buy', target_port: 'signal' },
+      { source: 'cross_down', source_port: 'result', target: 'sell', target_port: 'signal' }
+    ]
+  },
+  bb: {
+    blocks: [
+      { type: 'bollinger', params: { period: 20, std_dev: 2.0 } },
+      { type: 'price', id: 'price' },
+      { type: 'crossover', id: 'cross_up' },
+      { type: 'crossunder', id: 'cross_down' },
+      { type: 'buy' },
+      { type: 'sell' }
+    ],
+    connections: [
+      // Price crosses above lower band → buy signal
+      { source: 'price', source_port: 'close', target: 'cross_up', target_port: 'a' },
+      { source: 'bollinger', source_port: 'lower', target: 'cross_up', target_port: 'b' },
+      // Price crosses below upper band → sell signal
+      { source: 'price', source_port: 'close', target: 'cross_down', target_port: 'a' },
+      { source: 'bollinger', source_port: 'upper', target: 'cross_down', target_port: 'b' },
+      // Condition → Action wiring
+      { source: 'cross_up', source_port: 'result', target: 'buy', target_port: 'signal' },
+      { source: 'cross_down', source_port: 'result', target: 'sell', target_port: 'signal' }
+    ]
+  },
+  custom: { blocks: [], connections: [] }
+};
+
+function openAiBuildModal() {
+  document.getElementById('aiBuildModal').style.display = 'flex';
+
+  // Populate summary from Parameters panel
+  const symbol = document.getElementById('backtestSymbol')?.value || '';
+  const timeframe = document.getElementById('strategyTimeframe')?.value || '15';
+  const direction = document.getElementById('builderDirection')?.value || 'both';
+  const capital = document.getElementById('backtestCapital')?.value || '10000';
+  const leverage = document.getElementById('backtestLeverage')?.value || '10';
+  const startDate = document.getElementById('backtestStartDate')?.value || '';
+  const endDate = document.getElementById('backtestEndDate')?.value || '';
+  const marketType = document.getElementById('builderMarketType')?.value || 'linear';
+
+  const tfLabels = { '1': '1m', '5': '5m', '15': '15m', '30': '30m', '60': '1h', '240': '4h', 'D': '1D', 'W': '1W', 'M': '1M' };
+  const dirLabels = { 'both': 'Long & Short', 'long': 'Long only', 'short': 'Short only' };
+  const mktLabels = { 'linear': 'Futures', 'spot': 'SPOT' };
+
+  const summaryEl = document.getElementById('aiBuildSummary');
+  if (summaryEl) {
+    let warning = '';
+    if (!symbol) {
+      warning = '<div class="summary-warning"><i class="bi bi-exclamation-triangle"></i> Выберите тикер в панели Параметры</div>';
+    }
+    summaryEl.innerHTML = `
+      <div class="summary-row"><span class="summary-label">Symbol:</span><span class="summary-value">${symbol || '—'}</span></div>
+      <div class="summary-row"><span class="summary-label">Timeframe:</span><span class="summary-value">${tfLabels[timeframe] || timeframe}</span></div>
+      <div class="summary-row"><span class="summary-label">Direction:</span><span class="summary-value">${dirLabels[direction] || direction}</span></div>
+      <div class="summary-row"><span class="summary-label">Market:</span><span class="summary-value">${mktLabels[marketType] || marketType}</span></div>
+      <div class="summary-row"><span class="summary-label">Capital:</span><span class="summary-value">$${parseFloat(capital).toLocaleString()}</span></div>
+      <div class="summary-row"><span class="summary-label">Leverage:</span><span class="summary-value">${leverage}x</span></div>
+      <div class="summary-row"><span class="summary-label">Period:</span><span class="summary-value">${startDate || '—'} → ${endDate || '—'}</span></div>
+      ${warning}
+    `;
+  }
+
+  // Pre-fill strategy name from Parameters
+  const stratName = document.getElementById('strategyName')?.value || 'New Strategy';
+  const aiNameEl = document.getElementById('aiName');
+  if (aiNameEl && (aiNameEl.value === 'AI RSI Strategy' || aiNameEl.value === 'New Strategy' || !aiNameEl.value)) {
+    aiNameEl.value = stratName === 'New Strategy' ? 'AI RSI Strategy' : `AI ${stratName}`;
+  }
+
+  applyAiPreset();
+}
+
+function closeAiBuildModal() {
+  document.getElementById('aiBuildModal').style.display = 'none';
+}
+
+function applyAiPreset() {
+  const presetSelect = document.getElementById('aiPreset');
+  if (!presetSelect) return;
+  const preset = AI_PRESETS[presetSelect.value];
+  const preview = document.getElementById('aiBlocksPreview');
+  if (preview && preset) {
+    preview.textContent = JSON.stringify(preset.blocks, null, 2);
+  }
+}
+
+function resetAiBuild() {
+  document.getElementById('aiBuildConfig').style.display = '';
+  document.getElementById('aiBuildProgress').style.display = 'none';
+  document.getElementById('aiBuildResults').style.display = 'none';
+}
+
+async function runAiBuild() {
+  const presetSelect = document.getElementById('aiPreset');
+  if (!presetSelect) return;
+  const presetKey = presetSelect.value;
+  const preset = AI_PRESETS[presetKey];
+
+  // Read values from Parameters panel (not from modal)
+  const symbol = document.getElementById('backtestSymbol')?.value || '';
+  const timeframe = document.getElementById('strategyTimeframe')?.value || '15';
+  const direction = document.getElementById('builderDirection')?.value || 'both';
+  const startDate = document.getElementById('backtestStartDate')?.value || '2025-01-01';
+  const endDate = document.getElementById('backtestEndDate')?.value || '2025-06-01';
+  const capital = parseFloat(document.getElementById('backtestCapital')?.value || '10000');
+  const leverage = parseFloat(document.getElementById('backtestLeverage')?.value || '10');
+
+  if (!symbol) {
+    alert('Выберите тикер (Symbol) в панели Параметры');
+    return;
+  }
+
+  const payload = {
+    name: document.getElementById('aiName').value,
+    symbol: symbol,
+    timeframe: timeframe,
+    direction: direction,
+    start_date: startDate,
+    end_date: endDate,
+    initial_capital: capital,
+    leverage: leverage,
+    max_iterations: parseInt(document.getElementById('aiMaxIter').value),
+    min_sharpe: parseFloat(document.getElementById('aiMinSharpe').value),
+    min_win_rate: 0.4,
+    enable_deliberation: document.getElementById('aiDeliberation').checked,
+    blocks: preset.blocks,
+    connections: preset.connections
+  };
+
+  // Show progress
+  document.getElementById('aiBuildConfig').style.display = 'none';
+  document.getElementById('aiBuildProgress').style.display = '';
+  document.getElementById('aiBuildStage').textContent =
+    'Building strategy with AI agent...';
+
+  try {
+    const response = await fetch('/api/v1/agents/advanced/builder/task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    await showAiBuildResults(data);
+
+  } catch (err) {
+    document.getElementById('aiBuildProgress').style.display = 'none';
+    document.getElementById('aiBuildResults').style.display = '';
+    document.getElementById('aiBuildResultContent').innerHTML =
+      `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${err.message}</div>`;
+  }
+}
+
+async function showAiBuildResults(data) {
+  document.getElementById('aiBuildProgress').style.display = 'none';
+  document.getElementById('aiBuildResults').style.display = '';
+
+  const w = data.workflow || {};
+  const _m = w.backtest_results?.metrics || {};
+  const iters = w.iterations || [];
+  const lastIter = iters[iters.length - 1] || {};
+  const ok = data.success;
+
+  let html = `
+    <div class="alert ${ok ? 'alert-success' : 'alert-warning'}">
+      <strong>${ok ? '✅ Strategy Built!' : '⚠️ Below Target'}</strong>
+      — ${w.status || 'unknown'} in ${(w.duration_seconds || 0).toFixed(1)}s
+    </div>
+    <table class="table table-sm table-bordered">
+      <tr><td>Strategy ID</td><td><code>${w.strategy_id || '—'}</code></td></tr>
+      <tr><td>Iterations</td><td>${iters.length}</td></tr>
+      <tr><td>Sharpe Ratio</td><td>${(lastIter.sharpe_ratio || 0).toFixed(3)}</td></tr>
+      <tr><td>Win Rate</td><td>${((lastIter.win_rate || 0) * 100).toFixed(1)}%</td></tr>
+      <tr><td>Net Profit</td><td>$${(lastIter.net_profit || 0).toFixed(2)}</td></tr>
+      <tr><td>Max Drawdown</td><td>${(lastIter.max_drawdown || 0).toFixed(2)}%</td></tr>
+      <tr><td>Total Trades</td><td>${lastIter.total_trades || 0}</td></tr>
+      <tr><td>Blocks Added</td><td>${(w.blocks_added || []).length}</td></tr>
+      <tr><td>Connections</td><td>${(w.connections_made || []).length}</td></tr>
+    </table>`;
+
+  if (w.deliberation && w.deliberation.decision) {
+    html += `
+      <div class="alert alert-info mt-2">
+        <strong>🤖 AI Deliberation</strong>
+        (confidence: ${(w.deliberation.confidence * 100).toFixed(0)}%)<br>
+        <small>${w.deliberation.decision.substring(0, 300)}...</small>
+      </div>`;
+  }
+
+  if (w.errors && w.errors.length > 0) {
+    html += '<div class="alert alert-danger mt-2"><strong>Errors:</strong><ul>';
+    w.errors.forEach(function (e) { html += `<li>${e}</li>`; });
+    html += '</ul></div>';
+  }
+
+  document.getElementById('aiBuildResultContent').innerHTML = html;
+
+  // Load the built strategy onto the canvas so user sees the blocks
+  console.log('[AI Build] Attempting to load strategy onto canvas:', w.strategy_id);
+
+  if (w.strategy_id && typeof loadStrategy === 'function') {
+    try {
+      await loadStrategy(w.strategy_id);
+      console.log('[AI Build] Strategy loaded onto canvas successfully:', w.strategy_id);
+
+      // Update URL so page knows which strategy is active
+      const newUrl = new URL(window.location);
+      newUrl.searchParams.set('id', w.strategy_id);
+      window.history.replaceState({}, '', newUrl);
+      console.log('[AI Build] URL updated with strategy ID');
+    } catch (err) {
+      console.error('[AI Build] Failed to load strategy onto canvas:', err);
+    }
+  } else {
+    console.error('[AI Build] Cannot load strategy - missing strategy_id or loadStrategy function');
+  }
+}
+
+// ============================================
+// CSP-COMPLIANT EVENT LISTENERS
+// Replaces all inline onclick="..." handlers
+// ============================================
+
+function initCspCompliantListeners() {
+  // Toolbar buttons
+  const btnFitToScreen = document.querySelector('.btn-icon[title="Fit to Screen"]');
+  if (btnFitToScreen) btnFitToScreen.addEventListener('click', fitToScreen);
+
+  const btnAiBuild = document.getElementById('btnAiBuild');
+  if (btnAiBuild) btnAiBuild.addEventListener('click', openAiBuildModal);
+
+  // Zoom controls
+  const zoomBtns = document.querySelectorAll('.zoom-btn');
+  zoomBtns.forEach(btn => {
+    const title = btn.getAttribute('title') || btn.getAttribute('aria-label') || '';
+    if (title.includes('Zoom out')) btn.addEventListener('click', zoomOut);
+    else if (title.includes('Zoom in')) btn.addEventListener('click', zoomIn);
+    else if (title.includes('Reset zoom')) btn.addEventListener('click', resetZoom);
+  });
+
+  // Template modal — Export/Import buttons
+  const exportBtn = document.querySelector('[title="Save current strategy as JSON file"]');
+  if (exportBtn) exportBtn.addEventListener('click', exportAsTemplate);
+
+  const importBtn = document.querySelector('[title="Load strategy from JSON file"]');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => {
+      document.getElementById('importTemplateInput')?.click();
+    });
+  }
+
+  // Backtest Results Modal — close buttons
+  const backtestCloseX = document.getElementById('btnCloseBacktestResults');
+  if (backtestCloseX) backtestCloseX.addEventListener('click', closeBacktestResultsModal);
+
+  const backtestCloseBtn = document.getElementById('btnCloseBacktestResults2');
+  if (backtestCloseBtn) backtestCloseBtn.addEventListener('click', closeBacktestResultsModal);
+
+  // Export & View Full buttons
+  const exportResultsBtn = document.getElementById('btnExportBacktestResults');
+  if (exportResultsBtn) exportResultsBtn.addEventListener('click', exportBacktestResults);
+
+  const viewFullBtn = document.getElementById('btnViewFullBacktestResults');
+  if (viewFullBtn) viewFullBtn.addEventListener('click', viewFullResults);
+
+  // Results tabs — delegated
+  document.querySelectorAll('.results-tab[data-tab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      switchResultsTab(tab.dataset.tab);
+    });
+  });
+
+  // AI Build Modal buttons
+  const aiBuildCloseBtn = document.getElementById('btnCloseAiBuild');
+  if (aiBuildCloseBtn) aiBuildCloseBtn.addEventListener('click', closeAiBuildModal);
+
+  const aiRunBtn = document.getElementById('btnRunAiBuild');
+  if (aiRunBtn) aiRunBtn.addEventListener('click', runAiBuild);
+
+  const aiResetBtn = document.getElementById('btnResetAiBuild');
+  if (aiResetBtn) aiResetBtn.addEventListener('click', resetAiBuild);
+
+  const aiPresetSelect = document.getElementById('aiPreset');
+  if (aiPresetSelect) aiPresetSelect.addEventListener('change', applyAiPreset);
+
+  console.log('[Strategy Builder] CSP-compliant event listeners initialized');
+}
+
+// ============================================
 // EXPORTS - Make functions available globally
 // ============================================
 
@@ -13646,6 +14203,14 @@ window.closeBacktestResultsModal = closeBacktestResultsModal;
 window.switchResultsTab = switchResultsTab;
 window.exportBacktestResults = exportBacktestResults;
 window.viewFullResults = viewFullResults;
+
+// AI Build functions
+window.openAiBuildModal = openAiBuildModal;
+window.closeAiBuildModal = closeAiBuildModal;
+window.applyAiPreset = applyAiPreset;
+window.resetAiBuild = resetAiBuild;
+window.runAiBuild = runAiBuild;
+window.showAiBuildResults = showAiBuildResults;
 
 // ============================================
 // WEBSOCKET VALIDATION INTEGRATION
@@ -13717,11 +14282,15 @@ function updateWsStatusIndicator(connected) {
   }
 }
 
-// Initialize WS listeners when DOM is ready
+// Initialize WS listeners and CSP-compliant event listeners when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initWsValidationListeners);
+  document.addEventListener('DOMContentLoaded', () => {
+    initWsValidationListeners();
+    initCspCompliantListeners();
+  });
 } else {
   initWsValidationListeners();
+  initCspCompliantListeners();
 }
 
 // Export WS functions

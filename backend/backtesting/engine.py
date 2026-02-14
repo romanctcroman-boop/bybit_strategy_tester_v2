@@ -514,6 +514,10 @@ def _build_performance_metrics(
         volatility=calc_metrics.get("volatility", 0.0),
         ulcer_index=calc_metrics.get("ulcer_index", 0.0),
         sqn=calc_metrics.get("sqn", 0.0),
+        kelly_percent=calc_metrics.get("kelly_percent", 0.0),
+        kelly_percent_long=calc_metrics.get("kelly_percent_long", 0.0),
+        kelly_percent_short=calc_metrics.get("kelly_percent_short", 0.0),
+        open_trades=calc_metrics.get("open_trades", 0),
         # Intrabar metrics (TradingView-style from OHLC simulation)
         max_drawdown_intrabar=max_drawdown_intrabar,
         max_drawdown_intrabar_value=max_drawdown_intrabar_value,
@@ -1620,7 +1624,9 @@ class BacktestEngine:
                     # === BREAKEVEN SL CHECK ===
                     # If breakeven is active, check breakeven SL before regular SL
                     if breakeven_active and breakeven_sl_price is not None:
-                        if (is_long and current_low <= breakeven_sl_price) or (not is_long and current_high >= breakeven_sl_price):
+                        if (is_long and current_low <= breakeven_sl_price) or (
+                            not is_long and current_high >= breakeven_sl_price
+                        ):
                             should_exit = True
                             exit_reason = "stop_loss"
                             exit_price = breakeven_sl_price
@@ -1636,7 +1642,9 @@ class BacktestEngine:
                             sl_check_price = current_low if is_long else current_high
                         else:
                             sl_check_price = price  # close price
-                        if (is_long and sl_check_price <= atr_sl_price) or (not is_long and sl_check_price >= atr_sl_price):
+                        if (is_long and sl_check_price <= atr_sl_price) or (
+                            not is_long and sl_check_price >= atr_sl_price
+                        ):
                             should_exit = True
                             exit_reason = "stop_loss"
                             exit_price = max(current_low, min(current_high, atr_sl_price))
@@ -1648,7 +1656,9 @@ class BacktestEngine:
                             tp_check_price = current_high if is_long else current_low
                         else:
                             tp_check_price = price  # close price
-                        if (is_long and tp_check_price >= atr_tp_price) or (not is_long and tp_check_price <= atr_tp_price):
+                        if (is_long and tp_check_price >= atr_tp_price) or (
+                            not is_long and tp_check_price <= atr_tp_price
+                        ):
                             should_exit = True
                             exit_reason = "take_profit"
                             exit_price = max(current_low, min(current_high, atr_tp_price))

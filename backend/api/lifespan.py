@@ -493,8 +493,9 @@ async def lifespan(app: "FastAPI"):
     # Start KlineDBService
     await _start_kline_db_service(app)
 
-    # Start background daily data refresh
-    asyncio.create_task(_refresh_daily_data_background())
+    # NOTE: Daily data refresh removed from startup — syncing happens when user
+    # selects a symbol in the Parameters panel (sync-all-tf-stream endpoint).
+    # This avoids duplicate functionality and unnecessary API calls on boot.
 
     # Preload Bybit tickers list for Properties Symbol dropdown (linear + spot)
     asyncio.create_task(_preload_symbols_list(app))

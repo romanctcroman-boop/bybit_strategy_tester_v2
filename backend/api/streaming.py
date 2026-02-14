@@ -206,7 +206,7 @@ async def streaming_agent_websocket(websocket: WebSocket, client_id: str):
         "agent": "deepseek",  // or "perplexity"
         "task_type": "analyze",
         "prompt": "Your question here",
-        "thinking_mode": true
+        "thinking_mode": false
     }
 
     Receive message formats:
@@ -291,7 +291,7 @@ async def handle_streaming_query(websocket: WebSocket, client_id: str, data: dic
     agent_name = data.get("agent", "deepseek").lower()
     task_type = data.get("task_type", "analyze")
     prompt = data.get("prompt", "")
-    thinking_mode = data.get("thinking_mode", True)
+    thinking_mode = data.get("thinking_mode", False)  # Default False — cost protection
 
     if not prompt:
         await websocket.send_json({"type": "error", "error": "Empty prompt"})

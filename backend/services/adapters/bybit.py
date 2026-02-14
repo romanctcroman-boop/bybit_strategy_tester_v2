@@ -7,6 +7,7 @@ Behavior:
 This module focuses on a small subset used by the strategy tester: fetching klines (candles) and recent trades.
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -14,7 +15,7 @@ import re
 import threading
 import time
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Callable
 
 import requests
 
@@ -24,14 +25,15 @@ logger = logging.getLogger(__name__)
 _tickers_cache: dict[str, Any] = {"data": None, "timestamp": 0, "ttl": 30}  # 30 sec TTL
 
 # Circuit breaker for API resilience
+_circuit_registry: Any = None
+_HAS_CIRCUIT_BREAKER = False
 try:
     from backend.core.circuit_breaker import get_circuit_registry
 
     _circuit_registry = get_circuit_registry()
     _HAS_CIRCUIT_BREAKER = True
 except ImportError:
-    _circuit_registry = None
-    _HAS_CIRCUIT_BREAKER = False
+    pass
 
 try:
     # pybit v2+ (the unofficial/official clients vary by name); attempt common import
@@ -44,7 +46,11 @@ except Exception:
 
 
 def _with_circuit_breaker(name: str = "bybit_api"):
-    """Decorator to wrap API calls with circuit breaker protection."""
+    """Decorator to wrap API calls with circuit breaker protection.
+
+    Note: circuit breaker record_success/record_failure are async;
+    in this sync context we only use can_execute() (which is sync).
+    """
 
     def decorator(func):
         if not _HAS_CIRCUIT_BREAKER or _circuit_registry is None:
@@ -54,13 +60,7 @@ def _with_circuit_breaker(name: str = "bybit_api"):
             breaker = _circuit_registry.get_or_create(name)
             if not breaker.can_execute():
                 raise ConnectionError(f"Circuit breaker '{name}' is OPEN - API calls blocked")
-            try:
-                result = func(*args, **kwargs)
-                breaker.record_success()
-                return result
-            except Exception:
-                breaker.record_failure()
-                raise
+            return func(*args, **kwargs)
 
         return wrapper
 
@@ -101,20 +101,17 @@ class BybitAdapter:
             self._circuit_breaker = _circuit_registry.get_or_create("bybit_api")
 
     def _api_get(self, url: str, params: dict, timeout: int | None = None) -> requests.Response:
-        """Make GET request with circuit breaker protection."""
+        """Make GET request with circuit breaker protection.
+
+        Note: circuit breaker record_success/record_failure are async;
+        in this sync context we only use can_execute() (which is sync).
+        """
         if self._circuit_breaker and not self._circuit_breaker.can_execute():
             raise ConnectionError("Circuit breaker OPEN - Bybit API temporarily unavailable")
 
-        try:
-            r = requests.get(url, params=params, timeout=timeout or self.timeout)
-            r.raise_for_status()
-            if self._circuit_breaker:
-                self._circuit_breaker.record_success()
-            return r
-        except Exception:
-            if self._circuit_breaker:
-                self._circuit_breaker.record_failure()
-            raise
+        r = requests.get(url, params=params, timeout=timeout or self.timeout)
+        r.raise_for_status()
+        return r
 
     def get_klines(self, symbol: str, interval: str = "1", limit: int = 200) -> list[dict]:
         """Fetch kline/candle data. interval is minutes as string in Bybit public API mapping.
@@ -193,11 +190,8 @@ class BybitAdapter:
                 _target_bind = None
 
             if _target_bind is not None:
-                try:
+                with contextlib.suppress(Exception):
                     BybitKlineAudit.__table__.create(bind=_target_bind, checkfirst=True)
-                except Exception:
-                    # best-effort: ignore if create fails
-                    pass
         except Exception:
             # models or database not available in this runtime (e.g. stripped tests); ignore
             pass
@@ -212,8 +206,8 @@ class BybitAdapter:
                 else info.get("result") or []
             )
             # Build a mapping of symbol -> instrument metadata for smarter selection
-            available_meta = {
-                itm.get("symbol"): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
+            available_meta: dict[str, dict] = {
+                str(itm.get("symbol")): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
             }
             available = set(available_meta.keys())
         except Exception:
@@ -315,7 +309,7 @@ class BybitAdapter:
                     normalized = [self._normalize_kline_row(d) for d in data]
                     # attempt to persist normalized candles to audit table (best-effort)
                     try:
-                        self._persist_klines_to_db(chosen, normalized)
+                        self._persist_klines_to_db(chosen, normalized, interval=interval_norm)
                     except Exception:
                         logger.exception("Failed to persist klines to DB")
                     return normalized
@@ -349,7 +343,7 @@ class BybitAdapter:
             if data:
                 normalized = [self._normalize_kline_row(d) for d in data]
                 try:
-                    self._persist_klines_to_db(spot_symbol, normalized)
+                    self._persist_klines_to_db(spot_symbol, normalized, interval=interval_norm)
                 except Exception:
                     logger.exception("Failed to persist klines to DB")
                 return normalized
@@ -425,7 +419,7 @@ class BybitAdapter:
         symbol_upper = symbol.upper()
 
         v5_kline_url = "https://api.bybit.com/v5/market/kline"
-        params = {
+        params: dict[str, str | int] = {
             "category": "linear",
             "symbol": symbol_upper,
             "interval": interval_norm,
@@ -481,6 +475,7 @@ class BybitAdapter:
         Returns:
             List of candles sorted by open_time ascending
         """
+
         # Normalize interval to Bybit v5
         def _to_v5(itv: str) -> str:
             itv = str(itv)
@@ -508,7 +503,7 @@ class BybitAdapter:
         iteration = 0
 
         while len(all_candles) < total_candles and iteration < max_iterations:
-            params = {
+            params: dict[str, str | int] = {
                 "category": category,
                 "symbol": symbol_upper,
                 "interval": interval_norm,
@@ -614,7 +609,7 @@ class BybitAdapter:
         logger.info(f"Fetching klines with category={category} (market_type={market_type})")
 
         for iteration in range(max_iterations):
-            params = {
+            params: dict[str, str | int] = {
                 "category": category,
                 "symbol": symbol_upper,
                 "interval": interval_norm,
@@ -673,7 +668,7 @@ class BybitAdapter:
                 # Move end backwards for next iteration
                 current_end = oldest_time - 1
 
-                # Минимальная пауза: Bybit ~120 req/s по IP, 8 TF параллельно — 0.02 с достаточно
+                # Minimal pause: Bybit ~120 req/s per IP, 8 TF in parallel — 0.02s is enough
                 await asyncio.sleep(0.02)
 
             except Exception as e:
@@ -695,6 +690,188 @@ class BybitAdapter:
         )
 
         return unique_candles
+
+    async def get_historical_klines_chunked(
+        self,
+        symbol: str,
+        interval: str = "60",
+        start_time: int | None = None,
+        end_time: int | None = None,
+        limit: int = 1000,
+        market_type: str = "linear",
+        persist_every: int = 5000,
+        on_progress: Callable[[int, int], None] | None = None,
+        cancel_check: Callable[[], bool] | None = None,
+    ) -> int:
+        """
+        Fetch historical klines with chunked persistence and progress reporting.
+
+        Unlike get_historical_klines(), this method:
+        - Saves data to DB every `persist_every` candles (no data loss on timeout)
+        - Reports progress via on_progress callback
+        - Supports cancellation via cancel_check callback
+
+        Args:
+            symbol: Trading pair (e.g. BTCUSDT)
+            interval: Timeframe (e.g. '60' for 1h, 'D' for daily)
+            start_time: Milliseconds timestamp - fetch data FROM this time
+            end_time: Milliseconds timestamp - fetch data TO this time
+            limit: Max number of candles per request (max 1000)
+            market_type: 'spot' or 'linear'
+            persist_every: Save to DB after this many candles (default 5000)
+            on_progress: Callback(fetched_so_far, estimated_total) called after each batch
+            cancel_check: Callback() -> bool, return True to cancel
+
+        Returns:
+            Total number of new candles persisted
+        """
+        import asyncio
+
+        # Normalize interval
+        def _to_v5_interval(itv: str) -> str:
+            itv = str(itv).strip()
+            if not itv:
+                return "60"
+            u = itv.upper()
+            if u in ("D", "W", "M"):
+                return u
+            if itv.endswith("m") and itv[:-1].isdigit():
+                return itv[:-1]
+            if itv.endswith("h") or itv.endswith("H"):
+                try:
+                    return str(int(itv[:-1]) * 60)
+                except Exception:
+                    return itv[:-1]
+            return itv
+
+        interval_norm = _to_v5_interval(interval)
+        symbol_upper = symbol.upper()
+        category = "spot" if market_type == "spot" else "linear"
+
+        v5_kline_url = "https://api.bybit.com/v5/market/kline"
+        max_iterations = 1500  # Safety limit (enough for ~1.5M candles)
+
+        total_persisted = 0
+        pending_candles: list[dict] = []
+        seen_times: set[int] = set()
+        current_end = end_time
+
+        # Estimate total candles for progress reporting
+        interval_ms_map = {
+            "1": 60_000,
+            "5": 300_000,
+            "15": 900_000,
+            "30": 1_800_000,
+            "60": 3_600_000,
+            "240": 14_400_000,
+            "D": 86_400_000,
+            "W": 604_800_000,
+            "M": 2_592_000_000,
+        }
+        estimated_total = 0
+        if start_time and end_time:
+            ims = interval_ms_map.get(interval_norm, 3_600_000)
+            estimated_total = max(1, (end_time - start_time) // ims)
+
+        logger.info(
+            f"[ChunkedFetch] Starting {symbol_upper}/{interval_norm} "
+            f"from {start_time} to {end_time}, estimated ~{estimated_total} candles"
+        )
+
+        for iteration in range(max_iterations):
+            # Check cancellation
+            if cancel_check and cancel_check():
+                logger.info(f"[ChunkedFetch] Cancelled at iteration {iteration}")
+                break
+
+            params: dict[str, str | int] = {
+                "category": category,
+                "symbol": symbol_upper,
+                "interval": interval_norm,
+                "limit": min(limit, 1000),
+            }
+            if start_time:
+                params["start"] = start_time
+            if current_end:
+                params["end"] = current_end
+
+            try:
+                loop = asyncio.get_event_loop()
+                r = await loop.run_in_executor(
+                    None,
+                    lambda p=params: requests.get(v5_kline_url, params=p, timeout=self.timeout),
+                )
+                r.raise_for_status()
+                payload = r.json()
+                result = payload.get("result") or payload.get("data") or payload
+
+                if isinstance(result, dict) and "list" in result:
+                    data = result["list"]
+                elif isinstance(result, list):
+                    data = result
+                else:
+                    data = []
+
+                if not data:
+                    break
+
+                normalized = [self._normalize_kline_row(d) for d in data]
+
+                # Deduplicate within this fetch
+                for c in normalized:
+                    t = c.get("open_time")
+                    if t is not None and t not in seen_times:
+                        seen_times.add(t)
+                        pending_candles.append(c)
+
+                # Persist chunk if enough candles accumulated
+                if len(pending_candles) >= persist_every:
+                    rows_with_interval = [{**c, "interval": interval_norm} for c in pending_candles]
+                    self._persist_klines_to_db(symbol_upper, rows_with_interval, market_type=market_type)
+                    total_persisted += len(pending_candles)
+                    logger.info(
+                        f"[ChunkedFetch] Persisted chunk: {len(pending_candles)} candles, "
+                        f"total={total_persisted} for {symbol_upper}/{interval_norm}"
+                    )
+                    pending_candles.clear()
+
+                # Report progress
+                fetched_so_far = total_persisted + len(pending_candles)
+                if on_progress:
+                    with contextlib.suppress(Exception):
+                        on_progress(fetched_so_far, estimated_total)
+
+                # Check pagination
+                if len(data) < limit:
+                    break
+
+                oldest_time = min(c.get("open_time", 0) for c in normalized)
+                if start_time and oldest_time <= start_time:
+                    break
+
+                current_end = oldest_time - 1
+                await asyncio.sleep(0.02)
+
+            except Exception as e:
+                logger.error(f"[ChunkedFetch] Error at iteration {iteration}: {e}")
+                # Persist whatever we have so far before re-raising
+                if pending_candles:
+                    rows_with_interval = [{**c, "interval": interval_norm} for c in pending_candles]
+                    self._persist_klines_to_db(symbol_upper, rows_with_interval, market_type=market_type)
+                    total_persisted += len(pending_candles)
+                    pending_candles.clear()
+                    logger.info(f"[ChunkedFetch] Saved {total_persisted} candles before error")
+                raise
+
+        # Persist remaining candles
+        if pending_candles:
+            rows_with_interval = [{**c, "interval": interval_norm} for c in pending_candles]
+            self._persist_klines_to_db(symbol_upper, rows_with_interval, market_type=market_type)
+            total_persisted += len(pending_candles)
+            pending_candles.clear()
+
+        logger.info(f"[ChunkedFetch] Complete: {total_persisted} candles for {symbol_upper}/{interval_norm}")
+        return total_persisted
 
     def _normalize_kline_row(self, row: dict) -> dict:
         # Accept both list-style and dict-style rows
@@ -740,7 +917,7 @@ class BybitAdapter:
             return parsed
         elif isinstance(row, dict):
             raw = dict(row)
-            parsed: dict[str, Any] = {"raw": raw}
+            parsed = {"raw": raw}
             # Common key aliases used across Bybit responses
             start_candidates = [
                 raw.get("startTime"),
@@ -763,9 +940,7 @@ class BybitAdapter:
                     except Exception:
                         continue
             parsed["open_time"] = start_ms
-            parsed["open_time_dt"] = (
-                datetime.fromtimestamp(start_ms / 1000.0, tz=UTC) if start_ms is not None else None
-            )
+            parsed["open_time_dt"] = datetime.fromtimestamp(start_ms / 1000.0, tz=UTC) if start_ms is not None else None
 
             def get_str(*keys) -> str | None:
                 for k in keys:
@@ -794,11 +969,22 @@ class BybitAdapter:
         self,
         symbol: str,
         normalized_rows: list[dict],
-        db: object | None = None,
-        engine: object | None = None,
+        db: Any = None,
+        engine: Any = None,
         market_type: str = "linear",
-    ):
+        interval: str | None = None,
+    ) -> None:
         """Persist normalized klines (list of dicts as returned by _normalize_kline_row) into audit table.
+
+        Args:
+            symbol: Trading pair symbol (e.g. BTCUSDT).
+            normalized_rows: List of normalized kline dicts.
+            db: Optional SQLAlchemy session for deterministic behavior in tests.
+            engine: Optional SQLAlchemy engine.
+            market_type: Market type (linear/spot).
+            interval: Timeframe interval (e.g. "15", "60", "D"). If not provided,
+                      extracted from each row's 'interval' key; rows without valid
+                      interval are skipped to prevent "UNKNOWN" pollution.
 
         Behaviour: best-effort; uses UNIQUE(symbol, open_time) to avoid duplicates.
         """
@@ -831,14 +1017,23 @@ class BybitAdapter:
                 raw_val = str(row)
 
             # Accept both styles used across tests and normalizers: keys may be named 'open'/'close' or 'open_price'/'close_price'.
-            def _pick(*keys):
+            def _pick(*keys, _row=row):
                 for k in keys:
-                    if k in row and row.get(k) is not None:
-                        return row.get(k)
+                    if k in _row and _row.get(k) is not None:
+                        return _row.get(k)
                 return None
 
-            # Extract interval from row, fallback to "UNKNOWN"
-            row_interval = _pick("interval") or "UNKNOWN"
+            # Extract interval from row, or use explicit parameter.
+            # NEVER fall back to "UNKNOWN" — skip rows without valid interval.
+            VALID_INTERVALS = {"1", "5", "15", "30", "60", "240", "D", "W", "M"}
+            row_interval = interval or _pick("interval")
+            if not row_interval or row_interval not in VALID_INTERVALS:
+                logger.debug(
+                    "Skipping persist for %s: invalid interval '%s'",
+                    symbol,
+                    row_interval,
+                )
+                continue
 
             params.append(
                 {
@@ -902,11 +1097,8 @@ class BybitAdapter:
                 target_bind = None
             if target_bind is None:
                 target_bind = _engine
-            try:
+            with contextlib.suppress(Exception):
                 BybitKlineAudit.__table__.create(bind=target_bind, checkfirst=True)
-            except Exception:
-                # ignore create failures; we'll surface DB errors during execute
-                pass
         except Exception:
             # swallow any unexpected errors in this best-effort block
             pass
@@ -1044,25 +1236,20 @@ class BybitAdapter:
                         turnover=p["turnover"],
                     )
                     try:
-                        obj.raw = p["raw"]
+                        obj.raw = p["raw"]  # type: ignore[assignment]
                     except Exception:
-                        obj.raw = str(p["raw"])
+                        obj.raw = str(p["raw"])  # type: ignore[assignment]
                     db.add(obj)
                 db.commit()
         except Exception:
             # safest rollback attempt for real sessions
-            try:
+            with contextlib.suppress(Exception):
                 db.rollback()
-            except Exception:
-                pass
             raise
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 if db:
                     db.close()
-            except Exception:
-                # best-effort close; ignore errors closing the session
-                pass
 
     # Instrument discovery and validation (thread-safe)
     def _refresh_instruments_cache(self, force: bool = False):
@@ -1100,7 +1287,7 @@ class BybitAdapter:
                     else info.get("result") or []
                 )
                 self._instruments_cache = {
-                    itm.get("symbol"): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
+                    str(itm.get("symbol")): itm for itm in instruments if isinstance(itm, dict) and itm.get("symbol")
                 }
                 self._instruments_cache_at = time.time()
             except Exception:
@@ -1140,9 +1327,7 @@ class BybitAdapter:
                 raise ValueError(f"symbol {cand} not trading")
         raise ValueError(f"symbol {symbol} not found in instruments-info")
 
-    def get_tickers(
-        self, symbols: list[str] | None = None, category: str = "linear"
-    ) -> list[dict[str, Any]]:
+    def get_tickers(self, symbols: list[str] | None = None, category: str = "linear") -> list[dict[str, Any]]:
         """Fetch real-time ticker data from Bybit V5 API.
 
         Args:
@@ -1167,7 +1352,8 @@ class BybitAdapter:
             entry = bc[cache_key]
             if entry and current_time - entry.get("timestamp", 0) < _tickers_cache.get("ttl", 30):
                 logger.debug(f"Using cached tickers for {cat}")
-                return entry.get("data", [])
+                cached_data: list[dict[str, Any]] = list(entry.get("data", []))
+                return cached_data
 
         try:
             params = {"category": cat}
@@ -1191,9 +1377,7 @@ class BybitAdapter:
                     {
                         "symbol": sym,
                         "price": _safe_float(ticker.get("lastPrice")),
-                        "change_24h": _safe_float(ticker.get("price24hPcnt")) * 100
-                        if ticker.get("price24hPcnt")
-                        else 0,
+                        "change_24h": (_safe_float(ticker.get("price24hPcnt")) or 0) * 100,
                         "volume_24h": _safe_float(ticker.get("volume24h")),
                         "high_24h": _safe_float(ticker.get("highPrice24h")),
                         "low_24h": _safe_float(ticker.get("lowPrice24h")),
@@ -1247,24 +1431,24 @@ class BybitAdapter:
         """
         v5_url = "https://api.bybit.com/v5/market/orderbook"
         try:
-            r = requests.get(
-                v5_url,
-                params={"category": category, "symbol": symbol.upper(), "limit": limit},
-                timeout=self.timeout,
-            )
+            ob_params: dict[str, str | int] = {
+                "category": category,
+                "symbol": symbol.upper(),
+                "limit": limit,
+            }
+            r = requests.get(v5_url, params=ob_params, timeout=self.timeout)
             r.raise_for_status()
             data = r.json()
             if data.get("retCode", -1) != 0:
                 logger.warning("get_orderbook retCode=%s", data.get("retMsg", ""))
                 return None
-            return data.get("result") or data.get("data")
+            result: dict[str, Any] | None = data.get("result") or data.get("data")
+            return result
         except Exception as e:
             logger.error("get_orderbook failed: %s", e)
             return None
 
-    def get_symbols_list(
-        self, category: str = "linear", trading_only: bool = True
-    ) -> list[str]:
+    def get_symbols_list(self, category: str = "linear", trading_only: bool = True) -> list[str]:
         """Fetch full list of symbols from Bybit instruments-info (all pages).
 
         Args:
@@ -1281,7 +1465,7 @@ class BybitAdapter:
         max_pages = 50  # safety
         timeout_sec = max(self.timeout, 30)  # instruments-info can be slow (many pages)
         try:
-            for page in range(max_pages):
+            for _page in range(max_pages):
                 params: dict[str, Any] = {"category": category, "limit": limit}
                 if cursor:
                     params["cursor"] = cursor
@@ -1349,7 +1533,7 @@ class BybitAdapter:
         """
         import concurrent.futures
 
-        results = {"spot": [], "linear": []}
+        results: dict[str, list[dict]] = {"spot": [], "linear": []}
 
         def fetch_market(market_type: str) -> list[dict]:
             """Fetch klines for a specific market type."""
@@ -1363,7 +1547,7 @@ class BybitAdapter:
             elif interval.endswith("h"):
                 interval_norm = str(int(interval[:-1]) * 60)
 
-            params = {
+            params: dict[str, str | int] = {
                 "category": market_type,
                 "symbol": symbol_upper,
                 "interval": interval_norm,

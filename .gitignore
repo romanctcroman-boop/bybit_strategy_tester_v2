@@ -415,6 +415,9 @@ openapi*.json
 # Agent skills (embedded repo)
 .agent/skills/
 
+# Agent MCP config (contains env variable references, may have had secrets)
+.agent/mcp.json
+
 # ==============================================================================
 # Additional entries (2026-01-27 cleanup)
 # ==============================================================================
@@ -500,3 +503,6 @@ validation_reports.json
 /opt_result*.txt
 /quick_result.txt
 /signal_gen_output*.txt
+
+# Backup files
+*.bak

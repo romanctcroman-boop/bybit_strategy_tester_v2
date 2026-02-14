@@ -15,6 +15,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -32,6 +33,7 @@ def get_blocked_symbols() -> set:
         blocked_path = PROJECT_ROOT / "data" / "blocked_tickers.json"
         if blocked_path.exists():
             import json
+
             with open(blocked_path, encoding="utf-8") as f:
                 data = json.load(f)
             return {s.upper() for s in data.get("symbols", []) if s}
@@ -41,7 +43,18 @@ def get_blocked_symbols() -> set:
 
 
 def get_all_symbols_intervals(conn: sqlite3.Connection) -> list:
-    """Get all unique symbol/interval pairs from database (excluding blocked)."""
+    """Get all unique symbol/interval pairs from database (excluding blocked).
+
+    Filters out:
+    - Blocked symbols (from blocked_tickers.json)
+    - Invalid/UNKNOWN intervals (test data leakage)
+    - Test symbols (e.g. TESTUSD)
+    """
+    # Only valid Bybit timeframes
+    VALID_INTERVALS = {"1", "5", "15", "30", "60", "240", "D", "W", "M"}
+    # Known test symbols that should never be updated
+    TEST_SYMBOLS = {"TESTUSD", "TESTUSDT", "TEST", "FAKE", "FAKEUSD"}
+
     cursor = conn.cursor()
     cursor.execute("""
         SELECT DISTINCT symbol, interval
@@ -49,15 +62,17 @@ def get_all_symbols_intervals(conn: sqlite3.Connection) -> list:
         ORDER BY symbol, interval
     """)
     pairs = cursor.fetchall()
+
+    # Filter out invalid intervals and test symbols
+    pairs = [(s, i) for s, i in pairs if i in VALID_INTERVALS and s.upper() not in TEST_SYMBOLS]
+
     blocked = get_blocked_symbols()
     if blocked:
         pairs = [(s, i) for s, i in pairs if s.upper() not in blocked]
     return pairs
 
 
-def get_newest_candle_time(
-    conn: sqlite3.Connection, symbol: str, interval: str
-) -> int | None:
+def get_newest_candle_time(conn: sqlite3.Connection, symbol: str, interval: str) -> int | None:
     """Get timestamp of newest candle for symbol/interval."""
     cursor = conn.cursor()
     cursor.execute(
@@ -74,9 +89,15 @@ def get_newest_candle_time(
 def interval_to_ms(interval: str) -> int:
     """Convert interval string to milliseconds."""
     mapping = {
-        "1": 60_000, "5": 300_000, "15": 900_000, "30": 1_800_000,
-        "60": 3_600_000, "240": 14_400_000,
-        "D": 86_400_000, "W": 604_800_000, "M": 30 * 86_400_000,
+        "1": 60_000,
+        "5": 300_000,
+        "15": 900_000,
+        "30": 1_800_000,
+        "60": 3_600_000,
+        "240": 14_400_000,
+        "D": 86_400_000,
+        "W": 604_800_000,
+        "M": 30 * 86_400_000,
     }
     return mapping.get(interval, 3_600_000)
 
@@ -87,9 +108,7 @@ def overlap_candles(interval: str) -> int:
     return mapping.get(interval, 3)
 
 
-def fetch_candles_from_api(
-    symbol: str, interval: str, start_ts: int, end_ts: int, max_retries: int = 3
-) -> list:
+def fetch_candles_from_api(symbol: str, interval: str, start_ts: int, end_ts: int, max_retries: int = 3) -> list:
     """Fetch candles from Bybit API using direct REST calls with retry logic."""
     import requests
 
@@ -101,11 +120,11 @@ def fetch_candles_from_api(
         interval_norm = str(int(interval[:-1]) * 60)
 
     url = "https://api.bybit.com/v5/market/kline"
-    all_candles = []
+    all_candles: list[dict[str, Any]] = []
     current_start = start_ts
 
     while current_start < end_ts:
-        params = {
+        params: dict[str, str | int] = {
             "category": "linear",
             "symbol": symbol.upper(),
             "interval": interval_norm,
@@ -117,15 +136,17 @@ def fetch_candles_from_api(
         # Retry logic for transient network errors
         for attempt in range(max_retries):
             try:
-                r = requests.get(url, params=params, timeout=15)
+                r = requests.get(url, params=params, timeout=15)  # type: ignore[arg-type]
                 r.raise_for_status()
                 data = r.json()
                 break
-            except (requests.exceptions.ConnectionError,
-                    requests.exceptions.Timeout,
-                    requests.exceptions.RequestException) as e:
+            except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout,
+                requests.exceptions.RequestException,
+            ) as e:
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    wait_time = 2**attempt  # Exponential backoff: 1s, 2s, 4s
                     time.sleep(wait_time)
                     continue
                 else:
@@ -170,9 +191,7 @@ def fetch_candles_from_api(
     return all_candles
 
 
-def insert_candles(
-    conn: sqlite3.Connection, symbol: str, interval: str, candles: list
-) -> int:
+def insert_candles(conn: sqlite3.Connection, symbol: str, interval: str, candles: list) -> int:
     """Insert candles into database."""
     if not candles:
         return 0
@@ -334,9 +353,7 @@ def main():
     start_time = time.time()
 
     for symbol, interval in pairs:
-        result = update_symbol_interval(
-            conn, symbol, interval, args.verbose, args.dry_run
-        )
+        result = update_symbol_interval(conn, symbol, interval, args.verbose, args.dry_run)
 
         if result["status"] == "fresh":
             results["fresh"] += 1

@@ -137,10 +137,7 @@ class VectorMemoryStore:
             logger.debug(f"ChromaDB collection initialized: {self.collection_name}")
 
         except ImportError:
-            logger.warning(
-                "ChromaDB not installed. Run: pip install chromadb\n"
-                "Vector search will be unavailable."
-            )
+            logger.warning("ChromaDB not installed. Run: pip install chromadb\nVector search will be unavailable.")
             self._client = None
             self._collection = None
 
@@ -421,6 +418,139 @@ class VectorMemoryStore:
             logger.info(f"Cleared vector store collection: {self.collection_name}")
         except Exception as e:
             logger.error(f"Failed to clear collection: {e}")
+
+    # ========================================================================
+    # BACKTEST MEMORY — store and retrieve backtest results semantically
+    # Added 2026-02-11 per Agent Ecosystem Audit (P0)
+    # ========================================================================
+
+    async def save_backtest_result(
+        self,
+        backtest_id: str,
+        strategy_type: str,
+        strategy_params: dict[str, Any],
+        metrics: dict[str, Any],
+        symbol: str = "BTCUSDT",
+        interval: str = "15",
+    ) -> str | None:
+        """
+        Save a backtest result as a searchable memory entry.
+
+        Creates a textual summary of the backtest for semantic retrieval,
+        allowing agents to find similar past results.
+
+        Args:
+            backtest_id: Unique identifier for the backtest
+            strategy_type: Strategy name (e.g. 'rsi', 'macd')
+            strategy_params: Strategy parameters dict
+            metrics: Metrics dict with win_rate, total_return, sharpe_ratio, etc.
+            symbol: Trading pair
+            interval: Timeframe
+
+        Returns:
+            Document ID if saved, None on failure
+        """
+        try:
+            # Build a searchable text description
+            win_rate = metrics.get("win_rate", 0)
+            total_return = metrics.get("total_return_pct", metrics.get("total_return", 0))
+            sharpe = metrics.get("sharpe_ratio", 0)
+            max_dd = metrics.get("max_drawdown_pct", metrics.get("max_drawdown", 0))
+            total_trades = metrics.get("total_trades", 0)
+            profit_factor = metrics.get("profit_factor", 0)
+
+            params_str = ", ".join(f"{k}={v}" for k, v in strategy_params.items())
+
+            text = (
+                f"Backtest: {strategy_type} strategy on {symbol} {interval}m. "
+                f"Parameters: {params_str}. "
+                f"Results: {total_trades} trades, {win_rate:.1f}% win rate, "
+                f"{total_return:.2f}% return, Sharpe {sharpe:.3f}, "
+                f"Max drawdown {max_dd:.2f}%, Profit factor {profit_factor:.3f}. "
+                f"{'Profitable' if total_return > 0 else 'Unprofitable'} strategy."
+            )
+
+            metadata = {
+                "type": "backtest_result",
+                "backtest_id": str(backtest_id),
+                "strategy_type": strategy_type,
+                "symbol": symbol,
+                "interval": interval,
+                "win_rate": float(win_rate),
+                "total_return": float(total_return),
+                "sharpe_ratio": float(sharpe),
+                "max_drawdown": float(max_dd),
+                "total_trades": int(total_trades),
+                "profit_factor": float(profit_factor),
+                "profitable": total_return > 0,
+            }
+
+            doc_id = f"backtest_{backtest_id}"
+
+            ids = await self.add(
+                texts=[text],
+                ids=[doc_id],
+                metadatas=[metadata],
+            )
+
+            if ids:
+                logger.info(f"Saved backtest {backtest_id} to vector memory")
+                return ids[0]
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to save backtest to memory: {e}")
+            return None
+
+    async def find_similar_results(
+        self,
+        query: str,
+        top_k: int = 5,
+        strategy_type: str | None = None,
+        profitable_only: bool = False,
+    ) -> list[SearchResult]:
+        """
+        Find similar backtest results using semantic search.
+
+        Args:
+            query: Natural language query (e.g. "RSI strategy with high win rate")
+            top_k: Number of results to return
+            strategy_type: Optional filter by strategy type
+            profitable_only: Only return profitable backtests
+
+        Returns:
+            List of SearchResult objects with backtest metadata
+        """
+        try:
+            where_filter: dict[str, Any] = {"type": "backtest_result"}
+
+            if strategy_type:
+                where_filter = {
+                    "$and": [
+                        {"type": "backtest_result"},
+                        {"strategy_type": strategy_type},
+                    ]
+                }
+
+            if profitable_only:
+                profit_filter = {"profitable": True}
+                if "$and" in where_filter:
+                    where_filter["$and"].append(profit_filter)
+                else:
+                    where_filter = {"$and": [where_filter, profit_filter]}
+
+            results = await self.query(
+                query_text=query,
+                n_results=top_k,
+                where=where_filter,
+            )
+
+            logger.debug(f"Found {len(results)} similar backtest results for: {query[:50]}...")
+            return results
+
+        except Exception as e:
+            logger.error(f"Failed to search backtest memory: {e}")
+            return []
 
 
 class DeepSeekEmbeddingProvider:

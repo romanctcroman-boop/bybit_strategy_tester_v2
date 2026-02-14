@@ -161,7 +161,7 @@ async function refreshData() {
 
         // Update timestamp
         document.getElementById('lastUpdate').textContent =
-                    `Last update: ${new Date().toLocaleTimeString()}`;
+            `Last update: ${new Date().toLocaleTimeString()}`;
 
     } catch (error) {
         console.error('Failed to refresh data:', error);
@@ -216,11 +216,11 @@ function updatePortfolioMetrics(portfolio) {
 
     document.getElementById('sharpeRatio').textContent = sharpe.toFixed(2);
     document.getElementById('sharpeRatio').className =
-                `metric-value ${sharpe > 1 ? 'positive' : sharpe < 0 ? 'negative' : ''}`;
+        `metric-value ${sharpe > 1 ? 'positive' : sharpe < 0 ? 'negative' : ''}`;
 
     document.getElementById('sortinoRatio').textContent = sortino.toFixed(2);
     document.getElementById('sortinoRatio').className =
-                `metric-value ${sortino > 1 ? 'positive' : sortino < 0 ? 'negative' : ''}`;
+        `metric-value ${sortino > 1 ? 'positive' : sortino < 0 ? 'negative' : ''}`;
 
     // Table values
     document.getElementById('totalEquity').textContent = formatCurrency(portfolio.total_equity || 0);
@@ -229,14 +229,14 @@ function updatePortfolioMetrics(portfolio) {
     const pnl = portfolio.unrealized_pnl || 0;
     document.getElementById('unrealizedPnl').textContent = formatCurrency(pnl);
     document.getElementById('unrealizedPnl').style.color =
-                pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+        pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
 
     document.getElementById('maxDrawdown').textContent =
-                formatPercent(portfolio.max_drawdown || 0);
+        formatPercent(portfolio.max_drawdown || 0);
     document.getElementById('currentDrawdown').textContent =
-                formatPercent(portfolio.current_drawdown || 0);
+        formatPercent(portfolio.current_drawdown || 0);
     document.getElementById('winRate').textContent =
-                formatPercent(portfolio.win_rate || 0);
+        formatPercent(portfolio.win_rate || 0);
 }
 
 function updatePositionHeatmap(positions) {
@@ -398,6 +398,10 @@ function formatTime(timestamp) {
 // Attach to window for backwards compatibility
 if (typeof window !== 'undefined') {
     window.analyticsPage = {
-        // Add public methods here
+        refreshData,
+        exportReport
     };
+    // Required for inline onclick handlers in analytics.html
+    window.refreshData = refreshData;
+    window.exportReport = exportReport;
 }

@@ -60,6 +60,7 @@ Write-Host "[INFO] Stopping existing services..." -ForegroundColor Yellow
 $stopScript = Join-Path $ProjectRoot "stop_all.ps1"
 if (Test-Path $stopScript) {
     & $stopScript
+    $global:LASTEXITCODE = 0
 }
 Start-Sleep -Seconds 2
 
@@ -71,6 +72,7 @@ Write-Host "[INFO] Starting Redis..." -ForegroundColor Cyan
 $redisScript = Join-Path $ProjectRoot "scripts\start_redis.ps1"
 if (Test-Path $redisScript) {
     & $redisScript start
+    $global:LASTEXITCODE = 0
     Start-Sleep -Seconds 1
 }
 
@@ -82,6 +84,7 @@ Write-Host "[INFO] Starting Kline DB Service..." -ForegroundColor Cyan
 $klineDbScript = Join-Path $ProjectRoot "scripts\start_kline_db_service.ps1"
 if (Test-Path $klineDbScript) {
     & $klineDbScript start
+    $global:LASTEXITCODE = 0
     Start-Sleep -Seconds 2
 }
 
@@ -93,31 +96,17 @@ Write-Host "[INFO] Starting DB Maintenance Server..." -ForegroundColor Cyan
 $dbMaintScript = Join-Path $ProjectRoot "scripts\start_db_maintenance.ps1"
 if (Test-Path $dbMaintScript) {
     & $dbMaintScript start
+    $global:LASTEXITCODE = 0
     Start-Sleep -Seconds 2
 }
 
 # =============================================================================
-# STEP 6: Update market data (skip with -FastStart)
+# STEP 6: Market data update — REMOVED (2026-02-08)
+# Data is synced on-demand when user selects a ticker in Properties panel.
+# Startup sync duplicated this and added 15-60s delay to boot time.
 # =============================================================================
-if (-not $FastStart) {
-    Write-Host ""
-    Write-Host "[INFO] Updating market data..." -ForegroundColor Cyan
-    $updateScript = Join-Path $ProjectRoot "scripts\update_market_data.py"
-    if (Test-Path $updateScript) {
-        # Run with verbose output to show progress
-        & $VenvPython $updateScript --verbose
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "[OK] Market data updated" -ForegroundColor Green
-        }
-        else {
-            Write-Host "[WARN] Market data update had some issues" -ForegroundColor Yellow
-        }
-    }
-}
-else {
-    Write-Host ""
-    Write-Host "[INFO] Skipping market data update (FastStart mode)" -ForegroundColor Yellow
-}
+Write-Host ""
+Write-Host "[OK] Market data sync: on-demand (when ticker selected in UI)" -ForegroundColor Green
 
 # =============================================================================
 # STEP 7: Start MCP Server (if exists)
@@ -127,6 +116,7 @@ Write-Host "[INFO] Starting MCP Server..." -ForegroundColor Cyan
 $mcpScript = Join-Path $ProjectRoot "scripts\start_mcp_server.ps1"
 if (Test-Path $mcpScript) {
     & $mcpScript start
+    $global:LASTEXITCODE = 0
     Start-Sleep -Seconds 1
 }
 
@@ -145,6 +135,7 @@ $env:AGENT_SKIP_API_HEALTHCHECK = "1"
 $uvicornScript = Join-Path $ProjectRoot "scripts\start_uvicorn.ps1"
 if (Test-Path $uvicornScript) {
     & $uvicornScript start
+    $global:LASTEXITCODE = 0
 }
 
 # =============================================================================
@@ -234,3 +225,6 @@ else {
 }
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
+
+# Reset $LASTEXITCODE to prevent child script errors from propagating
+cmd /c "exit 0"

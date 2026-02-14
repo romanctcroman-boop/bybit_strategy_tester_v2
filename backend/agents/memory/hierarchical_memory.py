@@ -16,8 +16,8 @@ References:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
-import json
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -156,6 +156,7 @@ class HierarchicalMemory:
         self,
         persist_path: str | None = None,
         embedding_fn: Callable[[str], list[float]] | None = None,
+        backend: Any | None = None,
     ):
         """
         Initialize hierarchical memory
@@ -163,9 +164,20 @@ class HierarchicalMemory:
         Args:
             persist_path: Path for persistent storage (None = in-memory only)
             embedding_fn: Function to generate embeddings for semantic search
+            backend: Optional MemoryBackend instance (overrides persist_path).
+                     Use SQLiteBackendAdapter for SQLite persistence or
+                     JsonFileBackend for legacy file-per-item storage.
         """
         self.persist_path = Path(persist_path) if persist_path else None
         self.embedding_fn = embedding_fn
+
+        # Backend for persistence (ABC-compliant)
+        self._backend: Any | None = backend
+        if self._backend is None and self.persist_path:
+            # Default: use legacy JsonFileBackend for backward compatibility
+            from backend.agents.memory.backend_interface import JsonFileBackend
+
+            self._backend = JsonFileBackend(self.persist_path)
 
         # Define memory tiers
         self.tiers: dict[MemoryType, MemoryTier] = {
@@ -215,12 +227,12 @@ class HierarchicalMemory:
         }
 
         # Load persisted memories if available
-        if self.persist_path:
+        if self._backend:
             self._load_from_disk()
 
         logger.info(
             f"🧠 HierarchicalMemory initialized "
-            f"(persist={self.persist_path is not None}, "
+            f"(backend={type(self._backend).__name__ if self._backend else 'None'}, "
             f"embedding={self.embedding_fn is not None})"
         )
 
@@ -283,7 +295,7 @@ class HierarchicalMemory:
         self.stats["total_stored"] += 1
 
         # Persist if enabled
-        if self.persist_path:
+        if self._backend:
             await self._persist_item(item)
 
         logger.debug(f"📝 Stored memory [{memory_type.value}]: {content[:50]}... (importance={importance:.2f})")
@@ -376,7 +388,7 @@ class HierarchicalMemory:
         for memory_type, store in self.stores.items():
             if item_id in store:
                 del store[item_id]
-                if self.persist_path:
+                if self._backend:
                     await self._delete_persisted(item_id, memory_type)
                 return True
         return False
@@ -501,7 +513,7 @@ class HierarchicalMemory:
 
             for item_id in items_to_forget:
                 del store[item_id]
-                if self.persist_path:
+                if self._backend:
                     await self._delete_persisted(item_id, memory_type)
                 forgotten[memory_type.value] += 1
 
@@ -596,58 +608,111 @@ class HierarchicalMemory:
         return f"[{topic}] " + ". ".join(unique_sentences)
 
     def _load_from_disk(self) -> None:
-        """Load persisted memories from disk"""
-        if not self.persist_path:
+        """Load persisted memories from backend (sync bootstrap).
+
+        Supports both JsonFileBackend (file-per-item) and SQLiteBackendAdapter.
+        Delegates to backend.load_all() for a uniform persistence interface,
+        so HierarchicalMemory boots with full state from any backend.
+
+        For JsonFileBackend, file I/O is cheap and synchronous — we call
+        load_all() directly via a new event loop even if one is running.
+        For SQLiteBackendAdapter (asyncio.to_thread), we defer to async_load().
+        """
+        if not self._backend:
             return
 
-        for memory_type in MemoryType:
-            tier_path = self.persist_path / memory_type.value
-            if not tier_path.exists():
-                tier_path.mkdir(parents=True, exist_ok=True)
-                continue
+        try:
+            import asyncio
 
-            for file_path in tier_path.glob("*.json"):
-                try:
-                    with open(file_path, encoding="utf-8") as f:
-                        data = json.load(f)
-                        item = MemoryItem.from_dict(data)
-                        self.stores[memory_type][item.id] = item
-                except Exception as e:
-                    logger.warning(f"Failed to load memory {file_path}: {e}")
+            # Check if an event loop is already running
+            loop_running = False
+            try:
+                asyncio.get_running_loop()
+                loop_running = True
+            except RuntimeError:
+                pass
+
+            if loop_running:
+                # For JsonFileBackend: file I/O is sync, safe to call in a nested loop
+                from backend.agents.memory.backend_interface import JsonFileBackend
+
+                if isinstance(self._backend, JsonFileBackend):
+                    # JsonFileBackend.load_all() is sync (file I/O), wrap in new thread
+                    import concurrent.futures
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        items = pool.submit(lambda: asyncio.run(self._backend.load_all(tier=None))).result(timeout=10)
+                    self._hydrate_items(items)
+                else:
+                    # For async backends, defer to async_load()
+                    logger.debug("_load_from_disk: event loop running, deferring to async_load")
+                    return
+            else:
+                # No running loop — safe to use asyncio.run()
+                items = asyncio.run(self._backend.load_all(tier=None))
+                self._hydrate_items(items)
+        except Exception as e:
+            logger.warning(f"Failed to load memories from backend: {e}")
 
         total = sum(len(store) for store in self.stores.values())
-        logger.info(f"📂 Loaded {total} persisted memories")
+        logger.info(f"📂 Loaded {total} persisted memories from {type(self._backend).__name__}")
+
+    def _hydrate_items(self, items: list[dict]) -> None:
+        """Hydrate in-memory stores from backend-loaded dicts."""
+        for data in items:
+            try:
+                item = MemoryItem.from_dict(data)
+                if item.memory_type in self.stores:
+                    self.stores[item.memory_type][item.id] = item
+            except Exception as e:
+                logger.warning(f"Failed to hydrate memory item: {e}")
+
+    async def async_load(self) -> int:
+        """Async bootstrap: load all persisted memories into in-memory stores.
+
+        Call this after construction if running inside an existing event loop
+        (e.g., FastAPI lifespan). Returns the number of items loaded.
+        """
+        if not self._backend:
+            return 0
+
+        loaded = 0
+        try:
+            items = await self._backend.load_all(tier=None)
+            for data in items:
+                try:
+                    item = MemoryItem.from_dict(data)
+                    if item.memory_type in self.stores:
+                        self.stores[item.memory_type][item.id] = item
+                        loaded += 1
+                except Exception as e:
+                    logger.warning(f"Failed to hydrate memory item: {e}")
+        except Exception as e:
+            logger.warning(f"async_load failed: {e}")
+
+        logger.info(f"📂 async_load: hydrated {loaded} memories from {type(self._backend).__name__}")
+        return loaded
 
     async def _persist_item(self, item: MemoryItem) -> None:
-        """Persist single memory item to disk"""
-        if not self.persist_path:
+        """Persist single memory item via backend."""
+        if not self._backend:
             return
-
-        tier_path = self.persist_path / item.memory_type.value
-        tier_path.mkdir(parents=True, exist_ok=True)
-
-        file_path = tier_path / f"{item.id}.json"
 
         try:
             data = item.to_dict()
             # Don't persist embeddings to save space
             data.pop("embedding", None)
-
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+            await self._backend.save_item(item.id, item.memory_type.value, data)
         except Exception as e:
             logger.warning(f"Failed to persist memory {item.id}: {e}")
 
     async def _delete_persisted(self, item_id: str, memory_type: MemoryType) -> None:
-        """Delete persisted memory file"""
-        if not self.persist_path:
+        """Delete persisted memory item via backend."""
+        if not self._backend:
             return
 
-        file_path = self.persist_path / memory_type.value / f"{item_id}.json"
-
         try:
-            if file_path.exists():
-                file_path.unlink()
+            await self._backend.delete_item(item_id, memory_type.value)
         except Exception as e:
             logger.warning(f"Failed to delete persisted memory {item_id}: {e}")
 
@@ -704,10 +769,8 @@ class MemoryConsolidator:
         self._running = False
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
         logger.info("⏹️ Memory consolidator stopped")
 
     async def _run_loop(self) -> None:

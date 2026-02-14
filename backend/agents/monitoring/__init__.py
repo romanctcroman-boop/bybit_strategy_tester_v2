@@ -31,6 +31,10 @@ from backend.agents.monitoring.metrics_collector import (
     MetricsCollector,
     MetricType,
 )
+from backend.agents.monitoring.system_monitor import (
+    SystemMonitor,
+    get_system_monitor,
+)
 from backend.agents.monitoring.tracing import (
     DistributedTracer,
     Span,
@@ -52,6 +56,8 @@ __all__ = [
     "MetricsCollector",
     "Span",
     "SpanContext",
+    "SystemMonitor",
     "TraceExporter",
     "WidgetType",
+    "get_system_monitor",
 ]

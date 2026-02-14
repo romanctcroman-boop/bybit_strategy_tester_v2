@@ -1,6 +1,7 @@
 """
 Perplexity API consultation with key rotation
 """
+
 import sys
 from pathlib import Path
 
@@ -35,6 +36,7 @@ We use VectorBT for fast optimization but found critical issues:
 Provide technical recommendations with code examples where possible.
 """
 
+
 def main():
     print("=" * 70)
     print("PERPLEXITY CONSULTATION (with key rotation)")
@@ -42,8 +44,8 @@ def main():
 
     km = get_key_manager()
 
-    # Try multiple keys
-    key_names = ['PERPLEXITY_API_KEY', 'PERPLEXITY_API_KEY_2', 'PERPLEXITY_API_KEY_3']
+    # Single key (no rotation needed)
+    key_names = ["PERPLEXITY_API_KEY"]
 
     for key_name in key_names:
         try:
@@ -66,10 +68,7 @@ def main():
                 response = client.post(
                     "https://api.perplexity.ai/chat/completions",
                     json=payload,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    }
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 )
 
             print(f"   Status: {response.status_code}")
@@ -115,6 +114,7 @@ def main():
             continue
 
     print("\n❌ All Perplexity keys failed!")
+
 
 if __name__ == "__main__":
     main()

@@ -39,8 +39,8 @@
     <link rel="stylesheet" href="./css/dashboard.css" />
     <!-- AI Assistant CSS -->
     <link rel="stylesheet" href="./css/ai-assistant.css" />
-      <script src="js/core/auto-event-binding.js"></script>
-</head>
+    <script src="js/core/auto-event-binding.js"></script>
+  </head>
   <body>
     <!-- Keyboard Shortcuts Modal -->
     <div class="shortcuts-modal" id="shortcutsModal">
@@ -193,6 +193,9 @@
               Tools <i class="bi bi-chevron-down"></i>
             </button>
             <div class="nav-dropdown-menu">
+              <a href="ai-pipeline.html"
+                ><i class="bi bi-lightning-charge"></i> AI Pipeline</a
+              >
               <a href="streaming-chat.html"
                 ><i class="bi bi-chat-dots"></i> AI Chat</a
               >
@@ -477,6 +480,24 @@
                     <div class="status-dot" id="agentsDot"></div>
                   </div>
                 </div>
+                <div id="agentKeysDetail" class="agent-keys-detail hidden">
+                  <div class="agent-key-row">
+                    <span class="agent-key-name">🧠 DeepSeek</span>
+                    <span id="dashDeepseekStatus" class="agent-key-badge"
+                      >--</span
+                    >
+                  </div>
+                  <div class="agent-key-row">
+                    <span class="agent-key-name">🔬 Qwen</span>
+                    <span id="dashQwenStatus" class="agent-key-badge">--</span>
+                  </div>
+                  <div class="agent-key-row">
+                    <span class="agent-key-name">🌐 Perplexity</span>
+                    <span id="dashPerplexityStatus" class="agent-key-badge"
+                      >--</span
+                    >
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -577,30 +598,7 @@
           </div>
           <div class="panel-body">
             <div class="risk-heatmap" id="riskHeatmap">
-              <div class="heatmap-cell risk-low">
-                <div class="symbol">BTC</div>
-                <div class="value">Low Risk (15%)</div>
-              </div>
-              <div class="heatmap-cell risk-low">
-                <div class="symbol">ETH</div>
-                <div class="value">Low Risk (22%)</div>
-              </div>
-              <div class="heatmap-cell risk-medium">
-                <div class="symbol">SOL</div>
-                <div class="value">Medium (45%)</div>
-              </div>
-              <div class="heatmap-cell risk-medium">
-                <div class="symbol">BNB</div>
-                <div class="value">Medium (38%)</div>
-              </div>
-              <div class="heatmap-cell risk-high">
-                <div class="symbol">DOGE</div>
-                <div class="value">High Risk (65%)</div>
-              </div>
-              <div class="heatmap-cell risk-extreme">
-                <div class="symbol">SHIB</div>
-                <div class="value">Extreme (85%)</div>
-              </div>
+              <!-- Dynamically rendered by dashboard.js updateRiskHeatmap() -->
             </div>
           </div>
         </div>
@@ -608,7 +606,7 @@
         <!-- Mini Calendar -->
         <div class="panel">
           <div class="panel-header">
-            <h3>� Calendar</h3>
+            <h3>📅 Calendar</h3>
             <div class="calendar-nav">
               <button onclick="changeMonth(-1)" title="Previous Month">
                 ◀
@@ -620,35 +618,7 @@
           <div class="panel-body">
             <div class="mini-calendar">
               <div class="calendar-grid">
-                <div class="calendar-day-header">Su</div>
-                <div class="calendar-day-header">Mo</div>
-                <div class="calendar-day-header">Tu</div>
-                <div class="calendar-day-header">We</div>
-                <div class="calendar-day-header">Th</div>
-                <div class="calendar-day-header">Fr</div>
-                <div class="calendar-day-header">Sa</div>
-                <!-- Days filled by JS -->
-                <div class="calendar-day other-month">29</div>
-                <div class="calendar-day other-month">30</div>
-                <div class="calendar-day other-month">31</div>
-                <div class="calendar-day">1</div>
-                <div class="calendar-day">2</div>
-                <div class="calendar-day">3</div>
-                <div class="calendar-day">4</div>
-                <div class="calendar-day">5</div>
-                <div class="calendar-day">6</div>
-                <div class="calendar-day today">7</div>
-                <div class="calendar-day">8</div>
-                <div class="calendar-day">9</div>
-                <div class="calendar-day has-event">10</div>
-                <div class="calendar-day">11</div>
-                <div class="calendar-day">12</div>
-                <div class="calendar-day">13</div>
-                <div class="calendar-day">14</div>
-                <div class="calendar-day has-event">15</div>
-                <div class="calendar-day">16</div>
-                <div class="calendar-day">17</div>
-                <div class="calendar-day">18</div>
+                <!-- Dynamically rendered by dashboard.js initMiniCalendar() -->
               </div>
             </div>
           </div>

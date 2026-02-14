@@ -22,20 +22,17 @@ from typing import Any
 from loguru import logger
 
 # Import shared models
+from backend.agents.key_models import APIKey, APIKeyHealth
 from backend.agents.models import AgentType
-
-# Import APIKey and APIKeyHealth from unified_agent_interface
-# These will be moved to models.py in future refactor
-from backend.agents.unified_agent_interface import APIKey, APIKeyHealth
 
 
 class APIKeyPoolManager:
     """
     Manages API key pools with health tracking and weighted selection.
-    
+
     Thread-safe key selection with async lock prevents race conditions
     in multi-worker FastAPI deployments.
-    
+
     Example:
         manager = APIKeyPoolManager()
         key = await manager.get_active_key(AgentType.DEEPSEEK)
@@ -55,6 +52,7 @@ class APIKeyPoolManager:
     def __init__(self):
         self.deepseek_keys: list[APIKey] = []
         self.perplexity_keys: list[APIKey] = []
+        self.qwen_keys: list[APIKey] = []
 
         # Async lock for thread-safe key selection
         self._key_selection_lock = asyncio.Lock()
@@ -70,47 +68,65 @@ class APIKeyPoolManager:
         self._load_keys()
 
     def _load_keys(self):
-        """Load and validate all API keys via KeyManager"""
+        """Load API keys via KeyManager — 1 key per provider."""
         try:
             from backend.security.key_manager import KeyManager
 
             km = KeyManager()
 
-            # DeepSeek (8 keys)
-            for i in range(8):
-                key_name = f"DEEPSEEK_API_KEY_{i + 1}" if i > 0 else "DEEPSEEK_API_KEY"
-                try:
-                    if km.has_key(key_name, require_decryptable=True):
-                        self.deepseek_keys.append(
-                            APIKey(
-                                value=None,
-                                agent_type=AgentType.DEEPSEEK,
-                                index=i,
-                                key_name=key_name,
-                            )
+            # DeepSeek (1 key)
+            key_name = "DEEPSEEK_API_KEY"
+            try:
+                if km.has_key(key_name, require_decryptable=True):
+                    self.deepseek_keys.append(
+                        APIKey(
+                            value=None,
+                            agent_type=AgentType.DEEPSEEK,
+                            index=0,
+                            key_name=key_name,
                         )
-                        logger.debug(f"DeepSeek key registered (pool size: {len(self.deepseek_keys)})")
-                except Exception as e:
-                    logger.warning(f"DeepSeek key lookup failed: {e}")
+                    )
+                    logger.debug(f"DeepSeek key registered (pool size: {len(self.deepseek_keys)})")
+            except Exception as e:
+                logger.warning(f"DeepSeek key lookup failed: {e}")
 
-            # Perplexity (8 keys)
-            for i in range(8):
-                key_name = f"PERPLEXITY_API_KEY_{i + 1}" if i > 0 else "PERPLEXITY_API_KEY"
-                try:
-                    if km.has_key(key_name, require_decryptable=True):
-                        self.perplexity_keys.append(
-                            APIKey(
-                                value=None,
-                                agent_type=AgentType.PERPLEXITY,
-                                index=i,
-                                key_name=key_name,
-                            )
+            # Perplexity (1 key)
+            key_name = "PERPLEXITY_API_KEY"
+            try:
+                if km.has_key(key_name, require_decryptable=True):
+                    self.perplexity_keys.append(
+                        APIKey(
+                            value=None,
+                            agent_type=AgentType.PERPLEXITY,
+                            index=0,
+                            key_name=key_name,
                         )
-                        logger.debug(f"Perplexity key registered (pool size: {len(self.perplexity_keys)})")
-                except Exception as e:
-                    logger.warning(f"Perplexity key lookup failed: {e}")
+                    )
+                    logger.debug(f"Perplexity key registered (pool size: {len(self.perplexity_keys)})")
+            except Exception as e:
+                logger.warning(f"Perplexity key lookup failed: {e}")
 
-            logger.info(f"Loaded {len(self.deepseek_keys)} DeepSeek + {len(self.perplexity_keys)} Perplexity keys")
+            # Qwen (1 key)
+            key_name = "QWEN_API_KEY"
+            try:
+                if km.has_key(key_name, require_decryptable=True):
+                    self.qwen_keys.append(
+                        APIKey(
+                            value=None,
+                            agent_type=AgentType.QWEN,
+                            index=0,
+                            key_name=key_name,
+                        )
+                    )
+                    logger.debug(f"Qwen key registered (pool size: {len(self.qwen_keys)})")
+            except Exception as e:
+                logger.warning(f"Qwen key lookup failed: {e}")
+
+            logger.info(
+                f"Loaded {len(self.deepseek_keys)} DeepSeek + "
+                f"{len(self.perplexity_keys)} Perplexity + "
+                f"{len(self.qwen_keys)} Qwen keys"
+            )
 
         except ImportError:
             logger.error("Encryption system not available!")
@@ -118,7 +134,11 @@ class APIKeyPoolManager:
 
     def _get_pool(self, agent_type: AgentType) -> list[APIKey]:
         """Get key pool by agent type"""
-        return self.deepseek_keys if agent_type == AgentType.DEEPSEEK else self.perplexity_keys
+        if agent_type == AgentType.DEEPSEEK:
+            return self.deepseek_keys
+        elif agent_type == AgentType.QWEN:
+            return self.qwen_keys
+        return self.perplexity_keys
 
     def _refresh_cooldowns(self, agent_type: AgentType) -> None:
         """Restore keys that have finished cooling"""
@@ -258,7 +278,7 @@ class APIKeyPoolManager:
     async def get_active_key(self, agent_type: AgentType) -> APIKey | None:
         """
         Get an active API key using weighted selection.
-        
+
         Thread-safe with async lock to prevent race conditions.
         """
         async with self._key_selection_lock:
@@ -281,8 +301,7 @@ class APIKeyPoolManager:
             selected = random.choices(active_keys, weights=weights, k=1)[0]
             selected_weight = weights[active_keys.index(selected)]
             logger.debug(
-                f"Weighted key selection for {agent_type.value}: "
-                f"key #{selected.index} (weight={selected_weight:.4f})"
+                f"Weighted key selection for {agent_type.value}: key #{selected.index} (weight={selected_weight:.4f})"
             )
             self._emit_pool_telemetry(agent_type)
             return selected
@@ -310,9 +329,13 @@ class APIKeyPoolManager:
                 key.last_error_time = None
             except Exception as _e:
                 logger.debug("Operation failed (expected): {}", _e)
-        if hasattr(key, "cooldown_level") and hasattr(key, "is_cooling"):
-            if key.cooldown_level > 0 and not key.is_cooling:
-                key.cooldown_level = max(0, key.cooldown_level - 1)
+        if (
+            hasattr(key, "cooldown_level")
+            and hasattr(key, "is_cooling")
+            and key.cooldown_level > 0
+            and not key.is_cooling
+        ):
+            key.cooldown_level = max(0, key.cooldown_level - 1)
         self._update_health_state(key)
 
     def mark_network_error(self, key: APIKey):
@@ -345,8 +368,114 @@ class APIKeyPoolManager:
 
     def count_active(self, agent_type: AgentType) -> int:
         """Count active (usable) keys for an agent type"""
-        keys = self.deepseek_keys if agent_type == AgentType.DEEPSEEK else self.perplexity_keys
-        return sum(1 for key in keys if key.is_usable)
+        pool = self._get_pool(agent_type)
+        return sum(1 for key in pool if key.is_usable)
+
+    async def validate_keys_preflight(self) -> dict[str, Any]:
+        """
+        Pre-flight validation: verify each registered key is valid
+        by sending a minimal API request.
+
+        Disables keys that return 401/403 (invalid/revoked).
+        Logs results for each provider.
+
+        Returns:
+            Dict with per-provider validation results:
+            {"deepseek": {"valid": True, "status": 200}, ...}
+        """
+        import httpx
+
+        results: dict[str, Any] = {}
+
+        # Validation endpoints — minimal requests for each provider
+        checks = [
+            (
+                "deepseek",
+                self.deepseek_keys,
+                "https://api.deepseek.com/models",
+                "DEEPSEEK_API_KEY",
+            ),
+            (
+                "qwen",
+                self.qwen_keys,
+                "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
+                "QWEN_API_KEY",
+            ),
+            (
+                "perplexity",
+                self.perplexity_keys,
+                "https://api.perplexity.ai/chat/completions",
+                "PERPLEXITY_API_KEY",
+            ),
+        ]
+
+        for provider, pool, url, key_name in checks:
+            if not pool:
+                results[provider] = {"valid": False, "reason": "no_key_registered"}
+                logger.warning(f"⚠️ Pre-flight: {provider} has no keys registered")
+                continue
+
+            key_obj = pool[0]
+            try:
+                from backend.security.key_manager import KeyManager
+
+                km = KeyManager()
+                api_key = km.get_decrypted_key(key_name)
+                if not api_key:
+                    results[provider] = {"valid": False, "reason": "key_not_decryptable"}
+                    key_obj.health = APIKeyHealth.DISABLED
+                    logger.error(f"❌ Pre-flight: {provider} key not decryptable")
+                    continue
+
+                # Lightweight validation request
+                headers = {"Authorization": f"Bearer {api_key}"}
+
+                # Perplexity doesn't have a /models endpoint, use a different check
+                if provider == "perplexity":
+                    # Just check that auth header is accepted with a tiny request
+                    headers["Content-Type"] = "application/json"
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        resp = await client.post(
+                            url,
+                            headers=headers,
+                            json={
+                                "model": "sonar",
+                                "messages": [{"role": "user", "content": "ping"}],
+                                "max_tokens": 1,
+                            },
+                        )
+                else:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        resp = await client.get(url, headers=headers)
+
+                if resp.status_code in (200, 201):
+                    results[provider] = {"valid": True, "status": resp.status_code}
+                    logger.info(f"✅ Pre-flight: {provider} key valid (HTTP {resp.status_code})")
+                elif resp.status_code in (401, 403):
+                    results[provider] = {"valid": False, "status": resp.status_code, "reason": "auth_failed"}
+                    key_obj.health = APIKeyHealth.DISABLED
+                    logger.error(f"❌ Pre-flight: {provider} key INVALID (HTTP {resp.status_code})")
+                elif resp.status_code == 429:
+                    # Rate limited but key is valid
+                    results[provider] = {"valid": True, "status": 429, "note": "rate_limited_but_valid"}
+                    logger.warning(f"⚠️ Pre-flight: {provider} key valid but rate-limited")
+                else:
+                    results[provider] = {"valid": True, "status": resp.status_code, "note": "unexpected_status"}
+                    logger.warning(f"⚠️ Pre-flight: {provider} returned HTTP {resp.status_code}")
+
+            except httpx.ConnectError as e:
+                results[provider] = {"valid": None, "reason": "connection_failed", "error": str(e)[:100]}
+                logger.warning(f"⚠️ Pre-flight: {provider} connection failed (DNS/network): {e}")
+            except Exception as e:
+                results[provider] = {"valid": None, "reason": "check_failed", "error": str(e)[:100]}
+                logger.warning(f"⚠️ Pre-flight: {provider} check failed: {e}")
+
+        # Summary
+        valid_count = sum(1 for r in results.values() if r.get("valid") is True)
+        total_count = len(results)
+        logger.info(f"🔑 Pre-flight key validation: {valid_count}/{total_count} providers OK")
+
+        return results
 
 
 # Backward compatibility alias

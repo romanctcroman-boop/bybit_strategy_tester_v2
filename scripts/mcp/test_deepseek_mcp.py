@@ -12,16 +12,25 @@ from pathlib import Path
 
 # Force UTF-8 output on Windows
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
 # Add project root
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# Set API keys for test
-os.environ["DEEPSEEK_API_KEY"] = "sk-1630fbba63c64f88952c16ad33337242"
-os.environ["DEEPSEEK_API_KEY_2"] = "sk-0a584271e8104aea89c9f5d7502093dd"
+# Set API key for test — load from environment or .env file
+if not os.environ.get("DEEPSEEK_API_KEY"):
+    # Try loading from .env file
+    env_path = PROJECT_ROOT / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if line.startswith("DEEPSEEK_API_KEY="):
+                os.environ["DEEPSEEK_API_KEY"] = line.split("=", 1)[1].strip()
+                break
+    if not os.environ.get("DEEPSEEK_API_KEY"):
+        print("❌ DEEPSEEK_API_KEY not set. Set it in .env or environment.")
+        sys.exit(1)
 
 from scripts.mcp.deepseek_mcp_server import DeepSeekMCPServer
 
@@ -52,7 +61,7 @@ def test_server():
     tools_response = server.handle_request(tools_request)
 
     if "result" in tools_response:
-        tools = tools_response['result']['tools']
+        tools = tools_response["result"]["tools"]
         print(f"   [OK] Available tools: {len(tools)}")
         for tool in tools:
             print(f"      - {tool['name']}: {tool['description'][:50]}...")
@@ -70,25 +79,23 @@ def test_server():
         "method": "tools/call",
         "params": {
             "name": "deepseek_chat",
-            "arguments": {
-                "message": "Say 'Hello, integration works!' in one line.",
-                "temperature": 0.3
-            }
-        }
+            "arguments": {"message": "Say 'Hello, integration works!' in one line.", "temperature": 0.3},
+        },
     }
 
     chat_response = server.handle_request(chat_request)
 
     if "result" in chat_response:
         import json
-        content = chat_response['result']['content'][0]['text']
+
+        content = chat_response["result"]["content"][0]["text"]
         result = json.loads(content)
 
         if result.get("success"):
             print("   [OK] Response received!")
             print(f"   [OK] Model: {result.get('model', 'unknown')}")
             print(f"   [OK] Response: {result.get('content', '')[:100]}")
-            usage = result.get('usage', {})
+            usage = result.get("usage", {})
             if usage:
                 print(f"   [OK] Tokens: {usage.get('prompt_tokens', 0)} in / {usage.get('completion_tokens', 0)} out")
         else:
@@ -115,5 +122,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[CRITICAL] Error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

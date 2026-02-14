@@ -82,9 +82,7 @@ class KeyManager:
 
             # Keep encrypted payloads in memory; decrypt lazily on demand
             self._encrypted_secrets = encrypted_secrets
-            logger.info(
-                "Registered %s encrypted API keys", len(self._encrypted_secrets)
-            )
+            logger.info("Registered %s encrypted API keys", len(self._encrypted_secrets))
 
         except Exception as e:
             logger.warning("Failed to load encrypted secrets: %s", e)
@@ -152,6 +150,7 @@ class KeyManager:
             "DEEPSEEK_API_KEY",
             "OPENAI_API_KEY",
             "ANTHROPIC_API_KEY",
+            "QWEN_API_KEY",
         ]
 
         for key_name in known_keys:

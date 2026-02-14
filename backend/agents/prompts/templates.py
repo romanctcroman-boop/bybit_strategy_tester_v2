@@ -40,11 +40,11 @@ AVAILABLE INDICATORS:
 RSI, MACD, EMA, SMA, Bollinger Bands, SuperTrend, Stochastic, CCI, ATR, ADX,
 Williams %R, VWAP, Volume MA, OBV
 
-TASK: Create a trading strategy that maximizes Sharpe Ratio while keeping Max Drawdown < 15%.
+TASK: Create a trading strategy that maximizes {primary_metric} while keeping Max Drawdown < {max_drawdown_target}%.
 
 STRATEGY REQUIREMENTS:
-1. Use 2-4 indicators for signal generation
-2. Add at least 1 filter condition
+1. Use {min_indicators}-{max_indicators} indicators for signal generation
+2. Add at least {min_filters} filter condition
 3. Clear entry/exit conditions
 4. Risk management (stop-loss, take-profit)
 5. Account for commission ({commission}%) and slippage

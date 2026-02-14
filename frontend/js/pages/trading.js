@@ -9,7 +9,9 @@
  */
 
 // Import shared utilities
+// eslint-disable-next-line no-unused-vars
 import { apiClient, API_CONFIG } from '../api.js';
+// eslint-disable-next-line no-unused-vars
 import { formatNumber, formatCurrency, formatDate, debounce } from '../utils.js';
 import liveTrading from '../services/liveTrading.js';
 
@@ -66,6 +68,7 @@ const positionsData = [
     }
 ];
 
+// eslint-disable-next-line no-unused-vars
 const openOrdersData = [
     { symbol: 'SOLUSDT', side: 'buy', type: 'Limit', price: 185.00, amount: 10, filled: 0, status: 'Open' },
     { symbol: 'BTCUSDT', side: 'sell', type: 'Stop', price: 100000, amount: 0.1, filled: 0, status: 'Open' },
@@ -432,11 +435,12 @@ function setupEventListeners() {
     });
 }
 
+// eslint-disable-next-line no-unused-vars
 function selectSymbol(symbol) {
     currentSymbol = symbol;
     document.getElementById('currentSymbol').textContent = symbol;
     document.getElementById('submitOrderBtn').textContent =
-                `${currentSide === 'buy' ? 'Buy/Long' : 'Sell/Short'} ${symbol}`;
+        `${currentSide === 'buy' ? 'Buy/Long' : 'Sell/Short'} ${symbol}`;
     renderWatchlist();
 
     // Update price
@@ -559,10 +563,12 @@ function startPriceUpdates() {
     setInterval(fetchRealPrices, 5000); // Обновление каждые 5 секунд
 }
 
+// eslint-disable-next-line no-unused-vars
 function editPosition(symbol) {
     alert(`Edit TP/SL for ${symbol}`);
 }
 
+// eslint-disable-next-line no-unused-vars
 function closePosition(symbol) {
     if (confirm(`Close ${symbol} position?`)) {
         const index = positionsData.findIndex(p => p.symbol === symbol);
@@ -739,4 +745,15 @@ if (typeof window !== 'undefined') {
     window.tradingPage = {
         // Add public methods here
     };
+
+    // onclick handler exports (required for auto-event-binding.js with type="module")
+    window.openSymbolSearch = openSymbolSearch;
+    window.toggleIndicators = toggleIndicators;
+    window.toggleDrawingTools = toggleDrawingTools;
+    window.selectSide = selectSide;
+    window.setLeverage = setLeverage;
+    window.submitOrder = submitOrder;
+    window.selectSymbol = selectSymbol;
+    window.editPosition = editPosition;
+    window.closePosition = closePosition;
 }

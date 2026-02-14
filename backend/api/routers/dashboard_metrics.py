@@ -103,7 +103,20 @@ async def get_metrics_summary(
         # Strategy metrics
         strategy_query = db.query(Strategy)
         total_strategies = strategy_query.count()
+        # Count strategies with ACTIVE status or that have completed backtests
         active_strategies = strategy_query.filter(Strategy.status == StrategyStatus.ACTIVE).count()
+        if active_strategies == 0:
+            # Fallback: count strategies that have at least one completed backtest
+            active_strategies = (
+                db.query(Strategy).filter(Strategy.backtests.any(Backtest.status == BacktestStatus.COMPLETED)).count()
+            )
+        if active_strategies == 0:
+            # Second fallback: count distinct strategy_type from completed backtests
+            active_strategies = (
+                db.query(func.count(func.distinct(Backtest.strategy_type)))
+                .filter(Backtest.status == BacktestStatus.COMPLETED, Backtest.total_trades > 0)
+                .scalar()
+            ) or 0
 
         # Performance metrics - average backtest duration
         avg_duration = (
@@ -211,16 +224,18 @@ async def get_top_performers(
                 detail=f"Invalid metric. Must be one of: {', '.join(valid_metrics)}",
             )
 
-        # Query top performers
+        # Query top performers — filter out backtests with no actual results
         metric_column = getattr(Backtest, metric)
 
         query = (
             db.query(Backtest)
-            .join(Strategy)
+            .outerjoin(Strategy)
             .filter(
                 and_(
                     Backtest.status == BacktestStatus.COMPLETED,
                     metric_column.isnot(None),
+                    Backtest.total_trades > 0,
+                    Backtest.completed_at.isnot(None),
                 )
             )
             .order_by(desc(metric_column))
@@ -234,7 +249,7 @@ async def get_top_performers(
             top_performers.append(
                 {
                     "id": bt.id,
-                    "strategy_name": bt.strategy.name if bt.strategy else "Unknown",
+                    "strategy_name": bt.strategy.name if bt.strategy else (bt.strategy_type or "Unknown"),
                     "symbol": bt.symbol,
                     "timeframe": bt.timeframe,
                     "sharpe_ratio": round(bt.sharpe_ratio or 0, 2),

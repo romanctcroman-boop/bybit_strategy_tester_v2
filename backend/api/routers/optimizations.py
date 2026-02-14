@@ -20,7 +20,6 @@ Endpoints:
 import logging
 import os
 from datetime import UTC, datetime
-from itertools import product
 from typing import Any
 
 import pandas as pd
@@ -35,6 +34,24 @@ from backend.database.models.optimization import (
     OptimizationType,
 )
 from backend.database.models.strategy import Strategy
+
+# Refactored optimization modules (extracted from this monolith)
+from backend.optimization.filters import passes_filters
+from backend.optimization.models import (
+    OptunaSyncRequest,
+    SmartRecommendation,
+    SmartRecommendations,
+    SyncOptimizationRequest,
+    SyncOptimizationResponse,
+    VectorbtOptimizationRequest,
+    VectorbtOptimizationResponse,
+)
+from backend.optimization.recommendations import generate_smart_recommendations
+from backend.optimization.scoring import (
+    apply_custom_sort_order,
+    calculate_composite_score,
+    rank_by_multi_criteria,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Optimization"])  # Prefix set in app.py
@@ -1016,261 +1033,37 @@ def _run_batch_backtests(
     start_dt_str: str,
     end_dt_str: str,
     strategy_type_str: str,
+    param_names: list[str] | None = None,
 ) -> list:
     """
     Выполняет батч бэктестов в отдельном процессе.
-    ОБНОВЛЕНО: Поддержка V2 движков (GPU/Numba/Fallback).
-    Для ProcessPoolExecutor - все аргументы должны быть сериализуемыми.
+
+    Thin wrapper — delegates to workers.run_batch_backtests()
+    which handles universal strategy dispatch + DRY helpers.
+
+    Args:
+        batch: List of param tuples.
+        request_params: Serializable config dict.
+        candles_dict: Candle data as list of dicts.
+        start_dt_str: ISO start date string.
+        end_dt_str: ISO end date string.
+        strategy_type_str: Strategy type (rsi, macd, bollinger_bands, etc.).
+        param_names: Ordered param names matching combo tuple positions.
+
+    Returns:
+        List of result dicts with params, score, metrics.
     """
-    from datetime import datetime as dt
+    from backend.optimization.workers import run_batch_backtests
 
-    import pandas as pd
-
-    from backend.backtesting.engine_selector import get_engine
-    from backend.backtesting.interfaces import BacktestInput, TradeDirection
-    from backend.backtesting.signal_generators import generate_rsi_signals
-
-    # Восстанавливаем DataFrame из dict
-    candles = pd.DataFrame(candles_dict)
-    candles["timestamp"] = pd.to_datetime(candles["timestamp"])
-    candles.set_index("timestamp", inplace=True)
-
-    # Парсим даты (validation - ensure valid datetime format)
-    dt.fromisoformat(start_dt_str)  # Validate start date
-    dt.fromisoformat(end_dt_str)  # Validate end date
-
-    # Получаем движок на основе выбранного engine_type
-    engine_type = request_params.get("engine_type", "auto")
-    engine = get_engine(engine_type=engine_type)
-
-    # Преобразуем direction
-    direction_str = request_params.get("direction", "both")
-    if direction_str == "long":
-        trade_direction = TradeDirection.LONG
-    elif direction_str == "short":
-        trade_direction = TradeDirection.SHORT
-    else:
-        trade_direction = TradeDirection.BOTH
-
-    results = []
-
-    for combo in batch:
-        period, overbought, oversold, stop_loss, take_profit = combo
-        try:
-            # Генерируем сигналы RSI для текущих параметров
-            long_entries, long_exits, short_entries, short_exits = generate_rsi_signals(
-                candles=candles,
-                period=period,
-                overbought=overbought,
-                oversold=oversold,
-                direction=direction_str,
-            )
-
-            # Создаём BacktestInput для V2 движков
-            # Position sizing: use fixed amount if specified, otherwise percentage
-            use_fixed = request_params.get("use_fixed_amount", False)
-            fixed_amt = request_params.get("fixed_amount", 0.0)
-            pos_size = 0.1 if use_fixed else 1.0  # 10% default or 100%
-
-            backtest_input = BacktestInput(
-                candles=candles,
-                candles_1m=None,  # Bar Magnifier отключен для оптимизации (скорость)
-                long_entries=long_entries,
-                long_exits=long_exits,
-                short_entries=short_entries,
-                short_exits=short_exits,
-                symbol=request_params["symbol"],
-                interval=request_params["interval"],
-                initial_capital=request_params["initial_capital"],
-                position_size=pos_size,
-                use_fixed_amount=use_fixed,
-                fixed_amount=fixed_amt,
-                leverage=request_params["leverage"],
-                stop_loss=stop_loss / 100.0 if stop_loss else 0.0,
-                take_profit=take_profit / 100.0 if take_profit else 0.0,
-                direction=trade_direction,
-                taker_fee=request_params["commission"],
-                maker_fee=request_params["commission"],
-                slippage=0.0005,  # 0.05% slippage
-                use_bar_magnifier=False,  # Отключаем для скорости
-                max_drawdown_limit=0.0,
-                pyramiding=1,
-            )
-
-            # Запуск бэктеста на выбранном движке
-            bt_output = engine.run(backtest_input)
-
-            if not bt_output.is_valid:
-                continue
-
-            metrics = bt_output.metrics
-            result = {
-                "total_return": metrics.total_return if metrics else 0,
-                "sharpe_ratio": metrics.sharpe_ratio if metrics else 0,
-                "max_drawdown": metrics.max_drawdown if metrics else 0,
-                "win_rate": metrics.win_rate * 100 if metrics else 0,  # V2 возвращает 0-1, конвертируем в %
-                "total_trades": metrics.total_trades if metrics else 0,
-                "profit_factor": metrics.profit_factor if metrics else 0,
-                # Additional metrics for full reporting
-                "winning_trades": metrics.winning_trades if metrics else 0,
-                "losing_trades": metrics.losing_trades if metrics else 0,
-                "net_profit": metrics.net_profit if metrics else 0,
-                "net_profit_pct": metrics.total_return if metrics else 0,
-                "gross_profit": metrics.gross_profit if metrics else 0,
-                "gross_loss": metrics.gross_loss if metrics else 0,
-                "avg_win": metrics.avg_win if metrics else 0,
-                "avg_loss": metrics.avg_loss if metrics else 0,
-                "avg_win_value": metrics.avg_win if metrics else 0,
-                "avg_loss_value": metrics.avg_loss if metrics else 0,
-                "largest_win": metrics.largest_win if metrics else 0,
-                "largest_loss": metrics.largest_loss if metrics else 0,
-                "largest_win_value": metrics.largest_win if metrics else 0,
-                "largest_loss_value": metrics.largest_loss if metrics else 0,
-                "recovery_factor": metrics.recovery_factor if metrics else 0,
-                "expectancy": metrics.expectancy if metrics else 0,
-                "sortino_ratio": metrics.sortino_ratio if metrics else 0,
-                "calmar_ratio": metrics.calmar_ratio if metrics else 0,
-                "max_drawdown_value": 0,
-                # Long/Short breakdown for TV parity
-                "long_trades": metrics.long_trades if metrics else 0,
-                "long_winning_trades": getattr(metrics, "long_winning_trades", 0) if metrics else 0,
-                "long_losing_trades": getattr(metrics, "long_losing_trades", 0) if metrics else 0,
-                "long_win_rate": metrics.long_win_rate * 100 if metrics else 0,
-                "long_gross_profit": getattr(metrics, "long_gross_profit", 0) if metrics else 0,
-                "long_gross_loss": getattr(metrics, "long_gross_loss", 0) if metrics else 0,
-                "long_net_profit": metrics.long_profit if metrics else 0,
-                "long_profit_factor": getattr(metrics, "long_profit_factor", 0) if metrics else 0,
-                "long_avg_win": getattr(metrics, "long_avg_win", 0) if metrics else 0,
-                "long_avg_loss": getattr(metrics, "long_avg_loss", 0) if metrics else 0,
-                "short_trades": metrics.short_trades if metrics else 0,
-                "short_winning_trades": getattr(metrics, "short_winning_trades", 0) if metrics else 0,
-                "short_losing_trades": getattr(metrics, "short_losing_trades", 0) if metrics else 0,
-                "short_win_rate": metrics.short_win_rate * 100 if metrics else 0,
-                "short_gross_profit": getattr(metrics, "short_gross_profit", 0) if metrics else 0,
-                "short_gross_loss": getattr(metrics, "short_gross_loss", 0) if metrics else 0,
-                "short_net_profit": metrics.short_profit if metrics else 0,
-                "short_profit_factor": getattr(metrics, "short_profit_factor", 0) if metrics else 0,
-                "short_avg_win": getattr(metrics, "short_avg_win", 0) if metrics else 0,
-                "short_avg_loss": getattr(metrics, "short_avg_loss", 0) if metrics else 0,
-                # Duration metrics
-                "avg_bars_in_trade": metrics.avg_trade_duration if metrics else 0,
-                "avg_bars_in_winning": metrics.avg_winning_duration if metrics else 0,
-                "avg_bars_in_losing": metrics.avg_losing_duration if metrics else 0,
-                # Commission
-                "total_commission": sum(t.fees for t in bt_output.trades) if bt_output.trades else 0,
-            }
-
-            # Проверить фильтры с учётом форматов (win_rate приходит в процентах)
-            if not _passes_filters(result, request_params):
-                continue
-
-            # Унифицированный расчёт метрики/скора
-            score = _calculate_composite_score(
-                result,
-                request_params.get("optimize_metric", "sharpe_ratio"),
-                request_params.get("weights"),
-            )
-
-            # Serialize trades for best results (limit to avoid memory issues)
-            trades_data = []
-            if bt_output.trades:
-                for t in bt_output.trades[:500]:  # Limit to 500 trades
-                    # Calculate duration if we have entry and exit times
-                    duration_hours = 0
-                    if t.entry_time and t.exit_time:
-                        duration_hours = (t.exit_time - t.entry_time).total_seconds() / 3600
-
-                    trades_data.append(
-                        {
-                            "entry_time": t.entry_time.isoformat() if t.entry_time else None,
-                            "exit_time": t.exit_time.isoformat() if t.exit_time else None,
-                            # V2 uses 'direction' field instead of 'side'
-                            "side": t.direction
-                            if hasattr(t, "direction")
-                            else (
-                                t.side.value
-                                if hasattr(t, "side") and hasattr(t.side, "value")
-                                else str(getattr(t, "side", "unknown"))
-                            ),
-                            "entry_price": float(t.entry_price) if t.entry_price else 0,
-                            "exit_price": float(t.exit_price) if t.exit_price else 0,
-                            "size": float(t.size) if t.size else 0,
-                            "pnl": float(t.pnl) if t.pnl else 0,
-                            "pnl_pct": float(t.pnl_pct) if hasattr(t, "pnl_pct") and t.pnl_pct else 0,
-                            "return_pct": float(t.pnl_pct) if hasattr(t, "pnl_pct") and t.pnl_pct else 0,
-                            "fees": float(t.fees) if hasattr(t, "fees") and t.fees else 0,
-                            "duration_hours": duration_hours,
-                            # MFE/MAE (TradingView style)
-                            "mfe": float(t.mfe) if hasattr(t, "mfe") and t.mfe else 0,
-                            "mae": float(t.mae) if hasattr(t, "mae") and t.mae else 0,
-                            "mfe_pct": float(t.mfe) if hasattr(t, "mfe") and t.mfe else 0,
-                            "mae_pct": float(t.mae) if hasattr(t, "mae") and t.mae else 0,
-                        }
-                    )
-
-            # Serialize equity curve (sample if too large)
-            # V2 BacktestOutput has equity_curve as numpy array, timestamps as numpy array
-            equity_data = None
-            if bt_output.equity_curve is not None and len(bt_output.equity_curve) > 0:
-                equity = bt_output.equity_curve
-                timestamps = bt_output.timestamps if bt_output.timestamps is not None else []
-                # Sample if too many points
-                step = max(1, len(equity) // 500)
-                equity_data = {
-                    "timestamps": [
-                        t.isoformat() if hasattr(t, "isoformat") else str(t)
-                        for t in (timestamps[::step] if len(timestamps) > 0 else [])
-                    ],
-                    "equity": [float(e) for e in equity[::step]],
-                    "drawdown": [],  # V2 computes drawdown separately in metrics
-                    "returns": [],
-                }
-
-            results.append(
-                {
-                    "params": {
-                        "rsi_period": period,
-                        "rsi_overbought": overbought,
-                        "rsi_oversold": oversold,
-                        "stop_loss_pct": stop_loss,
-                        "take_profit_pct": take_profit,
-                    },
-                    "score": score,
-                    # Core metrics
-                    "total_return": result["total_return"],
-                    "sharpe_ratio": result["sharpe_ratio"],
-                    "max_drawdown": result["max_drawdown"],
-                    "win_rate": result["win_rate"],
-                    "total_trades": result["total_trades"],
-                    "profit_factor": result["profit_factor"],
-                    # Extended metrics
-                    "winning_trades": result["winning_trades"],
-                    "losing_trades": result["losing_trades"],
-                    "net_profit": result["net_profit"],
-                    "net_profit_pct": result["net_profit_pct"],
-                    "gross_profit": result["gross_profit"],
-                    "gross_loss": result["gross_loss"],
-                    "max_drawdown_value": result["max_drawdown_value"],
-                    "avg_win": result["avg_win"],
-                    "avg_loss": result["avg_loss"],
-                    "avg_win_value": result.get("avg_win_value", result["avg_win"]),
-                    "avg_loss_value": result.get("avg_loss_value", result["avg_loss"]),
-                    "largest_win": result["largest_win"],
-                    "largest_loss": result["largest_loss"],
-                    "recovery_factor": result["recovery_factor"],
-                    "expectancy": result["expectancy"],
-                    "sortino_ratio": result["sortino_ratio"],
-                    "calmar_ratio": result["calmar_ratio"],
-                    "total_commission": result.get("total_commission", 0),
-                    # Trade and equity data
-                    "trades": trades_data,
-                    "equity_curve": equity_data,
-                }
-            )
-        except Exception as e:
-            logger.warning("Skipped failed backtest in grid: %s", e)
-
-    return results
+    return run_batch_backtests(
+        batch=batch,
+        request_params=request_params,
+        candles_dict=candles_dict,
+        start_dt_str=start_dt_str,
+        end_dt_str=end_dt_str,
+        strategy_type_str=strategy_type_str,
+        param_names=param_names,
+    )
 
 
 def _run_single_backtest_for_process(args: tuple) -> dict:
@@ -1369,90 +1162,131 @@ def _run_single_backtest_for_process(args: tuple) -> dict:
         return None
 
 
-def _calculate_composite_score(result: dict, metric: str, weights: dict = None) -> float:
+def _calculate_composite_score(result: dict, metric: str, weights: dict | None = None) -> float:
+    """Delegate to backend.optimization.scoring.calculate_composite_score."""
+    return calculate_composite_score(result, metric, weights)
+
+
+def _calculate_composite_score_ORIGINAL(result: dict, metric: str, weights: dict | None = None) -> float:
     """
-    Вычисляет композитный скор для результата бэктеста.
+    DEPRECATED: Original implementation kept for reference only.
+    Use calculate_composite_score from backend.optimization.scoring.
 
-    Поддерживаемые метрики:
-    - net_profit: чистая прибыль (больше = лучше) - PRIMARY
-    - max_drawdown: максимальная просадка (меньше = лучше) - PRIMARY
-    - sharpe_ratio, total_return, win_rate, profit_factor (простые)
-    - calmar_ratio: Return / MaxDrawdown (чем выше, тем лучше)
-    - risk_adjusted_return: Return * (1 - Drawdown/100)
+    Supports all 20 metrics from EvaluationCriteriaPanel:
+    - Performance: total_return, cagr, sharpe_ratio, sortino_ratio, calmar_ratio
+    - Risk: max_drawdown, avg_drawdown, volatility, var_95, risk_adjusted_return
+    - Trade quality: win_rate, profit_factor, avg_win, avg_loss, expectancy, payoff_ratio
+    - Activity: total_trades, trades_per_month, avg_trade_duration, avg_bars_in_trade
 
-    Примечание: max_drawdown приходит в ПРОЦЕНТАХ (17.29 = 17.29%)
+    Note: max_drawdown comes in PERCENT (17.29 = 17.29%)
     """
     total_return = result.get("total_return", 0) or 0
     sharpe_ratio = result.get("sharpe_ratio", 0) or 0
     net_profit = result.get("net_profit", 0) or 0
-    # max_drawdown уже в процентах, конвертируем в долю для расчётов
     max_drawdown_pct = abs(result.get("max_drawdown", 0) or 0)
-    max_drawdown = max_drawdown_pct / 100.0  # Теперь в долях (0.1729)
-    # Win rate from engine is in PERCENT (0-100). Normalize to fraction for calculations.
+    max_drawdown = max_drawdown_pct / 100.0
     win_rate_pct = result.get("win_rate", 0) or 0
-    win_rate = win_rate_pct / 100.0
     profit_factor = result.get("profit_factor", 1) or 1
 
-    # Простые метрики
+    # Simple metrics (higher = better)
     if metric == "net_profit":
-        # Total P&L - больше = лучше
         return net_profit
     elif metric == "sharpe_ratio":
         return sharpe_ratio
+    elif metric == "sortino_ratio":
+        return result.get("sortino_ratio", 0) or 0
     elif metric == "total_return":
         return total_return
+    elif metric == "cagr":
+        return result.get("cagr", 0) or 0
     elif metric == "win_rate":
-        return win_rate
+        return win_rate_pct
     elif metric == "profit_factor":
         return profit_factor
+    elif metric == "expectancy":
+        return result.get("expectancy", 0) or 0
+    elif metric == "recovery_factor":
+        return result.get("recovery_factor", 0) or 0
+    elif metric == "avg_win":
+        return result.get("avg_win", 0) or 0
+    elif metric == "payoff_ratio":
+        return result.get("payoff_ratio", 0) or 0
+    elif metric == "total_trades":
+        return result.get("total_trades", 0) or 0
+    elif metric == "trades_per_month":
+        return result.get("trades_per_month", 0) or 0
+
+    # Inverted metrics (lower = better, return negative for sorting)
     elif metric == "max_drawdown":
-        # Инвертируем: меньше просадка = лучше (возвращаем отрицательное)
-        return -max_drawdown_pct  # В процентах для сортировки
+        return -max_drawdown_pct
+    elif metric == "avg_drawdown":
+        return -(abs(result.get("avg_drawdown", 0) or 0))
+    elif metric == "avg_loss":
+        return -(abs(result.get("avg_loss", 0) or 0))
+    elif metric == "volatility":
+        return -(abs(result.get("volatility", 0) or 0))
+    elif metric == "var_95":
+        return -(abs(result.get("var_95", 0) or 0))
 
-    # Композитные метрики
+    # Activity metrics (neutral - return raw value)
+    elif metric == "avg_trade_duration":
+        return result.get("avg_trade_duration", 0) or result.get("avg_bars_in_trade", 0) or 0
+    elif metric == "avg_bars_in_trade":
+        return result.get("avg_bars_in_trade", 0) or 0
+
+    # Composite metrics (computed)
     elif metric == "calmar_ratio":
-        # Calmar = Return / Max Drawdown (оба в %)
-        # Положительный = хорошо, отрицательный = плохо
         if max_drawdown_pct > 0.01:
-            calmar = total_return / max_drawdown_pct
-            return calmar  # Может быть отрицательным при убытке
+            return total_return / max_drawdown_pct
         return total_return * 10 if total_return > 0 else total_return
-
     elif metric == "risk_adjusted_return":
-        # Risk-Adjusted Return - работает с любой просадкой
-        # Используем формулу: Return / (1 + Drawdown)
-        # При DD=0%: score = return, при DD=100%: score = return/2
-        drawdown_factor = 1 + max_drawdown  # max_drawdown в долях (1.729 = 172.9%)
+        drawdown_factor = 1 + max_drawdown
         return total_return / drawdown_factor
 
-    # По умолчанию - net_profit
+    # Default - net_profit
     return net_profit
 
 
 def _rank_by_multi_criteria(results: list, selection_criteria: list) -> list:
+    """Delegate to backend.optimization.scoring.rank_by_multi_criteria."""
+    return rank_by_multi_criteria(results, selection_criteria)
+
+
+def _rank_by_multi_criteria_ORIGINAL(results: list, selection_criteria: list) -> list:
     """
-    Ранжирует результаты по нескольким критериям.
-
-    Логика:
-    - net_profit: больше = лучше (ранг по убыванию)
-    - max_drawdown: меньше = лучше (ранг по возрастанию)
-
-    Если выбрано несколько критериев, вычисляем средний ранг.
-    Лучший результат = минимальный средний ранг.
+    DEPRECATED: Original kept for reference.
     """
     if not results or not selection_criteria:
         return results
 
-    # Определяем направление для каждого критерия
-    # True = больше лучше, False = меньше лучше
+    # Direction for each criterion: True = higher is better, False = lower is better
     criteria_direction = {
-        "net_profit": True,  # больше = лучше
-        "max_drawdown": False,  # меньше = лучше (абсолютное значение)
-        "sharpe_ratio": True,
+        # Performance (higher = better)
+        "net_profit": True,
         "total_return": True,
+        "cagr": True,
+        "sharpe_ratio": True,
+        "sortino_ratio": True,
+        "calmar_ratio": True,
+        "risk_adjusted_return": True,
+        # Risk (lower = better)
+        "max_drawdown": False,
+        "avg_drawdown": False,
+        "volatility": False,
+        "var_95": False,
+        # Trade quality
         "win_rate": True,
         "profit_factor": True,
+        "avg_win": True,
+        "avg_loss": False,  # lower avg loss = better
+        "expectancy": True,
+        "payoff_ratio": True,
+        "recovery_factor": True,
+        # Activity
         "total_trades": True,
+        "trades_per_month": True,
+        "avg_trade_duration": True,  # neutral but default to higher
+        "avg_bars_in_trade": True,
     }
 
     n = len(results)
@@ -1508,9 +1342,12 @@ def _rank_by_multi_criteria(results: list, selection_criteria: list) -> list:
 def _compute_weighted_composite(result: dict, weights: dict) -> float:
     """Compute weighted composite score from evaluation criteria weights.
 
+    Supports all 20 metrics from EvaluationCriteriaPanel.
+    Each metric is normalized to 0-1 range before applying weight.
+
     Args:
         result: Optimization result dict with metrics
-        weights: Dict mapping metric names to weights (should sum to 1.0)
+        weights: Dict mapping metric names to weights
             Example: {"profit_factor": 0.4, "sharpe_ratio": 0.3, "max_drawdown": 0.3}
 
     Returns:
@@ -1519,48 +1356,56 @@ def _compute_weighted_composite(result: dict, weights: dict) -> float:
     if not weights:
         return 0.0
 
-    score = 0.0
+    # Normalization ranges for each metric type
+    normalization = {
+        # Performance (higher = better, normalize to 0-1)
+        "total_return": lambda v: (min(max(v, -100.0), 500.0) + 100.0) / 600.0,
+        "cagr": lambda v: (min(max(v, -50.0), 200.0) + 50.0) / 250.0,
+        "sharpe_ratio": lambda v: (min(max(v, -2.0), 3.0) + 2.0) / 5.0,
+        "sortino_ratio": lambda v: (min(max(v, -2.0), 5.0) + 2.0) / 7.0,
+        "calmar_ratio": lambda v: (min(max(v, -5.0), 10.0) + 5.0) / 15.0,
+        "net_profit": lambda v: (min(max(v, -10000.0), 50000.0) + 10000.0) / 60000.0,
+        "risk_adjusted_return": lambda v: (min(max(v, -100.0), 500.0) + 100.0) / 600.0,
+        # Risk (lower = better, invert to 0-1)
+        "max_drawdown": lambda v: 1.0 - min(abs(v), 100.0) / 100.0,
+        "avg_drawdown": lambda v: 1.0 - min(abs(v), 50.0) / 50.0,
+        "volatility": lambda v: 1.0 - min(abs(v), 100.0) / 100.0,
+        "var_95": lambda v: 1.0 - min(abs(v), 50.0) / 50.0,
+        # Trade quality
+        "win_rate": lambda v: min(v, 100.0) / 100.0,
+        "profit_factor": lambda v: min(v, 5.0) / 5.0,
+        "avg_win": lambda v: min(max(v, 0.0), 10.0) / 10.0,
+        "avg_loss": lambda v: 1.0 - min(abs(v), 10.0) / 10.0,  # lower = better
+        "expectancy": lambda v: (min(max(v, -500.0), 2000.0) + 500.0) / 2500.0,
+        "payoff_ratio": lambda v: min(v, 5.0) / 5.0,
+        "recovery_factor": lambda v: min(v, 10.0) / 10.0,
+        # Activity (neutral, normalized)
+        "total_trades": lambda v: min(v, 500.0) / 500.0,
+        "trades_per_month": lambda v: min(v, 100.0) / 100.0,
+        "avg_trade_duration": lambda v: min(v, 100.0) / 100.0,
+        "avg_bars_in_trade": lambda v: min(v, 100.0) / 100.0,
+    }
 
+    score = 0.0
     for metric, weight in weights.items():
         value = result.get(metric, 0) or 0
-
-        # Normalize based on metric type
-        if metric == "profit_factor":
-            # PF: 0-3 is typical range, cap at 5
-            normalized = min(value, 5.0) / 5.0
-        elif metric == "sharpe_ratio":
-            # Sharpe: -2 to +3 typical, normalize to 0-1
-            normalized = (min(max(value, -2.0), 3.0) + 2.0) / 5.0
-        elif metric == "max_drawdown":
-            # Drawdown: 0-100%, lower is better, invert
-            normalized = 1.0 - min(abs(value), 100.0) / 100.0
-        elif metric == "win_rate":
-            # Win rate: 0-100%
-            normalized = min(value, 100.0) / 100.0
-        elif metric == "total_return":
-            # Return: -100% to +500% typical
-            normalized = (min(max(value, -100.0), 500.0) + 100.0) / 600.0
-        elif metric == "calmar_ratio":
-            # Calmar: -5 to +10 typical
-            normalized = (min(max(value, -5.0), 10.0) + 5.0) / 15.0
-        elif metric == "recovery_factor":
-            # Recovery: 0-10 typical
-            normalized = min(value, 10.0) / 10.0
+        normalizer = normalization.get(metric)
+        if normalizer:
+            normalized = normalizer(value)
         else:
-            # Unknown metric - use raw value capped at 0-1
             normalized = min(max(value, 0.0), 1.0)
-
         score += normalized * weight
 
     return round(score, 4)
 
 
 def _apply_custom_sort_order(results: list, sort_order: list[dict]) -> list:
-    """Apply custom multi-level sorting from frontend.
+    """Delegate to backend.optimization.scoring.apply_custom_sort_order."""
+    return apply_custom_sort_order(results, sort_order)
 
-    Sort order format: [{"metric": "sharpe_ratio", "direction": "desc"}, ...]
-    Direction: "asc" (ascending) or "desc" (descending)
-    """
+
+def _apply_custom_sort_order_ORIGINAL(results: list, sort_order: list[dict]) -> list:
+    """DEPRECATED: Original kept for reference."""
     if not results or not sort_order:
         return results
 
@@ -1586,10 +1431,11 @@ def _apply_custom_sort_order(results: list, sort_order: list[dict]) -> list:
 
 
 def _generate_smart_recommendations(results: list) -> dict:
-    """
-    Генерирует умные рекомендации на основе результатов оптимизации.
-    Анализирует все результаты и предлагает лучшие варианты по разным критериям.
-    """
+    """Delegate to backend.optimization.recommendations.generate_smart_recommendations."""
+    return generate_smart_recommendations(results)
+
+
+def _generate_smart_recommendations_ORIGINAL(results: list) -> dict:
     if not results:
         return {
             "best_balanced": None,
@@ -1677,7 +1523,11 @@ def _generate_smart_recommendations(results: list) -> dict:
 
 
 def _passes_filters(result: dict, request_params: dict) -> bool:
-    """Проверяет, проходит ли результат фильтры."""
+    """Delegate to backend.optimization.filters.passes_filters."""
+    return passes_filters(result, request_params)
+
+
+def _passes_filters_ORIGINAL(result: dict, request_params: dict) -> bool:
     # Минимум сделок
     min_trades = request_params.get("min_trades")
     if min_trades is not None and (result.get("total_trades", 0) or 0) < min_trades:
@@ -1735,7 +1585,14 @@ def _passes_dynamic_constraints(result: dict, constraints: list[dict]) -> bool:
 
         # Apply operator
         try:
-            if (operator == "<=" and value > threshold) or (operator == ">=" and value < threshold) or (operator == "<" and value >= threshold) or (operator == ">" and value <= threshold) or (operator == "==" and value != threshold) or (operator == "!=" and value == threshold):
+            if (
+                (operator == "<=" and value > threshold)
+                or (operator == ">=" and value < threshold)
+                or (operator == "<" and value >= threshold)
+                or (operator == ">" and value <= threshold)
+                or (operator == "==" and value != threshold)
+                or (operator == "!=" and value == threshold)
+            ):
                 return False
         except (TypeError, ValueError):
             continue
@@ -1845,133 +1702,9 @@ def _run_single_backtest(
         return None
 
 
-class SyncOptimizationRequest(BaseModel):
-    """Запрос для синхронной оптимизации"""
-
-    symbol: str = "BTCUSDT"
-    interval: str = "30m"
-    start_date: str = "2025-01-01"
-    end_date: str = "2025-06-01"
-
-    # Базовые параметры стратегии
-    strategy_type: str = "rsi"
-    direction: str = "long"
-    use_fixed_amount: bool = True
-    fixed_amount: float = 100.0
-    leverage: int = 10
-    initial_capital: float = 10000.0
-    commission: float = 0.0007  # 0.07% TradingView parity
-
-    # Пространство параметров для оптимизации RSI (списки значений)
-    rsi_period_range: list[int] = [7, 14, 21]
-    rsi_overbought_range: list[int] = [70, 75, 80]
-    rsi_oversold_range: list[int] = [20, 25, 30]
-
-    # Пространство параметров TP/SL (списки значений в процентах)
-    stop_loss_range: list[float] = [10.0]  # По умолчанию одно значение
-    take_profit_range: list[float] = [1.5]  # По умолчанию одно значение
-
-    # Метрика для оптимизации (основная, для обратной совместимости)
-    optimize_metric: str = "net_profit"
-
-    # Новая система: массив критериев отбора
-    # net_profit - Total P&L (больше = лучше)
-    # max_drawdown - Max Equity Drawdown (меньше = лучше)
-    selection_criteria: list[str] = ["net_profit", "max_drawdown"]
-
-    # Выбор движка бэктеста
-    # auto - автоматический выбор (GPU > Numba > Fallback)
-    # gpu - CUDA-ускорение
-    # numba - JIT-компиляция
-    # fallback - чистый Python (эталонная реализация)
-    engine_type: str = "auto"
-
-    # Метод поиска оптимальных параметров
-    # grid - Grid Search (все комбинации)
-    # random - Random Search (случайная выборка)
-    search_method: str = "grid"
-
-    # Максимум итераций для Random Search (игнорируется для Grid)
-    # Если 0 - используется 10% от общего числа комбинаций
-    max_iterations: int = 0
-
-    # Тип рынка для источника данных
-    # spot - данные спотового рынка (идентичны TradingView для паритета сигналов)
-    # linear - перпетуальные фьючерсы (для реальной торговли)
-    market_type: str = "linear"
-
-    # Гибридный pipeline: после оптимизации на Numba/GPU перепроверить best_params на FallbackV4
-    # Даёт эталонные метрики для аудита (при Numba паритет 100%, drift = 0)
-    validate_best_with_fallback: bool = False
-
-    # Market Regime Filter (P1 Regime integration)
-    # При включении используется FallbackV4 (Numba не поддерживает regime)
-    market_regime_enabled: bool = False
-    market_regime_filter: str = "not_volatile"  # all|trending|ranging|volatile|not_volatile
-    market_regime_lookback: int = 50
-
-    # === NEW: Evaluation Criteria from Frontend ===
-    # Dynamic constraints from EvaluationCriteriaPanel
-    # Format: [{"metric": "max_drawdown", "operator": "<=", "value": 15}, ...]
-    constraints: list[dict] | None = None
-
-    # Multi-level sort order
-    # Format: [{"metric": "sharpe_ratio", "direction": "desc"}, ...]
-    sort_order: list[dict] | None = None
-
-    # Composite scoring (weighted metrics)
-    use_composite: bool = False
-    weights: dict[str, float] | None = None
-
-
-class OptimizationResult(BaseModel):
-    """Результат одной комбинации параметров"""
-
-    params: dict[str, Any]
-    score: float
-    total_return: float
-    sharpe_ratio: float
-    max_drawdown: float
-    win_rate: float
-    total_trades: int
-
-
-class SmartRecommendation(BaseModel):
-    """Одна рекомендация"""
-
-    params: dict[str, Any] | None = None
-    total_return: float | None = None
-    max_drawdown: float | None = None
-    sharpe_ratio: float | None = None
-    win_rate: float | None = None
-    total_trades: int | None = None
-
-
-class SmartRecommendations(BaseModel):
-    """Умные рекомендации системы"""
-
-    best_balanced: SmartRecommendation | None = None
-    best_conservative: SmartRecommendation | None = None
-    best_aggressive: SmartRecommendation | None = None
-    recommendation_text: str = ""
-
-
-class SyncOptimizationResponse(BaseModel):
-    """Ответ синхронной оптимизации"""
-
-    status: str
-    total_combinations: int
-    tested_combinations: int
-    best_params: dict[str, Any]
-    best_score: float
-    best_metrics: dict[str, Any]
-    top_results: list[dict[str, Any]]
-    execution_time_seconds: float
-    speed_combinations_per_sec: int | None = None  # Actual speed achieved
-    num_workers: int | None = None  # Number of parallel workers used
-    smart_recommendations: SmartRecommendations | None = None
-    # Hybrid pipeline: эталонные метрики от FallbackV4 (при validate_best_with_fallback=True)
-    validated_metrics: dict[str, Any] | None = None
+# --- Models moved to backend.optimization.models ---
+# SyncOptimizationRequest, OptimizationResult, SmartRecommendation,
+# SmartRecommendations, SyncOptimizationResponse are imported at top of file.
 
 
 @router.post("/sync/grid-search", response_model=SyncOptimizationResponse)
@@ -1999,6 +1732,17 @@ async def sync_grid_search_optimization(
     logger.info(f"   Period range: {request.rsi_period_range}")
     logger.info(f"   Overbought range: {request.rsi_overbought_range}")
     logger.info(f"   Oversold range: {request.rsi_oversold_range}")
+
+    # Map max_trials from frontend to max_iterations for Random Search
+    if request.max_trials and request.max_trials > 0 and request.max_iterations == 0:
+        request.max_iterations = request.max_trials
+        logger.info(f"   Mapped max_trials={request.max_trials} → max_iterations={request.max_iterations}")
+
+    # Log optimization config fields
+    logger.info(f"   Workers: {request.workers}, Timeout: {request.timeout_seconds}s")
+    logger.info(f"   Train split: {request.train_split}, Search method: {request.search_method}")
+    logger.info(f"   Early stopping: {request.early_stopping} (patience={request.early_stopping_patience})")
+    logger.info(f"   Random seed: {request.random_seed}")
 
     # Normalize interval format for database queries (4h -> 240, 1h -> 60, etc.)
     db_interval = _normalize_interval(request.interval)
@@ -2054,43 +1798,22 @@ async def sync_grid_search_optimization(
 
     logger.info(f"📊 Loaded {len(candles)} candles")
 
-    # Генерация комбинаций параметров (RSI + TP/SL)
-    # Fix: empty lists cause product() to return no combinations
-    # Default to [0] (no SL/TP) if range is empty
-    sl_range = request.stop_loss_range if request.stop_loss_range else [0]
-    tp_range = request.take_profit_range if request.take_profit_range else [0]
+    # Generate parameter combinations using universal generator
+    from backend.optimization.utils import combo_to_params, generate_param_combinations
 
-    param_combinations = list(
-        product(
-            request.rsi_period_range,
-            request.rsi_overbought_range,
-            request.rsi_oversold_range,
-            sl_range,
-            tp_range,
-        )
+    search_method = getattr(request, "search_method", "grid").lower()
+    max_iter = getattr(request, "max_iterations", 0)
+    random_seed = getattr(request, "random_seed", None)
+
+    param_combinations, total_combinations, param_names = generate_param_combinations(
+        request,
+        search_method=search_method,
+        max_iterations=max_iter,
+        random_seed=random_seed,
     )
 
-    total_combinations = len(param_combinations)
-
-    # Random Search: sample subset of combinations
-    search_method = getattr(request, "search_method", "grid").lower()
-    if search_method == "random":
-        import random
-
-        max_iter = getattr(request, "max_iterations", 0)
-        if max_iter <= 0:
-            max_iter = max(10, total_combinations // 10)  # Default: 10% of total
-
-        if max_iter < total_combinations:
-            param_combinations = random.sample(param_combinations, max_iter)
-            logger.info(f"🎲 Random Search: sampling {max_iter} from {total_combinations} combinations")
-            total_combinations = max_iter
-        else:
-            logger.info(f"🎲 Random Search: using all {total_combinations} combinations (< max_iterations)")
-    else:
-        logger.info(f"🔢 Grid Search: testing all {total_combinations} parameter combinations")
-
     # No limit - user is informed about time estimate in UI
+    strategy_type_str = getattr(request, "strategy_type", "rsi").lower().strip()
 
     # Запуск бэктестов
     from backend.backtesting.models import StrategyType
@@ -2159,8 +1882,12 @@ async def sync_grid_search_optimization(
         try:
             from backend.backtesting.engine_selector import get_engine
             from backend.backtesting.gpu_batch_optimizer import GPUBatchOptimizer
-            from backend.backtesting.interfaces import BacktestInput, TradeDirection
-            from backend.backtesting.signal_generators import generate_rsi_signals
+            from backend.backtesting.signal_generators import generate_signals_for_strategy
+            from backend.optimization.utils import (
+                build_backtest_input,
+                extract_metrics_from_output,
+                parse_trade_direction,
+            )
 
             # Phase 1: Fast GPU Batch screening
             batch_optimizer = GPUBatchOptimizer()
@@ -2206,73 +1933,45 @@ async def sync_grid_search_optimization(
 
             # Convert direction
             direction_str = request_params.get("direction", "both")
-            if direction_str == "long":
-                trade_direction = TradeDirection.LONG
-            elif direction_str == "short":
-                trade_direction = TradeDirection.SHORT
-            else:
-                trade_direction = TradeDirection.BOTH
+            trade_direction = parse_trade_direction(direction_str)
 
             for candidate in batch_with_scores[:top_n]:
                 params = candidate["params"]
-                period = params["rsi_period"]
-                overbought = params["rsi_overbought"]
-                oversold = params["rsi_oversold"]
-                stop_loss = params["stop_loss_pct"]
-                take_profit = params["take_profit_pct"]
+                stop_loss = params.get("stop_loss_pct", 0)
+                take_profit = params.get("take_profit_pct", 0)
+                # Strategy params (without SL/TP)
+                signal_params = {k: v for k, v in params.items() if k not in ("stop_loss_pct", "take_profit_pct")}
 
                 try:
-                    # Generate signals with full engine
-                    long_entries, long_exits, short_entries, short_exits = generate_rsi_signals(
+                    # Generate signals with universal dispatcher
+                    long_entries, long_exits, short_entries, short_exits = generate_signals_for_strategy(
                         candles=candles,
-                        period=period,
-                        overbought=overbought,
-                        oversold=oversold,
+                        strategy_type=strategy_type_str,
+                        params=signal_params,
                         direction=direction_str,
                     )
 
-                    backtest_input = BacktestInput(
+                    backtest_input = build_backtest_input(
                         candles=candles,
-                        candles_1m=None,
                         long_entries=long_entries,
                         long_exits=long_exits,
                         short_entries=short_entries,
                         short_exits=short_exits,
-                        symbol=request_params["symbol"],
-                        interval=request_params["interval"],
-                        initial_capital=request_params["initial_capital"],
-                        position_size=0.1 if request_params.get("use_fixed_amount") else 1.0,
-                        use_fixed_amount=request_params.get("use_fixed_amount", False),
-                        fixed_amount=request_params.get("fixed_amount", 0.0),
-                        leverage=request_params["leverage"],
-                        stop_loss=stop_loss / 100.0 if stop_loss else 0.0,
-                        take_profit=take_profit / 100.0 if take_profit else 0.0,
-                        direction=trade_direction,
-                        taker_fee=request_params["commission"],
-                        maker_fee=request_params["commission"],
-                        slippage=0.0005,
-                        use_bar_magnifier=False,
-                        max_drawdown_limit=0.0,
-                        pyramiding=1,
-                        market_regime_enabled=request_params.get("market_regime_enabled", False),
-                        market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
-                        market_regime_lookback=request_params.get("market_regime_lookback", 50),
+                        request_params=request_params,
+                        trade_direction=trade_direction,
+                        stop_loss_pct=stop_loss,
+                        take_profit_pct=take_profit,
                     )
 
                     bt_output = engine.run(backtest_input)
 
                     if bt_output.is_valid and bt_output.metrics:
-                        metrics = bt_output.metrics
-                        result_entry = {
-                            "total_return": metrics.total_return,
-                            "sharpe_ratio": metrics.sharpe_ratio,
-                            "max_drawdown": metrics.max_drawdown,
-                            "win_rate": metrics.win_rate * 100,
-                            "total_trades": metrics.total_trades,
-                            "profit_factor": metrics.profit_factor,
-                            "net_profit": metrics.net_profit,
-                            "params": params,
-                        }
+                        result_entry = extract_metrics_from_output(bt_output, win_rate_as_pct=True)
+                        result_entry["params"] = params
+
+                        # Apply constraints/filters from EvaluationCriteriaPanel
+                        if not _passes_filters(result_entry, request_params):
+                            continue
 
                         score = _calculate_composite_score(
                             result_entry,
@@ -2306,8 +2005,16 @@ async def sync_grid_search_optimization(
         logger.info(f"⚡ Using single-process mode for {engine_type} ({total_combinations} combinations)")
 
         from backend.backtesting.engine_selector import get_engine
-        from backend.backtesting.interfaces import BacktestInput, TradeDirection
-        from backend.backtesting.signal_generators import generate_rsi_signals
+        from backend.backtesting.signal_generators import generate_signals_for_strategy
+        from backend.optimization.utils import (
+            EarlyStopper,
+            TimeoutChecker,
+            build_backtest_input,
+            combo_to_params,
+            extract_metrics_from_output,
+            parse_trade_direction,
+            split_candles,
+        )
 
         # Get engine once (single warmup)
         engine = get_engine(engine_type=engine_type)
@@ -2315,53 +2022,62 @@ async def sync_grid_search_optimization(
 
         # Convert direction
         direction_str = request_params.get("direction", "both")
-        if direction_str == "long":
-            trade_direction = TradeDirection.LONG
-        elif direction_str == "short":
-            trade_direction = TradeDirection.SHORT
-        else:
-            trade_direction = TradeDirection.BOTH
+        trade_direction = parse_trade_direction(direction_str)
+
+        # Train/Test split
+        train_split = getattr(request, "train_split", 1.0)
+        train_candles, test_candles = split_candles(candles, train_split)
+        if test_candles is not None:
+            logger.info(f"   Train/Test split: {len(train_candles)}/{len(test_candles)} candles ({train_split:.0%})")
+
+        # Timeout checker
+        timeout_checker = TimeoutChecker(getattr(request, "timeout_seconds", 3600))
+
+        # Early stopping
+        early_stopper = None
+        if getattr(request, "early_stopping", False):
+            early_stopper = EarlyStopper(patience=getattr(request, "early_stopping_patience", 20))
+            logger.info(f"   Early stopping enabled: patience={early_stopper.patience}")
 
         # Process all combinations in single process
         for combo in param_combinations:
-            period, overbought, oversold, stop_loss, take_profit = combo
+            # Check timeout
+            if timeout_checker.is_expired():
+                logger.warning(f"⏰ Timeout reached after {timeout_checker.elapsed():.1f}s")
+                break
+
+            # Check early stopping
+            if early_stopper and early_stopper.should_stop(best_score):
+                logger.info(
+                    f"🛑 Early stopping at iteration {completed} (no improvement for {early_stopper.patience} steps)"
+                )
+                break
+
             try:
-                # Generate RSI signals
-                long_entries, long_exits, short_entries, short_exits = generate_rsi_signals(
-                    candles=candles,
-                    period=period,
-                    overbought=overbought,
-                    oversold=oversold,
+                # Convert combo to named params using universal helper
+                named_params = combo_to_params(combo, param_names)
+                stop_loss = named_params.pop("stop_loss_pct", 0)
+                take_profit = named_params.pop("take_profit_pct", 0)
+
+                # Generate signals using universal dispatcher
+                long_entries, long_exits, short_entries, short_exits = generate_signals_for_strategy(
+                    candles=train_candles,
+                    strategy_type=strategy_type_str,
+                    params=named_params,
                     direction=direction_str,
                 )
 
-                # Create BacktestInput
-                backtest_input = BacktestInput(
-                    candles=candles,
-                    candles_1m=None,
+                # Create BacktestInput using DRY builder
+                backtest_input = build_backtest_input(
+                    candles=train_candles,
                     long_entries=long_entries,
                     long_exits=long_exits,
                     short_entries=short_entries,
                     short_exits=short_exits,
-                    symbol=request_params["symbol"],
-                    interval=request_params["interval"],
-                    initial_capital=request_params["initial_capital"],
-                    position_size=0.1 if request_params.get("use_fixed_amount") else 1.0,
-                    use_fixed_amount=request_params.get("use_fixed_amount", False),
-                    fixed_amount=request_params.get("fixed_amount", 0.0),
-                    leverage=request_params["leverage"],
-                    stop_loss=stop_loss / 100.0 if stop_loss else 0.0,
-                    take_profit=take_profit / 100.0 if take_profit else 0.0,
-                    direction=trade_direction,
-                    taker_fee=request_params["commission"],
-                    maker_fee=request_params["commission"],
-                    slippage=0.0005,
-                    use_bar_magnifier=False,
-                    max_drawdown_limit=0.0,
-                    pyramiding=1,
-                    market_regime_enabled=request_params.get("market_regime_enabled", False),
-                    market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
-                    market_regime_lookback=request_params.get("market_regime_lookback", 50),
+                    request_params=request_params,
+                    trade_direction=trade_direction,
+                    stop_loss_pct=stop_loss,
+                    take_profit_pct=take_profit,
                 )
 
                 # Run backtest
@@ -2370,81 +2086,12 @@ async def sync_grid_search_optimization(
                 if not bt_output.is_valid:
                     continue
 
-                metrics = bt_output.metrics
-                result_entry = {
-                    "total_return": metrics.total_return if metrics else 0,
-                    "sharpe_ratio": metrics.sharpe_ratio if metrics else 0,
-                    "max_drawdown": metrics.max_drawdown if metrics else 0,
-                    "win_rate": metrics.win_rate * 100 if metrics else 0,
-                    "total_trades": metrics.total_trades if metrics else 0,
-                    "profit_factor": metrics.profit_factor if metrics else 0,
-                    "winning_trades": metrics.winning_trades if metrics else 0,
-                    "losing_trades": metrics.losing_trades if metrics else 0,
-                    "net_profit": metrics.net_profit if metrics else 0,
-                    "gross_profit": metrics.gross_profit if metrics else 0,
-                    "gross_loss": metrics.gross_loss if metrics else 0,
-                    "avg_win": metrics.avg_win if metrics else 0,
-                    "avg_loss": metrics.avg_loss if metrics else 0,
-                    "avg_win_value": metrics.avg_win if metrics else 0,  # Same as avg_win for TV parity
-                    "avg_loss_value": metrics.avg_loss if metrics else 0,
-                    "largest_win": metrics.largest_win if metrics else 0,
-                    "largest_loss": metrics.largest_loss if metrics else 0,
-                    "largest_win_value": metrics.largest_win if metrics else 0,
-                    "largest_loss_value": metrics.largest_loss if metrics else 0,
-                    "recovery_factor": metrics.recovery_factor if metrics else 0,
-                    "expectancy": metrics.expectancy if metrics else 0,
-                    "sortino_ratio": metrics.sortino_ratio if metrics else 0,
-                    "calmar_ratio": metrics.calmar_ratio if metrics else 0,
-                    # Long/Short breakdown
-                    "long_trades": metrics.long_trades if metrics else 0,
-                    "long_winning_trades": getattr(metrics, "long_winning_trades", 0) if metrics else 0,
-                    "long_losing_trades": getattr(metrics, "long_losing_trades", 0) if metrics else 0,
-                    "long_win_rate": metrics.long_win_rate * 100 if metrics else 0,
-                    "long_gross_profit": getattr(metrics, "long_gross_profit", 0) if metrics else 0,
-                    "long_gross_loss": getattr(metrics, "long_gross_loss", 0) if metrics else 0,
-                    "long_net_profit": metrics.long_profit if metrics else 0,
-                    "long_profit_factor": getattr(metrics, "long_profit_factor", 0) if metrics else 0,
-                    "long_avg_win": getattr(metrics, "long_avg_win", 0) if metrics else 0,
-                    "long_avg_loss": getattr(metrics, "long_avg_loss", 0) if metrics else 0,
-                    "short_trades": metrics.short_trades if metrics else 0,
-                    "short_winning_trades": getattr(metrics, "short_winning_trades", 0) if metrics else 0,
-                    "short_losing_trades": getattr(metrics, "short_losing_trades", 0) if metrics else 0,
-                    "short_win_rate": metrics.short_win_rate * 100 if metrics else 0,
-                    "short_gross_profit": getattr(metrics, "short_gross_profit", 0) if metrics else 0,
-                    "short_gross_loss": getattr(metrics, "short_gross_loss", 0) if metrics else 0,
-                    "short_net_profit": metrics.short_profit if metrics else 0,
-                    "short_profit_factor": getattr(metrics, "short_profit_factor", 0) if metrics else 0,
-                    "short_avg_win": getattr(metrics, "short_avg_win", 0) if metrics else 0,
-                    "short_avg_loss": getattr(metrics, "short_avg_loss", 0) if metrics else 0,
-                    # Duration metrics
-                    "avg_bars_in_trade": metrics.avg_trade_duration if metrics else 0,
-                    "avg_bars_in_winning": metrics.avg_winning_duration if metrics else 0,
-                    "avg_bars_in_losing": metrics.avg_losing_duration if metrics else 0,
-                    # Commission
-                    "total_commission": sum(t.fees for t in bt_output.trades) if bt_output.trades else 0,
-                    "params": {
-                        "rsi_period": period,
-                        "rsi_overbought": overbought,
-                        "rsi_oversold": oversold,
-                        "stop_loss_pct": stop_loss,
-                        "take_profit_pct": take_profit,
-                    },
-                    # Trade list for comparison with TV
-                    "trades": [
-                        {
-                            "entry_time": t.entry_time.isoformat() if t.entry_time else None,
-                            "exit_time": t.exit_time.isoformat() if t.exit_time else None,
-                            "direction": t.direction,
-                            "entry_price": round(t.entry_price, 2),
-                            "exit_price": round(t.exit_price, 2),
-                            "pnl": round(t.pnl, 2),
-                            "pnl_pct": round(t.pnl_pct, 4) if t.pnl_pct else 0,
-                            "exit_reason": str(t.exit_reason.value) if t.exit_reason else "unknown",
-                            "duration_bars": t.duration_bars,
-                        }
-                        for t in (bt_output.trades or [])
-                    ],
-                }
+                # Extract metrics using DRY helper
+                result_entry = extract_metrics_from_output(bt_output, win_rate_as_pct=True)
+
+                # Apply constraints/filters from EvaluationCriteriaPanel
+                if not _passes_filters(result_entry, request_params):
+                    continue
 
                 # Calculate score
                 score = _calculate_composite_score(
@@ -2453,7 +2100,14 @@ async def sync_grid_search_optimization(
                     request_params.get("weights"),
                 )
                 result_entry["score"] = score
+                result_entry["params"] = {
+                    **named_params,
+                    "stop_loss_pct": stop_loss,
+                    "take_profit_pct": take_profit,
+                }
 
+                # Memory optimization: only store trades for top results
+                # Trades are stored temporarily, will be pruned later
                 results.append(result_entry)
                 completed += 1
 
@@ -2465,11 +2119,23 @@ async def sync_grid_search_optimization(
             except Exception as e:
                 logger.warning(f"Combo failed: {combo} - {e}")
 
+        # Memory optimization: keep trades only for top 10 results
+        results.sort(key=lambda x: x.get("score", 0), reverse=True)
+        for i, r in enumerate(results):
+            if i >= 10 and "trades" in r:
+                del r["trades"]
+
         logger.info(f"   Completed: {completed}/{total_combinations}")
 
     # Multiprocessing mode for Fallback (CPU parallelism)
     if completed == 0:
-        max_workers = min(os.cpu_count() or 4, 8)
+        # Use workers from request if provided, capped at cpu_count
+        cpu_count = os.cpu_count() or 4
+        requested_workers = getattr(request, "workers", None)
+        if requested_workers and requested_workers > 0:
+            max_workers = min(requested_workers, cpu_count)
+        else:
+            max_workers = min(cpu_count, 8)
         logger.info(f"📝 Using multiprocessing with {max_workers} processes for {engine_type}")
 
         # Prepare serializable data
@@ -2493,6 +2159,7 @@ async def sync_grid_search_optimization(
                     start_dt_str,
                     end_dt_str,
                     strategy_type_str,
+                    param_names,
                 ): batch
                 for batch in batches
             }
@@ -2556,49 +2223,34 @@ async def sync_grid_search_optimization(
     if getattr(request, "validate_best_with_fallback", False) and best_params and engine_type in ("numba", "gpu"):
         try:
             from backend.backtesting.engine_selector import get_engine
-            from backend.backtesting.interfaces import BacktestInput, TradeDirection
-            from backend.backtesting.signal_generators import generate_rsi_signals
+            from backend.backtesting.signal_generators import generate_signals_for_strategy
+            from backend.optimization.utils import (
+                build_backtest_input,
+                extract_metrics_from_output,
+                parse_trade_direction,
+            )
 
             fallback_engine = get_engine(engine_type="fallback_v4")
             direction_str = request_params.get("direction", "both")
-            trade_direction = (
-                TradeDirection.LONG
-                if direction_str == "long"
-                else (TradeDirection.SHORT if direction_str == "short" else TradeDirection.BOTH)
-            )
-            long_entries, long_exits, short_entries, short_exits = generate_rsi_signals(
+            trade_direction = parse_trade_direction(direction_str)
+            # Extract signal params (without SL/TP)
+            signal_params = {k: v for k, v in best_params.items() if k not in ("stop_loss_pct", "take_profit_pct")}
+            long_entries, long_exits, short_entries, short_exits = generate_signals_for_strategy(
                 candles=candles,
-                period=best_params["rsi_period"],
-                overbought=best_params["rsi_overbought"],
-                oversold=best_params["rsi_oversold"],
+                strategy_type=strategy_type_str,
+                params=signal_params,
                 direction=direction_str,
             )
-            bt_input = BacktestInput(
+            bt_input = build_backtest_input(
                 candles=candles,
-                candles_1m=None,
                 long_entries=long_entries,
                 long_exits=long_exits,
                 short_entries=short_entries,
                 short_exits=short_exits,
-                symbol=request_params["symbol"],
-                interval=request_params["interval"],
-                initial_capital=request_params["initial_capital"],
-                position_size=0.1 if request_params.get("use_fixed_amount") else 1.0,
-                use_fixed_amount=request_params.get("use_fixed_amount", False),
-                fixed_amount=request_params.get("fixed_amount", 0.0),
-                leverage=request_params["leverage"],
-                stop_loss=best_params.get("stop_loss_pct", 0) / 100.0,
-                take_profit=best_params.get("take_profit_pct", 0) / 100.0,
-                direction=trade_direction,
-                taker_fee=request_params["commission"],
-                maker_fee=request_params["commission"],
-                slippage=0.0005,
-                use_bar_magnifier=False,
-                max_drawdown_limit=0.0,
-                pyramiding=1,
-                market_regime_enabled=request_params.get("market_regime_enabled", False),
-                market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
-                market_regime_lookback=request_params.get("market_regime_lookback", 50),
+                request_params=request_params,
+                trade_direction=trade_direction,
+                stop_loss_pct=best_params.get("stop_loss_pct", 0),
+                take_profit_pct=best_params.get("take_profit_pct", 0),
             )
             bt_out = fallback_engine.run(bt_input)
             if bt_out.is_valid and bt_out.metrics:
@@ -2738,17 +2390,7 @@ async def sync_grid_search_optimization(
 # OPTUNA BAYESIAN OPTIMIZATION (TPE/GP, fewer iterations, same quality)
 # =============================================================================
 
-
-class OptunaSyncRequest(SyncOptimizationRequest):
-    """Optuna Bayesian optimization — extends grid-search request."""
-
-    n_trials: int = Field(100, ge=10, le=500, description="Number of Optuna trials")
-    sampler_type: str = Field(
-        "tpe",
-        description="Optuna sampler: tpe (default), random, cmaes",
-    )
-    n_jobs: int = Field(1, ge=1, le=8, description="Parallel trials (n_jobs)")
-    validate_best_with_fallback: bool = False
+# OptunaSyncRequest imported from backend.optimization.models
 
 
 @router.post("/sync/optuna-search", response_model=SyncOptimizationResponse)
@@ -2760,13 +2402,23 @@ async def sync_optuna_optimization(
     Bayesian оптимизация (Optuna TPE).
 
     Меньше итераций при том же качестве, многокритериальность, ограничения.
+    Поддерживает все типы стратегий (RSI, MACD, Bollinger, SMA/EMA crossover).
+    Возвращает top-N результатов с полными метриками.
     """
     import time
     from datetime import datetime as dt
 
     import pandas as pd
 
+    from backend.backtesting.engine_selector import get_engine
+    from backend.backtesting.signal_generators import generate_signals_for_strategy
     from backend.optimization.optuna_optimizer import OPTUNA_AVAILABLE, OptunaOptimizer
+    from backend.optimization.scoring import calculate_composite_score
+    from backend.optimization.utils import (
+        build_backtest_input,
+        extract_metrics_from_output,
+        parse_trade_direction,
+    )
     from backend.services.data_service import DataService
 
     if not OPTUNA_AVAILABLE:
@@ -2776,8 +2428,9 @@ async def sync_optuna_optimization(
         )
 
     start_time = time.time()
+    strategy_type_str = request.strategy_type.lower()
     logger.info("🔬 Starting Optuna Bayesian optimization")
-    logger.info(f"   n_trials={request.n_trials}, sampler={request.sampler_type}")
+    logger.info(f"   strategy={strategy_type_str}, n_trials={request.n_trials}, sampler={request.sampler_type}")
 
     db_interval = _normalize_interval(request.interval)
     try:
@@ -2816,28 +2469,14 @@ async def sync_optuna_optimization(
     )
     candles.set_index("timestamp", inplace=True)
 
-    # Param space from ranges (min/max for Optuna)
+    # ── Build param_space based on strategy_type ──
     def _low_high(arr, default_lo, default_hi):
         if not arr:
             return default_lo, default_hi
         return min(arr), max(arr)
 
+    # Common: stop_loss and take_profit
     param_space = {
-        "rsi_period": {
-            "type": "int",
-            "low": _low_high(request.rsi_period_range, 7, 30)[0],
-            "high": _low_high(request.rsi_period_range, 7, 30)[1],
-        },
-        "rsi_overbought": {
-            "type": "int",
-            "low": _low_high(request.rsi_overbought_range, 65, 85)[0],
-            "high": _low_high(request.rsi_overbought_range, 65, 85)[1],
-        },
-        "rsi_oversold": {
-            "type": "int",
-            "low": _low_high(request.rsi_oversold_range, 15, 35)[0],
-            "high": _low_high(request.rsi_oversold_range, 15, 35)[1],
-        },
         "stop_loss_pct": {
             "type": "float",
             "low": _low_high(request.stop_loss_range, 1.0, 10.0)[0],
@@ -2852,9 +2491,74 @@ async def sync_optuna_optimization(
         },
     }
 
-    from backend.backtesting.engine_selector import get_engine
-    from backend.backtesting.interfaces import BacktestInput, TradeDirection
-    from backend.backtesting.signal_generators import generate_rsi_signals
+    # Strategy-specific params
+    if strategy_type_str in ("sma_crossover", "sma"):
+        param_space["sma_fast_period"] = {
+            "type": "int",
+            "low": _low_high(request.sma_fast_period_range, 5, 20)[0],
+            "high": _low_high(request.sma_fast_period_range, 5, 20)[1],
+        }
+        param_space["sma_slow_period"] = {
+            "type": "int",
+            "low": _low_high(request.sma_slow_period_range, 30, 100)[0],
+            "high": _low_high(request.sma_slow_period_range, 30, 100)[1],
+        }
+    elif strategy_type_str in ("ema_crossover", "ema"):
+        param_space["ema_fast_period"] = {
+            "type": "int",
+            "low": _low_high(request.ema_fast_period_range, 5, 20)[0],
+            "high": _low_high(request.ema_fast_period_range, 5, 20)[1],
+        }
+        param_space["ema_slow_period"] = {
+            "type": "int",
+            "low": _low_high(request.ema_slow_period_range, 30, 100)[0],
+            "high": _low_high(request.ema_slow_period_range, 30, 100)[1],
+        }
+    elif strategy_type_str == "macd":
+        param_space["macd_fast_period"] = {
+            "type": "int",
+            "low": _low_high(request.macd_fast_period_range, 8, 16)[0],
+            "high": _low_high(request.macd_fast_period_range, 8, 16)[1],
+        }
+        param_space["macd_slow_period"] = {
+            "type": "int",
+            "low": _low_high(request.macd_slow_period_range, 20, 30)[0],
+            "high": _low_high(request.macd_slow_period_range, 20, 30)[1],
+        }
+        param_space["macd_signal_period"] = {
+            "type": "int",
+            "low": _low_high(request.macd_signal_period_range, 7, 12)[0],
+            "high": _low_high(request.macd_signal_period_range, 7, 12)[1],
+        }
+    elif strategy_type_str in ("bollinger_bands", "bollinger", "bb"):
+        param_space["bb_period"] = {
+            "type": "int",
+            "low": _low_high(request.bb_period_range, 10, 30)[0],
+            "high": _low_high(request.bb_period_range, 10, 30)[1],
+        }
+        param_space["bb_std_dev"] = {
+            "type": "float",
+            "low": _low_high(request.bb_std_dev_range, 1.5, 3.0)[0],
+            "high": _low_high(request.bb_std_dev_range, 1.5, 3.0)[1],
+            "step": 0.1,
+        }
+    else:
+        # Default: RSI
+        param_space["rsi_period"] = {
+            "type": "int",
+            "low": _low_high(request.rsi_period_range, 7, 30)[0],
+            "high": _low_high(request.rsi_period_range, 7, 30)[1],
+        }
+        param_space["rsi_overbought"] = {
+            "type": "int",
+            "low": _low_high(request.rsi_overbought_range, 65, 85)[0],
+            "high": _low_high(request.rsi_overbought_range, 65, 85)[1],
+        }
+        param_space["rsi_oversold"] = {
+            "type": "int",
+            "low": _low_high(request.rsi_oversold_range, 15, 35)[0],
+            "high": _low_high(request.rsi_oversold_range, 15, 35)[1],
+        }
 
     # Market regime requires FallbackV4 (Numba doesn't support it)
     optuna_engine = "fallback_v4" if getattr(request, "market_regime_enabled", False) else "numba"
@@ -2874,55 +2578,41 @@ async def sync_optuna_optimization(
         "market_regime_lookback": getattr(request, "market_regime_lookback", 50),
     }
     direction_str = request.direction
-    trade_direction = (
-        TradeDirection.LONG
-        if direction_str == "long"
-        else (TradeDirection.SHORT if direction_str == "short" else TradeDirection.BOTH)
-    )
+    trade_direction = parse_trade_direction(direction_str)
 
     def objective(params):
+        """Universal objective — works for any strategy_type."""
         try:
-            le, lex, se, sex = generate_rsi_signals(
+            # Separate stop_loss/take_profit from signal params
+            signal_params = {k: v for k, v in params.items() if k not in ("stop_loss_pct", "take_profit_pct")}
+
+            le, lex, se, sex = generate_signals_for_strategy(
                 candles=candles,
-                period=int(params["rsi_period"]),
-                overbought=int(params["rsi_overbought"]),
-                oversold=int(params["rsi_oversold"]),
+                strategy_type=strategy_type_str,
+                params=signal_params,
                 direction=direction_str,
             )
-            sl = params.get("stop_loss_pct", 0) / 100.0
-            tp = params.get("take_profit_pct", 0) / 100.0
-            pos_size = 0.1 if request_params.get("use_fixed_amount") else 1.0
-            bt_input = BacktestInput(
+
+            sl_pct = params.get("stop_loss_pct", 0)
+            tp_pct = params.get("take_profit_pct", 0)
+
+            bt_input = build_backtest_input(
                 candles=candles,
-                candles_1m=None,
                 long_entries=le,
                 long_exits=lex,
                 short_entries=se,
                 short_exits=sex,
-                symbol=request_params["symbol"],
-                interval=request_params["interval"],
-                initial_capital=request_params["initial_capital"],
-                position_size=pos_size,
-                use_fixed_amount=request_params.get("use_fixed_amount", False),
-                fixed_amount=request_params.get("fixed_amount", 0.0),
-                leverage=request_params["leverage"],
-                stop_loss=sl if sl else 0.0,
-                take_profit=tp if tp else 0.0,
-                direction=trade_direction,
-                taker_fee=request_params["commission"],
-                maker_fee=request_params["commission"],
-                slippage=0.0005,
-                use_bar_magnifier=False,
-                max_drawdown_limit=0.0,
-                pyramiding=1,
-                market_regime_enabled=request_params.get("market_regime_enabled", False),
-                market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
-                market_regime_lookback=request_params.get("market_regime_lookback", 50),
+                request_params=request_params,
+                trade_direction=trade_direction,
+                stop_loss_pct=sl_pct,
+                take_profit_pct=tp_pct,
             )
+
             out = engine.run(bt_input)
             if not out.is_valid or not out.metrics:
                 return float("-inf")
-            return _calculate_composite_score(
+
+            return calculate_composite_score(
                 {
                     "sharpe_ratio": out.metrics.sharpe_ratio,
                     "total_return": out.metrics.total_return,
@@ -2948,77 +2638,76 @@ async def sync_optuna_optimization(
         show_progress=True,
     )
 
-    # Re-run best params for full metrics
-    best_p = result.best_params
-    le, lex, se, sex = generate_rsi_signals(
-        candles=candles,
-        period=int(best_p["rsi_period"]),
-        overbought=int(best_p["rsi_overbought"]),
-        oversold=int(best_p["rsi_oversold"]),
-        direction=direction_str,
-    )
-    sl = best_p.get("stop_loss_pct", 0) / 100.0
-    tp = best_p.get("take_profit_pct", 0) / 100.0
-    pos_size = 0.1 if request_params.get("use_fixed_amount") else 1.0
-    bt_input = BacktestInput(
-        candles=candles,
-        candles_1m=None,
-        long_entries=le,
-        long_exits=lex,
-        short_entries=se,
-        short_exits=sex,
-        symbol=request_params["symbol"],
-        interval=request_params["interval"],
-        initial_capital=request_params["initial_capital"],
-        position_size=pos_size,
-        use_fixed_amount=request_params.get("use_fixed_amount", False),
-        fixed_amount=request_params.get("fixed_amount", 0.0),
-        leverage=request_params["leverage"],
-        stop_loss=sl if sl else 0.0,
-        take_profit=tp if tp else 0.0,
-        direction=trade_direction,
-        taker_fee=request_params["commission"],
-        maker_fee=request_params["commission"],
-        slippage=0.0005,
-        use_bar_magnifier=False,
-        max_drawdown_limit=0.0,
-        pyramiding=1,
-        market_regime_enabled=request_params.get("market_regime_enabled", False),
-        market_regime_filter=request_params.get("market_regime_filter", "not_volatile"),
-        market_regime_lookback=request_params.get("market_regime_lookback", 50),
-    )
-    out = engine.run(bt_input)
-    metrics = out.metrics
+    # ── Re-run top-N trials for full metrics ──
+    # Sort all completed trials by value (descending), take top 10
+    top_n = 10
+    sorted_trials = sorted(result.all_trials, key=lambda t: t["value"], reverse=True)
+    top_trials = sorted_trials[:top_n]
 
-    best_result = {
-        "params": {
-            "rsi_period": int(best_p["rsi_period"]),
-            "rsi_overbought": int(best_p["rsi_overbought"]),
-            "rsi_oversold": int(best_p["rsi_oversold"]),
-            "stop_loss_pct": best_p.get("stop_loss_pct", 0),
-            "take_profit_pct": best_p.get("take_profit_pct", 0),
-        },
-        "score": result.best_value,
-        "total_return": metrics.total_return if metrics else 0,
-        "sharpe_ratio": metrics.sharpe_ratio if metrics else 0,
-        "max_drawdown": metrics.max_drawdown if metrics else 0,
-        "win_rate": metrics.win_rate * 100 if metrics else 0,
-        "total_trades": metrics.total_trades if metrics else 0,
-        "profit_factor": metrics.profit_factor if metrics else 0,
-        "net_profit": metrics.net_profit if metrics else 0,
-    }
+    results = []
+    for trial_info in top_trials:
+        try:
+            trial_params = trial_info["params"]
+            signal_params = {k: v for k, v in trial_params.items() if k not in ("stop_loss_pct", "take_profit_pct")}
+
+            le, lex, se, sex = generate_signals_for_strategy(
+                candles=candles,
+                strategy_type=strategy_type_str,
+                params=signal_params,
+                direction=direction_str,
+            )
+
+            sl_pct = trial_params.get("stop_loss_pct", 0)
+            tp_pct = trial_params.get("take_profit_pct", 0)
+
+            bt_input = build_backtest_input(
+                candles=candles,
+                long_entries=le,
+                long_exits=lex,
+                short_entries=se,
+                short_exits=sex,
+                request_params=request_params,
+                trade_direction=trade_direction,
+                stop_loss_pct=sl_pct,
+                take_profit_pct=tp_pct,
+            )
+
+            out = engine.run(bt_input)
+            if not out.is_valid:
+                continue
+
+            metrics_dict = extract_metrics_from_output(out, win_rate_as_pct=True)
+            score = calculate_composite_score(
+                metrics_dict,
+                request_params["optimize_metric"],
+                None,
+            )
+
+            results.append(
+                {
+                    "params": trial_params,
+                    "score": score,
+                    **metrics_dict,
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Re-run of trial failed: {e}")
+
+    # Sort results by score
+    results.sort(key=lambda x: x["score"], reverse=True)
+
+    best_result = results[0] if results else {"params": result.best_params, "score": result.best_value}
 
     execution_time = time.time() - start_time
-    results = [{"params": best_result["params"], "score": best_result["score"], **best_result}]
 
     return SyncOptimizationResponse(
         status="completed",
         total_combinations=request.n_trials,
-        tested_combinations=request.n_trials,
+        tested_combinations=len(result.all_trials),
         best_params=best_result["params"],
         best_score=best_result["score"],
         best_metrics=best_result,
-        top_results=results[:10],
+        top_results=results[:top_n],
         execution_time_seconds=round(execution_time, 2),
         speed_combinations_per_sec=int(request.n_trials / execution_time) if execution_time > 0 else 0,
         num_workers=request.n_jobs,
@@ -3031,63 +2720,7 @@ async def sync_optuna_optimization(
 # VECTORBT HIGH-PERFORMANCE OPTIMIZATION (100K - 100M+ combinations)
 # =============================================================================
 
-
-class VectorbtOptimizationRequest(BaseModel):
-    """Request for VectorBT high-performance optimization"""
-
-    symbol: str = "BTCUSDT"
-    interval: str = "30m"
-    start_date: str = "2025-01-01"
-    end_date: str = "2025-06-01"
-
-    # Базовые параметры
-    direction: str = "long"
-    leverage: int = 10
-    initial_capital: float = 10000.0
-    commission: float = 0.0007  # 0.07% TradingView parity
-    slippage: float = 0.0005  # Slippage per trade (0.0005 = 0.05%)
-    position_size: float = 1.0  # 1.0 = 100% of capital per trade
-
-    # RSI parameter ranges (lists of values)
-    rsi_period_range: list[int] = [7, 14, 21]
-    rsi_overbought_range: list[int] = [70, 75, 80]
-    rsi_oversold_range: list[int] = [20, 25, 30]
-
-    # TP/SL ranges
-    stop_loss_range: list[float] = [5.0, 10.0, 15.0]
-    take_profit_range: list[float] = [1.0, 2.0, 3.0]
-
-    # Optimization settings
-    optimize_metric: str = "sharpe_ratio"
-
-    # Custom weights (for custom_score metric)
-    weight_return: float = 0.4
-    weight_drawdown: float = 0.3
-    weight_sharpe: float = 0.2
-    weight_win_rate: float = 0.1
-
-    # Filters
-    min_trades: int | None = None
-    max_drawdown_limit: float | None = None
-    min_profit_factor: float | None = None
-    min_win_rate: float | None = None
-
-
-class VectorbtOptimizationResponse(BaseModel):
-    """Response from VectorBT optimization"""
-
-    status: str
-    total_combinations: int
-    tested_combinations: int
-    execution_time_seconds: float
-    speed_combinations_per_sec: int | None = None  # Actual speed achieved
-    num_workers: int | None = None  # Number of parallel workers used
-    best_params: dict[str, Any]
-    best_score: float
-    best_metrics: dict[str, Any]
-    top_results: list[dict[str, Any]]
-    performance_stats: dict[str, Any]
-    smart_recommendations: SmartRecommendations | None = None
+# VectorbtOptimizationRequest, VectorbtOptimizationResponse imported from backend.optimization.models
 
 
 @router.post("/vectorbt/grid-search", response_model=VectorbtOptimizationResponse)

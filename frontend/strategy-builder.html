@@ -128,8 +128,13 @@
             <button id="btnAutoLayout" class="btn btn-icon btn-secondary" title="Auto Layout">
               <i class="bi bi-grid-3x3"></i>
             </button>
-            <button class="btn btn-icon btn-secondary" onclick="fitToScreen()" title="Fit to Screen">
+            <button class="btn btn-icon btn-secondary" title="Fit to Screen">
               <i class="bi bi-fullscreen"></i>
+            </button>
+          </div>
+          <div class="toolbar-group">
+            <button id="btnAiBuild" class="btn btn-sm btn-ai-build" title="AI Agent builds and backtests a strategy automatically">
+              <i class="bi bi-robot"></i> AI Build
             </button>
           </div>
         </div>
@@ -145,14 +150,14 @@
 
         <!-- Zoom Controls — вне canvas-container, чтобы не обрезалось overflow -->
         <div class="zoom-controls">
-          <button class="zoom-btn" onclick="zoomOut()" title="Zoom out" aria-label="Zoom out">
+          <button class="zoom-btn" title="Zoom out" aria-label="Zoom out">
             <i class="bi bi-dash"></i>
           </button>
           <span class="zoom-level" id="zoomLevel">100%</span>
-          <button class="zoom-btn" onclick="zoomIn()" title="Zoom in" aria-label="Zoom in">
+          <button class="zoom-btn" title="Zoom in" aria-label="Zoom in">
             <i class="bi bi-plus"></i>
           </button>
-          <button class="zoom-btn" onclick="resetZoom()" title="Reset zoom" aria-label="Reset zoom">
+          <button class="zoom-btn" title="Reset zoom" aria-label="Reset zoom">
             <i class="bi bi-arrows-angle-expand"></i>
           </button>
         </div>
@@ -514,12 +519,11 @@
           </div>
           <div class="modal-footer d-flex flex-wrap gap-2 justify-content-between">
             <div class="d-flex gap-2">
-              <button class="btn btn-outline-secondary btn-sm" onclick="exportAsTemplate()"
-                title="Save current strategy as JSON file">
+              <button class="btn btn-outline-secondary btn-sm" title="Save current strategy as JSON file">
                 <i class="bi bi-download"></i> Export
               </button>
               <button class="btn btn-outline-secondary btn-sm"
-                onclick="document.getElementById('importTemplateInput').click()" title="Load strategy from JSON file">
+                title="Load strategy from JSON file">
                 <i class="bi bi-upload"></i> Import
               </button>
               <input type="file" id="importTemplateInput" accept=".json" class="hidden"
@@ -562,7 +566,7 @@
               <i class="bi bi-bar-chart-fill text-primary"></i>
               Backtest Results
             </h3>
-            <button class="modal-close" onclick="closeBacktestResultsModal()">
+            <button class="modal-close" id="btnCloseBacktestResults">
               &times;
             </button>
           </div>
@@ -574,16 +578,16 @@
 
             <!-- Tabs for different views -->
             <div class="results-tabs">
-              <button class="results-tab active" data-tab="overview" onclick="switchResultsTab('overview')">
+              <button class="results-tab active" data-tab="overview">
                 <i class="bi bi-speedometer2"></i> Overview
               </button>
-              <button class="results-tab" data-tab="equity" onclick="switchResultsTab('equity')">
+              <button class="results-tab" data-tab="equity">
                 <i class="bi bi-graph-up-arrow"></i> Equity Curve
               </button>
-              <button class="results-tab" data-tab="trades" onclick="switchResultsTab('trades')">
+              <button class="results-tab" data-tab="trades">
                 <i class="bi bi-list-ul"></i> Trades
               </button>
-              <button class="results-tab" data-tab="metrics" onclick="switchResultsTab('metrics')">
+              <button class="results-tab" data-tab="metrics">
                 <i class="bi bi-calculator"></i> All Metrics
               </button>
             </div>
@@ -636,13 +640,13 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeBacktestResultsModal()">
+            <button class="btn btn-secondary" id="btnCloseBacktestResults2">
               <i class="bi bi-x-lg"></i> Close
             </button>
-            <button class="btn btn-outline-primary" onclick="exportBacktestResults()">
+            <button class="btn btn-outline-primary" id="btnExportBacktestResults">
               <i class="bi bi-download"></i> Export Results
             </button>
-            <button class="btn btn-primary" onclick="viewFullResults()">
+            <button class="btn btn-primary" id="btnViewFullBacktestResults">
               <i class="bi bi-box-arrow-up-right"></i> Full Analysis
             </button>
           </div>
@@ -651,12 +655,85 @@
 
       <script src="./js/sidebar-toggle.js"></script>
       <script src="./js/pages/strategy_builder_debug.js"></script>
-      <script type="module" src="./js/pages/strategy_builder.js?v=20260204"></script>
+      <script type="module" src="./js/pages/strategy_builder.js?v=20260215c"></script>
       <script src="./js/pages/symbol_picker_debug.js" defer></script>
       <script src="./js/pages/optimization_panels.js?v=20260204"></script>
       <script src="./js/pages/optimization.js"></script>
       <script src="./js/pages/evaluation_criteria_panel.js?v=20260204"></script>
       <script src="./js/pages/optimization_config_panel.js?v=20260204d"></script>
+
+      <!-- AI Build Modal -->
+      <div id="aiBuildModal" class="ai-build-modal" style="display:none">
+        <div class="ai-build-modal-content">
+          <div class="ai-build-header">
+            <h3><i class="bi bi-robot"></i> AI Strategy Builder</h3>
+            <button class="btn btn-icon btn-secondary" id="btnCloseAiBuild">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+
+          <!-- Config form -->
+          <div id="aiBuildConfig" class="ai-build-body">
+            <!-- Summary from Parameters panel (read-only) -->
+            <div class="ai-build-summary" id="aiBuildSummary">
+              <!-- Populated by JS from Parameters panel -->
+            </div>
+
+            <div class="ai-build-row">
+              <label>Strategy Name</label>
+              <input type="text" id="aiName" value="AI RSI Strategy" class="form-control form-control-sm">
+            </div>
+            <div class="ai-build-row-half">
+              <div>
+                <label>Max Iterations</label>
+                <input type="number" id="aiMaxIter" value="3" min="1" max="10" class="form-control form-control-sm">
+              </div>
+              <div>
+                <label>Min Sharpe</label>
+                <input type="number" id="aiMinSharpe" value="0.5" step="0.1" class="form-control form-control-sm">
+              </div>
+            </div>
+            <div class="ai-build-row">
+              <label class="form-check-label">
+                <input type="checkbox" id="aiDeliberation" class="form-check-input">
+                AI Deliberation (DeepSeek + Perplexity consensus — uses API credits)
+              </label>
+            </div>
+
+            <h5 class="ai-build-preset-heading">Preset Blocks</h5>
+            <select id="aiPreset" class="form-select form-select-sm">
+              <option value="rsi">RSI Overbought/Oversold</option>
+              <option value="ema_cross">EMA Crossover (9/21)</option>
+              <option value="macd">MACD Signal</option>
+              <option value="bb">Bollinger Bands</option>
+              <option value="custom">Custom (empty)</option>
+            </select>
+            <pre id="aiBlocksPreview" class="ai-blocks-preview"></pre>
+
+            <button class="btn btn-primary w-100 mt-2" id="btnRunAiBuild">
+              <i class="bi bi-play-fill"></i> Build & Backtest
+            </button>
+          </div>
+
+          <!-- Progress -->
+          <div id="aiBuildProgress" class="ai-build-body" style="display:none">
+            <div class="ai-build-spinner">
+              <div class="spinner-border text-primary" role="status"></div>
+              <p id="aiBuildStage">Starting AI workflow...</p>
+            </div>
+          </div>
+
+          <!-- Results -->
+          <div id="aiBuildResults" class="ai-build-body" style="display:none">
+            <div id="aiBuildResultContent"></div>
+            <button class="btn btn-secondary w-100 mt-2" id="btnResetAiBuild">
+              <i class="bi bi-arrow-repeat"></i> Build Another
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Build logic moved to strategy_builder.js (CSP-compliant) -->
 </body>
 
 </html>

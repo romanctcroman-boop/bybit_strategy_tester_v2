@@ -208,6 +208,10 @@ class AutoMLPipeline:
             )
 
             is_classifier = params.pop("is_classifier", True)
+            # Remove XGBoost/LightGBM-specific params not supported by sklearn
+            params.pop("reg_alpha", None)
+            params.pop("reg_lambda", None)
+            params.pop("colsample_bytree", None)
             cls = GradientBoostingClassifier if is_classifier else GradientBoostingRegressor
             return cls(**params)
 
@@ -248,6 +252,11 @@ class AutoMLPipeline:
             from sklearn.linear_model import LogisticRegression, Ridge
 
             is_classifier = params.pop("is_classifier", True)
+            if not is_classifier:
+                # Ridge uses 'alpha' not 'C'; convert if needed
+                c_value = params.pop("C", None)
+                if c_value is not None and "alpha" not in params:
+                    params["alpha"] = 1.0 / max(c_value, 1e-10)
             cls = LogisticRegression if is_classifier else Ridge
             return cls(**params)
 

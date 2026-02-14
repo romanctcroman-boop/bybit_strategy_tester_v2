@@ -25,6 +25,7 @@ class StrategyType(str, Enum):
     # Custom
     CUSTOM = "custom"
     ADVANCED = "advanced"
+    BUILDER = "builder"
 
 
 class OrderSide(str, Enum):
@@ -697,7 +698,7 @@ class BacktestConfig(BaseModel):
 class TradeRecord(BaseModel):
     """Single trade record with TradingView-compatible metrics"""
 
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(use_enum_values=True, extra="ignore")
 
     id: str = Field(default="", description="Trade ID for identification")
     entry_time: datetime
@@ -710,6 +711,47 @@ class TradeRecord(BaseModel):
     pnl_pct: float = 0.0  # Optional with default
     fees: float = 0.0  # Optional with default
     duration_hours: float = 0.0  # Optional with default
+
+    # ===== Backwards compatibility: accept legacy field names from engines =====
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_fields(cls, data: dict) -> dict:
+        """Map legacy engine field names to canonical TradeRecord fields.
+
+        FallbackEngineV2/V3/V4, GPU, Numba, and DCA engines pass:
+          direction= → side=
+          exit_reason= → exit_comment=
+          duration_bars= → bars_in_trade=
+          position_size= → size=
+          pnl_percent= → pnl_pct=
+        """
+        if not isinstance(data, dict):
+            return data
+
+        # direction → side (all engines)
+        if "side" not in data and "direction" in data:
+            val = data.pop("direction")
+            # Handle enum values (TradeDirection.LONG etc.)
+            data["side"] = val.value if hasattr(val, "value") else str(val)
+
+        # exit_reason → exit_comment (V2/V3/V4, GPU, Numba)
+        if "exit_comment" not in data and "exit_reason" in data:
+            val = data.pop("exit_reason")
+            data["exit_comment"] = val.value if hasattr(val, "value") else str(val)
+
+        # duration_bars → bars_in_trade (V2/V3/V4, GPU, Numba)
+        if "bars_in_trade" not in data and "duration_bars" in data:
+            data["bars_in_trade"] = data.pop("duration_bars")
+
+        # position_size → size (DCA engine)
+        if "size" not in data and "position_size" in data:
+            data["size"] = data.pop("position_size")
+
+        # pnl_percent → pnl_pct (DCA engine)
+        if "pnl_pct" not in data and "pnl_percent" in data:
+            data["pnl_pct"] = data.pop("pnl_percent")
+
+        return data
 
     # ===== Trade Identification (TradingView compatible) =====
     entry_id: str = Field(default="", description="Entry order ID (TradingView strategy.entry id)")
@@ -803,6 +845,10 @@ class PerformanceMetrics(BaseModel):
     sortino_ratio: float = Field(default=0.0, description="Sortino ratio (monthly returns, downside deviation)")
     calmar_ratio: float = Field(default=0.0, description="Calmar ratio (annual return / max drawdown)")
     sqn: float = Field(default=0.0, description="System Quality Number (expectancy / stdev of trades)")
+    kelly_percent: float = Field(default=0.0, description="Kelly Criterion as fraction (0-1)")
+    kelly_percent_long: float = Field(default=0.0, description="Kelly Criterion for long trades")
+    kelly_percent_short: float = Field(default=0.0, description="Kelly Criterion for short trades")
+    open_trades: int = Field(default=0, description="Number of open trades at end of backtest")
 
     # ===== ПРОСАДКА (Drawdown) - DUAL FORMAT =====
     max_drawdown: float = Field(default=0.0, description="Maximum drawdown percentage (peak-to-trough)")

@@ -227,8 +227,12 @@ async def test_llm_connections():
         assert response.total_tokens == 15  # Should be calculated or set
         mark_test(category, "response_structure", True)
 
-        # Test RateLimiter
-        limiter = RateLimiter(rate_limit_rpm=60)
+        # Test RateLimiter (deprecated — backward compat)
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            limiter = RateLimiter(rate_limit_rpm=60)
         acquired = await limiter.acquire()
         assert acquired
         mark_test(category, "rate_limiter", True)

@@ -10,6 +10,7 @@ Extracted from unified_agent_interface.py for better modularity.
 """
 
 import json
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -34,7 +35,7 @@ class AgentRequest:
     prompt: str
     code: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
-    thinking_mode: bool = True  # DeepSeek V3.2 Thinking Mode (CoT)
+    thinking_mode: bool = False  # DeepSeek V3.2 Thinking Mode (CoT) — disabled by default for cost
     strict_mode: bool = False  # DeepSeek Strict Mode for guaranteed JSON
     stream: bool = False  # Enable streaming for real-time output
 
@@ -72,15 +73,23 @@ class AgentRequest:
             return self._build_perplexity_payload()
 
     def _build_deepseek_payload(self, include_tools: bool) -> dict[str, Any]:
-        """Build DeepSeek API payload."""
-        model = "deepseek-reasoner" if self.thinking_mode else "deepseek-chat"
-        max_tokens = 16000 if self.thinking_mode else 4000
+        """Build DeepSeek API payload.
+
+        Cost protection: deepseek-reasoner is blocked unless
+        DEEPSEEK_ALLOW_REASONER=true is set in env.
+        """
+        # Cost guard: block reasoner unless explicitly allowed
+        allow_reasoner = os.getenv("DEEPSEEK_ALLOW_REASONER", "false").lower() == "true"
+        use_thinking = self.thinking_mode and allow_reasoner
+
+        if self.thinking_mode and not allow_reasoner:
+            logger.warning("⚠️ deepseek-reasoner blocked (DEEPSEEK_ALLOW_REASONER=false). Using deepseek-chat instead.")
+
+        model = "deepseek-reasoner" if use_thinking else "deepseek-chat"
+        max_tokens = 16000 if use_thinking else 4000
 
         # V3.2 recommended sampling params
-        if self.thinking_mode:
-            sampling_params = {"top_p": 0.95}
-        else:
-            sampling_params = {"temperature": 0.7}
+        sampling_params = {"top_p": 0.95} if use_thinking else {"temperature": 0.7}
 
         # Use 'developer' role for search tasks
         task_type = self.task_type.lower()
@@ -114,19 +123,42 @@ class AgentRequest:
         """Build Perplexity API payload."""
         task_type = self.task_type.lower()
 
-        # Select model based on task type
-        if task_type in ("research", "report", "deep"):
-            model = "sonar-deep-research"
-            max_tokens = 4000
-        elif task_type in ("analyze", "reason", "solve", "complex"):
-            model = "sonar-reasoning-pro"
-            max_tokens = 4000
-        elif task_type in ("quick", "simple", "fast"):
-            model = "sonar"
-            max_tokens = 1000
+        # Cost guard: block expensive models unless explicitly allowed
+        allow_expensive = os.getenv("PERPLEXITY_ALLOW_EXPENSIVE", "false").lower() == "true"
+
+        if not allow_expensive:
+            # Force cheap model regardless of task type
+            if task_type in ("research", "report", "deep"):
+                logger.warning(
+                    "⚠️ sonar-deep-research blocked (PERPLEXITY_ALLOW_EXPENSIVE=false). "
+                    f"Task '{task_type}' downgraded to sonar-pro."
+                )
+            elif task_type in ("analyze", "reason", "solve", "complex"):
+                logger.warning(
+                    "⚠️ sonar-reasoning-pro blocked (PERPLEXITY_ALLOW_EXPENSIVE=false). "
+                    f"Task '{task_type}' downgraded to sonar-pro."
+                )
+
+            if task_type in ("quick", "simple", "fast"):
+                model = "sonar"
+                max_tokens = 1000
+            else:
+                model = "sonar-pro"
+                max_tokens = 2000
         else:
-            model = "sonar-pro"
-            max_tokens = 2000
+            # Expensive models allowed
+            if task_type in ("research", "report", "deep"):
+                model = "sonar-deep-research"
+                max_tokens = 4000
+            elif task_type in ("analyze", "reason", "solve", "complex"):
+                model = "sonar-reasoning-pro"
+                max_tokens = 4000
+            elif task_type in ("quick", "simple", "fast"):
+                model = "sonar"
+                max_tokens = 1000
+            else:
+                model = "sonar-pro"
+                max_tokens = 2000
 
         payload = {
             "model": model,
@@ -160,9 +192,7 @@ class AgentRequest:
 
         if self.context:
             safe_context = {
-                self._sanitize(str(k)): self._sanitize(str(v))
-                if not isinstance(v, (dict, list))
-                else v
+                self._sanitize(str(k)): self._sanitize(str(v)) if not isinstance(v, (dict, list)) else v
                 for k, v in self.context.items()
             }
             parts.append(f"\n\nContext: {json.dumps(safe_context, indent=2)}")
@@ -176,9 +206,7 @@ class AgentRequest:
             return text
 
         for pattern in self.UNSAFE_PATTERNS:
-            new = re.sub(
-                pattern, "[REDACTED_UNSAFE_PATTERN]", text, flags=re.IGNORECASE
-            )
+            new = re.sub(pattern, "[REDACTED_UNSAFE_PATTERN]", text, flags=re.IGNORECASE)
             if new != text:
                 logger.warning(f"🚫 Unsafe pattern sanitized: {pattern}")
             text = new
@@ -307,9 +335,7 @@ class TokenUsage:
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
             total_tokens=usage.get("total_tokens", 0),
-            reasoning_tokens=usage.get("completion_tokens_details", {}).get(
-                "reasoning_tokens", 0
-            ),
+            reasoning_tokens=usage.get("completion_tokens_details", {}).get("reasoning_tokens", 0),
             cache_hit_tokens=usage.get("prompt_cache_hit_tokens", 0),
             cache_miss_tokens=usage.get("prompt_cache_miss_tokens", 0),
         )

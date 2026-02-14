@@ -95,9 +95,7 @@ class TestAgentRequest:
 
     def test_agent_request_init_minimal(self):
         """AgentRequest initializes with minimal params"""
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="analyze", prompt="Test prompt"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="analyze", prompt="Test prompt")
 
         assert request.agent_type == AgentType.DEEPSEEK
         assert request.task_type == "analyze"
@@ -156,7 +154,7 @@ class TestAgentRequest:
         assert api_format["max_tokens"] == 4000
 
     def test_agent_request_to_direct_api_format_deepseek_thinking_mode(self):
-        """AgentRequest converts to DeepSeek API format with thinking mode (default)"""
+        """Thinking mode blocked by default (DEEPSEEK_ALLOW_REASONER=false)."""
         request = AgentRequest(
             agent_type=AgentType.DEEPSEEK,
             task_type="analyze",
@@ -167,9 +165,9 @@ class TestAgentRequest:
 
         api_format = request.to_direct_api_format()
 
-        assert api_format["model"] == "deepseek-reasoner"
-        assert api_format["max_tokens"] == 16000
-        assert api_format.get("top_p") == 0.95
+        # Reasoner blocked by default — falls back to deepseek-chat
+        assert api_format["model"] == "deepseek-chat"
+        assert api_format["max_tokens"] == 4000
 
     def test_agent_request_to_direct_api_format_perplexity(self):
         """AgentRequest converts to Perplexity API format"""
@@ -272,9 +270,7 @@ class TestAPIKeyManager:
         assert len(manager.deepseek_keys) <= 8  # Up to 8 keys
         assert len(manager.perplexity_keys) <= 8
         assert all(k.agent_type == AgentType.DEEPSEEK for k in manager.deepseek_keys)
-        assert all(
-            k.agent_type == AgentType.PERPLEXITY for k in manager.perplexity_keys
-        )
+        assert all(k.agent_type == AgentType.PERPLEXITY for k in manager.perplexity_keys)
 
     @pytest.mark.asyncio
     @patch("backend.security.key_manager.KeyManager")
@@ -292,9 +288,7 @@ class TestAPIKeyManager:
             APIKey("key2", AgentType.DEEPSEEK, 1, is_active=True, error_count=0),
         ]
 
-        with patch(
-            "backend.agents.unified_agent_interface.random.choices"
-        ) as mock_choices:
+        with patch("backend.agents.api_key_pool.random.choices") as mock_choices:
             mock_choices.return_value = [manager.deepseek_keys[1]]
             key = await manager.get_active_key(AgentType.DEEPSEEK)
 
@@ -314,9 +308,7 @@ class TestAPIKeyManager:
             APIKey("pk1", AgentType.PERPLEXITY, 0, is_active=True),
         ]
 
-        with patch(
-            "backend.agents.unified_agent_interface.random.choices"
-        ) as mock_choices:
+        with patch("backend.agents.api_key_pool.random.choices") as mock_choices:
             mock_choices.return_value = [manager.perplexity_keys[0]]
             key = await manager.get_active_key(AgentType.PERPLEXITY)
 
@@ -355,9 +347,7 @@ class TestAPIKeyManager:
             APIKey("key3", AgentType.DEEPSEEK, 2, error_count=1, requests_count=5),
         ]
 
-        with patch(
-            "backend.agents.unified_agent_interface.random.choices"
-        ) as mock_choices:
+        with patch("backend.agents.api_key_pool.random.choices") as mock_choices:
             mock_choices.return_value = [manager.deepseek_keys[2]]
             key = await manager.get_active_key(AgentType.DEEPSEEK)
 
@@ -611,9 +601,7 @@ class TestUnifiedAgentInterfaceRequests:
         mock_km.get_active_key = AsyncMock(return_value=None)  # No keys, will fail
 
         interface = UnifiedAgentInterface()
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
         await interface.send_request(request)
 
@@ -631,13 +619,9 @@ class TestUnifiedAgentInterfaceRequests:
         interface.mcp_available = True
         interface.mcp_disabled = False  # Ensure MCP is not disabled
 
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
-        with patch.object(
-            interface, "_try_mcp", new_callable=AsyncMock
-        ) as mock_try_mcp:
+        with patch.object(interface, "_try_mcp", new_callable=AsyncMock) as mock_try_mcp:
             mock_try_mcp.return_value = AgentResponse(
                 success=True, content="MCP result", channel=AgentChannel.MCP_SERVER
             )
@@ -660,13 +644,12 @@ class TestUnifiedAgentInterfaceRequests:
         interface.mcp_available = True
         interface.mcp_disabled = False  # Ensure MCP is not disabled
 
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
-        with patch.object(interface, "_try_mcp", new_callable=AsyncMock) as mock_mcp, patch.object(
-            interface, "_try_direct_api", new_callable=AsyncMock
-        ) as mock_direct:
+        with (
+            patch.object(interface, "_try_mcp", new_callable=AsyncMock) as mock_mcp,
+            patch.object(interface, "_try_direct_api", new_callable=AsyncMock) as mock_direct,
+        ):
             mock_mcp.return_value = AgentResponse(
                 success=False,
                 content="",
@@ -679,9 +662,7 @@ class TestUnifiedAgentInterfaceRequests:
                 channel=AgentChannel.DIRECT_API,
             )
 
-            response = await interface.send_request(
-                request, AgentChannel.MCP_SERVER
-            )
+            response = await interface.send_request(request, AgentChannel.MCP_SERVER)
 
             assert mock_mcp.called
             assert mock_direct.called
@@ -701,18 +682,19 @@ class TestUnifiedAgentInterfaceRequests:
         interface.mcp_available = True
         interface.mcp_disabled = False  # Ensure MCP is not disabled
 
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
-        with patch.object(interface, "_try_mcp", side_effect=Exception("MCP crash")), patch.object(
-            interface,
-            "_try_direct_api",
-            new_callable=AsyncMock,
-            return_value=AgentResponse(
-                success=True,
-                content="Fallback success",
-                channel=AgentChannel.DIRECT_API,
+        with (
+            patch.object(interface, "_try_mcp", side_effect=Exception("MCP crash")),
+            patch.object(
+                interface,
+                "_try_direct_api",
+                new_callable=AsyncMock,
+                return_value=AgentResponse(
+                    success=True,
+                    content="Fallback success",
+                    channel=AgentChannel.DIRECT_API,
+                ),
             ),
         ):
             response = await interface.send_request(request)
@@ -731,13 +713,9 @@ class TestUnifiedAgentInterfaceRequests:
 
         interface = UnifiedAgentInterface()
 
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
-        with patch.object(
-            interface, "_try_direct_api", side_effect=Exception("API crash")
-        ):
+        with patch.object(interface, "_try_direct_api", side_effect=Exception("API crash")):
             response = await interface.send_request(request)
 
             assert response.success is False
@@ -755,13 +733,9 @@ class TestUnifiedAgentInterfaceRequests:
         interface = UnifiedAgentInterface(force_direct_api=False)
         interface.mcp_disabled = False  # Ensure MCP is not disabled
 
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
-        with patch.object(
-            interface.circuit_manager, "call_with_breaker", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(interface.circuit_manager, "call_with_breaker", new_callable=AsyncMock) as mock_call:
             mock_call.side_effect = CircuitBreakerError("open")
             response = await interface._try_mcp(request)
 
@@ -781,9 +755,7 @@ class TestUnifiedAgentInterfaceRequests:
 
         # Setup httpx mock
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "API response"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "API response"}}]}
         mock_response.raise_for_status = MagicMock()
 
         mock_client = MagicMock()
@@ -793,9 +765,7 @@ class TestUnifiedAgentInterfaceRequests:
         mock_client_class.return_value = mock_client
 
         interface = UnifiedAgentInterface()
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
         response = await interface._try_direct_api(request)
 
@@ -815,9 +785,7 @@ class TestUnifiedAgentInterfaceRequests:
         interface.key_manager.deepseek_keys = []  # Empty keys
         interface.key_manager.perplexity_keys = []
 
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
         response = await interface._try_direct_api(request)
 
@@ -827,9 +795,7 @@ class TestUnifiedAgentInterfaceRequests:
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")
     @patch("backend.security.key_manager.KeyManager")
-    async def test_try_direct_api_http_error_tries_backup(
-        self, mock_km_class, mock_client_class
-    ):
+    async def test_try_direct_api_http_error_tries_backup(self, mock_km_class, mock_client_class):
         """_try_direct_api tries backup key on HTTP error"""
         mock_km = MagicMock()
         mock_km_class.return_value = mock_km
@@ -848,17 +814,13 @@ class TestUnifiedAgentInterfaceRequests:
 
         mock_client = MagicMock()
         mock_client.post = AsyncMock(
-            side_effect=httpx.HTTPStatusError(
-                "429", request=MagicMock(), response=mock_response
-            )
+            side_effect=httpx.HTTPStatusError("429", request=MagicMock(), response=mock_response)
         )
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
         mock_client_class.return_value = mock_client
 
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
         await interface._try_direct_api(request)
 
@@ -868,9 +830,7 @@ class TestUnifiedAgentInterfaceRequests:
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")
     @patch("backend.security.key_manager.KeyManager")
-    async def test_try_direct_api_generic_exception(
-        self, mock_km_class, mock_client_class
-    ):
+    async def test_try_direct_api_generic_exception(self, mock_km_class, mock_client_class):
         """_try_direct_api handles generic exception"""
         mock_km = MagicMock()
         mock_km_class.return_value = mock_km
@@ -888,9 +848,7 @@ class TestUnifiedAgentInterfaceRequests:
         mock_client.__aexit__ = AsyncMock(return_value=None)
         mock_client_class.return_value = mock_client
 
-        request = AgentRequest(
-            agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test"
-        )
+        request = AgentRequest(agent_type=AgentType.DEEPSEEK, task_type="test", prompt="test")
 
         response = await interface._try_direct_api(request)
 
@@ -982,9 +940,7 @@ class TestConvenienceFunctions:
         """analyze_with_deepseek creates correct request"""
         mock_interface = MagicMock()
         mock_interface.send_request = AsyncMock(
-            return_value=AgentResponse(
-                success=True, content="Analysis", channel=AgentChannel.DIRECT_API
-            )
+            return_value=AgentResponse(success=True, content="Analysis", channel=AgentChannel.DIRECT_API)
         )
         mock_get_interface.return_value = mock_interface
 
@@ -1003,9 +959,7 @@ class TestConvenienceFunctions:
         """ask_perplexity creates correct request"""
         mock_interface = MagicMock()
         mock_interface.send_request = AsyncMock(
-            return_value=AgentResponse(
-                success=True, content="Answer", channel=AgentChannel.DIRECT_API
-            )
+            return_value=AgentResponse(success=True, content="Answer", channel=AgentChannel.DIRECT_API)
         )
         mock_get_interface.return_value = mock_interface
 
@@ -1029,9 +983,7 @@ class TestIntegration:
     @pytest.mark.asyncio
     @patch("backend.agents.unified_agent_interface.APIKeyManager")
     @patch("httpx.AsyncClient")
-    async def test_full_workflow_deepseek_analysis(
-        self, mock_client_class, mock_km_class
-    ):
+    async def test_full_workflow_deepseek_analysis(self, mock_client_class, mock_km_class):
         """Full workflow: DeepSeek code analysis"""
         # Setup key manager
         mock_km = MagicMock()
@@ -1043,9 +995,7 @@ class TestIntegration:
 
         # Setup HTTP mock
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "No issues found"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "No issues found"}}]}
         mock_response.raise_for_status = MagicMock()
 
         mock_client = MagicMock()

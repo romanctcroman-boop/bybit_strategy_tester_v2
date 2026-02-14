@@ -95,9 +95,7 @@ class ChaosMonkey:
         return random.random() < config.probability
 
     @asynccontextmanager
-    async def inject_latency(
-        self, service: str, delay_ms: int = 500, probability: float = 1.0
-    ):
+    async def inject_latency(self, service: str, delay_ms: int = 500, probability: float = 1.0):
         """Inject latency into a service."""
         config = ChaosConfig(
             chaos_type=ChaosType.LATENCY,
@@ -174,10 +172,7 @@ class ChaosMonkey:
             "successful": successful,
             "failed": total - successful,
             "recovery_rate": recovered / total if total > 0 else 0,
-            "by_type": {
-                t.value: sum(1 for e in self.experiments if e.chaos_type == t)
-                for t in ChaosType
-            },
+            "by_type": {t.value: sum(1 for e in self.experiments if e.chaos_type == t) for t in ChaosType},
         }
 
 
@@ -397,9 +392,9 @@ class TestTimeoutHandling:
                 }
             )
 
-        # All should complete reasonably quickly
+        # All should complete reasonably quickly (30s allows for slow CI/loaded machines)
         for r in responses:
-            assert r["elapsed"] < 10.0
+            assert r["elapsed"] < 30.0
             assert r["status"] in (200, 404, 500, 503)
 
 

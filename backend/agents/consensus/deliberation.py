@@ -271,6 +271,14 @@ MAINTAINED_POINTS: [Points you stand by]
 
         self.deliberation_history: list[DeliberationResult] = []
 
+        # Adaptive agent accuracy weights — tracks historical accuracy per agent
+        # Updated via record_outcome() after validating deliberation decisions
+        self.agent_accuracy: dict[str, dict[str, float]] = {}
+        # Structure: {"deepseek": {"correct": 5, "total": 8, "weight": 1.25}, ...}
+
+        # Decision chain audit log — full traceability of intermediate steps
+        self.audit_log: list[dict[str, Any]] = []
+
         # Statistics
         self.stats = {
             "total_deliberations": 0,
@@ -337,6 +345,18 @@ MAINTAINED_POINTS: [Points you stand by]
 
         logger.info(f"🎭 Starting deliberation: {question[:50]}... ({len(agents)} agents)")
 
+        self._audit_event(
+            "deliberation_start",
+            {
+                "id": deliberation_id,
+                "question": question[:200],
+                "agents": agents,
+                "voting_strategy": voting_strategy.value,
+                "max_rounds": max_rounds,
+                "agent_weights": {a: round(self._get_agent_weight(a), 3) for a in agents},
+            },
+        )
+
         for round_num in range(1, max_rounds + 1):
             logger.debug(f"📍 Round {round_num}/{max_rounds}")
 
@@ -354,6 +374,23 @@ MAINTAINED_POINTS: [Points you stand by]
             # Calculate convergence
             convergence = self._calculate_convergence(current_opinions)
             consensus_emerging = convergence >= convergence_threshold
+
+            # Audit: log each round
+            self._audit_event(
+                "round_complete",
+                {
+                    "id": deliberation_id,
+                    "round": round_num,
+                    "phase": "initial" if round_num == 1 else "refinement",
+                    "positions": [
+                        {"agent": o.agent_type, "position": o.position[:80], "confidence": round(o.confidence, 3)}
+                        for o in current_opinions
+                    ],
+                    "critiques_count": len(critiques),
+                    "convergence": round(convergence, 3),
+                    "consensus_emerging": consensus_emerging,
+                },
+            )
 
             round_result = DeliberationRound(
                 round_number=round_num,
@@ -397,6 +434,20 @@ MAINTAINED_POINTS: [Points you stand by]
 
         self.deliberation_history.append(result)
         self._update_stats(result)
+
+        # Audit: log final result
+        self._audit_event(
+            "deliberation_complete",
+            {
+                "id": deliberation_id,
+                "decision": decision[:200],
+                "confidence": round(confidence, 4),
+                "rounds_used": len(rounds),
+                "dissenting_count": len(dissenting),
+                "duration_seconds": round(duration, 2),
+                "voting_strategy": voting_strategy.value,
+            },
+        )
 
         logger.info(
             f"🎭 Deliberation complete: decision='{decision[:50]}...', "
@@ -571,14 +622,15 @@ MAINTAINED_POINTS: [Points you stand by]
         opinions: list[AgentVote],
     ) -> tuple[str, float, list[AgentVote]]:
         """
-        Confidence-weighted voting with evidence scoring.
+        Confidence-weighted voting with evidence scoring and adaptive agent weights.
 
         Combines:
         - Agent confidence (calibrated if enabled)
         - Evidence quality weighting
+        - Adaptive accuracy weight per agent (historical performance)
         - Number of supporting agents
         """
-        # Group by position with confidence + evidence weighting
+        # Group by position with confidence + evidence + accuracy weighting
         position_weights: dict[str, float] = {}
         position_examples: dict[str, str] = {}
 
@@ -594,10 +646,12 @@ MAINTAINED_POINTS: [Points you stand by]
             # Calibrate confidence if enabled
             calibrated_conf = self.calibrate_confidence(op.confidence)
 
-            # Combine confidence with evidence weight
-            # Base: calibrated confidence, boosted by evidence
+            # Get adaptive accuracy weight for this agent (default 1.0)
+            accuracy_weight = self._get_agent_weight(op.agent_type)
+
+            # Combine: confidence * accuracy_weight, boosted by evidence
             evidence_boost = evidence_scores.get(key, 0.0) / max(len(opinions), 1)
-            combined_weight = calibrated_conf * 0.7 + evidence_boost * 0.3
+            combined_weight = (calibrated_conf * accuracy_weight) * 0.7 + evidence_boost * 0.3
 
             position_weights[key] += combined_weight
 
@@ -608,6 +662,19 @@ MAINTAINED_POINTS: [Points you stand by]
         total_weight = sum(position_weights.values())
         confidence = position_weights[winner_key] / total_weight if total_weight > 0 else 0
 
+        # Audit: log adaptive weights used
+        self._audit_event(
+            "weighted_vote",
+            {
+                "position_weights": {k: round(v, 4) for k, v in position_weights.items()},
+                "agent_accuracy_weights": {
+                    op.agent_type: round(self._get_agent_weight(op.agent_type), 3) for op in opinions
+                },
+                "winner": decision[:100],
+                "confidence": round(confidence, 4),
+            },
+        )
+
         return decision, confidence, opinions
 
     def _unanimous_vote(
@@ -615,7 +682,7 @@ MAINTAINED_POINTS: [Points you stand by]
         opinions: list[AgentVote],
     ) -> tuple[str, float, list[AgentVote]]:
         """Unanimous voting - all must agree"""
-        positions = set(op.position.lower().strip()[:100] for op in opinions)
+        positions = {op.position.lower().strip()[:100] for op in opinions}
 
         if len(positions) == 1:
             decision = opinions[0].position
@@ -639,7 +706,7 @@ MAINTAINED_POINTS: [Points you stand by]
 
         threshold = len(opinions) * 2 / 3
 
-        for key, votes in position_counts.items():
+        for _key, votes in position_counts.items():
             if len(votes) >= threshold:
                 decision = votes[0].position
                 confidence = len(votes) / len(opinions)
@@ -718,9 +785,14 @@ MAINTAINED_POINTS: [Points you stand by]
         if self.agent_interface:
             try:
                 from backend.agents.models import AgentType
-                from backend.agents.unified_agent_interface import AgentRequest
+                from backend.agents.request_models import AgentRequest
 
-                at = AgentType.DEEPSEEK if "deepseek" in agent_type.lower() else AgentType.PERPLEXITY
+                agent_type_map = {
+                    "deepseek": AgentType.DEEPSEEK,
+                    "qwen": AgentType.QWEN,
+                    "perplexity": AgentType.PERPLEXITY,
+                }
+                at = agent_type_map.get(agent_type.lower(), AgentType.DEEPSEEK)
                 request = AgentRequest(
                     task_type="deliberation",
                     agent_type=at,
@@ -833,6 +905,165 @@ MAINTAINED_POINTS: Trailing mechanism is superior for trend capture
             suggested_improvements=improvements,
             confidence_adjustment=max(-0.5, min(0.5, confidence_adj)),
         )
+
+    # ── Adaptive Agent Accuracy Weights ─────────────────────────────────
+
+    def _get_agent_weight(self, agent_type: str) -> float:
+        """
+        Get adaptive accuracy weight for an agent.
+
+        Agents with higher historical accuracy get proportionally
+        more influence in weighted voting.
+
+        Weight formula: 0.5 + (accuracy_ratio * 1.0)
+          - 0% accuracy -> 0.5 (still has some voice)
+          - 50% accuracy -> 1.0 (neutral)
+          - 100% accuracy -> 1.5 (max boost)
+
+        New agents with no history default to 1.0.
+
+        Args:
+            agent_type: Agent identifier (e.g. 'deepseek', 'qwen')
+
+        Returns:
+            Weight multiplier (0.5 to 1.5)
+        """
+        key = agent_type.lower().strip()
+        if key not in self.agent_accuracy:
+            return 1.0  # Default — no history
+
+        stats = self.agent_accuracy[key]
+        total = stats.get("total", 0)
+        if total == 0:
+            return 1.0
+
+        accuracy = stats.get("correct", 0) / total
+        # Map [0, 1] accuracy to [0.5, 1.5] weight
+        weight = 0.5 + accuracy
+        stats["weight"] = round(weight, 3)
+        return weight
+
+    def record_outcome(
+        self,
+        deliberation_id: str,
+        actual_outcome: str,
+        winning_agents: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Record the actual outcome of a deliberation to update agent accuracy.
+
+        Call this after a deliberation decision has been validated
+        (e.g., after a trade result is known).
+
+        Args:
+            deliberation_id: ID of the deliberation (from DeliberationResult.id)
+            actual_outcome: What actually happened
+            winning_agents: List of agents whose position matched the outcome.
+                            If None, auto-detect from deliberation history.
+
+        Returns:
+            Updated accuracy stats for all participating agents
+        """
+        # Find the deliberation in history
+        delib = None
+        for d in self.deliberation_history:
+            if d.id == deliberation_id:
+                delib = d
+                break
+
+        if not delib:
+            logger.warning(f"Deliberation {deliberation_id} not found in history")
+            return {}
+
+        # Auto-detect winning agents if not provided
+        if winning_agents is None:
+            outcome_lower = actual_outcome.lower().strip()[:100]
+            winning_agents = [
+                v.agent_type for v in delib.final_votes if v.position.lower().strip()[:100] == outcome_lower
+            ]
+
+        # Update accuracy for all participants
+        all_agents = {v.agent_type for v in delib.final_votes}
+        updates = {}
+
+        for agent in all_agents:
+            key = agent.lower().strip()
+            if key not in self.agent_accuracy:
+                self.agent_accuracy[key] = {"correct": 0, "total": 0, "weight": 1.0}
+
+            self.agent_accuracy[key]["total"] += 1
+            if agent in winning_agents:
+                self.agent_accuracy[key]["correct"] += 1
+
+            # Recalculate weight
+            total = self.agent_accuracy[key]["total"]
+            correct = self.agent_accuracy[key]["correct"]
+            self.agent_accuracy[key]["weight"] = round(0.5 + (correct / total), 3)
+            updates[key] = dict(self.agent_accuracy[key])
+
+        self._audit_event(
+            "outcome_recorded",
+            {
+                "deliberation_id": deliberation_id,
+                "actual_outcome": actual_outcome[:200],
+                "winning_agents": winning_agents,
+                "updated_weights": {k: v["weight"] for k, v in updates.items()},
+            },
+        )
+
+        logger.info(
+            f"📊 Outcome recorded for {deliberation_id}: "
+            f"winners={winning_agents}, weights={ {k: v['weight'] for k, v in updates.items()} }"
+        )
+
+        return updates
+
+    # ── Decision Chain Audit Logging ────────────────────────────────────
+
+    def _audit_event(self, event_type: str, data: dict[str, Any]) -> None:
+        """
+        Record an audit event for decision chain traceability.
+
+        All intermediate steps of deliberation are logged with timestamps
+        for post-hoc analysis and debugging.
+
+        Args:
+            event_type: Type of event (e.g. 'weighted_vote', 'outcome_recorded')
+            data: Event payload
+        """
+        event = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "event": event_type,
+            "data": data,
+        }
+        self.audit_log.append(event)
+        logger.debug(f"📝 Audit [{event_type}]: {json.dumps(data, default=str)[:300]}")
+
+    def get_audit_log(self, last_n: int | None = None) -> list[dict[str, Any]]:
+        """
+        Get decision chain audit log.
+
+        Args:
+            last_n: Return only last N entries. None = all.
+
+        Returns:
+            List of audit events with timestamps
+        """
+        if last_n is not None:
+            return self.audit_log[-last_n:]
+        return list(self.audit_log)
+
+    def get_agent_accuracy_report(self) -> dict[str, Any]:
+        """
+        Get summary of adaptive accuracy weights for all agents.
+
+        Returns:
+            Dict with per-agent accuracy stats and current weights
+        """
+        return {
+            "agents": dict(self.agent_accuracy),
+            "total_outcomes_recorded": sum(v.get("total", 0) for v in self.agent_accuracy.values()),
+        }
 
     def _update_stats(self, result: DeliberationResult) -> None:
         """Update statistics"""

@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
+    <title>AI Pipeline - Bybit Strategy Tester v2</title>
+    <link rel="icon" href="/frontend/favicon.ico" type="image/x-icon" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
+      integrity="sha384-4LISF5TTJX/fLmGSxO53rV4miRxdg84mZsxmO8Rx5jGtp/LbrixFETvWa5a6sESd"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="./css/variables.css" />
+    <link rel="stylesheet" href="./css/components.css" />
+    <link rel="stylesheet" href="./css/common.css" />
+    <link rel="stylesheet" href="./css/ai_pipeline.css" />
+    <script src="js/core/auto-event-binding.js"></script>
+  </head>
+  <body>
+    <div class="pipeline-page">
+      <!-- Header -->
+      <header class="pipeline-header">
+        <div class="breadcrumb-wrapper">
+          <a href="dashboard.html" class="breadcrumb-link">🏠 Dashboard</a>
+        </div>
+        <h1>🤖 AI Strategy Pipeline</h1>
+        <p>Generate • Backtest • Optimize — powered by LLM agents</p>
+      </header>
+
+      <!-- Configuration Panel -->
+      <section class="config-panel">
+        <h2><i class="bi bi-gear"></i> Pipeline Configuration</h2>
+
+        <div class="config-grid">
+          <div class="form-group">
+            <label for="symbol">Symbol</label>
+            <select id="symbol">
+              <option value="BTCUSDT" selected>BTCUSDT</option>
+              <option value="ETHUSDT">ETHUSDT</option>
+              <option value="SOLUSDT">SOLUSDT</option>
+              <option value="XRPUSDT">XRPUSDT</option>
+              <option value="BNBUSDT">BNBUSDT</option>
+              <option value="DOGEUSDT">DOGEUSDT</option>
+              <option value="ADAUSDT">ADAUSDT</option>
+              <option value="AVAXUSDT">AVAXUSDT</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="timeframe">Timeframe</label>
+            <select id="timeframe">
+              <option value="1">1m</option>
+              <option value="5">5m</option>
+              <option value="15" selected>15m</option>
+              <option value="30">30m</option>
+              <option value="60">1h</option>
+              <option value="240">4h</option>
+              <option value="D">1D</option>
+              <option value="W">1W</option>
+              <option value="M">1M</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="startDate">Start Date</label>
+            <input type="date" id="startDate" value="2025-01-01" />
+          </div>
+
+          <div class="form-group">
+            <label for="endDate">End Date</label>
+            <input type="date" id="endDate" value="2025-06-01" />
+          </div>
+
+          <div class="form-group">
+            <label for="initialCapital">Initial Capital ($)</label>
+            <input
+              type="number"
+              id="initialCapital"
+              value="10000"
+              min="100"
+              max="100000000"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="leverage">Leverage</label>
+            <select id="leverage">
+              <option value="1">1x</option>
+              <option value="3">3x</option>
+              <option value="5">5x</option>
+              <option value="10" selected>10x</option>
+              <option value="25">25x</option>
+              <option value="50">50x</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Agent Selection -->
+        <div class="agent-section">
+          <label class="agent-section-label"> Select AI Agents </label>
+          <div class="agent-chips" id="agentChips">
+            <div
+              class="agent-chip selected"
+              data-agent="deepseek"
+              onclick="toggleAgent(this)"
+            >
+              <span class="agent-icon">🧠</span>
+              <span>DeepSeek</span>
+              <span class="agent-chip-subtitle">Quantitative</span>
+            </div>
+            <div
+              class="agent-chip"
+              data-agent="qwen"
+              onclick="toggleAgent(this)"
+            >
+              <span class="agent-icon">🔬</span>
+              <span>Qwen</span>
+              <span class="agent-chip-subtitle">Technical</span>
+            </div>
+            <div
+              class="agent-chip"
+              data-agent="perplexity"
+              onclick="toggleAgent(this)"
+            >
+              <span class="agent-icon">🌐</span>
+              <span>Perplexity</span>
+              <span class="agent-chip-subtitle">Research</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent Health Panel -->
+        <div class="agent-health-panel" id="agentHealthPanel">
+          <div class="health-header" onclick="toggleHealthPanel()">
+            <span>🔑 Agent Health & Accuracy</span>
+            <span class="health-toggle-icon" id="healthToggleIcon">▼</span>
+          </div>
+          <div class="health-content hidden" id="healthContent">
+            <div class="health-grid" id="healthGrid">
+              <div class="health-card" data-provider="deepseek">
+                <div class="health-provider">🧠 DeepSeek</div>
+                <div class="health-status" id="deepseekStatus">
+                  ⏳ Checking...
+                </div>
+                <div class="health-weight" id="deepseekWeight">Weight: 1.0</div>
+              </div>
+              <div class="health-card" data-provider="qwen">
+                <div class="health-provider">🔬 Qwen</div>
+                <div class="health-status" id="qwenStatus">⏳ Checking...</div>
+                <div class="health-weight" id="qwenWeight">Weight: 1.0</div>
+              </div>
+              <div class="health-card" data-provider="perplexity">
+                <div class="health-provider">🌐 Perplexity</div>
+                <div class="health-status" id="perplexityStatus">
+                  ⏳ Checking...
+                </div>
+                <div class="health-weight" id="perplexityWeight">
+                  Weight: 1.0
+                </div>
+              </div>
+            </div>
+            <div class="health-actions">
+              <button class="btn-sm" onclick="runPreflight()">
+                🔄 Re-check Keys
+              </button>
+              <button class="btn-sm" onclick="loadAuditLog()">
+                📝 Audit Log
+              </button>
+              <button class="btn-sm" onclick="loadDeliberationHistory()">
+                📊 History
+              </button>
+            </div>
+            <!-- Audit Log Expandable -->
+            <div class="audit-log-container hidden" id="auditLogContainer">
+              <h4 class="expandable-heading">📝 Decision Chain Audit Log</h4>
+              <div class="audit-log-entries" id="auditLogEntries"></div>
+            </div>
+            <!-- Deliberation History Expandable -->
+            <div
+              class="deliberation-history-container hidden"
+              id="deliberationHistoryContainer"
+            >
+              <h4 class="expandable-heading">📊 Recent Deliberations</h4>
+              <div
+                class="deliberation-history-entries"
+                id="deliberationHistoryEntries"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Options -->
+        <div class="options-row">
+          <label class="toggle-option">
+            <input type="checkbox" id="runBacktest" checked />
+            <span>Run Backtest</span>
+          </label>
+          <label class="toggle-option">
+            <input type="checkbox" id="walkForward" />
+            <span>Walk-Forward Validation</span>
+          </label>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions-bar">
+          <button class="btn-primary" id="btnGenerate" onclick="runPipeline()">
+            <i class="bi bi-lightning-charge"></i>
+            Generate Strategy
+          </button>
+          <button
+            class="btn-secondary"
+            id="btnAnalyze"
+            onclick="analyzeMarket()"
+          >
+            <i class="bi bi-search"></i>
+            Analyze Market
+          </button>
+          <button
+            class="btn-secondary"
+            id="btnMonitor"
+            onclick="loadMonitoring()"
+          >
+            <i class="bi bi-activity"></i>
+            Agent Monitoring
+          </button>
+        </div>
+      </section>
+
+      <!-- Progress Section -->
+      <section class="progress-section" id="progressSection">
+        <div class="progress-label" id="progressLabel">
+          Initializing pipeline...
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+        <div class="stages-list" id="stagesList"></div>
+      </section>
+
+      <!-- Results Section -->
+      <section class="results-section" id="resultsSection">
+        <!-- Strategy Result -->
+        <div class="result-card hidden" id="strategyCard">
+          <h3><i class="bi bi-lightbulb"></i> Generated Strategy</h3>
+          <div class="strategy-info" id="strategyInfo"></div>
+        </div>
+
+        <!-- Backtest Metrics -->
+        <div class="result-card hidden" id="metricsCard">
+          <h3><i class="bi bi-bar-chart-line"></i> Backtest Metrics</h3>
+          <div class="metrics-grid" id="metricsGrid"></div>
+        </div>
+
+        <!-- Walk-Forward Results -->
+        <div class="result-card hidden" id="wfCard">
+          <h3><i class="bi bi-arrow-repeat"></i> Walk-Forward Validation</h3>
+          <div class="wf-summary" id="wfSummary"></div>
+        </div>
+
+        <!-- Consensus / Details -->
+        <div class="result-card hidden" id="consensusCard">
+          <h3><i class="bi bi-people"></i> Consensus Summary</h3>
+          <div class="consensus-box" id="consensusBox"></div>
+        </div>
+
+        <!-- Stages Timeline -->
+        <div class="result-card hidden" id="stagesCard">
+          <h3><i class="bi bi-list-check"></i> Pipeline Stages</h3>
+          <div class="stages-timeline" id="stagesTimeline"></div>
+        </div>
+      </section>
+
+      <!-- Market Analysis Result -->
+      <section class="results-section" id="marketAnalysisSection">
+        <div class="result-card hidden" id="marketCard">
+          <h3><i class="bi bi-graph-up-arrow"></i> Market Analysis</h3>
+          <div class="strategy-info" id="marketInfo"></div>
+          <div class="consensus-box result-card-gap" id="marketContext"></div>
+        </div>
+      </section>
+
+      <!-- Monitoring Section -->
+      <section class="monitor-section" id="monitorSection">
+        <h3><i class="bi bi-activity"></i> Agent Monitoring</h3>
+        <div class="monitor-grid" id="monitorGrid"></div>
+        <div class="alerts-list" id="alertsList"></div>
+      </section>
+    </div>
+
+    <script src="./js/pages/ai_pipeline.js"></script>
+  </body>
+</html>

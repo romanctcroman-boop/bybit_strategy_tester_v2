@@ -1,15 +1,15 @@
 """
-🎯 Pydantic Models для Agent System
+🎯 Pydantic Models for Agent System
 
-Стандартизированные модели для валидации и сериализации данных
-в системе межагентной коммуникации.
+Standardized models for data validation and serialization
+in the inter-agent communication system.
 
 Benefits:
-- Автоматическая валидация данных
-- Type hints и автокомплиты в IDE
+- Automatic data validation
+- Type hints and IDE autocompletion
 - JSON Schema generation
 - FastAPI integration
-- Серализация/десериализация из коробки
+- Built-in serialization/deserialization
 """
 
 from datetime import datetime
@@ -26,16 +26,17 @@ from backend.utils.time import utc_now
 
 
 class AgentType(str, Enum):
-    """Типы AI агентов в системе"""
+    """AI agent types in the system"""
 
     DEEPSEEK = "deepseek"
     PERPLEXITY = "perplexity"
+    QWEN = "qwen"
     COPILOT = "copilot"
     ORCHESTRATOR = "orchestrator"
 
 
 class AgentChannel(str, Enum):
-    """Каналы связи с агентами"""
+    """Agent communication channels"""
 
     MCP_SERVER = "mcp_server"
     DIRECT_API = "direct_api"
@@ -43,7 +44,7 @@ class AgentChannel(str, Enum):
 
 
 class MessageType(str, Enum):
-    """Типы сообщений между агентами"""
+    """Message types between agents"""
 
     QUERY = "query"
     RESPONSE = "response"
@@ -54,7 +55,7 @@ class MessageType(str, Enum):
 
 
 class CommunicationPattern(str, Enum):
-    """Паттерны коммуникации между агентами"""
+    """Communication patterns between agents"""
 
     SEQUENTIAL = "sequential"
     PARALLEL = "parallel"
@@ -64,7 +65,7 @@ class CommunicationPattern(str, Enum):
 
 
 class TaskType(str, Enum):
-    """Типы задач для AI агентов"""
+    """Task types for AI agents"""
 
     CODE_GENERATION = "code_generation"
     CODE_REVIEW = "code_review"
@@ -83,7 +84,7 @@ class TaskType(str, Enum):
 
 class AgentTask(BaseModel):
     """
-    Задача для AI агента
+    Task for an AI agent
 
     Examples:
         >>> task = AgentTask(
@@ -95,18 +96,16 @@ class AgentTask(BaseModel):
 
     model_config = ConfigDict(use_enum_values=False)
 
-    task_type: TaskType = Field(..., description="Тип задачи")
+    task_type: TaskType = Field(..., description="Task type")
     instruction: str = Field(
         ...,
-        description="Инструкция для выполнения задачи",
+        description="Instruction for task execution",
         min_length=1,
         max_length=5000,
     )
-    context: dict[str, Any] = Field(
-        default_factory=dict, description="Контекст для задачи"
-    )
-    priority: int = Field(default=5, ge=1, le=10, description="Приоритет задачи (1-10)")
-    timeout: float = Field(default=120.0, gt=0, description="Таймаут в секундах")
+    context: dict[str, Any] = Field(default_factory=dict, description="Task context")
+    priority: int = Field(default=5, ge=1, le=10, description="Task priority (1-10)")
+    timeout: float = Field(default=120.0, gt=0, description="Timeout in seconds")
 
 
 # =============================================================================
@@ -116,7 +115,7 @@ class AgentTask(BaseModel):
 
 class AgentRequest(BaseModel):
     """
-    Унифицированный запрос к агенту
+    Unified request to an agent
 
     Examples:
         >>> request = AgentRequest(
@@ -129,27 +128,21 @@ class AgentRequest(BaseModel):
 
     model_config = ConfigDict(use_enum_values=False)
 
-    agent_type: AgentType = Field(..., description="Тип целевого агента")
+    agent_type: AgentType = Field(..., description="Target agent type")
     task_type: str = Field(
         ...,
-        description="Тип задачи: analyze, fix, explain, generate, etc.",
+        description="Task type: analyze, fix, explain, generate, etc.",
         min_length=1,
         max_length=50,
     )
-    prompt: str = Field(
-        ..., description="Текст запроса к агенту", min_length=1, max_length=10000
-    )
-    code: str | None = Field(
-        None, description="Код для анализа (опционально)", max_length=50000
-    )
-    context: dict[str, Any] = Field(
-        default_factory=dict, description="Дополнительный контекст запроса"
-    )
+    prompt: str = Field(..., description="Request text for the agent", min_length=1, max_length=10000)
+    code: str | None = Field(None, description="Code for analysis (optional)", max_length=50000)
+    context: dict[str, Any] = Field(default_factory=dict, description="Additional request context")
 
     @field_validator("task_type")
     @classmethod
     def validate_task_type(cls, v: str) -> str:
-        """Валидация допустимых типов задач"""
+        """Validate allowed task types"""
         allowed = {
             "analyze",
             "fix",
@@ -167,7 +160,7 @@ class AgentRequest(BaseModel):
         return v.lower()
 
     def to_mcp_format(self) -> dict[str, Any]:
-        """Преобразовать в формат MCP tool"""
+        """Convert to MCP tool format"""
         return {
             "strategy_code": self.code or self.prompt,
             "include_suggestions": True,
@@ -175,17 +168,14 @@ class AgentRequest(BaseModel):
         }
 
     def to_direct_api_format(self, include_tools: bool = True) -> dict[str, Any]:
-        """Преобразовать в формат прямого API"""
+        """Convert to direct API format"""
         if self.agent_type == AgentType.DEEPSEEK:
             payload = {
                 "model": "deepseek-chat",
                 "messages": [
                     {
                         "role": "system",
-                        "content": (
-                            "You are an expert Python developer "
-                            "analyzing trading strategies."
-                        ),
+                        "content": ("You are an expert Python developer analyzing trading strategies."),
                     },
                     {"role": "user", "content": self._build_prompt()},
                 ],
@@ -213,7 +203,7 @@ class AgentRequest(BaseModel):
             }
 
     def _build_prompt(self) -> str:
-        """Построить полный prompt с защитой от prompt injection.
+        """Build complete prompt with prompt injection protection.
 
         SECURITY: Implements Phase 1 MEDIUM vulnerability fix (prompt injection sanitization).
         Phase 2: Applies external config limits from agents.yaml if present.
@@ -235,9 +225,7 @@ class AgentRequest(BaseModel):
             if not text:
                 return text
             for pattern in UNSAFE_PATTERNS:
-                new = re.sub(
-                    pattern, "[REDACTED_UNSAFE_PATTERN]", text, flags=re.IGNORECASE
-                )
+                new = re.sub(pattern, "[REDACTED_UNSAFE_PATTERN]", text, flags=re.IGNORECASE)
                 text = new
             return text
 
@@ -246,9 +234,7 @@ class AgentRequest(BaseModel):
             parts.append(f"\n\nCode to analyze:\n```python\n{self.code}\n```")
         if self.context:
             safe_context = {
-                sanitize(str(k)): sanitize(str(v))
-                if not isinstance(v, (dict, list))
-                else v
+                sanitize(str(k)): sanitize(str(v)) if not isinstance(v, (dict, list)) else v
                 for k, v in self.context.items()
             }
             parts.append(f"\n\nContext: {json.dumps(safe_context, indent=2)}")
@@ -274,7 +260,7 @@ class AgentRequest(BaseModel):
 
     @staticmethod
     def _get_mcp_tools_definition() -> list[dict[str, Any]]:
-        """MCP file access tools для DeepSeek"""
+        """MCP file access tools for DeepSeek"""
         return [
             {
                 "type": "function",
@@ -303,7 +289,7 @@ class AgentRequest(BaseModel):
 
 class AgentMessage(BaseModel):
     """
-    Сообщение между агентами
+    Message between agents
 
     Examples:
         >>> msg = AgentMessage(
@@ -319,28 +305,18 @@ class AgentMessage(BaseModel):
 
     model_config = ConfigDict(use_enum_values=False)
 
-    message_id: str = Field(..., description="Уникальный ID сообщения")
-    from_agent: AgentType = Field(..., description="Отправитель")
-    to_agent: AgentType = Field(..., description="Получатель")
-    message_type: MessageType = Field(..., description="Тип сообщения")
-    content: str = Field(
-        ..., min_length=1, max_length=50000, description="Содержимое сообщения"
-    )
-    context: dict[str, Any] = Field(
-        default_factory=dict, description="Контекст коммуникации"
-    )
-    conversation_id: str = Field(..., description="ID беседы")
-    iteration: int = Field(default=1, ge=1, le=100, description="Номер итерации")
-    max_iterations: int = Field(
-        default=5, ge=1, le=100, description="Максимум итераций"
-    )
-    confidence_score: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="Уверенность агента"
-    )
-    timestamp: datetime = Field(default_factory=utc_now, description="Время создания")
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Дополнительные метаданные"
-    )
+    message_id: str = Field(..., description="Unique message ID")
+    from_agent: AgentType = Field(..., description="Sender")
+    to_agent: AgentType = Field(..., description="Recipient")
+    message_type: MessageType = Field(..., description="Message type")
+    content: str = Field(..., min_length=1, max_length=50000, description="Message content")
+    context: dict[str, Any] = Field(default_factory=dict, description="Communication context")
+    conversation_id: str = Field(..., description="Conversation ID")
+    iteration: int = Field(default=1, ge=1, le=100, description="Iteration number")
+    max_iterations: int = Field(default=5, ge=1, le=100, description="Maximum iterations")
+    confidence_score: float = Field(default=0.0, ge=0.0, le=1.0, description="Agent confidence")
+    timestamp: datetime = Field(default_factory=utc_now, description="Creation time")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 # =============================================================================
@@ -350,7 +326,7 @@ class AgentMessage(BaseModel):
 
 class AgentResponse(BaseModel):
     """
-    Унифицированный ответ от агента
+    Unified response from an agent
 
     Examples:
         >>> response = AgentResponse(
@@ -363,30 +339,28 @@ class AgentResponse(BaseModel):
 
     model_config = ConfigDict(use_enum_values=False)
 
-    success: bool = Field(..., description="Успешность выполнения")
-    content: str = Field(..., description="Ответ агента")
-    channel: AgentChannel = Field(..., description="Канал коммуникации")
-    api_key_index: int | None = Field(
-        None, ge=0, le=11, description="Индекс использованного API ключа"
-    )
-    latency_ms: float = Field(default=0, ge=0, description="Задержка в миллисекундах")
-    error: str | None = Field(None, description="Описание ошибки (если есть)")
-    timestamp: datetime = Field(default_factory=utc_now, description="Время ответа")
+    success: bool = Field(..., description="Execution success")
+    content: str = Field(..., description="Agent response")
+    channel: AgentChannel = Field(..., description="Communication channel")
+    api_key_index: int | None = Field(None, ge=0, le=11, description="Index of used API key")
+    latency_ms: float = Field(default=0, ge=0, description="Latency in milliseconds")
+    error: str | None = Field(None, description="Error description (if any)")
+    timestamp: datetime = Field(default_factory=utc_now, description="Response time")
 
     @field_validator("latency_ms")
     @classmethod
     def validate_latency(cls, v: float) -> float:
-        """Валидация задержки (не может быть отрицательной или слишком большой)"""
+        """Validate latency (cannot be negative or too large)"""
         if v < 0:
             raise ValueError("latency_ms cannot be negative")
-        if v > 300000:  # 5 минут
+        if v > 300000:  # 5 minutes
             raise ValueError("latency_ms too large (>5 minutes), possible error")
         return v
 
 
 class ConsensusRequest(BaseModel):
     """
-    Запрос на получение консенсуса от нескольких агентов
+    Request for consensus from multiple agents
 
     Examples:
         >>> req = ConsensusRequest(
@@ -398,23 +372,15 @@ class ConsensusRequest(BaseModel):
 
     model_config = ConfigDict(use_enum_values=False)
 
-    question: str = Field(
-        ..., min_length=10, max_length=5000, description="Вопрос для консенсуса"
-    )
-    agents: list[AgentType] = Field(
-        ..., min_length=2, max_length=4, description="Список агентов для опроса"
-    )
-    context: dict[str, Any] = Field(
-        default_factory=dict, description="Контекст запроса"
-    )
-    require_full_consensus: bool = Field(
-        default=False, description="Требовать полного согласия всех агентов"
-    )
+    question: str = Field(..., min_length=10, max_length=5000, description="Question for consensus")
+    agents: list[AgentType] = Field(..., min_length=2, max_length=4, description="List of agents to query")
+    context: dict[str, Any] = Field(default_factory=dict, description="Request context")
+    require_full_consensus: bool = Field(default=False, description="Require full agreement of all agents")
 
     @field_validator("agents")
     @classmethod
     def validate_unique_agents(cls, v: list[AgentType]) -> list[AgentType]:
-        """Проверка уникальности агентов"""
+        """Check agent uniqueness"""
         if len(v) != len(set(v)):
             raise ValueError("agents must be unique")
         return v
@@ -422,7 +388,7 @@ class ConsensusRequest(BaseModel):
 
 class ConsensusResponse(BaseModel):
     """
-    Ответ с консенсусом от агентов
+    Consensus response from agents
 
     Examples:
         >>> resp = ConsensusResponse(
@@ -433,20 +399,12 @@ class ConsensusResponse(BaseModel):
         ... )
     """
 
-    question: str = Field(..., description="Исходный вопрос")
-    consensus: str = Field(..., description="Консенсусный ответ")
-    individual_responses: dict[str, str] = Field(
-        ..., description="Индивидуальные ответы агентов"
-    )
-    agreement_level: float = Field(
-        ..., ge=0.0, le=1.0, description="Уровень согласованности (0-1)"
-    )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Метаданные консенсуса"
-    )
-    timestamp: datetime = Field(
-        default_factory=utc_now, description="Время формирования консенсуса"
-    )
+    question: str = Field(..., description="Original question")
+    consensus: str = Field(..., description="Consensus answer")
+    individual_responses: dict[str, str] = Field(..., description="Individual agent responses")
+    agreement_level: float = Field(..., ge=0.0, le=1.0, description="Agreement level (0-1)")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Consensus metadata")
+    timestamp: datetime = Field(default_factory=utc_now, description="Consensus formation time")
 
 
 # =============================================================================
@@ -456,7 +414,7 @@ class ConsensusResponse(BaseModel):
 
 class APIKey(BaseModel):
     """
-    API ключ с метаданными
+    API key with metadata
 
     Examples:
         >>> key = APIKey(
@@ -468,23 +426,19 @@ class APIKey(BaseModel):
 
     model_config = ConfigDict(use_enum_values=False)
 
-    value: str = Field(..., min_length=10, description="Значение API ключа")
-    agent_type: AgentType = Field(..., description="Тип агента")
-    index: int = Field(..., ge=0, le=11, description="Индекс ключа")
-    is_active: bool = Field(default=True, description="Активен ли ключ")
-    last_used: float | None = Field(
-        None, description="Timestamp последнего использования"
-    )
-    error_count: int = Field(default=0, ge=0, description="Счетчик ошибок")
-    requests_count: int = Field(default=0, ge=0, description="Счетчик запросов")
-    last_error_time: float | None = Field(
-        None, description="Timestamp последней ошибки"
-    )
+    value: str = Field(..., min_length=10, description="API key value")
+    agent_type: AgentType = Field(..., description="Agent type")
+    index: int = Field(..., ge=0, le=11, description="Key index")
+    is_active: bool = Field(default=True, description="Whether key is active")
+    last_used: float | None = Field(None, description="Last usage timestamp")
+    error_count: int = Field(default=0, ge=0, description="Error counter")
+    requests_count: int = Field(default=0, ge=0, description="Request counter")
+    last_error_time: float | None = Field(None, description="Last error timestamp")
 
     @field_validator("value")
     @classmethod
     def validate_key_format(cls, v: str) -> str:
-        """Базовая валидация формата API ключа"""
+        """Basic API key format validation"""
         if not v.startswith(("sk-", "pplx-")):
             raise ValueError("API key must start with 'sk-' or 'pplx-'")
         return v
@@ -496,7 +450,7 @@ class APIKey(BaseModel):
 
 
 class AgentStats(BaseModel):
-    """Статистика работы агента"""
+    """Agent operation statistics"""
 
     total_requests: int = Field(default=0, ge=0)
     successful_requests: int = Field(default=0, ge=0)
@@ -510,14 +464,14 @@ class AgentStats(BaseModel):
 
     @property
     def success_rate(self) -> float:
-        """Процент успешных запросов"""
+        """Percentage of successful requests"""
         if self.total_requests == 0:
             return 0.0
         return self.successful_requests / self.total_requests
 
     @property
     def mcp_preference(self) -> float:
-        """Процент использования MCP vs Direct API"""
+        """Percentage of MCP vs Direct API usage"""
         mcp_total = self.mcp_success + self.mcp_failed
         total = mcp_total + self.direct_api_success + self.direct_api_failed
         if total == 0:
@@ -526,14 +480,10 @@ class AgentStats(BaseModel):
 
 
 class HealthStatus(BaseModel):
-    """Статус здоровья агента"""
+    """Agent health status"""
 
-    is_healthy: bool = Field(..., description="Здоров ли агент")
-    mcp_available: bool = Field(..., description="Доступен ли MCP")
-    api_keys_available: int = Field(
-        ..., ge=0, description="Количество доступных API ключей"
-    )
-    last_check: datetime = Field(
-        default_factory=utc_now, description="Время последней проверки"
-    )
-    errors: list[str] = Field(default_factory=list, description="Список ошибок")
+    is_healthy: bool = Field(..., description="Whether agent is healthy")
+    mcp_available: bool = Field(..., description="Whether MCP is available")
+    api_keys_available: int = Field(..., ge=0, description="Number of available API keys")
+    last_check: datetime = Field(default_factory=utc_now, description="Last check time")
+    errors: list[str] = Field(default_factory=list, description="Error list")

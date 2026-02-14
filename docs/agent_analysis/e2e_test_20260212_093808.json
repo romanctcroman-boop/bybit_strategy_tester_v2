@@ -1,0 +1,102 @@
+{
+  "timestamp": "2026-02-12T09:38:08.298739",
+  "total_time_s": 169.5,
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+  },
+  "results": {
+    "1_individual": {
+      "deepseek": {
+        "status": "success",
+        "model": "deepseek-chat",
+        "latency_ms": 19885,
+        "tokens": {
+          "prompt": 51,
+          "completion": 216,
+          "total": 267
+        },
+        "response_length": 710,
+        "response_preview": "Основные уязвимости RSI-стратегии для криптовалют:\n\n1. **Ложные сигналы на волатильном рынке**: Криптовалюты часто находятся в состояниях сильного тренда, когда RSI может долго оставаться в зонах пере"
+      },
+      "qwen": {
+        "status": "success",
+        "model": "qwen-plus",
+        "latency_ms": 5097,
+        "tokens": {
+          "prompt": 65,
+          "completion": 181,
+          "total": 246
+        },
+        "response_length": 521,
+        "response_preview": "Для подтверждения сигналов RSI лучше комбинировать с трендовыми индикаторами — например, скользящими средними (SMA/EMA), особенно 50- и 200-периодными: пересечение цены и MA помогает определить направ"
+      },
+      "perplexity": {
+        "status": "success",
+        "model": "sonar",
+        "latency_ms": 3212,
+        "tokens": {
+          "prompt": 35,
+          "completion": 173,
+          "total": 208
+        },
+        "response_length": 697,
+        "response_preview": "As of February 2026, Bitcoin trades in a **rangebound** market around **$57,500–$64,000**, with prediction markets pricing expectations near $57,500–$58,000 by February 12 at 6pm EST and recent analys"
+      }
+    },
+    "2_collaborative": {
+      "agents_responded": [
+        "deepseek",
+        "qwen"
+      ],
+      "response_count": 2,
+      "collaborative": true
+    },
+    "3_deliberation": {
+      "status": "success",
+      "agents": [
+        "deepseek",
+        "perplexity",
+        "qwen"
+      ],
+      "latency_ms": 16320,
+      "decision_preview": "ДА",
+      "confidence": 0.38153187074999384,
+      "rounds": 1
+    },
+    "4_unified_interface": {
+      "deepseek_analyze": {
+        "status": "error",
+        "error": "All communication channels failed"
+      },
+      "qwen_analyze": {
+        "status": "success",
+        "latency_ms": 8625,
+        "channel": "direct_api",
+        "tokens": 197
+      }
+    },
+    "5_cost_tracking": {
+      "status": "success",
+      "cost_table_providers": [
+        "deepseek",
+        "qwen",
+        "perplexity"
+      ],
+      "guards": {
+        "DEEPSEEK_ALLOW_REASONER": "false",
+        "QWEN_ENABLE_THINKING": "false",
+        "PERPLEXITY_ALLOW_EXPENSIVE": "false"
+      },
+      "all_guards_safe": true
+    },
+    "6_modernization": {
+      "agents_responded": [
+        "deepseek",
+        "qwen"
+      ],
+      "modernization_plans": 2
+    }
+  }
+}

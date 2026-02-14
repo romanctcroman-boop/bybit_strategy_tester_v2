@@ -1,0 +1,1973 @@
+
+DeepSeek/Qwen Надо подготовить подробной техническое задание с пояснениями, примерами кода, промтов, формат промтов и ответов. Это тз, должно основываться на нашей бесед из чата и из баз знаний из интернета. Примеры Структурных схем логических блоков и их связей.
+Техническое задание: Система LLM-агентов для генерации и оптимизации торговых стратегий
+1. Обзор системы
+1.1 Цель проекта
+Создание интеллектуальной системы на базе LLM (DeepSeek/Qwen) для автоматизированной генерации, тестирования и оптимизации торговых стратегий на платформе Bybit с интеграцией в существующий бэктестер.
+
+1.2 Основные компоненты
+LLM Агенты (DeepSeek V3.1, Qwen 2.5 72B) - "мозг" системы
+
+Контроллер стратегий - управление workflow
+
+Промпт-инженер - генерация контекстных промптов
+
+Парсер ответов - конвертация LLM-ответов в JSON-стратегии
+
+Бэктест-интерфейс - интеграция с bybit_strategy_tester
+
+Оценщик метрик - анализ результатов бэктеста
+
+Оптимизатор - улучшение стратегий на основе метрик
+
+Консенсус-система - агрегация мнений нескольких агентов
+
+2. Архитектура системы
+2.1 Общая схема архитектуры
+text
+┌─────────────────────────────────────────────────────────────┐
+│                    Платформа Bybit                          │
+├─────────────────────────────────────────────────────────────┤
+│                 bybit_strategy_tester                       │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │Историч.  │  │Бэктест   │  │Оптимизац.│  │Валидация │   │
+│  │данные    │  │движок    │  │параметров│  │OOS       │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ API
+┌──────────────────────────▼──────────────────────────────────┐
+│               LLM Trading System (Наша система)             │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │              Strategy Controller                     │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                    │              │                         │
+│      ┌─────────────▼────┐ ┌──────▼────────────┐           │
+│      │  Prompt Engineer │ │ Response Parser   │           │
+│      └─────────────┬────┘ └────────┬──────────┘           │
+│                    │                │                      │
+│  ┌─────────────────▼────────────────▼──────────────────┐  │
+│  │              LLM Agents Pool                         │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐          │  │
+│  │  │DeepSeek  │  │ Qwen     │  │ GPT-4o   │          │  │
+│  │  │V3.1      │  │2.5 72B   │  │(бенчмарк)│          │  │
+│  │  └──────────┘  └──────────┘  └──────────┘          │  │
+│  └─────────────────────────────────────────────────────┘  │
+│                    │                │                      │
+│      ┌─────────────▼────┐ ┌────────▼──────────┐          │
+│      │ Consensus Engine │ │ Backtest Interface │          │
+│      └─────────────┬────┘ └────────┬──────────┘          │
+│                    │                │                      │
+│  ┌─────────────────▼────────────────▼──────────────────┐  │
+│  │           Metrics Analyzer & Optimizer               │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐          │  │
+│  │  │ Sharpe   │  │ Max DD   │  │Win Rate  │          │  │
+│  │  │Analyzer  │  │Analyzer  │  │Analyzer  │          │  │
+│  │  └──────────┘  └──────────┘  └──────────┘          │  │
+│  └─────────────────────────────────────────────────────┘  │
+│                    │                                       │
+│      ┌─────────────▼────┐                                 │
+│      │ Report Generator │                                 │
+│      └──────────────────┘                                 │
+└────────────────────────────────────────────────────────────┘
+2.2 Детализированная схема workflow
+text
+┌─────────────────────────────────────────────────────────────┐
+│                      Инициализация                          │
+├─────────────────────────────────────────────────────────────┤
+│ 1. Загрузка конфигурации платформы                          │
+│ 2. Подключение к историческим данным (1 год+)               │
+│ 3. Инициализация LLM агентов                                │
+└─────────────────────────────┬───────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Анализ рынка (Фаза 1)                     │
+├─────────────────────────────────────────────────────────────┤
+│ 4. Определение рыночных режимов                             │
+│ 5. Анализ волатильности и ликвидности                       │
+│ 6. Выявление сезонных паттернов                             │
+└─────────────────────────────┬───────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Генерация стратегии (Фаза 2)                    │
+├─────────────────────────────────────────────────────────────┤
+│ 7. Промпт-инженер создает контекстный промпт                │
+│ 8. LLM агенты генерируют стратегии независимо              │
+│ 9. Парсер конвертирует ответы в JSON-формат                │
+└─────────────────────────────┬───────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Консенсус и агрегация (Фаза 3)                  │
+├─────────────────────────────────────────────────────────────┤
+│ 10. Consensus Engine агрегирует стратегии                   │
+│ 11. Применение риск-фильтров                                │
+│ 12. Генерация финальной стратегии                          │
+└─────────────────────────────┬───────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Бэктестирование (Фаза 4)                       │
+├─────────────────────────────────────────────────────────────┤
+│ 13. Интеграция с bybit_strategy_tester                      │
+│ 14. Walk-forward тестирование (60/30 days)                  │
+│ 15. Capacity-stress тестирование                           │
+└─────────────────────────────┬───────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│             Оптимизация (Фаза 5)                            │
+├─────────────────────────────────────────────────────────────┤
+│ 16. Анализ метрик (Sharpe, DD, Win Rate)                    │
+│ 17. Генетическая оптимизация параметров                     │
+│ 18. Out-of-sample валидация                                │
+└─────────────────────────────┬───────────────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│               Отчетность (Фаза 6)                          │
+├─────────────────────────────────────────────────────────────┤
+│ 19. Генерация комплексного отчета                          │
+│ 20. Сравнение с бенчмарками                                │
+│ 21. Рекомендации по улучшению                              │
+└─────────────────────────────────────────────────────────────┘
+3. Детализация компонентов
+3.1 LLM Agents Pool
+3.1.1 Конфигурация агентов
+python
+class LLMAgentConfig:
+    """Конфигурация LLM агентов"""
+    
+    AGENTS = {
+        "deepseek_v3": {
+            "model_name": "deepseek-chat",
+            "api_base": "https://api.deepseek.com/v1",
+            "context_window": 128000,
+            "max_tokens": 4096,
+            "temperature": 0.3,  # Низкая для детерминированных стратегий
+            "top_p": 0.95,
+            "frequency_penalty": 0.1,
+            "presence_penalty": 0.1,
+            "timeout": 60,
+            "max_retries": 3,
+            "cost_per_1k_tokens": 0.14  # USD
+        },
+        "qwen_72b": {
+            "model_name": "qwen2.5-72b-instruct",
+            "api_base": "https://api.together.xyz/v1",
+            "context_window": 32768,
+            "max_tokens": 4096,
+            "temperature": 0.4,
+            "top_p": 0.9,
+            "frequency_penalty": 0.0,
+            "presence_penalty": 0.0,
+            "timeout": 90,
+            "max_retries": 3,
+            "cost_per_1k_tokens": 0.90  # USD
+        },
+        "gpt_4o": {
+            "model_name": "gpt-4o",
+            "api_base": "https://api.openai.com/v1",
+            "context_window": 128000,
+            "max_tokens": 4096,
+            "temperature": 0.3,
+            "top_p": 0.95,
+            "timeout": 60,
+            "max_retries": 3,
+            "cost_per_1k_tokens": 2.50  # USD
+        }
+    }
+    
+    # Специализация агентов
+    AGENT_SPECIALIZATION = {
+        "deepseek_v3": {
+            "primary_role": "quantitative_analyst",
+            "strengths": ["statistical_analysis", "mean_reversion", "risk_management"],
+            "style": "conservative",
+            "preferred_timeframes": ["4h", "1d"],
+            "max_strategies_per_day": 50
+        },
+        "qwen_72b": {
+            "primary_role": "technical_analyst",
+            "strengths": ["pattern_recognition", "market_structure", "momentum"],
+            "style": "aggressive",
+            "preferred_timeframes": ["15m", "1h"],
+            "max_strategies_per_day": 30
+        }
+    }
+3.1.2 Класс агента
+python
+class LLMTradingAgent:
+    """Класс LLM агента для генерации стратегий"""
+    
+    def __init__(self, agent_config, specialization):
+        self.config = agent_config
+        self.specialization = specialization
+        self.performance_history = []
+        self.token_usage = {"input": 0, "output": 0}
+        
+    async def generate_strategy(self, market_context, platform_config):
+        """Генерация торговой стратегии"""
+        
+        # Создание промпта с учетом специализации
+        prompt = self._create_strategy_prompt(market_context, platform_config)
+        
+        try:
+            # Вызов LLM API
+            response = await self._call_llm_api(prompt)
+            
+            # Парсинг ответа
+            strategy = self._parse_response(response)
+            
+            # Валидация стратегии
+            if self._validate_strategy(strategy):
+                self._update_performance("success")
+                return strategy
+            else:
+                self._update_performance("validation_failed")
+                return None
+                
+        except Exception as e:
+            self._update_performance("error")
+            logger.error(f"Agent {self.config['model_name']} error: {e}")
+            return None
+    
+    def _create_strategy_prompt(self, market_context, platform_config):
+        """Создание контекстного промпта"""
+        
+        prompt_template = """ROLE: Ты профессиональный алгоритмический трейдер с 10+ лет опыта.
+
+SPECIALIZATION: {specialization}
+
+CURRENT MARKET CONTEXT:
+{symbol} ({timeframe}) - {market_regime}
+Волатильность: {volatility_level}
+Тренд: {trend_direction}
+Ключевые уровни: {key_levels}
+
+PLATFORM CONSTRAINTS:
+- Позиция: {position_type}
+- Плечо: {leverage}x
+- Комиссия: {commission}%
+- Макс. позиций одновременно: {pyramiding}
+- Фильтр времени: {time_filter}
+
+AVAILABLE TOOLS:
+{available_tools}
+
+TASK: Создай торговую стратегию, которая максимизирует Sharpe Ratio при Max Drawdown < 15%.
+
+STRATEGY REQUIREMENTS:
+1. Используй от 2 до 4 сигналов
+2. Добавь минимум 2 фильтра
+3. Четкие условия входа/выхода
+4. Управление рисками (стоп-лосс, тейк-профит)
+5. Учет комиссий и проскальзывания
+
+RESPONSE FORMAT (JSON):
+{{
+  "strategy_meta": {{
+    "name": "Уникальное название",
+    "description": "Описание логики",
+    "agent_specialization": "{specialization}"
+  }},
+  "signals": [
+    {{
+      "id": "signal_1",
+      "type": "MA_Crossover|RSI|MACD|Bollinger|etc",
+      "timeframe": "15m|1h|4h|1d",
+      "params": {{"fast": 9, "slow": 21}},
+      "weight": 0.0-1.0,
+      "condition": "price > value"
+    }}
+  ],
+  "filters": [
+    {{
+      "id": "filter_1",
+      "type": "Volume|Trend|Volatility|Time",
+      "params": {{"min_volume": 1.5}},
+      "condition": "volume > avg_volume * 1.5"
+    }}
+  ],
+  "entry_conditions": {{
+    "logic": "(signal_1 AND signal_2) OR (signal_3 AND filter_1)",
+    "conditions": [
+      "RSI(14) < 30 для лонга, > 70 для шорта",
+      "Цена пробила Bollinger Lower Band"
+    ]
+  }},
+  "exit_conditions": {{
+    "take_profit": {{
+      "type": "Fixed|Trailing|Multiple",
+      "params": {{"target_pct": 2.0}},
+      "rules": "Закрывать при достижении 2% прибыли"
+    }},
+    "stop_loss": {{
+      "type": "Fixed|ATR|Indicator",
+      "params": {{"stop_pct": 1.5, "atr_multiplier": 2}},
+      "rules": "Стоп-лосс на 1.5% или 2x ATR"
+    }}
+  }},
+  "position_management": {{
+    "size_method": "Fixed|Kelly|OptimalF",
+    "size_pct": {position_size},
+    "pyramiding_rules": "Макс {pyramiding} позиций, добавлять при +1%",
+    "correlation_limit": 0.7
+  }},
+  "optimization_hints": {{
+    "parameters_to_optimize": ["ma_fast", "ma_slow", "rsi_period"],
+    "ranges": {{"ma_fast": [5, 20], "ma_slow": [20, 50]}},
+    "objectives": ["Sharpe", "MaxDD", "WinRate"]
+  }}
+}}
+
+IMPORTANT: Будь конкретен в параметрах. Избегай общих фраз."""
+        
+        return prompt_template.format(
+            specialization=self.specialization["primary_role"],
+            symbol=market_context["symbol"],
+            timeframe=market_context["timeframe"],
+            market_regime=market_context["regime"],
+            volatility_level=market_context["volatility"],
+            trend_direction=market_context["trend"],
+            key_levels=market_context["key_levels"],
+            position_type=platform_config["position_type"],
+            leverage=platform_config["leverage"],
+            commission=platform_config["commission"],
+            pyramiding=platform_config["pyramiding"],
+            time_filter=platform_config["time_filter"],
+            available_tools=self._format_available_tools(),
+            position_size=platform_config["position_size_pct"]
+        )
+    
+    def _parse_response(self, llm_response):
+        """Парсинг ответа LLM в структурированный JSON"""
+        
+        try:
+            # Извлечение JSON из ответа
+            json_match = re.search(r'```json\n(.*?)\n```', llm_response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # Попробуем найти JSON без бэктиков
+                json_match = re.search(r'({.*})', llm_response, re.DOTALL)
+                json_str = json_match.group(1) if json_match else llm_response
+            
+            strategy = json.loads(json_str)
+            
+            # Добавление метаданных агента
+            strategy["agent_metadata"] = {
+                "model": self.config["model_name"],
+                "timestamp": datetime.now().isoformat(),
+                "specialization": self.specialization,
+                "token_usage": self.token_usage
+            }
+            
+            return strategy
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error: {e}")
+            # Попытка исправить JSON
+            fixed_json = self._fix_json(llm_response)
+            return json.loads(fixed_json) if fixed_json else None
+3.2 Prompt Engineer
+3.2.1 Система шаблонов промптов
+python
+class PromptEngineer:
+    """Система генерации и управления промптами"""
+    
+    PROMPT_TEMPLATES = {
+        "strategy_generation": {
+            "base_template": """SYSTEM: Ты {role} с опытом в {experience}.
+CONTEXT: {market_context}
+CONSTRAINTS: {constraints}
+TASK: {task_description}
+RESPONSE_FORMAT: {response_format}
+EXAMPLES: {examples}""",
+            
+            "roles": {
+                "quant_analyst": "количественный аналитик хедж-фонда",
+                "technical_analyst": "технический аналитик с 15+ лет опыта",
+                "risk_manager": "риск-менеджер инвестиционного банка",
+                "algorithmic_trader": "алгоритмический трейдер проп-фирмы"
+            },
+            
+            "experience_levels": {
+                "junior": "3 года опыта",
+                "senior": "10 лет опыта", 
+                "expert": "20+ лет опыта"
+            }
+        },
+        
+        "market_analysis": {
+            "template": """Проанализируй рыночные данные и определи:
+1. Текущий режим рынка (тренд, диапазон, волатильность)
+2. Ключевые уровни поддержки/сопротивления
+3. Уровень волатильности (ATR, историческая волатильность)
+4. Объемы и ликвидность
+5. Сезонные/циклические паттерны
+
+Данные:
+{symbol} {timeframe}
+Период: {start_date} - {end_date}
+Доступные индикаторы: {available_indicators}
+
+Верни ответ в формате JSON."""
+        },
+        
+        "optimization_suggestions": {
+            "template": """На основе результатов бэктеста предложи оптимизации:
+
+ТЕКУЩАЯ СТРАТЕГИЯ:
+{current_strategy}
+
+РЕЗУЛЬТАТЫ БЭКТЕСТА:
+{backtest_results}
+
+ПРОБЛЕМЫ:
+{issues}
+
+ПРЕДЛОЖИ:
+1. Какие параметры изменить и на что
+2. Какие фильтры добавить/убрать
+3. Как улучшить условия входа/выхода
+4. Конкретные значения для оптимизации"""
+        }
+    }
+    
+    def create_contextual_prompt(self, prompt_type, context_vars, agent_specialization=None):
+        """Создание контекстного промпта"""
+        
+        template_config = self.PROMPT_TEMPLATES[prompt_type]
+        
+        if prompt_type == "strategy_generation":
+            # Настройка промпта под специализацию агента
+            if agent_specialization == "quantitative_analyst":
+                role = template_config["roles"]["quant_analyst"]
+                experience = template_config["experience_levels"]["expert"]
+                task = "Создай статистически обоснованную стратегию"
+                
+            elif agent_specialization == "technical_analyst":
+                role = template_config["roles"]["technical_analyst"]
+                experience = template_config["experience_levels"]["senior"]
+                task = "Создай стратегию на основе технического анализа"
+        
+        prompt = template_config["base_template"].format(
+            role=role,
+            experience=experience,
+            market_context=context_vars.get("market_context", ""),
+            constraints=context_vars.get("constraints", ""),
+            task_description=task,
+            response_format=self._get_response_format(prompt_type),
+            examples=self._get_examples(prompt_type)
+        )
+        
+        return prompt
+    
+    def _get_response_format(self, prompt_type):
+        """Получение формата ответа для промпта"""
+        
+        formats = {
+            "strategy_generation": """Строгий JSON формат с полями:
+- strategy_name: string
+- signals: array of objects
+- filters: array of objects
+- entry_conditions: object
+- exit_conditions: object
+- position_management: object""",
+            
+            "market_analysis": """JSON с полями:
+- market_regime: string
+- key_levels: array
+- volatility_metrics: object
+- volume_analysis: object
+- recommendations: array"""
+        }
+        
+        return formats.get(prompt_type, "JSON формат")
+    
+    def _get_examples(self, prompt_type):
+        """Примеры для few-shot обучения"""
+        
+        examples = {
+            "strategy_generation": """
+ПРИМЕР СТРАТЕГИИ:
+{
+  "strategy_name": "Multi-Timeframe Mean Reversion",
+  "signals": [
+    {
+      "type": "RSI",
+      "params": {"period": 14, "oversold": 30, "overbought": 70},
+      "condition": "RSI < 30 для лонга, RSI > 70 для шорта"
+    }
+  ]
+}""",
+            
+            "market_analysis": """
+ПРИМЕР АНАЛИЗА:
+{
+  "market_regime": "высокая волатильность, боковой тренд",
+  "key_levels": ["45000", "44000", "43000"],
+  "volatility_metrics": {"atr": "2.5%", "historical_vol": "65%"}
+}"""
+        }
+        
+        return examples.get(prompt_type, "")
+3.3 Strategy Controller
+3.3.1 Workflow менеджер
+python
+class StrategyController:
+    """Контроллер управления workflow генерации стратегий"""
+    
+    def __init__(self, platform_config, agents_pool):
+        self.platform_config = platform_config
+        self.agents = agents_pool
+        self.strategies_generated = []
+        self.current_workflow_state = {}
+        
+    async def run_full_workflow(self):
+        """Запуск полного workflow генерации стратегии"""
+        
+        workflow_steps = [
+            self._initialize_workflow,
+            self._analyze_market,
+            self._generate_strategies_parallel,
+            self._apply_consensus,
+            self._run_backtests,
+            self._optimize_strategies,
+            self._validate_oos,
+            self._generate_final_report
+        ]
+        
+        results = {}
+        
+        for step in workflow_steps:
+            step_name = step.__name__
+            logger.info(f"Starting step: {step_name}")
+            
+            try:
+                step_result = await step()
+                results[step_name] = step_result
+                self.current_workflow_state[step_name] = step_result
+                
+                # Проверка на критическую ошибку
+                if step_name == "_run_backtests" and not step_result.get("success"):
+                    logger.error("Backtests failed, stopping workflow")
+                    break
+                    
+            except Exception as e:
+                logger.error(f"Step {step_name} failed: {e}")
+                results[step_name] = {"error": str(e)}
+                break
+        
+        return results
+    
+    async def _generate_strategies_parallel(self):
+        """Параллельная генерация стратегий разными агентами"""
+        
+        strategies = {}
+        
+        # Создание задач для каждого агента
+        tasks = []
+        for agent_name, agent in self.agents.items():
+            task = asyncio.create_task(
+                self._generate_single_strategy(agent_name, agent)
+            )
+            tasks.append((agent_name, task))
+        
+        # Ожидание завершения всех задач
+        for agent_name, task in tasks:
+            try:
+                strategy = await task
+                if strategy:
+                    strategies[agent_name] = strategy
+                    self.strategies_generated.append(strategy)
+            except Exception as e:
+                logger.error(f"Agent {agent_name} failed: {e}")
+        
+        return {
+            "total_generated": len(strategies),
+            "strategies": strategies,
+            "success_rate": len(strategies) / len(tasks) if tasks else 0
+        }
+    
+    async def _generate_single_strategy(self, agent_name, agent):
+        """Генерация стратегии одним агентом"""
+        
+        # Подготовка контекста
+        market_context = self._prepare_market_context()
+        
+        # Получение промпта
+        prompt = self.prompt_engineer.create_contextual_prompt(
+            prompt_type="strategy_generation",
+            context_vars={
+                "market_context": market_context,
+                "constraints": self._format_constraints()
+            },
+            agent_specialization=agent.specialization["primary_role"]
+        )
+        
+        # Генерация стратегии
+        strategy = await agent.generate_strategy(
+            market_context=market_context,
+            platform_config=self.platform_config
+        )
+        
+        if strategy:
+            # Добавление метаданных
+            strategy["workflow_metadata"] = {
+                "generation_step": "initial",
+                "agent": agent_name,
+                "timestamp": datetime.now().isoformat(),
+                "market_context_snapshot": market_context
+            }
+        
+        return strategy
+    
+    def _prepare_market_context(self):
+        """Подготовка рыночного контекста для агентов"""
+        
+        # Анализ исторических данных
+        historical_data = self.data_fetcher.get_historical_data(
+            symbol=self.platform_config["symbol"],
+            timeframe=self.platform_config["timeframe"],
+            limit=1000
+        )
+        
+        # Технический анализ
+        technical_analysis = self.technical_analyzer.analyze(historical_data)
+        
+        # Определение режима рынка
+        market_regime = self.regime_detector.detect_regime(historical_data)
+        
+        return {
+            "symbol": self.platform_config["symbol"],
+            "timeframe": self.platform_config["timeframe"],
+            "historical_period": f"{len(historical_data)} periods",
+            "current_price": historical_data.iloc[-1]["close"],
+            "market_regime": market_regime["regime"],
+            "trend_direction": technical_analysis["trend"],
+            "volatility_level": technical_analysis["volatility"],
+            "key_levels": technical_analysis["key_levels"],
+            "volume_profile": technical_analysis["volume"],
+            "indicators_summary": self._summarize_indicators(technical_analysis)
+        }
+    
+    def _format_constraints(self):
+        """Форматирование ограничений платформы"""
+        
+        constraints = [
+            f"Тип позиции: {self.platform_config['position_type']}",
+            f"Плечо: {self.platform_config['leverage']}x",
+            f"Комиссия: {self.platform_config['commission']}%",
+            f"Размер позиции: {self.platform_config['position_size_pct']}% от капитала",
+            f"Макс. одновременных позиций: {self.platform_config['pyramiding']}",
+            f"Начальный капитал: ${self.platform_config['initial_capital']}",
+            f"Период торговли: {self.platform_config['start_date']} - {self.platform_config['end_date']}"
+        ]
+        
+        if self.platform_config.get("time_filter"):
+            constraints.append(f"Фильтр времени: {self.platform_config['time_filter']}")
+        
+        return "\n".join(constraints)
+3.4 Consensus Engine
+3.4.1 Система консенсусной агрегации
+python
+class ConsensusEngine:
+    """Движок для агрегации стратегий от разных агентов"""
+    
+    CONSENSUS_METHODS = {
+        "weighted_voting": {
+            "description": "Взвешенное голосование на основе confidence scores",
+            "implementation": "_weighted_voting"
+        },
+        "bayesian_aggregation": {
+            "description": "Байесовское объединение с учетом исторической точности",
+            "implementation": "_bayesian_aggregation"
+        },
+        "portfolio_optimization": {
+            "description": "Оптимизация портфеля сигналов",
+            "implementation": "_portfolio_optimization"
+        },
+        "meta_learning": {
+            "description": "Мета-обучение на исторических результатах",
+            "implementation": "_meta_learning_aggregation"
+        }
+    }
+    
+    def __init__(self, historical_performance=None):
+        self.historical_performance = historical_performance or {}
+        self.consensus_history = []
+        
+    def aggregate_strategies(self, strategies, market_context, method="weighted_voting"):
+        """Агрегация стратегий от разных агентов"""
+        
+        if len(strategies) < 2:
+            return list(strategies.values())[0] if strategies else None
+        
+        # Выбор метода агрегации
+        if method in self.CONSENSUS_METHODS:
+            aggregation_func = getattr(self, self.CONSENSUS_METHODS[method]["implementation"])
+            consensus = aggregation_func(strategies, market_context)
+        else:
+            # По умолчанию взвешенное голосование
+            consensus = self._weighted_voting(strategies, market_context)
+        
+        # Добавление метаданных консенсуса
+        consensus["consensus_metadata"] = {
+            "method": method,
+            "input_strategies": list(strategies.keys()),
+            "agreement_score": self._calculate_agreement_score(strategies),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        self.consensus_history.append(consensus)
+        
+        return consensus
+    
+    def _weighted_voting(self, strategies, market_context):
+        """Взвешенное голосование на основе confidence scores"""
+        
+        # Структура для агрегации сигналов
+        aggregated_signals = {}
+        aggregated_filters = {}
+        
+        for agent_name, strategy in strategies.items():
+            agent_weight = self._calculate_agent_weight(agent_name, strategy)
+            
+            # Агрегация сигналов
+            for signal in strategy.get("signals", []):
+                signal_key = f"{signal['type']}_{signal.get('timeframe', '')}"
+                
+                if signal_key not in aggregated_signals:
+                    aggregated_signals[signal_key] = {
+                        "type": signal["type"],
+                        "timeframe": signal.get("timeframe"),
+                        "total_weight": 0,
+                        "votes": [],
+                        "params_suggestions": []
+                    }
+                
+                aggregated_signals[signal_key]["total_weight"] += agent_weight
+                aggregated_signals[signal_key]["votes"].append({
+                    "agent": agent_name,
+                    "weight": agent_weight,
+                    "params": signal.get("params", {}),
+                    "condition": signal.get("condition", "")
+                })
+                aggregated_signals[signal_key]["params_suggestions"].append(signal.get("params", {}))
+        
+        # Выбор лучших сигналов (по суммарному весу)
+        top_signals = sorted(
+            aggregated_signals.items(),
+            key=lambda x: x[1]["total_weight"],
+            reverse=True
+        )[:4]  # Максимум 4 сигнала
+        
+        # Консенсусные параметры (медиана или взвешенное среднее)
+        consensus_signals = []
+        for signal_key, signal_data in top_signals:
+            if signal_data["total_weight"] > 0.3:  # Порог консенсуса
+                consensus_params = self._calculate_consensus_params(signal_data["params_suggestions"])
+                
+                consensus_signals.append({
+                    "id": f"consensus_{signal_key}",
+                    "type": signal_data["type"],
+                    "timeframe": signal_data["timeframe"],
+                    "params": consensus_params,
+                    "weight": signal_data["total_weight"] / len(strategies),
+                    "supporting_agents": [v["agent"] for v in signal_data["votes"]],
+                    "condition": self._extract_common_condition(signal_data["votes"])
+                })
+        
+        # Построение финальной стратегии
+        consensus_strategy = {
+            "strategy_name": f"Consensus_{market_context['symbol']}_{datetime.now().strftime('%Y%m%d')}",
+            "description": f"Консенсусная стратегия от {len(strategies)} агентов",
+            "signals": consensus_signals,
+            "filters": self._aggregate_filters(strategies),
+            "entry_conditions": self._build_consensus_entry_conditions(consensus_signals),
+            "exit_conditions": self._build_consensus_exit_conditions(strategies),
+            "position_management": self._build_consensus_position_management(strategies),
+            "consensus_metrics": {
+                "agreement_score": self._calculate_agreement_score(strategies),
+                "confidence_weighted": sum(s["weight"] for s in consensus_signals) / len(consensus_signals) if consensus_signals else 0,
+                "diversity_score": self._calculate_diversity_score(strategies)
+            }
+        }
+        
+        return consensus_strategy
+    
+    def _calculate_agent_weight(self, agent_name, strategy):
+        """Расчет веса агента на основе исторической производительности"""
+        
+        base_weight = 1.0
+        
+        # Учет исторической точности
+        if agent_name in self.historical_performance:
+            perf = self.historical_performance[agent_name]
+            success_rate = perf.get("success_rate", 0.5)
+            avg_sharpe = perf.get("avg_sharpe", 0)
+            
+            # Вес = база * успешность * Sharpe (нормализованный)
+            historical_weight = base_weight * success_rate * max(0, avg_sharpe + 1) / 2
+            base_weight = historical_weight
+        
+        # Учет confidence текущей стратегии
+        confidence = strategy.get("confidence", 0.5)
+        base_weight *= confidence
+        
+        # Специализация агента
+        agent_type = strategy.get("agent_metadata", {}).get("specialization", {}).get("primary_role", "")
+        if agent_type == "quantitative_analyst":
+            base_weight *= 1.2  # Больший вес для квантов
+        elif agent_type == "risk_manager":
+            base_weight *= 0.9  # Меньший вес для risk-менеджеров
+        
+        return base_weight
+    
+    def _calculate_agreement_score(self, strategies):
+        """Расчет уровня согласия между агентами"""
+        
+        if len(strategies) < 2:
+            return 1.0
+        
+        # Анализ сходства сигналов
+        all_signals = []
+        for strategy in strategies.values():
+            signals = [(s["type"], s.get("timeframe", "")) for s in strategy.get("signals", [])]
+            all_signals.append(set(signals))
+        
+        # Расчет пересечений
+        intersections = []
+        for i in range(len(all_signals)):
+            for j in range(i + 1, len(all_signals)):
+                intersection = len(all_signals[i] & all_signals[j])
+                union = len(all_signals[i] | all_signals[j])
+                if union > 0:
+                    intersections.append(intersection / union)
+        
+        return np.mean(intersections) if intersections else 0
+3.5 Backtest Interface
+3.5.1 Интерфейс для bybit_strategy_tester
+python
+class BacktestInterface:
+    """Интерфейс для взаимодействия с bybit_strategy_tester"""
+    
+    def __init__(self, api_client, platform_config):
+        self.api = api_client
+        self.platform_config = platform_config
+        self.backtest_results_cache = {}
+        
+    def convert_strategy_to_platform_format(self, llm_strategy):
+        """Конвертация LLM-стратегии в формат платформы"""
+        
+        platform_strategy = {
+            "name": llm_strategy.get("strategy_name", "LLM_Generated_Strategy"),
+            "market_type": self.platform_config["market_type"],
+            "position_type": self.platform_config["position_type"],
+            "symbol": self.platform_config["symbol"],
+            "timeframe": self.platform_config["timeframe"],
+            "initial_capital": self.platform_config["initial_capital"],
+            "position_size_pct": self.platform_config["position_size_pct"],
+            "leverage": self.platform_config["leverage"],
+            "commission": self.platform_config["commission"],
+            "pyramiding": self.platform_config["pyramiding"],
+            "start_date": self.platform_config["start_date"],
+            "end_date": self.platform_config["end_date"],
+            "time_filter": self.platform_config.get("time_filter"),
+            "days_to_block": self.platform_config.get("days_to_block", 0)
+        }
+        
+        # Конвертация сигналов
+        signals_config = self._convert_signals(llm_strategy.get("signals", []))
+        platform_strategy.update(signals_config)
+        
+        # Конвертация условий
+        conditions_config = self._convert_conditions(llm_strategy)
+        platform_strategy.update(conditions_config)
+        
+        # Конвертация управления рисками
+        risk_config = self._convert_risk_management(llm_strategy)
+        platform_strategy.update(risk_config)
+        
+        return platform_strategy
+    
+    def _convert_signals(self, llm_signals):
+        """Конвертация LLM-сигналов в формат платформы"""
+        
+        platform_signals = {}
+        
+        for i, signal in enumerate(llm_signals[:4]):  # Максимум 4 сигнала
+            signal_type = signal["type"]
+            signal_id = f"signal_{i+1}"
+            
+            if signal_type == "MA_Crossover":
+                platform_signals.update({
+                    f"{signal_id}_type": "ma_crossover",
+                    f"{signal_id}_fast_period": signal["params"].get("fast", 9),
+                    f"{signal_id}_slow_period": signal["params"].get("slow", 21),
+                    f"{signal_id}_ma_type": signal["params"].get("ma_type", "EMA")
+                })
+                
+            elif signal_type == "RSI":
+                platform_signals.update({
+                    f"{signal_id}_type": "rsi",
+                    f"{signal_id}_period": signal["params"].get("period", 14),
+                    f"{signal_id}_overbought": signal["params"].get("overbought", 70),
+                    f"{signal_id}_oversold": signal["params"].get("oversold", 30)
+                })
+                
+            elif signal_type == "MACD":
+                platform_signals.update({
+                    f"{signal_id}_type": "macd",
+                    f"{signal_id}_fast": signal["params"].get("fast", 12),
+                    f"{signal_id}_slow": signal["params"].get("slow", 26),
+                    f"{signal_id}_signal": signal["params"].get("signal", 9)
+                })
+            
+            # Добавление веса и условий
+            platform_signals[f"{signal_id}_weight"] = signal.get("weight", 1.0)
+            platform_signals[f"{signal_id}_condition"] = signal.get("condition", "")
+        
+        return platform_signals
+    
+    def _convert_conditions(self, llm_strategy):
+        """Конвертация условий входа/выхода"""
+        
+        conditions = {
+            "entry_logic": llm_strategy.get("entry_conditions", {}).get("logic", ""),
+            "exit_logic": self._build_exit_logic(llm_strategy)
+        }
+        
+        # Конвертация конкретных условий
+        entry_conditions = llm_strategy.get("entry_conditions", {}).get("conditions", [])
+        conditions["entry_conditions"] = " AND ".join(
+            f"({cond})" for cond in entry_conditions[:3]  # Максимум 3 условия
+        )
+        
+        return conditions
+    
+    def _build_exit_logic(self, llm_strategy):
+        """Построение логики выхода"""
+        
+        exit_conditions = llm_strategy.get("exit_conditions", {})
+        tp_config = exit_conditions.get("take_profit", {})
+        sl_config = exit_conditions.get("stop_loss", {})
+        
+        exit_logic_parts = []
+        
+        if tp_config:
+            tp_type = tp_config.get("type", "Fixed")
+            if tp_type == "Fixed":
+                exit_logic_parts.append(
+                    f"TAKE_PROFIT: {tp_config.get('params', {}).get('target_pct', 2)}%"
+                )
+            elif tp_type == "Trailing":
+                exit_logic_parts.append(
+                    f"TRAILING_STOP: {tp_config.get('params', {}).get('trail_pct', 3)}%"
+                )
+        
+        if sl_config:
+            sl_type = sl_config.get("type", "Fixed")
+            if sl_type == "Fixed":
+                exit_logic_parts.append(
+                    f"STOP_LOSS: {sl_config.get('params', {}).get('stop_pct', 1.5)}%"
+                )
+            elif sl_type == "ATR":
+                exit_logic_parts.append(
+                    f"ATR_STOP: {sl_config.get('params', {}).get('atr_multiplier', 2)}x ATR"
+                )
+        
+        return " | ".join(exit_logic_parts)
+    
+    def run_backtest(self, strategy, walk_forward=False):
+        """Запуск бэктеста на платформе"""
+        
+        # Конвертация стратегии
+        platform_strategy = self.convert_strategy_to_platform_format(strategy)
+        
+        # Настройка параметров бэктеста
+        backtest_params = {
+            "strategy": platform_strategy,
+            "walk_forward": walk_forward,
+            "wf_window_size": 60,  # дней
+            "wf_step_size": 30,    # дней
+            "metrics": [
+                "total_return", "sharpe_ratio", "max_drawdown",
+                "win_rate", "profit_factor", "calmar_ratio"
+            ]
+        }
+        
+        # Запуск бэктеста через API
+        try:
+            response = self.api.run_backtest(backtest_params)
+            
+            # Кэширование результатов
+            cache_key = self._generate_strategy_hash(strategy)
+            self.backtest_results_cache[cache_key] = {
+                "results": response,
+                "timestamp": datetime.now().isoformat(),
+                "strategy_name": strategy.get("strategy_name")
+            }
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Backtest failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "metrics": {}
+            }
+    
+    def run_walk_forward_test(self, strategy):
+        """Запуск walk-forward тестирования"""
+        
+        walk_forward_results = []
+        
+        # Разделение данных на окна
+        windows = self._create_walk_forward_windows()
+        
+        for i, (train_window, test_window) in enumerate(windows):
+            logger.info(f"Running WF window {i+1}/{len(windows)}")
+            
+            # Обновление дат в стратегии
+            strategy_copy = strategy.copy()
+            strategy_copy["wf_metadata"] = {
+                "window": i+1,
+                "train_period": train_window,
+                "test_period": test_window
+            }
+            
+            # Запуск бэктеста на тестовом окне
+            result = self.run_backtest(strategy_copy)
+            result["window"] = i+1
+            
+            walk_forward_results.append(result)
+        
+        # Агрегация результатов
+        aggregated = self._aggregate_wf_results(walk_forward_results)
+        
+        return {
+            "walk_forward_results": walk_forward_results,
+            "aggregated_metrics": aggregated,
+            "consistency_score": self._calculate_wf_consistency(walk_forward_results)
+        }
+3.6 Metrics Analyzer & Optimizer
+3.6.1 Анализатор метрик
+python
+class MetricsAnalyzer:
+    """Анализатор метрик бэктеста"""
+    
+    METRIC_THRESHOLDS = {
+        "sharpe_ratio": {"min": 1.0, "good": 1.5, "excellent": 2.0},
+        "max_drawdown": {"max": 0.15, "good": 0.10, "excellent": 0.05},
+        "win_rate": {"min": 0.45, "good": 0.55, "excellent": 0.65},
+        "profit_factor": {"min": 1.2, "good": 1.5, "excellent": 2.0},
+        "calmar_ratio": {"min": 1.0, "good": 2.0, "excellent": 3.0}
+    }
+    
+    def analyze_backtest_results(self, backtest_results):
+        """Анализ результатов бэктеста"""
+        
+        metrics = backtest_results.get("metrics", {})
+        
+        analysis = {
+            "metrics_summary": metrics,
+            "threshold_assessment": {},
+            "strengths": [],
+            "weaknesses": [],
+            "recommendations": [],
+            "overall_score": 0
+        }
+        
+        # Оценка по порогам
+        score_components = []
+        
+        for metric_name, metric_value in metrics.items():
+            if metric_name in self.METRIC_THRESHOLDS:
+                thresholds = self.METRIC_THRESHOLDS[metric_name]
+                
+                # Определение уровня
+                if "max" in thresholds:
+                    # Для метрик, которые должны быть меньше (например, drawdown)
+                    if metric_value <= thresholds["excellent"]:
+                        level = "excellent"
+                        score = 1.0
+                    elif metric_value <= thresholds["good"]:
+                        level = "good"
+                        score = 0.7
+                    elif metric_value <= thresholds["max"]:
+                        level = "acceptable"
+                        score = 0.4
+                    else:
+                        level = "poor"
+                        score = 0.1
+                        
+                    if level == "excellent":
+                        analysis["strengths"].append(f"{metric_name}: {metric_value:.2%}")
+                    elif level == "poor":
+                        analysis["weaknesses"].append(f"{metric_name}: {metric_value:.2%} (>{thresholds['max']:.2%})")
+                
+                else:
+                    # Для метрик, которые должны быть больше
+                    if metric_value >= thresholds["excellent"]:
+                        level = "excellent"
+                        score = 1.0
+                    elif metric_value >= thresholds["good"]:
+                        level = "good"
+                        score = 0.7
+                    elif metric_value >= thresholds["min"]:
+                        level = "acceptable"
+                        score = 0.4
+                    else:
+                        level = "poor"
+                        score = 0.1
+                        
+                    if level == "excellent":
+                        analysis["strengths"].append(f"{metric_name}: {metric_value:.2f}")
+                    elif level == "poor":
+                        analysis["weaknesses"].append(f"{metric_name}: {metric_value:.2f} (<{thresholds['min']:.2f})")
+                
+                analysis["threshold_assessment"][metric_name] = {
+                    "value": metric_value,
+                    "level": level,
+                    "score": score
+                }
+                score_components.append(score)
+        
+        # Расчет общего скора
+        if score_components:
+            analysis["overall_score"] = np.mean(score_components)
+        
+        # Генерация рекомендаций
+        analysis["recommendations"] = self._generate_recommendations(analysis)
+        
+        return analysis
+    
+    def _generate_recommendations(self, analysis):
+        """Генерация рекомендаций по улучшению"""
+        
+        recommendations = []
+        weaknesses = analysis.get("weaknesses", [])
+        
+        for weakness in weaknesses:
+            if "sharpe_ratio" in weakness:
+                recommendations.extend([
+                    "Увеличить соотношение прибыль/риск: добавить фильтры по тренду",
+                    "Уменьшить просадки: оптимизировать stop-loss",
+                    "Повысить частоту прибыльных сделок: улучшить условия входа"
+                ])
+            elif "max_drawdown" in weakness:
+                recommendations.extend([
+                    "Ужесточить риск-менеджмент: уменьшить размер позиции",
+                    "Добавить trailing stop-loss",
+                    "Ввести фильтр по волатильности"
+                ])
+            elif "win_rate" in weakness:
+                recommendations.extend([
+                    "Улучшить селективность сигналов: добавить подтверждающие индикаторы",
+                    "Ввести фильтр по объему",
+                    "Оптимизировать параметры индикаторов"
+                ])
+        
+        # Общие рекомендации
+        if analysis.get("overall_score", 0) < 0.5:
+            recommendations.append("Рассмотреть полный редизайн стратегии")
+        elif analysis.get("overall_score", 0) < 0.7:
+            recommendations.append("Требуется умеренная оптимизация параметров")
+        
+        return list(set(recommendations))[:5]  # Максимум 5 рекомендаций
+3.6.2 Оптимизатор стратегий
+python
+class StrategyOptimizer:
+    """Оптимизатор торговых стратегий"""
+    
+    OPTIMIZATION_METHODS = {
+        "genetic_algorithm": {
+            "population_size": 50,
+            "generations": 20,
+            "mutation_rate": 0.1,
+            "crossover_rate": 0.8
+        },
+        "grid_search": {
+            "max_combinations": 1000
+        },
+        "bayesian_optimization": {
+            "n_iter": 30,
+            "init_points": 10
+        }
+    }
+    
+    def __init__(self, backtest_interface):
+        self.backtester = backtest_interface
+        self.optimization_history = []
+        
+    def optimize_strategy(self, strategy, method="genetic_algorithm"):
+        """Оптимизация параметров стратегии"""
+        
+        # Извлечение параметров для оптимизации
+        optimizable_params = self._extract_optimizable_parameters(strategy)
+        
+        if not optimizable_params:
+            logger.warning("No optimizable parameters found")
+            return strategy
+        
+        # Выбор метода оптимизации
+        if method == "genetic_algorithm":
+            optimized = self._genetic_optimization(strategy, optimizable_params)
+        elif method == "grid_search":
+            optimized = self._grid_search_optimization(strategy, optimizable_params)
+        elif method == "bayesian_optimization":
+            optimized = self._bayesian_optimization(strategy, optimizable_params)
+        else:
+            logger.error(f"Unknown optimization method: {method}")
+            return strategy
+        
+        # Валидация улучшений
+        if self._validate_improvement(strategy, optimized):
+            optimized["optimization_metadata"] = {
+                "method": method,
+                "original_score": self._calculate_strategy_score(strategy),
+                "optimized_score": self._calculate_strategy_score(optimized),
+                "improvement_pct": self._calculate_improvement_pct(strategy, optimized),
+                "parameters_changed": list(optimizable_params.keys()),
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            self.optimization_history.append(optimized["optimization_metadata"])
+            
+            return optimized
+        else:
+            logger.warning("Optimization did not improve the strategy")
+            return strategy
+    
+    def _genetic_optimization(self, strategy, optimizable_params):
+        """Генетическая оптимизация параметров"""
+        
+        config = self.OPTIMIZATION_METHODS["genetic_algorithm"]
+        
+        # Инициализация популяции
+        population = self._initialize_population(strategy, optimizable_params, config["population_size"])
+        
+        best_individual = None
+        best_fitness = -float('inf')
+        
+        for generation in range(config["generations"]):
+            logger.info(f"Generation {generation + 1}/{config['generations']}")
+            
+            # Оценка фитнеса
+            fitness_scores = []
+            for individual in population:
+                fitness = self._evaluate_individual(individual)
+                fitness_scores.append(fitness)
+                
+                if fitness > best_fitness:
+                    best_fitness = fitness
+                    best_individual = individual
+            
+            # Селекция
+            selected = self._selection(population, fitness_scores)
+            
+            # Кроссовер
+            offspring = self._crossover(selected, config["crossover_rate"])
+            
+            # Мутация
+            mutated = self._mutation(offspring, optimizable_params, config["mutation_rate"])
+            
+            # Формирование новой популяции
+            population = self._create_new_population(selected, mutated)
+        
+        # Возврат лучшей стратегии
+        return best_individual if best_individual else strategy
+    
+    def _evaluate_individual(self, strategy_individual):
+        """Оценка фитнеса индивидуума (стратегии)"""
+        
+        # Запуск бэктеста
+        results = self.backtester.run_backtest(strategy_individual)
+        
+        if not results.get("success", False):
+            return -float('inf')
+        
+        # Расчет фитнеса (взвешенная комбинация метрик)
+        metrics = results.get("metrics", {})
+        
+        fitness = (
+            0.4 * metrics.get("sharpe_ratio", 0) +
+            0.3 * (1 - metrics.get("max_drawdown", 1)) +
+            0.2 * metrics.get("win_rate", 0) +
+            0.1 * metrics.get("profit_factor", 0)
+        )
+        
+        # Штраф за сложность (количество сигналов)
+        num_signals = len(strategy_individual.get("signals", []))
+        if num_signals > 4:
+            fitness *= 0.9
+        
+        return fitness
+    
+    def _extract_optimizable_parameters(self, strategy):
+        """Извлечение оптимизируемых параметров из стратегии"""
+        
+        optimizable = {}
+        
+        # Параметры сигналов
+        for i, signal in enumerate(strategy.get("signals", [])):
+            signal_type = signal["type"]
+            params = signal.get("params", {})
+            
+            if signal_type == "MA_Crossover":
+                optimizable[f"signal_{i}_fast"] = {
+                    "type": "int",
+                    "range": [5, 20],
+                    "default": params.get("fast", 9)
+                }
+                optimizable[f"signal_{i}_slow"] = {
+                    "type": "int", 
+                    "range": [20, 50],
+                    "default": params.get("slow", 21)
+                }
+                
+            elif signal_type == "RSI":
+                optimizable[f"signal_{i}_period"] = {
+                    "type": "int",
+                    "range": [7, 21],
+                    "default": params.get("period", 14)
+                }
+                optimizable[f"signal_{i}_oversold"] = {
+                    "type": "int",
+                    "range": [20, 40],
+                    "default": params.get("oversold", 30)
+                }
+                optimizable[f"signal_{i}_overbought"] = {
+                    "type": "int",
+                    "range": [60, 80],
+                    "default": params.get("overbought", 70)
+                }
+        
+        # Параметры риск-менеджмента
+        exit_conditions = strategy.get("exit_conditions", {})
+        tp_params = exit_conditions.get("take_profit", {}).get("params", {})
+        sl_params = exit_conditions.get("stop_loss", {}).get("params", {})
+        
+        if tp_params.get("target_pct"):
+            optimizable["take_profit_pct"] = {
+                "type": "float",
+                "range": [1.0, 5.0],
+                "default": tp_params["target_pct"]
+            }
+        
+        if sl_params.get("stop_pct"):
+            optimizable["stop_loss_pct"] = {
+                "type": "float",
+                "range": [0.5, 3.0],
+                "default": sl_params["stop_pct"]
+            }
+        
+        return optimizable
+4. Форматы данных и API
+4.1 Формат стратегии (JSON Schema)
+json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Trading Strategy",
+  "type": "object",
+  "required": ["strategy_name", "signals"],
+  "properties": {
+    "strategy_meta": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "maxLength": 100},
+        "description": {"type": "string", "maxLength": 500},
+        "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "author": {"type": "string"}
+      }
+    },
+    "signals": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["type", "params"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^signal_[a-z0-9_]+$"},
+          "type": {
+            "type": "string",
+            "enum": ["MA_Crossover", "RSI", "MACD", "Bollinger", "Stochastic", "ATR", "Volume"]
+          },
+          "timeframe": {
+            "type": "string", 
+            "enum": ["15m", "1h", "4h", "1d"]
+          },
+          "params": {"type": "object"},
+          "weight": {"type": "number", "minimum": 0, "maximum": 1},
+          "condition": {"type": "string"}
+        }
+      }
+    },
+    "entry_conditions": {
+      "type": "object",
+      "properties": {
+        "logic": {"type": "string"},
+        "conditions": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "exit_conditions": {
+      "type": "object",
+      "properties": {
+        "take_profit": {
+          "type": "object",
+          "properties": {
+            "type": {"type": "string", "enum": ["Fixed", "Trailing", "Multiple"]},
+            "params": {"type": "object"}
+          }
+        },
+        "stop_loss": {
+          "type": "object",
+          "properties": {
+            "type": {"type": "string", "enum": ["Fixed", "ATR", "Indicator"]},
+            "params": {"type": "object"}
+          }
+        }
+      }
+    }
+  }
+}
+4.2 Формат результатов бэктеста
+json
+{
+  "backtest_id": "uuid",
+  "strategy_name": "string",
+  "period": {
+    "start": "2024-01-01",
+    "end": "2024-12-31"
+  },
+  "metrics": {
+    "performance": {
+      "total_return": 0.452,
+      "annualized_return": 0.523,
+      "sharpe_ratio": 1.82,
+      "sortino_ratio": 2.45,
+      "calmar_ratio": 3.67
+    },
+    "risk": {
+      "max_drawdown": 0.123,
+      "max_drawdown_duration": 45,
+      "value_at_risk_95": 0.045,
+      "expected_shortfall": 0.067
+    },
+    "trades": {
+      "total_trades": 245,
+      "win_rate": 0.524,
+      "profit_factor": 1.67,
+      "average_win": 0.0234,
+      "average_loss": -0.0156,
+      "largest_win": 0.089,
+      "largest_loss": -0.045
+    },
+    "consistency": {
+      "monthly_profitable": 10,
+      "consecutive_wins": 8,
+      "consecutive_losses": 4,
+      "recovery_factor": 3.67
+    }
+  },
+  "equity_curve": {
+    "dates": ["2024-01-01", ...],
+    "values": [10000, ...]
+  },
+  "trades": [
+    {
+      "id": "trade_1",
+      "entry_time": "2024-01-02T10:30:00Z",
+      "exit_time": "2024-01-03T14:45:00Z",
+      "direction": "long",
+      "entry_price": 45000,
+      "exit_price": 45900,
+      "size": 0.002,
+      "pnl": 18.0,
+      "pnl_pct": 0.02,
+      "duration_hours": 28.25
+    }
+  ]
+}
+4.3 API Endpoints
+python
+# Основные эндпоинты системы
+API_ENDPOINTS = {
+    # Управление агентами
+    "agents": {
+        "list": {"method": "GET", "path": "/api/v1/agents"},
+        "create": {"method": "POST", "path": "/api/v1/agents"},
+        "status": {"method": "GET", "path": "/api/v1/agents/{agent_id}/status"}
+    },
+    
+    # Генерация стратегий
+    "strategies": {
+        "generate": {
+            "method": "POST", 
+            "path": "/api/v1/strategies/generate",
+            "body": {
+                "symbol": "BTCUSDT",
+                "timeframe": "1h",
+                "market_regime": "trending",
+                "constraints": {},
+                "agents": ["deepseek", "qwen"]
+            }
+        },
+        "list": {"method": "GET", "path": "/api/v1/strategies"},
+        "get": {"method": "GET", "path": "/api/v1/strategies/{strategy_id}"}
+    },
+    
+    # Бэктестирование
+    "backtest": {
+        "run": {
+            "method": "POST",
+            "path": "/api/v1/backtest/run",
+            "body": {
+                "strategy_id": "uuid",
+                "period": {"start": "2024-01-01", "end": "2024-12-31"},
+                "settings": {}
+            }
+        },
+        "walk_forward": {
+            "method": "POST",
+            "path": "/api/v1/backtest/walk-forward",
+            "body": {
+                "strategy_id": "uuid",
+                "window_size": 60,
+                "step_size": 30
+            }
+        }
+    },
+    
+    # Оптимизация
+    "optimization": {
+        "run": {
+            "method": "POST",
+            "path": "/api/v1/optimization/run",
+            "body": {
+                "strategy_id": "uuid",
+                "method": "genetic_algorithm",
+                "parameters": {},
+                "iterations": 100
+            }
+        }
+    },
+    
+    # Отчеты
+    "reports": {
+        "generate": {
+            "method": "POST",
+            "path": "/api/v1/reports/generate",
+            "body": {
+                "strategy_ids": ["uuid1", "uuid2"],
+                "comparison_metrics": ["sharpe", "max_dd", "win_rate"],
+                "format": "html"
+            }
+        }
+    }
+}
+5. Интеграция с платформой
+5.1 Конфигурация интеграции
+python
+PLATFORM_INTEGRATION_CONFIG = {
+    "bybit_strategy_tester": {
+        "api_base": "https://api.bybit-tester.com/v1",
+        "auth_method": "api_key",
+        "rate_limit": {
+            "requests_per_minute": 60,
+            "burst_limit": 10
+        },
+        "endpoints": {
+            "historical_data": "/data/historical",
+            "run_backtest": "/backtest/run",
+            "optimize": "/backtest/optimize",
+            "get_results": "/backtest/results/{id}"
+        },
+        "data_formats": {
+            "ohlcv": {
+                "columns": ["timestamp", "open", "high", "low", "close", "volume"],
+                "timeframe_mapping": {
+                    "15m": 900,
+                    "1h": 3600,
+                    "4h": 14400,
+                    "1d": 86400
+                }
+            }
+        }
+    },
+    
+    "llm_apis": {
+        "deepseek": {
+            "api_base": "https://api.deepseek.com/v1",
+            "models": ["deepseek-chat", "deepseek-coder"],
+            "context_window": 128000,
+            "supported_formats": ["json", "text"]
+        },
+        "qwen": {
+            "api_base": "https://api.together.xyz/v1",
+            "models": ["qwen2.5-72b-instruct", "qwen2.5-32b-instruct"],
+            "context_window": 32768
+        }
+    }
+}
+5.2 Пример полного workflow
+python
+async def complete_llm_trading_workflow():
+    """Пример полного workflow системы"""
+    
+    # 1. Инициализация
+    config = load_platform_config("config.yaml")
+    system = LLMTradingSystem(config)
+    
+    # 2. Анализ рынка
+    market_analysis = await system.analyze_market(
+        symbol="BTCUSDT",
+        timeframe="1h",
+        lookback_period=365
+    )
+    
+    # 3. Генерация стратегий разными агентами
+    strategies = await system.generate_strategies_parallel(
+        market_context=market_analysis,
+        agents=["deepseek_v3", "qwen_72b"],
+        num_strategies_per_agent=3
+    )
+    
+    # 4. Консенсусная агрегация
+    consensus_strategy = system.apply_consensus(
+        strategies=strategies,
+        method="weighted_voting"
+    )
+    
+    # 5. Бэктестирование
+    backtest_results = system.run_backtest(
+        strategy=consensus_strategy,
+        period={"start": "2024-01-01", "end": "2024-06-30"},
+        walk_forward=True
+    )
+    
+    # 6. Анализ метрик
+    metrics_analysis = system.analyze_metrics(backtest_results)
+    
+    # 7. Оптимизация (если требуется)
+    if metrics_analysis["overall_score"] < 0.7:
+        optimized = system.optimize_strategy(
+            strategy=consensus_strategy,
+            method="genetic_algorithm",
+            iterations=50
+        )
+        
+        # Повторный бэктест
+        optimized_results = system.run_backtest(optimized)
+        
+        # Выбор лучшей версии
+        final_strategy = optimized if optimized_results["metrics"]["sharpe_ratio"] > backtest_results["metrics"]["sharpe_ratio"] else consensus_strategy
+    else:
+        final_strategy = consensus_strategy
+    
+    # 8. Валидация на OOS данных
+    oos_validation = system.validate_oos(
+        strategy=final_strategy,
+        validation_period={"start": "2024-07-01", "end": "2024-12-31"}
+    )
+    
+    # 9. Генерация отчета
+    report = system.generate_report(
+        strategy=final_strategy,
+        backtest_results=backtest_results,
+        oos_validation=oos_validation,
+        comparison_benchmarks=["buy_hold", "simple_ma"]
+    )
+    
+    return {
+        "final_strategy": final_strategy,
+        "report": report,
+        "performance_summary": {
+            "in_sample_sharpe": backtest_results["metrics"]["sharpe_ratio"],
+            "oos_sharpe": oos_validation["metrics"]["sharpe_ratio"],
+            "total_return": backtest_results["metrics"]["total_return"],
+            "max_drawdown": backtest_results["metrics"]["max_drawdown"]
+        }
+    }
+6. Мониторинг и логирование
+6.1 Система мониторинга
+python
+class SystemMonitor:
+    """Мониторинг системы LLM-трейдинга"""
+    
+    METRICS_TO_TRACK = [
+        "agent_success_rate",
+        "strategy_generation_time",
+        "backtest_duration", 
+        "llm_token_usage",
+        "api_costs",
+        "strategy_performance",
+        "system_errors"
+    ]
+    
+    def __init__(self):
+        self.metrics_history = {metric: [] for metric in self.METRICS_TO_TRACK}
+        self.alerts = []
+        
+    def track_metric(self, metric_name, value, timestamp=None):
+        """Трекинг метрики"""
+        
+        if metric_name not in self.METRICS_TO_TRACK:
+            logger.warning(f"Unknown metric: {metric_name}")
+            return
+        
+        timestamp = timestamp or datetime.now()
+        
+        self.metrics_history[metric_name].append({
+            "timestamp": timestamp,
+            "value": value
+        })
+        
+        # Проверка алертов
+        self._check_alerts(metric_name, value, timestamp)
+    
+    def _check_alerts(self, metric_name, value, timestamp):
+        """Проверка условий для алертов"""
+        
+        alert_rules = {
+            "agent_success_rate": {
+                "threshold": 0.3,
+                "condition": "lt",
+                "message": "Низкий success rate агентов",
+                "severity": "warning"
+            },
+            "strategy_generation_time": {
+                "threshold": 30,
+                "condition": "gt",
+                "message": "Долгая генерация стратегий",
+                "severity": "info"
+            },
+            "api_costs": {
+                "threshold": 100,
+                "condition": "gt_daily",
+                "message": "Высокие API costs за день",
+                "severity": "warning"
+            }
+        }
+        
+        if metric_name in alert_rules:
+            rule = alert_rules[metric_name]
+            
+            if rule["condition"] == "lt" and value < rule["threshold"]:
+                self._trigger_alert(metric_name, value, rule, timestamp)
+            elif rule["condition"] == "gt" and value > rule["threshold"]:
+                self._trigger_alert(metric_name, value, rule, timestamp)
+6.2 Логирование
+python
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "detailed": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S"
+        },
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(name)s %(levelname)s %(message)s"
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+            "formatter": "detailed"
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": "logs/llm_trading_system.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "formatter": "detailed"
+        },
+        "json_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": "logs/metrics.json.log",
+            "maxBytes": 10485760,
+            "backupCount": 5,
+            "formatter": "json"
+        }
+    },
+    "loggers": {
+        "llm_trading_system": {
+            "level": "INFO",
+            "handlers": ["console", "file"],
+            "propagate": False
+        },
+        "agents": {
+            "level": "DEBUG",
+            "handlers": ["file"],
+            "propagate": False
+        },
+        "backtest": {
+            "level": "INFO",
+            "handlers": ["json_file"],
+            "propagate": False
+        }
+    }
+}
+7. Тестирование и валидация
+7.1 Тестовые сценарии
+python
+TEST_SCENARIOS = {
+    "basic_strategy_generation": {
+        "description": "Базовая генерация стратегии одним агентом",
+        "steps": [
+            "Инициализация агента DeepSeek",
+            "Загрузка исторических данных BTCUSDT 1h",
+            "Генерация стратегии",
+            "Парсинг и валидация ответа",
+            "Конвертация в формат платформы"
+        ],
+        "expected_results": {
+            "success_rate": "> 80%",
+            "response_time": "< 30s",
+            "strategy_valid": "JSON соответствует схеме"
+        }
+    },
+    
+    "consensus_aggregation": {
+        "description": "Агрегация стратегий от нескольких агентов",
+        "steps": [
+            "Генерация 3 стратегий разными агентами",
+            "Применение консенсус-движка",
+            "Оценка уровня согласия",
+            "Построение финальной стратегии"
+        ],
+        "expected_results": {
+            "agreement_score": "> 0.4",
+            "final_strategy_quality": "Метрики лучше среднего по агентам"
+        }
+    },
+    
+    "walk_forward_validation": {
+        "description": "Walk-forward тестирование стратегии",
+        "steps": [
+            "Разделение данных на 5 окон",
+            "Бэктест на каждом окне",
+            "Агрегация результатов",
+            "Оценка устойчивости"
+        ],
+        "expected_results": {
+            "consistency_score": "> 0.6",
+            "sharpe_std": "< 0.5",
+            "positive_windows": "> 60%"
+        }
+    }
+}
+8. Развертывание и масштабирование
+8.1 Docker конфигурация
+dockerfile
+# Dockerfile для LLM Trading System
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Установка системных зависимостей
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копирование требований
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копирование исходного кода
+COPY . .
+
+# Создание пользователя
+RUN useradd -m -u 1000 trader
+USER trader
+
+# Запуск приложения
+CMD ["python", "-m", "llm_trading_system.main"]
+8.2 Конфигурация Kubernetes
+yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-trading-system
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: llm-trading
+  template:
+    metadata:
+      labels:
+        app: llm-trading
+    spec:
+      containers:
+      - name: main
+        image: llm-trading-system:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: API_KEYS
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: keys.json
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+---
+# service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-trading-service
+spec:
+  selector:
+    app: llm-trading
+  ports:
+  - port: 80
+    targetPort: 8000
+9. Заключение
+9.1 Ключевые преимущества системы
+Интеллектуальная генерация: Использование современных LLM для создания сложных стратегий
+
+Консенсусный подход: Агрегация мнений нескольких агентов для повышения надежности
+
+Интеграция с платформой: Прямая работа с bybit_strategy_tester
+
+Автоматическая оптимизация: AI-driven улучшение параметров стратегий
+
+Комплексная валидация: Walk-forward тестирование, capacity-stress тесты
+
+9.2 Ожидаемые результаты
+Увеличение Sharpe Ratio на 20-40% по сравнению с базовыми стратегиями
+
+Снижение максимальной просадки на 15-30%
+
+Автоматическая генерация 10-20 стратегий в день
+
+Сокращение времени разработки стратегий с дней до часов
+
+9.3 Дальнейшее развитие
+Мультимодальные агенты: Добавление анализа новостей и социальных медиа
+
+Обучение с подкреплением: Fine-tuning LLM на trading-specific задачах
+
+Федеративное обучение: Совместное обучение агентов без обмена данными
+
+Explainable AI: Интерпретируемость решений LLM для регуляторного соответствия
+
+Техническое задание готово к реализации. Система предоставляет полный цикл от генерации стратегий LLM-агентами до их тестирования и оптимизации на платформе Bybit. Архитектура модульная и масштабируемая, позволяющая добавлять новых агентов и методы агрегации.
+
+Этот ответ сгенерирован AI, только для справки.

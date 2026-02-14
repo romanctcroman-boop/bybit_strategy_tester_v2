@@ -444,7 +444,33 @@ class ResponseParser:
             return None
 
     def _build_strategy(self, data: dict[str, Any], agent_name: str) -> StrategyDefinition:
-        """Build StrategyDefinition from parsed JSON dict."""
+        """Build StrategyDefinition from parsed JSON dict.
+
+        First attempts Pydantic model_validate for schema-level pre-validation.
+        Falls back to manual construction for LLM responses that use
+        non-standard field names or structures.
+        """
+        # Attempt 1: Direct Pydantic schema validation (fast path)
+        try:
+            data_copy = dict(data)
+            # Inject agent metadata
+            data_copy.setdefault("agent_metadata", {})
+            if isinstance(data_copy["agent_metadata"], dict):
+                data_copy["agent_metadata"]["agent_name"] = agent_name
+            # Normalize "name" -> "strategy_name"
+            if "strategy_name" not in data_copy and "name" in data_copy:
+                data_copy["strategy_name"] = data_copy.pop("name")
+            strategy = StrategyDefinition.model_validate(data_copy)
+            logger.debug(f"Fast-path Pydantic validation succeeded for '{strategy.strategy_name}'")
+            return strategy
+        except Exception as e:
+            logger.debug(f"Pydantic fast-path failed ({e}), falling back to manual build")
+
+        # Attempt 2: Manual construction (handles non-standard LLM output)
+        return self._build_strategy_manual(data, agent_name)
+
+    def _build_strategy_manual(self, data: dict[str, Any], agent_name: str) -> StrategyDefinition:
+        """Manual StrategyDefinition construction for non-standard LLM output."""
         # Normalize signal objects
         signals = []
         for i, s in enumerate(data.get("signals", [])):
