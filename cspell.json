@@ -18,6 +18,13 @@
             ]
         },
         {
+            "languageId": "python",
+            "locale": "en,ru",
+            "ignoreRegExpList": [
+                "[а-яА-ЯёЁ]+"
+            ]
+        },
+        {
             "languageId": "powershell",
             "locale": "en"
         }
@@ -77,7 +84,24 @@
         "Csvg",
         "Cpath",
         "LASTEXITCODE",
-        "strat"
+        "strat",
+        "fomc",
+        "pplx",
+        "llen",
+        "hset",
+        "hget",
+        "zadd",
+        "zrem",
+        "zcard",
+        "zpopmax",
+        "sadd",
+        "srem",
+        "scard",
+        "lpush",
+        "norecursedirs",
+        "asyncio",
+        "pytest",
+        "doesnt"
     ],
     "ignorePaths": [
         ".gitignore",
