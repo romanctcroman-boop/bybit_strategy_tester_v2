@@ -20,8 +20,6 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from loguru import logger
-
 # ═══════════════════════════════════════════════════════════════════
 # Data Models
 # ═══════════════════════════════════════════════════════════════════

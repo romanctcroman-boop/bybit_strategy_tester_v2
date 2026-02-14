@@ -129,7 +129,6 @@ __all__ = [
     "AGENT_MEMORY_BACKEND",
     "AGENT_MEMORY_DIR",
     "AGENT_TIMEOUT_SECONDS",
-    "AgentSettings",
     "DEBUG_AGENTS",
     "DEBUG_AGENT_COMMUNICATION",
     "DEEPSEEK_AVAILABLE",
@@ -137,4 +136,5 @@ __all__ = [
     "MCP_DISABLED",
     "PERPLEXITY_AVAILABLE",
     "TOOL_CALL_BUDGET",
+    "AgentSettings",
 ]

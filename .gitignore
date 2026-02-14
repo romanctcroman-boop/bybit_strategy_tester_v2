@@ -513,3 +513,7 @@ validation_reports.json
 
 # Backup files
 *.bak
+
+# Additional database files
+mlflow.db
+*.db

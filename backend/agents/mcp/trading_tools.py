@@ -9,7 +9,7 @@ from __future__ import annotations
 from loguru import logger
 
 from backend.agents.mcp.tool_registry import get_tool_registry
-from backend.agents.mcp.tools import (  # noqa: F401
+from backend.agents.mcp.tools import (
     analyze_trend,
     calculate_atr,
     calculate_bollinger_bands,

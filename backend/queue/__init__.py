@@ -10,9 +10,9 @@ import json
 import logging
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

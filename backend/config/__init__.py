@@ -4,7 +4,7 @@ Central configuration management for the backend system.
 """
 
 import os
-from typing import Any, Dict
+from typing import Any
 
 
 class ConfigNamespace:
@@ -34,18 +34,14 @@ def _build_config() -> ConfigNamespace:
         {
             "DEBUG": os.getenv("DEBUG", "False").lower() in ("true", "1", "yes"),
             "LOG_LEVEL": os.getenv("LOG_LEVEL", "INFO"),
-            "DATABASE_URL": os.getenv(
-                "DATABASE_URL", "sqlite:///./bybit_strategy_tester.db"
-            ),
+            "DATABASE_URL": os.getenv("DATABASE_URL", "sqlite:///./bybit_strategy_tester.db"),
             "REDIS_URL": os.getenv("REDIS_URL", "redis://localhost:6379/0"),
             "API_HOST": os.getenv("API_HOST", "0.0.0.0"),
             "API_PORT": int(os.getenv("API_PORT", "8000")),
-            "ENABLE_WEBSOCKETS": os.getenv("ENABLE_WEBSOCKETS", "False").lower()
-            in ("true", "1", "yes"),
+            "ENABLE_WEBSOCKETS": os.getenv("ENABLE_WEBSOCKETS", "False").lower() in ("true", "1", "yes"),
             "BYBIT_API_KEY": os.getenv("BYBIT_API_KEY", ""),
             "BYBIT_API_SECRET": os.getenv("BYBIT_API_SECRET", ""),
-            "BYBIT_TESTNET": os.getenv("BYBIT_TESTNET", "True").lower()
-            in ("true", "1", "yes"),
+            "BYBIT_TESTNET": os.getenv("BYBIT_TESTNET", "True").lower() in ("true", "1", "yes"),
         }
     )
 

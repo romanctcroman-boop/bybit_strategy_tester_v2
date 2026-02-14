@@ -200,7 +200,7 @@ class CandleCache:
             candles: List of candle dicts to persist
         """
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             from backend.database import SessionLocal
             from backend.models.bybit_kline_audit import BybitKlineAudit

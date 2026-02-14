@@ -12,11 +12,11 @@ Benefits:
     ✅ Backward compatible API
 """
 
-import os
-import time
 import hashlib
 import json
 import logging
+import os
+import time
 from collections import OrderedDict
 from datetime import datetime, timedelta
 from typing import Optional
@@ -28,8 +28,8 @@ from backend.reliability.retry_policy import is_http_error_retryable
 
 try:  # Local import guard for non-backend runtimes
     from backend.agents.circuit_breaker_manager import (
-        get_circuit_manager,
         CircuitBreakerError,
+        get_circuit_manager,
     )
 except Exception:  # pragma: no cover - fallback for lightweight scripts/tests
     get_circuit_manager = None  # type: ignore
@@ -57,9 +57,7 @@ class SimpleCache:
         cache_dict = {"query": query.strip().lower(), **kwargs}
         cache_str = json.dumps(cache_dict, sort_keys=True)
         # Using SHA256 for cache keys (more secure than MD5)
-        return hashlib.sha256(cache_str.encode()).hexdigest()[
-            :16
-        ]  # Truncate for shorter keys
+        return hashlib.sha256(cache_str.encode()).hexdigest()[:16]  # Truncate for shorter keys
 
     def get(self, query: str, **kwargs) -> Optional[dict]:
         """Get from cache"""
@@ -196,8 +194,8 @@ class PerplexityClient:
             else:
                 response = await _ping_request()
 
-                    # Only 200 is truly healthy; 401/403 indicate auth issues
-                    is_healthy = response.status_code == 200
+            # Only 200 is truly healthy; 401/403 indicate auth issues
+            is_healthy = response.status_code == 200
 
             # Cache result
             self.cache.set("ping", {"success": is_healthy}, model="sonar")
