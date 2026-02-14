@@ -14404,11 +14404,41 @@ async function batchDeleteSelected() {
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
+    console.log(`[SUCCESS] Deleted ${data.deleted_count} strategies`);
     showNotification(`Deleted ${data.deleted_count} strateg${data.deleted_count === 1 ? 'y' : 'ies'}`, 'success');
+
+    // Remove deleted cards from DOM instantly (no extra API call)
+    const deletedSet = new Set(data.deleted_ids || Array.from(_selectedStrategyIds));
+    deletedSet.forEach(id => {
+      const card = document.querySelector(`.strategy-card[data-strategy-id="${id}"]`);
+      if (card) card.remove();
+    });
+
+    // Update cache
+    if (_strategiesCache) {
+      _strategiesCache = _strategiesCache.filter(s => !deletedSet.has(s.id));
+    }
+
     _selectedStrategyIds.clear();
-    // Refresh the list
-    const strategies = await fetchStrategiesList();
-    renderStrategiesList(strategies);
+    updateBatchDeleteUI();
+
+    // Update count label
+    const countEl = document.getElementById('strategiesCount');
+    const remaining = document.querySelectorAll('.strategy-card[data-strategy-id]').length;
+    if (countEl) countEl.textContent = `${remaining} strategies`;
+
+    // Show empty state if no strategies left
+    if (remaining === 0) {
+      const listEl = document.getElementById('strategiesList');
+      if (listEl) {
+        listEl.innerHTML = `
+          <div class="strategies-empty">
+            <i class="bi bi-folder2"></i>
+            <p>No saved strategies yet</p>
+            <p class="text-sm mt-1">Use the Save button to save your first strategy</p>
+          </div>`;
+      }
+    }
   } catch (err) {
     console.error('[My Strategies] Batch delete failed:', err);
     showNotification('Failed to delete strategies', 'error');
@@ -14448,9 +14478,35 @@ async function deleteStrategyById(strategyId, name) {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     showNotification(`Strategy "${name}" deleted`, 'success');
     _selectedStrategyIds.delete(strategyId);
-    // Refresh the list
-    const strategies = await fetchStrategiesList();
-    renderStrategiesList(strategies);
+
+    // Remove card from DOM instantly (no extra API call)
+    const card = document.querySelector(`.strategy-card[data-strategy-id="${strategyId}"]`);
+    if (card) card.remove();
+
+    // Update cache
+    if (_strategiesCache) {
+      _strategiesCache = _strategiesCache.filter(s => s.id !== strategyId);
+    }
+
+    updateBatchDeleteUI();
+
+    // Update count label
+    const countEl = document.getElementById('strategiesCount');
+    const remaining = document.querySelectorAll('.strategy-card[data-strategy-id]').length;
+    if (countEl) countEl.textContent = `${remaining} strategies`;
+
+    // Show empty state if no strategies left
+    if (remaining === 0) {
+      const listEl = document.getElementById('strategiesList');
+      if (listEl) {
+        listEl.innerHTML = `
+          <div class="strategies-empty">
+            <i class="bi bi-folder2"></i>
+            <p>No saved strategies yet</p>
+            <p class="text-sm mt-1">Use the Save button to save your first strategy</p>
+          </div>`;
+      }
+    }
   } catch (err) {
     console.error('[My Strategies] Delete failed:', err);
     showNotification('Failed to delete strategy', 'error');

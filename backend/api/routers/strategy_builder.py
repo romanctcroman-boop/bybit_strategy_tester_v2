@@ -468,13 +468,15 @@ async def batch_delete_strategies(
         .all()
     )
 
-    deleted_ids = []
-    for s in strategies:
-        s.is_deleted = True  # type: ignore[assignment]
-        s.deleted_at = datetime.now(UTC)  # type: ignore[assignment]
-        deleted_ids.append(s.id)
+    deleted_ids = [s.id for s in strategies]
 
-    db.commit()
+    if deleted_ids:
+        # Bulk update — single SQL UPDATE instead of per-row Python loop
+        db.query(Strategy).filter(Strategy.id.in_(deleted_ids)).update(
+            {Strategy.is_deleted: True, Strategy.deleted_at: datetime.now(UTC)},
+            synchronize_session="fetch",
+        )
+        db.commit()
 
     return {
         "status": "deleted",
@@ -2188,9 +2190,7 @@ async def run_backtest_from_builder(
                     block.get("type") in ["stop_loss", "take_profit"] and block.get("params", {}).get("use_atr", False)
                     for block in blocks_list
                 )
-                has_pyramiding = any(
-                    block.get("params", {}).get("pyramiding", 0) > 1 for block in blocks_list
-                )
+                has_pyramiding = any(block.get("params", {}).get("pyramiding", 0) > 1 for block in blocks_list)
 
                 if has_multi_tp or has_atr or has_pyramiding:
                     engine_type = "fallback_v4"
