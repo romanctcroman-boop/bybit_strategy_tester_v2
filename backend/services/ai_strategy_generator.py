@@ -376,16 +376,13 @@ class AIStrategyGenerator:
         )
 
         # Build conditions
-        conditions = request.pattern_description or self._get_default_conditions(
-            request.pattern_type
-        )
+        conditions = request.pattern_description or self._get_default_conditions(request.pattern_type)
 
         # Build prompt
         prompt = STRATEGY_GENERATION_USER_TEMPLATE.format(
             name=request.name or f"AI_{request.pattern_type.value}",
             pattern_type=request.pattern_type.value.replace("_", " ").title(),
-            description=request.description
-            or f"AI-generated {request.pattern_type.value} strategy",
+            description=request.description or f"AI-generated {request.pattern_type.value} strategy",
             indicators_list=indicators_list,
             conditions=conditions,
             max_drawdown=request.max_drawdown,
@@ -506,9 +503,7 @@ class AIStrategyGenerator:
                 param_info["type"] = type_match.group(1).lower()
 
             # Default
-            default_match = re.search(
-                r'default\s*=\s*([\d.]+|True|False|["\'][^"\']+["\'])', param_text
-            )
+            default_match = re.search(r'default\s*=\s*([\d.]+|True|False|["\'][^"\']+["\'])', param_text)
             if default_match:
                 param_info["default"] = self._parse_value(default_match.group(1))
 
@@ -556,7 +551,8 @@ class AIStrategyGenerator:
         match = re.search(pattern, response, re.DOTALL)
         if match:
             try:
-                return json.loads(match.group(0))
+                parsed: dict[str, Any] = json.loads(match.group(0))
+                return parsed  # type: ignore[return-value]
             except json.JSONDecodeError:
                 pass
 
@@ -588,20 +584,30 @@ class AIStrategyGenerator:
         """Get default entry/exit conditions for pattern type."""
         conditions = {
             PatternType.TREND_FOLLOWING: """
-            Entry: Price above EMA, EMA rising, RSI > 50
-            Exit: Price below EMA or RSI < 40
+            Entry: Price above EMA, EMA rising, RSI in range filter (long_rsi_more=50, long_rsi_less=100;
+            more=LOWER bound, less=UPPER bound, engine: RSI > more AND RSI < less)
+            Exit: Price below EMA or RSI cross level triggers (cross_short_level=40)
+            RSI modes: use Range filter for trend confirmation, Cross level for exit signals
+            MACD: use_macd_cross_zero=true for trend direction, or use_macd_cross_signal=true
+            for MACD/Signal crossover entries. Modes combine with OR logic.
             """,
             PatternType.MEAN_REVERSION: """
-            Entry: Price at Bollinger Band extremes, RSI oversold/overbought
-            Exit: Price returns to middle band or opposite RSI extreme
+            Entry: Price at Bollinger Band extremes, RSI cross level (cross_long_level=30, cross_short_level=70)
+            Exit: Price returns to middle band or RSI crosses opposite level
+            RSI modes: use Cross level for entry timing, Range filter for confirmation
             """,
             PatternType.BREAKOUT: """
             Entry: Price breaks above resistance with volume confirmation
             Exit: Stop below breakout level, take profit at ATR multiples
             """,
             PatternType.MOMENTUM: """
-            Entry: Strong momentum (RSI > 60 or MACD crossover)
-            Exit: Momentum weakening or trend reversal signal
+            Entry: Strong momentum — RSI range filter (long_rsi_more=60, long_rsi_less=100;
+            more=LOWER bound, less=UPPER bound) or MACD cross signal
+            (use_macd_cross_signal=true, signal_only_if_macd_positive=true for mean-reversion filter)
+            Exit: Momentum weakening (RSI cross level triggers) or MACD cross zero reversal
+            RSI modes: combine Range filter for strength + Cross level for reversals
+            MACD modes: Cross Signal for entries, Cross Zero for confirmation. OR logic — either fires.
+            signal_memory_bars extends MACD signals for N bars (default 5).
             """,
             PatternType.SCALPING: """
             Entry: Quick reversal signals on short timeframe
@@ -630,9 +636,9 @@ class AIStrategyGenerator:
         """Run automatic backtesting on generated strategy."""
         try:
             # Import backtest executor
-            from backend.ml.ai_backtest_executor import BacktestExecutor
+            from backend.ml.ai_backtest_executor import AIBacktestExecutor
 
-            executor = BacktestExecutor()
+            executor = AIBacktestExecutor()
 
             # Run backtest for each symbol/timeframe
             results = {}
@@ -648,20 +654,15 @@ class AIStrategyGenerator:
                     results[key] = result
 
             # Aggregate results
-            total_return = sum(
-                r.get("total_return", 0) for r in results.values()
-            ) / len(results)
-            win_rate = sum(r.get("win_rate", 0) for r in results.values()) / len(
-                results
-            )
+            total_return = sum(r.get("total_return", 0) for r in results.values()) / len(results)
+            win_rate = sum(r.get("win_rate", 0) for r in results.values()) / len(results)
             max_dd = min(r.get("max_drawdown", 0) for r in results.values())
 
             return {
                 "total_return": total_return,
                 "win_rate": win_rate,
                 "max_drawdown": max_dd,
-                "sharpe_ratio": sum(r.get("sharpe_ratio", 0) for r in results.values())
-                / len(results),
+                "sharpe_ratio": sum(r.get("sharpe_ratio", 0) for r in results.values()) / len(results),
                 "total_trades": sum(r.get("total_trades", 0) for r in results.values()),
                 "detailed_results": results,
             }

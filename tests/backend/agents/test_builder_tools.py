@@ -716,6 +716,22 @@ class TestBuilderWorkflow:
                 }
             ],
         }
+        # After auto-adding static_sltp block (no exit blocks in config)
+        strategy_with_sltp = {
+            **strategy_with_main,
+            "blocks": strategy_with_main["blocks"]
+            + [
+                {
+                    "id": "auto_sltp",
+                    "type": "static_sltp",
+                    "category": "action",
+                    "name": "SL/TP",
+                    "x": 950,
+                    "y": 500,
+                    "params": {"stop_loss_percent": 2.0, "take_profit_percent": 4.0},
+                },
+            ],
+        }
 
         # Mock all API calls
         with (
@@ -734,14 +750,16 @@ class TestBuilderWorkflow:
         ):
             # Configure return values
             # GETs: block_library, add_block(price), add_block(rsi), add_block(buy),
-            #        add_block(main_strategy), connect(user), connect(auto-wire buy→main)
+            #        add_block(main_strategy), add_block(static_sltp),
+            #        connect(user), connect(auto-wire buy→main)
             mock_get.side_effect = [
                 mock_block_library,  # get block library
                 strategy_empty,  # get strategy for add_block (price_input)
                 strategy_with_price,  # get strategy for add_block (rsi)
                 strategy_with_rsi,  # get strategy for add_block (buy)
                 strategy_with_buy,  # get strategy for add_block (main_strategy)
-                strategy_with_main,  # get strategy for connect_blocks (user)
+                strategy_with_main,  # get strategy for add_block (static_sltp)
+                strategy_with_sltp,  # get strategy for connect_blocks (user)
                 strategy_with_conn,  # get strategy for connect_blocks (auto-wire)
             ]
             mock_post.side_effect = [
@@ -757,8 +775,8 @@ class TestBuilderWorkflow:
 
         assert result.status == BuilderStage.COMPLETED
         assert result.strategy_id == "test-strategy-001"
-        # 4 blocks: price_input + rsi + buy + main_strategy
-        assert len(result.blocks_added) == 4
+        # 5 blocks: price_input + rsi + buy + main_strategy + auto_sltp
+        assert len(result.blocks_added) == 5
         assert result.backtest_results["metrics"]["sharpe_ratio"] == 1.25
         assert result.duration_seconds > 0
         assert len(result.iterations) == 1
@@ -826,6 +844,103 @@ class TestBuilderWorkflow:
         assert d["workflow_id"] == "bw_test123"
         assert d["status"] == "completed"
         assert len(d["generated_code"]) == 500  # truncated
+
+    @pytest.mark.asyncio
+    async def test_workflow_optimize_existing_strategy(self):
+        """Optimize mode: skip Stages 2-4 when existing_strategy_id is set."""
+        from backend.agents.workflows.builder_workflow import (
+            BuilderWorkflow,
+            BuilderWorkflowConfig,
+        )
+
+        config = BuilderWorkflowConfig(
+            name="Optimize RSI",
+            symbol="BTCUSDT",
+            existing_strategy_id="existing-strat-999",
+            blocks=[],
+            connections=[],
+            max_iterations=1,
+        )
+
+        existing_strategy_response = {
+            "id": "existing-strat-999",
+            "name": "Optimize RSI",
+            "blocks": [
+                {"id": "rsi_1", "type": "rsi", "params": {"period": 14}},
+                {"id": "buy_1", "type": "buy", "params": {}},
+            ],
+            "connections": [{"source": "rsi_1", "source_port": "value", "target": "buy_1", "target_port": "signal"}],
+        }
+
+        mock_validate = {"is_valid": True, "errors": []}
+        mock_code = {"code": "def generate_signals(df): return df"}
+        mock_backtest = {
+            "results": {
+                "sharpe_ratio": 1.5,
+                "win_rate": 0.55,
+                "total_trades": 20,
+                "net_profit": 500.0,
+                "max_drawdown_pct": 5.0,
+            }
+        }
+
+        with (
+            patch(
+                "backend.agents.workflows.builder_workflow.builder_get_block_library",
+                new_callable=AsyncMock,
+                return_value={"blocks": {}},
+            ),
+            patch(
+                "backend.agents.mcp.tools.strategy_builder.builder_get_strategy",
+                new_callable=AsyncMock,
+                return_value=existing_strategy_response,
+            ) as mock_get_strat,
+            patch(
+                "backend.agents.workflows.builder_workflow.builder_validate_strategy",
+                new_callable=AsyncMock,
+                return_value=mock_validate,
+            ),
+            patch(
+                "backend.agents.workflows.builder_workflow.builder_generate_code",
+                new_callable=AsyncMock,
+                return_value=mock_code,
+            ),
+            patch(
+                "backend.agents.workflows.builder_workflow.builder_run_backtest",
+                new_callable=AsyncMock,
+                return_value=mock_backtest,
+            ),
+        ):
+            workflow = BuilderWorkflow()
+            result = await workflow.run(config)
+
+        # Verify strategy_id is set to existing one (not created)
+        assert result.strategy_id == "existing-strat-999"
+        assert result.status.value == "completed"
+        # Verify no create/add_block/connect calls were made
+        # (builder_create_strategy, builder_add_block, builder_connect_blocks NOT called)
+        assert result.blocks_added == existing_strategy_response["blocks"]
+        assert result.connections_made == existing_strategy_response["connections"]
+        # Verify backtest was run
+        assert result.backtest_results == mock_backtest
+        assert len(result.iterations) >= 1
+        assert result.iterations[0]["sharpe_ratio"] == 1.5
+
+    def test_workflow_config_existing_strategy_serialization(self):
+        """Config with existing_strategy_id should serialize correctly."""
+        from backend.agents.workflows.builder_workflow import BuilderWorkflowConfig
+
+        config = BuilderWorkflowConfig(
+            name="Optimize Test",
+            existing_strategy_id="strat-abc-123",
+        )
+        d = config.to_dict()
+        assert d["existing_strategy_id"] == "strat-abc-123"
+
+        # Without existing_strategy_id
+        config2 = BuilderWorkflowConfig(name="Build Test")
+        d2 = config2.to_dict()
+        assert d2["existing_strategy_id"] is None
 
 
 # =============================================================================

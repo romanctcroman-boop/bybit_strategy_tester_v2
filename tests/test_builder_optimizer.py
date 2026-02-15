@@ -221,12 +221,25 @@ class TestDefaultParamRanges:
                 )
 
     def test_rsi_has_expected_params(self):
-        """RSI must have period, overbought, oversold."""
-        assert set(DEFAULT_PARAM_RANGES["rsi"].keys()) == {"period", "overbought", "oversold"}
+        """RSI must have period, range bounds, cross levels, memory, and legacy params."""
+        expected = {
+            "period",
+            "long_rsi_more",
+            "long_rsi_less",
+            "short_rsi_less",
+            "short_rsi_more",
+            "cross_long_level",
+            "cross_short_level",
+            "cross_memory_bars",
+            "overbought",
+            "oversold",
+        }
+        assert set(DEFAULT_PARAM_RANGES["rsi"].keys()) == expected
 
     def test_macd_has_expected_params(self):
-        """MACD must have fast_period, slow_period, signal_period."""
-        assert set(DEFAULT_PARAM_RANGES["macd"].keys()) == {"fast_period", "slow_period", "signal_period"}
+        """MACD must have fast_period, slow_period, signal_period, macd_cross_zero_level, signal_memory_bars."""
+        expected = {"fast_period", "slow_period", "signal_period", "macd_cross_zero_level", "signal_memory_bars"}
+        assert set(DEFAULT_PARAM_RANGES["macd"].keys()) == expected
 
 
 # =============================================================================
@@ -309,6 +322,226 @@ class TestExtractOptimizableParams:
         }
         params = extract_optimizable_params(graph)
         assert params == []
+
+    # ── Conditional extraction for universal RSI modes ──────────────────
+
+    def test_extract_rsi_with_long_range_enabled(self):
+        """When use_long_range is True, long range params are extracted."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "rsi_1",
+                    "type": "rsi",
+                    "name": "RSI",
+                    "params": {"period": 14, "use_long_range": True, "long_rsi_more": 25, "long_rsi_less": 75},
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        assert "long_rsi_more" in keys
+        assert "long_rsi_less" in keys
+        # Short range not enabled → skipped
+        assert "short_rsi_less" not in keys
+        assert "short_rsi_more" not in keys
+        # Legacy skipped when new mode active
+        assert "overbought" not in keys
+        assert "oversold" not in keys
+
+    def test_extract_rsi_with_cross_level_enabled(self):
+        """When use_cross_level is True, cross level params are extracted."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "rsi_1",
+                    "type": "rsi",
+                    "name": "RSI",
+                    "params": {"period": 14, "use_cross_level": True, "cross_long_level": 30, "cross_short_level": 70},
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        assert "cross_long_level" in keys
+        assert "cross_short_level" in keys
+        # Memory not enabled → skipped
+        assert "cross_memory_bars" not in keys
+        # Legacy skipped when new mode active
+        assert "overbought" not in keys
+
+    def test_extract_rsi_with_cross_memory_enabled(self):
+        """When use_cross_memory is True, cross_memory_bars is extracted."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "rsi_1",
+                    "type": "rsi",
+                    "name": "RSI",
+                    "params": {"period": 14, "use_cross_level": True, "use_cross_memory": True, "cross_memory_bars": 3},
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        assert "cross_memory_bars" in keys
+
+    def test_extract_rsi_all_modes_enabled(self):
+        """All modes enabled → all numeric params extracted, legacy skipped."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "rsi_1",
+                    "type": "rsi",
+                    "name": "RSI",
+                    "params": {
+                        "period": 14,
+                        "use_long_range": True,
+                        "long_rsi_more": 30,
+                        "long_rsi_less": 70,
+                        "use_short_range": True,
+                        "short_rsi_less": 70,
+                        "short_rsi_more": 30,
+                        "use_cross_level": True,
+                        "cross_long_level": 30,
+                        "cross_short_level": 70,
+                        "use_cross_memory": True,
+                        "cross_memory_bars": 5,
+                    },
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        expected = {
+            "period",
+            "long_rsi_more",
+            "long_rsi_less",
+            "short_rsi_less",
+            "short_rsi_more",
+            "cross_long_level",
+            "cross_short_level",
+            "cross_memory_bars",
+        }
+        assert keys == expected
+
+    def test_extract_rsi_legacy_only(self):
+        """No new modes → only period + legacy overbought/oversold."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "rsi_1",
+                    "type": "rsi",
+                    "name": "RSI",
+                    "params": {"period": 14, "overbought": 70, "oversold": 30},
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        assert keys == {"period", "overbought", "oversold"}
+
+    # ── Conditional extraction for MACD modes ───────────────────────────
+
+    def test_extract_macd_no_mode_base_only(self):
+        """No MACD mode enabled → only fast/slow/signal extracted (no cross_zero_level, no memory)."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "macd_1",
+                    "type": "macd",
+                    "name": "MACD",
+                    "params": {"fast_period": 12, "slow_period": 26, "signal_period": 9},
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        assert keys == {"fast_period", "slow_period", "signal_period"}
+
+    def test_extract_macd_cross_zero_enabled(self):
+        """Cross zero enabled → macd_cross_zero_level + signal_memory_bars extracted."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "macd_1",
+                    "type": "macd",
+                    "name": "MACD",
+                    "params": {
+                        "fast_period": 12,
+                        "slow_period": 26,
+                        "signal_period": 9,
+                        "use_macd_cross_zero": True,
+                        "macd_cross_zero_level": 0,
+                    },
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        assert "macd_cross_zero_level" in keys
+        assert "signal_memory_bars" in keys  # memory enabled by default
+
+    def test_extract_macd_cross_signal_enabled(self):
+        """Cross signal enabled → signal_memory_bars extracted, but not cross_zero_level."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "macd_1",
+                    "type": "macd",
+                    "name": "MACD",
+                    "params": {"fast_period": 12, "slow_period": 26, "signal_period": 9, "use_macd_cross_signal": True},
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        assert "macd_cross_zero_level" not in keys  # cross zero not enabled
+        assert "signal_memory_bars" in keys  # memory on by default
+
+    def test_extract_macd_memory_disabled(self):
+        """When disable_signal_memory=True, signal_memory_bars is NOT extracted."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "macd_1",
+                    "type": "macd",
+                    "name": "MACD",
+                    "params": {
+                        "fast_period": 12,
+                        "slow_period": 26,
+                        "signal_period": 9,
+                        "use_macd_cross_signal": True,
+                        "disable_signal_memory": True,
+                    },
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        assert "signal_memory_bars" not in keys
+
+    def test_extract_macd_all_modes_enabled(self):
+        """Both modes enabled → all 5 params extracted."""
+        graph = {
+            "blocks": [
+                {
+                    "id": "macd_1",
+                    "type": "macd",
+                    "name": "MACD",
+                    "params": {
+                        "fast_period": 12,
+                        "slow_period": 26,
+                        "signal_period": 9,
+                        "use_macd_cross_zero": True,
+                        "macd_cross_zero_level": 0,
+                        "use_macd_cross_signal": True,
+                    },
+                },
+            ]
+        }
+        params = extract_optimizable_params(graph)
+        keys = {p["param_key"] for p in params}
+        assert keys == {"fast_period", "slow_period", "signal_period", "macd_cross_zero_level", "signal_memory_bars"}
 
 
 # =============================================================================

@@ -546,6 +546,24 @@ class StrategyBuilderAdapter(BaseStrategy):
                             inputs[target_port] = next(iter(source_outputs.values()))
         return inputs
 
+    @staticmethod
+    def _apply_signal_memory(signal: pd.Series, bars: int) -> pd.Series:
+        """Keep a boolean signal active for N bars after it fires.
+
+        Args:
+            signal: Boolean Series where True = signal fired.
+            bars: Number of bars to keep the signal active.
+
+        Returns:
+            Boolean Series with extended signal memory.
+        """
+        if bars <= 0:
+            return signal
+        result = signal.copy()
+        for i in range(1, bars + 1):
+            result = result | signal.shift(i).fillna(False).astype(bool)
+        return result
+
     def _execute_indicator(
         self, indicator_type: str, params: dict[str, Any], ohlcv: pd.DataFrame, inputs: dict[str, pd.Series]
     ) -> dict[str, pd.Series]:
@@ -557,16 +575,104 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         if indicator_type == "rsi":
             period = params.get("period", 14)
-            overbought = params.get("overbought", 70)
-            oversold = params.get("oversold", 30)
             rsi = vbt.RSI.run(close, window=period).rsi
-            # Generate overbought/oversold signals
-            overbought_signal = pd.Series(rsi > overbought, index=ohlcv.index)
-            oversold_signal = pd.Series(rsi < oversold, index=ohlcv.index)
+
+            use_long_range = params.get("use_long_range", False)
+            use_short_range = params.get("use_short_range", False)
+            use_cross_level = params.get("use_cross_level", False)
+
+            logger.debug(
+                "RSI node | period={} | modes: long_range={}, short_range={}, cross={}",
+                period,
+                use_long_range,
+                use_short_range,
+                use_cross_level,
+            )
+
+            # --- Range filter: continuous condition (True while RSI is in range) ---
+            # When enabled acts as a FILTER; when disabled defaults to True (allow all)
+            if use_long_range:
+                long_more = params.get("long_rsi_more", 30)
+                long_less = params.get("long_rsi_less", 70)
+                long_range_condition = (rsi > long_more) & (rsi < long_less)
+            else:
+                long_range_condition = pd.Series(True, index=ohlcv.index)
+
+            if use_short_range:
+                short_less = params.get("short_rsi_less", 70)
+                short_more = params.get("short_rsi_more", 30)
+                short_range_condition = (rsi < short_less) & (rsi > short_more)
+            else:
+                short_range_condition = pd.Series(True, index=ohlcv.index)
+
+            # --- Cross level: event-based signal (True only on crossover bar) ---
+            # When enabled acts as a SIGNAL trigger; when disabled defaults to True
+            if use_cross_level:
+                cross_long_level = params.get("cross_long_level", 30)
+                cross_short_level = params.get("cross_short_level", 70)
+                rsi_prev = rsi.shift(1)
+
+                # Long: RSI crosses up through long level
+                cross_long = (rsi_prev <= cross_long_level) & (rsi > cross_long_level)
+                # Short: RSI crosses down through short level
+                cross_short = (rsi_prev >= cross_short_level) & (rsi < cross_short_level)
+
+                # Opposite signal reversal
+                if params.get("opposite_signal", False):
+                    cross_long, cross_short = cross_short, cross_long
+
+                # Cross memory: keep signal active for N bars
+                if params.get("use_cross_memory", False):
+                    memory_bars = int(params.get("cross_memory_bars", 5))
+                    cross_long = self._apply_signal_memory(cross_long, memory_bars)
+                    cross_short = self._apply_signal_memory(cross_short, memory_bars)
+
+                long_cross_condition = cross_long
+                short_cross_condition = cross_short
+            else:
+                long_cross_condition = pd.Series(True, index=ohlcv.index)
+                short_cross_condition = pd.Series(True, index=ohlcv.index)
+
+            # --- Combine: Range AND Cross (both must be True) ---
+            # Matches rsi_advanced.py logic: filter AND signal
+            long_signal = long_range_condition & long_cross_condition
+            short_signal = short_range_condition & short_cross_condition
+
+            # If no mode is enabled, all conditions default to True → always True
+            # Fall back to legacy overbought/oversold if those params exist
+            has_new_mode = use_long_range or use_short_range or use_cross_level
+            if not has_new_mode and ("overbought" in params or "oversold" in params):
+                overbought = params.get("overbought", 70)
+                oversold = params.get("oversold", 30)
+                long_signal = pd.Series(rsi < oversold, index=ohlcv.index)
+                short_signal = pd.Series(rsi > overbought, index=ohlcv.index)
+                logger.debug(
+                    "RSI node | LEGACY mode | overbought={}, oversold={} | long_signals={}, short_signals={}",
+                    overbought,
+                    oversold,
+                    long_signal.sum(),
+                    short_signal.sum(),
+                )
+            elif not has_new_mode:
+                # No mode enabled and no legacy params: RSI passthrough (always True)
+                # This allows RSI to act purely as an indicator value source
+                long_signal = pd.Series(True, index=ohlcv.index)
+                short_signal = pd.Series(True, index=ohlcv.index)
+                logger.debug("RSI node | PASSTHROUGH mode (no mode enabled, no legacy params)")
+            else:
+                logger.debug(
+                    "RSI node | UNIVERSAL mode | long_signals={}, short_signals={} (range AND cross combined)",
+                    long_signal.sum(),
+                    short_signal.sum(),
+                )
+
             return {
                 "value": rsi,
-                "overbought": overbought_signal,
-                "oversold": oversold_signal,
+                "long": long_signal,
+                "short": short_signal,
+                # Legacy aliases for backward compatibility
+                "overbought": short_signal,
+                "oversold": long_signal,
             }
 
         elif indicator_type == "macd":
@@ -574,10 +680,81 @@ class StrategyBuilderAdapter(BaseStrategy):
             slow = _param(params, 26, "slow_period", "slow")
             signal = _param(params, 9, "signal_period", "signal")
             macd_result = vbt.MACD.run(close, fast_window=fast, slow_window=slow, signal_window=signal)
+
+            macd_line = macd_result.macd
+            signal_line = macd_result.signal
+            histogram = macd_result.histogram
+
+            # --- Universal MACD signal generation ---
+            use_cross_zero = params.get("use_macd_cross_zero", False)
+            use_cross_signal = params.get("use_macd_cross_signal", False)
+
+            long_signal = pd.Series(False, index=ohlcv.index)
+            short_signal = pd.Series(False, index=ohlcv.index)
+
+            if use_cross_zero:
+                level = float(params.get("macd_cross_zero_level", 0))
+                zero_long = (macd_line > level) & (macd_line.shift(1) <= level)
+                zero_short = (macd_line < level) & (macd_line.shift(1) >= level)
+                if params.get("opposite_macd_cross_zero", False):
+                    zero_long, zero_short = zero_short, zero_long
+                long_signal = long_signal | zero_long
+                short_signal = short_signal | zero_short
+                logger.debug(
+                    "MACD CROSS_ZERO: level=%s opposite=%s → long=%d short=%d",
+                    level,
+                    params.get("opposite_macd_cross_zero", False),
+                    zero_long.sum(),
+                    zero_short.sum(),
+                )
+
+            if use_cross_signal:
+                sig_long = (macd_line > signal_line) & (macd_line.shift(1) <= signal_line.shift(1))
+                sig_short = (macd_line < signal_line) & (macd_line.shift(1) >= signal_line.shift(1))
+                # Filter: only generate long when MACD < 0, short when MACD > 0
+                if params.get("signal_only_if_macd_positive", False):
+                    sig_long = sig_long & (macd_line < 0)
+                    sig_short = sig_short & (macd_line > 0)
+                if params.get("opposite_macd_cross_signal", False):
+                    sig_long, sig_short = sig_short, sig_long
+                long_signal = long_signal | sig_long
+                short_signal = short_signal | sig_short
+                logger.debug(
+                    "MACD CROSS_SIGNAL: positive_filter=%s opposite=%s → long=%d short=%d",
+                    params.get("signal_only_if_macd_positive", False),
+                    params.get("opposite_macd_cross_signal", False),
+                    sig_long.sum(),
+                    sig_short.sum(),
+                )
+
+            if not use_cross_zero and not use_cross_signal:
+                logger.debug(
+                    "MACD PASSTHROUGH: no mode enabled, fast=%s slow=%s signal=%s → data-only (long/short=False)",
+                    fast,
+                    slow,
+                    signal,
+                )
+
+            # Signal memory (enabled by default, disable_signal_memory disables it)
+            if not params.get("disable_signal_memory", False):
+                memory_bars = int(params.get("signal_memory_bars", 5))
+                if memory_bars > 0 and (use_cross_zero or use_cross_signal):
+                    long_before = long_signal.sum()
+                    long_signal = self._apply_signal_memory(long_signal, memory_bars)
+                    short_signal = self._apply_signal_memory(short_signal, memory_bars)
+                    logger.debug(
+                        "MACD MEMORY: bars=%d → long %d→%d, short expanded similarly",
+                        memory_bars,
+                        long_before,
+                        long_signal.sum(),
+                    )
+
             return {
-                "macd": macd_result.macd,
-                "signal": macd_result.signal,
-                "hist": macd_result.histogram,
+                "macd": macd_line,
+                "signal": signal_line,
+                "hist": histogram,
+                "long": long_signal,
+                "short": short_signal,
             }
 
         elif indicator_type == "ema":
@@ -3381,9 +3558,16 @@ class StrategyBuilderAdapter(BaseStrategy):
         short_entries = pd.Series([False] * n, index=ohlcv.index)
         short_exits = pd.Series([False] * n, index=ohlcv.index)
 
+        # Track whether main node received signals via connections
+        has_connections_to_main = False
+
         if main_node_id:
             # Case 1: Main node is a signal block (long_entry, short_entry, etc.)
-            # Its outputs should directly map to signals
+            # Its outputs should directly map to signals.
+            # NOTE: type="strategy" main nodes are skipped during execution, so
+            # they won't appear in _value_cache. This branch handles edge cases
+            # where a signal block is marked as main.
+            case1_found = False
             if main_node_id in self._value_cache:
                 main_outputs = self._value_cache[main_node_id]
                 main_type = main_node.get("type", "") if main_node else ""
@@ -3391,60 +3575,86 @@ class StrategyBuilderAdapter(BaseStrategy):
                 # Map signal block outputs directly
                 if "entry_long" in main_outputs:
                     entries = entries | main_outputs["entry_long"]
+                    case1_found = True
                 if "entry_short" in main_outputs:
                     short_entries = short_entries | main_outputs["entry_short"]
+                    case1_found = True
                 if "exit_long" in main_outputs:
                     exits = exits | main_outputs["exit_long"]
+                    case1_found = True
                 if "exit_short" in main_outputs:
                     short_exits = short_exits | main_outputs["exit_short"]
+                    case1_found = True
 
                 # Also check for generic "signal" output based on block type
                 if "signal" in main_outputs:
                     signal = main_outputs["signal"]
                     if main_type in ["long_entry", "entry_long", "buy_signal"]:
                         entries = entries | signal
+                        case1_found = True
                     elif main_type in ["short_entry", "entry_short", "sell_signal"]:
                         short_entries = short_entries | signal
+                        case1_found = True
                     elif main_type in ["long_exit", "exit_long", "close_long"]:
                         exits = exits | signal
+                        case1_found = True
                     elif main_type in ["short_exit", "exit_short", "close_short"]:
                         short_exits = short_exits | signal
+                        case1_found = True
 
-            # Case 2: Main node is a pure strategy aggregator - collect from connections
-            for conn in self.connections:
-                target_id = self._get_connection_target_id(conn)
-                if target_id == main_node_id:
-                    source_id = self._get_connection_source_id(conn)
-                    source_port = self._get_connection_source_port(conn)
-                    target_port = self._get_connection_target_port(conn)
+                if case1_found:
+                    logger.debug(
+                        f"[SignalRouting] Case 1: main node '{main_node_id}' "
+                        f"had cached outputs, skipping connection scan"
+                    )
 
-                    if source_id in self._value_cache:
-                        source_outputs = self._value_cache[source_id]
-                        if source_port in source_outputs:
-                            signal = source_outputs[source_port]
+            # Case 2: Main node is a pure strategy aggregator — collect from
+            # connections ONLY when Case 1 didn't produce signals (avoid
+            # double-counting if main node is both cached and wired to).
+            if not case1_found:
+                for conn in self.connections:
+                    target_id = self._get_connection_target_id(conn)
+                    if target_id == main_node_id:
+                        has_connections_to_main = True
+                        source_id = self._get_connection_source_id(conn)
+                        source_port = self._get_connection_source_port(conn)
+                        target_port = self._get_connection_target_port(conn)
 
-                            # Map to appropriate signal series
-                            # Support old format (entry_long/entry_short),
-                            # new (entry/exit), and action aliases (buy/sell)
-                            if target_port in ("entry_long", "buy"):
-                                entries = entries | signal
-                            elif target_port in ("exit_long", "close_long"):
-                                exits = exits | signal
-                            elif target_port in ("entry_short", "sell"):
-                                short_entries = short_entries | signal
-                            elif target_port in ("exit_short", "close_short"):
-                                short_exits = short_exits | signal
-                            elif target_port == "entry":
-                                # Universal entry - applies to both long and short based on direction
-                                entries = entries | signal
-                                short_entries = short_entries | signal
-                            elif target_port == "exit":
-                                # Universal exit - applies to both long and short
-                                exits = exits | signal
-                                short_exits = short_exits | signal
+                        if source_id in self._value_cache:
+                            source_outputs = self._value_cache[source_id]
+                            if source_port in source_outputs:
+                                signal = source_outputs[source_port]
 
-        # Fallback: If no main node found, look for signal blocks directly
-        if not main_node_id or (entries.sum() == 0 and short_entries.sum() == 0):
+                                # Map to appropriate signal series
+                                # Support old format (entry_long/entry_short),
+                                # new (entry/exit), and action aliases (buy/sell)
+                                if target_port in ("entry_long", "buy"):
+                                    entries = entries | signal
+                                elif target_port in ("exit_long", "close_long"):
+                                    exits = exits | signal
+                                elif target_port in ("entry_short", "sell"):
+                                    short_entries = short_entries | signal
+                                elif target_port in ("exit_short", "close_short"):
+                                    short_exits = short_exits | signal
+                                elif target_port == "entry":
+                                    # Universal entry - applies to both long and short based on direction
+                                    entries = entries | signal
+                                    short_entries = short_entries | signal
+                                elif target_port == "exit":
+                                    # Universal exit - applies to both long and short
+                                    exits = exits | signal
+                                    short_exits = short_exits | signal
+
+        # Fallback: Look for signal blocks by category ONLY when:
+        # 1. No main node exists at all, OR
+        # 2. Main node exists but has NO incoming connections AND produced 0 signals.
+        # If user wired connections to main node, respect that wiring even if
+        # it produced 0 signals — don't silently override with category-based routing.
+        use_fallback = not main_node_id or (
+            not has_connections_to_main and entries.sum() == 0 and short_entries.sum() == 0
+        )
+
+        if use_fallback:
             for block_id, block in self.blocks.items():
                 block_type = block.get("type", "")
                 category = block.get("category", "")

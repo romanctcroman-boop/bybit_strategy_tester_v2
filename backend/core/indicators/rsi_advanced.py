@@ -18,8 +18,8 @@ Example Usage:
     rsi_filter = RSIAdvancedFilter(
         rsi_period=14,
         use_long_range=True,
-        long_range_lower=1,
-        long_range_upper=50,
+        long_range_lower=30,
+        long_range_upper=70,
         use_cross_level=True,
         long_cross_level=30,
         activate_memory=True,
@@ -61,13 +61,13 @@ class RSIAdvancedConfig:
 
     # Long Range Filter
     use_long_range: bool = False
-    long_range_lower: int = 1  # "(LONG) RSI is More"
-    long_range_upper: int = 50  # "& RSI Less"
+    long_range_lower: int = 30  # "(LONG) RSI is More"
+    long_range_upper: int = 70  # "& RSI Less"
 
     # Short Range Filter
     use_short_range: bool = False
-    short_range_lower: int = 50  # "(SHORT) RSI More" (lower bound)
-    short_range_upper: int = 100  # "(SHORT) RSI is Less" (upper bound)
+    short_range_lower: int = 30  # "(SHORT) RSI More" (lower bound)
+    short_range_upper: int = 70  # "(SHORT) RSI is Less" (upper bound)
 
     # Cross Level Filter
     use_cross_level: bool = False
@@ -83,9 +83,11 @@ class RSIAdvancedConfig:
 
     def get_mode(self) -> RSIFilterMode:
         """Determine the active filter mode based on settings."""
+        has_range = self.use_long_range or self.use_short_range
+
         if self.use_cross_level and self.opposite_signal:
             return RSIFilterMode.OPPOSITE_CROSS
-        elif self.use_long_range and self.use_cross_level:
+        elif has_range and self.use_cross_level:
             return RSIFilterMode.RANGE_AND_CROSS
         elif self.use_cross_level and self.activate_memory:
             return RSIFilterMode.CROSS_WITH_MEMORY
@@ -168,10 +170,7 @@ class RSIAdvancedFilter:
         n = len(close)
 
         # Calculate RSI (or use external)
-        if external_rsi is not None:
-            rsi = external_rsi
-        else:
-            rsi = calculate_rsi(close, self.config.rsi_period)
+        rsi = external_rsi if external_rsi is not None else calculate_rsi(close, self.config.rsi_period)
 
         # Initialize result arrays
         long_signals = np.ones(n, dtype=bool)  # Start with all True
@@ -367,10 +366,10 @@ class RSIAdvancedFilter:
 def apply_rsi_range_filter(
     close: np.ndarray,
     rsi_period: int = 14,
-    long_lower: int = 1,
-    long_upper: int = 50,
-    short_lower: int = 50,
-    short_upper: int = 100,
+    long_lower: int = 30,
+    long_upper: int = 70,
+    short_lower: int = 30,
+    short_upper: int = 70,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Apply simple RSI range filter.
@@ -447,10 +446,10 @@ def apply_rsi_combined_filter(
     close: np.ndarray,
     rsi_period: int = 14,
     # Range settings
-    long_range_lower: int = 20,
-    long_range_upper: int = 60,
-    short_range_lower: int = 40,
-    short_range_upper: int = 80,
+    long_range_lower: int = 30,
+    long_range_upper: int = 70,
+    short_range_lower: int = 30,
+    short_range_upper: int = 70,
     # Cross settings
     long_cross_level: int = 30,
     short_cross_level: int = 70,

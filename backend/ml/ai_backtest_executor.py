@@ -360,6 +360,43 @@ Provide recommendations in JSON format:
         """Get history of backtest executions"""
         return self.backtest_results
 
+    async def run_backtest(
+        self,
+        strategy_code: str,
+        symbol: str,
+        timeframe: str,
+        days: int = 30,
+    ) -> dict[str, Any]:
+        """Run a backtest for a given strategy code and market parameters.
+
+        Public convenience wrapper around ``_run_backtest`` used by
+        ``AIStrategyGenerator._run_backtest``.
+
+        Args:
+            strategy_code: Python source of the strategy.
+            symbol: Trading pair, e.g. ``"BTCUSDT"``.
+            timeframe: Candle interval, e.g. ``"15"``.
+            days: Look-back period in days.
+
+        Returns:
+            Dict with backtest metrics (total_return, win_rate, …).
+        """
+        from datetime import UTC, datetime, timedelta
+
+        end = datetime.now(UTC)
+        start = end - timedelta(days=days)
+
+        config: dict[str, Any] = {
+            "asset": symbol,
+            "timeframe": timeframe,
+            "strategy_code": strategy_code,
+        }
+        return await self._run_backtest(
+            backtest_config=config,
+            start_date=start.strftime("%Y-%m-%d"),
+            end_date=end.strftime("%Y-%m-%d"),
+        )
+
     async def _run_backtest(
         self,
         backtest_config: dict[str, Any],

@@ -20,9 +20,12 @@ import copy
 import logging
 import time
 from itertools import product
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from optuna.samplers import BaseSampler
 import pandas as pd
 
 from backend.optimization.filters import passes_filters
@@ -38,6 +41,18 @@ logger = logging.getLogger(__name__)
 DEFAULT_PARAM_RANGES: dict[str, dict[str, dict[str, Any]]] = {
     "rsi": {
         "period": {"type": "int", "low": 5, "high": 30, "step": 1, "default": 14},
+        # Range filter bounds (long)
+        "long_rsi_more": {"type": "float", "low": 10, "high": 45, "step": 5, "default": 30},
+        "long_rsi_less": {"type": "float", "low": 55, "high": 90, "step": 5, "default": 70},
+        # Range filter bounds (short)
+        "short_rsi_less": {"type": "float", "low": 55, "high": 90, "step": 5, "default": 70},
+        "short_rsi_more": {"type": "float", "low": 10, "high": 45, "step": 5, "default": 30},
+        # Cross levels
+        "cross_long_level": {"type": "float", "low": 15, "high": 45, "step": 5, "default": 30},
+        "cross_short_level": {"type": "float", "low": 55, "high": 85, "step": 5, "default": 70},
+        # Cross memory
+        "cross_memory_bars": {"type": "int", "low": 1, "high": 20, "step": 1, "default": 5},
+        # Legacy (backward compatibility — only used when no new mode is enabled)
         "overbought": {"type": "int", "low": 60, "high": 85, "step": 5, "default": 70},
         "oversold": {"type": "int", "low": 15, "high": 40, "step": 5, "default": 30},
     },
@@ -45,6 +60,10 @@ DEFAULT_PARAM_RANGES: dict[str, dict[str, dict[str, Any]]] = {
         "fast_period": {"type": "int", "low": 8, "high": 16, "step": 1, "default": 12},
         "slow_period": {"type": "int", "low": 20, "high": 30, "step": 1, "default": 26},
         "signal_period": {"type": "int", "low": 6, "high": 12, "step": 1, "default": 9},
+        # Cross with Level (Zero Line)
+        "macd_cross_zero_level": {"type": "float", "low": -50.0, "high": 50.0, "step": 1.0, "default": 0},
+        # Signal Memory
+        "signal_memory_bars": {"type": "int", "low": 1, "high": 20, "step": 1, "default": 5},
     },
     "ema": {
         "period": {"type": "int", "low": 5, "high": 50, "step": 1, "default": 20},
@@ -207,6 +226,40 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
 
         for param_key, range_spec in type_ranges.items():
             current_value = block_params.get(param_key, range_spec["default"])
+
+            # Skip RSI params for disabled modes to avoid wasted optimization iterations
+            if block_type == "rsi":
+                if param_key in ("long_rsi_more", "long_rsi_less") and not block_params.get("use_long_range", False):
+                    continue
+                if param_key in ("short_rsi_less", "short_rsi_more") and not block_params.get("use_short_range", False):
+                    continue
+                if param_key in ("cross_long_level", "cross_short_level") and not block_params.get(
+                    "use_cross_level", False
+                ):
+                    continue
+                if param_key == "cross_memory_bars" and not block_params.get("use_cross_memory", False):
+                    continue
+                # Skip legacy overbought/oversold if new modes are active
+                has_new_mode = (
+                    block_params.get("use_long_range", False)
+                    or block_params.get("use_short_range", False)
+                    or block_params.get("use_cross_level", False)
+                )
+                if param_key in ("overbought", "oversold") and has_new_mode:
+                    continue
+
+            # Skip MACD params for disabled modes to avoid wasted optimization iterations
+            if block_type == "macd":
+                if param_key == "macd_cross_zero_level" and not block_params.get("use_macd_cross_zero", False):
+                    continue
+                if param_key == "signal_memory_bars" and block_params.get("disable_signal_memory", False):
+                    continue
+                # Skip signal_memory_bars if no signal mode is enabled
+                has_signal_mode = block_params.get("use_macd_cross_zero", False) or block_params.get(
+                    "use_macd_cross_signal", False
+                )
+                if param_key == "signal_memory_bars" and not has_signal_mode:
+                    continue
 
             params.append(
                 {
@@ -637,12 +690,13 @@ def run_builder_optuna_search(
     start_time = time.time()
 
     # Choose sampler
+    sampler: BaseSampler
     if sampler_type == "random":
         sampler = RandomSampler(seed=42)
     elif sampler_type == "cmaes":
-        sampler = CmaEsSampler(seed=42)
+        sampler = CmaEsSampler(seed=42)  # type: ignore[assignment]
     else:
-        sampler = TPESampler(seed=42, n_startup_trials=min(10, n_trials // 3))
+        sampler = TPESampler(seed=42, n_startup_trials=min(10, n_trials // 3))  # type: ignore[assignment]
 
     # Suppress Optuna logging
     optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -661,10 +715,11 @@ def run_builder_optuna_search(
         for spec in param_specs:
             path = spec["param_path"]
             if spec["type"] == "int":
-                value = trial.suggest_int(path, int(spec["low"]), int(spec["high"]), step=int(spec["step"]))
+                val: int | float = trial.suggest_int(path, int(spec["low"]), int(spec["high"]), step=int(spec["step"]))
+                overrides[path] = val
             else:
-                value = trial.suggest_float(path, float(spec["low"]), float(spec["high"]), step=float(spec["step"]))
-            overrides[path] = value
+                val = trial.suggest_float(path, float(spec["low"]), float(spec["high"]), step=float(spec["step"]))
+                overrides[path] = val
 
         # Clone graph and run backtest
         modified_graph = clone_graph_with_params(base_graph, overrides)
@@ -692,7 +747,7 @@ def run_builder_optuna_search(
         for t in study.trials
         if t.state == optuna.trial.TrialState.COMPLETE and t.value is not None and t.value > float("-inf")
     ]
-    completed_trials.sort(key=lambda t: t.value, reverse=True)
+    completed_trials.sort(key=lambda t: t.value if t.value is not None else 0.0, reverse=True)  # type: ignore[arg-type]
     top_trials = completed_trials[:top_n]
 
     # Re-run top-N for full metrics
