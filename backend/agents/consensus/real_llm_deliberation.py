@@ -18,18 +18,21 @@ P2 Update (2026-02-11): Deep Perplexity integration — context enrichment,
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
+if TYPE_CHECKING:
+    from backend.security.key_manager import KeyManager
+
 # Use KeyManager for secure API key access
+_key_manager: KeyManager | None = None
 try:
-    from backend.security.key_manager import get_key_manager
+    from backend.security.key_manager import KeyManager, get_key_manager
 
     _key_manager = get_key_manager()
 except ImportError:
     logger.warning("KeyManager not available, falling back to environment variables")
-    _key_manager = None
 
 import os
 
@@ -68,6 +71,7 @@ from backend.agents.llm.connections import (
     LLMConfig,
     LLMMessage,
     LLMProvider,
+    LLMResponse,
     PerplexityClient,
     QwenClient,
 )
@@ -120,12 +124,34 @@ class RealLLMDeliberation(MultiAgentDeliberation):
             "drawdown control, and evidence-based decision making. "
             "You prefer conservative, data-validated strategies with strong risk-adjusted returns. "
             "Always consider commission impact (0.07%) and realistic slippage. "
+            "You have access to a 4-tier Hierarchical Memory system: "
+            "WORKING (5min TTL, current context), EPISODIC (7d TTL, session events), "
+            "SEMANTIC (365d TTL, long-term knowledge), PROCEDURAL (permanent, learned skills). "
+            "Use memory to recall past backtest results, store findings, and build on previous analysis. "
             "Follow the exact format specified in the prompt."
         ),
         "qwen": (
             "You are a technical analysis expert participating in a multi-agent deliberation. "
             "Your expertise: momentum indicators (RSI, MACD, Stochastic), moving average systems, "
             "Bollinger Bands, pattern recognition, and indicator parameter optimization. "
+            "RSI supports 3 modes: Range filter (RSI > long_rsi_more AND RSI < long_rsi_less; "
+            "more=LOWER bound, less=UPPER bound, always more < less), Cross level (RSI crosses threshold), "
+            "and Legacy (overbought/oversold). Modes combine with AND logic. "
+            "Optimizable params: period, long_rsi_more/less, short_rsi_more/less, cross_long/short_level, cross_memory_bars. "
+            "OPTIMIZATION: Each optimizable param can have a range for grid search: "
+            "{enabled: true/false, min: <low>, max: <high>, step: <step>}. "
+            "RSI ranges: period {5,30,1}, long_rsi_more {10,45,5}, long_rsi_less {55,90,5}, "
+            "cross_long_level {15,45,5}, cross_short_level {55,85,5}, cross_memory_bars {1,20,1}. "
+            "MACD supports 2 modes combined with OR logic: "
+            "Cross Zero (MACD crosses level, default 0) and Cross Signal (MACD crosses Signal line). "
+            "signal_only_if_macd_positive filters: long only when MACD<0, short only when MACD>0. "
+            "Signal Memory keeps cross signals active for N bars (default 5, on by default). "
+            "Optimizable params: fast_period(12), slow_period(26), signal_period(9), macd_cross_zero_level, signal_memory_bars. "
+            "MACD ranges: fast_period {8,16,1}, slow_period {20,30,1}, signal_period {6,12,1}, "
+            "macd_cross_zero_level {-50,50,1}, signal_memory_bars {1,20,1}. "
+            "MEMORY: You can store/recall knowledge using Hierarchical Memory (4 tiers: "
+            "working/episodic/semantic/procedural). Store indicator insights in SEMANTIC tier, "
+            "optimization results in EPISODIC, and reusable patterns in PROCEDURAL. "
             "You balance signal quality with trade frequency, preferring robust indicator combinations. "
             "Consider timeframe alignment and multi-timeframe confirmation. "
             "Follow the exact format specified in the prompt."
@@ -137,6 +163,9 @@ class RealLLMDeliberation(MultiAgentDeliberation):
             "You bring real-time market context and broader economic perspective. "
             "Consider market conditions, correlation shifts, and regime changes. "
             "When providing signals, always include current market regime and sentiment direction. "
+            "You can use the Hierarchical Memory system to store and recall market observations: "
+            "WORKING (5min TTL, current analysis), EPISODIC (7d TTL, recent market events), "
+            "SEMANTIC (365d TTL, market patterns/rules), PROCEDURAL (permanent, analytical workflows). "
             "Follow the exact format specified in the prompt."
         ),
     }
@@ -145,6 +174,8 @@ class RealLLMDeliberation(MultiAgentDeliberation):
     DEFAULT_SYSTEM_PROMPT = (
         "You are an expert AI agent participating in a multi-agent deliberation. "
         "You must analyze the question carefully and provide a well-reasoned response. "
+        "You have access to a 4-tier Hierarchical Memory system (working/episodic/semantic/procedural) "
+        "for storing and recalling knowledge across sessions. "
         "Follow the exact format specified in the prompt."
     )
 
@@ -168,6 +199,9 @@ class RealLLMDeliberation(MultiAgentDeliberation):
         self._last_market_context: dict[str, Any] | None = None
         self._last_cross_validation: dict[str, Any] | None = None
         self._agent_signals: list[AgentSignal] = []
+
+        # P5: Memory context for deliberation
+        self._memory_context: str | None = None
 
         # Override ask_fn to use real LLM
         self.ask_fn = self._real_ask
@@ -260,12 +294,16 @@ class RealLLMDeliberation(MultiAgentDeliberation):
                     peer_signals=self._agent_signals if self._agent_signals else None,
                 )
 
+            # P5: Inject memory context (prior knowledge) into prompt
+            if self._memory_context:
+                enriched_prompt = f"{self._memory_context}\n\n{enriched_prompt}"
+
             messages = [
                 LLMMessage(role="system", content=system_prompt),
                 LLMMessage(role="user", content=enriched_prompt),
             ]
 
-            response = await client.chat(messages)
+            response: LLMResponse = await client.chat(messages)
 
             logger.debug(
                 f"🤖 {agent_type} response: {len(response.content)} chars, "
@@ -273,7 +311,8 @@ class RealLLMDeliberation(MultiAgentDeliberation):
                 f"{' [enriched]' if enriched_prompt != prompt else ''}"
             )
 
-            return response.content
+            result: str = str(response.content)
+            return result  # type: ignore[return-value]
 
         except Exception as e:
             logger.error(f"LLM request failed for {agent_type}: {e}")
@@ -372,6 +411,126 @@ class RealLLMDeliberation(MultiAgentDeliberation):
 
         return signal
 
+    # ------------------------------------------------------------------
+    # P5: Memory Integration
+    # ------------------------------------------------------------------
+
+    async def recall_for_deliberation(
+        self,
+        question: str,
+        agents: list[str] | None = None,
+    ) -> str | None:
+        """P5.1: Auto-recall relevant memories before deliberation.
+
+        Queries hierarchical memory for prior knowledge related to
+        the deliberation topic and formats it for prompt injection.
+
+        Args:
+            question: The deliberation question/topic.
+            agents: Agent list — used to recall per-namespace memories.
+
+        Returns:
+            Formatted memory context string, or None if nothing found.
+        """
+        try:
+            from backend.agents.mcp.tools.memory import get_global_memory
+
+            memory = get_global_memory()
+
+            # Recall from "shared" namespace (cross-agent knowledge)
+            all_memories = await memory.recall(
+                query=question,
+                memory_type=None,  # search all tiers
+                top_k=5,
+                min_importance=0.3,
+                agent_namespace=None,  # all namespaces
+            )
+
+            if not all_memories:
+                logger.debug("P5: No relevant memories found for deliberation")
+                return None
+
+            # Format as prompt context
+            lines = ["## Relevant Prior Knowledge"]
+            for i, item in enumerate(all_memories, 1):
+                tier = item.memory_type.value.upper()
+                imp = item.importance
+                tags_str = ", ".join(item.tags[:5]) if item.tags else "—"
+                content_preview = item.content[:200]
+                lines.append(f"{i}. [{tier}, importance={imp:.2f}, tags={tags_str}] {content_preview}")
+
+            context = "\n".join(lines)
+            self._memory_context = context
+
+            logger.info(
+                f"🧠 P5: Recalled {len(all_memories)} memories for deliberation "
+                f"(best importance={all_memories[0].importance:.2f})"
+            )
+            return context
+
+        except Exception as e:
+            logger.warning(f"P5: Memory recall failed (non-fatal): {e}")
+            return None
+
+    async def store_deliberation_result(
+        self,
+        result: DeliberationResult,
+    ) -> str | None:
+        """P5.2: Auto-store deliberation result in memory.
+
+        Saves the consensus decision to EPISODIC tier (or SEMANTIC if
+        confidence >= 0.8). Tags are auto-generated from the question.
+
+        Args:
+            result: The completed DeliberationResult.
+
+        Returns:
+            Stored memory item ID, or None on failure.
+        """
+        try:
+            from backend.agents.mcp.tools.memory import get_global_memory
+            from backend.agents.memory.hierarchical_memory import MemoryType
+
+            memory = get_global_memory()
+
+            # Determine tier based on confidence
+            tier = MemoryType.SEMANTIC if result.confidence >= 0.8 else MemoryType.EPISODIC
+
+            # Build content summary
+            agents_str = ", ".join(result.metadata.get("agents", []))
+            content = (
+                f"Deliberation consensus: {result.decision}\n"
+                f"Question: {result.question}\n"
+                f"Confidence: {result.confidence:.2%}\n"
+                f"Agents: {agents_str}\n"
+                f"Rounds: {len(result.rounds)}"
+            )
+
+            item = await memory.store(
+                content=content,
+                memory_type=tier,
+                importance=result.confidence,
+                tags=["deliberation", "consensus"],
+                metadata={
+                    "deliberation_id": result.id,
+                    "agents": result.metadata.get("agents", []),
+                    "voting_strategy": result.voting_strategy.value,
+                    "rounds": len(result.rounds),
+                    "question": result.question[:200],
+                },
+                source="deliberation",
+                agent_namespace="shared",
+            )
+
+            logger.info(
+                f"🧠 P5: Stored deliberation result → {tier.value} (id={item.id}, confidence={result.confidence:.2%})"
+            )
+            return item.id
+
+        except Exception as e:
+            logger.warning(f"P5: Failed to store deliberation result: {e}")
+            return None
+
     def cross_validate(self) -> dict[str, Any] | None:
         """
         Cross-validate all recorded agent signals.
@@ -419,6 +578,7 @@ class RealLLMDeliberation(MultiAgentDeliberation):
         self._agent_signals.clear()
         self._last_market_context = None
         self._last_cross_validation = None
+        self._memory_context = None
         logger.debug("🔄 Deliberation session cleared")
 
     async def close(self) -> None:
@@ -460,6 +620,7 @@ async def deliberate_with_llm(
     symbol: str = "BTCUSDT",
     strategy_type: str = "general",
     enrich_with_perplexity: bool = True,
+    use_memory: bool = True,
 ) -> DeliberationResult:
     """
     Convenience function for real LLM deliberation with Perplexity enrichment.
@@ -468,6 +629,8 @@ async def deliberate_with_llm(
     1. Uses all available agents (up to 3: deepseek, qwen, perplexity)
     2. Enriches context with Perplexity web-search (if relevant to the task)
     3. Cross-validates signals after deliberation
+    4. (P5) Recalls relevant memories before deliberation
+    5. (P5) Stores consensus result in memory after deliberation
 
     Falls back to deepseek-only if no agents have API keys configured.
 
@@ -480,6 +643,7 @@ async def deliberate_with_llm(
         symbol: Trading symbol for Perplexity context
         strategy_type: Strategy type for context enrichment
         enrich_with_perplexity: Whether to pre-enrich with Perplexity
+        use_memory: Whether to auto-recall/store memories (P5)
 
     Returns:
         DeliberationResult with real AI responses
@@ -493,6 +657,10 @@ async def deliberate_with_llm(
     if agents is None:
         available = list(deliberation._clients.keys())
         agents = available if available else ["deepseek"]
+
+    # P5: Auto-recall relevant memories before deliberation
+    if use_memory:
+        await deliberation.recall_for_deliberation(question, agents)
 
     # Pre-enrich context with Perplexity (adaptive — may skip for backtest tasks)
     if enrich_with_perplexity and "perplexity" in agents:
@@ -514,6 +682,12 @@ async def deliberate_with_llm(
     cross_val = deliberation.cross_validate()
     if cross_val:
         result.metadata["cross_validation"] = cross_val
+
+    # P5: Auto-store deliberation result in memory
+    if use_memory:
+        stored_id = await deliberation.store_deliberation_result(result)
+        if stored_id:
+            result.metadata["memory_id"] = stored_id
 
     return result
 

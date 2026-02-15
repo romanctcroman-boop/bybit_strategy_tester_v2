@@ -228,6 +228,12 @@ Format your response as JSON:
             "cache_hits": 0,
             "avg_response_time": 0.0,
             "errors": 0,
+            "calls_skipped": 0,
+            "calls_made": 0,
+            "enrichments": 0,
+            "cross_validations": 0,
+            "conflicts_detected": 0,
+            "conflicts_resolved": 0,
         }
 
     def get_client(self) -> PerplexityClient | None:

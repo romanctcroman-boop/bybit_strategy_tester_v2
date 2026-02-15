@@ -284,6 +284,63 @@ class ConsensusEngine:
         """Get consensus history."""
         return list(self._history)
 
+    async def build_memory_context(
+        self,
+        topic: str,
+        max_items: int = 3,
+    ) -> str | None:
+        """P5.3: Build prior consensus context from memory.
+
+        Queries hierarchical memory for previous deliberation results
+        tagged with "deliberation" and formats them for prompt injection.
+        Deduplicates: excludes results from the current session (last 5 min).
+
+        Args:
+            topic: The current deliberation topic for relevance matching.
+            max_items: Maximum number of prior results to include.
+
+        Returns:
+            Formatted context string, or None if no prior results found.
+        """
+        try:
+            from backend.agents.mcp.tools.memory import get_global_memory
+
+            memory = get_global_memory()
+
+            results = await memory.recall(
+                query=topic,
+                memory_type=None,
+                top_k=max_items,
+                min_importance=0.3,
+                tags=["deliberation"],
+                agent_namespace=None,
+            )
+
+            if not results:
+                return None
+
+            # Deduplicate: skip items created in the last 5 minutes
+            from datetime import UTC, datetime, timedelta
+
+            cutoff = datetime.now(UTC) - timedelta(minutes=5)
+            prior = [r for r in results if r.created_at < cutoff]
+            if not prior:
+                return None
+
+            lines = ["## Prior Consensus Results"]
+            for i, item in enumerate(prior, 1):
+                tier = item.memory_type.value.upper()
+                lines.append(f"{i}. [{tier}, importance={item.importance:.2f}] {item.content[:300]}")
+
+            context = "\n".join(lines)
+
+            logger.info(f"🧠 P5.3: Built memory context with {len(prior)} prior consensus results")
+            return context
+
+        except Exception as e:
+            logger.warning(f"P5.3: Failed to build memory context: {e}")
+            return None
+
     # ─────────────────────────────────────────────────────────────────
     # WEIGHT CALCULATION
     # ─────────────────────────────────────────────────────────────────
@@ -475,9 +532,6 @@ class ConsensusEngine:
 
         # Merge filters (union, deduplicated by type)
         merged_filters = self._merge_filters(strategies, agent_weights)
-
-        # Exit conditions from best agent
-        exit_conditions = best_strategy.exit_conditions
 
         # If multiple agents define exits, average the values
         exit_conditions = self._merge_exit_conditions(strategies, agent_weights)
