@@ -93,7 +93,9 @@
     "test_eval_test_*/**": true,
     "test_memory_test_*/**": true,
     "**/agent_memory/**": true,
-    "**/journal/**": true
+    "**/journal/**": true,
+    "**/screenshots/**": true,
+    "**/data/**": true
   },
   // Hide non-essential directories from Explorer sidebar
   "files.exclude": {
@@ -108,7 +110,8 @@
     "**/.cache": true,
     "test_e2e_test_*": true,
     "test_eval_test_*": true,
-    "test_memory_test_*": true
+    "test_memory_test_*": true,
+    "**/screenshots": true
   },
   // Exclude from search results (Ctrl+Shift+F)
   "search.exclude": {
@@ -130,7 +133,14 @@
     "**/.vs/**": true,
     "test_e2e_test_*/**": true,
     "test_eval_test_*/**": true,
-    "test_memory_test_*/**": true
+    "test_memory_test_*/**": true,
+    "**/screenshots/**": true,
+    "**/data/**": true,
+    "**/*.png": true,
+    "**/*.jpg": true,
+    "**/*.jpeg": true,
+    "**/*.gif": true,
+    "**/*.ico": true
   },
   // Auto-run tasks on folder open
   "task.allowAutomaticTasks": "on",
@@ -140,6 +150,14 @@
   "python.testing.pytestArgs": [
     "tests"
   ],
+  // ═══════════════════════════════════════════════════════════
+  // Pylance / Pyright — Type Checking Configuration
+  // ═══════════════════════════════════════════════════════════
+  "python.analysis.typeCheckingMode": "basic",
+  // ═══════════════════════════════════════════════════════════
+  // MyPy Type Checker — Disable (Pylance handles type checking)
+  // ═══════════════════════════════════════════════════════════
+  "mypy-type-checker.enabled": false,
   // ═══════════════════════════════════════════════════════════
   // GitHub Copilot — Maximum Agent Autonomy for Claude Sonnet 4 / Opus 4
   // ═══════════════════════════════════════════════════════════

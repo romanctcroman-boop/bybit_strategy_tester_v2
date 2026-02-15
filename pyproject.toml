@@ -161,11 +161,23 @@ fail_under = 50
 directory = "htmlcov"
 
 # ==============================================================================
+# Pyright / Pylance Configuration
+# ==============================================================================
+[tool.pyright]
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+# Relax strict return-type checks for dynamic typing patterns (json.loads, resp.json(), etc.)
+reportReturnType = "none"
+reportAssignmentType = "warning"
+reportCallIssue = "warning"
+exclude = ["venv", ".venv", "scripts", "node_modules", "mcp-server", "test_*"]
+
+# ==============================================================================
 # MyPy Configuration
 # ==============================================================================
 [tool.mypy]
 python_version = "3.13"
-warn_return_any = true
+warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
