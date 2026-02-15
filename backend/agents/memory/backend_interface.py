@@ -80,7 +80,8 @@ class JsonFileBackend(MemoryBackend):
             return None
         try:
             with open(file_path, encoding="utf-8") as f:
-                return json.load(f)
+                data: dict[str, Any] = json.load(f)
+                return data  # type: ignore[return-value]
         except Exception as e:
             logger.warning(f"Failed to load memory {item_id}: {e}")
             return None
@@ -122,9 +123,12 @@ class SQLiteBackendAdapter(MemoryBackend):
     Adapter that wraps SQLiteMemoryBackend to conform to MemoryBackend ABC.
 
     Bridges the gap between HierarchicalMemory's persistence needs and
-    the existing SQLiteMemoryBackend (which has its own schema).
-    SQLiteMemoryBackend is sync — we wrap calls via ``asyncio.to_thread``
+    the existing SQLiteMemoryBackend (which uses the unified schema).
+    SQLiteMemoryBackend is sync -- we wrap calls via ``asyncio.to_thread``
     to avoid blocking the event loop.
+
+    Since P1.2, SQLiteMemoryBackend returns ``dict[str, Any]`` instead of
+    a separate dataclass, so no attribute-style access is needed.
     """
 
     def __init__(self, db_path: str = "agent_memory.db"):
@@ -135,42 +139,66 @@ class SQLiteBackendAdapter(MemoryBackend):
         logger.debug(f"SQLiteBackendAdapter initialized: {db_path}")
 
     async def save_item(self, item_id: str, tier: str, data: dict[str, Any]) -> None:
-        """Save item to SQLite via SQLiteMemoryBackend (non-blocking)."""
+        """Save item to SQLite via SQLiteMemoryBackend (non-blocking).
+
+        Passes ALL MemoryItem fields without loss.
+        """
         import asyncio
 
         content = data.get("content", "")
         importance = data.get("importance", 0.5)
         tags = data.get("tags", [])
-        metadata = {
-            k: v
-            for k, v in data.items()
-            if k not in ("id", "content", "memory_type", "importance", "tags", "embedding")
+        agent_namespace = data.get("agent_namespace", "shared")
+        source = data.get("source")
+        related_ids = data.get("related_ids", [])
+        embedding = data.get("embedding")
+        ttl_seconds = data.get("ttl_seconds")
+
+        # Store extra fields that don't map to dedicated columns as metadata
+        reserved_keys = {
+            "id",
+            "content",
+            "memory_type",
+            "importance",
+            "tags",
+            "embedding",
+            "agent_namespace",
+            "source",
+            "related_ids",
+            "ttl_seconds",
+            "created_at",
+            "accessed_at",
+            "access_count",
         }
+        metadata = {k: v for k, v in data.items() if k not in reserved_keys}
+
         await asyncio.to_thread(
             self._backend.store,
-            memory_type=f"hierarchical.{tier}",
+            memory_type=tier,
             content=content,
             importance=importance,
             tags=tags,
             metadata=metadata,
             item_id=item_id,
+            agent_namespace=agent_namespace,
+            source=source,
+            related_ids=related_ids,
+            embedding=embedding,
+            ttl_seconds=ttl_seconds,
         )
 
     async def load_item(self, item_id: str, tier: str) -> dict[str, Any] | None:
-        """Load item from SQLite (non-blocking)."""
+        """Load item from SQLite (non-blocking).
+
+        Returns a MemoryItem-compatible dict.
+        """
         import asyncio
 
         result = await asyncio.to_thread(self._backend.get_by_id, item_id)
         if result is None:
             return None
-        return {
-            "id": result.id,
-            "content": result.content,
-            "memory_type": tier,
-            "importance": result.importance,
-            "tags": result.tags,
-            **result.metadata,
-        }
+        # Result is already a dict with all unified fields
+        return result
 
     async def delete_item(self, item_id: str, tier: str) -> None:
         """Delete item from SQLite (non-blocking)."""
@@ -179,29 +207,20 @@ class SQLiteBackendAdapter(MemoryBackend):
         await asyncio.to_thread(self._backend.delete, item_id)
 
     async def load_all(self, tier: str | None = None) -> list[dict[str, Any]]:
-        """Load all items from SQLite (non-blocking)."""
+        """Load all items from SQLite (non-blocking).
+
+        Returns list of MemoryItem-compatible dicts.
+        """
         import asyncio
 
-        memory_type = f"hierarchical.{tier}" if tier else None
         results = await asyncio.to_thread(
             self._backend.query,
-            memory_type=memory_type,
+            memory_type=tier,
             limit=10000,
             include_expired=True,
         )
-        items = []
-        for r in results:
-            items.append(
-                {
-                    "id": r.id,
-                    "content": r.content,
-                    "memory_type": tier or r.memory_type.replace("hierarchical.", ""),
-                    "importance": r.importance,
-                    "tags": r.tags,
-                    **r.metadata,
-                }
-            )
-        return items
+        # Results are already list[dict] with all unified fields
+        return results
 
     async def close(self) -> None:
         """SQLiteMemoryBackend doesn't require explicit close."""
