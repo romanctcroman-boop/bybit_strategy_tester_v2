@@ -284,15 +284,14 @@ class TestAnalyzeMarketEndpoint:
         """Successful market analysis returns structured response."""
         mock_load.return_value = sample_ohlcv
 
-        # Mock context object
+        # Mock context object with real MarketContext fields
         mock_context = MagicMock()
-        mock_context.market_regime = "trending"
+        mock_context.market_regime = "trending_up"
         mock_context.trend_direction = "bullish"
-        mock_context.volatility_level = "medium"
+        mock_context.atr_pct = 1.5  # medium volatility (1-3%)
         mock_context.support_levels = [48000.0, 47000.0]
         mock_context.resistance_levels = [52000.0, 53000.0]
-        mock_context.recommended_strategies = ["ema_crossover", "supertrend"]
-        mock_context.summary = "Bullish trend with medium volatility"
+        mock_context.indicators_summary = "Bullish trend with medium volatility"
         mock_ctx.return_value = mock_context
 
         response = client.post(
@@ -308,8 +307,10 @@ class TestAnalyzeMarketEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["symbol"] == "BTCUSDT"
-        assert data["market_regime"] == "trending"
+        assert data["market_regime"] == "trending_up"
         assert data["trend_direction"] == "bullish"
+        assert data["volatility_level"] == "medium"
+        assert data["context_summary"] == "Bullish trend with medium volatility"
         assert data["candles_analyzed"] == len(sample_ohlcv)
 
     @patch("backend.api.routers.ai_pipeline._load_ohlcv_data")

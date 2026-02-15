@@ -976,6 +976,10 @@ class BuilderTaskRequest(BaseModel):
         default=False,
         description="Use AI multi-agent deliberation (DeepSeek+Perplexity) for planning",
     )
+    existing_strategy_id: str | None = Field(
+        default=None,
+        description="Existing strategy ID to optimize (skip create/blocks/connect stages)",
+    )
 
 
 @router.post("/builder/task")
@@ -1011,6 +1015,7 @@ async def run_builder_task(request: BuilderTaskRequest):
             min_acceptable_sharpe=request.min_sharpe,
             min_acceptable_win_rate=request.min_win_rate,
             enable_deliberation=request.enable_deliberation,
+            existing_strategy_id=request.existing_strategy_id,
         )
 
         workflow = BuilderWorkflow()

@@ -23,7 +23,38 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 # In-memory pipeline job store (lightweight — no DB needed)
+# Eviction: max 200 entries, stale jobs removed after 1 hour.
 _pipeline_jobs: dict[str, dict[str, Any]] = {}
+_PIPELINE_JOBS_MAX = 200
+_PIPELINE_JOB_TTL_SECONDS = 3600  # 1 hour
+
+
+def _evict_stale_jobs() -> None:
+    """Remove jobs older than TTL and enforce max size."""
+    now = datetime.now(UTC)
+    stale_ids = []
+    for jid, job in _pipeline_jobs.items():
+        created_raw = job.get("created_at")
+        if created_raw is None:
+            continue
+        try:
+            created = datetime.fromisoformat(str(created_raw))
+            if (now - created).total_seconds() > _PIPELINE_JOB_TTL_SECONDS:
+                stale_ids.append(jid)
+        except (ValueError, TypeError):
+            stale_ids.append(jid)  # malformed — evict
+    for jid in stale_ids:
+        _pipeline_jobs.pop(jid, None)
+
+    # If still over limit, remove oldest first
+    if len(_pipeline_jobs) > _PIPELINE_JOBS_MAX:
+        sorted_ids = sorted(
+            _pipeline_jobs,
+            key=lambda k: _pipeline_jobs[k].get("created_at", ""),
+        )
+        for jid in sorted_ids[: len(_pipeline_jobs) - _PIPELINE_JOBS_MAX]:
+            _pipeline_jobs.pop(jid, None)
+
 
 router = APIRouter(
     prefix="/ai-pipeline",
@@ -241,7 +272,8 @@ async def generate_strategy(request: GenerateRequest) -> PipelineResponse:
             end_date=request.end_date,
         )
 
-        # Create pipeline job
+        # Create pipeline job (evict stale entries first)
+        _evict_stale_jobs()
         pipeline_id = str(uuid.uuid4())[:12]
         _pipeline_jobs[pipeline_id] = {
             "status": "running",
@@ -371,16 +403,33 @@ async def analyze_market(request: AnalyzeMarketRequest) -> MarketAnalysisRespons
         builder = MarketContextBuilder()
         context = builder.build_context(request.symbol, request.timeframe, df)
 
+        # Derive volatility level from real ATR% field
+        if context.atr_pct >= 3.0:
+            volatility = "high"
+        elif context.atr_pct >= 1.0:
+            volatility = "medium"
+        else:
+            volatility = "low"
+
+        # Derive strategy recommendations from market regime
+        regime_strategies: dict[str, list[str]] = {
+            "trending_up": ["ema_crossover", "macd", "supertrend"],
+            "trending_down": ["ema_crossover", "macd", "supertrend"],
+            "ranging": ["rsi", "bollinger", "stochastic"],
+            "volatile": ["bollinger", "rsi", "stochastic"],
+        }
+        recommended = regime_strategies.get(context.market_regime, ["rsi", "macd"])
+
         return MarketAnalysisResponse(
             symbol=request.symbol,
             timeframe=request.timeframe,
-            market_regime=getattr(context, "market_regime", "unknown"),
-            trend_direction=getattr(context, "trend_direction", "unknown"),
-            volatility_level=getattr(context, "volatility_level", "unknown"),
-            support_levels=getattr(context, "support_levels", []),
-            resistance_levels=getattr(context, "resistance_levels", []),
-            recommended_strategies=getattr(context, "recommended_strategies", []),
-            context_summary=getattr(context, "summary", str(context)),
+            market_regime=context.market_regime,
+            trend_direction=context.trend_direction,
+            volatility_level=volatility,
+            support_levels=context.support_levels,
+            resistance_levels=context.resistance_levels,
+            recommended_strategies=recommended,
+            context_summary=context.indicators_summary or str(context),
             candles_analyzed=len(df),
         )
 

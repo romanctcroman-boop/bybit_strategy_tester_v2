@@ -15,6 +15,7 @@ Protocol:
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, cast
@@ -150,8 +151,27 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
     # RSI
     "rsi": {
         "period": {"type": "integer", "min": 2, "max": 500, "default": 14},
-        "overbought": {"type": "number", "min": 50, "max": 100, "default": 70},
-        "oversold": {"type": "number", "min": 0, "max": 50, "default": 30},
+        "timeframe": {
+            "type": "select",
+            "options": ["Chart", "1", "5", "15", "30", "60", "240", "D", "W", "M"],
+            "default": "Chart",
+        },
+        "use_btc_source": {"type": "boolean", "default": False},
+        "use_long_range": {"type": "boolean", "default": False},
+        "long_rsi_more": {"type": "number", "min": 0.1, "max": 100, "default": 30},
+        "long_rsi_less": {"type": "number", "min": 0.1, "max": 100, "default": 70},
+        "use_short_range": {"type": "boolean", "default": False},
+        "short_rsi_less": {"type": "number", "min": 0.1, "max": 100, "default": 70},
+        "short_rsi_more": {"type": "number", "min": 0.1, "max": 100, "default": 30},
+        "use_cross_level": {"type": "boolean", "default": False},
+        "cross_long_level": {"type": "number", "min": 0.1, "max": 100, "default": 30},
+        "cross_short_level": {"type": "number", "min": 0.1, "max": 100, "default": 70},
+        "opposite_signal": {"type": "boolean", "default": False},
+        "use_cross_memory": {"type": "boolean", "default": False},
+        "cross_memory_bars": {"type": "integer", "min": 1, "max": 100, "default": 5},
+        # Legacy params (backward compatibility)
+        "overbought": {"type": "number", "min": 50, "max": 100, "default": 70, "required": False},
+        "oversold": {"type": "number", "min": 0, "max": 50, "default": 30, "required": False},
     },
     "rsi_cross_above": {
         "period": {"type": "integer", "min": 2, "max": 500, "default": 14},
@@ -406,22 +426,50 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
 CONNECTION_RULES: dict[str, list[str]] = {
     # Block types that can connect to entry signals
     "entry_long": [
+        # Logic gates
         "and",
         "or",
+        "not",
+        "delay",
+        "sequence",
+        # RSI family
         "rsi",
+        "rsi_cross_above",
+        "rsi_cross_below",
+        "rsi_divergence",
+        # MACD family
         "macd_cross",
+        "macd_histogram",
+        "macd_divergence",
+        # Moving averages
         "ma_cross",
+        "price_above_ma",
+        "price_below_ma",
+        # Bollinger Bands
         "bb_breakout",
-        "engulfing",
-        "hammer",
+        "bb_squeeze",
+        # Stochastic
         "stoch_cross",
+        "stoch_overbought",
+        "stoch_oversold",
+        # Volume
         "volume_spike",
+        "volume_above_avg",
+        # Price action
         "price_above",
         "price_below",
+        "price_cross_above",
+        "price_cross_below",
+        # ATR filter
+        "atr_filter",
+        # Classic candlestick patterns
         "doji",
         "pin_bar",
+        "engulfing",
+        "hammer",
         "morning_star",
         "three_soldiers",
+        # Exotic candlestick patterns
         "three_line_strike",
         "kicker",
         "abandoned_baby",
@@ -434,22 +482,50 @@ CONNECTION_RULES: dict[str, list[str]] = {
         "matching_low_high",
     ],
     "entry_short": [
+        # Logic gates
         "and",
         "or",
+        "not",
+        "delay",
+        "sequence",
+        # RSI family
         "rsi",
+        "rsi_cross_above",
+        "rsi_cross_below",
+        "rsi_divergence",
+        # MACD family
         "macd_cross",
+        "macd_histogram",
+        "macd_divergence",
+        # Moving averages
         "ma_cross",
+        "price_above_ma",
+        "price_below_ma",
+        # Bollinger Bands
         "bb_breakout",
-        "engulfing",
-        "hammer",
+        "bb_squeeze",
+        # Stochastic
         "stoch_cross",
+        "stoch_overbought",
+        "stoch_oversold",
+        # Volume
         "volume_spike",
+        "volume_above_avg",
+        # Price action
         "price_above",
         "price_below",
+        "price_cross_above",
+        "price_cross_below",
+        # ATR filter
+        "atr_filter",
+        # Classic candlestick patterns
         "doji",
         "pin_bar",
+        "engulfing",
+        "hammer",
         "evening_star",
         "three_crows",
+        # Exotic candlestick patterns
         "three_line_strike",
         "kicker",
         "abandoned_baby",
@@ -458,6 +534,7 @@ CONNECTION_RULES: dict[str, list[str]] = {
         "gap_pattern",
         "ladder_pattern",
         "stick_sandwich",
+        "homing_pigeon",
         "matching_low_high",
     ],
     # Logic gates accept any signal
@@ -646,8 +723,8 @@ def _cross_validate_block(block_type: str, params: dict[str, Any]) -> list[Valid
     """Cross-validate parameters within a block."""
     messages: list[ValidationMessage] = []
 
-    # MACD: fast < slow
-    if block_type in ["macd_cross", "macd_histogram", "macd_divergence"]:
+    # MACD: fast < slow (universal block + legacy variants)
+    if block_type in ["macd", "macd_cross", "macd_histogram", "macd_divergence"]:
         fast = params.get("fast_period", 12)
         slow = params.get("slow_period", 26)
         if fast >= slow:
@@ -674,8 +751,9 @@ def _cross_validate_block(block_type: str, params: dict[str, Any]) -> list[Valid
                 )
             )
 
-    # RSI: oversold < overbought
+    # RSI: validate range bounds and cross levels
     if block_type == "rsi":
+        # Legacy overbought/oversold validation
         oversold = params.get("oversold", 30)
         overbought = params.get("overbought", 70)
         if oversold >= overbought:
@@ -687,6 +765,45 @@ def _cross_validate_block(block_type: str, params: dict[str, Any]) -> list[Valid
                     code="CROSS_VALIDATION",
                 )
             )
+        # Long range: "RSI is More" must be less than "RSI Less"
+        if params.get("use_long_range", False):
+            long_more = params.get("long_rsi_more", 1)
+            long_less = params.get("long_rsi_less", 50)
+            if long_more >= long_less:
+                messages.append(
+                    ValidationMessage(
+                        severity=ValidationSeverity.ERROR,
+                        message="Long range: 'RSI is More' must be less than 'RSI Less'",
+                        field="long_rsi_more",
+                        code="CROSS_VALIDATION",
+                    )
+                )
+        # Short range: "RSI More" must be less than "RSI is Less"
+        if params.get("use_short_range", False):
+            short_more = params.get("short_rsi_more", 50)
+            short_less = params.get("short_rsi_less", 100)
+            if short_more >= short_less:
+                messages.append(
+                    ValidationMessage(
+                        severity=ValidationSeverity.ERROR,
+                        message="Short range: 'RSI More' must be less than 'RSI is Less'",
+                        field="short_rsi_more",
+                        code="CROSS_VALIDATION",
+                    )
+                )
+        # Cross levels: long cross level should typically be below short cross level
+        if params.get("use_cross_level", False):
+            cross_long = params.get("cross_long_level", 30)
+            cross_short = params.get("cross_short_level", 70)
+            if cross_long >= cross_short:
+                messages.append(
+                    ValidationMessage(
+                        severity=ValidationSeverity.WARNING,
+                        message="Long cross level >= Short cross level is unusual (unless using opposite signal)",
+                        field="cross_long_level",
+                        code="UNUSUAL_VALUE",
+                    )
+                )
 
     # Stochastic: oversold < overbought
     if block_type in ["stoch_overbought", "stoch_oversold"]:
@@ -900,22 +1017,49 @@ def validate_strategy(
 
 
 class ValidationWebSocketManager:
-    """Manages WebSocket connections for validation."""
+    """Manages WebSocket connections for validation.
+
+    Includes safeguards against resource exhaustion:
+    - Max 100 concurrent connections (configurable)
+    - Stale connection cleanup on each connect
+    """
+
+    MAX_CONNECTIONS = 100
 
     def __init__(self):
         self.active_connections: dict[str, WebSocket] = {}
+        self._connected_at: dict[str, float] = {}
 
     async def connect(self, websocket: WebSocket, client_id: str):
-        """Accept a new WebSocket connection."""
+        """Accept a new WebSocket connection after cleanup."""
+        self._evict_stale()
+
+        if len(self.active_connections) >= self.MAX_CONNECTIONS:
+            logger.warning(f"Rejecting WS connection {client_id}: max {self.MAX_CONNECTIONS} reached")
+            await websocket.close(code=1013, reason="Too many connections")
+            return False
+
         await websocket.accept()
         self.active_connections[client_id] = websocket
+        self._connected_at[client_id] = time.monotonic()
         logger.info(f"Validation WS connected: {client_id}")
+        return True
 
     def disconnect(self, client_id: str):
         """Remove a WebSocket connection."""
-        if client_id in self.active_connections:
-            del self.active_connections[client_id]
-            logger.info(f"Validation WS disconnected: {client_id}")
+        self.active_connections.pop(client_id, None)
+        self._connected_at.pop(client_id, None)
+        logger.info(f"Validation WS disconnected: {client_id}")
+
+    def _evict_stale(self) -> None:
+        """Remove connections that have been idle > 1 hour (safety net)."""
+        cutoff = time.monotonic() - 3600
+        stale = [cid for cid, ts in self._connected_at.items() if ts < cutoff]
+        for cid in stale:
+            self.active_connections.pop(cid, None)
+            self._connected_at.pop(cid, None)
+        if stale:
+            logger.info(f"Evicted {len(stale)} stale WS connections")
 
     async def send_result(self, client_id: str, result: dict[str, Any]):
         """Send validation result to a specific client."""
@@ -942,12 +1086,34 @@ async def validation_websocket(websocket: WebSocket):
     - validate_connection: Validate a connection
     - validate_strategy: Validate entire strategy
     - heartbeat: Keep connection alive
+
+    Rate limits:
+    - validate_strategy: max 5 calls / 10 seconds
+    - all other types: unlimited
     """
     import uuid
 
     client_id = str(uuid.uuid4())
 
-    await manager.connect(websocket, client_id)
+    connected = await manager.connect(websocket, client_id)
+    if not connected:
+        return
+
+    # Per-client rate limiter for heavy operations (validate_strategy)
+    _strategy_call_times: list[float] = []
+    _RATE_WINDOW = 10.0  # seconds
+    _RATE_MAX = 5  # max calls per window
+
+    def _check_rate_limit() -> bool:
+        """Return True if within limits, False if throttled."""
+        now = time.monotonic()
+        # Remove calls outside the window
+        while _strategy_call_times and _strategy_call_times[0] < now - _RATE_WINDOW:
+            _strategy_call_times.pop(0)
+        if len(_strategy_call_times) >= _RATE_MAX:
+            return False
+        _strategy_call_times.append(now)
+        return True
 
     try:
         # Send welcome message
@@ -1027,6 +1193,17 @@ async def validation_websocket(websocket: WebSocket):
                     )
 
                 elif msg_type == MessageType.VALIDATE_STRATEGY.value:
+                    if not _check_rate_limit():
+                        await websocket.send_json(
+                            {
+                                "type": MessageType.ERROR.value,
+                                "message": "Rate limit exceeded for validate_strategy. "
+                                f"Max {_RATE_MAX} calls per {_RATE_WINDOW:.0f}s.",
+                                "code": "RATE_LIMITED",
+                            }
+                        )
+                        continue
+
                     blocks = data.get("blocks", [])
                     connections = data.get("connections", [])
 

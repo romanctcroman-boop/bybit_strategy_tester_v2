@@ -1828,19 +1828,56 @@ async def simulate_strategy(
 
 @router.get("/blocks/library")
 async def get_block_library():
-    """Get the complete block library with categories"""
+    """Get the complete block library with categories and descriptions."""
     from backend.services.strategy_builder.builder import BlockType
+
+    # Rich descriptions for AI agent discoverability
+    _BLOCK_DESCRIPTIONS: dict[str, str] = {
+        "rsi": (
+            "Universal RSI indicator with 3 combinable modes: "
+            "Range filter (RSI within bounds), Cross level (RSI crosses threshold), "
+            "Legacy overbought/oversold. Modes combine with AND. "
+            "Outputs: value (0-100), long/short boolean signals. "
+            "14 params, 8 optimizable."
+        ),
+        "macd": (
+            "Universal MACD indicator with 2 combinable signal modes (OR logic): "
+            "Cross Zero (MACD crosses a level) and Cross Signal (MACD crosses Signal line). "
+            "Signal memory extends crosses for N bars. Opposite signal support. "
+            "Outputs: macd, signal, hist, long/short boolean signals. "
+            "12 params, 5 optimizable."
+        ),
+        "ema": "Exponential Moving Average. Params: period. Output: smoothed price series.",
+        "sma": "Simple Moving Average. Params: period. Output: smoothed price series.",
+        "bollinger": "Bollinger Bands. Params: period, std_dev. Outputs: upper/middle/lower bands, %B.",
+        "atr": "Average True Range volatility indicator. Params: period. Output: ATR value.",
+        "supertrend": "Supertrend trend-following indicator. Params: period, multiplier. Outputs: trend direction, value.",
+        "stochastic": "Stochastic oscillator. Params: k_period, d_period, overbought, oversold. Outputs: %K, %D.",
+        "adx": "Average Directional Index. Params: period. Outputs: ADX, +DI, -DI.",
+        "buy": "Action block: enter long position when input signal is True.",
+        "sell": "Action block: enter short position when input signal is True.",
+        "close": "Action block: close current position when input signal is True.",
+        "crossover": "Condition: True when series A crosses above series B.",
+        "crossunder": "Condition: True when series A crosses below series B.",
+        "greater_than": "Condition: True when series A > series B (or constant).",
+        "less_than": "Condition: True when series A < series B (or constant).",
+    }
 
     categories: dict[str, list[dict[str, str]]] = {}
     for block_type in BlockType:
         category = block_type.name.split("_")[0].lower()
         if category not in categories:
             categories[category] = []
+
+        # Use block_type.value (e.g. "indicator_rsi") to derive the short key
+        short_key = block_type.value.replace("indicator_", "").replace("condition_", "").replace("action_", "")
+        description = _BLOCK_DESCRIPTIONS.get(short_key, f"{block_type.name.replace('_', ' ').title()} block")
+
         categories[category].append(
             {
                 "type": block_type.value,
                 "name": block_type.name,
-                "description": f"{block_type.name} block type",
+                "description": description,
             }
         )
 
@@ -1852,7 +1889,344 @@ async def get_block_library():
 
 @router.get("/blocks/{block_id}/parameters")
 async def get_block_parameters(block_id: str):
-    """Get parameters schema for a block type"""
+    """Get parameters schema for a block type.
+
+    Returns the full parameter schema including types, ranges, defaults,
+    and descriptions — used by AI agents and the optimizer.
+    """
+    from backend.api.routers.strategy_validation_ws import BLOCK_VALIDATION_RULES
+
+    # ── RSI Universal Node ──────────────────────────────────────────────
+    if block_id == "rsi":
+        return {
+            "block_id": block_id,
+            "block_type": "rsi",
+            "description": (
+                "Universal RSI indicator node with 3 signal modes combined via AND logic. "
+                "Range = continuous filter (RSI within bounds), Cross = event trigger (RSI crosses level), "
+                "Legacy = classic overbought/oversold. No mode enabled → passthrough (always True)."
+            ),
+            "signal_modes": {
+                "range": "Continuous filter: True while RSI is within [more, less] bounds. Acts as a gate.",
+                "cross": "Event-based: True only on the bar RSI crosses through a level. One-shot trigger.",
+                "legacy": "Auto-fallback if no new mode enabled and overbought/oversold params present.",
+                "combination": "Range AND Cross — both must be True for signal to fire.",
+            },
+            "parameters": [
+                {
+                    "name": "period",
+                    "type": "integer",
+                    "default": 14,
+                    "min": 2,
+                    "max": 500,
+                    "description": "RSI calculation period",
+                    "optimizable": True,
+                    "step": 1,
+                },
+                # ── Range filter (long) ─────────────────────────────────
+                {
+                    "name": "use_long_range",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Enable long range filter: signal=True when RSI is between long_rsi_more and long_rsi_less",
+                },
+                {
+                    "name": "long_rsi_more",
+                    "type": "number",
+                    "default": 30,
+                    "min": 0.1,
+                    "max": 100,
+                    "description": "Long range lower bound (RSI > this value)",
+                    "optimizable": True,
+                    "step": 0.1,
+                },
+                {
+                    "name": "long_rsi_less",
+                    "type": "number",
+                    "default": 70,
+                    "min": 0.1,
+                    "max": 100,
+                    "description": "Long range upper bound (RSI < this value)",
+                    "optimizable": True,
+                    "step": 0.1,
+                },
+                # ── Range filter (short) ────────────────────────────────
+                {
+                    "name": "use_short_range",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Enable short range filter: signal=True when RSI is between short_rsi_more and short_rsi_less",
+                },
+                {
+                    "name": "short_rsi_less",
+                    "type": "number",
+                    "default": 70,
+                    "min": 0.1,
+                    "max": 100,
+                    "description": "Short range upper bound (RSI < this value)",
+                    "optimizable": True,
+                    "step": 0.1,
+                },
+                {
+                    "name": "short_rsi_more",
+                    "type": "number",
+                    "default": 30,
+                    "min": 0.1,
+                    "max": 100,
+                    "description": "Short range lower bound (RSI > this value)",
+                    "optimizable": True,
+                    "step": 0.1,
+                },
+                # ── Cross level ─────────────────────────────────────────
+                {
+                    "name": "use_cross_level",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Enable cross level: long=RSI crosses UP through cross_long_level, short=RSI crosses DOWN through cross_short_level",
+                },
+                {
+                    "name": "cross_long_level",
+                    "type": "number",
+                    "default": 30,
+                    "min": 0.1,
+                    "max": 100,
+                    "description": "Level RSI must cross upward for long signal",
+                    "optimizable": True,
+                    "step": 0.1,
+                },
+                {
+                    "name": "cross_short_level",
+                    "type": "number",
+                    "default": 70,
+                    "min": 0.1,
+                    "max": 100,
+                    "description": "Level RSI must cross downward for short signal",
+                    "optimizable": True,
+                    "step": 0.1,
+                },
+                {
+                    "name": "opposite_signal",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Swap cross long/short signals (reversal mode). Does NOT affect range filter.",
+                },
+                # ── Cross memory ────────────────────────────────────────
+                {
+                    "name": "use_cross_memory",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Keep cross signal active for N bars after it fires",
+                },
+                {
+                    "name": "cross_memory_bars",
+                    "type": "integer",
+                    "default": 5,
+                    "min": 1,
+                    "max": 100,
+                    "description": "Number of bars to keep cross signal active",
+                    "optimizable": True,
+                    "step": 1,
+                },
+                # ── Legacy (backward compat) ────────────────────────────
+                {
+                    "name": "overbought",
+                    "type": "number",
+                    "default": 70,
+                    "min": 50,
+                    "max": 100,
+                    "description": "Legacy: RSI > overbought → short signal. Only used if no new mode enabled.",
+                    "required": False,
+                },
+                {
+                    "name": "oversold",
+                    "type": "number",
+                    "default": 30,
+                    "min": 0,
+                    "max": 50,
+                    "description": "Legacy: RSI < oversold → long signal. Only used if no new mode enabled.",
+                    "required": False,
+                },
+            ],
+            "inputs": [
+                {"name": "price", "type": "series", "required": True, "description": "Price series (default: close)"}
+            ],
+            "outputs": [
+                {"name": "value", "type": "series", "description": "Raw RSI value (0-100)"},
+                {"name": "long", "type": "boolean_series", "description": "Long signal (True = enter long)"},
+                {"name": "short", "type": "boolean_series", "description": "Short signal (True = enter short)"},
+            ],
+            "edge_cases": [
+                "opposite_signal swaps cross signals but NOT range signals",
+                "cross_memory extends cross signal but does NOT affect range filter",
+                "No mode enabled + no legacy params = passthrough (always True)",
+                "Range 'more' must be < 'less' (validated by cross-validation)",
+                "cross_long_level should typically be < cross_short_level (warning if not)",
+            ],
+        }
+
+    # ── MACD Universal Node ─────────────────────────────────────────────
+    if block_id == "macd":
+        return {
+            "block_id": block_id,
+            "block_type": "macd",
+            "description": (
+                "Universal MACD indicator node with 2 signal modes combined via OR logic. "
+                "Cross Zero = MACD line crosses a level (default 0). "
+                "Cross Signal = MACD line crosses Signal line. "
+                "Modes OR together: either mode can produce signals independently. "
+                "No mode enabled → data-only (long/short always False, but MACD/Signal/Hist still output). "
+                "Signal Memory extends cross signals for N bars (enabled by default)."
+            ),
+            "signal_modes": {
+                "cross_zero": "Event-based: True when MACD line crosses through a level (default 0). Opposite swaps.",
+                "cross_signal": "Event-based: True when MACD line crosses Signal line. positive_filter requires MACD<0 for long.",
+                "combination": "Cross Zero OR Cross Signal — either can fire independently.",
+                "data_only": "No mode enabled → MACD/Signal/Hist output, but long/short always False.",
+            },
+            "parameters": [
+                {
+                    "name": "fast_period",
+                    "type": "integer",
+                    "default": 12,
+                    "min": 2,
+                    "max": 200,
+                    "description": "Fast EMA period for MACD calculation",
+                    "optimizable": True,
+                    "step": 1,
+                },
+                {
+                    "name": "slow_period",
+                    "type": "integer",
+                    "default": 26,
+                    "min": 2,
+                    "max": 200,
+                    "description": "Slow EMA period for MACD calculation (must be > fast_period)",
+                    "optimizable": True,
+                    "step": 1,
+                },
+                {
+                    "name": "signal_period",
+                    "type": "integer",
+                    "default": 9,
+                    "min": 2,
+                    "max": 100,
+                    "description": "Signal line smoothing period",
+                    "optimizable": True,
+                    "step": 1,
+                },
+                {
+                    "name": "source",
+                    "type": "select",
+                    "default": "close",
+                    "options": ["close", "open", "high", "low", "hl2", "hlc3", "ohlc4"],
+                    "description": "Price source for MACD calculation",
+                },
+                # ── Cross with Level (Zero Line) ───────────────────────
+                {
+                    "name": "use_macd_cross_zero",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Enable cross-level mode: long when MACD crosses above level, short when below",
+                },
+                {
+                    "name": "opposite_macd_cross_zero",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Swap long/short signals for level crossing",
+                },
+                {
+                    "name": "macd_cross_zero_level",
+                    "type": "number",
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "description": "Level MACD must cross (default 0 = zero line)",
+                    "optimizable": True,
+                    "step": 0.1,
+                },
+                # ── Cross with Signal Line ─────────────────────────────
+                {
+                    "name": "use_macd_cross_signal",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Enable signal-line cross: long when MACD crosses above Signal, short when below",
+                },
+                {
+                    "name": "signal_only_if_macd_positive",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Filter: only long when MACD < 0, only short when MACD > 0 (mean-reversion filter)",
+                },
+                {
+                    "name": "opposite_macd_cross_signal",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Swap long/short signals for signal line crossing",
+                },
+                # ── Signal Memory ──────────────────────────────────────
+                {
+                    "name": "disable_signal_memory",
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Disable signal memory (when disabled, signals fire only on exact cross bar)",
+                },
+                {
+                    "name": "signal_memory_bars",
+                    "type": "integer",
+                    "default": 5,
+                    "min": 1,
+                    "max": 100,
+                    "description": "Number of bars to keep cross signal active after it fires",
+                    "optimizable": True,
+                    "step": 1,
+                },
+            ],
+            "inputs": [
+                {"name": "price", "type": "series", "required": True, "description": "Price series (default: close)"}
+            ],
+            "outputs": [
+                {"name": "macd", "type": "series", "description": "MACD line (fast EMA - slow EMA)"},
+                {"name": "signal", "type": "series", "description": "Signal line (EMA of MACD)"},
+                {"name": "hist", "type": "series", "description": "Histogram (MACD - Signal)"},
+                {"name": "long", "type": "boolean_series", "description": "Long signal (True = enter long)"},
+                {"name": "short", "type": "boolean_series", "description": "Short signal (True = enter short)"},
+            ],
+            "edge_cases": [
+                "fast_period must be < slow_period (validated by cross-validation)",
+                "No mode enabled → data-only output (long/short always False)",
+                "Signal memory is ON by default — disable_signal_memory=True to get one-shot crosses",
+                "Cross Zero and Cross Signal combine with OR — either mode fires independently",
+                "signal_only_if_macd_positive filters signal-line crosses for mean-reversion setups",
+            ],
+        }
+
+    # ── Generic: look up from BLOCK_VALIDATION_RULES ────────────────────
+    rules = BLOCK_VALIDATION_RULES.get(block_id, {})
+    if rules:
+        parameters = []
+        for param_name, spec in rules.items():
+            param_info: dict[str, Any] = {
+                "name": param_name,
+                "type": spec.get("type", "string"),
+                "default": spec.get("default"),
+            }
+            if "min" in spec:
+                param_info["min"] = spec["min"]
+            if "max" in spec:
+                param_info["max"] = spec["max"]
+            if "options" in spec:
+                param_info["options"] = spec["options"]
+            if spec.get("required") is not None:
+                param_info["required"] = spec["required"]
+            parameters.append(param_info)
+        return {
+            "block_id": block_id,
+            "parameters": parameters,
+            "inputs": [{"name": "price", "type": "series", "required": True}],
+            "outputs": [{"name": "value", "type": "series"}],
+        }
+
+    # ── Fallback for unknown block types ────────────────────────────────
     return {
         "block_id": block_id,
         "parameters": [
@@ -2136,9 +2510,27 @@ async def run_backtest_from_builder(
     conns: list[dict] = list(db_strategy.builder_connections or [])
     validation_errors: list[str] = []
 
+    # Helper: extract target port from connection (supports all 5 formats
+    # that StrategyBuilderAdapter._get_connection_target_port handles).
+    def _get_target_port(conn: dict) -> str:
+        # Format 1: conn["target"]["portId"] (frontend/template format)
+        if "target" in conn and isinstance(conn["target"], dict):
+            return str(conn["target"].get("portId", "value"))
+        # Format 2: conn["target_port"] (builder_workflow / AI Build format)
+        if "target_port" in conn:
+            return str(conn.get("target_port", "value"))
+        # Format 3: conn["target_input"] (new API format)
+        if "target_input" in conn:
+            return str(conn.get("target_input", "value"))
+        # Format 4: conn["targetPort"] (frontend/Strategy Builder format)
+        if "targetPort" in conn:
+            return str(conn.get("targetPort", "value"))
+        # Format 5: conn["toPort"] (test/API format)
+        return str(conn.get("toPort", "value"))
+
     # Part 2: Entry conditions — at least one connection to entry_long or entry_short
     entry_ports = {"entry_long", "entry_short"}
-    has_entry = any(c.get("target", {}).get("portId") in entry_ports for c in conns)
+    has_entry = any(_get_target_port(c) in entry_ports for c in conns)
     if not has_entry:
         validation_errors.append("No entry conditions: connect signals to Entry Long or Entry Short ports.")
 
@@ -2164,7 +2556,7 @@ async def run_backtest_from_builder(
     }
     has_exit_block = any(b.get("type") in exit_block_types for b in blocks)
     exit_ports = {"exit_long", "exit_short"}
-    has_exit_signal = any(c.get("target", {}).get("portId") in exit_ports for c in conns)
+    has_exit_signal = any(_get_target_port(c) in exit_ports for c in conns)
     if not has_exit_block and not has_exit_signal:
         validation_errors.append("No exit conditions: add SL/TP block or connect signals to Exit Long/Exit Short.")
 
@@ -2576,6 +2968,9 @@ async def run_backtest_from_builder(
                 "win_rate": result.metrics.win_rate if result.metrics else 0.0,
                 "total_trades": result.metrics.total_trades if result.metrics else 0,
                 "max_drawdown": result.metrics.max_drawdown if result.metrics else 0.0,
+                "net_profit": result.metrics.net_profit if result.metrics else 0.0,
+                "max_drawdown_pct": result.metrics.max_drawdown if result.metrics else 0.0,
+                "profit_factor": result.metrics.profit_factor if result.metrics else 0.0,
             },
             "redirect_url": f"/frontend/backtest-results.html?backtest_id={db_backtest.id}",
         }
