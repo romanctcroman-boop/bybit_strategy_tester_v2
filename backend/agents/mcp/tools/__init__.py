@@ -22,6 +22,14 @@ from backend.agents.mcp.tools.indicators import (
     calculate_rsi,
     find_support_resistance,
 )
+from backend.agents.mcp.tools.memory import (
+    get_global_memory,
+    memory_consolidate,
+    memory_forget,
+    memory_get_stats,
+    memory_recall,
+    memory_store,
+)
 from backend.agents.mcp.tools.risk import calculate_position_size, calculate_risk_reward
 from backend.agents.mcp.tools.strategy import (
     evolve_strategy,
@@ -93,8 +101,14 @@ __all__ = [
     "find_support_resistance",
     "generate_backtest_report",
     "get_backtest_metrics",
+    "get_global_memory",
     "list_strategies",
     "log_agent_action",
+    "memory_consolidate",
+    "memory_forget",
+    "memory_get_stats",
+    "memory_recall",
+    "memory_store",
     "run_backtest",
     "validate_strategy",
 ]

@@ -27,36 +27,40 @@ _API_BASE = "http://localhost:8000/api/v1/strategy-builder"
 _TIMEOUT = 30.0
 
 
-async def _api_get(path: str, params: dict | None = None) -> dict:
+async def _api_get(path: str, params: dict | None = None) -> dict[str, Any]:
     """Make GET request to strategy builder API."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.get(f"{_API_BASE}{path}", params=params)
         resp.raise_for_status()
-        return resp.json()
+        result: dict[str, Any] = resp.json()
+        return result  # type: ignore[return-value]
 
 
-async def _api_post(path: str, json_data: dict | None = None) -> dict:
+async def _api_post(path: str, json_data: dict | None = None) -> dict[str, Any]:
     """Make POST request to strategy builder API."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.post(f"{_API_BASE}{path}", json=json_data or {})
         resp.raise_for_status()
-        return resp.json()
+        result: dict[str, Any] = resp.json()
+        return result  # type: ignore[return-value]
 
 
-async def _api_put(path: str, json_data: dict | None = None) -> dict:
+async def _api_put(path: str, json_data: dict | None = None) -> dict[str, Any]:
     """Make PUT request to strategy builder API."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.put(f"{_API_BASE}{path}", json=json_data or {})
         resp.raise_for_status()
-        return resp.json()
+        result: dict[str, Any] = resp.json()
+        return result  # type: ignore[return-value]
 
 
-async def _api_delete(path: str) -> dict:
+async def _api_delete(path: str) -> dict[str, Any]:
     """Make DELETE request to strategy builder API."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.delete(f"{_API_BASE}{path}")
         resp.raise_for_status()
-        return resp.json()
+        result: dict[str, Any] = resp.json()
+        return result  # type: ignore[return-value]
 
 
 # =============================================================================
@@ -455,7 +459,55 @@ async def builder_delete_strategy(strategy_id: str) -> dict[str, Any]:
         "static_sltp, trailing_stop_exit, atr_exit, multi_tp_exit, "
         "fixed_size, percent_balance, risk_percent, "
         "and many more (use builder_get_block_library to see all). "
-        "Parameters depend on block type (e.g. RSI: period=14, overbought=70, oversold=30)."
+        "\n\n"
+        "RSI UNIVERSAL NODE — supports 3 signal modes that combine with AND logic:\n"
+        "  1) RANGE filter (continuous): use_long_range=True → long when RSI > long_rsi_more "
+        "AND RSI < long_rsi_less. long_rsi_more=LOWER bound (min), long_rsi_less=UPPER bound (max). "
+        "MUST have more < less. Example: long_rsi_more=0, long_rsi_less=30 → oversold zone 0..30.\n"
+        "  use_short_range=True → short when RSI > short_rsi_more AND RSI < short_rsi_less. "
+        "short_rsi_more=LOWER bound, short_rsi_less=UPPER bound. MUST have more < less. "
+        "Example: short_rsi_more=70, short_rsi_less=100 → overbought zone 70..100.\n"
+        "  2) CROSS signal (event): use_cross_level=True → long when RSI crosses UP "
+        "through cross_long_level(30), short when RSI crosses DOWN through "
+        "cross_short_level(70). opposite_signal swaps long/short. "
+        "use_cross_memory + cross_memory_bars(5) extends cross signal for N bars.\n"
+        "  3) LEGACY (auto-fallback): if no mode enabled and overbought/oversold params exist, "
+        "uses classic RSI < oversold = long, RSI > overbought = short.\n"
+        "  No mode enabled + no legacy params → passthrough (always True).\n"
+        "RSI params: period(14, 2-500), use_long_range(false), long_rsi_more(30, 0.1-100), "
+        "long_rsi_less(70, 0.1-100), use_short_range(false), short_rsi_less(70, 0.1-100), "
+        "short_rsi_more(30, 0.1-100), use_cross_level(false), cross_long_level(30, 0.1-100), "
+        "cross_short_level(70, 0.1-100), opposite_signal(false), use_cross_memory(false), "
+        "cross_memory_bars(5, 1-100).\n"
+        "Outputs: value (RSI series), long (bool signal), short (bool signal).\n"
+        "Optimizable params: period, long_rsi_more/less, short_rsi_less/more, "
+        "cross_long_level, cross_short_level, cross_memory_bars.\n"
+        "OPTIMIZATION RANGES (RSI): Each optimizable param can be set for grid search with "
+        "{enabled: true/false, min: <low>, max: <high>, step: <step>}. "
+        "Stored in block.optimizationParams. Default ranges: "
+        "period {5,30,1}, long_rsi_more {10,45,5}, long_rsi_less {55,90,5}, "
+        "short_rsi_less {55,90,5}, short_rsi_more {10,45,5}, cross_long_level {15,45,5}, "
+        "cross_short_level {55,85,5}, cross_memory_bars {1,20,1}.\n\n"
+        "MACD UNIVERSAL NODE — supports 2 signal modes combined with OR logic:\n"
+        "  1) CROSS ZERO: use_macd_cross_zero=True → long when MACD crosses above level "
+        "(default 0), short when below. opposite_macd_cross_zero swaps signals.\n"
+        "  2) CROSS SIGNAL: use_macd_cross_signal=True → long when MACD crosses above "
+        "Signal line, short when below. signal_only_if_macd_positive filters: long only "
+        "when MACD<0, short only when MACD>0. opposite_macd_cross_signal swaps.\n"
+        "  No mode enabled → data-only (MACD/Signal/Hist output, long/short always False).\n"
+        "  Signal Memory: enabled by default, disable_signal_memory=True to turn off. "
+        "signal_memory_bars(5) controls how many bars cross signals persist.\n"
+        "MACD params: fast_period(12), slow_period(26), signal_period(9), source(close), "
+        "use_macd_cross_zero(false), opposite_macd_cross_zero(false), macd_cross_zero_level(0), "
+        "use_macd_cross_signal(false), signal_only_if_macd_positive(false), "
+        "opposite_macd_cross_signal(false), disable_signal_memory(false), signal_memory_bars(5).\n"
+        "Outputs: macd (series), signal (series), hist (series), long (bool), short (bool).\n"
+        "Optimizable params: fast_period, slow_period, signal_period, macd_cross_zero_level, signal_memory_bars.\n"
+        "OPTIMIZATION RANGES (MACD): Each optimizable param can be set for grid search with "
+        "{enabled: true/false, min: <low>, max: <high>, step: <step>}. "
+        "Stored in block.optimizationParams. Default ranges: "
+        "fast_period {8,16,1}, slow_period {20,30,1}, signal_period {6,12,1}, "
+        "macd_cross_zero_level {-50,50,1}, signal_memory_bars {1,20,1}."
     ),
     category="strategy_builder",
 )
@@ -544,7 +596,15 @@ async def builder_add_block(
     name="builder_update_block_params",
     description=(
         "Update parameters of an existing block on the canvas. "
-        "For example, change RSI period from 14 to 21, or change overbought from 70 to 80."
+        "For RSI: use params like period, use_long_range, long_rsi_more, long_rsi_less, "
+        "use_short_range, short_rsi_less, short_rsi_more, use_cross_level, "
+        "cross_long_level, cross_short_level, opposite_signal, use_cross_memory, "
+        "cross_memory_bars. Example: {use_cross_level: true, cross_long_level: 25}. "
+        "For MACD: use params like fast_period, slow_period, signal_period, source, "
+        "use_macd_cross_zero, opposite_macd_cross_zero, macd_cross_zero_level, "
+        "use_macd_cross_signal, signal_only_if_macd_positive, opposite_macd_cross_signal, "
+        "disable_signal_memory, signal_memory_bars. "
+        "Example: {use_macd_cross_signal: true, signal_only_if_macd_positive: true}."
     ),
     category="strategy_builder",
 )
@@ -847,6 +907,28 @@ async def builder_validate_strategy(
     """
     try:
         return await _api_post(f"/validate/{strategy_id}")
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            # Strategy exists in DB but not in the in-memory StrategyBuilder.strategies dict.
+            # This happens when the strategy was created via MCP workflow (REST API) rather
+            # than the in-memory StrategyBuilder.create_strategy() path.
+            # Return advisory-valid so the workflow can proceed to backtest,
+            # which has its own validation against the DB-backed strategy.
+            logger.warning(
+                f"builder_validate_strategy: strategy {strategy_id} not in memory "
+                f"(created via API) — returning advisory-valid"
+            )
+            return {
+                "is_valid": True,
+                "errors": [],
+                "warnings": [
+                    "Validation skipped: strategy exists in DB but not in memory graph. "
+                    "Backtest endpoint will perform its own validation."
+                ],
+                "skipped": True,
+            }
+        logger.error(f"builder_validate_strategy HTTP error: {e.response.status_code} - {e.response.text}")
+        return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
     except Exception as e:
         logger.error(f"builder_validate_strategy error: {e}")
         return {"error": str(e)}
