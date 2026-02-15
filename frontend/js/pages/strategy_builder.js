@@ -138,11 +138,10 @@ const blockLibrary = {
     { id: 'mtf', name: 'MTF', desc: 'Multi-Timeframe indicator', icon: 'layers-half' }
   ],
   filters: [
-    { id: 'rsi_filter', name: 'RSI Filter', desc: 'RSI range/cross filter', icon: 'funnel' },
     { id: 'supertrend_filter', name: 'SuperTrend Filter', desc: 'Trend filter with signal modes', icon: 'arrow-up-right-circle' },
     { id: 'two_ma_filter', name: 'TWO MAs Filter', desc: 'MA cross & price filter', icon: 'arrows-angle-contract' },
     { id: 'stochastic_filter', name: 'Stochastic Filter', desc: 'Range/cross/K-D filter', icon: 'percent' },
-    { id: 'macd_filter', name: 'MACD Filter', desc: 'Zero/signal line cross', icon: 'bar-chart' },
+    // (MACD Filter removed — consolidated into universal MACD indicator block)
     { id: 'qqe_filter', name: 'QQE Filter', desc: 'QQE signals with RSI smoothing', icon: 'activity' },
     { id: 'cci_filter', name: 'CCI Filter', desc: 'CCI range filter', icon: 'graph-up-arrow' },
     { id: 'momentum_filter', name: 'Momentum Filter', desc: 'Momentum range filter', icon: 'speedometer2' },
@@ -909,18 +908,7 @@ const blockLibrary = {
   ],
   // NEW CATEGORY: Divergence Detection
   divergence: [
-    {
-      id: 'rsi_divergence',
-      name: 'RSI Divergence',
-      desc: 'Detect RSI divergence signals',
-      icon: 'graph-up'
-    },
-    {
-      id: 'macd_divergence',
-      name: 'MACD Divergence',
-      desc: 'Detect MACD divergence signals',
-      icon: 'bar-chart'
-    },
+    // (MACD Divergence removed — consolidated into universal MACD indicator block)
     {
       id: 'stoch_divergence',
       name: 'Stochastic Divergence',
@@ -946,35 +934,6 @@ const blockLibrary = {
   // indicator + condition in one block
   // ============================================
   smart_signals: [
-    // RSI-based signals
-    {
-      id: 'rsi_overbought_signal',
-      name: 'RSI Overbought',
-      desc: 'Signal when RSI > 70 (configurable)',
-      icon: 'graph-up',
-      composite: { indicator: 'rsi', condition: 'greater_than', defaultThreshold: 70 }
-    },
-    {
-      id: 'rsi_oversold_signal',
-      name: 'RSI Oversold',
-      desc: 'Signal when RSI < 30 (configurable)',
-      icon: 'graph-down',
-      composite: { indicator: 'rsi', condition: 'less_than', defaultThreshold: 30 }
-    },
-    {
-      id: 'rsi_cross_up_signal',
-      name: 'RSI Cross Up 50',
-      desc: 'Signal when RSI crosses above 50',
-      icon: 'arrow-up-circle',
-      composite: { indicator: 'rsi', condition: 'crossover', defaultThreshold: 50 }
-    },
-    {
-      id: 'rsi_cross_down_signal',
-      name: 'RSI Cross Down 50',
-      desc: 'Signal when RSI crosses below 50',
-      icon: 'arrow-down-circle',
-      composite: { indicator: 'rsi', condition: 'crossunder', defaultThreshold: 50 }
-    },
     // Stochastic-based signals
     {
       id: 'stoch_overbought_signal',
@@ -1004,35 +963,7 @@ const blockLibrary = {
       icon: 'intersect',
       composite: { indicator: 'stochastic', condition: 'crossunder', compareWith: 'stoch_d' }
     },
-    // MACD-based signals
-    {
-      id: 'macd_cross_signal_up',
-      name: 'MACD Cross Signal Up',
-      desc: 'Bullish: MACD crosses above Signal',
-      icon: 'bar-chart',
-      composite: { indicator: 'macd', condition: 'crossover', compareWith: 'macd_signal' }
-    },
-    {
-      id: 'macd_cross_signal_down',
-      name: 'MACD Cross Signal Down',
-      desc: 'Bearish: MACD crosses below Signal',
-      icon: 'bar-chart',
-      composite: { indicator: 'macd', condition: 'crossunder', compareWith: 'macd_signal' }
-    },
-    {
-      id: 'macd_cross_zero_up',
-      name: 'MACD Cross Zero Up',
-      desc: 'Bullish: MACD crosses above zero',
-      icon: 'arrow-up',
-      composite: { indicator: 'macd', condition: 'crossover', defaultThreshold: 0 }
-    },
-    {
-      id: 'macd_cross_zero_down',
-      name: 'MACD Cross Zero Down',
-      desc: 'Bearish: MACD crosses below zero',
-      icon: 'arrow-down',
-      composite: { indicator: 'macd', condition: 'crossunder', defaultThreshold: 0 }
-    },
+    // (MACD smart signals removed — consolidated into universal MACD indicator block)
     // Moving Average signals
     {
       id: 'golden_cross_signal',
@@ -1124,24 +1055,24 @@ const templates = [
   // =============================================
   {
     id: 'rsi_oversold',
-    name: 'RSI Oversold Strategy',
-    desc: 'Buy when RSI is oversold, sell when overbought',
+    name: 'RSI Cross Level',
+    desc: 'Long when RSI crosses up through 30, short when crosses down through 70',
     icon: 'graph-up',
     iconColor: 'var(--accent-blue)',
-    blocks: 6,
-    connections: 8,
+    blocks: 2,
+    connections: 4,
     category: 'Mean Reversion',
     difficulty: 'Beginner',
     expectedWinRate: '45-55%'
   },
   {
     id: 'rsi_long_short',
-    name: 'RSI Long then Short',
-    desc: 'Enter Long when RSI < 30, exit and enter Short when RSI > 70',
+    name: 'RSI Range Filter',
+    desc: 'Long when RSI in low range (1-30), Short when RSI in high range (70-100)',
     icon: 'arrow-up-down',
     iconColor: 'var(--accent-green)',
-    blocks: 6,
-    connections: 8,
+    blocks: 2,
+    connections: 4,
     category: 'Mean Reversion',
     difficulty: 'Beginner',
     expectedWinRate: '40-50%'
@@ -3467,6 +3398,14 @@ function setupEventListeners() {
       if (!key || !selectedBlockId) return;
       if (target.classList.contains('tv-checkbox')) {
         updateBlockParam(selectedBlockId, key, target.checked);
+        // Re-render properties panel for showWhen conditional fields
+        const block = strategyBlocks.find(b => b.id === selectedBlockId);
+        if (block) {
+          const propsEl = document.getElementById('blockProperties');
+          if (propsEl) {
+            propsEl.innerHTML = renderGroupedParams(block);
+          }
+        }
       } else if (target.classList.contains('tv-select') || target.classList.contains('tv-input') || target.classList.contains('property-input')) {
         const val = target.type === 'number' ? (parseFloat(target.value) || 0) : target.value;
         updateBlockParam(selectedBlockId, key, val);
@@ -4212,8 +4151,24 @@ function getDefaultParams(blockType) {
       period: 14,
       source: 'close',
       timeframe: 'Chart',
-      overbought: 70,
-      oversold: 30
+      // BTC source
+      use_btc_source: false,
+      // Long range filter
+      use_long_range: false,
+      long_rsi_more: 30,
+      long_rsi_less: 70,
+      // Short range filter
+      use_short_range: false,
+      short_rsi_less: 70,
+      short_rsi_more: 30,
+      // Cross level
+      use_cross_level: false,
+      cross_long_level: 30,
+      cross_short_level: 70,
+      opposite_signal: false,
+      // Cross memory
+      use_cross_memory: false,
+      cross_memory_bars: 5
     },
     stochastic: {
       k_period: 14,
@@ -4289,7 +4244,21 @@ function getDefaultParams(blockType) {
       fast_period: 12,
       slow_period: 26,
       signal_period: 9,
-      source: 'close'
+      source: 'close',
+      timeframe: 'Chart',
+      use_btc_source: false,
+      enable_visualization: false,
+      // Cross with Level (Zero Line)
+      use_macd_cross_zero: false,
+      opposite_macd_cross_zero: false,
+      macd_cross_zero_level: 0,
+      // Cross with Signal Line
+      use_macd_cross_signal: false,
+      signal_only_if_macd_positive: false,
+      opposite_macd_cross_signal: false,
+      // Signal Memory
+      disable_signal_memory: false,
+      signal_memory_bars: 5
     },
     adx: {
       period: 14,
@@ -4385,40 +4354,6 @@ function getDefaultParams(blockType) {
     // =============================================
     // FILTERS
     // =============================================
-    rsi_filter: {
-      // RSI TF1
-      rsi_period: 14,
-      rsi_timeframe: 'chart',
-      use_btcusdt_source: false,
-      use_long_range: false,
-      long_rsi_more: 1,
-      long_rsi_less: 50,
-      use_short_range: false,
-      short_rsi_less: 100,
-      short_rsi_more: 50,
-      use_cross_level: false,
-      cross_level_long: 30,
-      cross_level_short: 70,
-      opposite_signal: false,
-      use_signal_memory: false,
-      signal_memory_bars: 5,
-      // RSI TF2
-      use_rsi_tf2: false,
-      rsi_tf2_period: 14,
-      rsi_tf2_timeframe: '1h',
-      rsi_tf2_long_more: 1,
-      rsi_tf2_long_less: 50,
-      rsi_tf2_short_more: 50,
-      rsi_tf2_short_less: 100,
-      // RSI TF3
-      use_rsi_tf3: false,
-      rsi_tf3_period: 14,
-      rsi_tf3_timeframe: '4h',
-      rsi_tf3_long_more: 1,
-      rsi_tf3_long_less: 50,
-      rsi_tf3_short_more: 50,
-      rsi_tf3_short_less: 100
-    },
     supertrend_filter: {
       // SuperTrend TF1
       use_supertrend: false,
@@ -4498,31 +4433,7 @@ function getDefaultParams(blockType) {
       activate_stoch_kd_memory: false,
       stoch_kd_memory_bars: 5
     },
-    // =============================================
-    // MACD [SIGNALS, CROSS X LINE OR CROSS SIGNAL LINE]
-    // =============================================
-    macd_filter: {
-      // Basic Settings
-      macd_fast_length: 12,
-      macd_slow_length: 26,
-      macd_signal_smoothing: 9,
-      macd_source: 'close',
-      macd_timeframe: 'Chart',
-      use_btcusdt_source: false,
-      // Visualization
-      enable_macd_visualization: false,
-      // Cross with Zero Level Mode
-      use_macd_cross_zero: false,
-      opposite_macd_cross_zero: false,
-      macd_cross_zero_level: 0,
-      // Cross with Signal Line Mode
-      use_macd_cross_signal: false,
-      signal_only_if_macd_positive: false,
-      opposite_macd_cross_signal: false,
-      // Signal Memory
-      disable_macd_signal_memory: false,
-      macd_signal_memory_bars: 5
-    },
+    // (MACD Filter removed — consolidated into universal MACD indicator block)
     // =============================================
     // QQE [SIGNALS]
     // =============================================
@@ -5664,22 +5575,7 @@ function getDefaultParams(blockType) {
     // =============================================
     // DIVERGENCE DETECTION
     // =============================================
-    rsi_divergence: {
-      enabled: false,
-      rsi_period: 14,
-      pivot_lookback: 5,
-      use_regular: true,
-      use_hidden: false
-    },
-    macd_divergence: {
-      enabled: false,
-      fast_period: 12,
-      slow_period: 26,
-      signal_period: 9,
-      pivot_lookback: 5,
-      use_regular: true,
-      use_hidden: false
-    },
+    // (macd_divergence removed — consolidated into universal MACD block)
     stoch_divergence: {
       enabled: false,
       k_period: 14,
@@ -5706,30 +5602,6 @@ function getDefaultParams(blockType) {
     // SMART SIGNALS (Composite nodes)
     // =============================================
     // RSI signals
-    rsi_overbought_signal: {
-      period: 14,
-      threshold: 70,
-      source: 'close',
-      signal_type: 'short'
-    },
-    rsi_oversold_signal: {
-      period: 14,
-      threshold: 30,
-      source: 'close',
-      signal_type: 'long'
-    },
-    rsi_cross_up_signal: {
-      period: 14,
-      threshold: 50,
-      source: 'close',
-      signal_type: 'long'
-    },
-    rsi_cross_down_signal: {
-      period: 14,
-      threshold: 50,
-      source: 'close',
-      signal_type: 'short'
-    },
     // Stochastic signals
     stoch_overbought_signal: {
       k_period: 14,
@@ -5757,31 +5629,7 @@ function getDefaultParams(blockType) {
       smooth_k: 3,
       signal_type: 'short'
     },
-    // MACD signals
-    macd_cross_signal_up: {
-      fast_period: 12,
-      slow_period: 26,
-      signal_period: 9,
-      signal_type: 'long'
-    },
-    macd_cross_signal_down: {
-      fast_period: 12,
-      slow_period: 26,
-      signal_period: 9,
-      signal_type: 'short'
-    },
-    macd_cross_zero_up: {
-      fast_period: 12,
-      slow_period: 26,
-      signal_period: 9,
-      signal_type: 'long'
-    },
-    macd_cross_zero_down: {
-      fast_period: 12,
-      slow_period: 26,
-      signal_period: 9,
-      signal_type: 'short'
-    },
+    // (MACD smart signal defaults removed — consolidated into universal MACD block)
     // Moving Average signals
     golden_cross_signal: {
       fast_period: 50,
@@ -6114,13 +5962,39 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
     // MOMENTUM INDICATORS
     // =============================================
     rsi: {
-      title: 'RSI Settings',
+      title: '======== RSI - [IN RANGE FILTER OR CROSS SIGNAL] ========',
       fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'overbought', label: 'Overbought Level', type: 'number', optimizable: true },
-        { key: 'oversold', label: 'Oversold Level', type: 'number', optimizable: true }
+        // Base settings
+        { key: 'period', label: 'RSI TF Long(14):', type: 'number', optimizable: true, min: 1, max: 200, step: 1 },
+        { key: 'timeframe', label: 'RSI TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'use_btc_source', label: 'Use BTCUSDT as Source for RSI 1 ?', type: 'checkbox' },
+        // --- Use RSI LONG Range ---
+        { key: 'use_long_range', label: 'Use RSI LONG Range', type: 'checkbox' },
+        {
+          type: 'inline',
+          fields: [
+            { key: 'long_rsi_more', label: '(LONG) RSI is More', type: 'number', width: '60px', optimizable: true, min: 0.1, max: 100, step: 0.1 },
+            { label: '& RSI Less', type: 'label' },
+            { key: 'long_rsi_less', type: 'number', width: '60px', optimizable: true, min: 0.1, max: 100, step: 0.1 }
+          ]
+        },
+        // --- Use RSI SHORT Range ---
+        { key: 'use_short_range', label: 'Use RSI SHORT Range', type: 'checkbox' },
+        {
+          type: 'inline',
+          fields: [
+            { key: 'short_rsi_less', label: '(SHORT) RSI is Less', type: 'number', width: '60px', optimizable: true, min: 0.1, max: 100, step: 0.1 },
+            { label: '& RSI More', type: 'label' },
+            { key: 'short_rsi_more', type: 'number', width: '60px', optimizable: true, min: 0.1, max: 100, step: 0.1 }
+          ]
+        },
+        // --- Use RSI Cross Level ---
+        { key: 'use_cross_level', label: 'Use RSI Cross Level', type: 'checkbox', tooltip: 'LONG: RSI crosses level from below. SHORT: RSI crosses level from above.' },
+        { key: 'cross_long_level', label: 'Level to Cross RSI for LONG', type: 'number', optimizable: true, min: 0.1, max: 100, step: 0.1 },
+        { key: 'cross_short_level', label: 'Level to Cross RSI for SHORT', type: 'number', optimizable: true, min: 0.1, max: 100, step: 0.1 },
+        { key: 'opposite_signal', label: 'Opposite Signal - RSI Cross Level', type: 'checkbox', tooltip: 'Reverse direction of cross level signals' },
+        { key: 'use_cross_memory', label: 'Activate RSI Cross Signal Memory', type: 'checkbox', tooltip: 'Keep signal in memory and execute when other conditions are met' },
+        { key: 'cross_memory_bars', label: 'Keep RSI Cross Signal Memory for XX bars', type: 'number', optimizable: true, min: 1, max: 100, step: 1, tooltip: 'Number of bars to keep the cross signal in memory' }
       ]
     },
     stochastic: {
@@ -6233,12 +6107,25 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
       ]
     },
     macd: {
-      title: 'MACD Settings',
+      title: 'MACD - [SIGNALS] (CROSS 0 LINE OR CROSS SIGNAL LINE)',
       fields: [
-        { key: 'fast_period', label: 'Fast Length', type: 'number', optimizable: true },
-        { key: 'slow_period', label: 'Slow Length', type: 'number', optimizable: true },
-        { key: 'signal_period', label: 'Signal Smoothing', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] }
+        { key: 'enable_visualization', label: 'Enable Visualisation MACD', type: 'checkbox', tooltip: 'Show MACD histogram on chart' },
+        { key: 'timeframe', label: 'MACD TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'use_btc_source', label: 'Use BTCUSDT as Source for MACD ?', type: 'checkbox' },
+        { key: 'fast_period', label: 'MACD Fast Length (12)', type: 'number', optimizable: true },
+        { key: 'slow_period', label: 'MACD Slow Length (26)', type: 'number', optimizable: true },
+        { key: 'signal_period', label: 'MACD Signal Smoothing (9)', type: 'number', optimizable: true },
+        { key: 'source', label: 'MACD Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
+        { type: 'divider' },
+        { key: 'use_macd_cross_zero', label: 'Use MACD Cross with Level (0)', type: 'checkbox', tooltip: 'Long when MACD crosses above level, Short when crosses below' },
+        { key: 'opposite_macd_cross_zero', label: 'Opposite Signal - MACD Cross with Level (0)', type: 'checkbox', tooltip: 'Swap long/short signals for level cross' },
+        { key: 'macd_cross_zero_level', label: 'Cross Line Level (0)', type: 'number', optimizable: true },
+        { type: 'divider' },
+        { key: 'use_macd_cross_signal', label: 'Use MACD Cross with Signal Line', type: 'checkbox', tooltip: 'Long when MACD crosses above Signal line, Short when crosses below' },
+        { key: 'signal_only_if_macd_positive', label: 'Signal only if MACD < 0 (Long) or > 0 (Short)', type: 'checkbox', tooltip: 'Filter: only generate long signals when MACD < 0, short when MACD > 0' },
+        { key: 'opposite_macd_cross_signal', label: 'Opposite Signal - MACD Cross with Signal Line', type: 'checkbox', tooltip: 'Swap long/short signals for signal line cross' },
+        { type: 'divider' },
+        { key: 'disable_signal_memory', label: '==Disable Signal Memory (for both MACD Crosses)==', type: 'checkbox', tooltip: 'When disabled, cross signals only fire on the exact bar of crossing. When enabled, signals persist for N bars.' }
       ]
     },
     adx: {
@@ -6392,82 +6279,6 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
     // =============================================
     // FILTERS
     // =============================================
-    rsi_filter: {
-      title: 'RSI - MTF [IN RANGE FILTER OR CROSS SIGNAL]',
-      fields: [
-        // TF1 (Main)
-        { type: 'separator', label: '━━━ RSI TF1 (Main) ━━━' },
-        { key: 'rsi_period', label: 'RSI Length', type: 'number', optimizable: true },
-        { key: 'rsi_timeframe', label: 'RSI TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for RSI?', type: 'checkbox' },
-        { key: 'use_long_range', label: 'Use RSI LONG Range', type: 'checkbox' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'long_rsi_more', label: '(LONG) RSI >', type: 'number', width: '70px', optimizable: true },
-            { label: '& RSI <', type: 'label' },
-            { key: 'long_rsi_less', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        { key: 'use_short_range', label: 'Use RSI SHORT Range', type: 'checkbox' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'short_rsi_less', label: '(SHORT) RSI <', type: 'number', width: '70px', optimizable: true },
-            { label: '& RSI >', type: 'label' },
-            { key: 'short_rsi_more', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        { key: 'use_cross_level', label: 'Use RSI Cross Level', type: 'checkbox', hasTooltip: true },
-        { key: 'cross_level_long', label: 'Cross Level for LONG', type: 'number', optimizable: true },
-        { key: 'cross_level_short', label: 'Cross Level for SHORT', type: 'number', optimizable: true },
-        { key: 'opposite_signal', label: 'Opposite Signal', type: 'checkbox', hasTooltip: true },
-        { key: 'use_signal_memory', label: 'Activate Signal Memory', type: 'checkbox', hasTooltip: true },
-        { key: 'signal_memory_bars', label: 'Signal Memory Bars', type: 'number', hasTooltip: true, optimizable: true },
-        // TF2
-        { type: 'separator', label: '━━━ RSI TF2 ━━━' },
-        { key: 'use_rsi_tf2', label: 'Use RSI TF2?', type: 'checkbox' },
-        { key: 'rsi_tf2_period', label: 'RSI Length', type: 'number', optimizable: true },
-        { key: 'rsi_tf2_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'rsi_tf2_long_more', label: '(LONG) RSI >', type: 'number', width: '70px', optimizable: true },
-            { label: '& <', type: 'label' },
-            { key: 'rsi_tf2_long_less', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'rsi_tf2_short_less', label: '(SHORT) RSI <', type: 'number', width: '70px', optimizable: true },
-            { label: '& >', type: 'label' },
-            { key: 'rsi_tf2_short_more', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        // TF3
-        { type: 'separator', label: '━━━ RSI TF3 ━━━' },
-        { key: 'use_rsi_tf3', label: 'Use RSI TF3?', type: 'checkbox' },
-        { key: 'rsi_tf3_period', label: 'RSI Length', type: 'number', optimizable: true },
-        { key: 'rsi_tf3_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'rsi_tf3_long_more', label: '(LONG) RSI >', type: 'number', width: '70px', optimizable: true },
-            { label: '& <', type: 'label' },
-            { key: 'rsi_tf3_long_less', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'rsi_tf3_short_less', label: '(SHORT) RSI <', type: 'number', width: '70px', optimizable: true },
-            { label: '& >', type: 'label' },
-            { key: 'rsi_tf3_short_more', type: 'number', width: '70px', optimizable: true }
-          ]
-        }
-      ]
-    },
     supertrend_filter: {
       title: 'SUPER TREND [FILTER] [SIGNAL] - MTF (3 Timeframes)',
       fields: [
@@ -6566,32 +6377,7 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         { key: 'stoch_kd_memory_bars', label: 'Keep Stochastic Cross K/D Signal Memory for XX bars', type: 'number', hasTooltip: true }
       ]
     },
-    // =============================================
-    // MACD [SIGNALS, CROSS X LINE OR CROSS SIGNAL LINE]
-    // =============================================
-    macd_filter: {
-      title: 'MACD [SIGNALS, CROSS X LINE OR CROSS SIGNAL LINE]',
-      fields: [
-        { key: 'macd_fast_length', label: 'MACD Fast Length (12)', type: 'number', optimizable: true },
-        { key: 'macd_slow_length', label: 'MACD Slow Length (26)', type: 'number', optimizable: true },
-        { key: 'macd_signal_smoothing', label: 'MACD Signal Smoothing (9)', type: 'number', optimizable: true },
-        { key: 'macd_source', label: 'MACD Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'macd_timeframe', label: 'MACD TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for MACD?', type: 'checkbox' },
-        { key: 'enable_macd_visualization', label: 'Enable Visualization MACD', type: 'checkbox' },
-        { type: 'separator', label: '------- Use MACD Cross with Level (0) -------' },
-        { key: 'use_macd_cross_zero', label: 'Use MACD Cross with Level (0)', type: 'checkbox' },
-        { key: 'opposite_macd_cross_zero', label: 'Opposite Signal - MACD Cross with Level (0)', type: 'checkbox', hasTooltip: true },
-        { key: 'macd_cross_zero_level', label: 'Cross Line Level (0)', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Use MACD Cross with Signal Line -------' },
-        { key: 'use_macd_cross_signal', label: 'Use MACD Cross with Signal Line', type: 'checkbox' },
-        { key: 'signal_only_if_macd_positive', label: 'Signal only if MACD > 0 (Long) or < 0 (Short)', type: 'checkbox', hasTooltip: true },
-        { key: 'opposite_macd_cross_signal', label: 'Opposite Signal - MACD Cross with Signal Line', type: 'checkbox' },
-        { type: 'separator', label: '------- Signal Memory -------' },
-        { key: 'disable_macd_signal_memory', label: '--Disable Signal Memory (for both MACD Crosses)--', type: 'checkbox' },
-        { key: 'macd_signal_memory_bars', label: 'Keep MACD Signal Memory for XX bars', type: 'number', hasTooltip: true }
-      ]
-    },
+    // (MACD Filter layout removed — consolidated into universal MACD indicator block)
     // =============================================
     // QQE [SIGNALS]
     // =============================================
@@ -8103,6 +7889,24 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
       return;
     }
 
+    // Divider - section header (similar to separator but styled differently)
+    if (field.type === 'divider') {
+      if (!optimizationMode) {
+        html += `
+          <div class="tv-param-divider" style="text-align:center;color:#888;font-size:11px;padding:6px 0 2px;border-top:1px solid #333;margin-top:6px;">
+            ${field.label || ''}
+          </div>
+        `;
+      }
+      return;
+    }
+
+    // Conditional visibility: hide field if showWhen param is falsy
+    const showWhenKey = field.showWhen;
+    if (showWhenKey && !params[showWhenKey]) {
+      return;
+    }
+
     if (field.type === 'inline' && !optimizationMode) {
       // Inline row - only in default mode
       html += '<div class="tv-param-row tv-inline-row">';
@@ -8138,6 +7942,9 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
       });
     } else if (field.type === 'checkbox' && !optimizationMode) {
       const checked = params[field.key] ? 'checked' : '';
+      const tooltipHtml = field.tooltip
+        ? `<i class="bi bi-info-circle tv-tooltip-icon" title="${field.tooltip}"></i>`
+        : (field.hasTooltip ? '<i class="bi bi-info-circle tv-tooltip-icon"></i>' : '');
       html += `
         <div class="tv-param-row tv-checkbox-row">
           <label class="tv-checkbox-label">
@@ -8147,7 +7954,7 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
                    data-param-key="${field.key}"
                    ${checked}>
             ${field.label}
-            ${field.hasTooltip ? '<i class="bi bi-info-circle tv-tooltip-icon"></i>' : ''}
+            ${tooltipHtml}
           </label>
         </div>
       `;
@@ -8205,8 +8012,8 @@ function getBlockPorts(blockId, _category) {
       inputs: [],
       outputs: [
         { id: 'value', label: 'Value', type: 'data' },
-        { id: 'oversold', label: 'OS', type: 'data' },
-        { id: 'overbought', label: 'OB', type: 'data' }
+        { id: 'long', label: 'Long', type: 'data' },
+        { id: 'short', label: 'Short', type: 'data' }
       ]
     },
     macd: {
@@ -8214,7 +8021,9 @@ function getBlockPorts(blockId, _category) {
       outputs: [
         { id: 'macd', label: 'MACD', type: 'data' },
         { id: 'signal', label: 'Signal', type: 'data' },
-        { id: 'hist', label: 'Hist', type: 'data' }
+        { id: 'hist', label: 'Hist', type: 'data' },
+        { id: 'long', label: 'Long', type: 'data' },
+        { id: 'short', label: 'Short', type: 'data' }
       ]
     },
     ema: {
@@ -8544,8 +8353,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Long"
-             style="top: 15%;"></div>
-        <span class="main-port-label entry-label" style="top: 15%; transform: translateY(-50%);">Entry L</span>
+             style="top: 13%;"></div>
+        <span class="main-port-label entry-label" style="top: 13%; transform: translateY(-50%);">Entry L</span>
         
         <!-- Entry Short port -->
         <div class="port condition-port main-port-left entry-port" 
@@ -8554,8 +8363,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Entry Short"
-             style="top: 32%;"></div>
-        <span class="main-port-label entry-label" style="top: 32%; transform: translateY(-50%);">Entry S</span>
+             style="top: 30%;"></div>
+        <span class="main-port-label entry-label" style="top: 30%; transform: translateY(-50%);">Entry S</span>
         
         <!-- Exit Long port -->
         <div class="port condition-port main-port-left exit-port" 
@@ -8564,8 +8373,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Exit Long"
-             style="top: 50%;"></div>
-        <span class="main-port-label exit-label" style="top: 50%; transform: translateY(-50%);">Exit L</span>
+             style="top: 47%;"></div>
+        <span class="main-port-label exit-label" style="top: 47%; transform: translateY(-50%);">Exit L</span>
         
         <!-- Exit Short port -->
         <div class="port condition-port main-port-left exit-port" 
@@ -8574,8 +8383,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="Exit Short"
-             style="top: 67%;"></div>
-        <span class="main-port-label exit-label" style="top: 67%; transform: translateY(-50%);">Exit S</span>
+             style="top: 64%;"></div>
+        <span class="main-port-label exit-label" style="top: 64%; transform: translateY(-50%);">Exit S</span>
 
         <!-- SL/TP config port -->
         <div class="port config-port main-port-left config-input-port" 
@@ -8584,8 +8393,8 @@ function renderMainStrategyNode(block, _ports) {
              data-block-id="${block.id}"
              data-direction="input"
              title="SL/TP Config"
-             style="top: 85%;"></div>
-        <span class="main-port-label config-label" style="top: 85%; transform: translateY(-50%);">SL/TP</span>
+             style="top: 82%;"></div>
+        <span class="main-port-label config-label" style="top: 82%; transform: translateY(-50%);">SL/TP</span>
         
         <!-- Center title -->
         <div class="main-block-title">${block.name}</div>
@@ -8613,8 +8422,13 @@ function renderBlocks() {
       const paramHint = getCompactParamHint(block.params || {}, block.type);
       const hasOptimization = block.optimizationParams &&
         Object.values(block.optimizationParams).some(p => p.enabled);
+      const hasLabeledInputs = ports.inputs && ports.inputs.length > 1 && ports.inputs.some(p => p.label);
+      const hasLabeledOutputs = ports.outputs && ports.outputs.length > 1 && ports.outputs.some(p => p.label);
+      const maxPorts = Math.max(ports.inputs?.length || 0, ports.outputs?.length || 0);
+      const manyPortsClass = maxPorts >= 5 ? 'has-many-ports' : maxPorts >= 4 ? 'has-some-ports' : '';
+      const portClasses = `${hasLabeledInputs ? 'has-labeled-inputs' : ''} ${hasLabeledOutputs ? 'has-labeled-outputs' : ''} ${manyPortsClass}`;
       return `
-        <div class="strategy-block ${block.category} ${selectedBlockId === block.id ? 'selected' : ''} ${hasOptimization ? 'has-optimization' : ''}"
+        <div class="strategy-block ${block.category} ${selectedBlockId === block.id ? 'selected' : ''} ${hasOptimization ? 'has-optimization' : ''} ${portClasses}"
              id="${block.id}"
              style="left: ${block.x}px; top: ${block.y}px"
              data-block-id="${block.id}">
@@ -8678,6 +8492,27 @@ function getCompactParamHint(params, blockType) {
 
   if (blockType === 'dca') {
     return `Grid: ${params.grid_size_percent || 0}% | ${params.order_count || 0} orders | M:${params.martingale_coefficient || 1}`;
+  }
+
+  if (blockType === 'rsi') {
+    const parts = [`${params.period || 14}`];
+    if (params.use_long_range) parts.push(`L:${params.long_rsi_more}-${params.long_rsi_less}`);
+    if (params.use_short_range) parts.push(`S:${params.short_rsi_less}-${params.short_rsi_more}`);
+    if (params.use_cross_level) parts.push(`X:${params.cross_long_level}/${params.cross_short_level}`);
+    if (params.use_cross_memory) parts.push(`Mem:${params.cross_memory_bars}`);
+    if (params.timeframe && params.timeframe !== 'Chart') parts.push(params.timeframe);
+    return parts.join(' | ');
+  }
+
+  if (blockType === 'macd') {
+    const parts = [`${params.fast_period || 12} | ${params.slow_period || 26} | ${params.signal_period || 9}`];
+    if (params.use_macd_cross_zero) parts.push(`Zero:${params.macd_cross_zero_level ?? 0}`);
+    if (params.use_macd_cross_signal) parts.push('Sig✓');
+    if (params.signal_only_if_macd_positive) parts.push('M>0');
+    if (!params.disable_signal_memory) parts.push(`Mem:${params.signal_memory_bars || 5}`);
+    if (params.source && params.source !== 'close') parts.push(params.source);
+    if (params.timeframe && params.timeframe !== 'Chart') parts.push(params.timeframe);
+    return parts.join(' | ');
   }
 
   const entries = Object.entries(params);
@@ -8973,8 +8808,19 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
     e.stopPropagation();
   });
 
-  // Position popup next to the block, ensuring it stays within viewport
-  positionPopupInViewport(popup, blockEl);
+  // Make popup invisible but in DOM to measure real height before positioning
+  popup.style.visibility = 'hidden';
+  popup.style.position = 'fixed';
+  popup.style.top = '0px';
+  popup.style.left = '0px';
+
+  // Double rAF ensures browser has fully laid out the popup before measuring
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      positionPopupInViewport(popup, blockEl);
+      popup.style.visibility = '';
+    });
+  });
 
   // Close on outside click
   setTimeout(() => {
@@ -8983,45 +8829,45 @@ function showBlockParamsPopup(blockId, optimizationMode = false) {
 }
 
 /**
- * Position popup next to block element, ensuring it stays within viewport
+ * Position popup next to block element, ensuring it stays within viewport.
+ * CSS flexbox layout guarantees header/footer are always visible.
+ * Body scrolls only when popup hits max-height.
  */
 function positionPopupInViewport(popup, blockEl) {
   const blockRect = blockEl.getBoundingClientRect();
   const popupWidth = popup.offsetWidth || 320;
   const popupHeight = popup.offsetHeight || 400;
   const padding = 10; // Gap between block and popup
-  const margin = 20; // Margin from viewport edges
+  const margin = 10; // Margin from viewport edges
+  const viewportH = window.innerHeight;
+  const viewportW = window.innerWidth;
 
   let left, top;
 
-  // Try to position to the right of the block
-  if (blockRect.right + padding + popupWidth + margin <= window.innerWidth) {
+  // --- Horizontal positioning ---
+  if (blockRect.right + padding + popupWidth + margin <= viewportW) {
     left = blockRect.right + padding;
-  }
-  // Try to position to the left of the block
-  else if (blockRect.left - padding - popupWidth >= margin) {
+  } else if (blockRect.left - padding - popupWidth >= margin) {
     left = blockRect.left - padding - popupWidth;
-  }
-  // Position at right edge of viewport
-  else {
-    left = window.innerWidth - popupWidth - margin;
+  } else {
+    left = viewportW - popupWidth - margin;
   }
 
-  // Position vertically aligned with block top, but ensure within viewport
+  // --- Vertical positioning ---
   top = blockRect.top;
 
-  // Check if popup goes below viewport
-  if (top + popupHeight + margin > window.innerHeight) {
-    top = window.innerHeight - popupHeight - margin;
+  // Ensure popup doesn't go below viewport
+  if (top + popupHeight + margin > viewportH) {
+    top = viewportH - popupHeight - margin;
   }
 
-  // Check if popup goes above viewport
+  // Ensure popup doesn't go above viewport
   if (top < margin) {
     top = margin;
   }
 
   popup.style.position = 'fixed';
-  popup.style.left = `${left}px`;
+  popup.style.left = `${Math.max(margin, left)}px`;
   popup.style.top = `${top}px`;
 }
 
@@ -9749,9 +9595,14 @@ function escapeHtml(str) {
 const blockValidationRules = {
   // Momentum Indicators
   rsi: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    overbought: { min: 0, max: 100, type: 'number' },
-    oversold: { min: 0, max: 100, type: 'number' }
+    period: { min: 1, max: 200, type: 'number', required: true },
+    long_rsi_more: { min: 0.1, max: 100, type: 'number' },
+    long_rsi_less: { min: 0.1, max: 100, type: 'number' },
+    short_rsi_less: { min: 0.1, max: 100, type: 'number' },
+    short_rsi_more: { min: 0.1, max: 100, type: 'number' },
+    cross_long_level: { min: 0.1, max: 100, type: 'number' },
+    cross_short_level: { min: 0.1, max: 100, type: 'number' },
+    cross_memory_bars: { min: 1, max: 100, type: 'number' }
   },
   stochastic: {
     k_period: { min: 1, max: 500, type: 'number', required: true },
@@ -9802,7 +9653,9 @@ const blockValidationRules = {
   macd: {
     fast_period: { min: 1, max: 500, type: 'number', required: true },
     slow_period: { min: 1, max: 500, type: 'number', required: true },
-    signal_period: { min: 1, max: 100, type: 'number', required: true }
+    signal_period: { min: 1, max: 100, type: 'number', required: true },
+    macd_cross_zero_level: { min: -1000, max: 1000, type: 'number' },
+    signal_memory_bars: { min: 1, max: 100, type: 'number' }
   },
   adx: {
     period: { min: 1, max: 500, type: 'number', required: true },
@@ -10009,15 +9862,7 @@ const blockValidationRules = {
   harami: {},
 
   // Divergence
-  rsi_divergence: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    lookback: { min: 5, max: 200, type: 'number' }
-  },
-  macd_divergence: {
-    fast_period: { min: 1, max: 500, type: 'number', required: true },
-    slow_period: { min: 1, max: 500, type: 'number', required: true },
-    signal_period: { min: 1, max: 100, type: 'number' }
-  },
+  // (macd_divergence validation removed — consolidated into universal MACD block)
   stoch_divergence: {
     k_period: { min: 1, max: 500, type: 'number', required: true },
     d_period: { min: 1, max: 100, type: 'number' }
@@ -11287,47 +11132,7 @@ const templateData = {
         icon: 'graph-up',
         x: 100,
         y: 150,
-        params: { period: 14, overbought: 70, oversold: 30 }
-      },
-      {
-        id: 'const_30',
-        type: 'constant',
-        category: 'input',
-        name: 'Constant',
-        icon: 'hash',
-        x: 100,
-        y: 300,
-        params: { value: 30 }
-      },
-      {
-        id: 'const_70',
-        type: 'constant',
-        category: 'input',
-        name: 'Constant',
-        icon: 'hash',
-        x: 100,
-        y: 400,
-        params: { value: 70 }
-      },
-      {
-        id: 'less_than_1',
-        type: 'less_than',
-        category: 'condition',
-        name: 'Less Than',
-        icon: 'chevron-double-down',
-        x: 350,
-        y: 200,
-        params: {}
-      },
-      {
-        id: 'greater_than_1',
-        type: 'greater_than',
-        category: 'condition',
-        name: 'Greater Than',
-        icon: 'chevron-double-up',
-        x: 350,
-        y: 350,
-        params: {}
+        params: { period: 14, use_cross_level: true, cross_long_level: 30, cross_short_level: 70 }
       },
       {
         id: 'sltp_1',
@@ -11343,49 +11148,25 @@ const templateData = {
     connections: [
       {
         id: 'conn_1',
-        source: { blockId: 'rsi_1', portId: 'value' },
-        target: { blockId: 'less_than_1', portId: 'left' },
-        type: 'data'
-      },
-      {
-        id: 'conn_2',
-        source: { blockId: 'const_30', portId: 'value' },
-        target: { blockId: 'less_than_1', portId: 'right' },
-        type: 'data'
-      },
-      {
-        id: 'conn_3',
-        source: { blockId: 'rsi_1', portId: 'value' },
-        target: { blockId: 'greater_than_1', portId: 'left' },
-        type: 'data'
-      },
-      {
-        id: 'conn_4',
-        source: { blockId: 'const_70', portId: 'value' },
-        target: { blockId: 'greater_than_1', portId: 'right' },
-        type: 'data'
-      },
-      {
-        id: 'conn_5',
-        source: { blockId: 'less_than_1', portId: 'result' },
+        source: { blockId: 'rsi_1', portId: 'long' },
         target: { blockId: 'main_strategy', portId: 'entry_long' },
         type: 'condition'
       },
       {
-        id: 'conn_6',
-        source: { blockId: 'greater_than_1', portId: 'result' },
+        id: 'conn_2',
+        source: { blockId: 'rsi_1', portId: 'short' },
         target: { blockId: 'main_strategy', portId: 'exit_long' },
         type: 'condition'
       },
       {
-        id: 'conn_7',
-        source: { blockId: 'greater_than_1', portId: 'result' },
+        id: 'conn_3',
+        source: { blockId: 'rsi_1', portId: 'short' },
         target: { blockId: 'main_strategy', portId: 'entry_short' },
         type: 'condition'
       },
       {
-        id: 'conn_8',
-        source: { blockId: 'less_than_1', portId: 'result' },
+        id: 'conn_4',
+        source: { blockId: 'rsi_1', portId: 'long' },
         target: { blockId: 'main_strategy', portId: 'exit_short' },
         type: 'condition'
       }
@@ -11401,27 +11182,7 @@ const templateData = {
         icon: 'bar-chart',
         x: 100,
         y: 200,
-        params: { fast: 12, slow: 26, signal: 9 }
-      },
-      {
-        id: 'crossover_1',
-        type: 'crossover',
-        category: 'condition',
-        name: 'Crossover',
-        icon: 'intersect',
-        x: 350,
-        y: 150,
-        params: {}
-      },
-      {
-        id: 'crossunder_1',
-        type: 'crossunder',
-        category: 'condition',
-        name: 'Crossunder',
-        icon: 'intersect',
-        x: 350,
-        y: 350,
-        params: {}
+        params: { fast_period: 12, slow_period: 26, signal_period: 9, source: 'close', use_macd_cross_signal: true }
       },
       {
         id: 'sltp_1',
@@ -11429,57 +11190,33 @@ const templateData = {
         category: 'exit',
         name: 'Static SL/TP',
         icon: 'shield-check',
-        x: 600,
-        y: 450,
+        x: 400,
+        y: 350,
         params: { take_profit_percent: 2.0, stop_loss_percent: 1.5 }
       }
     ],
     connections: [
       {
         id: 'conn_1',
-        source: { blockId: 'macd_1', portId: 'macd' },
-        target: { blockId: 'crossover_1', portId: 'a' },
-        type: 'data'
-      },
-      {
-        id: 'conn_2',
-        source: { blockId: 'macd_1', portId: 'signal' },
-        target: { blockId: 'crossover_1', portId: 'b' },
-        type: 'data'
-      },
-      {
-        id: 'conn_3',
-        source: { blockId: 'macd_1', portId: 'macd' },
-        target: { blockId: 'crossunder_1', portId: 'a' },
-        type: 'data'
-      },
-      {
-        id: 'conn_4',
-        source: { blockId: 'macd_1', portId: 'signal' },
-        target: { blockId: 'crossunder_1', portId: 'b' },
-        type: 'data'
-      },
-      {
-        id: 'conn_5',
-        source: { blockId: 'crossover_1', portId: 'result' },
+        source: { blockId: 'macd_1', portId: 'long' },
         target: { blockId: 'main_strategy', portId: 'entry_long' },
         type: 'condition'
       },
       {
-        id: 'conn_6',
-        source: { blockId: 'crossunder_1', portId: 'result' },
+        id: 'conn_2',
+        source: { blockId: 'macd_1', portId: 'short' },
         target: { blockId: 'main_strategy', portId: 'exit_long' },
         type: 'condition'
       },
       {
-        id: 'conn_7',
-        source: { blockId: 'crossunder_1', portId: 'result' },
+        id: 'conn_3',
+        source: { blockId: 'macd_1', portId: 'short' },
         target: { blockId: 'main_strategy', portId: 'entry_short' },
         type: 'condition'
       },
       {
-        id: 'conn_8',
-        source: { blockId: 'crossover_1', portId: 'result' },
+        id: 'conn_4',
+        source: { blockId: 'macd_1', portId: 'long' },
         target: { blockId: 'main_strategy', portId: 'exit_short' },
         type: 'condition'
       }
@@ -11703,47 +11440,7 @@ const templateData = {
         icon: 'graph-up',
         x: 150,
         y: 150,
-        params: { period: 14, overbought: 70, oversold: 30 }
-      },
-      {
-        id: 'const_30',
-        type: 'constant',
-        category: 'input',
-        name: 'Constant',
-        icon: 'hash',
-        x: 150,
-        y: 300,
-        params: { value: 30 }
-      },
-      {
-        id: 'const_70',
-        type: 'constant',
-        category: 'input',
-        name: 'Constant',
-        icon: 'hash',
-        x: 150,
-        y: 450,
-        params: { value: 70 }
-      },
-      {
-        id: 'less_than_oversold',
-        type: 'less_than',
-        category: 'condition',
-        name: 'Less Than',
-        icon: 'chevron-double-down',
-        x: 400,
-        y: 200,
-        params: {}
-      },
-      {
-        id: 'greater_than_overbought',
-        type: 'greater_than',
-        category: 'condition',
-        name: 'Greater Than',
-        icon: 'chevron-double-up',
-        x: 400,
-        y: 400,
-        params: {}
+        params: { period: 14, use_long_range: true, long_rsi_more: 1, long_rsi_less: 30, use_short_range: true, short_rsi_less: 100, short_rsi_more: 70 }
       },
       {
         id: 'sltp_1',
@@ -11757,59 +11454,31 @@ const templateData = {
       }
     ],
     connections: [
-      // RSI -> Less Than (left) - для проверки RSI < 30
+      // RSI long signal → Entry Long
       {
         id: 'conn_1',
-        source: { blockId: 'rsi_1', portId: 'value' },
-        target: { blockId: 'less_than_oversold', portId: 'left' },
-        type: 'data'
-      },
-      // Constant 30 -> Less Than (right) - порог oversold
-      {
-        id: 'conn_2',
-        source: { blockId: 'const_30', portId: 'value' },
-        target: { blockId: 'less_than_oversold', portId: 'right' },
-        type: 'data'
-      },
-      // RSI -> Greater Than (left) - для проверки RSI > 70
-      {
-        id: 'conn_3',
-        source: { blockId: 'rsi_1', portId: 'value' },
-        target: { blockId: 'greater_than_overbought', portId: 'left' },
-        type: 'data'
-      },
-      // Constant 70 -> Greater Than (right) - порог overbought
-      {
-        id: 'conn_4',
-        source: { blockId: 'const_70', portId: 'value' },
-        target: { blockId: 'greater_than_overbought', portId: 'right' },
-        type: 'data'
-      },
-      // Less Than (oversold) -> Entry Long (RSI < 30 = вход в Long)
-      {
-        id: 'conn_5',
-        source: { blockId: 'less_than_oversold', portId: 'result' },
+        source: { blockId: 'rsi_1', portId: 'long' },
         target: { blockId: 'main_strategy', portId: 'entry_long' },
         type: 'condition'
       },
-      // Greater Than (overbought) -> Exit Long (RSI > 70 = выход из Long)
+      // RSI short signal → Exit Long
       {
-        id: 'conn_6',
-        source: { blockId: 'greater_than_overbought', portId: 'result' },
+        id: 'conn_2',
+        source: { blockId: 'rsi_1', portId: 'short' },
         target: { blockId: 'main_strategy', portId: 'exit_long' },
         type: 'condition'
       },
-      // Greater Than (overbought) -> Entry Short (RSI > 70 = вход в Short)
+      // RSI short signal → Entry Short
       {
-        id: 'conn_7',
-        source: { blockId: 'greater_than_overbought', portId: 'result' },
+        id: 'conn_3',
+        source: { blockId: 'rsi_1', portId: 'short' },
         target: { blockId: 'main_strategy', portId: 'entry_short' },
         type: 'condition'
       },
-      // Less Than (oversold) -> Exit Short (RSI < 30 = выход из Short)
+      // RSI long signal → Exit Short
       {
-        id: 'conn_8',
-        source: { blockId: 'less_than_oversold', portId: 'result' },
+        id: 'conn_4',
+        source: { blockId: 'rsi_1', portId: 'long' },
         target: { blockId: 'main_strategy', portId: 'exit_short' },
         type: 'condition'
       }
@@ -12074,7 +11743,7 @@ const templateData = {
   // =============================================
   simple_dca: {
     blocks: [
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 80, y: 150, params: { period: 14, overbought: 70, oversold: 30 } },
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 80, y: 150, params: { period: 14 } },
       { id: 'const_40', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 320, params: { value: 40 } },
       { id: 'const_60', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 440, params: { value: 60 } },
       { id: 'lt_entry', type: 'less_than', category: 'condition', name: 'RSI < 40', icon: 'chevron-double-down', x: 330, y: 180, params: {} },
@@ -12098,7 +11767,7 @@ const templateData = {
   // =============================================
   rsi_dca: {
     blocks: [
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 80, y: 150, params: { period: 14, overbought: 70, oversold: 30 } },
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 80, y: 150, params: { period: 14 } },
       { id: 'const_25', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 320, params: { value: 25 } },
       { id: 'const_50', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 440, params: { value: 50 } },
       { id: 'const_75', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 80, y: 560, params: { value: 75 } },
@@ -12164,8 +11833,8 @@ const templateData = {
   // =============================================
   multi_indicator: {
     blocks: [
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 60, y: 80, params: { period: 14, overbought: 70, oversold: 30 } },
-      { id: 'macd_1', type: 'macd', category: 'indicator', name: 'MACD', icon: 'bar-chart', x: 60, y: 220, params: { fast: 12, slow: 26, signal: 9 } },
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 60, y: 80, params: { period: 14 } },
+      { id: 'macd_1', type: 'macd', category: 'indicator', name: 'MACD', icon: 'bar-chart', x: 60, y: 220, params: { fast_period: 12, slow_period: 26, signal_period: 9 } },
       { id: 'ema_fast', type: 'ema', category: 'indicator', name: 'EMA 9', icon: 'graph-up-arrow', x: 60, y: 380, params: { period: 9 } },
       { id: 'ema_slow', type: 'ema', category: 'indicator', name: 'EMA 21', icon: 'graph-up-arrow', x: 60, y: 500, params: { period: 21 } },
       { id: 'const_30', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 620, params: { value: 30 } },
@@ -12229,7 +11898,7 @@ const templateData = {
   divergence_hunter: {
     blocks: [
       { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 60, y: 100, params: {} },
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 60, y: 260, params: { period: 14, overbought: 70, oversold: 30 } },
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 60, y: 260, params: { period: 14 } },
       { id: 'const_30', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 420, params: { value: 30 } },
       { id: 'const_70', type: 'constant', category: 'input', name: 'Constant', icon: 'hash', x: 60, y: 530, params: { value: 70 } },
       { id: 'ema_price', type: 'ema', category: 'indicator', name: 'EMA Price', icon: 'graph-up-arrow', x: 60, y: 640, params: { period: 14 } },
@@ -12275,7 +11944,7 @@ const templateData = {
   smart_money: {
     blocks: [
       { id: 'price_1', type: 'price', category: 'input', name: 'Price', icon: 'currency-dollar', x: 40, y: 80, params: {} },
-      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 40, y: 220, params: { period: 14, overbought: 70, oversold: 30 } },
+      { id: 'rsi_1', type: 'rsi', category: 'indicator', name: 'RSI', icon: 'graph-up', x: 40, y: 220, params: { period: 14 } },
       { id: 'obv_1', type: 'obv', category: 'indicator', name: 'OBV', icon: 'bar-chart-steps', x: 40, y: 370, params: {} },
       { id: 'obv_ema', type: 'ema', category: 'indicator', name: 'OBV EMA', icon: 'graph-up-arrow', x: 40, y: 510, params: { period: 21 } },
       { id: 'st_1', type: 'supertrend', category: 'indicator', name: 'SuperTrend', icon: 'arrow-up-right-circle', x: 40, y: 650, params: { period: 10, multiplier: 3.0 } },
@@ -13912,10 +13581,15 @@ async function revertToVersion(strategyId, versionId) {
 // =============================================
 
 /**
- * Convert strategy blocks to backend API format
- * Maps visual blocks to strategy_type and strategy_params
+ * Convert strategy blocks to backend API format.
+ * Maps visual blocks to strategy_type and strategy_params.
+ *
+ * NOTE (2026-02-15): This function is NOT used by buildBacktestRequest() because
+ * the backend reads blocks/connections directly from the database. The fields it
+ * produces (strategy_type, filters, exits, etc.) were silently dropped by Pydantic.
+ * Kept as _mapBlocksToBackendParams for potential future use (e.g. code generation).
  */
-function mapBlocksToBackendParams() {
+function _mapBlocksToBackendParams() {
   const result = {
     strategy_type: 'custom',
     strategy_params: {},
@@ -14097,11 +13771,15 @@ function mapIndicatorParams(block) {
 }
 
 /**
- * Build full backtest request from UI state
+ * Build full backtest request from UI state.
+ *
+ * NOTE: Backend reads blocks/connections from the DATABASE (not from this payload).
+ * Only Properties-panel fields (symbol, interval, capital, leverage, etc.) are sent here.
+ * mapBlocksToBackendParams() is NOT called — its output was silently dropped by Pydantic
+ * because BacktestRequest model doesn't define strategy_type/filters/exits/etc. fields.
+ * See: Bug #1 fix (2026-02-15).
  */
 function buildBacktestRequest() {
-  const strategyMapping = mapBlocksToBackendParams();
-
   // Таймфрейм и направление — из общей секции (формат Bybit: 1,3,5,15,30,60,120,240,360,720,D,W,M)
   const timeframeRaw = document.getElementById('strategyTimeframe')?.value || '15';
   const interval = convertIntervalToAPIFormat(timeframeRaw);
@@ -14126,8 +13804,20 @@ function buildBacktestRequest() {
     direction: document.getElementById('builderDirection')?.value || 'both',
     pyramiding: parseInt(document.getElementById('backtestPyramiding')?.value) || 1,
 
-    // Commission: read from UI (default 0.07% = 0.0007)
-    commission: parseFloat(document.getElementById('backtestCommission')?.value || '0.07') / 100 || 0.0007,
+    // Commission: read from UI as percentage (e.g. 0.07 = 0.07%), convert to decimal (0.0007)
+    commission: (() => {
+      const rawVal = parseFloat(document.getElementById('backtestCommission')?.value || '0.07');
+      // Validate commission range: UI shows percentage (0.01–1.0%), convert to decimal
+      if (rawVal > 1.0) {
+        console.warn(`[Backtest] Commission ${rawVal}% is unusually high (max 1%). Clamping to 1%.`);
+        return 0.01;
+      }
+      if (rawVal < 0.001) {
+        console.warn(`[Backtest] Commission ${rawVal}% is suspiciously low. Did you enter decimal instead of %? Using 0.07%.`);
+        return 0.0007;
+      }
+      return rawVal / 100;
+    })(),
     slippage: 0.0005,
 
     // Position sizing from Properties (position_size as fraction 0–1 for percent mode)
@@ -14139,25 +13829,6 @@ function buildBacktestRequest() {
       const val = parseFloat(sizeEl?.value) || 100;
       return type === 'percent' ? val / 100 : val;
     })(),
-
-    // Strategy from blocks
-    strategy_type: strategyMapping.strategy_type,
-    strategy_params: (() => {
-      const params = { ...(strategyMapping.strategy_params || {}) };
-      const typeEl = document.getElementById('backtestPositionSizeType');
-      const sizeEl = document.getElementById('backtestPositionSize');
-      const type = typeEl?.value || 'percent';
-      const val = parseFloat(sizeEl?.value) || 100;
-      params._position_size_type = type;
-      if (type === 'fixed_amount' || type === 'contracts') params._order_amount = val;
-      return params;
-    })(),
-
-    // Advanced: filters, exits, sizing
-    filters: strategyMapping.filters,
-    exit_rules: strategyMapping.exits,
-    position_sizing: strategyMapping.position_sizing,
-    risk_controls: strategyMapping.risk_controls,
 
     // Time filter: days to block (0=Mon … 6=Sun). Unchecked = trade that day.
     no_trade_days: getNoTradeDaysFromUI()
@@ -14822,24 +14493,15 @@ window.toggleRightSidebar = toggleRightSidebar;
 const AI_PRESETS = {
   rsi: {
     blocks: [
-      { type: 'rsi', params: { period: 14, overbought: 70, oversold: 30 } },
-      { type: 'constant', id: 'const_oversold', params: { value: 30 } },
-      { type: 'constant', id: 'const_overbought', params: { value: 70 } },
-      { type: 'crossover', id: 'cross_up' },
-      { type: 'crossunder', id: 'cross_down' },
+      { type: 'rsi', params: { period: 14, use_cross_level: true, cross_long_level: 30, cross_short_level: 70 } },
       { type: 'buy' },
-      { type: 'sell' }
+      { type: 'sell' },
+      { type: 'static_sltp', id: 'sltp_1', params: { stop_loss_percent: 2.0, take_profit_percent: 4.0 } }
     ],
     connections: [
-      // RSI value crosses above oversold (30) → buy signal
-      { source: 'rsi', source_port: 'value', target: 'cross_up', target_port: 'a' },
-      { source: 'const_oversold', source_port: 'value', target: 'cross_up', target_port: 'b' },
-      // RSI value crosses below overbought (70) → sell signal
-      { source: 'rsi', source_port: 'value', target: 'cross_down', target_port: 'a' },
-      { source: 'const_overbought', source_port: 'value', target: 'cross_down', target_port: 'b' },
-      // Condition → Action wiring
-      { source: 'cross_up', source_port: 'result', target: 'buy', target_port: 'signal' },
-      { source: 'cross_down', source_port: 'result', target: 'sell', target_port: 'signal' }
+      // RSI long signal → buy, short signal → sell
+      { source: 'rsi', source_port: 'long', target: 'buy', target_port: 'signal' },
+      { source: 'rsi', source_port: 'short', target: 'sell', target_port: 'signal' }
     ]
   },
   ema_cross: {
@@ -14849,7 +14511,8 @@ const AI_PRESETS = {
       { type: 'crossover', id: 'cross_up' },
       { type: 'crossunder', id: 'cross_down' },
       { type: 'buy' },
-      { type: 'sell' }
+      { type: 'sell' },
+      { type: 'static_sltp', id: 'sltp_1', params: { stop_loss_percent: 2.0, take_profit_percent: 4.0 } }
     ],
     connections: [
       { source: 'ema_fast', source_port: 'value', target: 'cross_up', target_port: 'a' },
@@ -14863,20 +14526,14 @@ const AI_PRESETS = {
   },
   macd: {
     blocks: [
-      { type: 'macd', params: { fast_period: 12, slow_period: 26, signal_period: 9 } },
-      { type: 'crossover', id: 'cross_up' },
-      { type: 'crossunder', id: 'cross_down' },
+      { type: 'macd', params: { fast_period: 12, slow_period: 26, signal_period: 9, use_macd_cross_signal: true } },
       { type: 'buy' },
-      { type: 'sell' }
+      { type: 'sell' },
+      { type: 'static_sltp', id: 'sltp_1', params: { stop_loss_percent: 2.0, take_profit_percent: 4.0 } }
     ],
     connections: [
-      { source: 'macd', source_port: 'macd', target: 'cross_up', target_port: 'a' },
-      { source: 'macd', source_port: 'signal', target: 'cross_up', target_port: 'b' },
-      { source: 'macd', source_port: 'macd', target: 'cross_down', target_port: 'a' },
-      { source: 'macd', source_port: 'signal', target: 'cross_down', target_port: 'b' },
-      // Condition → Action wiring
-      { source: 'cross_up', source_port: 'result', target: 'buy', target_port: 'signal' },
-      { source: 'cross_down', source_port: 'result', target: 'sell', target_port: 'signal' }
+      { source: 'macd', source_port: 'long', target: 'buy', target_port: 'signal' },
+      { source: 'macd', source_port: 'short', target: 'sell', target_port: 'signal' }
     ]
   },
   bb: {
@@ -14886,7 +14543,8 @@ const AI_PRESETS = {
       { type: 'crossover', id: 'cross_up' },
       { type: 'crossunder', id: 'cross_down' },
       { type: 'buy' },
-      { type: 'sell' }
+      { type: 'sell' },
+      { type: 'static_sltp', id: 'sltp_1', params: { stop_loss_percent: 2.0, take_profit_percent: 4.0 } }
     ],
     connections: [
       // Price crosses above lower band → buy signal
@@ -14903,10 +14561,62 @@ const AI_PRESETS = {
   custom: { blocks: [], connections: [] }
 };
 
+// Track AI Build mode: 'build' (from preset) or 'optimize' (existing canvas strategy)
+let _aiBuildMode = 'build';
+let _aiBuildExistingStrategyId = null;
+
 function openAiBuildModal() {
   const modal = document.getElementById('aiBuildModal');
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
+
+  // Detect mode: if canvas has a saved strategy → optimize mode
+  const existingId = getStrategyIdFromURL();
+  const hasCanvasBlocks = strategyBlocks.length > 0;
+  const stratName = document.getElementById('strategyName')?.value || 'New Strategy';
+
+  if (existingId && hasCanvasBlocks) {
+    _aiBuildMode = 'optimize';
+    _aiBuildExistingStrategyId = existingId;
+  } else {
+    _aiBuildMode = 'build';
+    _aiBuildExistingStrategyId = null;
+  }
+
+  // Update modal title based on mode
+  const titleEl = modal.querySelector('.ai-build-header h3');
+  if (titleEl) {
+    titleEl.innerHTML = _aiBuildMode === 'optimize'
+      ? '<i class="bi bi-stars"></i> AI Strategy Optimizer'
+      : '<i class="bi bi-robot"></i> AI Strategy Builder';
+  }
+
+  // Show/hide preset section based on mode
+  const presetHeading = modal.querySelector('.ai-build-preset-heading');
+  const presetSelect = document.getElementById('aiPreset');
+  const blocksPreview = document.getElementById('aiBlocksPreview');
+  const isOptimize = _aiBuildMode === 'optimize';
+
+  if (presetHeading) presetHeading.style.display = isOptimize ? 'none' : '';
+  if (presetSelect) presetSelect.style.display = isOptimize ? 'none' : '';
+  if (blocksPreview) {
+    if (isOptimize) {
+      // Show current canvas blocks as read-only info
+      const blockTypes = strategyBlocks.map(b => b.type || b.blockType || '?');
+      blocksPreview.textContent = `Текущие блоки на канвасе (${blockTypes.length}):\n` +
+        blockTypes.map(t => `  • ${t}`).join('\n');
+      blocksPreview.style.display = '';
+    }
+    // In build mode, applyAiPreset() handles this
+  }
+
+  // Update Build button text
+  const btnRun = document.getElementById('btnRunAiBuild');
+  if (btnRun) {
+    btnRun.innerHTML = isOptimize
+      ? '<i class="bi bi-stars"></i> Optimize & Backtest'
+      : '<i class="bi bi-play-fill"></i> Build & Backtest';
+  }
 
   // Populate summary from Parameters panel
   const symbol = document.getElementById('backtestSymbol')?.value || '';
@@ -14928,7 +14638,14 @@ function openAiBuildModal() {
     if (!symbol) {
       warning = '<div class="summary-warning"><i class="bi bi-exclamation-triangle"></i> Выберите тикер в панели Параметры</div>';
     }
+    let modeInfo = '';
+    if (isOptimize) {
+      modeInfo = `<div class="summary-row" style="background:#1a3a1a;border-radius:4px;padding:4px 8px;margin-bottom:4px;">
+        <span class="summary-label"><i class="bi bi-stars"></i> Режим:</span>
+        <span class="summary-value">Оптимизация «${stratName}»</span></div>`;
+    }
     summaryEl.innerHTML = `
+      ${modeInfo}
       <div class="summary-row"><span class="summary-label">Symbol:</span><span class="summary-value">${symbol || '—'}</span></div>
       <div class="summary-row"><span class="summary-label">Timeframe:</span><span class="summary-value">${tfLabels[timeframe] || timeframe}</span></div>
       <div class="summary-row"><span class="summary-label">Direction:</span><span class="summary-value">${dirLabels[direction] || direction}</span></div>
@@ -14941,13 +14658,19 @@ function openAiBuildModal() {
   }
 
   // Pre-fill strategy name from Parameters
-  const stratName = document.getElementById('strategyName')?.value || 'New Strategy';
   const aiNameEl = document.getElementById('aiName');
-  if (aiNameEl && (aiNameEl.value === 'AI RSI Strategy' || aiNameEl.value === 'New Strategy' || !aiNameEl.value)) {
-    aiNameEl.value = stratName === 'New Strategy' ? 'AI RSI Strategy' : `AI ${stratName}`;
+  if (isOptimize) {
+    // In optimize mode, keep the current strategy name
+    if (aiNameEl) aiNameEl.value = stratName;
+  } else {
+    if (aiNameEl && (aiNameEl.value === 'AI RSI Strategy' || aiNameEl.value === 'New Strategy' || !aiNameEl.value)) {
+      aiNameEl.value = stratName === 'New Strategy' ? 'AI RSI Strategy' : `AI ${stratName}`;
+    }
   }
 
-  applyAiPreset();
+  if (!isOptimize) {
+    applyAiPreset();
+  }
 }
 
 function closeAiBuildModal() {
@@ -14970,14 +14693,12 @@ function resetAiBuild() {
   document.getElementById('aiBuildConfig').classList.remove('hidden');
   document.getElementById('aiBuildProgress').classList.add('hidden');
   document.getElementById('aiBuildResults').classList.add('hidden');
+  // Re-detect mode when modal is reset (user may have loaded a different strategy)
+  _aiBuildMode = 'build';
+  _aiBuildExistingStrategyId = null;
 }
 
 async function runAiBuild() {
-  const presetSelect = document.getElementById('aiPreset');
-  if (!presetSelect) return;
-  const presetKey = presetSelect.value;
-  const preset = AI_PRESETS[presetKey];
-
   // Read values from Parameters panel (not from modal)
   const symbol = document.getElementById('backtestSymbol')?.value || '';
   const timeframe = document.getElementById('strategyTimeframe')?.value || '15';
@@ -15004,16 +14725,30 @@ async function runAiBuild() {
     max_iterations: parseInt(document.getElementById('aiMaxIter').value),
     min_sharpe: parseFloat(document.getElementById('aiMinSharpe').value),
     min_win_rate: 0.4,
-    enable_deliberation: document.getElementById('aiDeliberation').checked,
-    blocks: preset.blocks,
-    connections: preset.connections
+    enable_deliberation: document.getElementById('aiDeliberation').checked
   };
+
+  if (_aiBuildMode === 'optimize' && _aiBuildExistingStrategyId) {
+    // Optimize mode: use existing strategy, skip creation/blocks/connections
+    payload.existing_strategy_id = _aiBuildExistingStrategyId;
+    payload.blocks = [];
+    payload.connections = [];
+  } else {
+    // Build mode: use preset blocks
+    const presetSelect = document.getElementById('aiPreset');
+    if (!presetSelect) return;
+    const presetKey = presetSelect.value;
+    const preset = AI_PRESETS[presetKey];
+    payload.blocks = preset.blocks;
+    payload.connections = preset.connections;
+  }
 
   // Show progress
   document.getElementById('aiBuildConfig').classList.add('hidden');
   document.getElementById('aiBuildProgress').classList.remove('hidden');
-  document.getElementById('aiBuildStage').textContent =
-    'Building strategy with AI agent...';
+  document.getElementById('aiBuildStage').textContent = _aiBuildMode === 'optimize'
+    ? 'Optimizing strategy with AI agent...'
+    : 'Building strategy with AI agent...';
 
   try {
     const response = await fetch('/api/v1/agents/advanced/builder/task', {
@@ -15047,9 +14782,10 @@ async function showAiBuildResults(data) {
   const lastIter = iters[iters.length - 1] || {};
   const ok = data.success;
 
+  const wasOptimize = _aiBuildMode === 'optimize';
   let html = `
     <div class="alert ${ok ? 'alert-success' : 'alert-warning'}">
-      <strong>${ok ? '✅ Strategy Built!' : '⚠️ Below Target'}</strong>
+      <strong>${ok ? (wasOptimize ? '✅ Strategy Optimized!' : '✅ Strategy Built!') : '⚠️ Below Target'}</strong>
       — ${w.status || 'unknown'} in ${(w.duration_seconds || 0).toFixed(1)}s
     </div>
     <table class="table table-sm table-bordered">

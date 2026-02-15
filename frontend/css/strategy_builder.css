@@ -1004,6 +1004,32 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* Extra padding when block has labeled ports, so labels don't overlap header content */
+.strategy-block.has-labeled-inputs .block-header {
+    padding-left: 28px;
+}
+
+.strategy-block.has-labeled-inputs .block-param-hint {
+    padding-left: 28px;
+}
+
+.strategy-block.has-labeled-outputs .block-header {
+    padding-right: 48px;
+}
+
+.strategy-block.has-labeled-outputs .block-param-hint {
+    padding-right: 48px;
+}
+
+/* Minimum height for blocks with many output ports (e.g. MACD has 5, Ichimoku has 5) */
+.strategy-block.has-some-ports {
+    min-height: 90px;
+}
+
+.strategy-block.has-many-ports {
+    min-height: 130px;
+}
+
 .strategy-block.indicator .block-header {
     background: linear-gradient(135deg, rgba(88, 166, 255, 0.3), rgba(88, 166, 255, 0.1));
 }
@@ -1032,9 +1058,9 @@ body {
 .strategy-block.main-block {
     /* Premium rectangular design */
     width: 140px;
-    height: 160px;
+    height: 200px;
     min-width: 140px;
-    min-height: 160px;
+    min-height: 200px;
     border-radius: 10px;
     border: none;
     background:
@@ -1114,7 +1140,7 @@ body {
     box-shadow: 0 0 20px rgba(220, 38, 127, 0.5);
 }
 
-/* Main block title in center */
+/* Main block title — rotated 90° and centered between labels and right border */
 .strategy-block.main-block .main-block-title {
     font-size: 15px;
     font-weight: 700;
@@ -1123,8 +1149,15 @@ body {
     text-shadow:
         0 0 10px rgba(255, 150, 200, 0.5),
         0 2px 4px rgba(0, 0, 0, 0.8);
-    letter-spacing: 1px;
+    letter-spacing: 3px;
     text-transform: uppercase;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%) rotate(180deg);
+    white-space: nowrap;
 }
 
 /* Hide default block-header for main block */
@@ -1206,6 +1239,26 @@ body {
     }
 }
 
+@keyframes pulseCyan {
+    0%,
+    100% {
+        box-shadow:
+            0 0 10px rgba(34, 211, 238, 0.6),
+            0 0 20px rgba(34, 211, 238, 0.3),
+            inset 0 0 6px rgba(255, 255, 255, 0.2);
+    }
+    50% {
+        box-shadow:
+            0 0 18px rgba(34, 211, 238, 0.9),
+            0 0 35px rgba(34, 211, 238, 0.5),
+            inset 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+}
+
+.strategy-block.main-block .main-port-left.config-input-port {
+    animation: pulseCyan 2s ease-in-out infinite;
+}
+
 /* Premium ports */
 .strategy-block.main-block .port {
     width: 18px;
@@ -1225,15 +1278,24 @@ body {
 }
 
 .strategy-block.main-block .port[data-port-id='entry_long']:hover,
-.strategy-block.main-block .port[data-port-id='entry_long'].connected,
-.strategy-block.main-block .port[data-port-id='entry_short']:hover,
-.strategy-block.main-block .port[data-port-id='entry_short'].connected {
+.strategy-block.main-block .port[data-port-id='entry_short']:hover {
     background: radial-gradient(circle at 30% 30%, #4ade80 0%, #22c55e 100%);
     box-shadow:
         0 0 25px rgba(74, 222, 128, 1),
         0 0 50px rgba(74, 222, 128, 0.6),
         inset 0 0 10px rgba(255, 255, 255, 0.5);
     transform: translateY(-50%) scale(1.3);
+    animation: none;
+}
+
+.strategy-block.main-block .port[data-port-id='entry_long'].connected,
+.strategy-block.main-block .port[data-port-id='entry_short'].connected {
+    background: radial-gradient(circle at 30% 30%, rgba(74, 222, 128, 0.8) 0%, rgba(34, 197, 94, 0.5) 100%);
+    box-shadow:
+        0 0 12px rgba(74, 222, 128, 0.6),
+        0 0 24px rgba(74, 222, 128, 0.25),
+        inset 0 0 6px rgba(255, 255, 255, 0.25);
+    transform: translateY(-50%) scale(1.1);
     animation: none;
 }
 
@@ -1245,9 +1307,7 @@ body {
 }
 
 .strategy-block.main-block .port[data-port-id='exit_long']:hover,
-.strategy-block.main-block .port[data-port-id='exit_long'].connected,
-.strategy-block.main-block .port[data-port-id='exit_short']:hover,
-.strategy-block.main-block .port[data-port-id='exit_short'].connected {
+.strategy-block.main-block .port[data-port-id='exit_short']:hover {
     background: radial-gradient(circle at 30% 30%, #f87171 0%, #ef4444 100%);
     box-shadow:
         0 0 25px rgba(248, 113, 113, 1),
@@ -1257,14 +1317,24 @@ body {
     animation: none;
 }
 
+.strategy-block.main-block .port[data-port-id='exit_long'].connected,
+.strategy-block.main-block .port[data-port-id='exit_short'].connected {
+    background: radial-gradient(circle at 30% 30%, rgba(248, 113, 113, 0.8) 0%, rgba(239, 68, 68, 0.5) 100%);
+    box-shadow:
+        0 0 12px rgba(248, 113, 113, 0.6),
+        0 0 24px rgba(248, 113, 113, 0.25),
+        inset 0 0 6px rgba(255, 255, 255, 0.25);
+    transform: translateY(-50%) scale(1.1);
+    animation: none;
+}
+
 /* SL/TP config port - cyan/blue */
 .strategy-block.main-block .port[data-port-id='sl_tp'] {
     border-color: #22d3ee;
     background: radial-gradient(circle at 30% 30%, rgba(34, 211, 238, 0.6) 0%, rgba(6, 182, 212, 0.3) 100%);
 }
 
-.strategy-block.main-block .port[data-port-id='sl_tp']:hover,
-.strategy-block.main-block .port[data-port-id='sl_tp'].connected {
+.strategy-block.main-block .port[data-port-id='sl_tp']:hover {
     background: radial-gradient(circle at 30% 30%, #22d3ee 0%, #06b6d4 100%);
     box-shadow:
         0 0 25px rgba(34, 211, 238, 1),
@@ -1274,8 +1344,21 @@ body {
     animation: none;
 }
 
+.strategy-block.main-block .port[data-port-id='sl_tp'].connected {
+    background: radial-gradient(circle at 30% 30%, rgba(34, 211, 238, 0.8) 0%, rgba(6, 182, 212, 0.5) 100%);
+    box-shadow:
+        0 0 12px rgba(34, 211, 238, 0.6),
+        0 0 24px rgba(34, 211, 238, 0.25),
+        inset 0 0 6px rgba(255, 255, 255, 0.25);
+    transform: translateY(-50%) scale(1.1);
+    animation: none;
+}
+
 .main-port-label.config-label {
     color: #22d3ee;
+    text-shadow:
+        0 0 8px rgba(34, 211, 238, 0.6),
+        0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 /* Hide old port containers for main block */
@@ -1391,7 +1474,9 @@ body {
     z-index: 100000;
     min-width: 280px;
     max-width: 400px;
-    max-height: calc(100vh - 40px);
+    max-height: calc(100vh - 20px);
+    display: flex;
+    flex-direction: column;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -1418,13 +1503,14 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: 8px 12px;
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .popup-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
     display: flex;
@@ -1454,8 +1540,9 @@ body {
 }
 
 .popup-body {
-    padding: 16px;
-    max-height: calc(100vh - 200px);
+    padding: 10px 12px 14px;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -1464,28 +1551,28 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
-    gap: 16px;
+    margin-bottom: 6px;
+    gap: 10px;
 }
 
 .popup-param-row:last-child {
-    margin-bottom: 0;
+    margin-bottom: 4px;
 }
 
 .popup-param-label {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
     flex-shrink: 0;
 }
 
 .popup-param-input {
     width: 100px;
-    padding: 8px 12px;
+    padding: 5px 8px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 12px;
     text-align: right;
     transition: border-color 0.2s ease;
     -webkit-appearance: textfield;
@@ -1508,9 +1595,10 @@ body {
 .popup-footer {
     display: flex;
     gap: 8px;
-    padding: 12px 16px;
+    padding: 8px 12px;
     background: var(--bg-tertiary);
     border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .popup-footer .btn {
@@ -2155,12 +2243,12 @@ body {
 /* Select dropdown */
 .popup-param-select {
     width: 100px;
-    padding: 8px 12px;
+    padding: 5px 8px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 12px;
     cursor: pointer;
 }
 
@@ -2855,7 +2943,7 @@ body {
     position: absolute;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .ports-container.input-ports {
@@ -2873,21 +2961,35 @@ body {
 .port-row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
 }
 
+/* Ports inside port-rows must be in flex flow (not absolute).
+   Base .port has position:absolute for single ports, override here. */
+.port-row .port {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    flex-shrink: 0;
+}
+
+/* Input ports: dot on left, label to the right (into block body) */
 .port-row.input {
     flex-direction: row;
 }
 
+/* Output ports: reversed — label on left (into block body), dot on right (at edge) */
 .port-row.output {
     flex-direction: row-reverse;
 }
 
 .port-label {
-    font-size: 9px;
-    color: var(--text-secondary);
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
     white-space: nowrap;
+    pointer-events: none;
+    line-height: 1;
 }
 
 /* Port type colors */
