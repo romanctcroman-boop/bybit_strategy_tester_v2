@@ -156,7 +156,12 @@ class StrategyDefinition(BaseModel):
         return max(self.signals, key=lambda s: s.weight).type
 
     def get_strategy_type_for_engine(self) -> str:
-        """Map to engine strategy type (rsi, ema_crossover, macd, etc.)."""
+        """Map to engine strategy type (rsi, ema_crossover, macd, etc.).
+
+        The backtest engine supports: rsi, sma_crossover, ema_crossover, macd,
+        bollinger_bands.  Unknown signal types fall back to ``rsi`` with a
+        logged warning so silent mismatches are visible.
+        """
         primary = self.get_primary_signal_type().lower()
         mapping = {
             "rsi": "rsi",
@@ -165,11 +170,21 @@ class StrategyDefinition(BaseModel):
             "ema": "ema_crossover",
             "sma_crossover": "sma_crossover",
             "sma": "sma_crossover",
-            "bollinger": "bollinger",
+            "bollinger": "bollinger_bands",
+            "bollinger_bands": "bollinger_bands",
             "supertrend": "supertrend",
             "stochastic": "stochastic",
         }
-        return mapping.get(primary, "rsi")  # fallback to RSI
+        engine_type = mapping.get(primary)
+        if engine_type is None:
+            from loguru import logger
+
+            logger.warning(
+                f"Unknown signal type '{primary}' — falling back to 'rsi'. "
+                f"Supported engine types: rsi, sma_crossover, ema_crossover, macd, bollinger_bands"
+            )
+            engine_type = "rsi"
+        return engine_type
 
     def get_engine_params(self) -> dict[str, Any]:
         """Extract engine-compatible parameters from signals."""

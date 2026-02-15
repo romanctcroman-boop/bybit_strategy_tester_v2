@@ -76,12 +76,19 @@ class PromptEngineer:
 
         # Merge context with platform config
         prompt_vars = context.to_prompt_vars()
+
+        # Commission: platform_config stores as fraction (0.0007),
+        # but template displays as "{commission}% per trade".
+        # Convert fraction → percentage for the prompt.
+        raw_commission = platform_config.get("commission", 0.0007)
+        commission_pct = raw_commission * 100 if raw_commission < 1 else raw_commission
+
         prompt_vars.update(
             {
                 "specialization": spec["description"],
                 "position_type": platform_config.get("position_type", "both"),
                 "leverage": platform_config.get("leverage", 10),
-                "commission": platform_config.get("commission", 0.07),
+                "commission": commission_pct,
                 "initial_capital": platform_config.get("initial_capital", 10000),
                 "start_date": platform_config.get("start_date", "2025-01-01"),
                 "end_date": platform_config.get("end_date", "2025-06-01"),

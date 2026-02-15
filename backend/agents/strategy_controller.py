@@ -402,6 +402,16 @@ class StrategyController:
     ):
         """Stage 1: Build market context from OHLCV data."""
         context = self._context_builder.build_context(symbol, timeframe, df)
+
+        # Guard: if context has zero price / unknown regime, the DataFrame
+        # was empty or too short.  Raise so _run_stage records a failure
+        # instead of silently feeding garbage to the LLM.
+        if context.current_price == 0.0 or context.data_points == 0:
+            raise ValueError(
+                f"Insufficient market data for {symbol}/{timeframe}: "
+                f"{context.data_points} rows, price={context.current_price}"
+            )
+
         logger.info(
             f"📊 Market context: {symbol} {timeframe} — regime={context.market_regime}, trend={context.trend_direction}"
         )

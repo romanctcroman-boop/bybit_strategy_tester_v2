@@ -92,6 +92,9 @@ class BuilderWorkflowConfig:
     # AI Deliberation — optional, uses real LLM agents for planning
     enable_deliberation: bool = False
 
+    # Existing strategy — when set, skip create/blocks/connect stages (optimize mode)
+    existing_strategy_id: str | None = None
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize config to dict."""
         return {
@@ -112,6 +115,7 @@ class BuilderWorkflowConfig:
             "min_acceptable_sharpe": self.min_acceptable_sharpe,
             "min_acceptable_win_rate": self.min_acceptable_win_rate,
             "enable_deliberation": self.enable_deliberation,
+            "existing_strategy_id": self.existing_strategy_id,
         }
 
 
@@ -221,173 +225,40 @@ class BuilderWorkflow:
             if config.enable_deliberation:
                 await self._run_deliberation(config)
 
-            # Stage 2: Create strategy
-            self._result.status = BuilderStage.CREATING
-            logger.info(f"[BuilderWorkflow] Creating strategy: {config.name}")
-            strategy = await builder_create_strategy(
-                name=config.name,
-                symbol=config.symbol,
-                timeframe=config.timeframe,
-                direction=config.direction,
-                initial_capital=config.initial_capital,
-                leverage=config.leverage,
-            )
-            if isinstance(strategy, dict) and "error" in strategy:
-                raise RuntimeError(f"Failed to create strategy: {strategy['error']}")
+            # Check mode: existing strategy (optimize) vs new strategy (build)
+            if config.existing_strategy_id:
+                # ── Optimize mode: skip Stages 2-4, reuse existing strategy ──
+                self._result.strategy_id = config.existing_strategy_id
+                logger.info(f"[BuilderWorkflow] Optimize mode — using existing strategy: {config.existing_strategy_id}")
 
-            self._result.strategy_id = strategy.get("id", "")
-            logger.info(f"[BuilderWorkflow] Strategy created: {self._result.strategy_id}")
+                # Fetch existing strategy state for iteration context
+                self._result.status = BuilderStage.CREATING
+                try:
+                    from backend.agents.mcp.tools.strategy_builder import (
+                        builder_get_strategy,
+                    )
 
-            # Stage 3: Add blocks
-            self._result.status = BuilderStage.ADDING_BLOCKS
-            block_id_map = {}  # type -> actual ID
-
-            # Layout blocks in a grid: indicators left, conditions center, actions right
-            x_offsets = {
-                "indicator": 100,
-                "filter": 100,
-                "condition": 400,
-                "crossover": 400,
-                "crossunder": 400,
-                "greater_than": 400,
-                "less_than": 400,
-                "between": 400,
-                "equals": 400,
-                "action": 700,
-                "buy": 700,
-                "sell": 700,
-                "close": 700,
-                "exit": 700,
-                "stop_loss": 700,
-                "take_profit": 700,
-            }
-
-            # Add a "price" input block first — feeds close data to indicators
-            logger.info("[BuilderWorkflow] Adding price input block")
-            price_result = await builder_add_block(
-                strategy_id=self._result.strategy_id,
-                block_type="price",
-                block_id="price_input",
-                name="PRICE",
-                x=50,
-                y=200,
-                params={"source": "close"},
-            )
-            if isinstance(price_result, dict) and "error" not in price_result:
-                price_block = price_result.get("block", {})
-                block_id_map["price"] = price_block.get("id", "price_input")
-                block_id_map["price_input"] = price_block.get("id", "price_input")
-                self._result.blocks_added.append(price_block)
-
-            for i, block_def in enumerate(config.blocks):
-                block_type = block_def.get("type", "")
-                params = block_def.get("params", {})
-                custom_id = block_def.get("id")
-                name = block_def.get("name")
-
-                # Auto-layout
-                x = x_offsets.get(block_type, 400)
-                y = 100 + (i * 120)
-
-                logger.info(f"[BuilderWorkflow] Adding block: {block_type} at ({x}, {y})")
-                result = await builder_add_block(
-                    strategy_id=self._result.strategy_id,
-                    block_type=block_type,
-                    block_id=custom_id,
-                    name=name,
-                    x=x,
-                    y=y,
-                    params=params,
-                )
-
-                if isinstance(result, dict) and "error" in result:
-                    self._result.errors.append(f"Failed to add block {block_type}: {result['error']}")
-                    continue
-
-                added_block = result.get("block", {})
-                actual_id = added_block.get("id", "")
-                block_id_map[block_type] = actual_id
-                if custom_id:
-                    block_id_map[custom_id] = actual_id
-                self._result.blocks_added.append(added_block)
-
-            # Add a main_strategy node — the adapter needs this to aggregate signals
-            logger.info("[BuilderWorkflow] Adding main_strategy aggregator node")
-            main_result = await builder_add_block(
-                strategy_id=self._result.strategy_id,
-                block_type="strategy",
-                block_id="main_strategy",
-                name="STRATEGY",
-                x=950,
-                y=300,
-                params={"isMain": True},
-            )
-            if isinstance(main_result, dict) and "error" not in main_result:
-                main_block = main_result.get("block", {})
-                main_block["isMain"] = True  # Ensure isMain is set
-                block_id_map["strategy"] = main_block.get("id", "main_strategy")
-                block_id_map["main_strategy"] = main_block.get("id", "main_strategy")
-                self._result.blocks_added.append(main_block)
-
-            logger.info(
-                f"[BuilderWorkflow] Added {len(self._result.blocks_added)} blocks (incl. price + main_strategy)"
-            )
-
-            # Stage 4: Connect blocks
-            self._result.status = BuilderStage.CONNECTING
-
-            # First, apply user-defined connections
-            for conn_def in config.connections:
-                source = conn_def.get("source", "")
-                source_port = conn_def.get("source_port", "value")
-                target = conn_def.get("target", "")
-                target_port = conn_def.get("target_port", "input")
-
-                # Resolve block type names to actual IDs
-                source_id = block_id_map.get(source, source)
-                target_id = block_id_map.get(target, target)
-
-                logger.info(f"[BuilderWorkflow] Connecting: {source_id}:{source_port} → {target_id}:{target_port}")
-                result = await builder_connect_blocks(
-                    strategy_id=self._result.strategy_id,
-                    source_block_id=source_id,
-                    source_port=source_port,
-                    target_block_id=target_id,
-                    target_port=target_port,
-                )
-
-                if isinstance(result, dict) and "error" in result:
-                    self._result.errors.append(f"Failed to connect {source}→{target}: {result['error']}")
-                    continue
-
-                self._result.connections_made.append(result.get("connection", {}))
-
-            # Auto-wire missing connections:
-            # 1. condition → action blocks (if condition has no downstream action)
-            # 2. action → main_strategy (always needed)
-            auto_connections = self._infer_missing_connections(config.blocks, block_id_map, config.connections)
-            for auto_conn in auto_connections:
-                source_id = auto_conn["source_id"]
-                source_port = auto_conn["source_port"]
-                target_id = auto_conn["target_id"]
-                target_port = auto_conn["target_port"]
-
-                logger.info(f"[BuilderWorkflow] Auto-wiring: {source_id}:{source_port} → {target_id}:{target_port}")
-                result = await builder_connect_blocks(
-                    strategy_id=self._result.strategy_id,
-                    source_block_id=source_id,
-                    source_port=source_port,
-                    target_block_id=target_id,
-                    target_port=target_port,
-                )
-
-                if isinstance(result, dict) and "error" in result:
-                    self._result.errors.append(f"Auto-wire failed {source_id}→{target_id}: {result['error']}")
-                    continue
-
-                self._result.connections_made.append(result.get("connection", {}))
-
-            logger.info(f"[BuilderWorkflow] Made {len(self._result.connections_made)} connections")
+                    existing = await builder_get_strategy(config.existing_strategy_id)
+                    if isinstance(existing, dict) and "error" not in existing:
+                        self._result.blocks_added = existing.get("blocks", [])
+                        self._result.connections_made = existing.get("connections", [])
+                        logger.info(
+                            f"[BuilderWorkflow] Loaded existing strategy: "
+                            f"{len(self._result.blocks_added)} blocks, "
+                            f"{len(self._result.connections_made)} connections"
+                        )
+                    else:
+                        logger.warning(
+                            f"[BuilderWorkflow] Could not load existing strategy details: "
+                            f"{existing}. Continuing with optimize anyway."
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"[BuilderWorkflow] Failed to fetch existing strategy: {e}. Continuing with optimize anyway."
+                    )
+            else:
+                # ── Build mode: Stages 2-4 — create strategy, add blocks, connect ──
+                await self._run_build_stages(config)
 
             # Stage 5: Validate
             self._result.status = BuilderStage.VALIDATING
@@ -434,7 +305,10 @@ class BuilderWorkflow:
                 if isinstance(backtest, dict):
                     metrics = backtest.get("results", backtest.get("metrics", {}))
                 sharpe = metrics.get("sharpe_ratio", 0)
-                win_rate = metrics.get("win_rate", 0)
+                # win_rate from the API is already a percentage (e.g. 52.11 for 52.11%)
+                # Normalize to fraction (0-1) for comparison with min_acceptable_win_rate
+                raw_win_rate = metrics.get("win_rate", 0)
+                win_rate = raw_win_rate / 100.0 if raw_win_rate > 1 else raw_win_rate
 
                 iteration_record = {
                     "iteration": iteration,
@@ -442,7 +316,7 @@ class BuilderWorkflow:
                     "win_rate": win_rate,
                     "total_trades": metrics.get("total_trades", 0),
                     "net_profit": metrics.get("net_profit", 0),
-                    "max_drawdown": metrics.get("max_drawdown_pct", 0),
+                    "max_drawdown": metrics.get("max_drawdown", metrics.get("max_drawdown_pct", 0)),
                     "acceptable": (
                         sharpe >= config.min_acceptable_sharpe and win_rate >= config.min_acceptable_win_rate
                     ),
@@ -571,6 +445,234 @@ class BuilderWorkflow:
         "close_short": "exit_short",
         "close_all": "exit_long",  # plus exit_short below
     }
+
+    async def _run_build_stages(self, config: BuilderWorkflowConfig) -> None:
+        """Execute Stages 2-4: create strategy, add blocks, connect blocks.
+
+        This is the 'build from scratch' path. Skipped in optimize mode
+        when ``config.existing_strategy_id`` is set.
+        """
+        # Stage 2: Create strategy
+        self._result.status = BuilderStage.CREATING
+        logger.info(f"[BuilderWorkflow] Creating strategy: {config.name}")
+        strategy = await builder_create_strategy(
+            name=config.name,
+            symbol=config.symbol,
+            timeframe=config.timeframe,
+            direction=config.direction,
+            initial_capital=config.initial_capital,
+            leverage=config.leverage,
+        )
+        if isinstance(strategy, dict) and "error" in strategy:
+            raise RuntimeError(f"Failed to create strategy: {strategy['error']}")
+
+        self._result.strategy_id = strategy.get("id", "")
+        logger.info(f"[BuilderWorkflow] Strategy created: {self._result.strategy_id}")
+
+        # Stage 3: Add blocks
+        self._result.status = BuilderStage.ADDING_BLOCKS
+        block_id_map: dict[str, str] = {}
+
+        # Layout blocks in a grid: indicators left, conditions center, actions right
+        x_offsets = {
+            "indicator": 100,
+            "filter": 100,
+            "condition": 400,
+            "crossover": 400,
+            "crossunder": 400,
+            "greater_than": 400,
+            "less_than": 400,
+            "between": 400,
+            "equals": 400,
+            "action": 700,
+            "buy": 700,
+            "sell": 700,
+            "close": 700,
+            "exit": 700,
+            "stop_loss": 700,
+            "take_profit": 700,
+        }
+
+        # Add a "price" input block first — feeds close data to indicators
+        logger.info("[BuilderWorkflow] Adding price input block")
+        price_result = await builder_add_block(
+            strategy_id=self._result.strategy_id,
+            block_type="price",
+            block_id="price_input",
+            name="PRICE",
+            x=50,
+            y=200,
+            params={"source": "close"},
+        )
+        if isinstance(price_result, dict) and "error" not in price_result:
+            price_block = price_result.get("block", {})
+            block_id_map["price"] = price_block.get("id", "price_input")
+            block_id_map["price_input"] = price_block.get("id", "price_input")
+            self._result.blocks_added.append(price_block)
+
+        for i, block_def in enumerate(config.blocks):
+            block_type = block_def.get("type", "")
+            params = block_def.get("params", {})
+            custom_id = block_def.get("id")
+            name = block_def.get("name")
+
+            # Auto-layout
+            x = x_offsets.get(block_type, 400)
+            y = 100 + (i * 120)
+
+            logger.info(f"[BuilderWorkflow] Adding block: {block_type} at ({x}, {y})")
+            result = await builder_add_block(
+                strategy_id=self._result.strategy_id,
+                block_type=block_type,
+                block_id=custom_id,
+                name=name,
+                x=x,
+                y=y,
+                params=params,
+            )
+
+            if isinstance(result, dict) and "error" in result:
+                self._result.errors.append(f"Failed to add block {block_type}: {result['error']}")
+                continue
+
+            added_block = result.get("block", {})
+            actual_id = added_block.get("id", "")
+            block_id_map[block_type] = actual_id
+            if custom_id:
+                block_id_map[custom_id] = actual_id
+            self._result.blocks_added.append(added_block)
+
+        # Add a main_strategy node — the adapter needs this to aggregate signals
+        logger.info("[BuilderWorkflow] Adding main_strategy aggregator node")
+        main_result = await builder_add_block(
+            strategy_id=self._result.strategy_id,
+            block_type="strategy",
+            block_id="main_strategy",
+            name="STRATEGY",
+            x=950,
+            y=300,
+            params={"isMain": True},
+        )
+        if isinstance(main_result, dict) and "error" not in main_result:
+            main_block = main_result.get("block", {})
+            main_block["isMain"] = True  # Ensure isMain is set
+            block_id_map["strategy"] = main_block.get("id", "main_strategy")
+            block_id_map["main_strategy"] = main_block.get("id", "main_strategy")
+            self._result.blocks_added.append(main_block)
+
+        # Auto-add exit block (static_sltp) when no exit blocks are present.
+        # The backtest endpoint requires exit conditions — without them it returns 400.
+        _EXIT_BLOCK_TYPES = {
+            "static_sltp",
+            "trailing_stop_exit",
+            "atr_exit",
+            "time_exit",
+            "session_exit",
+            "break_even_exit",
+            "chandelier_exit",
+            "partial_close",
+            "multi_tp_exit",
+            "tp_percent",
+            "sl_percent",
+            "rsi_close",
+            "stoch_close",
+            "channel_close",
+            "ma_close",
+            "psar_close",
+            "time_bars_close",
+            "stop_loss",
+            "take_profit",
+            "trailing_stop",
+            "atr_stop",
+            "chandelier_stop",
+            "break_even",
+            "profit_lock",
+        }
+        has_exit_block = any(b.get("type", "").lower() in _EXIT_BLOCK_TYPES for b in config.blocks)
+        if not has_exit_block:
+            sl_pct = config.stop_loss if config.stop_loss else 0.02
+            tp_pct = config.take_profit if config.take_profit else 0.04
+            logger.info(
+                f"[BuilderWorkflow] No exit blocks in preset — auto-adding static_sltp "
+                f"(SL={sl_pct * 100:.1f}%, TP={tp_pct * 100:.1f}%)"
+            )
+            sltp_result = await builder_add_block(
+                strategy_id=self._result.strategy_id,
+                block_type="static_sltp",
+                block_id="auto_sltp",
+                name="SL/TP",
+                x=950,
+                y=500,
+                params={
+                    "stop_loss_percent": sl_pct * 100,
+                    "take_profit_percent": tp_pct * 100,
+                },
+            )
+            if isinstance(sltp_result, dict) and "error" not in sltp_result:
+                sltp_block = sltp_result.get("block", {})
+                block_id_map["static_sltp"] = sltp_block.get("id", "auto_sltp")
+                block_id_map["auto_sltp"] = sltp_block.get("id", "auto_sltp")
+                self._result.blocks_added.append(sltp_block)
+            else:
+                self._result.errors.append(f"Failed to auto-add SL/TP block: {sltp_result.get('error', 'unknown')}")
+
+        logger.info(f"[BuilderWorkflow] Added {len(self._result.blocks_added)} blocks (incl. price + main_strategy)")
+
+        # Stage 4: Connect blocks
+        self._result.status = BuilderStage.CONNECTING
+
+        # First, apply user-defined connections
+        for conn_def in config.connections:
+            source = conn_def.get("source", "")
+            source_port = conn_def.get("source_port", "value")
+            target = conn_def.get("target", "")
+            target_port = conn_def.get("target_port", "input")
+
+            # Resolve block type names to actual IDs
+            source_id = block_id_map.get(source, source)
+            target_id = block_id_map.get(target, target)
+
+            logger.info(f"[BuilderWorkflow] Connecting: {source_id}:{source_port} → {target_id}:{target_port}")
+            result = await builder_connect_blocks(
+                strategy_id=self._result.strategy_id,
+                source_block_id=source_id,
+                source_port=source_port,
+                target_block_id=target_id,
+                target_port=target_port,
+            )
+
+            if isinstance(result, dict) and "error" in result:
+                self._result.errors.append(f"Failed to connect {source}→{target}: {result['error']}")
+                continue
+
+            self._result.connections_made.append(result.get("connection", {}))
+
+        # Auto-wire missing connections:
+        # 1. condition → action blocks (if condition has no downstream action)
+        # 2. action → main_strategy (always needed)
+        auto_connections = self._infer_missing_connections(config.blocks, block_id_map, config.connections)
+        for auto_conn in auto_connections:
+            source_id = auto_conn["source_id"]
+            source_port = auto_conn["source_port"]
+            target_id = auto_conn["target_id"]
+            target_port = auto_conn["target_port"]
+
+            logger.info(f"[BuilderWorkflow] Auto-wiring: {source_id}:{source_port} → {target_id}:{target_port}")
+            result = await builder_connect_blocks(
+                strategy_id=self._result.strategy_id,
+                source_block_id=source_id,
+                source_port=source_port,
+                target_block_id=target_id,
+                target_port=target_port,
+            )
+
+            if isinstance(result, dict) and "error" in result:
+                self._result.errors.append(f"Auto-wire failed {source_id}→{target_id}: {result['error']}")
+                continue
+
+            self._result.connections_made.append(result.get("connection", {}))
+
+        logger.info(f"[BuilderWorkflow] Made {len(self._result.connections_made)} connections")
 
     def _infer_missing_connections(
         self,
