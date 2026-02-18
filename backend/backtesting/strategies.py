@@ -160,6 +160,14 @@ class RSIStrategy(BaseStrategy):
         period: RSI period (default: 14)
         oversold: Oversold level (default: 30)
         overbought: Overbought level (default: 70)
+
+    DEPRECATED (2026-02-16):
+        This is the OLD backtesting engine RSI strategy.
+        For new strategies, use the UNIVERSAL RSI block in Strategy Builder.
+        The universal RSI block supports Range filter, Cross level, Legacy modes,
+        BTC source, optimization ranges, and cross signal memory.
+        AI agents MUST use the universal RSI block (type='rsi') instead.
+        Kept for backward compatibility with old backtest configs.
     """
 
     name = "rsi"

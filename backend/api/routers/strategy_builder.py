@@ -1589,6 +1589,8 @@ async def optimize_strategy(
         "connections": db_strategy.builder_connections or [],
         "market_type": request.market_type,
         "direction": request.direction,
+        # Main chart interval — resolves "Chart" timeframe in block params
+        "interval": request.interval,
     }
     if db_strategy.builder_graph and db_strategy.builder_graph.get("main_strategy"):
         strategy_graph["main_strategy"] = db_strategy.builder_graph["main_strategy"]  # type: ignore[assignment]
@@ -2590,6 +2592,9 @@ async def run_backtest_from_builder(
             "connections": db_strategy.builder_connections or [],
             "market_type": market_type,
             "direction": direction,
+            # Main chart interval from Properties panel — used to resolve
+            # "Chart" timeframe in block params (e.g. RSI timeframe="Chart" → "15")
+            "interval": request.interval,
         }
         # Add main_strategy from builder_graph if available
         if db_strategy.builder_graph and db_strategy.builder_graph.get("main_strategy"):

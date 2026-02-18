@@ -96,74 +96,25 @@ function enableWheelScrollForNumberInputs(container) {
 // Block Library Data
 const blockLibrary = {
   indicators: [
-    // Momentum Indicators
+    // Universal indicator blocks (integrated with AI agents — do not remove)
     { id: 'rsi', name: 'RSI', desc: 'Relative Strength Index (0-100)', icon: 'graph-up' },
-    { id: 'stochastic', name: 'Stochastic', desc: 'Stochastic Oscillator %K/%D', icon: 'percent' },
-    { id: 'stoch_rsi', name: 'StochRSI', desc: 'Stochastic RSI (0-100)', icon: 'percent' },
-    { id: 'williams_r', name: 'Williams %R', desc: 'Williams Percent Range', icon: 'graph-down' },
-    { id: 'roc', name: 'ROC', desc: 'Rate of Change', icon: 'arrow-up-right' },
-    { id: 'mfi', name: 'MFI', desc: 'Money Flow Index', icon: 'currency-exchange' },
-    { id: 'cmo', name: 'CMO', desc: 'Chande Momentum Oscillator', icon: 'activity' },
-    { id: 'cci', name: 'CCI', desc: 'Commodity Channel Index', icon: 'arrows-expand' },
-    // Trend Indicators
-    { id: 'sma', name: 'SMA', desc: 'Simple Moving Average', icon: 'graph-up-arrow' },
-    { id: 'ema', name: 'EMA', desc: 'Exponential Moving Average', icon: 'graph-up-arrow' },
-    { id: 'wma', name: 'WMA', desc: 'Weighted Moving Average', icon: 'graph-up-arrow' },
-    { id: 'dema', name: 'DEMA', desc: 'Double Exponential MA', icon: 'layers' },
-    { id: 'tema', name: 'TEMA', desc: 'Triple Exponential MA', icon: 'layers-fill' },
-    { id: 'hull_ma', name: 'Hull MA', desc: 'Hull Moving Average', icon: 'graph-up-arrow' },
+    { id: 'stochastic', name: 'Stochastic', desc: 'Stochastic (Range Filter + Cross Signal + K/D Cross)', icon: 'percent' },
     { id: 'macd', name: 'MACD', desc: 'Moving Average Convergence Divergence', icon: 'bar-chart' },
-    { id: 'adx', name: 'ADX', desc: 'Average Directional Index', icon: 'activity' },
     { id: 'supertrend', name: 'Supertrend', desc: 'Trend following indicator', icon: 'arrow-up-right-circle' },
-    { id: 'ichimoku', name: 'Ichimoku', desc: 'Ichimoku Cloud (5 lines)', icon: 'cloud' },
-    { id: 'parabolic_sar', name: 'Parabolic SAR', desc: 'Stop and Reverse', icon: 'circle' },
-    { id: 'aroon', name: 'Aroon', desc: 'Aroon Up/Down/Oscillator', icon: 'arrow-down-up' },
     { id: 'qqe', name: 'QQE', desc: 'Quantitative Qualitative Estimation', icon: 'activity' },
-    // Volatility Indicators
-    { id: 'atr', name: 'ATR', desc: 'Average True Range', icon: 'arrows-expand' },
-    { id: 'atrp', name: 'ATR%', desc: 'ATR as percentage of price', icon: 'percent' },
-    { id: 'bollinger', name: 'Bollinger Bands', desc: 'Upper/Middle/Lower bands', icon: 'distribute-vertical' },
-    { id: 'keltner', name: 'Keltner Channel', desc: 'EMA-based channel', icon: 'distribute-vertical' },
-    { id: 'donchian', name: 'Donchian Channel', desc: 'High/Low channel', icon: 'distribute-vertical' },
-    { id: 'stddev', name: 'StdDev', desc: 'Standard Deviation', icon: 'graph-up' },
-    // Volume Indicators
-    { id: 'obv', name: 'OBV', desc: 'On Balance Volume', icon: 'bar-chart-steps' },
-    { id: 'vwap', name: 'VWAP', desc: 'Volume Weighted Avg Price', icon: 'currency-dollar' },
-    { id: 'cmf', name: 'CMF', desc: 'Chaikin Money Flow', icon: 'water' },
-    { id: 'ad_line', name: 'A/D Line', desc: 'Accumulation/Distribution', icon: 'graph-up' },
-    { id: 'pvt', name: 'PVT', desc: 'Price Volume Trend', icon: 'graph-up' },
-    // Support/Resistance
-    { id: 'pivot_points', name: 'Pivot Points', desc: 'PP, R1-R3, S1-S3', icon: 'arrows-collapse' },
-    // Multi-Timeframe
-    { id: 'mtf', name: 'MTF', desc: 'Multi-Timeframe indicator', icon: 'layers-half' }
+    // Universal filters (integrated with AI agents — do not remove)
+    { id: 'atr_volatility', name: 'ATR Volatility', desc: 'ATR Volatility Filter (ATR1 <> ATR2)', icon: 'arrows-expand' },
+    { id: 'volume_filter', name: 'Volume Filter', desc: 'Volume Filter (VOL1 <> VOL2)', icon: 'bar-chart-steps' },
+    { id: 'highest_lowest_bar', name: 'Highest/Lowest Bar', desc: 'Signal on Highest/Lowest Bar + Block if Worse Than', icon: 'arrow-up-short' },
+    { id: 'two_mas', name: 'TWO MAs', desc: 'Two Moving Averages (Signal + Filter)', icon: 'graph-up-arrow' },
+    { id: 'accumulation_areas', name: 'Accumulation Areas', desc: 'Accumulation Areas Filter or Signal', icon: 'layers' },
+    { id: 'keltner_bollinger', name: 'Keltner/Bollinger Channel', desc: 'Keltner Channel / Bollinger Bands Filter', icon: 'border-outer' },
+    { id: 'rvi_filter', name: 'RVI', desc: 'Relative Volatility Index Filter', icon: 'speedometer' },
+    { id: 'mfi_filter', name: 'MFI', desc: 'Money Flow Index Filter', icon: 'currency-exchange' },
+    { id: 'cci_filter', name: 'CCI', desc: 'Commodity Channel Index Filter', icon: 'reception-4' },
+    { id: 'momentum_filter', name: 'Momentum', desc: 'Momentum Filter', icon: 'rocket-takeoff' }
   ],
-  filters: [
-    { id: 'supertrend_filter', name: 'SuperTrend Filter', desc: 'Trend filter with signal modes', icon: 'arrow-up-right-circle' },
-    { id: 'two_ma_filter', name: 'TWO MAs Filter', desc: 'MA cross & price filter', icon: 'arrows-angle-contract' },
-    { id: 'stochastic_filter', name: 'Stochastic Filter', desc: 'Range/cross/K-D filter', icon: 'percent' },
-    // (MACD Filter removed — consolidated into universal MACD indicator block)
-    { id: 'qqe_filter', name: 'QQE Filter', desc: 'QQE signals with RSI smoothing', icon: 'activity' },
-    { id: 'cci_filter', name: 'CCI Filter', desc: 'CCI range filter', icon: 'graph-up-arrow' },
-    { id: 'momentum_filter', name: 'Momentum Filter', desc: 'Momentum range filter', icon: 'speedometer2' },
-    { id: 'dmi_filter', name: 'DMI/ADX Filter', desc: 'DI+/DI- cross with ADX', icon: 'arrows-move' },
-    { id: 'cmf_filter', name: 'CMF Filter', desc: 'Chaikin Money Flow', icon: 'water' },
-    { id: 'bop_filter', name: 'Balance of Power', desc: 'Bulls vs Bears power', icon: 'scale' },
-    { id: 'levels_filter', name: 'Levels Break Filter', desc: 'Pivot/S&R breaks', icon: 'rulers' },
-    { id: 'atr_filter', name: 'ATR Volatility Filter', desc: 'ATR threshold filter', icon: 'arrows-fullscreen' },
-    { id: 'volume_compare_filter', name: 'Volume Compare Filter', desc: 'Volume vs MA comparison', icon: 'bar-chart-line' },
-    { id: 'highest_lowest_filter', name: 'Highest/Lowest Bar', desc: 'N-bar high/low breakout', icon: 'arrow-up-short' },
-    { id: 'accumulation_filter', name: 'Accumulation Areas', desc: 'Volume accumulation zones', icon: 'layers-half' },
-    { id: 'linreg_filter', name: 'Linear Regression', desc: 'LinReg channel filter', icon: 'graph-up' },
-    { id: 'rvi_filter', name: 'RVI Filter', desc: 'Relative Volatility Index', icon: 'activity' },
-    { id: 'divergence_filter', name: 'Divergence Filter', desc: 'Price/indicator divergence', icon: 'arrow-left-right' },
-    { id: 'price_action_filter', name: 'Price Action', desc: 'Candlestick patterns', icon: 'fire' },
-    { id: 'trend_filter', name: 'Trend Filter', desc: 'EMA slope / ADX direction', icon: 'arrow-up-right' },
-    { id: 'volume_filter', name: 'Volume Filter', desc: 'Volume above/below average', icon: 'bar-chart-steps' },
-    { id: 'volatility_filter', name: 'Volatility Filter', desc: 'ATR/BB width threshold', icon: 'arrows-expand' },
-    { id: 'time_filter', name: 'Time Filter', desc: 'Trading sessions/days', icon: 'clock' },
-    { id: 'price_filter', name: 'Price Filter', desc: 'Price above/below level', icon: 'currency-dollar' },
-    { id: 'block_worse_filter', name: 'Block if Worse', desc: 'Block entry if price moved X%', icon: 'shield-x' }
-  ],
+  // (Filters category removed — entire block deprecated)
   conditions: [
     {
       id: 'crossover',
@@ -202,119 +153,18 @@ const blockLibrary = {
       icon: 'arrows-collapse'
     }
   ],
-  actions: [
-    // Entry Management
+  entry_mgmt: [
     {
-      id: 'buy',
-      name: 'Buy',
-      desc: 'Open long position',
-      icon: 'arrow-up-circle'
+      id: 'dca',
+      name: 'DCA',
+      desc: 'Dollar Cost Averaging',
+      icon: 'grid-3x3'
     },
     {
-      id: 'sell',
-      name: 'Sell',
-      desc: 'Open short position',
-      icon: 'arrow-down-circle'
-    },
-    {
-      id: 'limit_entry',
-      name: 'Limit Entry',
-      desc: 'Entry at specific price',
-      icon: 'bookmark'
-    },
-    {
-      id: 'stop_entry',
-      name: 'Stop Entry',
-      desc: 'Entry on breakout',
-      icon: 'box-arrow-up'
-    },
-    {
-      id: 'indent_order',
-      name: 'Indent Order',
-      desc: 'Limit entry with offset',
-      icon: 'arrow-right-circle'
-    },
-    // Exit Management
-    {
-      id: 'close',
-      name: 'Close Position',
-      desc: 'Close current position',
-      icon: 'x-circle'
-    },
-    {
-      id: 'close_long',
-      name: 'Close Long',
-      desc: 'Close only long positions',
-      icon: 'x-circle'
-    },
-    {
-      id: 'close_short',
-      name: 'Close Short',
-      desc: 'Close only short positions',
-      icon: 'x-circle'
-    },
-    {
-      id: 'close_all',
-      name: 'Close All',
-      desc: 'Close all positions',
-      icon: 'x-octagon'
-    },
-    // Risk Management (conditional — triggered by node signal)
-    {
-      id: 'stop_loss',
-      name: 'Stop Loss',
-      desc: 'Conditional SL by signal/node',
-      icon: 'shield-x'
-    },
-    {
-      id: 'take_profit',
-      name: 'Take Profit',
-      desc: 'Conditional TP by signal/node',
-      icon: 'trophy'
-    },
-    {
-      id: 'trailing_stop',
-      name: 'Trailing Stop',
-      desc: 'Conditional trailing by signal',
-      icon: 'arrow-bar-down'
-    },
-    {
-      id: 'atr_stop',
-      name: 'ATR Stop',
-      desc: 'Conditional ATR SL by signal',
-      icon: 'shield-exclamation'
-    },
-    {
-      id: 'chandelier_stop',
-      name: 'Chandelier Stop',
-      desc: 'Conditional Chandelier by signal',
-      icon: 'lamp'
-    },
-    // Break-even & Protection
-    {
-      id: 'break_even',
-      name: 'Break Even',
-      desc: 'Move stop to entry price',
-      icon: 'dash-circle'
-    },
-    {
-      id: 'profit_lock',
-      name: 'Profit Lock',
-      desc: 'Lock minimum profit',
-      icon: 'lock'
-    },
-    // Partial Exits
-    {
-      id: 'scale_out',
-      name: 'Scale Out',
-      desc: 'Partial position close',
-      icon: 'layers'
-    },
-    {
-      id: 'multi_tp',
-      name: 'Multi Take Profit',
-      desc: 'TP1, TP2, TP3 levels',
-      icon: 'stack'
+      id: 'grid_orders',
+      name: 'Manual Grid',
+      desc: 'Custom offset & volume per order',
+      icon: 'grid'
     }
   ],
   // Exits: Standard exit rules (SL/TP, trailing, ATR, session, DCA close)
@@ -338,461 +188,13 @@ const blockLibrary = {
       icon: 'arrows-expand'
     },
     {
-      id: 'time_exit',
-      name: 'Time Exit',
-      desc: 'Exit after N bars/hours',
-      icon: 'clock-history'
-    },
-    {
-      id: 'session_exit',
-      name: 'Session Exit',
-      desc: 'Exit at session end',
-      icon: 'calendar-event'
-    },
-    {
-      id: 'signal_exit',
-      name: 'Signal Exit',
-      desc: 'Exit on opposite signal',
-      icon: 'signpost'
-    },
-    {
-      id: 'indicator_exit',
-      name: 'Indicator Exit',
-      desc: 'Exit on indicator condition',
-      icon: 'activity'
-    },
-    {
-      id: 'break_even_exit',
-      name: 'Break Even Move',
-      desc: 'Move SL to entry after profit',
-      icon: 'dash-circle'
-    },
-    {
-      id: 'partial_close',
-      name: 'Partial Close',
-      desc: 'Close % at targets',
-      icon: 'pie-chart'
-    },
-    {
       id: 'multi_tp_exit',
       name: 'Multi TP Levels',
       desc: 'TP1/TP2/TP3 with % allocation',
       icon: 'stack'
-    },
-    {
-      id: 'chandelier_exit',
-      name: 'Chandelier Exit',
-      desc: 'Auto ATR from high/low',
-      icon: 'lamp'
-    },
-    // ===== DCA CLOSE CONDITIONS (combined indicator blocks) =====
-    {
-      id: 'rsi_close',
-      name: 'RSI Close',
-      desc: 'Close on RSI reach/cross level',
-      icon: 'graph-up'
-    },
-    {
-      id: 'stoch_close',
-      name: 'Stochastic Close',
-      desc: 'Close on Stoch reach/cross level',
-      icon: 'percent'
-    },
-    {
-      id: 'channel_close',
-      name: 'Channel Close',
-      desc: 'Close on Keltner/BB breakout',
-      icon: 'distribute-vertical'
-    },
-    {
-      id: 'ma_close',
-      name: 'Two MAs Close',
-      desc: 'Close on MA cross',
-      icon: 'graph-up-arrow'
-    },
-    {
-      id: 'psar_close',
-      name: 'PSAR Close',
-      desc: 'Close on Parabolic SAR flip',
-      icon: 'circle'
-    },
-    {
-      id: 'time_bars_close',
-      name: 'Time/Bars Close',
-      desc: 'Close after X bars with profit filter',
-      icon: 'clock-history'
-    }
-  ],
-  // NEW CATEGORY: Position Sizing
-  position_sizing: [
-    {
-      id: 'fixed_size',
-      name: 'Fixed Size',
-      desc: 'Fixed position size',
-      icon: 'hash'
-    },
-    {
-      id: 'percent_balance',
-      name: '% of Balance',
-      desc: 'Percentage of account balance',
-      icon: 'percent'
-    },
-    {
-      id: 'risk_percent',
-      name: 'Risk %',
-      desc: 'Risk percentage per trade',
-      icon: 'shield-check'
-    },
-    {
-      id: 'atr_sizing',
-      name: 'ATR Sizing',
-      desc: 'Size based on volatility',
-      icon: 'arrows-expand'
-    },
-    {
-      id: 'kelly_criterion',
-      name: 'Kelly Criterion',
-      desc: 'Optimal mathematical sizing',
-      icon: 'calculator'
-    }
-  ],
-  // NEW CATEGORY: Entry Refinement
-  entry_refinement: [
-    {
-      id: 'dca',
-      name: 'DCA',
-      desc: 'Dollar Cost Averaging',
-      icon: 'grid-3x3'
-    },
-    {
-      id: 'grid_orders',
-      name: 'Manual Grid',
-      desc: 'Custom offset & volume per order',
-      icon: 'grid'
-    },
-    {
-      id: 'average_down',
-      name: 'Average Down',
-      desc: 'Average losing long',
-      icon: 'arrow-down-square'
-    },
-    {
-      id: 'reentry',
-      name: 'Re-entry',
-      desc: 'Re-enter after exit',
-      icon: 'arrow-repeat'
-    },
-    {
-      id: 'martingale',
-      name: 'Martingale',
-      desc: 'Double size after loss',
-      icon: 'arrow-up-right-circle'
-    },
-    {
-      id: 'anti_martingale',
-      name: 'Anti-Martingale',
-      desc: 'Increase size after win',
-      icon: 'arrow-down-left-circle'
-    },
-    {
-      id: 'scale_in',
-      name: 'Scale In',
-      desc: 'Gradual position building',
-      icon: 'bar-chart-steps'
-    }
-  ],
-  // NEW CATEGORY: Risk Controls (Circuit Breakers)
-  risk_controls: [
-    {
-      id: 'max_daily_loss',
-      name: 'Max Daily Loss',
-      desc: 'Stop trading after daily loss limit',
-      icon: 'exclamation-triangle'
-    },
-    {
-      id: 'max_drawdown',
-      name: 'Max Drawdown',
-      desc: 'Stop at max drawdown',
-      icon: 'graph-down-arrow'
-    },
-    {
-      id: 'max_trades_day',
-      name: 'Max Trades/Day',
-      desc: 'Limit daily trades',
-      icon: 'calendar-check'
-    },
-    {
-      id: 'consecutive_loss',
-      name: 'Consecutive Loss',
-      desc: 'Pause after X losses',
-      icon: 'pause-circle'
-    },
-    {
-      id: 'cooloff_period',
-      name: 'Cool-off Period',
-      desc: 'Pause after losses',
-      icon: 'hourglass'
-    }
-  ],
-  // NEW CATEGORY: Session Management
-  session_mgmt: [
-    {
-      id: 'active_hours',
-      name: 'Active Hours',
-      desc: 'Trading hours filter',
-      icon: 'clock'
-    },
-    {
-      id: 'trading_days',
-      name: 'Trading Days',
-      desc: 'Allowed weekdays',
-      icon: 'calendar-week'
-    },
-    {
-      id: 'session_filter',
-      name: 'Session Filter',
-      desc: 'London/NY/Asia sessions',
-      icon: 'globe'
-    },
-    {
-      id: 'news_filter',
-      name: 'News Filter',
-      desc: 'Avoid news events',
-      icon: 'newspaper'
-    },
-    {
-      id: 'weekend_close',
-      name: 'Weekend Close',
-      desc: 'Close before weekend',
-      icon: 'calendar-x'
-    }
-  ],
-  // NEW CATEGORY: Time Management
-  time_mgmt: [
-    {
-      id: 'time_stop',
-      name: 'Time Stop',
-      desc: 'Close after X hours',
-      icon: 'stopwatch'
-    },
-    {
-      id: 'max_duration',
-      name: 'Max Duration',
-      desc: 'Max trade duration',
-      icon: 'hourglass-split'
-    },
-    {
-      id: 'session_close',
-      name: 'Session Close',
-      desc: 'Close at session end',
-      icon: 'door-closed'
-    },
-    {
-      id: 'intraday_only',
-      name: 'Intraday Only',
-      desc: 'No overnight positions',
-      icon: 'sun'
-    }
-  ],
-  logic: [
-    {
-      id: 'and',
-      name: 'AND',
-      desc: 'All conditions must be true',
-      icon: 'union'
-    },
-    {
-      id: 'or',
-      name: 'OR',
-      desc: 'Any condition must be true',
-      icon: 'exclude'
-    },
-    { id: 'not', name: 'NOT', desc: 'Inverse condition', icon: 'slash-circle' },
-    { id: 'delay', name: 'Delay', desc: 'Wait N bars', icon: 'clock-history' },
-    { id: 'filter', name: 'Filter', desc: 'Filter signals', icon: 'funnel' }
-  ],
-  inputs: [
-    {
-      id: 'price',
-      name: 'Price',
-      desc: 'OHLCV price data',
-      icon: 'currency-dollar'
-    },
-    {
-      id: 'volume',
-      name: 'Volume',
-      desc: 'Trading volume',
-      icon: 'bar-chart-steps'
-    },
-    {
-      id: 'constant',
-      name: 'Constant',
-      desc: 'Fixed numeric value',
-      icon: 'hash'
-    },
-    {
-      id: 'timeframe',
-      name: 'Timeframe',
-      desc: 'Chart timeframe',
-      icon: 'calendar'
-    }
-  ],
-  // NEW CATEGORY: Correlation & Multi-Symbol
-  correlation: [
-    {
-      id: 'correlation_filter',
-      name: 'Correlation Filter',
-      desc: 'Filter by symbol correlation',
-      icon: 'link-45deg'
-    },
-    {
-      id: 'btc_dominance',
-      name: 'BTC Dominance',
-      desc: 'Filter by BTC dominance',
-      icon: 'currency-bitcoin'
-    },
-    {
-      id: 'sector_strength',
-      name: 'Sector Strength',
-      desc: 'Compare to sector/index',
-      icon: 'pie-chart'
-    },
-    {
-      id: 'relative_strength',
-      name: 'Relative Strength',
-      desc: 'RS vs benchmark',
-      icon: 'graph-up-arrow'
-    }
-  ],
-  // NEW CATEGORY: Alert System
-  alerts: [
-    {
-      id: 'price_alert',
-      name: 'Price Alert',
-      desc: 'Alert at price level',
-      icon: 'bell'
-    },
-    {
-      id: 'indicator_alert',
-      name: 'Indicator Alert',
-      desc: 'Alert on indicator condition',
-      icon: 'bell-fill'
-    },
-    {
-      id: 'trade_alert',
-      name: 'Trade Alert',
-      desc: 'Alert on entry/exit',
-      icon: 'megaphone'
-    },
-    {
-      id: 'pnl_alert',
-      name: 'P&L Alert',
-      desc: 'Alert on profit/loss threshold',
-      icon: 'exclamation-triangle'
-    },
-    {
-      id: 'drawdown_alert',
-      name: 'Drawdown Alert',
-      desc: 'Alert on drawdown level',
-      icon: 'graph-down-arrow'
-    }
-  ],
-  // NEW CATEGORY: Visualization
-  visualization: [
-    {
-      id: 'show_entries',
-      name: 'Show Entries',
-      desc: 'Display entry markers on chart',
-      icon: 'geo-alt'
-    },
-    {
-      id: 'show_exits',
-      name: 'Show Exits',
-      desc: 'Display exit markers on chart',
-      icon: 'geo-alt-fill'
-    },
-    {
-      id: 'show_sl_tp',
-      name: 'Show SL/TP Lines',
-      desc: 'Display stop loss & take profit',
-      icon: 'rulers'
-    },
-    {
-      id: 'show_indicators',
-      name: 'Show Indicators',
-      desc: 'Overlay indicators on chart',
-      icon: 'graph-up'
-    },
-    {
-      id: 'show_equity',
-      name: 'Show Equity Curve',
-      desc: 'Display equity curve panel',
-      icon: 'bar-chart-line'
-    },
-    {
-      id: 'show_trades_table',
-      name: 'Trades Table',
-      desc: 'Show trades in table format',
-      icon: 'table'
-    }
-  ],
-  // NEW CATEGORY: Multiple Take Profits
-  multiple_tp: [
-    {
-      id: 'multi_tp_enable',
-      name: 'Enable Multi-TP',
-      desc: 'Use TP1-TP4 instead of single TP',
-      icon: 'layers'
-    },
-    {
-      id: 'tp1_config',
-      name: 'TP1 Level',
-      desc: 'First take profit level and %',
-      icon: 'trophy'
-    },
-    {
-      id: 'tp2_config',
-      name: 'TP2 Level',
-      desc: 'Second take profit level and %',
-      icon: 'trophy-fill'
-    },
-    {
-      id: 'tp3_config',
-      name: 'TP3 Level',
-      desc: 'Third take profit level and %',
-      icon: 'award'
-    },
-    {
-      id: 'tp4_config',
-      name: 'TP4 Level',
-      desc: 'Final take profit (close all)',
-      icon: 'award-fill'
-    }
-  ],
-  // NEW CATEGORY: Signal Memory
-  signal_memory: [
-    {
-      id: 'signal_memory_enable',
-      name: 'Signal Memory',
-      desc: 'Remember signal for N bars',
-      icon: 'clock-history'
-    },
-    {
-      id: 'cross_memory',
-      name: 'Cross Memory',
-      desc: 'Remember indicator cross signals',
-      icon: 'arrow-left-right'
-    },
-    {
-      id: 'pattern_memory',
-      name: 'Pattern Memory',
-      desc: 'Remember price patterns',
-      icon: 'lightning'
     }
   ],
   // Close Conditions: Indicator-based close rules with profit filter (TradingView-style)
-  // NOTE: These use separate block IDs (close_rsi_reach, close_stoch_reach, etc.)
-  // vs exits category which has combined blocks (rsi_close, stoch_close)
   close_conditions: [
     {
       id: 'close_by_time',
@@ -801,251 +203,47 @@ const blockLibrary = {
       icon: 'clock'
     },
     {
-      id: 'close_rsi_reach',
-      name: 'RSI Reach Level',
-      desc: 'Close when RSI reaches level',
-      icon: 'graph-up'
-    },
-    {
-      id: 'close_rsi_cross',
-      name: 'RSI Cross Level',
-      desc: 'Close when RSI crosses level',
-      icon: 'arrow-left-right'
-    },
-    {
-      id: 'close_stoch_reach',
-      name: 'Stochastic Reach',
-      desc: 'Close when Stoch reaches level',
-      icon: 'percent'
-    },
-    {
-      id: 'close_stoch_cross',
-      name: 'Stochastic Cross',
-      desc: 'Close when Stoch crosses level',
-      icon: 'arrow-left-right'
-    },
-    {
-      id: 'close_channel_break',
-      name: 'Channel Breakout',
-      desc: 'Close on Keltner/BB breakout',
-      icon: 'distribute-vertical'
+      id: 'close_channel',
+      name: 'Channel Close (Keltner/BB)',
+      desc: 'Close on Keltner/Bollinger band touch',
+      icon: 'bar-chart'
     },
     {
       id: 'close_ma_cross',
-      name: 'MA Cross Close',
+      name: 'Two MAs Close',
       desc: 'Close on MA1/MA2 cross',
-      icon: 'graph-up-arrow'
+      icon: 'trending-up'
+    },
+    {
+      id: 'close_rsi',
+      name: 'Close by RSI',
+      desc: 'Close on RSI reach/cross level',
+      icon: 'activity'
+    },
+    {
+      id: 'close_stochastic',
+      name: 'Close by Stochastic',
+      desc: 'Close on Stoch reach/cross level',
+      icon: 'activity'
     },
     {
       id: 'close_psar',
-      name: 'Parabolic SAR Close',
-      desc: 'Close on PSAR signal',
-      icon: 'circle'
-    },
-    {
-      id: 'close_profit_only',
-      name: 'Close Only in Profit',
-      desc: 'Require minimum profit to close',
-      icon: 'cash-coin'
+      name: 'Close by Parabolic SAR',
+      desc: 'Close on PSAR signal reversal',
+      icon: 'git-commit'
     }
   ],
-  // NEW CATEGORY: Price Action Patterns (from TradingView)
-  price_action: [
-    {
-      id: 'engulfing',
-      name: 'Engulfing',
-      desc: 'Bullish/Bearish engulfing pattern',
-      icon: 'arrow-up-down'
-    },
-    {
-      id: 'hammer_hangman',
-      name: 'Hammer/Hanging Man',
-      desc: 'Reversal candle patterns',
-      icon: 'hammer'
-    },
-    {
-      id: 'doji_patterns',
-      name: 'Doji Patterns',
-      desc: 'Doji, Doji Star, Dragonfly, Gravestone',
-      icon: 'dash-lg'
-    },
-    {
-      id: 'shooting_star',
-      name: 'Shooting Star',
-      desc: 'Bearish reversal pattern',
-      icon: 'star'
-    },
-    {
-      id: 'marubozu',
-      name: 'Marubozu',
-      desc: 'Strong momentum candle',
-      icon: 'square-fill'
-    },
-    {
-      id: 'tweezer',
-      name: 'Tweezer Top/Bottom',
-      desc: 'Double reversal pattern',
-      icon: 'arrows-collapse'
-    },
-    {
-      id: 'three_methods',
-      name: 'Three Methods',
-      desc: 'Rising/Falling three methods',
-      icon: 'three-dots'
-    },
-    {
-      id: 'piercing_darkcloud',
-      name: 'Piercing/Dark Cloud',
-      desc: 'Two-candle reversal patterns',
-      icon: 'cloud-moon'
-    },
-    {
-      id: 'harami',
-      name: 'Harami',
-      desc: 'Inside bar reversal pattern',
-      icon: 'square'
-    }
-  ],
-  // NEW CATEGORY: Divergence Detection
+  // Divergence Detection — unified multi-indicator divergence signal block
   divergence: [
-    // (MACD Divergence removed — consolidated into universal MACD indicator block)
     {
-      id: 'stoch_divergence',
-      name: 'Stochastic Divergence',
-      desc: 'Detect Stochastic divergence',
-      icon: 'percent'
-    },
-    {
-      id: 'obv_divergence',
-      name: 'OBV Divergence',
-      desc: 'Detect On Balance Volume divergence',
-      icon: 'bar-chart-steps'
-    },
-    {
-      id: 'mfi_divergence',
-      name: 'MFI Divergence',
-      desc: 'Detect Money Flow Index divergence',
-      icon: 'currency-exchange'
-    }
-  ],
-
-  // ============================================
-  // SMART SIGNALS - Composite nodes that combine
-  // indicator + condition in one block
-  // ============================================
-  smart_signals: [
-    // Stochastic-based signals
-    {
-      id: 'stoch_overbought_signal',
-      name: 'Stoch Overbought',
-      desc: 'Signal when Stoch %K > 80',
-      icon: 'percent',
-      composite: { indicator: 'stochastic', condition: 'greater_than', defaultThreshold: 80 }
-    },
-    {
-      id: 'stoch_oversold_signal',
-      name: 'Stoch Oversold',
-      desc: 'Signal when Stoch %K < 20',
-      icon: 'percent',
-      composite: { indicator: 'stochastic', condition: 'less_than', defaultThreshold: 20 }
-    },
-    {
-      id: 'stoch_k_cross_d_up',
-      name: 'Stoch K Cross D Up',
-      desc: 'Bullish signal: %K crosses above %D',
-      icon: 'intersect',
-      composite: { indicator: 'stochastic', condition: 'crossover', compareWith: 'stoch_d' }
-    },
-    {
-      id: 'stoch_k_cross_d_down',
-      name: 'Stoch K Cross D Down',
-      desc: 'Bearish signal: %K crosses below %D',
-      icon: 'intersect',
-      composite: { indicator: 'stochastic', condition: 'crossunder', compareWith: 'stoch_d' }
-    },
-    // (MACD smart signals removed — consolidated into universal MACD indicator block)
-    // Moving Average signals
-    {
-      id: 'golden_cross_signal',
-      name: 'Golden Cross',
-      desc: 'Bullish: Fast MA crosses above Slow MA',
-      icon: 'star',
-      composite: { indicator: 'ema', condition: 'crossover', compareWith: 'ema_slow', fastPeriod: 50, slowPeriod: 200 }
-    },
-    {
-      id: 'death_cross_signal',
-      name: 'Death Cross',
-      desc: 'Bearish: Fast MA crosses below Slow MA',
-      icon: 'x-circle',
-      composite: { indicator: 'ema', condition: 'crossunder', compareWith: 'ema_slow', fastPeriod: 50, slowPeriod: 200 }
-    },
-    {
-      id: 'price_above_ma_signal',
-      name: 'Price Above MA',
-      desc: 'Bullish: Price above Moving Average',
-      icon: 'arrow-up-right',
-      composite: { indicator: 'ema', condition: 'price_above', period: 20 }
-    },
-    {
-      id: 'price_below_ma_signal',
-      name: 'Price Below MA',
-      desc: 'Bearish: Price below Moving Average',
-      icon: 'arrow-down-right',
-      composite: { indicator: 'ema', condition: 'price_below', period: 20 }
-    },
-    // Bollinger Bands signals
-    {
-      id: 'bb_upper_touch_signal',
-      name: 'BB Upper Touch',
-      desc: 'Price touches upper Bollinger Band',
-      icon: 'distribute-vertical',
-      composite: { indicator: 'bollinger', condition: 'price_above', compareWith: 'bb_upper' }
-    },
-    {
-      id: 'bb_lower_touch_signal',
-      name: 'BB Lower Touch',
-      desc: 'Price touches lower Bollinger Band',
-      icon: 'distribute-vertical',
-      composite: { indicator: 'bollinger', condition: 'price_below', compareWith: 'bb_lower' }
-    },
-    {
-      id: 'bb_squeeze_signal',
-      name: 'BB Squeeze',
-      desc: 'Bollinger Band width at minimum',
-      icon: 'arrows-collapse',
-      composite: { indicator: 'bollinger', condition: 'squeeze' }
-    },
-    // SuperTrend signals
-    {
-      id: 'supertrend_buy_signal',
-      name: 'SuperTrend Buy',
-      desc: 'Price crosses above SuperTrend',
-      icon: 'arrow-up-right-circle',
-      composite: { indicator: 'supertrend', condition: 'bullish_flip' }
-    },
-    {
-      id: 'supertrend_sell_signal',
-      name: 'SuperTrend Sell',
-      desc: 'Price crosses below SuperTrend',
-      icon: 'arrow-down-right-circle',
-      composite: { indicator: 'supertrend', condition: 'bearish_flip' }
-    },
-    // Volume signals
-    {
-      id: 'volume_spike_signal',
-      name: 'Volume Spike',
-      desc: 'Volume > 2x average',
-      icon: 'bar-chart-steps',
-      composite: { indicator: 'volume', condition: 'greater_than', multiplier: 2 }
-    },
-    {
-      id: 'volume_dry_signal',
-      name: 'Volume Dry Up',
-      desc: 'Volume < 0.5x average',
-      icon: 'bar-chart-line',
-      composite: { indicator: 'volume', condition: 'less_than', multiplier: 0.5 }
+      id: 'divergence',
+      name: 'Divergence',
+      desc: 'Multi-indicator divergence detection (RSI, Stochastic, Momentum, CMF, OBV, MFI)',
+      icon: 'arrow-left-right'
     }
   ]
+
+  // (Smart Signals category removed — all composite nodes deprecated in favor of universal indicator blocks)
 };
 
 // Strategy Templates - EXPANDED
@@ -1869,85 +1067,34 @@ function renderBlockLibrary() {
   }
   container.innerHTML = '';
 
-  // Simplified category groups (7 main groups)
+  // Simplified category groups (5 main groups — Smart Signals removed, Indicators merged into Entry)
   const categoryGroups = [
     {
-      groupName: '⚡ Быстрые сигналы',
-      groupIcon: 'lightning-charge',
-      groupColor: '#00ff88',
-      categories: [
-        { key: 'smart_signals', name: 'Smart Signals', iconType: 'smart' }
-      ]
-    },
-    {
-      groupName: '📊 Индикаторы',
-      groupIcon: 'graph-up',
-      groupColor: '#58a6ff',
-      categories: [
-        { key: 'indicators', name: 'Технические индикаторы', iconType: 'indicator' },
-        { key: 'divergence', name: 'Дивергенции', iconType: 'filter' }
-      ]
-    },
-    {
-      groupName: '🎯 Условия входа',
+      groupName: '🎯 Условия Входа',
       groupIcon: 'bullseye',
       groupColor: '#a371f7',
       categories: [
-        { key: 'filters', name: 'Фильтры', iconType: 'filter' },
+        { key: 'indicators', name: 'Технические индикаторы', iconType: 'indicator' },
         { key: 'conditions', name: 'Условия', iconType: 'condition' },
-        { key: 'price_action', name: 'Price Action', iconType: 'filter' }
+        { key: 'divergence', name: 'Дивергенции', iconType: 'filter' },
+        { key: 'entry_mgmt', name: 'DCA/Grid', iconType: 'entry' }
       ]
     },
     {
-      groupName: '🚀 Действия',
-      groupIcon: 'play-circle',
-      groupColor: '#3fb950',
-      categories: [
-        { key: 'actions', name: 'Действия', iconType: 'action' },
-        { key: 'entry_refinement', name: 'Уточнение входа', iconType: 'entry' }
-      ]
-    },
-    {
-      groupName: '🚪 Выходы',
+      groupName: '🚪 Условия Выхода',
       groupIcon: 'box-arrow-right',
       groupColor: '#f0883e',
       categories: [
-        { key: 'exits', name: 'Выходы (SL/TP/ATR/DCA)', iconType: 'exit' },
-        { key: 'multiple_tp', name: 'Multiple TP', iconType: 'action' },
+        { key: 'exits', name: 'Выходы (SL/TP/ATR)', iconType: 'exit' },
         { key: 'close_conditions', name: 'Закрытие по индикатору', iconType: 'exit' }
-      ]
-    },
-    {
-      groupName: '⚙️ Управление',
-      groupIcon: 'gear',
-      groupColor: '#d29922',
-      categories: [
-        { key: 'position_sizing', name: 'Размер позиции', iconType: 'sizing' },
-        { key: 'risk_controls', name: 'Риск-контроль', iconType: 'risk' },
-        { key: 'session_mgmt', name: 'Сессии', iconType: 'session' },
-        { key: 'time_mgmt', name: 'Время', iconType: 'time' }
-      ]
-    },
-    {
-      groupName: '🔧 Утилиты',
-      groupIcon: 'tools',
-      groupColor: '#8b949e',
-      categories: [
-        { key: 'logic', name: 'Логика', iconType: 'logic' },
-        { key: 'inputs', name: 'Входные данные', iconType: 'input' },
-        { key: 'signal_memory', name: 'Память сигналов', iconType: 'logic' },
-        { key: 'correlation', name: 'Корреляция', iconType: 'filter' },
-        { key: 'alerts', name: 'Алерты', iconType: 'session' },
-        { key: 'visualization', name: 'Визуализация', iconType: 'visualization' }
       ]
     }
   ];
 
   const ADAPTER_SPECIFIC_CATEGORIES = [
-    'smart_signals', 'multiple_tp', 'atr_exit', 'signal_memory',
-    'close_conditions', 'price_action', 'divergence', 'correlation',
-    'session_mgmt', 'time_mgmt', 'risk_controls', 'entry_refinement',
-    'position_sizing', 'alerts', 'visualization'
+    'atr_exit',
+    'close_conditions', 'divergence',
+    'entry_mgmt'
   ];
 
   // Render grouped categories
@@ -4171,74 +3318,28 @@ function getDefaultParams(blockType) {
       cross_memory_bars: 5
     },
     stochastic: {
-      k_period: 14,
-      d_period: 3,
-      smooth_k: 3,
+      stoch_k_length: 14,
+      stoch_k_smoothing: 3,
+      stoch_d_smoothing: 3,
       timeframe: 'Chart',
-      overbought: 80,
-      oversold: 20
-    },
-    stoch_rsi: {
-      rsi_period: 14,
-      stoch_period: 14,
-      k_period: 3,
-      d_period: 3,
-      overbought: 80,
-      oversold: 20
-    },
-    williams_r: {
-      period: 14,
-      overbought: -20,
-      oversold: -80
-    },
-    roc: {
-      period: 12,
-      source: 'close'
-    },
-    mfi: {
-      period: 14,
-      overbought: 80,
-      oversold: 20
-    },
-    cmo: {
-      period: 14,
-      overbought: 50,
-      oversold: -50
-    },
-    cci: {
-      period: 20,
-      overbought: 100,
-      oversold: -100
-    },
-
-    // =============================================
-    // TREND INDICATORS
-    // =============================================
-    sma: {
-      period: 50,
-      source: 'close',
-      offset: 0
-    },
-    ema: {
-      period: 20,
-      source: 'close',
-      offset: 0
-    },
-    wma: {
-      period: 20,
-      source: 'close'
-    },
-    dema: {
-      period: 20,
-      source: 'close'
-    },
-    tema: {
-      period: 20,
-      source: 'close'
-    },
-    hull_ma: {
-      period: 16,
-      source: 'close'
+      use_btc_source: false,
+      // Range Filter Mode
+      use_stoch_range_filter: false,
+      long_stoch_d_more: 1,
+      long_stoch_d_less: 50,
+      short_stoch_d_less: 100,
+      short_stoch_d_more: 50,
+      // Cross Level Mode
+      use_stoch_cross_level: false,
+      stoch_cross_level_long: 20,
+      stoch_cross_level_short: 80,
+      activate_stoch_cross_memory: false,
+      stoch_cross_memory_bars: 5,
+      // K/D Cross Mode
+      use_stoch_kd_cross: false,
+      opposite_stoch_kd: false,
+      activate_stoch_kd_memory: false,
+      stoch_kd_memory_bars: 5
     },
     macd: {
       fast_period: 12,
@@ -4260,526 +3361,144 @@ function getDefaultParams(blockType) {
       disable_signal_memory: false,
       signal_memory_bars: 5
     },
-    adx: {
-      period: 14,
-      threshold: 25
-    },
     supertrend: {
+      use_supertrend: false,
+      generate_on_trend_change: false,
+      use_btc_source: false,
+      opposite_signal: false,
+      show_supertrend: false,
       period: 10,
       multiplier: 3.0,
-      source: 'hl2'
-    },
-    ichimoku: {
-      tenkan_period: 9,
-      kijun_period: 26,
-      senkou_b_period: 52,
-      displacement: 26
-    },
-    parabolic_sar: {
-      start: 0.02,
-      increment: 0.02,
-      max_value: 0.2
-    },
-    aroon: {
-      period: 25,
-      threshold: 70
+      source: 'hl2',
+      timeframe: 'Chart'
     },
     qqe: {
       rsi_period: 14,
       qqe_factor: 4.238,
       smoothing_period: 5,
       source: 'close',
-      timeframe: 'Chart'
-    },
-
-    // =============================================
-    // VOLATILITY INDICATORS
-    // =============================================
-    atr: {
-      period: 14
-    },
-    atrp: {
-      period: 14
-    },
-    bollinger: {
-      period: 20,
-      std_dev: 2.0,
-      source: 'close'
-    },
-    keltner: {
-      ema_period: 20,
-      atr_period: 10,
-      multiplier: 2.0
-    },
-    donchian: {
-      period: 20
-    },
-    stddev: {
-      period: 20,
-      source: 'close'
-    },
-
-    // =============================================
-    // VOLUME INDICATORS
-    // =============================================
-    obv: {},
-    vwap: {
-      anchor: 'session'
-    },
-    cmf: {
-      period: 20
-    },
-    ad_line: {},
-    pvt: {},
-
-    // =============================================
-    // SUPPORT/RESISTANCE
-    // =============================================
-    pivot_points: {
-      type: 'traditional',
-      timeframe: '1D'
-    },
-
-    // =============================================
-    // MULTI-TIMEFRAME
-    // =============================================
-    mtf: {
-      indicator: 'ema',
-      period: 20,
-      source: 'close',
-      timeframe: '1h',
-      show_on_chart: true
-    },
-
-    // =============================================
-    // FILTERS
-    // =============================================
-    supertrend_filter: {
-      // SuperTrend TF1
-      use_supertrend: false,
-      generate_on_trend_change: false,
-      use_btc_source: false,
-      opposite_signal: false,
-      show_supertrend: false,
-      atr_period: 10,
-      atr_multiplier: 3.0,
       timeframe: 'Chart',
-      // SuperTrend TF2
-      use_supertrend_tf2: false,
-      supertrend_tf2_btc_source: false,
-      supertrend_tf2_opposite: false,
-      supertrend_tf2_show: false,
-      supertrend_tf2_period: 10,
-      supertrend_tf2_multiplier: 3.0,
-      supertrend_tf2_timeframe: '1h',
-      // SuperTrend TF3
-      use_supertrend_tf3: false,
-      supertrend_tf3_opposite: false,
-      supertrend_tf3_show: false,
-      supertrend_tf3_period: 10,
-      supertrend_tf3_multiplier: 3.0,
-      supertrend_tf3_timeframe: '4h'
-    },
-    // =============================================
-    // TWO MA's MOV [SIGNAL AND FILTER]
-    // =============================================
-    two_ma_filter: {
-      // MA1 Settings
-      ma1_length: 50,
-      ma1_type: 'WMA',
-      ma1_source: 'close',
-      // MA2 Settings
-      ma2_length: 100,
-      ma2_type: 'EMA',
-      ma2_source: 'close',
-      // Visualization
-      show_two_mas: false,
-      // MA1/MA2 Cross Mode
-      use_ma_cross: false,
-      opposite_ma_cross: false,
-      activate_ma_cross_memory: false,
-      ma_cross_memory_bars: 5,
-      // MA1 as Filter Mode
-      use_ma1_filter: false,
-      opposite_ma1_filter: false,
-      // TimeFrame
-      two_ma_timeframe: 'Chart'
-    },
-    // =============================================
-    // STOCHASTIC [RANGE FILTER]
-    // =============================================
-    stochastic_filter: {
-      // Basic Settings
-      stoch_k_length: 14,
-      stoch_k_smoothing: 3,
-      stoch_d_smoothing: 3,
-      stoch_timeframe: 'Chart',
-      use_btcusdt_source: false,
-      // Range Filter Mode
-      use_stoch_range_filter: false,
-      long_stoch_d_more: 0,
-      long_stoch_d_less: 20,
-      short_stoch_d_less: 100,
-      short_stoch_d_more: 80,
-      // Cross Level Mode
-      use_stoch_cross_level: false,
-      stoch_cross_level_long: 20,
-      stoch_cross_level_short: 80,
-      activate_stoch_cross_memory: false,
-      stoch_cross_memory_bars: 5,
-      // K/D Cross Mode
-      use_stoch_kd_cross: false,
-      opposite_stoch_kd: false,
-      activate_stoch_kd_memory: false,
-      stoch_kd_memory_bars: 5
-    },
-    // (MACD Filter removed — consolidated into universal MACD indicator block)
-    // =============================================
-    // QQE [SIGNALS]
-    // =============================================
-    qqe_filter: {
+      // QQE cross signal mode (consolidated from qqe_filter)
       use_qqe: false,
       opposite_qqe: false,
       enable_qqe_visualization: false,
       disable_qqe_signal_memory: false,
-      qqe_rsi_length: 14,
-      qqe_rsi_smoothing: 5,
-      qqe_delta_multiplier: 5.1
+      qqe_signal_memory_bars: 5
     },
+
     // =============================================
-    // CCI [TIMEFRAME]
+    // UNIVERSAL FILTERS (new instruments)
     // =============================================
-    cci_filter: {
-      cci_length: 14,
-      cci_timeframe: 'Chart',
-      use_btcusdt_source: false,
-      // Long Range
-      use_cci_long_range: false,
-      long_cci_more: -400,
-      long_cci_less: 400,
-      // Short Range
-      use_cci_short_range: false,
-      short_cci_less: 400,
-      short_cci_more: -400
+    atr_volatility: {
+      use_atr_volatility: false,
+      atr1_to_atr2: 'ATR1 < ATR2',
+      atr_diff_percent: 10,
+      atr_length1: 20,
+      atr_length2: 100,
+      atr_smoothing: 'WMA'
     },
-    // =============================================
-    // MOMENTUM
-    // =============================================
-    momentum_filter: {
-      momentum_length: 14,
-      momentum_timeframe: 'Chart',
-      momentum_source: 'close',
-      use_btcusdt_source: false,
-      // Long Range
-      use_momentum_long_range: false,
-      long_momentum_more: 100,
-      long_momentum_less: 180,
-      // Short Range
-      use_momentum_short_range: false,
-      short_momentum_less: 100,
-      short_momentum_more: -180
+    volume_filter: {
+      use_volume_filter: false,
+      vol1_to_vol2: 'VOL1 < VOL2',
+      vol_diff_percent: 10,
+      vol_length1: 20,
+      vol_length2: 100,
+      vol_smoothing: 'WMA'
     },
-    // =============================================
-    // DMI (ADX)
-    // =============================================
-    dmi_filter: {
-      dmi_period: 14,
-      adx_smoothing: 14,
-      dmi_timeframe: 'Chart',
-      use_btcusdt_source: false,
-      // Long using DMI
-      use_dmi_long: false,
-      dmi_long_di_plus: true,
-      dmi_long_threshold: 0,
-      // Short using DMI
-      use_dmi_short: false,
-      dmi_short_di_minus: true,
-      dmi_short_threshold: 0,
-      // ADX Filter
-      use_adx_filter: false,
-      adx_threshold: 25
-    },
-    // =============================================
-    // CMF Filter (Chaikin Money Flow)
-    // =============================================
-    cmf_filter: {
-      use_cmf: false,
-      opposite_cmf: false,
-      cmf_length: 20,
-      cmf_timeframe: 'Chart',
-      use_btcusdt_source: false,
-      // Long range
-      cmf_long_min: 0,
-      cmf_long_max: 100,
-      // Short range
-      cmf_short_min: -100,
-      cmf_short_max: 0
-    },
-    // =============================================
-    // Balance of Power Filter (Extended DCA)
-    // =============================================
-    bop_filter: {
-      use_bop: false,
-      opposite_bop: false,
-      bop_smoothing: 14,
-      bop_triple_smooth_length: 4,
-      bop_timeframe: 'Chart',
-      use_btcusdt_source: false,
-      // Cross line mode
-      bop_cross_line_enable: false,
-      bop_disable_memory: false,
-      bop_cross_level: 0,
-      // Long range
-      bop_long_min: 0,
-      bop_long_max: 100,
-      // Short range
-      bop_short_min: -100,
-      bop_short_max: 0
-    },
-    // =============================================
-    // Block if Worse Than Filter (DCA)
-    // =============================================
-    block_worse_filter: {
-      block_worse_enable: false,
-      block_worse_percent: 0.5
-    },
-    // =============================================
-    // Levels Break Filter (Pivot S&R) - Extended DCA
-    // =============================================
-    levels_filter: {
-      use_levels: false,
-      levels_pivot_bars: 10,
-      levels_search_period: 100,
-      levels_channel_width: 0.5,
-      levels_test_count: 2,
-      levels_opposite: false,
-      levels_memory_enable: false,
-      levels_memory_bars: 5,
-      pivot_type: 'Traditional',
-      levels_timeframe: 'D',
-      // Long conditions
-      long_above_s1: false,
-      long_above_pivot: false,
-      long_break_r1: false,
-      // Short conditions
-      short_below_r1: false,
-      short_below_pivot: false,
-      short_break_s1: false
-    },
-    // =============================================
-    // ATR Volatility Filter
-    // =============================================
-    atr_filter: {
-      use_atr_filter: false,
-      atr_length: 14,
-      atr_multiplier: 1.0,
-      atr_timeframe: 'Chart',
-      use_btcusdt_source: false,
-      // Min/Max ATR % range
-      atr_min_percent: 0.5,
-      atr_max_percent: 5.0,
-      // Filter mode
-      atr_filter_mode: 'between'
-    },
-    // =============================================
-    // Volume Compare Filter
-    // =============================================
-    volume_compare_filter: {
-      use_vol_compare: false,
-      vol_ma_length: 20,
-      vol_ma_type: 'SMA',
-      vol_timeframe: 'Chart',
-      use_btcusdt_source: false,
-      // Volume threshold
-      vol_multiplier: 1.5,
-      vol_compare_mode: 'above',
-      // Consecutive bars
-      vol_consecutive_bars: 1
-    },
-    // =============================================
-    // Highest/Lowest Bar Filter
-    // =============================================
-    highest_lowest_filter: {
+    highest_lowest_bar: {
+      // Highest/Lowest Bar signal
       use_highest_lowest: false,
-      lookback_period: 20,
-      hl_timeframe: 'Chart',
-      use_btcusdt_source: false,
-      // Long conditions
-      long_break_highest: true,
-      long_above_lowest: false,
-      // Short conditions
-      short_break_lowest: true,
-      short_below_highest: false
+      hl_lookback_bars: 10,
+      hl_price_percent: 0,
+      hl_atr_percent: 0,
+      atr_hl_length: 50,
+      // Block if Worse Than filter
+      use_block_worse_than: false,
+      block_worse_percent: 1.1
     },
-    // =============================================
-    // Accumulation Areas Filter - Extended DCA
-    // =============================================
-    accumulation_filter: {
+    two_mas: {
+      ma1_length: 50,
+      ma1_smoothing: 'SMA',
+      ma1_source: 'close',
+      ma2_length: 100,
+      ma2_smoothing: 'EMA',
+      ma2_source: 'close',
+      show_two_mas: false,
+      two_mas_timeframe: 'Chart',
+      // MA Cross signal
+      use_ma_cross: false,
+      opposite_ma_cross: false,
+      activate_ma_cross_memory: false,
+      ma_cross_memory_bars: 5,
+      // MA1 as Filter
+      use_ma1_filter: false,
+      opposite_ma1_filter: false
+    },
+    accumulation_areas: {
       use_accumulation: false,
-      acc_backtrack_interval: 50,
-      acc_min_bars: 3,
-      acc_breakout_signal: true,
-      acc_opposite_direction: false,
-      volume_threshold: 2.0,
-      price_range_percent: 1.0,
-      min_bars_in_range: 5,
-      acc_timeframe: 'Chart',
-      // Entry conditions
-      enter_on_breakout: true,
-      enter_in_range: false
+      backtracking_interval: 30,
+      min_bars_to_execute: 5,
+      signal_on_breakout: false,
+      signal_on_opposite_breakout: false
     },
-    // =============================================
-    // Linear Regression Channel Filter (Extended DCA)
-    // =============================================
-    linreg_filter: {
-      use_linreg: false,
-      disable_linreg_memory: false,
-      linreg_memory_bars: 5,
-      linreg_length: 100,
-      linreg_offset: 0,
-      channel_mult: 2.0,
-      linreg_timeframe: 'Chart',
-      linreg_source: 'close',
-      linreg_breakout_rebound: 'Breakout',
-      linreg_slope_direction: 'Allow_Any',
-      show_linreg_extend_lines: false,
-      show_broken_channel: false,
-      // Long conditions
-      long_above_lower: true,
-      long_slope_up: false,
-      // Short conditions
-      short_below_upper: true,
-      short_slope_down: false
+    keltner_bollinger: {
+      use_channel: false,
+      channel_timeframe: 'Chart',
+      channel_mode: 'Rebound',
+      channel_type: 'Keltner Channel',
+      enter_conditions: 'Wick out of band',
+      keltner_length: 14,
+      keltner_mult: 1.5,
+      bb_length: 20,
+      bb_deviation: 2
     },
-    // =============================================
-    // RVI Filter (Relative Volatility Index)
-    // =============================================
     rvi_filter: {
-      use_rvi: false,
       rvi_length: 10,
       rvi_timeframe: 'Chart',
       rvi_ma_type: 'WMA',
-      rvi_ma_length: 14,
-      // Long range
+      rvi_ma_length: 2,
       use_rvi_long_range: false,
-      rvi_long_more: 50,
-      rvi_long_less: 100,
-      // Short range
+      rvi_long_more: 1,
+      rvi_long_less: 50,
       use_rvi_short_range: false,
-      rvi_short_more: 0,
-      rvi_short_less: 50
+      rvi_short_less: 100,
+      rvi_short_more: 50
     },
-    // =============================================
-    // Divergence Filter
-    // =============================================
-    divergence_filter: {
-      use_divergence: false,
-      div_indicator: 'RSI',
-      div_period: 14,
-      div_timeframe: 'Chart',
-      pivot_lookback: 5,
-      // Types
-      use_regular_bullish: true,
-      use_regular_bearish: true,
-      use_hidden_bullish: false,
-      use_hidden_bearish: false
+    mfi_filter: {
+      mfi_length: 14,
+      mfi_timeframe: 'Chart',
+      use_btcusdt_mfi: false,
+      use_mfi_long_range: false,
+      mfi_long_more: 1,
+      mfi_long_less: 60,
+      use_mfi_short_range: false,
+      mfi_short_less: 100,
+      mfi_short_more: 50
     },
-    // =============================================
-    // Price Action Filter (47 Candlestick Patterns)
-    // =============================================
-    price_action_filter: {
-      use_price_action: false,
-      pa_timeframe: 'Chart',
-      // ===== BULLISH REVERSAL (for LONG) =====
-      // Classic patterns
-      use_hammer: true,
-      use_inverted_hammer: false,
-      use_engulfing_bull: true,
-      use_morning_star: false,
-      use_piercing_line: false,
-      use_three_white: false,
-      use_tweezer_bottom: false,
-      use_dragonfly_doji: false,
-      use_bullish_harami: false,
-      use_rising_three: false,
-      use_bullish_marubozu: false,
-      // Exotic bullish
-      use_pin_bar_bullish: false,
-      use_three_line_strike_bull: false,
-      use_kicker_bullish: false,
-      use_abandoned_baby_bull: false,
-      use_belt_hold_bullish: false,
-      use_counterattack_bull: false,
-      use_ladder_bottom: false,
-      use_stick_sandwich_bull: false,
-      use_homing_pigeon: false,
-      use_matching_low: false,
-      // ===== BEARISH REVERSAL (for SHORT) =====
-      // Classic patterns
-      use_shooting_star: true,
-      use_hanging_man: false,
-      use_engulfing_bear: true,
-      use_evening_star: false,
-      use_dark_cloud: false,
-      use_three_black: false,
-      use_tweezer_top: false,
-      use_gravestone_doji: false,
-      use_bearish_harami: false,
-      use_falling_three: false,
-      use_bearish_marubozu: false,
-      // Exotic bearish
-      use_pin_bar_bearish: false,
-      use_three_line_strike_bear: false,
-      use_kicker_bearish: false,
-      use_abandoned_baby_bear: false,
-      use_belt_hold_bearish: false,
-      use_counterattack_bear: false,
-      use_ladder_top: false,
-      use_stick_sandwich_bear: false,
-      use_matching_high: false,
-      // ===== NEUTRAL / STRUCTURE =====
-      use_doji: false,
-      use_spinning_top: false,
-      use_inside_bar: false,
-      use_outside_bar: false,
-      // ===== GAP PATTERNS =====
-      use_gap_up: false,
-      use_gap_down: false,
-      use_gap_up_filled: false,
-      use_gap_down_filled: false
+    cci_filter: {
+      cci_length: 14,
+      cci_timeframe: 'Chart',
+      use_cci_long_range: false,
+      cci_long_more: -400,
+      cci_long_less: 400,
+      use_cci_short_range: false,
+      cci_short_less: 400,
+      cci_short_more: 10
     },
-    trend_filter: {
-      ema_period: 50,
-      use_ema_slope: true,
-      slope_threshold: 0,
-      use_adx: false,
-      adx_period: 14,
-      adx_threshold: 25
+    momentum_filter: {
+      momentum_length: 14,
+      momentum_timeframe: 'Chart',
+      use_btcusdt_momentum: false,
+      momentum_source: 'close',
+      use_momentum_long_range: false,
+      momentum_long_more: -100,
+      momentum_long_less: 10,
+      use_momentum_short_range: false,
+      momentum_short_less: 95,
+      momentum_short_more: -30
     },
-    volume_filter: {
-      ma_period: 20,
-      volume_multiplier: 1.5,
-      filter_type: 'above'
-    },
-    volatility_filter: {
-      atr_period: 14,
-      atr_multiplier: 1.0,
-      use_bb_width: false,
-      bb_period: 20,
-      bb_threshold: 0.02
-    },
-    time_filter: {
-      start_hour: 9,
-      end_hour: 17,
-      use_days: false,
-      trading_days: [1, 2, 3, 4, 5]
-    },
-    price_filter: {
-      level: 0,
-      filter_type: 'above',
-      use_ema: false,
-      ema_period: 200
-    },
+
+    // (Filters defaults removed — entire Filters category deprecated)
 
     // =============================================
     // CONDITIONS
@@ -4807,127 +3526,6 @@ function getDefaultParams(blockType) {
     between: {
       min_value: 0,
       max_value: 100
-    },
-
-    // =============================================
-    // ACTIONS
-    // =============================================
-    buy: {
-      quantity: 100,
-      order_type: 'market',
-      use_percent: true
-    },
-    sell: {
-      quantity: 100,
-      order_type: 'market',
-      use_percent: true
-    },
-    close: {
-      close_percent: 100
-    },
-    stop_loss: {
-      percent: 2.0,
-      use_atr: false,
-      atr_multiplier: 1.5
-    },
-    take_profit: {
-      percent: 5.0,
-      use_atr: false,
-      atr_multiplier: 3.0
-    },
-    trailing_stop: {
-      percent: 1.0,
-      activation_percent: 1.0,
-      use_atr: false,
-      atr_multiplier: 2.0
-    },
-
-    // =============================================
-    // NEW ENTRY TYPES
-    // =============================================
-    limit_entry: {
-      price_offset: 0,
-      offset_type: 'percent',
-      time_in_force: 'GTC'
-    },
-    stop_entry: {
-      price_offset: 0,
-      offset_type: 'percent',
-      time_in_force: 'GTC'
-    },
-    // Indent Order (DCA Feature)
-    indent_order: {
-      indent_enable: false,
-      indent_show_lines: true,
-      indent_percent: 0.1,
-      indent_cancel_bars: 10
-    },
-
-    // =============================================
-    // EXIT MANAGEMENT
-    // =============================================
-    close_long: {
-      close_percent: 100
-    },
-    close_short: {
-      close_percent: 100
-    },
-    close_all: {},
-
-    // =============================================
-    // ADVANCED STOPS (Extended DCA)
-    // =============================================
-    atr_stop: {
-      // ATR Stop Loss
-      atr_sl_enable: true,
-      atr_sl_wicks: true,
-      atr_sl_method: 'RMA',
-      atr_sl_period: 140,
-      atr_sl_multiplier: 2.0,
-      // ATR Take Profit
-      atr_tp_enable: false,
-      atr_tp_wicks: true,
-      atr_tp_method: 'RMA',
-      atr_tp_period: 140,
-      atr_tp_multiplier: 3.0,
-      from_entry: true
-    },
-    chandelier_stop: {
-      period: 22,
-      atr_multiplier: 3.0
-    },
-
-    // =============================================
-    // BREAK-EVEN & PROTECTION
-    // =============================================
-    break_even: {
-      trigger_percent: 1.0,
-      offset: 0,
-      include_commission: true
-    },
-    profit_lock: {
-      trigger_percent: 2.0,
-      lock_percent: 1.0,
-      step_mode: false,
-      step_size: 1.0
-    },
-
-    // =============================================
-    // PARTIAL EXITS
-    // =============================================
-    scale_out: {
-      exit_percent: 50,
-      trigger_type: 'profit_percent',
-      trigger_value: 2.0
-    },
-    multi_tp: {
-      tp1_percent: 50,
-      tp1_target: 1.0,
-      tp2_percent: 30,
-      tp2_target: 2.0,
-      tp3_percent: 20,
-      tp3_target: 3.0,
-      use_tp3: true
     },
 
     // =============================================
@@ -4959,42 +3557,6 @@ function getDefaultParams(blockType) {
       atr_tp_period: 140,
       atr_tp_multiplier: 4.0
     },
-    time_exit: {
-      exit_after_bars: 10,
-      exit_after_hours: 0,
-      exit_type: 'bars'
-    },
-    session_exit: {
-      exit_session: 'NY_close',
-      custom_hour: 16,
-      custom_minute: 0,
-      use_utc: true
-    },
-    signal_exit: {
-      exit_on_opposite: true,
-      exit_on_any_signal: false,
-      confirm_bars: 1
-    },
-    indicator_exit: {
-      indicator: 'rsi',
-      condition: 'crosses_above',
-      threshold: 70,
-      exit_long_only: false,
-      exit_short_only: false
-    },
-    break_even_exit: {
-      activation_profit_percent: 1.0,
-      move_to_profit_percent: 0.1,
-      use_for_long: true,
-      use_for_short: true
-    },
-    partial_close: {
-      close_percent_1: 50,
-      trigger_profit_1: 1.0,
-      close_percent_2: 25,
-      trigger_profit_2: 2.0,
-      use_second_partial: true
-    },
     multi_tp_exit: {
       tp1_percent: 1.0,
       tp1_close_percent: 33,
@@ -5005,122 +3567,9 @@ function getDefaultParams(blockType) {
       use_tp2: true,
       use_tp3: true
     },
-    chandelier_exit: {
-      atr_period: 22,
-      atr_multiplier: 3.0,
-      use_close: true,
-      use_for_long: true,
-      use_for_short: true
-    },
 
     // =============================================
-    // DCA CLOSE CONDITIONS
-    // =============================================
-    rsi_close: {
-      rsi_close_enable: false,
-      rsi_close_length: 14,
-      rsi_close_timeframe: 'Chart',
-      rsi_close_only_profit: true,
-      rsi_close_min_profit: 0.5,
-      // Reach mode
-      rsi_close_reach_enable: false,
-      rsi_close_reach_long_more: 70,
-      rsi_close_reach_long_less: 0,
-      rsi_close_reach_short_more: 100,
-      rsi_close_reach_short_less: 30,
-      // Cross mode
-      rsi_close_cross_enable: false,
-      rsi_close_cross_long_level: 70,
-      rsi_close_cross_short_level: 30
-    },
-    stoch_close: {
-      stoch_close_enable: false,
-      stoch_close_k_length: 14,
-      stoch_close_k_smooth: 1,
-      stoch_close_d_smooth: 3,
-      stoch_close_timeframe: 'Chart',
-      stoch_close_only_profit: true,
-      stoch_close_min_profit: 0.5,
-      // Reach mode
-      stoch_close_reach_enable: false,
-      stoch_close_reach_long_more: 80,
-      stoch_close_reach_long_less: 0,
-      stoch_close_reach_short_more: 100,
-      stoch_close_reach_short_less: 20,
-      // Cross mode
-      stoch_close_cross_enable: false,
-      stoch_close_cross_long_level: 80,
-      stoch_close_cross_short_level: 20
-    },
-    channel_close: {
-      channel_close_enable: false,
-      channel_close_timeframe: 'Chart',
-      channel_close_band: 'Breakout',
-      channel_close_type: 'Keltner',
-      channel_close_condition: 'long_upper_short_lower',
-      // Keltner params
-      channel_close_keltner_length: 20,
-      channel_close_keltner_mult: 2.0,
-      // Bollinger params
-      channel_close_bb_length: 20,
-      channel_close_bb_deviation: 2.0
-    },
-    ma_close: {
-      ma_close_enable: false,
-      ma_close_show_lines: true,
-      ma_close_only_profit: true,
-      ma_close_min_profit: 0.5,
-      ma_close_ma1_length: 9,
-      ma_close_ma1_type: 'EMA',
-      ma_close_ma2_length: 21,
-      ma_close_ma2_type: 'EMA'
-    },
-    psar_close: {
-      psar_close_enable: false,
-      psar_close_opposite: true,
-      psar_close_only_profit: true,
-      psar_close_min_profit: 0.5,
-      psar_close_start: 0.02,
-      psar_close_increment: 0.02,
-      psar_close_maximum: 0.2,
-      psar_close_nth_bar: 0
-    },
-    time_bars_close: {
-      time_bars_close_enable: false,
-      close_after_bars: 20,
-      close_only_profit: true,
-      close_min_profit: 0.5,
-      close_max_bars: 100
-    },
-
-    // =============================================
-    // POSITION SIZING
-    // =============================================
-    fixed_size: {
-      size: 0.1,
-      size_type: 'base_currency'
-    },
-    percent_balance: {
-      percent: 10,
-      use_available: true
-    },
-    risk_percent: {
-      risk_percent: 2.0,
-      stop_distance: 1.0
-    },
-    atr_sizing: {
-      risk_percent: 2.0,
-      atr_period: 14,
-      atr_multiplier: 2.0
-    },
-    kelly_criterion: {
-      win_rate: 0.5,
-      reward_risk: 2.0,
-      fraction: 0.5
-    },
-
-    // =============================================
-    // ENTRY REFINEMENT
+    // ENTRY MANAGEMENT (DCA / Grid)
     // =============================================
     dca: {
       grid_size_percent: 15,
@@ -5140,313 +3589,6 @@ function getDefaultParams(blockType) {
       ],
       grid_trailing: 0 // Grid Trailing / Cancel (%), 0 = disabled
     },
-    average_down: {
-      max_adds: 3,
-      loss_trigger: 2.0,
-      add_size_percent: 100
-    },
-    reentry: {
-      wait_bars: 5,
-      max_reentries: 2,
-      same_direction: true
-    },
-    martingale: {
-      multiplier: 2.0,
-      max_steps: 5,
-      reset_on_win: true,
-      max_position_size: 1000
-    },
-    anti_martingale: {
-      multiplier: 1.5,
-      max_steps: 3,
-      reset_on_loss: true,
-      base_size_percent: 10
-    },
-    scale_in: {
-      total_orders: 3,
-      first_order_percent: 50,
-      interval_type: 'bars',
-      interval_value: 5,
-      price_condition: 'any'
-    },
-
-    // =============================================
-    // RISK CONTROLS (CIRCUIT BREAKERS)
-    // =============================================
-    max_daily_loss: {
-      max_loss_percent: 5.0,
-      max_loss_amount: 0,
-      use_percent: true,
-      reset_hour: 0
-    },
-    max_drawdown: {
-      max_dd_percent: 10.0,
-      from_peak: true,
-      stop_all_trading: true
-    },
-    max_trades_day: {
-      max_trades: 10,
-      reset_hour: 0
-    },
-    consecutive_loss: {
-      max_consecutive: 3,
-      cooloff_hours: 24
-    },
-    cooloff_period: {
-      cooloff_hours: 24,
-      trigger_type: 'loss_count',
-      trigger_value: 3
-    },
-
-    // =============================================
-    // SESSION MANAGEMENT
-    // =============================================
-    active_hours: {
-      start_hour: 9,
-      end_hour: 17,
-      timezone: 'UTC'
-    },
-    trading_days: {
-      monday: true,
-      tuesday: true,
-      wednesday: true,
-      thursday: true,
-      friday: true,
-      saturday: false,
-      sunday: false
-    },
-    session_filter: {
-      london: true,
-      new_york: true,
-      tokyo: false,
-      sydney: false,
-      overlap_only: false
-    },
-    news_filter: {
-      high_impact: true,
-      medium_impact: false,
-      minutes_before: 30,
-      minutes_after: 30
-    },
-    weekend_close: {
-      close_friday_hour: 21,
-      close_all: true
-    },
-
-    // =============================================
-    // TIME MANAGEMENT
-    // =============================================
-    time_stop: {
-      hours: 24,
-      close_in_profit: false,
-      close_in_loss: true
-    },
-    max_duration: {
-      max_hours: 48,
-      action: 'close'
-    },
-    session_close: {
-      close_hour: 16,
-      close_minute: 0,
-      timezone: 'UTC'
-    },
-    intraday_only: {
-      close_hour: 23,
-      close_minute: 0
-    },
-
-    // =============================================
-    // LOGIC
-    // =============================================
-    and: {},
-    or: {},
-    not: {},
-    delay: {
-      bars: 1,
-      delay_type: 'bars'
-    },
-    filter: {
-      filter_type: 'pass'
-    },
-
-    // =============================================
-    // INPUTS
-    // =============================================
-    price: {
-      source: 'close'
-    },
-    volume: {},
-    constant: {
-      value: 0
-    },
-
-    // =============================================
-    // CORRELATION & MULTI-SYMBOL
-    // =============================================
-    correlation_filter: {
-      use_correlation: false,
-      correlated_symbol: 'BTCUSDT',
-      correlation_period: 20,
-      min_correlation: 0.7,
-      max_correlation: 1.0,
-      correlation_mode: 'positive',
-      use_for_long: true,
-      use_for_short: true
-    },
-    btc_dominance: {
-      use_btc_dom: false,
-      btc_dom_threshold: 50,
-      condition: 'above',
-      use_trend: false,
-      trend_period: 10
-    },
-    sector_strength: {
-      use_sector: false,
-      benchmark_symbol: 'BTCUSDT',
-      lookback_period: 20,
-      min_outperformance: 5,
-      use_for_long: true,
-      use_for_short: true
-    },
-    relative_strength: {
-      use_rs: false,
-      benchmark: 'BTCUSDT',
-      rs_period: 14,
-      rs_threshold: 50,
-      rs_condition: 'above'
-    },
-
-    // =============================================
-    // ALERT SYSTEM
-    // =============================================
-    price_alert: {
-      enabled: false,
-      alert_type: 'crossing',
-      price_level: 0,
-      send_notification: true,
-      sound_alert: true,
-      webhook_url: ''
-    },
-    indicator_alert: {
-      enabled: false,
-      indicator: 'rsi',
-      condition: 'crosses_above',
-      threshold: 70,
-      send_notification: true,
-      sound_alert: true
-    },
-    trade_alert: {
-      enabled: false,
-      on_entry: true,
-      on_exit: true,
-      on_sl_hit: true,
-      on_tp_hit: true,
-      send_notification: true,
-      webhook_url: ''
-    },
-    pnl_alert: {
-      enabled: false,
-      profit_threshold: 5.0,
-      loss_threshold: -3.0,
-      use_percent: true,
-      send_notification: true
-    },
-    drawdown_alert: {
-      enabled: false,
-      drawdown_threshold: 10.0,
-      send_notification: true,
-      pause_trading: false
-    },
-
-    // =============================================
-    // VISUALIZATION
-    // =============================================
-    show_entries: {
-      enabled: true,
-      long_color: '#22c55e',
-      short_color: '#ef4444',
-      marker_size: 'medium',
-      show_label: true
-    },
-    show_exits: {
-      enabled: true,
-      profit_color: '#22c55e',
-      loss_color: '#ef4444',
-      marker_size: 'medium',
-      show_pnl: true
-    },
-    show_sl_tp: {
-      enabled: true,
-      sl_color: '#ef4444',
-      tp_color: '#22c55e',
-      line_style: 'dashed',
-      show_price: true
-    },
-    show_indicators: {
-      enabled: true,
-      main_pane: ['ema', 'sma', 'bollinger'],
-      separate_pane: ['rsi', 'macd', 'volume'],
-      custom_colors: {}
-    },
-    show_equity: {
-      enabled: true,
-      show_drawdown: true,
-      show_benchmark: false,
-      benchmark_symbol: 'BTCUSDT'
-    },
-    show_trades_table: {
-      enabled: true,
-      columns: ['entry_time', 'exit_time', 'side', 'entry_price', 'exit_price', 'pnl', 'pnl_percent'],
-      max_rows: 100,
-      highlight_winners: true
-    },
-
-    // =============================================
-    // MULTIPLE TAKE PROFITS
-    // =============================================
-    multi_tp_enable: {
-      enabled: false,
-      use_main_tp: true
-    },
-    tp1_config: {
-      percent: 0.5,
-      close_percent: 25,
-      enabled: true
-    },
-    tp2_config: {
-      percent: 1.0,
-      close_percent: 25,
-      enabled: true
-    },
-    tp3_config: {
-      percent: 1.5,
-      close_percent: 25,
-      enabled: true
-    },
-    tp4_config: {
-      percent: 2.0,
-      close_percent: 25,
-      enabled: true
-    },
-
-    // =============================================
-    // SIGNAL MEMORY
-    // =============================================
-    signal_memory_enable: {
-      enabled: false,
-      memory_bars: 5,
-      execute_on_conditions_met: true
-    },
-    cross_memory: {
-      enabled: false,
-      memory_bars: 5,
-      indicator: 'ma_cross'
-    },
-    pattern_memory: {
-      enabled: false,
-      memory_bars: 3,
-      pattern_type: 'any'
-    },
 
     // =============================================
     // CLOSE CONDITIONS (from TradingView)
@@ -5457,245 +3599,91 @@ function getDefaultParams(blockType) {
       profit_only: false,
       min_profit_percent: 0
     },
-    close_rsi_reach: {
+    close_channel: {
       enabled: false,
-      rsi_period: 14,
-      long_close_above: 70,
-      short_close_below: 30,
-      profit_only: false,
-      min_profit_percent: 0
-    },
-    close_rsi_cross: {
-      enabled: false,
-      rsi_period: 14,
-      long_cross_level: 70,
-      short_cross_level: 30,
-      profit_only: false
-    },
-    close_stoch_reach: {
-      enabled: false,
-      stoch_period: 14,
-      long_close_above: 80,
-      short_close_below: 20,
-      profit_only: false,
-      min_profit_percent: 0
-    },
-    close_stoch_cross: {
-      enabled: false,
-      stoch_period: 14,
-      long_cross_level: 80,
-      short_cross_level: 20,
-      profit_only: false
-    },
-    close_channel_break: {
-      enabled: false,
-      channel_type: 'bollinger',
-      channel_period: 20,
-      channel_mult: 2.0,
-      close_mode: 'rebound',
-      profit_only: false
+      channel_close_timeframe: 'Chart',
+      band_to_close: 'Rebound',
+      channel_type: 'Keltner Channel',
+      close_condition: 'Wick out of band',
+      keltner_length: 14,
+      keltner_mult: 1.5,
+      bb_length: 20,
+      bb_deviation: 2
     },
     close_ma_cross: {
       enabled: false,
-      ma1_period: 9,
-      ma2_period: 21,
+      show_ma_lines: false,
       profit_only: false,
-      min_profit_percent: 0
+      min_profit_percent: 1,
+      ma1_length: 10,
+      ma2_length: 30
+    },
+    close_rsi: {
+      enabled: false,
+      rsi_close_length: 14,
+      rsi_close_timeframe: 'Chart',
+      rsi_close_profit_only: false,
+      rsi_close_min_profit: 1,
+      activate_rsi_reach: false,
+      rsi_long_more: 70,
+      rsi_long_less: 100,
+      rsi_short_less: 30,
+      rsi_short_more: 1,
+      activate_rsi_cross: false,
+      rsi_cross_long_level: 70,
+      rsi_cross_short_level: 30
+    },
+    close_stochastic: {
+      enabled: false,
+      stoch_close_k_length: 14,
+      stoch_close_k_smoothing: 3,
+      stoch_close_d_smoothing: 3,
+      stoch_close_timeframe: 'Chart',
+      stoch_close_profit_only: false,
+      stoch_close_min_profit: 1,
+      activate_stoch_reach: false,
+      stoch_long_more: 80,
+      stoch_long_less: 100,
+      stoch_short_less: 20,
+      stoch_short_more: 1,
+      activate_stoch_cross: false,
+      stoch_cross_long_level: 80,
+      stoch_cross_short_level: 20
     },
     close_psar: {
       enabled: false,
+      psar_opposite: false,
+      psar_close_profit_only: false,
+      psar_close_min_profit: 1,
       psar_start: 0.02,
       psar_increment: 0.02,
-      psar_max: 0.2,
-      close_on_nth_bar: 1,
-      profit_only: false
-    },
-    close_profit_only: {
-      enabled: false,
-      min_profit_percent: 0.5
-    },
-
-    // =============================================
-    // PRICE ACTION PATTERNS
-    // =============================================
-    engulfing: {
-      enabled: false,
-      use_bullish: true,
-      use_bearish: true,
-      confirmation_bars: 0
-    },
-    hammer_hangman: {
-      enabled: false,
-      use_hammer: true,
-      use_hanging_man: true,
-      body_ratio: 0.3
-    },
-    doji_patterns: {
-      enabled: false,
-      use_doji: true,
-      use_doji_star: true,
-      use_dragonfly: true,
-      use_gravestone: true,
-      body_ratio: 0.1
-    },
-    shooting_star: {
-      enabled: false,
-      min_upper_shadow: 2.0,
-      max_body_ratio: 0.3
-    },
-    marubozu: {
-      enabled: false,
-      use_white: true,
-      use_black: true,
-      min_body_ratio: 0.9
-    },
-    tweezer: {
-      enabled: false,
-      use_top: true,
-      use_bottom: true,
-      tolerance_percent: 0.1
-    },
-    three_methods: {
-      enabled: false,
-      use_rising: true,
-      use_falling: true
-    },
-    piercing_darkcloud: {
-      enabled: false,
-      use_piercing: true,
-      use_dark_cloud: true,
-      min_penetration: 0.5
-    },
-    harami: {
-      enabled: false,
-      use_bullish: true,
-      use_bearish: true
+      psar_maximum: 0.2,
+      psar_close_nth_bar: 1
     },
 
     // =============================================
     // DIVERGENCE DETECTION
     // =============================================
-    // (macd_divergence removed — consolidated into universal MACD block)
-    stoch_divergence: {
-      enabled: false,
-      k_period: 14,
-      d_period: 3,
-      pivot_lookback: 5,
-      use_regular: true,
-      use_hidden: false
-    },
-    obv_divergence: {
-      enabled: false,
-      pivot_lookback: 5,
-      use_regular: true,
-      use_hidden: false
-    },
-    mfi_divergence: {
-      enabled: false,
-      mfi_period: 14,
-      pivot_lookback: 5,
-      use_regular: true,
-      use_hidden: false
-    },
-
-    // =============================================
-    // SMART SIGNALS (Composite nodes)
-    // =============================================
-    // RSI signals
-    // Stochastic signals
-    stoch_overbought_signal: {
-      k_period: 14,
-      d_period: 3,
-      smooth_k: 3,
-      threshold: 80,
-      signal_type: 'short'
-    },
-    stoch_oversold_signal: {
-      k_period: 14,
-      d_period: 3,
-      smooth_k: 3,
-      threshold: 20,
-      signal_type: 'long'
-    },
-    stoch_k_cross_d_up: {
-      k_period: 14,
-      d_period: 3,
-      smooth_k: 3,
-      signal_type: 'long'
-    },
-    stoch_k_cross_d_down: {
-      k_period: 14,
-      d_period: 3,
-      smooth_k: 3,
-      signal_type: 'short'
-    },
-    // (MACD smart signal defaults removed — consolidated into universal MACD block)
-    // Moving Average signals
-    golden_cross_signal: {
-      fast_period: 50,
-      slow_period: 200,
-      ma_type: 'ema',
-      signal_type: 'long'
-    },
-    death_cross_signal: {
-      fast_period: 50,
-      slow_period: 200,
-      ma_type: 'ema',
-      signal_type: 'short'
-    },
-    price_above_ma_signal: {
-      period: 20,
-      ma_type: 'ema',
-      source: 'close',
-      signal_type: 'long'
-    },
-    price_below_ma_signal: {
-      period: 20,
-      ma_type: 'ema',
-      source: 'close',
-      signal_type: 'short'
-    },
-    // Bollinger signals
-    bb_upper_touch_signal: {
-      period: 20,
-      std_dev: 2.0,
-      source: 'close',
-      signal_type: 'short'
-    },
-    bb_lower_touch_signal: {
-      period: 20,
-      std_dev: 2.0,
-      source: 'close',
-      signal_type: 'long'
-    },
-    bb_squeeze_signal: {
-      period: 20,
-      std_dev: 2.0,
-      squeeze_threshold: 0.02,
-      signal_type: 'neutral'
-    },
-    // SuperTrend signals
-    supertrend_buy_signal: {
-      period: 10,
-      multiplier: 3.0,
-      signal_type: 'long'
-    },
-    supertrend_sell_signal: {
-      period: 10,
-      multiplier: 3.0,
-      signal_type: 'short'
-    },
-    // Volume signals
-    volume_spike_signal: {
-      ma_period: 20,
-      multiplier: 2.0,
-      signal_type: 'neutral'
-    },
-    volume_dry_signal: {
-      ma_period: 20,
-      multiplier: 0.5,
-      signal_type: 'neutral'
+    divergence: {
+      pivot_interval: 9,
+      act_without_confirmation: false,
+      show_divergence_lines: false,
+      activate_diver_signal_memory: false,
+      keep_diver_signal_memory_bars: 5,
+      use_divergence_rsi: false,
+      rsi_period: 14,
+      use_divergence_stochastic: false,
+      stoch_length: 14,
+      use_divergence_momentum: false,
+      momentum_length: 10,
+      use_divergence_cmf: false,
+      cmf_period: 21,
+      use_obv: false,
+      use_mfi: false,
+      mfi_length: 14
     }
+
+    // (Smart Signals defaults removed — entire category deprecated in favor of universal indicator blocks)
   };
   return params[blockType] || {};
 }
@@ -5954,7 +3942,6 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
   // Только таймфреймы Bybit API v5: 1,3,5,15,30,60,120,240,360,720,D,W,M
   // Единый набор: 1m, 5m, 15m, 30m, 60m, 4h, 1D, 1W, 1M
   const BYBIT_TF_OPTS = ['Chart', '1', '5', '15', '30', '60', '240', 'D', 'W', 'M'];
-  const BYBIT_TF_DAY = ['D', 'W', 'M'];
 
   // Define custom layouts for complex blocks
   const customLayouts = {
@@ -5998,114 +3985,51 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
       ]
     },
     stochastic: {
-      title: 'Stochastic Settings',
+      title: '==== STOCHASTIC - [RANGE FILTER OR CROSS SIGNAL] ====',
       fields: [
-        { key: 'k_period', label: '%K Length', type: 'number', optimizable: true },
-        { key: 'd_period', label: '%D Smoothing', type: 'number', optimizable: true },
-        { key: 'smooth_k', label: '%K Smoothing', type: 'number', optimizable: true },
-        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'overbought', label: 'Overbought', type: 'number', optimizable: true },
-        { key: 'oversold', label: 'Oversold', type: 'number', optimizable: true }
+        // Base settings
+        { key: 'stoch_k_length', label: 'Stochastic %K Length (14)', type: 'number', optimizable: true, min: 1, max: 200, step: 1 },
+        { key: 'stoch_k_smoothing', label: 'Stochastic %K Smoothing (3)', type: 'number', optimizable: true, min: 1, max: 50, step: 1 },
+        { key: 'stoch_d_smoothing', label: 'Stochastic %D Smoothing (3)', type: 'number', optimizable: true, min: 1, max: 50, step: 1 },
+        { key: 'timeframe', label: 'Stochastic TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'use_btc_source', label: 'Use BTCUSDT as Source for Stochastic ?', type: 'checkbox' },
+        // --- Range Filter ---
+        { type: 'separator', label: '======= Use Stochastic Range Filter =======' },
+        { key: 'use_stoch_range_filter', label: 'Use Stochastic Range Filter', type: 'checkbox' },
+        {
+          type: 'inline',
+          fields: [
+            { key: 'long_stoch_d_more', label: '(LONG) Stoch %D is More', type: 'number', width: '60px', optimizable: true, min: 0, max: 100, step: 1 },
+            { label: '& Stoch %D Less', type: 'label' },
+            { key: 'long_stoch_d_less', type: 'number', width: '60px', optimizable: true, min: 0, max: 100, step: 1 }
+          ]
+        },
+        {
+          type: 'inline',
+          fields: [
+            { key: 'short_stoch_d_less', label: '(SHORT) Stoch %D is Less', type: 'number', width: '60px', optimizable: true, min: 0, max: 100, step: 1 },
+            { label: '& Stoch %D More', type: 'label' },
+            { key: 'short_stoch_d_more', type: 'number', width: '60px', optimizable: true, min: 0, max: 100, step: 1 }
+          ]
+        },
+        // --- Cross Level ---
+        { type: 'separator', label: '======= Use Stochastic Cross Level =======' },
+        { key: 'use_stoch_cross_level', label: 'Use Stochastic Cross Level', type: 'checkbox', tooltip: 'LONG: %D crosses level from below. SHORT: %D crosses level from above.' },
+        { key: 'stoch_cross_level_long', label: 'Level to Cross Stochastic for LONG', type: 'number', optimizable: true, min: 0, max: 100, step: 1 },
+        { key: 'stoch_cross_level_short', label: 'Level to Cross Stochastic for SHORT', type: 'number', optimizable: true, min: 0, max: 100, step: 1 },
+        { key: 'activate_stoch_cross_memory', label: 'Activate Stochastic Cross Signal Memory', type: 'checkbox', tooltip: 'Keep signal in memory and execute when other conditions are met' },
+        { key: 'stoch_cross_memory_bars', label: 'Keep Stochastic Cross Signal Memory for XX bars', type: 'number', optimizable: true, min: 1, max: 100, step: 1, tooltip: 'Number of bars to keep the cross signal in memory' },
+        // --- K/D Cross ---
+        { type: 'separator', label: '======= Use Stochastic Cross K/D =======' },
+        { key: 'use_stoch_kd_cross', label: 'Use Stochastic Cross K/D', type: 'checkbox', tooltip: 'LONG: %K crosses %D from below. SHORT: %K crosses %D from above.' },
+        { key: 'opposite_stoch_kd', label: 'Opposite Signal - Stochastic Cross K/D', type: 'checkbox', tooltip: 'Reverse direction of K/D cross signals' },
+        { key: 'activate_stoch_kd_memory', label: 'Activate Stochastic Cross K/D Signal Memory', type: 'checkbox', tooltip: 'Keep K/D cross signal in memory' },
+        { key: 'stoch_kd_memory_bars', label: 'Keep Stochastic Cross K/D Signal Memory for XX bars', type: 'number', optimizable: true, min: 1, max: 100, step: 1, tooltip: 'Number of bars to keep K/D cross signal in memory' }
       ]
     },
-    stoch_rsi: {
-      title: 'Stochastic RSI Settings',
-      fields: [
-        { key: 'rsi_period', label: 'RSI Length', type: 'number', optimizable: true },
-        { key: 'stoch_period', label: 'Stochastic Length', type: 'number', optimizable: true },
-        { key: 'k_period', label: '%K Smoothing', type: 'number', optimizable: true },
-        { key: 'd_period', label: '%D Smoothing', type: 'number', optimizable: true },
-        { key: 'overbought', label: 'Overbought', type: 'number', optimizable: true },
-        { key: 'oversold', label: 'Oversold', type: 'number', optimizable: true }
-      ]
-    },
-    williams_r: {
-      title: 'Williams %R Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'overbought', label: 'Overbought', type: 'number', optimizable: true },
-        { key: 'oversold', label: 'Oversold', type: 'number', optimizable: true }
-      ]
-    },
-    roc: {
-      title: 'ROC Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] }
-      ]
-    },
-    mfi: {
-      title: 'MFI Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'overbought', label: 'Overbought', type: 'number', optimizable: true },
-        { key: 'oversold', label: 'Oversold', type: 'number', optimizable: true }
-      ]
-    },
-    cmo: {
-      title: 'CMO Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'overbought', label: 'Overbought', type: 'number', optimizable: true },
-        { key: 'oversold', label: 'Oversold', type: 'number', optimizable: true }
-      ]
-    },
-    cci: {
-      title: 'CCI Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'overbought', label: 'Overbought', type: 'number', optimizable: true },
-        { key: 'oversold', label: 'Oversold', type: 'number', optimizable: true }
-      ]
-    },
-
     // =============================================
     // TREND INDICATORS
     // =============================================
-    sma: {
-      title: 'SMA Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'offset', label: 'Offset', type: 'number', optimizable: false }
-      ]
-    },
-    ema: {
-      title: 'EMA Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'offset', label: 'Offset', type: 'number', optimizable: false }
-      ]
-    },
-    wma: {
-      title: 'WMA Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] }
-      ]
-    },
-    dema: {
-      title: 'DEMA Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] }
-      ]
-    },
-    tema: {
-      title: 'TEMA Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] }
-      ]
-    },
-    hull_ma: {
-      title: 'Hull MA Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] }
-      ]
-    },
     macd: {
       title: 'MACD - [SIGNALS] (CROSS 0 LINE OR CROSS SIGNAL LINE)',
       fields: [
@@ -6128,729 +4052,192 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         { key: 'disable_signal_memory', label: '==Disable Signal Memory (for both MACD Crosses)==', type: 'checkbox', tooltip: 'When disabled, cross signals only fire on the exact bar of crossing. When enabled, signals persist for N bars.' }
       ]
     },
-    adx: {
-      title: 'ADX Settings',
-      fields: [
-        { key: 'period', label: 'ADX Smoothing', type: 'number', optimizable: true },
-        { key: 'threshold', label: 'Trend Threshold', type: 'number', optimizable: true }
-      ]
-    },
     supertrend: {
-      title: 'Supertrend Settings',
+      title: 'SUPER TREND [FILTER] [SIGNAL]',
       fields: [
-        { key: 'period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'multiplier', label: 'Factor', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['hl2', 'hlc3', 'close'] }
-      ]
-    },
-    ichimoku: {
-      title: 'Ichimoku Cloud Settings',
-      fields: [
-        { key: 'tenkan_period', label: 'Tenkan-sen (Conversion)', type: 'number', optimizable: true },
-        { key: 'kijun_period', label: 'Kijun-sen (Base)', type: 'number', optimizable: true },
-        { key: 'senkou_b_period', label: 'Senkou Span B', type: 'number', optimizable: true },
-        { key: 'displacement', label: 'Displacement', type: 'number', optimizable: false }
-      ]
-    },
-    parabolic_sar: {
-      title: 'Parabolic SAR Settings',
-      fields: [
-        { key: 'start', label: 'Start', type: 'number', optimizable: true },
-        { key: 'increment', label: 'Increment', type: 'number', optimizable: true },
-        { key: 'max_value', label: 'Max Value', type: 'number', optimizable: true }
-      ]
-    },
-    aroon: {
-      title: 'Aroon Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'threshold', label: 'Threshold', type: 'number', optimizable: true }
+        { key: 'use_supertrend', label: 'Use SuperTrend?', type: 'checkbox' },
+        { key: 'generate_on_trend_change', label: 'Generate Signals on Trend Change?', type: 'checkbox', hasTooltip: true },
+        { key: 'use_btc_source', label: 'Use BTCUSDT as Source for SuperTrend?', type: 'checkbox' },
+        { key: 'opposite_signal', label: 'Opposite SP Signal? (Sell on UPtrend..)', type: 'checkbox' },
+        { key: 'show_supertrend', label: 'Show SuperTrend?', type: 'checkbox' },
+        { key: 'period', label: 'SuperTrend ATR Period', type: 'number', optimizable: true },
+        { key: 'multiplier', label: 'SuperTrend ATR Multiplier', type: 'number', step: 0.1, optimizable: true },
+        { key: 'source', label: 'Source', type: 'select', options: ['hl2', 'hlc3', 'close'] },
+        { key: 'timeframe', label: 'SuperTrend TimeFrame:', type: 'select', options: BYBIT_TF_OPTS }
       ]
     },
     qqe: {
       title: 'QQE Settings',
       fields: [
-        { key: 'rsi_period', label: 'RSI Period', type: 'number', optimizable: true },
-        { key: 'qqe_factor', label: 'QQE Factor', type: 'number', optimizable: true },
-        { key: 'smoothing_period', label: 'Smoothing Period', type: 'number', optimizable: true },
+        { key: 'rsi_period', label: 'QQE RSI Length(14)', type: 'number', optimizable: true },
+        { key: 'qqe_factor', label: 'Delta Multiplier(5.1)', type: 'number', optimizable: true },
+        { key: 'smoothing_period', label: 'QQE RSI Smoothing(5)', type: 'number', optimizable: true },
         { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] },
-        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS }
-      ]
-    },
-
-    // =============================================
-    // VOLATILITY INDICATORS
-    // =============================================
-    atr: {
-      title: 'ATR Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true }
-      ]
-    },
-    atrp: {
-      title: 'ATR% Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true }
-      ]
-    },
-    bollinger: {
-      title: 'Bollinger Bands Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'std_dev', label: 'StdDev Multiplier', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] }
-      ]
-    },
-    keltner: {
-      title: 'Keltner Channel Settings',
-      fields: [
-        { key: 'ema_period', label: 'EMA Length', type: 'number', optimizable: true },
-        { key: 'atr_period', label: 'ATR Length', type: 'number', optimizable: true },
-        { key: 'multiplier', label: 'Multiplier', type: 'number', optimizable: true }
-      ]
-    },
-    donchian: {
-      title: 'Donchian Channel Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true }
-      ]
-    },
-    stddev: {
-      title: 'Standard Deviation Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3'] }
-      ]
-    },
-
-    // =============================================
-    // VOLUME INDICATORS
-    // =============================================
-    obv: {
-      title: 'OBV Settings',
-      fields: []
-    },
-    vwap: {
-      title: 'VWAP Settings',
-      fields: [
-        { key: 'anchor', label: 'Anchor Period', type: 'select', options: ['session', 'week', 'month'] }
-      ]
-    },
-    cmf: {
-      title: 'Chaikin Money Flow Settings',
-      fields: [
-        { key: 'period', label: 'Length', type: 'number', optimizable: true }
-      ]
-    },
-    ad_line: {
-      title: 'A/D Line Settings',
-      fields: []
-    },
-    pvt: {
-      title: 'PVT Settings',
-      fields: []
-    },
-
-    // =============================================
-    // SUPPORT/RESISTANCE
-    // =============================================
-    pivot_points: {
-      title: 'Pivot Points Settings',
-      fields: [
-        { key: 'type', label: 'Type', type: 'select', options: ['traditional', 'fibonacci', 'woodie', 'classic', 'demark', 'camarilla'] },
-        { key: 'timeframe', label: 'Timeframe', type: 'select', options: BYBIT_TF_DAY }
-      ]
-    },
-
-    // =============================================
-    // MULTI-TIMEFRAME
-    // =============================================
-    mtf: {
-      title: 'Multi-Timeframe Settings',
-      fields: [
-        { key: 'indicator', label: 'Indicator', type: 'select', options: ['ema', 'sma', 'wma', 'rsi', 'macd', 'stochastic', 'adx', 'atr', 'bollinger'] },
-        { key: 'period', label: 'Period', type: 'number', optimizable: true },
-        { key: 'source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'timeframe', label: 'Timeframe', type: 'select', options: BYBIT_TF_OPTS.filter((t) => t !== 'Chart') },
-        { key: 'show_on_chart', label: 'Show on Chart', type: 'checkbox' }
-      ]
-    },
-
-    // =============================================
-    // FILTERS
-    // =============================================
-    supertrend_filter: {
-      title: 'SUPER TREND [FILTER] [SIGNAL] - MTF (3 Timeframes)',
-      fields: [
-        // TF1 (Main)
-        { type: 'separator', label: '━━━ SuperTrend TF1 (Main) ━━━' },
-        { key: 'use_supertrend', label: 'Use SuperTrend TF1?', type: 'checkbox' },
-        { key: 'generate_on_trend_change', label: 'Generate Signals on Trend Change?', type: 'checkbox', hasTooltip: true },
-        { key: 'use_btc_source', label: 'Use BTCUSDT as Source for TF1?', type: 'checkbox' },
-        { key: 'opposite_signal', label: 'Opposite Signal? (Sell on UPtrend..)', type: 'checkbox' },
-        { key: 'show_supertrend', label: 'Show SuperTrend TF1?', type: 'checkbox' },
-        { key: 'atr_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', step: 0.1, optimizable: true },
-        { key: 'timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        // TF2
-        { type: 'separator', label: '━━━ SuperTrend TF2 ━━━' },
-        { key: 'use_supertrend_tf2', label: 'Use SuperTrend TF2?', type: 'checkbox' },
-        { key: 'supertrend_tf2_btc_source', label: 'Use BTCUSDT as Source?', type: 'checkbox' },
-        { key: 'supertrend_tf2_opposite', label: 'Opposite Signal?', type: 'checkbox' },
-        { key: 'supertrend_tf2_show', label: 'Show SuperTrend TF2?', type: 'checkbox' },
-        { key: 'supertrend_tf2_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'supertrend_tf2_multiplier', label: 'ATR Multiplier', type: 'number', step: 0.1, optimizable: true },
-        { key: 'supertrend_tf2_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        // TF3
-        { type: 'separator', label: '━━━ SuperTrend TF3 ━━━' },
-        { key: 'use_supertrend_tf3', label: 'Use SuperTrend TF3?', type: 'checkbox' },
-        { key: 'supertrend_tf3_opposite', label: 'Opposite Signal?', type: 'checkbox' },
-        { key: 'supertrend_tf3_show', label: 'Show SuperTrend TF3?', type: 'checkbox' },
-        { key: 'supertrend_tf3_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'supertrend_tf3_multiplier', label: 'ATR Multiplier', type: 'number', step: 0.1, optimizable: true },
-        { key: 'supertrend_tf3_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS }
-      ]
-    },
-    // =============================================
-    // TWO MA's MOV [SIGNAL AND FILTER]
-    // =============================================
-    two_ma_filter: {
-      title: 'TWO MAs MOV [SIGNAL AND FILTER]',
-      fields: [
-        { key: 'ma1_length', label: 'Moving Average 1 length (50)', type: 'number', optimizable: true },
-        { key: 'ma1_type', label: 'MA 1 Smoothing Type', type: 'select', options: ['SMA', 'EMA', 'WMA', 'VWMA', 'HMA', 'DEMA', 'TEMA'] },
-        { key: 'ma1_source', label: 'MA1 Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'ma2_length', label: 'Moving Average 2 length (100)', type: 'number', optimizable: true },
-        { key: 'ma2_type', label: 'MA 2 Smoothing Type', type: 'select', options: ['SMA', 'EMA', 'WMA', 'VWMA', 'HMA', 'DEMA', 'TEMA'] },
-        { key: 'ma2_source', label: 'MA2 Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'show_two_mas', label: 'Show TWO MAs (MA1 - green, MA2 - red)', type: 'checkbox' },
-        { type: 'separator', label: '------- Use MA1 / MA2 Cross -------' },
-        { key: 'use_ma_cross', label: 'Use MA1 / MA2 Cross', type: 'checkbox' },
-        { key: 'opposite_ma_cross', label: "Opposite Signal - 'MA1 / MA2 Cross'", type: 'checkbox' },
-        { key: 'activate_ma_cross_memory', label: "Activate 'MA1 / MA2 Cross' Signal Memory", type: 'checkbox' },
-        { key: 'ma_cross_memory_bars', label: "Keep 'MA1 / MA2 Cross' Signal Memory for XX bars", type: 'number', hasTooltip: true },
-        { type: 'separator', label: '------ Use MA1 as Filter. Long if Price > MA 1 ------' },
-        { key: 'use_ma1_filter', label: 'Use MA1 as Filter', type: 'checkbox' },
-        { key: 'opposite_ma1_filter', label: "Opposite Signal - 'MA1 as Filter'", type: 'checkbox' },
-        { key: 'two_ma_timeframe', label: 'TWO MAs TimeFrame:', type: 'select', options: BYBIT_TF_OPTS }
-      ]
-    },
-    // =============================================
-    // STOCHASTIC [RANGE FILTER]
-    // =============================================
-    stochastic_filter: {
-      title: 'STOCHASTIC [RANGE FILTER]',
-      fields: [
-        { key: 'stoch_k_length', label: 'Stochastic %K Length (14)', type: 'number', optimizable: true },
-        { key: 'stoch_k_smoothing', label: 'Stochastic %K Smoothing (3)', type: 'number', optimizable: true },
-        { key: 'stoch_d_smoothing', label: 'Stochastic %D Smoothing (3)', type: 'number', optimizable: true },
-        { key: 'stoch_timeframe', label: 'Stochastic TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for Stochastic?', type: 'checkbox' },
-        { type: 'separator', label: '------- Use Stochastic Range Filter -------' },
-        { key: 'use_stoch_range_filter', label: 'Use Stochastic Range Filter', type: 'checkbox' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'long_stoch_d_more', label: '(LONG) Stoch %D is More', type: 'number', width: '60px', optimizable: true },
-            { label: '& Stoch %D Less', type: 'label' },
-            { key: 'long_stoch_d_less', type: 'number', width: '60px', optimizable: true }
-          ]
-        },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'short_stoch_d_less', label: '(SHORT) Stoch %D is Less', type: 'number', width: '60px', optimizable: true },
-            { label: '& Stoch %D More', type: 'label' },
-            { key: 'short_stoch_d_more', type: 'number', width: '60px', optimizable: true }
-          ]
-        },
-        { type: 'separator', label: '------- Use Stochastic Cross Level -------' },
-        { key: 'use_stoch_cross_level', label: 'Use Stochastic Cross Level', type: 'checkbox' },
-        { key: 'stoch_cross_level_long', label: 'Level to Cross Stochastic for LONG', type: 'number', optimizable: true },
-        { key: 'stoch_cross_level_short', label: 'Level to Cross Stochastic for SHORT', type: 'number', optimizable: true },
-        { key: 'activate_stoch_cross_memory', label: 'Activate Stochastic Cross Signal Memory', type: 'checkbox' },
-        { key: 'stoch_cross_memory_bars', label: 'Keep Stochastic Cross Signal Memory for XX bars', type: 'number', hasTooltip: true },
-        { type: 'separator', label: '------- Use Stochastic Cross K/D -------' },
-        { key: 'use_stoch_kd_cross', label: 'Use Stochastic Cross K/D', type: 'checkbox' },
-        { key: 'opposite_stoch_kd', label: 'Opposite Signal - Stochastic Cross K/D', type: 'checkbox' },
-        { key: 'activate_stoch_kd_memory', label: 'Activate Stochastic Cross K/D Signal Memory', type: 'checkbox' },
-        { key: 'stoch_kd_memory_bars', label: 'Keep Stochastic Cross K/D Signal Memory for XX bars', type: 'number', hasTooltip: true }
-      ]
-    },
-    // (MACD Filter layout removed — consolidated into universal MACD indicator block)
-    // =============================================
-    // QQE [SIGNALS]
-    // =============================================
-    qqe_filter: {
-      title: 'QQE [SIGNALS]',
-      fields: [
-        { key: 'use_qqe', label: 'Use QQE?', type: 'checkbox' },
-        { key: 'opposite_qqe', label: 'Opposite QQE?', type: 'checkbox' },
-        { key: 'enable_qqe_visualization', label: 'Enable QQE Visualization', type: 'checkbox' },
+        { key: 'timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
+        { type: 'separator', label: '=============== QQE [SIGNALS] ==================' },
+        { key: 'use_qqe', label: 'Use QQE ?', type: 'checkbox' },
+        { key: 'opposite_qqe', label: 'Opposite QQE ?', type: 'checkbox' },
+        { key: 'enable_qqe_visualization', label: 'Enable QQE Visualisation', type: 'checkbox' },
         { key: 'disable_qqe_signal_memory', label: 'Disable QQE Signal Memory', type: 'checkbox' },
-        { key: 'qqe_rsi_length', label: 'QQE RSI Length(14)', type: 'number', optimizable: true },
-        { key: 'qqe_rsi_smoothing', label: 'QQE RSI Smoothing(5)', type: 'number', optimizable: true },
-        { key: 'qqe_delta_multiplier', label: 'Delta Multiplier(5.1)', type: 'number', step: 0.1, optimizable: true }
+        { key: 'qqe_signal_memory_bars', label: 'QQE Signal Memory Bars', type: 'number', optimizable: true }
       ]
     },
+
     // =============================================
-    // CCI [TIMEFRAME]
+    // UNIVERSAL FILTERS (new instruments)
     // =============================================
-    cci_filter: {
-      title: 'CCI [TIMEFRAME]',
+    atr_volatility: {
+      title: '======== ATR VOLATILITY - [FILTER] ========',
       fields: [
-        { key: 'cci_length', label: 'CCI TF Long(14)', type: 'number', optimizable: true },
-        { key: 'cci_timeframe', label: 'CCI TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for CCI?', type: 'checkbox' },
-        { type: 'separator', label: '------- Use CCI LONG Range -------' },
-        { key: 'use_cci_long_range', label: 'Use CCI LONG Range', type: 'checkbox' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'long_cci_more', label: '(LONG) CCI is More', type: 'number', width: '70px', optimizable: true },
-            { label: '& CCI Less', type: 'label' },
-            { key: 'long_cci_less', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        { type: 'separator', label: '------- Use CCI SHORT Range -------' },
-        { key: 'use_cci_short_range', label: 'Use CCI SHORT Range', type: 'checkbox' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'short_cci_less', label: '(SHORT) CCI is Less', type: 'number', width: '70px', optimizable: true },
-            { label: '& CCI More', type: 'label' },
-            { key: 'short_cci_more', type: 'number', width: '70px', optimizable: true }
-          ]
-        }
-      ]
-    },
-    // =============================================
-    // MOMENTUM
-    // =============================================
-    momentum_filter: {
-      title: 'MOMENTUM',
-      fields: [
-        { key: 'momentum_length', label: 'Momentum TF Long(14)', type: 'number', optimizable: true },
-        { key: 'momentum_timeframe', label: 'Momentum TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'momentum_source', label: 'Momentum Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for Momentum?', type: 'checkbox' },
-        { type: 'separator', label: '------- Use Momentum LONG Range -------' },
-        { key: 'use_momentum_long_range', label: 'Use Momentum LONG Range', type: 'checkbox' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'long_momentum_more', label: '(LONG) Momentum is More', type: 'number', width: '70px', optimizable: true },
-            { label: '& Momentum Less', type: 'label' },
-            { key: 'long_momentum_less', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        { type: 'separator', label: '------- Use Momentum SHORT Range -------' },
-        { key: 'use_momentum_short_range', label: 'Use Momentum SHORT Range', type: 'checkbox' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'short_momentum_less', label: '(SHORT) Momentum is Less', type: 'number', width: '70px', optimizable: true },
-            { label: '& Momentum More', type: 'label' },
-            { key: 'short_momentum_more', type: 'number', width: '70px', optimizable: true }
-          ]
-        }
-      ]
-    },
-    // =============================================
-    // DMI (ADX)
-    // =============================================
-    dmi_filter: {
-      title: 'DMI (ADX)',
-      fields: [
-        { key: 'dmi_period', label: 'D Period Length (14)', type: 'number', optimizable: true },
-        { key: 'adx_smoothing', label: 'ADX Smoothing Period (14)', type: 'number', optimizable: true },
-        { key: 'dmi_timeframe', label: 'DMI TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for DMI?', type: 'checkbox' },
-        { type: 'separator', label: '------- Far Long using DMI Line -------' },
-        { key: 'use_dmi_long', label: 'Far Long using DMI Line', type: 'checkbox' },
-        { key: 'dmi_long_di_plus', label: 'DI+ > DI- for LONG', type: 'checkbox' },
-        { key: 'dmi_long_threshold', label: 'DI+ Threshold for LONG', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Far Shorts using DMI Line -------' },
-        { key: 'use_dmi_short', label: 'Far Shorts using DMI Line', type: 'checkbox' },
-        { key: 'dmi_short_di_minus', label: 'DI- > DI+ for SHORT', type: 'checkbox' },
-        { key: 'dmi_short_threshold', label: 'DI- Threshold for SHORT', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- ADX Filter -------' },
-        { key: 'use_adx_filter', label: 'Use ADX Filter (ADX > threshold)', type: 'checkbox' },
-        { key: 'adx_threshold', label: 'ADX Threshold', type: 'number', optimizable: true }
-      ]
-    },
-    // =============================================
-    // CMF Filter (Chaikin Money Flow)
-    // =============================================
-    cmf_filter: {
-      title: 'CHAIKIN MONEY FLOW (CMF)',
-      fields: [
-        { key: 'use_cmf', label: 'Use CMF Filter', type: 'checkbox' },
-        { key: 'opposite_cmf', label: 'Opposite CMF Signal', type: 'checkbox' },
-        { key: 'cmf_length', label: 'CMF Length (20)', type: 'number', optimizable: true },
-        { key: 'cmf_timeframe', label: 'CMF TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for CMF?', type: 'checkbox' },
-        { type: 'separator', label: '------- CMF LONG Range -------' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'cmf_long_min', label: '(LONG) CMF >', type: 'number', width: '70px', optimizable: true },
-            { label: '& CMF <', type: 'label' },
-            { key: 'cmf_long_max', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        { type: 'separator', label: '------- CMF SHORT Range -------' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'cmf_short_min', label: '(SHORT) CMF >', type: 'number', width: '70px', optimizable: true },
-            { label: '& CMF <', type: 'label' },
-            { key: 'cmf_short_max', type: 'number', width: '70px', optimizable: true }
-          ]
-        }
-      ]
-    },
-    // =============================================
-    // Balance of Power Filter
-    // =============================================
-    bop_filter: {
-      title: 'BALANCE OF POWER (Extended)',
-      fields: [
-        { key: 'use_bop', label: 'Use Balance of Power Filter', type: 'checkbox' },
-        { key: 'opposite_bop', label: 'Opposite BoP Signal', type: 'checkbox' },
-        { key: 'bop_smoothing', label: 'BoP Smoothing (14)', type: 'number', optimizable: true },
-        { key: 'bop_triple_smooth_length', label: 'Triple Smooth Length (4)', type: 'number', optimizable: true },
-        { key: 'bop_timeframe', label: 'BoP TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for BoP?', type: 'checkbox' },
-        { type: 'separator', label: '------- Cross Line Mode -------' },
-        { key: 'bop_cross_line_enable', label: 'Use Cross Line Signal', type: 'checkbox' },
-        { key: 'bop_disable_memory', label: 'Disable Signal Memory', type: 'checkbox' },
-        { key: 'bop_cross_level', label: 'Cross Level (0)', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- BoP LONG Range -------' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'bop_long_min', label: '(LONG) BoP >', type: 'number', width: '70px', optimizable: true },
-            { label: '& BoP <', type: 'label' },
-            { key: 'bop_long_max', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        { type: 'separator', label: '------- BoP SHORT Range -------' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'bop_short_min', label: '(SHORT) BoP >', type: 'number', width: '70px', optimizable: true },
-            { label: '& BoP <', type: 'label' },
-            { key: 'bop_short_max', type: 'number', width: '70px', optimizable: true }
-          ]
-        }
-      ]
-    },
-    // =============================================
-    // Levels Break Filter (Pivot S&R)
-    // =============================================
-    levels_filter: {
-      title: 'LEVELS BREAK (PIVOT S&R) - Extended',
-      fields: [
-        { key: 'use_levels', label: 'Use Levels Break Filter', type: 'checkbox' },
-        { key: 'levels_pivot_bars', label: 'Bars to Find Pivot', type: 'number', optimizable: true },
-        { key: 'levels_search_period', label: 'Search Period', type: 'number', optimizable: true },
-        { key: 'levels_channel_width', label: 'Channel Width %', type: 'number', optimizable: true },
-        { key: 'levels_test_count', label: 'Test Count', type: 'number', optimizable: true },
-        { key: 'levels_opposite', label: 'Opposite Signal', type: 'checkbox' },
-        { key: 'levels_memory_enable', label: 'Enable Signal Memory', type: 'checkbox' },
-        { key: 'levels_memory_bars', label: 'Signal Memory Bars', type: 'number', optimizable: true },
-        { key: 'pivot_type', label: 'Pivot Type', type: 'select', options: ['Traditional', 'Fibonacci', 'Woodie', 'Classic', 'DeMark', 'Camarilla'] },
-        { key: 'levels_timeframe', label: 'Levels TimeFrame:', type: 'select', options: BYBIT_TF_DAY },
-        { type: 'separator', label: '------- LONG Conditions -------' },
-        { key: 'long_above_s1', label: 'Price > S1 for LONG', type: 'checkbox' },
-        { key: 'long_above_pivot', label: 'Price > Pivot for LONG', type: 'checkbox' },
-        { key: 'long_break_r1', label: 'Break Above R1 for LONG', type: 'checkbox' },
-        { type: 'separator', label: '------- SHORT Conditions -------' },
-        { key: 'short_below_r1', label: 'Price < R1 for SHORT', type: 'checkbox' },
-        { key: 'short_below_pivot', label: 'Price < Pivot for SHORT', type: 'checkbox' },
-        { key: 'short_break_s1', label: 'Break Below S1 for SHORT', type: 'checkbox' }
-      ]
-    },
-    // =============================================
-    // ATR Volatility Filter
-    // =============================================
-    atr_filter: {
-      title: 'ATR VOLATILITY FILTER',
-      fields: [
-        { key: 'use_atr_filter', label: 'Use ATR Volatility Filter', type: 'checkbox' },
-        { key: 'atr_length', label: 'ATR Length (14)', type: 'number', optimizable: true },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true },
-        { key: 'atr_timeframe', label: 'ATR TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for ATR?', type: 'checkbox' },
-        { type: 'separator', label: '------- ATR % Range -------' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'atr_min_percent', label: 'ATR % Min', type: 'number', width: '70px', optimizable: true },
-            { label: 'ATR % Max', type: 'label' },
-            { key: 'atr_max_percent', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        { key: 'atr_filter_mode', label: 'Filter Mode', type: 'select', options: ['between', 'above', 'below'] }
-      ]
-    },
-    // =============================================
-    // Volume Compare Filter
-    // =============================================
-    volume_compare_filter: {
-      title: 'VOLUME COMPARE',
-      fields: [
-        { key: 'use_vol_compare', label: 'Use Volume Compare Filter', type: 'checkbox' },
-        { key: 'vol_ma_length', label: 'Volume MA Length (20)', type: 'number', optimizable: true },
-        { key: 'vol_ma_type', label: 'Volume MA Type', type: 'select', options: ['SMA', 'EMA', 'WMA', 'VWMA'] },
-        { key: 'vol_timeframe', label: 'Volume TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source for Volume?', type: 'checkbox' },
-        { type: 'separator', label: '------- Volume Threshold -------' },
-        { key: 'vol_multiplier', label: 'Volume Multiplier (1.5)', type: 'number', optimizable: true },
-        { key: 'vol_compare_mode', label: 'Compare Mode', type: 'select', options: ['above', 'below', 'between'] },
-        { key: 'vol_consecutive_bars', label: 'Consecutive Bars Required', type: 'number', optimizable: true }
-      ]
-    },
-    // =============================================
-    // Highest/Lowest Bar Filter
-    // =============================================
-    highest_lowest_filter: {
-      title: 'HIGHEST/LOWEST BAR',
-      fields: [
-        { key: 'use_highest_lowest', label: 'Use Highest/Lowest Filter', type: 'checkbox' },
-        { key: 'lookback_period', label: 'Lookback Period (20)', type: 'number', optimizable: true },
-        { key: 'hl_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'use_btcusdt_source', label: 'Use BTCUSDT as Source?', type: 'checkbox' },
-        { type: 'separator', label: '------- LONG Conditions -------' },
-        { key: 'long_break_highest', label: 'Break Above Highest (N-bar high)', type: 'checkbox' },
-        { key: 'long_above_lowest', label: 'Price > Lowest (N-bar low)', type: 'checkbox' },
-        { type: 'separator', label: '------- SHORT Conditions -------' },
-        { key: 'short_break_lowest', label: 'Break Below Lowest (N-bar low)', type: 'checkbox' },
-        { key: 'short_below_highest', label: 'Price < Highest (N-bar high)', type: 'checkbox' }
-      ]
-    },
-    // =============================================
-    // Accumulation Areas Filter
-    // =============================================
-    accumulation_filter: {
-      title: 'ACCUMULATION AREAS - Extended',
-      fields: [
-        { key: 'use_accumulation', label: 'Use Accumulation Filter', type: 'checkbox' },
-        { key: 'acc_backtrack_interval', label: 'Backtrack Interval', type: 'number', optimizable: true },
-        { key: 'acc_min_bars', label: 'Min Bars to Execute', type: 'number', optimizable: true },
-        { key: 'acc_breakout_signal', label: 'Breakout Signal', type: 'checkbox' },
-        { key: 'acc_opposite_direction', label: 'Opposite Direction', type: 'checkbox' },
-        { key: 'volume_threshold', label: 'Volume Threshold (x avg)', type: 'number', optimizable: true },
-        { key: 'price_range_percent', label: 'Price Range %', type: 'number', optimizable: true },
-        { key: 'min_bars_in_range', label: 'Min Bars in Range', type: 'number', optimizable: true },
-        { key: 'acc_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { type: 'separator', label: '------- Entry Conditions -------' },
-        { key: 'enter_on_breakout', label: 'Enter on Breakout', type: 'checkbox' },
-        { key: 'enter_in_range', label: 'Enter Inside Range', type: 'checkbox' }
-      ]
-    },
-    // =============================================
-    // Linear Regression Channel Filter (Extended DCA)
-    // =============================================
-    linreg_filter: {
-      title: 'LINEAR REGRESSION CHANNEL',
-      fields: [
-        { key: 'use_linreg', label: 'Use LinReg Filter', type: 'checkbox' },
-        { key: 'disable_linreg_memory', label: 'Disable Signal Memory', type: 'checkbox' },
-        { key: 'linreg_memory_bars', label: 'Signal Memory Bars', type: 'number', optimizable: true },
-        { key: 'linreg_length', label: 'LinReg Length (100)', type: 'number', optimizable: true },
-        { key: 'linreg_offset', label: 'Offset', type: 'number', optimizable: true },
-        { key: 'channel_mult', label: 'Channel Deviation (2.0)', type: 'number', optimizable: true },
-        { key: 'linreg_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'linreg_source', label: 'Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4', 'hlcc4'] },
-        { key: 'linreg_breakout_rebound', label: 'Band Action', type: 'select', options: ['Breakout', 'Rebound'] },
-        { key: 'linreg_slope_direction', label: 'Slope Direction', type: 'select', options: ['Allow_Any', 'Follow', 'Opposite'] },
-        { key: 'show_linreg_extend_lines', label: 'Show Extended Lines', type: 'checkbox' },
-        { key: 'show_broken_channel', label: 'Show Broken Channel', type: 'checkbox' },
-        { type: 'separator', label: '------- LONG Conditions -------' },
-        { key: 'long_above_lower', label: 'Price > Lower Channel', type: 'checkbox' },
-        { key: 'long_slope_up', label: 'LinReg Slope Up', type: 'checkbox' },
-        { type: 'separator', label: '------- SHORT Conditions -------' },
-        { key: 'short_below_upper', label: 'Price < Upper Channel', type: 'checkbox' },
-        { key: 'short_slope_down', label: 'LinReg Slope Down', type: 'checkbox' }
-      ]
-    },
-    // =============================================
-    // RVI Filter (Relative Volatility Index)
-    // =============================================
-    rvi_filter: {
-      title: 'RVI - RELATIVE VOLATILITY INDEX',
-      fields: [
-        { key: 'use_rvi', label: 'Use RVI Filter', type: 'checkbox' },
-        { key: 'rvi_length', label: 'RVI Length (10)', type: 'number', optimizable: true },
-        { key: 'rvi_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'rvi_ma_type', label: 'MA Smoothing Type', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'] },
-        { key: 'rvi_ma_length', label: 'MA Length (14)', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- LONG Range -------' },
-        { key: 'use_rvi_long_range', label: 'Use RVI LONG Range', type: 'checkbox' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'rvi_long_more', label: '(LONG) RVI >', type: 'number', width: '70px', optimizable: true },
-            { label: '& RVI <', type: 'label' },
-            { key: 'rvi_long_less', type: 'number', width: '70px', optimizable: true }
-          ]
-        },
-        { type: 'separator', label: '------- SHORT Range -------' },
-        { key: 'use_rvi_short_range', label: 'Use RVI SHORT Range', type: 'checkbox' },
-        {
-          type: 'inline',
-          fields: [
-            { key: 'rvi_short_more', label: '(SHORT) RVI >', type: 'number', width: '70px', optimizable: true },
-            { label: '& RVI <', type: 'label' },
-            { key: 'rvi_short_less', type: 'number', width: '70px', optimizable: true }
-          ]
-        }
-      ]
-    },
-    // =============================================
-    // Divergence Filter
-    // =============================================
-    divergence_filter: {
-      title: 'DIVERGENCE FILTER',
-      fields: [
-        { key: 'use_divergence', label: 'Use Divergence Filter', type: 'checkbox' },
-        { key: 'div_indicator', label: 'Indicator', type: 'select', options: ['RSI', 'MACD', 'Stochastic', 'CCI', 'OBV', 'MFI'] },
-        { key: 'div_period', label: 'Indicator Period', type: 'number', optimizable: true },
-        { key: 'div_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'pivot_lookback', label: 'Pivot Lookback', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Divergence Types -------' },
-        { key: 'use_regular_bullish', label: 'Regular Bullish (for LONG)', type: 'checkbox' },
-        { key: 'use_regular_bearish', label: 'Regular Bearish (for SHORT)', type: 'checkbox' },
-        { key: 'use_hidden_bullish', label: 'Hidden Bullish (trend continuation)', type: 'checkbox' },
-        { key: 'use_hidden_bearish', label: 'Hidden Bearish (trend continuation)', type: 'checkbox' }
-      ]
-    },
-    // =============================================
-    // Price Action Filter
-    // =============================================
-    price_action_filter: {
-      title: 'PRICE ACTION (47 CANDLESTICK PATTERNS)',
-      fields: [
-        { key: 'use_price_action', label: 'Use Price Action Filter', type: 'checkbox' },
-        { key: 'pa_timeframe', label: 'TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
-        // ===== BULLISH REVERSAL (LONG) =====
-        { type: 'separator', label: '━━━ Bullish Reversal (LONG) ━━━' },
-        { key: 'use_hammer', label: 'Hammer', type: 'checkbox' },
-        { key: 'use_inverted_hammer', label: 'Inverted Hammer', type: 'checkbox' },
-        { key: 'use_engulfing_bull', label: 'Bullish Engulfing', type: 'checkbox' },
-        { key: 'use_morning_star', label: 'Morning Star', type: 'checkbox' },
-        { key: 'use_piercing_line', label: 'Piercing Line', type: 'checkbox' },
-        { key: 'use_three_white', label: 'Three White Soldiers', type: 'checkbox' },
-        { key: 'use_tweezer_bottom', label: 'Tweezer Bottom', type: 'checkbox' },
-        { key: 'use_dragonfly_doji', label: 'Dragonfly Doji', type: 'checkbox' },
-        { key: 'use_bullish_harami', label: 'Bullish Harami', type: 'checkbox' },
-        { key: 'use_rising_three', label: 'Rising Three Methods', type: 'checkbox' },
-        { key: 'use_bullish_marubozu', label: 'Bullish Marubozu', type: 'checkbox' },
-        // Exotic Bullish
-        { type: 'separator', label: '── Exotic Bullish ──' },
-        { key: 'use_pin_bar_bullish', label: 'Pin Bar Bullish', type: 'checkbox' },
-        { key: 'use_three_line_strike_bull', label: 'Three Line Strike (Bull)', type: 'checkbox' },
-        { key: 'use_kicker_bullish', label: 'Kicker Bullish', type: 'checkbox' },
-        { key: 'use_abandoned_baby_bull', label: 'Abandoned Baby (Bull)', type: 'checkbox' },
-        { key: 'use_belt_hold_bullish', label: 'Belt Hold Bullish', type: 'checkbox' },
-        { key: 'use_counterattack_bull', label: 'Counterattack Bullish', type: 'checkbox' },
-        { key: 'use_ladder_bottom', label: 'Ladder Bottom', type: 'checkbox' },
-        { key: 'use_stick_sandwich_bull', label: 'Stick Sandwich (Bull)', type: 'checkbox' },
-        { key: 'use_homing_pigeon', label: 'Homing Pigeon', type: 'checkbox' },
-        { key: 'use_matching_low', label: 'Matching Low', type: 'checkbox' },
-        // ===== BEARISH REVERSAL (SHORT) =====
-        { type: 'separator', label: '━━━ Bearish Reversal (SHORT) ━━━' },
-        { key: 'use_shooting_star', label: 'Shooting Star', type: 'checkbox' },
-        { key: 'use_hanging_man', label: 'Hanging Man', type: 'checkbox' },
-        { key: 'use_engulfing_bear', label: 'Bearish Engulfing', type: 'checkbox' },
-        { key: 'use_evening_star', label: 'Evening Star', type: 'checkbox' },
-        { key: 'use_dark_cloud', label: 'Dark Cloud Cover', type: 'checkbox' },
-        { key: 'use_three_black', label: 'Three Black Crows', type: 'checkbox' },
-        { key: 'use_tweezer_top', label: 'Tweezer Top', type: 'checkbox' },
-        { key: 'use_gravestone_doji', label: 'Gravestone Doji', type: 'checkbox' },
-        { key: 'use_bearish_harami', label: 'Bearish Harami', type: 'checkbox' },
-        { key: 'use_falling_three', label: 'Falling Three Methods', type: 'checkbox' },
-        { key: 'use_bearish_marubozu', label: 'Bearish Marubozu', type: 'checkbox' },
-        // Exotic Bearish
-        { type: 'separator', label: '── Exotic Bearish ──' },
-        { key: 'use_pin_bar_bearish', label: 'Pin Bar Bearish', type: 'checkbox' },
-        { key: 'use_three_line_strike_bear', label: 'Three Line Strike (Bear)', type: 'checkbox' },
-        { key: 'use_kicker_bearish', label: 'Kicker Bearish', type: 'checkbox' },
-        { key: 'use_abandoned_baby_bear', label: 'Abandoned Baby (Bear)', type: 'checkbox' },
-        { key: 'use_belt_hold_bearish', label: 'Belt Hold Bearish', type: 'checkbox' },
-        { key: 'use_counterattack_bear', label: 'Counterattack Bearish', type: 'checkbox' },
-        { key: 'use_ladder_top', label: 'Ladder Top', type: 'checkbox' },
-        { key: 'use_stick_sandwich_bear', label: 'Stick Sandwich (Bear)', type: 'checkbox' },
-        { key: 'use_matching_high', label: 'Matching High', type: 'checkbox' },
-        // ===== NEUTRAL / STRUCTURE =====
-        { type: 'separator', label: '━━━ Neutral / Structure ━━━' },
-        { key: 'use_doji', label: 'Standard Doji', type: 'checkbox' },
-        { key: 'use_spinning_top', label: 'Spinning Top', type: 'checkbox' },
-        { key: 'use_inside_bar', label: 'Inside Bar', type: 'checkbox' },
-        { key: 'use_outside_bar', label: 'Outside Bar', type: 'checkbox' },
-        // ===== GAP PATTERNS =====
-        { type: 'separator', label: '━━━ Gap Patterns ━━━' },
-        { key: 'use_gap_up', label: 'Gap Up', type: 'checkbox' },
-        { key: 'use_gap_down', label: 'Gap Down', type: 'checkbox' },
-        { key: 'use_gap_up_filled', label: 'Gap Up Filled', type: 'checkbox' },
-        { key: 'use_gap_down_filled', label: 'Gap Down Filled', type: 'checkbox' }
-      ]
-    },
-    trend_filter: {
-      title: 'Trend Filter Settings',
-      fields: [
-        { key: 'ema_period', label: 'EMA Period', type: 'number', optimizable: true },
-        { key: 'use_ema_slope', label: 'Use EMA Slope', type: 'checkbox' },
-        { key: 'slope_threshold', label: 'Slope Threshold', type: 'number', optimizable: true },
-        { key: 'use_adx', label: 'Use ADX Filter', type: 'checkbox' },
-        { key: 'adx_period', label: 'ADX Period', type: 'number', optimizable: true },
-        { key: 'adx_threshold', label: 'ADX Threshold', type: 'number', optimizable: true }
+        { key: 'use_atr_volatility', label: 'Use ATR1 <> ATR2 ?', type: 'checkbox' },
+        { key: 'atr1_to_atr2', label: 'ATR1 to ATR2', type: 'select', options: ['ATR1 < ATR2', 'ATR1 > ATR2'], hasTooltip: true, tooltip: 'ATR1 < ATR2 — Volatility is Small in last bars. ATR1 > ATR2 — Volatility is High in last bars.' },
+        { key: 'atr_diff_percent', label: 'How ATR1 > (<) ATR2. More than XX%', type: 'number', min: 0.1, max: 50, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Fast ATR1 is < Slow ATR2 for XX% or more.' },
+        { key: 'atr_length1', label: 'ATR length1 (20)(5)', type: 'number', min: 5, max: 20, step: 1, optimizable: true },
+        { key: 'atr_length2', label: 'ATR length2 (100)(20)', type: 'number', min: 20, max: 100, step: 1, optimizable: true },
+        { key: 'atr_smoothing', label: 'ATR Smoothing', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'] }
       ]
     },
     volume_filter: {
-      title: 'Volume Filter Settings',
+      title: '======== VOLUME [FILTER] ========',
       fields: [
-        { key: 'ma_period', label: 'MA Period', type: 'number', optimizable: true },
-        { key: 'volume_multiplier', label: 'Volume Multiplier', type: 'number', optimizable: true },
-        { key: 'filter_type', label: 'Filter Type', type: 'select', options: ['above', 'below'] }
+        { key: 'use_volume_filter', label: 'Use VOL1 <> VOL2 ?', type: 'checkbox' },
+        { key: 'vol1_to_vol2', label: 'VOL1 to VOL2', type: 'select', options: ['VOL1 < VOL2', 'VOL1 > VOL2'], hasTooltip: true, tooltip: 'VOL1 < VOL2 — Volume is Small in last bars. VOL1 > VOL2 — Volume is High in last bars.' },
+        { key: 'vol_diff_percent', label: 'How VOL1 > (<) VOL2. More than XX%', type: 'number', min: 0.1, max: 50, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Fast VOL1 is < Slow VOL2 for XX% or more.' },
+        { key: 'vol_length1', label: 'VOL length1 (20)(5)', type: 'number', min: 5, max: 20, step: 1, optimizable: true },
+        { key: 'vol_length2', label: 'VOL length2 (100)(20)', type: 'number', min: 20, max: 100, step: 1, optimizable: true },
+        { key: 'vol_smoothing', label: 'VOL Smoothing', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'] }
       ]
     },
-    volatility_filter: {
-      title: 'Volatility Filter Settings',
+    highest_lowest_bar: {
+      title: '======== HIGHEST LOWEST BAR - [SIGNALS] ========',
       fields: [
-        { key: 'atr_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true },
-        { key: 'use_bb_width', label: 'Use BB Width', type: 'checkbox' },
-        { key: 'bb_period', label: 'BB Period', type: 'number', optimizable: true },
-        { key: 'bb_threshold', label: 'BB Width Threshold', type: 'number', optimizable: true }
+        { key: 'use_highest_lowest', label: 'Use Highest/Lowest Bar ?', type: 'checkbox', hasTooltip: true, tooltip: 'Make signal only if Current Bar is Highest/Lowest for last XX bars.' },
+        { key: 'hl_lookback_bars', label: 'Is now Highest/Lowest Bar for last XX bars ?', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        {
+          type: 'inline',
+          fields: [
+            { key: 'hl_price_percent', label: 'More/Less: Price on (%)', type: 'number', width: '80px', min: 0, max: 30, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Price is Higher/Lower on Y% than XX bars ago. If = 0 — this condition is disabled.' },
+            { key: 'hl_atr_percent', label: 'ATR on (%)', type: 'number', width: '80px', min: 0, max: 30, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'ATR for last 2 bars is Higher/Lower on X% than ATR for last 50 bars. If = 0 — this condition is disabled.' }
+          ]
+        },
+        { key: 'atr_hl_length', label: 'ATR_HL Lenght (50)', type: 'number', min: 1, max: 50, step: 1, optimizable: true },
+        { type: 'separator', label: '======= BLOCK IF WORSE THAN [FILTER] =======' },
+        { key: 'use_block_worse_than', label: 'Use Block if Worse Than ?', type: 'checkbox', hasTooltip: true, tooltip: 'Does not permit the order if Current Price is worse by more than XX% compared to Previous bar close. Long: order if current price higher than prev bar but not higher than XX%. Short: order if current price lower than prev bar but not lower than XX%.' },
+        { key: 'block_worse_percent', label: 'Block if worse than XX%', type: 'number', min: 0.1, max: 30, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Maximum allowable percentage of price change in the adverse direction from the previous bar.' }
       ]
     },
-    time_filter: {
-      title: 'Time Filter Settings',
+    two_mas: {
+      title: '========== TWO MAS NEW [SIGNALS AND FILTER] ==========',
       fields: [
-        { key: 'start_hour', label: 'Start Hour (UTC)', type: 'number', optimizable: false },
-        { key: 'end_hour', label: 'End Hour (UTC)', type: 'number', optimizable: false },
-        { key: 'use_days', label: 'Filter by Days', type: 'checkbox' }
+        { key: 'ma1_length', label: 'Moving Average 1 length (50)', type: 'number', min: 1, max: 500, step: 1, optimizable: true },
+        { key: 'ma1_smoothing', label: 'MA 1 Smoothing Type', type: 'select', options: ['SMA', 'EMA', 'WMA', 'RMA'] },
+        { key: 'ma1_source', label: 'MA1 Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4', 'hlcc4'] },
+        { key: 'ma2_length', label: 'Moving Average 2 length (100)', type: 'number', min: 1, max: 500, step: 1, optimizable: true },
+        { key: 'ma2_smoothing', label: 'MA 2 Smoothing Type', type: 'select', options: ['SMA', 'EMA', 'WMA', 'RMA'] },
+        { key: 'ma2_source', label: 'MA2 Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4', 'hlcc4'] },
+        { key: 'show_two_mas', label: 'Show TWO MAs. (MA1 - green, MA2 - red)', type: 'checkbox', hasTooltip: true, tooltip: 'Two different MAs, Fast and Slow' },
+        { key: 'two_mas_timeframe', label: 'TWO MAs TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { type: 'separator', label: '======= Use MA1 / MA2 Cross =======' },
+        { key: 'use_ma_cross', label: 'Use MA1 / MA2 Cross', type: 'checkbox', hasTooltip: true, tooltip: 'Make Long Signal if MA1/MA2 cross from Down to UP. Make Short Signal if MA1/MA2 cross from UP to Down.' },
+        { key: 'opposite_ma_cross', label: 'Opposite Signal - "MA1 / MA2 Cross"', type: 'checkbox', hasTooltip: true, tooltip: 'Reverse Direction of Signals. Go Long if MA1/MA2 cross from UP to Down. Go Short if MA1/MA2 cross from Down to UP.' },
+        { key: 'activate_ma_cross_memory', label: 'Activate "MA1 / MA2 Cross" Signal Memory', type: 'checkbox', hasTooltip: true, tooltip: 'Keep Signal in Memory and execute when other conditions are met.' },
+        { key: 'ma_cross_memory_bars', label: 'Keep "MA1 / MA2 Cross" Signal Memory for XX bars', type: 'number', min: 1, max: 100, step: 1, optimizable: true, hasTooltip: true, tooltip: 'How long to Keep Signal in Memory' },
+        { type: 'separator', label: '===== Use MA1 as Filter. Long if Price > MA 1 =====' },
+        { key: 'use_ma1_filter', label: 'Use MA1 as Filter. Long if Price > MA 1', type: 'checkbox', hasTooltip: true, tooltip: 'Filter. Allow Long if Price > MA 1. Allow Short if Price < MA 1' },
+        { key: 'opposite_ma1_filter', label: 'Opposite Signal - "MA1 as Filter"', type: 'checkbox', hasTooltip: true, tooltip: 'Reverse Direction. Allow Long if Price < MA 1. Allow Short if Price > MA 1' }
       ]
     },
-    price_filter: {
-      title: 'Price Filter Settings',
+    accumulation_areas: {
+      title: '***** ACCUMULATION AREAS - [FILTER] OR [SIGNAL] *****',
       fields: [
-        { key: 'level', label: 'Price Level', type: 'number', optimizable: true },
-        { key: 'filter_type', label: 'Filter Type', type: 'select', options: ['above', 'below'] },
-        { key: 'use_ema', label: 'Use EMA instead', type: 'checkbox' },
-        { key: 'ema_period', label: 'EMA Period', type: 'number', optimizable: true }
+        { key: 'use_accumulation', label: 'Use Accumulation Areas ?', type: 'checkbox', hasTooltip: true, tooltip: 'As Filter: Allow orders only if price is in Accumulation Areas. Enable, see chart and change settings.' },
+        { key: 'backtracking_interval', label: 'Backtracking Interval', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'min_bars_to_execute', label: 'Min Bars to Execute Order', type: 'number', min: 1, max: 100, step: 1, optimizable: true, hasTooltip: true, tooltip: 'Minimal amount of bars in Accumulation to allow order Execution' },
+        { key: 'signal_on_breakout', label: 'Signal on Accumulation BreakOut ?', type: 'checkbox' },
+        { key: 'signal_on_opposite_breakout', label: 'Signal on BreakOut-Opposite Direction ?', type: 'checkbox' }
       ]
     },
-    block_worse_filter: {
-      title: 'BLOCK IF WORSE THAN',
+    keltner_bollinger: {
+      title: '======== KELTNER/BOLLINGER CHANNEL - [FILTER] ========',
       fields: [
-        { key: 'block_worse_enable', label: 'Enable Block if Worse Filter', type: 'checkbox' },
-        { key: 'block_worse_percent', label: 'Max Price Change % (block entry if exceeded)', type: 'number', optimizable: true }
+        { key: 'use_channel', label: 'Use Channel ?', type: 'checkbox', hasTooltip: true, tooltip: 'Make order if bar is outside of Channel' },
+        { key: 'channel_timeframe', label: 'Channel TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'channel_mode', label: 'BB/KC Channel Breackout or Rebound from bands:', type: 'select', options: ['Rebound', 'Breackout'] },
+        { key: 'channel_type', label: 'Channel to Use:', type: 'select', options: ['Bollinger Bands', 'Keltner Channel'] },
+        { key: 'enter_conditions', label: 'Enter Conditions', type: 'select', options: ['Out-of-band closure', 'Wick out of band', 'Wick out of the band then close in', 'Close out of the band then close in'] },
+        { key: 'keltner_length', label: 'Keltner Long.', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true },
+        { key: 'keltner_mult', label: 'Keltner Mult.', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true },
+        { key: 'bb_length', label: 'BB Long.', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true },
+        { key: 'bb_deviation', label: 'BB Deviation (Desv.)', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true }
       ]
     },
+    rvi_filter: {
+      title: '======== RVI - RELATIVE VOLATILITY INDEX [FILTER] ========',
+      fields: [
+        { key: 'rvi_length', label: 'RVI Long(10):', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'rvi_timeframe', label: 'RVI TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'rvi_ma_type', label: 'RVI MA Type', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'] },
+        { key: 'rvi_ma_length', label: 'RVI MA Length(2)', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { type: 'separator', label: '=== RVI LONG Range ===' },
+        { key: 'use_rvi_long_range', label: 'Use RVI LONG Range', type: 'checkbox' },
+        { key: 'rvi_long_more', label: '(LONG) RVI is More', type: 'number', min: 1, max: 100, step: 1, optimizable: true, inline: true },
+        { key: 'rvi_long_less', label: '& RVI Less', type: 'number', min: 1, max: 100, step: 1, optimizable: true, inline: true },
+        { type: 'separator', label: '=== RVI SHORT Range ===' },
+        { key: 'use_rvi_short_range', label: 'Use RVI SHORT Range', type: 'checkbox' },
+        { key: 'rvi_short_less', label: '(SHORT) RVI is Less', type: 'number', min: 1, max: 100, step: 1, optimizable: true, inline: true },
+        { key: 'rvi_short_more', label: '& RVI More', type: 'number', min: 1, max: 100, step: 1, optimizable: true, inline: true }
+      ]
+    },
+    mfi_filter: {
+      title: '======== MONEY FLOW INDEX [FILTER] ========',
+      fields: [
+        { key: 'mfi_length', label: 'MFI TF Long:', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'mfi_timeframe', label: 'MFI TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'use_btcusdt_mfi', label: 'Use BTCUSDT as Source for MFI ?', type: 'checkbox', hasTooltip: true, tooltip: 'Use BTCUSDT price data as source for MFI calculation' },
+        { type: 'separator', label: '=== MFI LONG Range ===' },
+        { key: 'use_mfi_long_range', label: 'Use MFI LONG Range', type: 'checkbox' },
+        { key: 'mfi_long_more', label: '(LONG) MFI is More', type: 'number', min: 1, max: 100, step: 1, optimizable: true, inline: true },
+        { key: 'mfi_long_less', label: '& MFI Less', type: 'number', min: 1, max: 100, step: 1, optimizable: true, inline: true },
+        { type: 'separator', label: '=== MFI SHORT Range ===' },
+        { key: 'use_mfi_short_range', label: 'Use MFI SHORT Range', type: 'checkbox' },
+        { key: 'mfi_short_less', label: '(SHORT) MFI is Less', type: 'number', min: 1, max: 100, step: 1, optimizable: true, inline: true },
+        { key: 'mfi_short_more', label: '& MFI More', type: 'number', min: 1, max: 100, step: 1, optimizable: true, inline: true }
+      ]
+    },
+    cci_filter: {
+      title: '======== CCI - [FILTER] ========',
+      fields: [
+        { key: 'cci_length', label: 'CCI TF Long(14):', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'cci_timeframe', label: 'CCI TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { type: 'separator', label: '=== CCI LONG Range (-400:400) ===' },
+        { key: 'use_cci_long_range', label: 'Use CCI LONG Range (-400:400)', type: 'checkbox' },
+        { key: 'cci_long_more', label: '(LONG) CCI is More', type: 'number', min: -400, max: 400, step: 1, optimizable: true, inline: true },
+        { key: 'cci_long_less', label: '& CCI Less', type: 'number', min: -400, max: 400, step: 1, optimizable: true, inline: true },
+        { type: 'separator', label: '=== CCI SHORT Range (400:-400) ===' },
+        { key: 'use_cci_short_range', label: 'Use CCI SHORT Range (400:-400)', type: 'checkbox' },
+        { key: 'cci_short_less', label: '(SHORT) CCI is Less', type: 'number', min: -400, max: 400, step: 1, optimizable: true, inline: true },
+        { key: 'cci_short_more', label: '& CCI More', type: 'number', min: -400, max: 400, step: 1, optimizable: true, inline: true }
+      ]
+    },
+    momentum_filter: {
+      title: '======== MOMENTUM - [FILTER] ========',
+      fields: [
+        { key: 'momentum_length', label: 'Momentum TF Long(14):', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'momentum_timeframe', label: 'Momentum TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'use_btcusdt_momentum', label: 'Use BTCUSDT as Source for Momentum ?', type: 'checkbox', hasTooltip: true, tooltip: 'Use BTCUSDT price data as source for Momentum calculation' },
+        { key: 'momentum_source', label: 'Momentum Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4', 'hlcc4'] },
+        { type: 'separator', label: '=== Momentum LONG Range (-100:100) ===' },
+        { key: 'use_momentum_long_range', label: 'Use Momentum LONG Range (-100:100)', type: 'checkbox' },
+        { key: 'momentum_long_more', label: '(LONG) Momentum is More', type: 'number', min: -100, max: 100, step: 1, optimizable: true, inline: true },
+        { key: 'momentum_long_less', label: '& Mom Less', type: 'number', min: -100, max: 100, step: 1, optimizable: true, inline: true },
+        { type: 'separator', label: '=== Momentum SHORT Range (100:-100) ===' },
+        { key: 'use_momentum_short_range', label: 'Use Momentum SHORT Range (100:-100)', type: 'checkbox' },
+        { key: 'momentum_short_less', label: '(SHORT) Momentum is Less', type: 'number', min: -100, max: 100, step: 1, optimizable: true, inline: true },
+        { key: 'momentum_short_more', label: '& Mom More', type: 'number', min: -100, max: 100, step: 1, optimizable: true, inline: true }
+      ]
+    },
+
+    // (Filters panels removed — entire Filters category deprecated)
 
     // =============================================
     // CONDITIONS
@@ -6899,231 +4286,6 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
     },
 
     // =============================================
-    // ACTIONS
-    // =============================================
-    buy: {
-      title: 'Buy Order Settings',
-      fields: [
-        { key: 'quantity', label: 'Quantity (%)', type: 'number', optimizable: false },
-        { key: 'order_type', label: 'Order Type', type: 'select', options: ['market', 'limit'] },
-        { key: 'use_percent', label: 'Use % of Capital', type: 'checkbox' }
-      ]
-    },
-    sell: {
-      title: 'Sell Order Settings',
-      fields: [
-        { key: 'quantity', label: 'Quantity (%)', type: 'number', optimizable: false },
-        { key: 'order_type', label: 'Order Type', type: 'select', options: ['market', 'limit'] },
-        { key: 'use_percent', label: 'Use % of Capital', type: 'checkbox' }
-      ]
-    },
-    close: {
-      title: 'Close Position Settings',
-      fields: [
-        { key: 'close_percent', label: 'Close %', type: 'number', optimizable: false }
-      ]
-    },
-    stop_loss: {
-      title: 'Stop Loss Settings',
-      fields: [
-        { key: 'percent', label: 'Stop Loss %', type: 'number', optimizable: true },
-        { key: 'use_atr', label: 'Use ATR-based SL', type: 'checkbox' },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true }
-      ]
-    },
-    take_profit: {
-      title: 'Take Profit Settings',
-      fields: [
-        { key: 'percent', label: 'Take Profit %', type: 'number', optimizable: true },
-        { key: 'use_atr', label: 'Use ATR-based TP', type: 'checkbox' },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true }
-      ]
-    },
-    trailing_stop: {
-      title: 'Trailing Stop Settings',
-      fields: [
-        { key: 'percent', label: 'Trail %', type: 'number', optimizable: true },
-        { key: 'activation_percent', label: 'Activation %', type: 'number', optimizable: true },
-        { key: 'use_atr', label: 'Use ATR-based', type: 'checkbox' },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true }
-      ]
-    },
-
-    // =============================================
-    // LOGIC
-    // =============================================
-    and: {
-      title: 'AND Logic',
-      fields: []
-    },
-    or: {
-      title: 'OR Logic',
-      fields: []
-    },
-    not: {
-      title: 'NOT Logic',
-      fields: []
-    },
-    delay: {
-      title: 'Delay Settings',
-      fields: [
-        { key: 'bars', label: 'Bars to Wait', type: 'number', optimizable: true },
-        { key: 'delay_type', label: 'Delay Type', type: 'select', options: ['bars', 'time'] }
-      ]
-    },
-    filter: {
-      title: 'Signal Filter',
-      fields: [
-        { key: 'filter_type', label: 'Filter Type', type: 'select', options: ['pass', 'block', 'once_per_bar'] }
-      ]
-    },
-
-    // =============================================
-    // INPUTS
-    // =============================================
-    price: {
-      title: 'Price Input',
-      fields: [
-        { key: 'source', label: 'Price Source', type: 'select', options: ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4'] }
-      ]
-    },
-    volume: {
-      title: 'Volume Input',
-      fields: []
-    },
-    constant: {
-      title: 'Constant Value',
-      fields: [
-        { key: 'value', label: 'Value', type: 'number', optimizable: true }
-      ]
-    },
-
-    // =============================================
-    // NEW ENTRY TYPES
-    // =============================================
-    limit_entry: {
-      title: 'Limit Entry Order',
-      fields: [
-        { key: 'price_offset', label: 'Price Offset', type: 'number', optimizable: true },
-        { key: 'offset_type', label: 'Offset Type', type: 'select', options: ['percent', 'points', 'atr'] },
-        { key: 'time_in_force', label: 'Time in Force', type: 'select', options: ['GTC', 'IOC', 'FOK'] }
-      ]
-    },
-    stop_entry: {
-      title: 'Stop Entry Order',
-      fields: [
-        { key: 'price_offset', label: 'Price Offset', type: 'number', optimizable: true },
-        { key: 'offset_type', label: 'Offset Type', type: 'select', options: ['percent', 'points', 'atr'] },
-        { key: 'time_in_force', label: 'Time in Force', type: 'select', options: ['GTC', 'IOC', 'FOK'] }
-      ]
-    },
-    // Indent Order (DCA Feature)
-    indent_order: {
-      title: 'INDENT ORDER (Limit Entry Offset)',
-      fields: [
-        { key: 'indent_enable', label: 'Enable Indent Order', type: 'checkbox' },
-        { key: 'indent_show_lines', label: 'Show Last Signal Lines', type: 'checkbox' },
-        { key: 'indent_percent', label: 'Indent % (0.01 - 10)', type: 'number', optimizable: true },
-        { key: 'indent_cancel_bars', label: 'Cancel if Not Executed After X Bars', type: 'number', optimizable: true }
-      ]
-    },
-
-    // =============================================
-    // EXIT MANAGEMENT
-    // =============================================
-    close_long: {
-      title: 'Close Long Position',
-      fields: [
-        { key: 'close_percent', label: 'Close %', type: 'number', optimizable: false }
-      ]
-    },
-    close_short: {
-      title: 'Close Short Position',
-      fields: [
-        { key: 'close_percent', label: 'Close %', type: 'number', optimizable: false }
-      ]
-    },
-    close_all: {
-      title: 'Close All Positions',
-      fields: []
-    },
-
-    // =============================================
-    // ADVANCED STOPS (Extended DCA)
-    // =============================================
-    atr_stop: {
-      title: 'ATR-BASED SL/TP (Extended)',
-      fields: [
-        { type: 'separator', label: '━━━ ATR Stop Loss ━━━' },
-        { key: 'atr_sl_enable', label: 'Enable ATR Stop Loss', type: 'checkbox' },
-        { key: 'atr_sl_wicks', label: 'Consider Wicks?', type: 'checkbox' },
-        { key: 'atr_sl_method', label: 'Smoothing Method', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'] },
-        { key: 'atr_sl_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'atr_sl_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true },
-        { type: 'separator', label: '━━━ ATR Take Profit ━━━' },
-        { key: 'atr_tp_enable', label: 'Enable ATR Take Profit', type: 'checkbox' },
-        { key: 'atr_tp_wicks', label: 'Consider Wicks?', type: 'checkbox' },
-        { key: 'atr_tp_method', label: 'Smoothing Method', type: 'select', options: ['WMA', 'RMA', 'SMA', 'EMA'] },
-        { key: 'atr_tp_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'atr_tp_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true },
-        { type: 'separator', label: '━━━ Common ━━━' },
-        { key: 'from_entry', label: 'Calculate From Entry Price', type: 'checkbox' }
-      ]
-    },
-    chandelier_stop: {
-      title: 'Chandelier Exit',
-      fields: [
-        { key: 'period', label: 'Period', type: 'number', optimizable: true },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true }
-      ]
-    },
-
-    // =============================================
-    // BREAK-EVEN & PROTECTION
-    // =============================================
-    break_even: {
-      title: 'Break Even Stop',
-      fields: [
-        { key: 'trigger_percent', label: 'Trigger at Profit %', type: 'number', optimizable: true },
-        { key: 'offset', label: 'Offset (pips)', type: 'number', optimizable: false },
-        { key: 'include_commission', label: 'Include Commission', type: 'checkbox' }
-      ]
-    },
-    profit_lock: {
-      title: 'Profit Lock',
-      fields: [
-        { key: 'trigger_percent', label: 'Trigger at Profit %', type: 'number', optimizable: true },
-        { key: 'lock_percent', label: 'Lock Profit %', type: 'number', optimizable: true },
-        { key: 'step_mode', label: 'Step Mode', type: 'checkbox' },
-        { key: 'step_size', label: 'Step Size %', type: 'number', optimizable: true }
-      ]
-    },
-
-    // =============================================
-    // PARTIAL EXITS
-    // =============================================
-    scale_out: {
-      title: 'Scale Out',
-      fields: [
-        { key: 'exit_percent', label: 'Exit %', type: 'number', optimizable: true },
-        { key: 'trigger_type', label: 'Trigger Type', type: 'select', options: ['profit_percent', 'profit_amount', 'price_level'] },
-        { key: 'trigger_value', label: 'Trigger Value', type: 'number', optimizable: true }
-      ]
-    },
-    multi_tp: {
-      title: 'Multiple Take Profits',
-      fields: [
-        { key: 'tp1_percent', label: 'TP1 Size %', type: 'number', optimizable: false },
-        { key: 'tp1_target', label: 'TP1 Target %', type: 'number', optimizable: true },
-        { key: 'tp2_percent', label: 'TP2 Size %', type: 'number', optimizable: false },
-        { key: 'tp2_target', label: 'TP2 Target %', type: 'number', optimizable: true },
-        { key: 'tp3_percent', label: 'TP3 Size %', type: 'number', optimizable: false },
-        { key: 'tp3_target', label: 'TP3 Target %', type: 'number', optimizable: true },
-        { key: 'use_tp3', label: 'Use TP3', type: 'checkbox' }
-      ]
-    },
-
-    // =============================================
     // CLOSE CONDITIONS (EXIT RULES)
     // =============================================
     static_sltp: {
@@ -7164,65 +4326,6 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         { key: 'atr_tp_multiplier', label: 'Size of ATR TP (Multiplier×ATR)', type: 'number', min: 0.1, max: 4, step: 0.1, optimizable: true }
       ]
     },
-    time_exit: {
-      title: 'TIME-BASED EXIT',
-      fields: [
-        { key: 'exit_type', label: 'Exit Type', type: 'select', options: ['bars', 'hours', 'minutes'] },
-        { key: 'exit_after_bars', label: 'Exit After N Bars', type: 'number', optimizable: true },
-        { key: 'exit_after_hours', label: 'Exit After N Hours', type: 'number', optimizable: true }
-      ]
-    },
-    session_exit: {
-      title: 'SESSION EXIT',
-      fields: [
-        { key: 'exit_session', label: 'Exit at Session', type: 'select', options: ['NY_close', 'London_close', 'Tokyo_close', 'Sydney_close', 'custom'] },
-        { type: 'separator', label: '------- Custom Time -------' },
-        { key: 'custom_hour', label: 'Custom Hour (0-23)', type: 'number', optimizable: false },
-        { key: 'custom_minute', label: 'Custom Minute (0-59)', type: 'number', optimizable: false },
-        { key: 'use_utc', label: 'Use UTC Time', type: 'checkbox' }
-      ]
-    },
-    signal_exit: {
-      title: 'SIGNAL EXIT',
-      fields: [
-        { key: 'exit_on_opposite', label: 'Exit on Opposite Signal', type: 'checkbox' },
-        { key: 'exit_on_any_signal', label: 'Exit on Any Signal', type: 'checkbox' },
-        { key: 'confirm_bars', label: 'Confirm Bars', type: 'number', optimizable: true }
-      ]
-    },
-    indicator_exit: {
-      title: 'INDICATOR EXIT',
-      fields: [
-        { key: 'indicator', label: 'Indicator', type: 'select', options: ['rsi', 'stochastic', 'cci', 'macd', 'bb_percent'] },
-        { key: 'condition', label: 'Condition', type: 'select', options: ['crosses_above', 'crosses_below', 'above', 'below'] },
-        { key: 'threshold', label: 'Threshold Value', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Apply To -------' },
-        { key: 'exit_long_only', label: 'Exit LONG Only', type: 'checkbox' },
-        { key: 'exit_short_only', label: 'Exit SHORT Only', type: 'checkbox' }
-      ]
-    },
-    break_even_exit: {
-      title: 'BREAK EVEN MOVE',
-      fields: [
-        { key: 'activation_profit_percent', label: 'Activate at Profit %', type: 'number', optimizable: true },
-        { key: 'move_to_profit_percent', label: 'Move SL to Profit %', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Apply To -------' },
-        { key: 'use_for_long', label: 'Use for LONG', type: 'checkbox' },
-        { key: 'use_for_short', label: 'Use for SHORT', type: 'checkbox' }
-      ]
-    },
-    partial_close: {
-      title: 'PARTIAL CLOSE',
-      fields: [
-        { type: 'separator', label: '------- First Partial Close -------' },
-        { key: 'trigger_profit_1', label: 'Trigger at Profit %', type: 'number', optimizable: true },
-        { key: 'close_percent_1', label: 'Close % of Position', type: 'number', optimizable: false },
-        { type: 'separator', label: '------- Second Partial Close -------' },
-        { key: 'use_second_partial', label: 'Use Second Partial', type: 'checkbox' },
-        { key: 'trigger_profit_2', label: 'Trigger at Profit %', type: 'number', optimizable: true },
-        { key: 'close_percent_2', label: 'Close % of Position', type: 'number', optimizable: false }
-      ]
-    },
     multi_tp_exit: {
       title: 'MULTI TAKE PROFIT LEVELS',
       fields: [
@@ -7239,167 +4342,91 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         { key: 'tp3_close_percent', label: 'TP3 Close %', type: 'number', optimizable: false }
       ]
     },
-    chandelier_exit: {
-      title: 'CHANDELIER EXIT',
+
+    // =============================================
+    // CLOSE CONDITIONS
+    // =============================================
+    close_channel: {
+      title: '=== CLOSE CONDITION - CHANNELS KELTNER/BOLLINGER ===',
       fields: [
-        { key: 'atr_period', label: 'ATR Period (22)', type: 'number', optimizable: true },
-        { key: 'atr_multiplier', label: 'ATR Multiplier (3.0)', type: 'number', optimizable: true },
-        { key: 'use_close', label: 'Use Close Price', type: 'checkbox' },
-        { type: 'separator', label: '------- Apply To -------' },
-        { key: 'use_for_long', label: 'Use for LONG (trail from High)', type: 'checkbox' },
-        { key: 'use_for_short', label: 'Use for SHORT (trail from Low)', type: 'checkbox' }
+        { key: 'enabled', label: 'Use Channels CLOSE COND ?', type: 'checkbox', hasTooltip: true, tooltip: 'CLOSE if bar is outside of Channel' },
+        { key: 'channel_close_timeframe', label: 'Channel CLOSE TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'band_to_close', label: 'Band to Close Position:', type: 'select', options: ['Rebound', 'Breakout'], hasTooltip: true, tooltip: 'Rebound (default): For LONG orders — close on UPPER band. Breakout: For LONG orders — close on LOWER band.' },
+        { key: 'channel_type', label: 'Channel to Use for CLOSE:', type: 'select', options: ['Keltner Channel', 'Bollinger Bands'] },
+        { key: 'close_condition', label: 'CLOSE Conditions', type: 'select', options: ['Close out of the band then close in', 'Wick out of band', 'Wick out of the band then close in', 'Out-of-band closure'] },
+        { key: 'keltner_length', label: 'Keltner Long. (CLOSE)', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'keltner_mult', label: 'Keltner Mult. (CLOSE)', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true },
+        { key: 'bb_length', label: 'BB Long. (CLOSE)', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'bb_deviation', label: 'BB Deviation (CLOSE)', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true }
+      ]
+    },
+    close_ma_cross: {
+      title: '=========== TWO MAS [CLOSE CONDITION] ===========',
+      fields: [
+        { key: 'enabled', label: 'Activate MA1 / MA2 Cross CLOSE Condition', type: 'checkbox', hasTooltip: true, tooltip: 'Make Long Signal if MA1 / MA2 cross from Down to UP. Make Short Signal if MA1 / MA2 cross from UP to Down.' },
+        { key: 'show_ma_lines', label: 'Show TWO MAs. CLO (MA1 - green, MA2 - red)', type: 'checkbox', hasTooltip: true, tooltip: 'Two different MAs, Fast and Slow' },
+        { key: 'profit_only', label: 'Close by MA Cross only with Profit ?', type: 'checkbox', hasTooltip: true, tooltip: 'Close only with Profit XX%' },
+        { key: 'min_profit_percent', label: 'Min Profit percent for Close by MA Cross. %%', type: 'number', min: 0.1, max: 50, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Close only with Profit XX%' },
+        { key: 'ma1_length', label: 'MA 1 CLO length (10)', type: 'number', min: 1, max: 500, step: 1, optimizable: true },
+        { key: 'ma2_length', label: 'MA 2 CLO length (30)', type: 'number', min: 1, max: 500, step: 1, optimizable: true }
+      ]
+    },
+    close_rsi: {
+      title: '======= CLOSE CONDITION - CLOSE BY RSI =======',
+      fields: [
+        { key: 'rsi_close_length', label: 'RSI CLOSE Length (14):', type: 'number', min: 1, max: 200, step: 1, optimizable: true },
+        { key: 'rsi_close_timeframe', label: 'RSI CLOSE TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'rsi_close_profit_only', label: 'Close by RSI only with Profit ?', type: 'checkbox', hasTooltip: true, tooltip: 'Close only with Profit XX%' },
+        { key: 'rsi_close_min_profit', label: 'Min Profit percent for Close by RSI. %%', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Close only with Profit XX%' },
+        { type: 'separator', label: '====== Activate RSI CLOSE (Reach the Level) ======' },
+        { key: 'activate_rsi_reach', label: 'Activate RSI CLOSE (Reach the Level)', type: 'checkbox' },
+        { key: 'rsi_long_more', label: '(LONG) RSI_CL is More', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'rsi_long_less', label: '& RSI_CL Less', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'rsi_short_less', label: '(SHORT) RSI_CL is Less', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'rsi_short_more', label: '& RSI_CL More', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { type: 'separator', label: '====== Activate RSI CLOSE (Cross the Level) ======' },
+        { key: 'activate_rsi_cross', label: 'Activate RSI CLOSE (Cross the Level)', type: 'checkbox', hasTooltip: true, tooltip: 'Close Long Position if RSI Crossed the Level from UP to Down. Close Short Position if RSI Crossed the Level from Down to UP.' },
+        { key: 'rsi_cross_long_level', label: 'Level to Cross RSI for LONG', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'rsi_cross_short_level', label: 'Level to Cross RSI for SHORT', type: 'number', min: 1, max: 100, step: 1, optimizable: true }
+      ]
+    },
+    close_stochastic: {
+      title: '======= CLOSE CONDITION - CLOSE BY STOCHASTIC =======',
+      fields: [
+        { key: 'stoch_close_k_length', label: 'Stochastic CL %K Length (14)', type: 'number', min: 1, max: 200, step: 1, optimizable: true },
+        { key: 'stoch_close_k_smoothing', label: 'Stochastic CL %K Smoothing (3)', type: 'number', min: 1, max: 50, step: 1, optimizable: true },
+        { key: 'stoch_close_d_smoothing', label: 'Stochastic CL %D Smoothing (3)', type: 'number', min: 1, max: 50, step: 1, optimizable: true },
+        { key: 'stoch_close_timeframe', label: 'Stochastic CL TimeFrame:', type: 'select', options: BYBIT_TF_OPTS },
+        { key: 'stoch_close_profit_only', label: 'Close by STOCH only with Profit ?', type: 'checkbox', hasTooltip: true, tooltip: 'Close only with Profit XX%' },
+        { key: 'stoch_close_min_profit', label: 'Min Profit percent for Close by STOCH. %%', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Close only with Profit XX%' },
+        { type: 'separator', label: '====== Activate STOCH CLOSE (Reach the Level) ======' },
+        { key: 'activate_stoch_reach', label: 'Activate STOCH CLOSE (Reach the Level)', type: 'checkbox' },
+        { key: 'stoch_long_more', label: '(LONG) Stoch_CL is More', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'stoch_long_less', label: '& Stoch_CL Less', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'stoch_short_less', label: '(SHORT) Stoch_CL is Less', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'stoch_short_more', label: '& Stoch_CL More', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { type: 'separator', label: '====== Activate STOCH CLOSE (Cross the Level) ======' },
+        { key: 'activate_stoch_cross', label: 'Activate STOCH CLOSE (Cross the Level)', type: 'checkbox', hasTooltip: true, tooltip: 'Close Long Position if STOCH Crossed the Level from UP to Down. Close Short Position if STOCH Crossed the Level from Down to UP.' },
+        { key: 'stoch_cross_long_level', label: 'Level to Cross Stoch for LONG', type: 'number', min: 1, max: 100, step: 1, optimizable: true },
+        { key: 'stoch_cross_short_level', label: 'Level to Cross Stoch for SHORT', type: 'number', min: 1, max: 100, step: 1, optimizable: true }
+      ]
+    },
+    close_psar: {
+      title: '======= CLOSE CONDITION - PARABOLIC SAR SIGNALS =======',
+      fields: [
+        { key: 'enabled', label: 'Use CLOSE CONDITION Parabolic SAR Signals ?', type: 'checkbox' },
+        { key: 'psar_opposite', label: 'Opposite Parabolic SAR CLOSE COND ?', type: 'checkbox' },
+        { key: 'psar_close_profit_only', label: 'Close by PSAR only with Profit ?', type: 'checkbox', hasTooltip: true, tooltip: 'Close only with Profit XX%' },
+        { key: 'psar_close_min_profit', label: 'Min Profit percent for Close by PSAR. %%', type: 'number', min: 0.1, max: 100, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Close only with Profit XX%' },
+        { key: 'psar_start', label: 'Start PSAR (0.02)', type: 'number', min: 0.001, max: 1, step: 0.001, optimizable: true },
+        { key: 'psar_increment', label: 'Increment PSAR (0.02)', type: 'number', min: 0.001, max: 1, step: 0.001, optimizable: true },
+        { key: 'psar_maximum', label: 'Maximum PSAR (0.2)', type: 'number', min: 0.01, max: 5, step: 0.01, optimizable: true },
+        { key: 'psar_close_nth_bar', label: 'Close on Nth trend bar', type: 'number', min: 1, max: 100, step: 1, optimizable: true }
       ]
     },
 
     // =============================================
-    // DCA CLOSE CONDITIONS
-    // =============================================
-    rsi_close: {
-      title: 'RSI CLOSE CONDITION',
-      fields: [
-        { key: 'rsi_close_enable', label: 'Enable RSI Close', type: 'checkbox' },
-        { key: 'rsi_close_length', label: 'RSI Length', type: 'number', optimizable: true },
-        { key: 'rsi_close_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
-        { type: 'separator', label: '------- Profit Filter -------' },
-        { key: 'rsi_close_only_profit', label: 'Close Only With Profit', type: 'checkbox' },
-        { key: 'rsi_close_min_profit', label: 'Min Profit %', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Reach Level Mode -------' },
-        { key: 'rsi_close_reach_enable', label: 'Use Reach Level', type: 'checkbox' },
-        { key: 'rsi_close_reach_long_more', label: 'LONG: Close if RSI >', type: 'number', optimizable: true },
-        { key: 'rsi_close_reach_long_less', label: 'LONG: Close if RSI <', type: 'number', optimizable: true },
-        { key: 'rsi_close_reach_short_more', label: 'SHORT: Close if RSI >', type: 'number', optimizable: true },
-        { key: 'rsi_close_reach_short_less', label: 'SHORT: Close if RSI <', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Cross Level Mode -------' },
-        { key: 'rsi_close_cross_enable', label: 'Use Cross Level', type: 'checkbox' },
-        { key: 'rsi_close_cross_long_level', label: 'LONG: Close on cross down', type: 'number', optimizable: true },
-        { key: 'rsi_close_cross_short_level', label: 'SHORT: Close on cross up', type: 'number', optimizable: true }
-      ]
-    },
-    stoch_close: {
-      title: 'STOCHASTIC CLOSE CONDITION',
-      fields: [
-        { key: 'stoch_close_enable', label: 'Enable Stochastic Close', type: 'checkbox' },
-        { key: 'stoch_close_k_length', label: '%K Length', type: 'number', optimizable: true },
-        { key: 'stoch_close_k_smooth', label: '%K Smoothing', type: 'number', optimizable: true },
-        { key: 'stoch_close_d_smooth', label: '%D Smoothing', type: 'number', optimizable: true },
-        { key: 'stoch_close_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
-        { type: 'separator', label: '------- Profit Filter -------' },
-        { key: 'stoch_close_only_profit', label: 'Close Only With Profit', type: 'checkbox' },
-        { key: 'stoch_close_min_profit', label: 'Min Profit %', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Reach Level Mode -------' },
-        { key: 'stoch_close_reach_enable', label: 'Use Reach Level', type: 'checkbox' },
-        { key: 'stoch_close_reach_long_more', label: 'LONG: Close if %K >', type: 'number', optimizable: true },
-        { key: 'stoch_close_reach_long_less', label: 'LONG: Close if %K <', type: 'number', optimizable: true },
-        { key: 'stoch_close_reach_short_more', label: 'SHORT: Close if %K >', type: 'number', optimizable: true },
-        { key: 'stoch_close_reach_short_less', label: 'SHORT: Close if %K <', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Cross Level Mode -------' },
-        { key: 'stoch_close_cross_enable', label: 'Use Cross Level', type: 'checkbox' },
-        { key: 'stoch_close_cross_long_level', label: 'LONG: Close on cross down', type: 'number', optimizable: true },
-        { key: 'stoch_close_cross_short_level', label: 'SHORT: Close on cross up', type: 'number', optimizable: true }
-      ]
-    },
-    channel_close: {
-      title: 'CHANNEL CLOSE (KELTNER/BOLLINGER)',
-      fields: [
-        { key: 'channel_close_enable', label: 'Enable Channel Close', type: 'checkbox' },
-        { key: 'channel_close_timeframe', label: 'TimeFrame', type: 'select', options: BYBIT_TF_OPTS },
-        { key: 'channel_close_band', label: 'Band Action', type: 'select', options: ['Breakout', 'Rebound'] },
-        { key: 'channel_close_type', label: 'Channel Type', type: 'select', options: ['Keltner', 'Bollinger'] },
-        { key: 'channel_close_condition', label: 'Condition', type: 'select', options: ['long_upper_short_lower', 'long_lower_short_upper', 'long_upper_short_upper', 'long_lower_short_lower'] },
-        { type: 'separator', label: '------- Keltner Channel -------' },
-        { key: 'channel_close_keltner_length', label: 'Keltner Length', type: 'number', optimizable: true },
-        { key: 'channel_close_keltner_mult', label: 'Keltner Multiplier', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Bollinger Bands -------' },
-        { key: 'channel_close_bb_length', label: 'BB Length', type: 'number', optimizable: true },
-        { key: 'channel_close_bb_deviation', label: 'BB Deviation', type: 'number', optimizable: true }
-      ]
-    },
-    ma_close: {
-      title: 'TWO MAs CLOSE CONDITION',
-      fields: [
-        { key: 'ma_close_enable', label: 'Enable MA Close', type: 'checkbox' },
-        { key: 'ma_close_show_lines', label: 'Show MA Lines on Chart', type: 'checkbox' },
-        { type: 'separator', label: '------- Profit Filter -------' },
-        { key: 'ma_close_only_profit', label: 'Close Only With Profit', type: 'checkbox' },
-        { key: 'ma_close_min_profit', label: 'Min Profit %', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- MA 1 (Fast) -------' },
-        { key: 'ma_close_ma1_length', label: 'MA1 Length', type: 'number', optimizable: true },
-        { key: 'ma_close_ma1_type', label: 'MA1 Type', type: 'select', options: ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'HMA'] },
-        { type: 'separator', label: '------- MA 2 (Slow) -------' },
-        { key: 'ma_close_ma2_length', label: 'MA2 Length', type: 'number', optimizable: true },
-        { key: 'ma_close_ma2_type', label: 'MA2 Type', type: 'select', options: ['SMA', 'EMA', 'WMA', 'DEMA', 'TEMA', 'HMA'] }
-      ]
-    },
-    psar_close: {
-      title: 'PARABOLIC SAR CLOSE',
-      fields: [
-        { key: 'psar_close_enable', label: 'Enable PSAR Close', type: 'checkbox' },
-        { key: 'psar_close_opposite', label: 'Close on Opposite Signal', type: 'checkbox' },
-        { type: 'separator', label: '------- Profit Filter -------' },
-        { key: 'psar_close_only_profit', label: 'Close Only With Profit', type: 'checkbox' },
-        { key: 'psar_close_min_profit', label: 'Min Profit %', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- PSAR Parameters -------' },
-        { key: 'psar_close_start', label: 'Start (0.02)', type: 'number', optimizable: true },
-        { key: 'psar_close_increment', label: 'Increment (0.02)', type: 'number', optimizable: true },
-        { key: 'psar_close_maximum', label: 'Maximum (0.2)', type: 'number', optimizable: true },
-        { key: 'psar_close_nth_bar', label: 'Close on Nth Trend Bar (0=any)', type: 'number', optimizable: true }
-      ]
-    },
-    time_bars_close: {
-      title: 'TIME/BARS CLOSE',
-      fields: [
-        { key: 'time_bars_close_enable', label: 'Enable Time/Bars Close', type: 'checkbox' },
-        { key: 'close_after_bars', label: 'Close After N Bars', type: 'number', optimizable: true },
-        { type: 'separator', label: '------- Profit Filter -------' },
-        { key: 'close_only_profit', label: 'Close Only With Profit', type: 'checkbox' },
-        { key: 'close_min_profit', label: 'Min Profit %', type: 'number', optimizable: true },
-        { key: 'close_max_bars', label: 'Max Bars (force close)', type: 'number', optimizable: true }
-      ]
-    },
-
-    // =============================================
-    // POSITION SIZING
-    // =============================================
-    fixed_size: {
-      title: 'Fixed Position Size',
-      fields: [
-        { key: 'size', label: 'Size', type: 'number', optimizable: false },
-        { key: 'size_type', label: 'Size Type', type: 'select', options: ['base_currency', 'quote_currency', 'contracts'] }
-      ]
-    },
-    percent_balance: {
-      title: '% of Balance',
-      fields: [
-        { key: 'percent', label: 'Balance %', type: 'number', optimizable: true },
-        { key: 'use_available', label: 'Use Available Balance', type: 'checkbox' }
-      ]
-    },
-    risk_percent: {
-      title: 'Risk % per Trade',
-      fields: [
-        { key: 'risk_percent', label: 'Risk %', type: 'number', optimizable: true },
-        { key: 'stop_distance', label: 'Stop Distance %', type: 'number', optimizable: true }
-      ]
-    },
-    atr_sizing: {
-      title: 'ATR-based Sizing',
-      fields: [
-        { key: 'risk_percent', label: 'Risk %', type: 'number', optimizable: true },
-        { key: 'atr_period', label: 'ATR Period', type: 'number', optimizable: true },
-        { key: 'atr_multiplier', label: 'ATR Multiplier', type: 'number', optimizable: true }
-      ]
-    },
-    kelly_criterion: {
-      title: 'Kelly Criterion',
-      fields: [
-        { key: 'win_rate', label: 'Win Rate (0-1)', type: 'number', optimizable: false },
-        { key: 'reward_risk', label: 'Reward/Risk Ratio', type: 'number', optimizable: false },
-        { key: 'fraction', label: 'Kelly Fraction', type: 'number', optimizable: false }
-      ]
-    },
-
-    // =============================================
-    // ENTRY REFINEMENT
+    // ENTRY MANAGEMENT (DCA / Grid)
     // =============================================
     dca: {
       title: 'DCA (Dollar Cost Averaging)',
@@ -7417,418 +4444,36 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
       customRenderer: 'grid_orders', // Special renderer for dynamic order list
       fields: [] // Handled by custom renderer
     },
-    average_down: {
-      title: 'Average Down',
-      fields: [
-        { key: 'max_adds', label: 'Max Additions', type: 'number', optimizable: true },
-        { key: 'loss_trigger', label: 'Loss Trigger %', type: 'number', optimizable: true },
-        { key: 'add_size_percent', label: 'Add Size %', type: 'number', optimizable: true }
-      ]
-    },
-    reentry: {
-      title: 'Re-entry Logic',
-      fields: [
-        { key: 'wait_bars', label: 'Wait Bars', type: 'number', optimizable: true },
-        { key: 'max_reentries', label: 'Max Re-entries', type: 'number', optimizable: true },
-        { key: 'same_direction', label: 'Same Direction Only', type: 'checkbox' }
-      ]
-    },
-    // =============================================
-    // MARTINGALE & ANTI-MARTINGALE
-    // =============================================
-    martingale: {
-      title: 'MARTINGALE',
-      fields: [
-        { key: 'multiplier', label: 'Size Multiplier (2.0)', type: 'number', optimizable: true },
-        { key: 'max_steps', label: 'Max Steps', type: 'number', optimizable: true },
-        { key: 'reset_on_win', label: 'Reset on Win', type: 'checkbox' },
-        { type: 'separator', label: '------- Safety Limits -------' },
-        { key: 'max_position_size', label: 'Max Position Size', type: 'number', optimizable: false }
-      ]
-    },
-    anti_martingale: {
-      title: 'ANTI-MARTINGALE',
-      fields: [
-        { key: 'multiplier', label: 'Size Multiplier (1.5)', type: 'number', optimizable: true },
-        { key: 'max_steps', label: 'Max Steps', type: 'number', optimizable: true },
-        { key: 'reset_on_loss', label: 'Reset on Loss', type: 'checkbox' },
-        { type: 'separator', label: '------- Base Size -------' },
-        { key: 'base_size_percent', label: 'Base Size %', type: 'number', optimizable: true }
-      ]
-    },
-    scale_in: {
-      title: 'SCALE IN',
-      fields: [
-        { key: 'total_orders', label: 'Total Orders', type: 'number', optimizable: true },
-        { key: 'first_order_percent', label: 'First Order % of Total', type: 'number', optimizable: false },
-        { type: 'separator', label: '------- Interval Settings -------' },
-        { key: 'interval_type', label: 'Interval Type', type: 'select', options: ['bars', 'seconds', 'price_move'] },
-        { key: 'interval_value', label: 'Interval Value', type: 'number', optimizable: true },
-        { key: 'price_condition', label: 'Price Condition', type: 'select', options: ['any', 'better_price', 'worse_price'] }
-      ]
-    },
 
     // =============================================
-    // RISK CONTROLS (CIRCUIT BREAKERS)
+    // DIVERGENCE DETECTION
     // =============================================
-    max_daily_loss: {
-      title: 'Max Daily Loss',
+    divergence: {
+      title: '===== DIVERGENCE DETECTION =====',
       fields: [
-        { key: 'max_loss_percent', label: 'Max Loss %', type: 'number', optimizable: false },
-        { key: 'max_loss_amount', label: 'Max Loss Amount', type: 'number', optimizable: false },
-        { key: 'use_percent', label: 'Use Percentage', type: 'checkbox' },
-        { key: 'reset_hour', label: 'Reset Hour (UTC)', type: 'number', optimizable: false }
-      ]
-    },
-    max_drawdown: {
-      title: 'Max Drawdown',
-      fields: [
-        { key: 'max_dd_percent', label: 'Max Drawdown %', type: 'number', optimizable: false },
-        { key: 'from_peak', label: 'From Equity Peak', type: 'checkbox' },
-        { key: 'stop_all_trading', label: 'Stop All Trading', type: 'checkbox' }
-      ]
-    },
-    max_trades_day: {
-      title: 'Max Trades per Day',
-      fields: [
-        { key: 'max_trades', label: 'Max Trades', type: 'number', optimizable: false },
-        { key: 'reset_hour', label: 'Reset Hour (UTC)', type: 'number', optimizable: false }
-      ]
-    },
-    consecutive_loss: {
-      title: 'Consecutive Loss Limit',
-      fields: [
-        { key: 'max_consecutive', label: 'Max Consecutive Losses', type: 'number', optimizable: false },
-        { key: 'cooloff_hours', label: 'Cool-off Hours', type: 'number', optimizable: false }
-      ]
-    },
-    cooloff_period: {
-      title: 'Cool-off Period',
-      fields: [
-        { key: 'cooloff_hours', label: 'Cool-off Hours', type: 'number', optimizable: false },
-        { key: 'trigger_type', label: 'Trigger Type', type: 'select', options: ['loss_count', 'loss_amount', 'drawdown'] },
-        { key: 'trigger_value', label: 'Trigger Value', type: 'number', optimizable: false }
-      ]
-    },
-
-    // =============================================
-    // SESSION MANAGEMENT
-    // =============================================
-    active_hours: {
-      title: 'Active Trading Hours',
-      fields: [
-        { key: 'start_hour', label: 'Start Hour', type: 'number', optimizable: false },
-        { key: 'end_hour', label: 'End Hour', type: 'number', optimizable: false },
-        { key: 'timezone', label: 'Timezone', type: 'select', options: ['UTC', 'EST', 'GMT', 'CET', 'JST'] }
-      ]
-    },
-    trading_days: {
-      title: 'Trading Days',
-      fields: [
-        { key: 'monday', label: 'Monday', type: 'checkbox' },
-        { key: 'tuesday', label: 'Tuesday', type: 'checkbox' },
-        { key: 'wednesday', label: 'Wednesday', type: 'checkbox' },
-        { key: 'thursday', label: 'Thursday', type: 'checkbox' },
-        { key: 'friday', label: 'Friday', type: 'checkbox' },
-        { key: 'saturday', label: 'Saturday', type: 'checkbox' },
-        { key: 'sunday', label: 'Sunday', type: 'checkbox' }
-      ]
-    },
-    session_filter: {
-      title: 'Session Filter',
-      fields: [
-        { key: 'london', label: 'London Session', type: 'checkbox' },
-        { key: 'new_york', label: 'New York Session', type: 'checkbox' },
-        { key: 'tokyo', label: 'Tokyo Session', type: 'checkbox' },
-        { key: 'sydney', label: 'Sydney Session', type: 'checkbox' },
-        { key: 'overlap_only', label: 'Overlap Only', type: 'checkbox' }
-      ]
-    },
-    news_filter: {
-      title: 'News Event Filter',
-      fields: [
-        { key: 'high_impact', label: 'Avoid High Impact', type: 'checkbox' },
-        { key: 'medium_impact', label: 'Avoid Medium Impact', type: 'checkbox' },
-        { key: 'minutes_before', label: 'Minutes Before', type: 'number', optimizable: false },
-        { key: 'minutes_after', label: 'Minutes After', type: 'number', optimizable: false }
-      ]
-    },
-    weekend_close: {
-      title: 'Weekend Close',
-      fields: [
-        { key: 'close_friday_hour', label: 'Close Friday Hour', type: 'number', optimizable: false },
-        { key: 'close_all', label: 'Close All Positions', type: 'checkbox' }
-      ]
-    },
-
-    // =============================================
-    // TIME MANAGEMENT
-    // =============================================
-    time_stop: {
-      title: 'Time-based Stop',
-      fields: [
-        { key: 'hours', label: 'Max Hours', type: 'number', optimizable: true },
-        { key: 'close_in_profit', label: 'Close if in Profit', type: 'checkbox' },
-        { key: 'close_in_loss', label: 'Close if in Loss', type: 'checkbox' }
-      ]
-    },
-    max_duration: {
-      title: 'Max Trade Duration',
-      fields: [
-        { key: 'max_hours', label: 'Max Hours', type: 'number', optimizable: true },
-        { key: 'action', label: 'Action', type: 'select', options: ['close', 'trail', 'break_even'] }
-      ]
-    },
-    session_close: {
-      title: 'Session Close',
-      fields: [
-        { key: 'close_hour', label: 'Close Hour', type: 'number', optimizable: false },
-        { key: 'close_minute', label: 'Close Minute', type: 'number', optimizable: false },
-        { key: 'timezone', label: 'Timezone', type: 'select', options: ['UTC', 'EST', 'GMT', 'CET'] }
-      ]
-    },
-    intraday_only: {
-      title: 'Intraday Only',
-      fields: [
-        { key: 'close_hour', label: 'Close Hour', type: 'number', optimizable: false },
-        { key: 'close_minute', label: 'Close Minute', type: 'number', optimizable: false }
-      ]
-    },
-
-    // =============================================
-    // CORRELATION & MULTI-SYMBOL
-    // =============================================
-    correlation_filter: {
-      title: 'Correlation Filter',
-      fields: [
-        { key: 'use_correlation', label: 'Enable Filter', type: 'checkbox' },
-        { key: 'correlated_symbol', label: 'Correlated Symbol', type: 'text' },
-        { key: 'correlation_period', label: 'Period', type: 'number', optimizable: true },
-        { key: 'min_correlation', label: 'Min Correlation', type: 'number', optimizable: true },
-        { key: 'max_correlation', label: 'Max Correlation', type: 'number', optimizable: false },
-        { key: 'correlation_mode', label: 'Mode', type: 'select', options: ['positive', 'negative', 'any'] },
-        { key: 'use_for_long', label: 'Use for Long', type: 'checkbox' },
-        { key: 'use_for_short', label: 'Use for Short', type: 'checkbox' }
-      ]
-    },
-    btc_dominance: {
-      title: 'BTC Dominance Filter',
-      fields: [
-        { key: 'use_btc_dom', label: 'Enable', type: 'checkbox' },
-        { key: 'btc_dom_threshold', label: 'Threshold %', type: 'number', optimizable: true },
-        { key: 'condition', label: 'Condition', type: 'select', options: ['above', 'below', 'rising', 'falling'] },
-        { key: 'use_trend', label: 'Use Trend', type: 'checkbox' },
-        { key: 'trend_period', label: 'Trend Period', type: 'number', optimizable: false }
-      ]
-    },
-    sector_strength: {
-      title: 'Sector Strength',
-      fields: [
-        { key: 'use_sector', label: 'Enable', type: 'checkbox' },
-        { key: 'benchmark_symbol', label: 'Benchmark', type: 'text' },
-        { key: 'lookback_period', label: 'Lookback', type: 'number', optimizable: true },
-        { key: 'min_outperformance', label: 'Min Outperformance %', type: 'number', optimizable: true },
-        { key: 'use_for_long', label: 'Use for Long', type: 'checkbox' },
-        { key: 'use_for_short', label: 'Use for Short', type: 'checkbox' }
-      ]
-    },
-    relative_strength: {
-      title: 'Relative Strength',
-      fields: [
-        { key: 'use_rs', label: 'Enable', type: 'checkbox' },
-        { key: 'benchmark', label: 'Benchmark', type: 'text' },
-        { key: 'rs_period', label: 'RS Period', type: 'number', optimizable: true },
-        { key: 'rs_threshold', label: 'RS Threshold', type: 'number', optimizable: true },
-        { key: 'rs_condition', label: 'Condition', type: 'select', options: ['above', 'below', 'rising', 'falling'] }
-      ]
-    },
-
-    // =============================================
-    // ALERT SYSTEM
-    // =============================================
-    price_alert: {
-      title: 'Price Alert',
-      fields: [
-        { key: 'enabled', label: 'Enable Alert', type: 'checkbox' },
-        { key: 'alert_type', label: 'Alert Type', type: 'select', options: ['crossing', 'above', 'below'] },
-        { key: 'price_level', label: 'Price Level', type: 'number', optimizable: false },
-        { key: 'send_notification', label: 'Send Notification', type: 'checkbox' },
-        { key: 'sound_alert', label: 'Sound Alert', type: 'checkbox' },
-        { key: 'webhook_url', label: 'Webhook URL', type: 'text' }
-      ]
-    },
-    indicator_alert: {
-      title: 'Indicator Alert',
-      fields: [
-        { key: 'enabled', label: 'Enable Alert', type: 'checkbox' },
-        { key: 'indicator', label: 'Indicator', type: 'select', options: ['rsi', 'macd', 'stochastic', 'cci', 'adx'] },
-        { key: 'condition', label: 'Condition', type: 'select', options: ['crosses_above', 'crosses_below', 'above', 'below'] },
-        { key: 'threshold', label: 'Threshold', type: 'number', optimizable: false },
-        { key: 'send_notification', label: 'Send Notification', type: 'checkbox' },
-        { key: 'sound_alert', label: 'Sound Alert', type: 'checkbox' }
-      ]
-    },
-    trade_alert: {
-      title: 'Trade Alert',
-      fields: [
-        { key: 'enabled', label: 'Enable Alert', type: 'checkbox' },
-        { key: 'on_entry', label: 'On Entry', type: 'checkbox' },
-        { key: 'on_exit', label: 'On Exit', type: 'checkbox' },
-        { key: 'on_sl_hit', label: 'On SL Hit', type: 'checkbox' },
-        { key: 'on_tp_hit', label: 'On TP Hit', type: 'checkbox' },
-        { key: 'send_notification', label: 'Send Notification', type: 'checkbox' },
-        { key: 'webhook_url', label: 'Webhook URL', type: 'text' }
-      ]
-    },
-    pnl_alert: {
-      title: 'P&L Alert',
-      fields: [
-        { key: 'enabled', label: 'Enable Alert', type: 'checkbox' },
-        { key: 'profit_threshold', label: 'Profit Threshold %', type: 'number', optimizable: false },
-        { key: 'loss_threshold', label: 'Loss Threshold %', type: 'number', optimizable: false },
-        { key: 'use_percent', label: 'Use Percent', type: 'checkbox' },
-        { key: 'send_notification', label: 'Send Notification', type: 'checkbox' }
-      ]
-    },
-    drawdown_alert: {
-      title: 'Drawdown Alert',
-      fields: [
-        { key: 'enabled', label: 'Enable Alert', type: 'checkbox' },
-        { key: 'drawdown_threshold', label: 'Drawdown Threshold %', type: 'number', optimizable: false },
-        { key: 'send_notification', label: 'Send Notification', type: 'checkbox' },
-        { key: 'pause_trading', label: 'Pause Trading', type: 'checkbox' }
-      ]
-    },
-
-    // =============================================
-    // VISUALIZATION
-    // =============================================
-    show_entries: {
-      title: 'Show Entry Markers',
-      fields: [
-        { key: 'enabled', label: 'Enable', type: 'checkbox' },
-        { key: 'long_color', label: 'Long Color', type: 'color' },
-        { key: 'short_color', label: 'Short Color', type: 'color' },
-        { key: 'marker_size', label: 'Marker Size', type: 'select', options: ['small', 'medium', 'large'] },
-        { key: 'show_label', label: 'Show Label', type: 'checkbox' }
-      ]
-    },
-    show_exits: {
-      title: 'Show Exit Markers',
-      fields: [
-        { key: 'enabled', label: 'Enable', type: 'checkbox' },
-        { key: 'profit_color', label: 'Profit Color', type: 'color' },
-        { key: 'loss_color', label: 'Loss Color', type: 'color' },
-        { key: 'marker_size', label: 'Marker Size', type: 'select', options: ['small', 'medium', 'large'] },
-        { key: 'show_pnl', label: 'Show P&L', type: 'checkbox' }
-      ]
-    },
-    show_sl_tp: {
-      title: 'Show SL/TP Lines',
-      fields: [
-        { key: 'enabled', label: 'Enable', type: 'checkbox' },
-        { key: 'sl_color', label: 'SL Color', type: 'color' },
-        { key: 'tp_color', label: 'TP Color', type: 'color' },
-        { key: 'line_style', label: 'Line Style', type: 'select', options: ['solid', 'dashed', 'dotted'] },
-        { key: 'show_price', label: 'Show Price', type: 'checkbox' }
-      ]
-    },
-    show_indicators: {
-      title: 'Show Indicators on Chart',
-      fields: [
-        { key: 'enabled', label: 'Enable', type: 'checkbox' }
-      ]
-    },
-    show_equity: {
-      title: 'Show Equity Curve',
-      fields: [
-        { key: 'enabled', label: 'Enable', type: 'checkbox' },
-        { key: 'show_drawdown', label: 'Show Drawdown', type: 'checkbox' },
-        { key: 'show_benchmark', label: 'Show Benchmark', type: 'checkbox' },
-        { key: 'benchmark_symbol', label: 'Benchmark Symbol', type: 'text' }
-      ]
-    },
-    show_trades_table: {
-      title: 'Show Trades Table',
-      fields: [
-        { key: 'enabled', label: 'Enable', type: 'checkbox' },
-        { key: 'max_rows', label: 'Max Rows', type: 'number', optimizable: false },
-        { key: 'highlight_winners', label: 'Highlight Winners', type: 'checkbox' }
-      ]
-    },
-
-    // =============================================
-    // MULTIPLE TAKE PROFITS (TP1-TP4)
-    // =============================================
-    multi_tp_enable: {
-      title: 'MULTIPLE TAKE PROFITS',
-      fields: [
-        { key: 'enabled', label: 'Use Multi-TP (TP1-TP4)', type: 'checkbox' },
-        { key: 'tp_count', label: 'Number of TPs (1-4)', type: 'number', optimizable: false },
-        { key: 'close_remaining_at_last', label: 'Close All at Last TP', type: 'checkbox' }
-      ]
-    },
-    tp1_config: {
-      title: 'TP1 CONFIGURATION',
-      fields: [
-        { key: 'enabled', label: 'Enable TP1', type: 'checkbox' },
-        { key: 'percent', label: 'TP1 Target %', type: 'number', optimizable: true },
-        { key: 'close_percent', label: 'Close % of Position', type: 'number', optimizable: false }
-      ]
-    },
-    tp2_config: {
-      title: 'TP2 CONFIGURATION',
-      fields: [
-        { key: 'enabled', label: 'Enable TP2', type: 'checkbox' },
-        { key: 'percent', label: 'TP2 Target %', type: 'number', optimizable: true },
-        { key: 'close_percent', label: 'Close % of Position', type: 'number', optimizable: false }
-      ]
-    },
-    tp3_config: {
-      title: 'TP3 CONFIGURATION',
-      fields: [
-        { key: 'enabled', label: 'Enable TP3', type: 'checkbox' },
-        { key: 'percent', label: 'TP3 Target %', type: 'number', optimizable: true },
-        { key: 'close_percent', label: 'Close % of Position', type: 'number', optimizable: false }
-      ]
-    },
-    tp4_config: {
-      title: 'TP4 CONFIGURATION (FINAL)',
-      fields: [
-        { key: 'enabled', label: 'Enable TP4', type: 'checkbox' },
-        { key: 'percent', label: 'TP4 Target %', type: 'number', optimizable: true },
-        { key: 'close_percent', label: 'Close Remaining %', type: 'number', optimizable: false }
-      ]
-    },
-
-    // =============================================
-    // SIGNAL MEMORY
-    // =============================================
-    signal_memory_enable: {
-      title: 'SIGNAL MEMORY',
-      fields: [
-        { key: 'enabled', label: 'Enable Signal Memory', type: 'checkbox' },
-        { key: 'memory_bars', label: 'Remember for N Bars', type: 'number', optimizable: true },
-        { key: 'execute_condition', label: 'Execute When', type: 'select', options: ['immediately', 'on_confirmation', 'on_pullback'] },
-        { type: 'separator', label: '------- Filter -------' },
-        { key: 'require_filter', label: 'Require Filter Pass', type: 'checkbox' },
-        { key: 'filter_type', label: 'Filter Type', type: 'select', options: ['trend', 'volatility', 'volume'] }
-      ]
-    },
-    cross_memory: {
-      title: 'CROSS MEMORY',
-      fields: [
-        { key: 'enabled', label: 'Remember Cross Signals', type: 'checkbox' },
-        { key: 'memory_bars', label: 'Memory Bars', type: 'number', optimizable: true },
-        { key: 'cross_type', label: 'Cross Type', type: 'select', options: ['ma_cross', 'macd_signal', 'rsi_level', 'stoch_kd'] }
-      ]
-    },
-    pattern_memory: {
-      title: 'PATTERN MEMORY',
-      fields: [
-        { key: 'enabled', label: 'Remember Patterns', type: 'checkbox' },
-        { key: 'memory_bars', label: 'Memory Bars', type: 'number', optimizable: true },
-        { key: 'patterns', label: 'Patterns', type: 'select', options: ['engulfing', 'hammer', 'doji', 'all'] }
+        { type: 'separator', label: '======== General Settings ========' },
+        { key: 'pivot_interval', label: 'Pivot Interval (1-9)', type: 'number', min: 1, max: 9, step: 1, optimizable: true },
+        { key: 'act_without_confirmation', label: 'Act Without Confirmation', type: 'checkbox', hasTooltip: true, tooltip: 'More signals, more false signals' },
+        { key: 'show_divergence_lines', label: 'Show Divergence Lines', type: 'checkbox' },
+        { key: 'activate_diver_signal_memory', label: 'Activate Divergence Signal Memory', type: 'checkbox', hasTooltip: true, tooltip: 'Keep Signal in Memory and execute when other conditions are met' },
+        { key: 'keep_diver_signal_memory_bars', label: 'Keep Signal Memory (bars)', type: 'number', min: 1, max: 100, step: 1, optimizable: true, hasTooltip: true, tooltip: 'How long to Keep Signal in Memory' },
+        { type: 'separator', label: '======== RSI Divergence ========' },
+        { key: 'use_divergence_rsi', label: 'Use RSI Divergence', type: 'checkbox' },
+        { key: 'rsi_period', label: 'RSI Period', type: 'number', min: 1, max: 200, step: 1, optimizable: true },
+        { type: 'separator', label: '======== Stochastic Divergence ========' },
+        { key: 'use_divergence_stochastic', label: 'Use Stochastic Divergence', type: 'checkbox' },
+        { key: 'stoch_length', label: 'Stochastic Length', type: 'number', min: 1, max: 200, step: 1, optimizable: true },
+        { type: 'separator', label: '======== Momentum Divergence ========' },
+        { key: 'use_divergence_momentum', label: 'Use Momentum Divergence', type: 'checkbox' },
+        { key: 'momentum_length', label: 'Momentum Length', type: 'number', min: 1, max: 200, step: 1, optimizable: true },
+        { type: 'separator', label: '======== CMF Divergence ========' },
+        { key: 'use_divergence_cmf', label: 'Use CMF Divergence', type: 'checkbox' },
+        { key: 'cmf_period', label: 'CMF Period', type: 'number', min: 1, max: 200, step: 1, optimizable: true },
+        { type: 'separator', label: '======== OBV Divergence ========' },
+        { key: 'use_obv', label: 'Use OBV Divergence', type: 'checkbox' },
+        { type: 'separator', label: '======== MFI Divergence ========' },
+        { key: 'use_mfi', label: 'Use MFI Divergence', type: 'checkbox' },
+        { key: 'mfi_length', label: 'MFI Length', type: 'number', min: 1, max: 200, step: 1, optimizable: true }
       ]
     }
   };
@@ -7959,7 +4604,7 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
         </div>
       `;
     } else if (field.type === 'select' && !optimizationMode) {
-      const val = (params[field.key] ?? 'chart').toString().toLowerCase();
+      const val = (params[field.key] ?? '').toString().toLowerCase();
       html += `
         <div class="tv-param-row">
           <label class="tv-label">${field.label}</label>
@@ -7968,9 +4613,8 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
                   data-param-key="${field.key}"
                   style="${field.selectStyle || ''}">
             ${field.options.map((opt, idx) => {
-        const optVal = opt.toLowerCase();
         const displayLabel = field.optionLabels ? field.optionLabels[idx] : opt;
-        return `<option value="${optVal}" ${val === optVal ? 'selected' : ''}>${displayLabel}</option>`;
+        return `<option value="${opt}" ${val === opt.toLowerCase() ? 'selected' : ''}>${displayLabel}</option>`;
       }).join('')}
           </select>
         </div>
@@ -8254,22 +4898,6 @@ function getBlockPorts(blockId, _category) {
     },
     atr_exit: {
       inputs: [],
-      outputs: [{ id: 'config', label: '', type: 'config' }]
-    },
-    time_exit: {
-      inputs: [],
-      outputs: [{ id: 'config', label: '', type: 'config' }]
-    },
-    session_exit: {
-      inputs: [],
-      outputs: [{ id: 'config', label: '', type: 'config' }]
-    },
-    break_even_exit: {
-      inputs: [],
-      outputs: [{ id: 'config', label: '', type: 'config' }]
-    },
-    signal_exit: {
-      inputs: [{ id: 'signal', label: '', type: 'condition' }],
       outputs: [{ id: 'config', label: '', type: 'config' }]
     },
     dca: {
@@ -8936,8 +5564,6 @@ function showQuickAddDialog(x, y) {
     { key: 'indicators', label: 'Индикаторы', icon: 'graph-up' },
     { key: 'filters', label: 'Фильтры', icon: 'funnel' },
     { key: 'conditions', label: 'Условия', icon: 'signpost' },
-    { key: 'logic', label: 'Логика', icon: 'diagram-3' },
-    { key: 'actions', label: 'Действия', icon: 'play-circle' },
     { key: 'exits', label: 'Выходы', icon: 'box-arrow-right' }
   ];
 
@@ -9611,45 +6237,7 @@ const blockValidationRules = {
     overbought: { min: 0, max: 100, type: 'number' },
     oversold: { min: 0, max: 100, type: 'number' }
   },
-  stoch_rsi: {
-    rsi_period: { min: 1, max: 500, type: 'number', required: true },
-    stoch_period: { min: 1, max: 500, type: 'number', required: true },
-    k_period: { min: 1, max: 100, type: 'number' },
-    d_period: { min: 1, max: 100, type: 'number' },
-    overbought: { min: 0, max: 100, type: 'number' },
-    oversold: { min: 0, max: 100, type: 'number' }
-  },
-  williams_r: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    overbought: { min: -100, max: 0, type: 'number' },
-    oversold: { min: -100, max: 0, type: 'number' }
-  },
-  mfi: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    overbought: { min: 0, max: 100, type: 'number' },
-    oversold: { min: 0, max: 100, type: 'number' }
-  },
-  cci: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    overbought: { min: -500, max: 500, type: 'number' },
-    oversold: { min: -500, max: 500, type: 'number' }
-  },
-  cmo: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    overbought: { min: -100, max: 100, type: 'number' },
-    oversold: { min: -100, max: 100, type: 'number' }
-  },
-  roc: {
-    period: { min: 1, max: 500, type: 'number', required: true }
-  },
-
   // Trend Indicators
-  sma: { period: { min: 1, max: 500, type: 'number', required: true } },
-  ema: { period: { min: 1, max: 500, type: 'number', required: true } },
-  wma: { period: { min: 1, max: 500, type: 'number', required: true } },
-  dema: { period: { min: 1, max: 500, type: 'number', required: true } },
-  tema: { period: { min: 1, max: 500, type: 'number', required: true } },
-  hull_ma: { period: { min: 1, max: 500, type: 'number', required: true } },
   macd: {
     fast_period: { min: 1, max: 500, type: 'number', required: true },
     slow_period: { min: 1, max: 500, type: 'number', required: true },
@@ -9657,28 +6245,9 @@ const blockValidationRules = {
     macd_cross_zero_level: { min: -1000, max: 1000, type: 'number' },
     signal_memory_bars: { min: 1, max: 100, type: 'number' }
   },
-  adx: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    threshold: { min: 0, max: 100, type: 'number' }
-  },
   supertrend: {
     period: { min: 1, max: 500, type: 'number', required: true },
     multiplier: { min: 0.1, max: 10, type: 'number', required: true }
-  },
-  ichimoku: {
-    tenkan_period: { min: 1, max: 500, type: 'number', required: true },
-    kijun_period: { min: 1, max: 500, type: 'number', required: true },
-    senkou_b_period: { min: 1, max: 500, type: 'number', required: true },
-    displacement: { min: 1, max: 100, type: 'number' }
-  },
-  parabolic_sar: {
-    start: { min: 0.001, max: 1, type: 'number', required: true },
-    increment: { min: 0.001, max: 1, type: 'number', required: true },
-    max_value: { min: 0.01, max: 2, type: 'number', required: true }
-  },
-  aroon: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    threshold: { min: 0, max: 100, type: 'number' }
   },
   qqe: {
     rsi_period: { min: 1, max: 500, type: 'number', required: true },
@@ -9686,23 +6255,68 @@ const blockValidationRules = {
     smoothing_period: { min: 1, max: 100, type: 'number', required: true }
   },
 
-  // Volatility Indicators
-  atr: { period: { min: 1, max: 500, type: 'number', required: true } },
-  atrp: { period: { min: 1, max: 500, type: 'number', required: true } },
-  bollinger: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    std_dev: { min: 0.1, max: 10, type: 'number', required: true }
+  // Universal Filters
+  atr_volatility: {
+    atr_diff_percent: { min: 0.1, max: 50, type: 'number', required: true },
+    atr_length1: { min: 5, max: 20, type: 'number', required: true },
+    atr_length2: { min: 20, max: 100, type: 'number', required: true }
   },
-  keltner: {
-    ema_period: { min: 1, max: 500, type: 'number', required: true },
-    atr_period: { min: 1, max: 500, type: 'number', required: true },
-    multiplier: { min: 0.1, max: 10, type: 'number', required: true }
+  volume_filter: {
+    vol_diff_percent: { min: 0.1, max: 50, type: 'number', required: true },
+    vol_length1: { min: 5, max: 20, type: 'number', required: true },
+    vol_length2: { min: 20, max: 100, type: 'number', required: true }
   },
-  donchian: { period: { min: 1, max: 500, type: 'number', required: true } },
-  stddev: { period: { min: 1, max: 500, type: 'number', required: true } },
-
-  // Volume Indicators
-  cmf: { period: { min: 1, max: 500, type: 'number', required: true } },
+  highest_lowest_bar: {
+    hl_lookback_bars: { min: 1, max: 100, type: 'number', required: true },
+    hl_price_percent: { min: 0, max: 30, type: 'number' },
+    hl_atr_percent: { min: 0, max: 30, type: 'number' },
+    atr_hl_length: { min: 1, max: 50, type: 'number' },
+    block_worse_percent: { min: 0.1, max: 30, type: 'number' }
+  },
+  two_mas: {
+    ma1_length: { min: 1, max: 500, type: 'number', required: true },
+    ma2_length: { min: 1, max: 500, type: 'number', required: true },
+    ma_cross_memory_bars: { min: 1, max: 100, type: 'number' }
+  },
+  accumulation_areas: {
+    backtracking_interval: { min: 1, max: 100, type: 'number', required: true },
+    min_bars_to_execute: { min: 1, max: 100, type: 'number', required: true }
+  },
+  keltner_bollinger: {
+    keltner_length: { min: 0.1, max: 100, type: 'number' },
+    keltner_mult: { min: 0.1, max: 100, type: 'number' },
+    bb_length: { min: 0.1, max: 100, type: 'number' },
+    bb_deviation: { min: 0.1, max: 100, type: 'number' }
+  },
+  rvi_filter: {
+    rvi_length: { min: 1, max: 100, type: 'number', required: true },
+    rvi_ma_length: { min: 1, max: 100, type: 'number' },
+    rvi_long_more: { min: 1, max: 100, type: 'number' },
+    rvi_long_less: { min: 1, max: 100, type: 'number' },
+    rvi_short_less: { min: 1, max: 100, type: 'number' },
+    rvi_short_more: { min: 1, max: 100, type: 'number' }
+  },
+  mfi_filter: {
+    mfi_length: { min: 1, max: 100, type: 'number', required: true },
+    mfi_long_more: { min: 1, max: 100, type: 'number' },
+    mfi_long_less: { min: 1, max: 100, type: 'number' },
+    mfi_short_less: { min: 1, max: 100, type: 'number' },
+    mfi_short_more: { min: 1, max: 100, type: 'number' }
+  },
+  cci_filter: {
+    cci_length: { min: 1, max: 100, type: 'number', required: true },
+    cci_long_more: { min: -400, max: 400, type: 'number' },
+    cci_long_less: { min: -400, max: 400, type: 'number' },
+    cci_short_less: { min: -400, max: 400, type: 'number' },
+    cci_short_more: { min: -400, max: 400, type: 'number' }
+  },
+  momentum_filter: {
+    momentum_length: { min: 1, max: 100, type: 'number', required: true },
+    momentum_long_more: { min: -100, max: 100, type: 'number' },
+    momentum_long_less: { min: -100, max: 100, type: 'number' },
+    momentum_short_less: { min: -100, max: 100, type: 'number' },
+    momentum_short_more: { min: -100, max: 100, type: 'number' }
+  },
 
   // Action Blocks
   stop_loss: {
@@ -9754,17 +6368,6 @@ const blockValidationRules = {
     atr_tp_period: { min: 1, max: 150, type: 'number' },
     atr_tp_multiplier: { min: 0.1, max: 4, type: 'number' }
   },
-  session_exit: {
-    hour: { min: 0, max: 23, type: 'number', required: true },
-    minute: { min: 0, max: 59, type: 'number' }
-  },
-  indicator_exit: {
-    threshold: { min: -1000, max: 1000, type: 'number', required: true }
-  },
-  partial_close: {
-    target: { min: 0.001, max: 100, type: 'number', required: true },
-    percent: { min: 1, max: 100, type: 'number', required: true }
-  },
   multi_tp_exit: {
     tp1: { min: 0.001, max: 1000, type: 'number' },
     tp2: { min: 0.001, max: 1000, type: 'number' },
@@ -9772,54 +6375,6 @@ const blockValidationRules = {
     alloc1: { min: 1, max: 100, type: 'number' },
     alloc2: { min: 1, max: 100, type: 'number' },
     alloc3: { min: 1, max: 100, type: 'number' }
-  },
-  // DCA Close Conditions validation
-  rsi_close: {
-    rsi_close_length: { min: 2, max: 200, type: 'number' },
-    rsi_close_min_profit: { min: 0, max: 100, type: 'number' },
-    rsi_close_reach_long_more: { min: 0, max: 100, type: 'number' },
-    rsi_close_reach_long_less: { min: 0, max: 100, type: 'number' },
-    rsi_close_reach_short_more: { min: 0, max: 100, type: 'number' },
-    rsi_close_reach_short_less: { min: 0, max: 100, type: 'number' },
-    rsi_close_cross_long_level: { min: 0, max: 100, type: 'number' },
-    rsi_close_cross_short_level: { min: 0, max: 100, type: 'number' }
-  },
-  stoch_close: {
-    stoch_close_k_length: { min: 1, max: 200, type: 'number' },
-    stoch_close_k_smooth: { min: 1, max: 50, type: 'number' },
-    stoch_close_d_smooth: { min: 1, max: 50, type: 'number' },
-    stoch_close_min_profit: { min: 0, max: 100, type: 'number' },
-    stoch_close_reach_long_more: { min: 0, max: 100, type: 'number' },
-    stoch_close_reach_long_less: { min: 0, max: 100, type: 'number' },
-    stoch_close_reach_short_more: { min: 0, max: 100, type: 'number' },
-    stoch_close_reach_short_less: { min: 0, max: 100, type: 'number' }
-  },
-  channel_close: {
-    channel_close_keltner_length: { min: 1, max: 200, type: 'number' },
-    channel_close_keltner_mult: { min: 0.1, max: 10, type: 'number' },
-    channel_close_bb_length: { min: 1, max: 200, type: 'number' },
-    channel_close_bb_deviation: { min: 0.1, max: 10, type: 'number' }
-  },
-  ma_close: {
-    ma_close_min_profit: { min: 0, max: 100, type: 'number' },
-    ma_close_ma1_length: { min: 1, max: 500, type: 'number' },
-    ma_close_ma2_length: { min: 1, max: 500, type: 'number' }
-  },
-  psar_close: {
-    psar_close_min_profit: { min: 0, max: 100, type: 'number' },
-    psar_close_start: { min: 0.001, max: 1, type: 'number' },
-    psar_close_increment: { min: 0.001, max: 1, type: 'number' },
-    psar_close_maximum: { min: 0.01, max: 1, type: 'number' },
-    psar_close_nth_bar: { min: 0, max: 100, type: 'number' }
-  },
-  time_bars_close: {
-    close_after_bars: { min: 1, max: 1000, type: 'number' },
-    close_min_profit: { min: 0, max: 100, type: 'number' },
-    close_max_bars: { min: 1, max: 10000, type: 'number' }
-  },
-  break_even_exit: {
-    trigger: { min: 0.001, max: 100, type: 'number', required: true },
-    offset: { min: -10, max: 10, type: 'number' }
   },
   static_sltp: {
     take_profit_percent: { min: 0.01, max: 100, type: 'number', required: true },
@@ -9843,36 +6398,17 @@ const blockValidationRules = {
     max_value: { type: 'number', required: true }
   },
 
-  // Price Action Patterns (no numeric validation needed)
-  engulfing: {},
-  hammer: { min_wick_ratio: { min: 0.1, max: 10, type: 'number' } },
-  doji: { body_threshold: { min: 0.01, max: 1, type: 'number' } },
-  pin_bar: { min_wick_ratio: { min: 0.1, max: 10, type: 'number' } },
-  inside_bar: {},
-  outside_bar: {},
-  three_white_soldiers: {},
-  morning_star: {},
-  hammer_hangman: { min_wick_ratio: { min: 0.1, max: 10, type: 'number' } },
-  doji_patterns: { body_threshold: { min: 0.01, max: 1, type: 'number' } },
-  shooting_star: { min_wick_ratio: { min: 0.1, max: 10, type: 'number' } },
-  marubozu: { max_wick_ratio: { min: 0.01, max: 1, type: 'number' } },
-  tweezer: { tolerance: { min: 0.0001, max: 0.1, type: 'number' } },
-  three_methods: {},
-  piercing_darkcloud: {},
-  harami: {},
+  // (divergence validation rules cleared — new blocks will be added)
 
-  // Divergence
-  // (macd_divergence validation removed — consolidated into universal MACD block)
-  stoch_divergence: {
-    k_period: { min: 1, max: 500, type: 'number', required: true },
-    d_period: { min: 1, max: 100, type: 'number' }
-  },
-  obv_divergence: {
-    lookback: { min: 5, max: 200, type: 'number' }
-  },
-  mfi_divergence: {
-    period: { min: 1, max: 500, type: 'number', required: true },
-    lookback: { min: 5, max: 200, type: 'number' }
+  // Divergence Detection
+  divergence: {
+    pivot_interval: { min: 1, max: 9, type: 'number', required: true },
+    keep_diver_signal_memory_bars: { min: 1, max: 100, type: 'number' },
+    rsi_period: { min: 1, max: 200, type: 'number' },
+    stoch_length: { min: 1, max: 200, type: 'number' },
+    momentum_length: { min: 1, max: 200, type: 'number' },
+    cmf_period: { min: 1, max: 200, type: 'number' },
+    mfi_length: { min: 1, max: 200, type: 'number' }
   }
 };
 
@@ -10026,8 +6562,15 @@ function validateParamInput(input) {
 function updateBlockParam(blockId, param, value) {
   const block = strategyBlocks.find((b) => b.id === blockId);
   if (block) {
-    // Store the value
-    const parsedValue = isNaN(value) ? value : parseFloat(value);
+    // Store the value — preserve booleans and strings, only parse numeric strings
+    let parsedValue;
+    if (typeof value === 'boolean') {
+      parsedValue = value;                            // checkbox true/false
+    } else if (typeof value === 'string' && value !== '' && !isNaN(value)) {
+      parsedValue = parseFloat(value);                // numeric string → number
+    } else {
+      parsedValue = value;                            // string (select), empty, etc.
+    }
     block.params[param] = parsedValue;
 
     // Update hint on the block without full re-render
@@ -10514,12 +7057,30 @@ function initConnectionSystem() {
   const _canvas = document.getElementById('connectionsCanvas');
   const container = document.getElementById('canvasContainer');
 
-  // Listen for port clicks
+  // Listen for port clicks (left button — start connection)
   container.addEventListener('mousedown', (e) => {
     const port = e.target.closest('.port');
     if (port) {
       e.stopPropagation();
       startConnection(port, e);
+    }
+  });
+
+  // Right-click on port — disconnect all connections from that port
+  container.addEventListener('contextmenu', (e) => {
+    const port = e.target.closest('.port');
+    if (port) {
+      e.preventDefault();
+      e.stopPropagation();
+      disconnectPort(port);
+      return;
+    }
+    // Right-click on connection line — delete that connection
+    const connLine = e.target.closest('.connection-line');
+    if (connLine && connLine.dataset.connectionId) {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteConnection(connLine.dataset.connectionId);
     }
   });
 
@@ -10963,6 +7524,13 @@ function renderConnections() {
       deleteConnection(conn.id);
     });
 
+    // Delete on right-click
+    path.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteConnection(conn.id);
+    });
+
     svg.appendChild(path);
 
     // Mark ports as connected
@@ -10990,6 +7558,42 @@ function deleteConnection(connectionId) {
     renderConnections();
     renderBlocks(); // Update port states
   }
+}
+
+/**
+ * Disconnect all connections from a specific port (right-click on port).
+ * Removes every connection where the port is either source or target.
+ * @param {HTMLElement} portElement - The .port DOM element
+ */
+function disconnectPort(portElement) {
+  const blockId = portElement.dataset.blockId;
+  const portId = portElement.dataset.portId;
+  const direction = portElement.dataset.direction;
+
+  if (!blockId || !portId) return;
+
+  // Find all connections involving this port
+  const toRemove = connections.filter(c => {
+    if (direction === 'output') {
+      return c.source.blockId === blockId && c.source.portId === portId;
+    } else {
+      return c.target.blockId === blockId && c.target.portId === portId;
+    }
+  });
+
+  if (toRemove.length === 0) return;
+
+  pushUndo();
+  const removeIds = new Set(toRemove.map(c => c.id));
+  for (let i = connections.length - 1; i >= 0; i--) {
+    if (removeIds.has(connections[i].id)) {
+      connections.splice(i, 1);
+    }
+  }
+
+  renderConnections();
+  renderBlocks();
+  console.log(`[Strategy Builder] Disconnected ${toRemove.length} connection(s) from port ${portId} on block ${blockId}`);
 }
 
 // Modal functions
@@ -12519,9 +9123,8 @@ function updateZoom() {
 // EXIT BLOCK TYPES (standalone — backend reads from builder_blocks, no connections needed)
 // =============================================
 const EXIT_BLOCK_TYPES = new Set([
-  'static_sltp', 'trailing_stop_exit', 'atr_exit', 'time_exit',
-  'session_exit', 'break_even_exit', 'chandelier_exit',
-  'partial_close', 'multi_tp_exit',
+  'static_sltp', 'trailing_stop_exit', 'atr_exit',
+  'multi_tp_exit',
   'tp_percent', 'sl_percent',
   'rsi_close', 'stoch_close', 'channel_close', 'ma_close',
   'psar_close', 'time_bars_close'

@@ -1,4 +1,4 @@
-"""
+r"""
 🔍 LIVE DEMO: AI Agents Explore Project Structure
 
 DeepSeek и Qwen получают реальный tool calling:
@@ -345,8 +345,8 @@ async def main():
 
     header("🔍 AI Agents Explore Project Structure")
     print(f"  Дата: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"  DeepSeek: deepseek-chat (Architect)")
-    print(f"  Qwen: qwen-flash (Reviewer, Singapore)")
+    print("  DeepSeek: deepseek-chat (Architect)")
+    print("  Qwen: qwen-flash (Reviewer, Singapore)")
     print(f"  Проект: {PROJECT_ROOT.name}")
     print()
 
@@ -478,8 +478,8 @@ async def main():
     header("📊 ИТОГИ")
     print(f"  ⏱  Время: {elapsed:.1f}s")
     print(f"  📡 API вызовов: {total_api_calls}")
-    print(f"  🏗  DeepSeek: deepseek-chat (Architect + tool calling)")
-    print(f"  🔍  Qwen: qwen-flash (Reviewer + tool calling)")
+    print("  🏗  DeepSeek: deepseek-chat (Architect + tool calling)")
+    print("  🔍  Qwen: qwen-flash (Reviewer + tool calling)")
     print(f"  📁  Проект: {PROJECT_ROOT.name}")
     print()
 

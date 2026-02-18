@@ -270,7 +270,7 @@ class TestAIBacktestAnalyzerAnalyze:
 
     @pytest.mark.asyncio
     async def test_analyze_backtest_with_mock_llm(self, analyzer, sample_metrics, mock_llm_response):
-        """Test full analyze_backtest flow with mocked LLM"""
+        """Test full analyze_backtest flow with mocked LLM (3 agents)"""
         with patch.object(analyzer, "_call_llm", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = mock_llm_response
 
@@ -287,12 +287,13 @@ class TestAIBacktestAnalyzerAnalyze:
         assert result.sharpe_ratio == 1.8
         assert result.strategy_name == "Momentum RSI"
         assert len(result.ai_summary) > 0
-        assert result.ai_confidence == 0.8
         assert result.overfitting_risk == "low"
+        # Default agents: deepseek, qwen, perplexity → 3 calls
+        assert mock_call.call_count == 3
 
     @pytest.mark.asyncio
     async def test_analyze_backtest_llm_failure(self, analyzer, sample_metrics):
-        """Test analyze_backtest when LLM call fails"""
+        """Test analyze_backtest when LLM call fails for all agents"""
         with patch.object(analyzer, "_call_llm", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = ""  # Empty response simulates failure
 
@@ -305,12 +306,14 @@ class TestAIBacktestAnalyzerAnalyze:
 
         assert isinstance(result, AIBacktestResult)
         assert result.ai_confidence == 0.0  # No summary → 0 confidence
-        # _parse_analysis("") initializes summary to "" (key exists)
-        assert result.ai_summary == ""
+        # _merge_analyses([]) returns default summary
+        assert isinstance(result.ai_summary, str)
+        # All 3 agents called, all returned ""
+        assert mock_call.call_count == 3
 
     @pytest.mark.asyncio
     async def test_analyze_backtest_default_agents(self, analyzer, sample_metrics):
-        """Test that default agents is ['deepseek']"""
+        """Test that default agents are ['deepseek', 'qwen', 'perplexity']"""
         with patch.object(analyzer, "_call_llm", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = "SUMMARY: Test"
 
@@ -321,10 +324,12 @@ class TestAIBacktestAnalyzerAnalyze:
                 timeframe="1h",
             )
 
-            # Should call with 'deepseek' (first of default agents)
-            mock_call.assert_called_once()
-            call_args = mock_call.call_args
-            assert call_args[0][0] == "deepseek"
+            # Should call all 3 default agents
+            assert mock_call.call_count == 3
+            called_agents = [call.args[0] for call in mock_call.call_args_list]
+            assert "deepseek" in called_agents
+            assert "qwen" in called_agents
+            assert "perplexity" in called_agents
 
     @pytest.mark.asyncio
     async def test_analyze_backtest_custom_agents(self, analyzer, sample_metrics):

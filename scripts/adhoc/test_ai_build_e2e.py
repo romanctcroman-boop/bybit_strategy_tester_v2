@@ -144,7 +144,7 @@ def test_ai_build_ema_cross():
     if results:
         # Backtest endpoint returns metrics under "results" key
         metrics = results.get("results", results.get("metrics", {}))
-        print(f"\n📈 Backtest Results:")
+        print("\n📈 Backtest Results:")
         print(f"   Total Trades: {metrics.get('total_trades', 'N/A')}")
         print(f"   Net Profit: {metrics.get('net_profit', 'N/A')}")
         print(f"   Win Rate: {metrics.get('win_rate', 'N/A')}")
@@ -193,10 +193,10 @@ def verify_strategy(strategy_id: str):
     if missing_cat:
         print(f"   ⚠️  Blocks WITHOUT category: {missing_cat}")
     else:
-        print(f"   ✅ All blocks have category field")
+        print("   ✅ All blocks have category field")
 
     # Check connections
-    print(f"\n   Connections:")
+    print("\n   Connections:")
     for c in connections:
         src = c.get("source", {})
         tgt = c.get("target", {})
@@ -210,7 +210,7 @@ def verify_strategy(strategy_id: str):
     if main_nodes:
         print(f"   ✅ Main strategy node found: {main_nodes[0].get('id')}")
     else:
-        print(f"   ❌ No main strategy node found!")
+        print("   ❌ No main strategy node found!")
 
     return strat
 

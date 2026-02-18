@@ -16,9 +16,12 @@
         <link rel="stylesheet" href="./css/variables.css" />
         <link rel="stylesheet" href="./css/components.css" />
         <link rel="stylesheet" href="./css/common.css" />
-        <link rel="stylesheet" href="./css/backtest_results.css?v=20260213b" />
+        <link rel="stylesheet" href="./css/backtest_results.css?v=20260217j" />
         <!-- AI Assistant CSS -->
         <link rel="stylesheet" href="./css/ai-assistant.css" />
+
+        <!-- TradingView Lightweight Charts (for candlestick chart) -->
+        <script src="libs/lightweight-charts.js"></script>
 
         <link
             href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/css/tabulator_bootstrap5.min.css"
@@ -216,6 +219,9 @@
                                 <button class="tv-report-tab active" data-tab="equity">
                                     <i class="bi bi-graph-up me-1"></i>График капитала
                                 </button>
+                                <button class="tv-report-tab" data-tab="price-chart">
+                                    <i class="bi bi-candlestick-chart me-1"></i>График цены
+                                </button>
                                 <button class="tv-report-tab" data-tab="dynamics">
                                     <i class="bi bi-bar-chart me-1"></i>Динамика
                                 </button>
@@ -315,6 +321,7 @@
                                             <label
                                                 class="tv-legend-item"
                                                 title="Наложение режимов рынка (тренд/боковик/волатильность) на график"
+                                                style="display: none"
                                             >
                                                 <input type="checkbox" id="legendRegimeOverlay" />
                                                 <span class="tv-legend-color tv-legend-color-regime"></span>
@@ -328,6 +335,41 @@
                                             <button class="tv-mode-btn" id="btnPercentMode">Проценты</button>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab: График цены (Price Chart - Candlestick with Trade Markers) -->
+                        <div class="tv-report-tab-content" id="tab-price-chart">
+                            <div class="bt-price-chart-section">
+                                <div class="bt-price-chart-header">
+                                    <span class="bt-price-chart-title" id="priceChartTitle">
+                                        <i class="bi bi-graph-up-arrow me-1"></i>
+                                        График цены
+                                    </span>
+                                    <div class="bt-price-chart-legend">
+                                        <span class="bt-legend-entry">
+                                            <span class="bt-legend-marker bt-marker-long"></span> Вход Long
+                                        </span>
+                                        <span class="bt-legend-entry">
+                                            <span class="bt-legend-marker bt-marker-short"></span> Вход Short
+                                        </span>
+                                        <span class="bt-legend-entry">
+                                            <span class="bt-legend-marker bt-marker-exit"></span> Выход (TP/SL)
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="bt-price-chart-container" id="btPriceChartContainer">
+                                    <div id="btCandlestickChart"></div>
+                                    <div class="bt-price-chart-loading" id="btPriceChartLoading">
+                                        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span class="ms-2 text-secondary">Загрузка свечных данных...</span>
+                                    </div>
+                                </div>
+                                <div class="bt-price-chart-info" id="btPriceChartInfo">
+                                    <span id="btChartOHLC" class="text-secondary"> O: -- H: -- L: -- C: -- </span>
                                 </div>
                             </div>
                         </div>
@@ -938,7 +980,7 @@
                                     </div>
                                 </div>
 
-                                <div class="col-12" id="mtfSettingsPanel" style="display: none">
+                                <div class="col-12 d-none" id="mtfSettingsPanel">
                                     <div class="card bg-secondary bg-opacity-25 border-secondary mt-2">
                                         <div class="card-body">
                                             <h6 class="card-subtitle mb-3 text-info">
@@ -1034,10 +1076,7 @@
                                                 </div>
                                             </div>
 
-                                            <div
-                                                class="alert alert-info alert-sm mt-3 mb-0 py-2"
-                                                style="font-size: 0.85rem"
-                                            >
+                                            <div class="alert alert-info alert-sm mt-3 mb-0 py-2 small-alert">
                                                 <i class="bi bi-info-circle me-1"></i>
                                                 <strong>MTF Mode:</strong> Only trade LTF signals when aligned with HTF
                                                 trend. BTC filter adds market sentiment confirmation.
@@ -1061,7 +1100,7 @@
                                     </div>
                                 </div>
 
-                                <div class="col-12" id="optimizeSettingsPanel" style="display: none">
+                                <div class="col-12 d-none" id="optimizeSettingsPanel">
                                     <div class="card bg-secondary bg-opacity-25 border-secondary mt-2">
                                         <div class="card-body">
                                             <h6 class="card-subtitle mb-3 text-warning">
@@ -1261,10 +1300,7 @@
                                                 </div>
                                             </div>
 
-                                            <div
-                                                class="alert alert-warning alert-sm mt-3 mb-0 py-2"
-                                                style="font-size: 0.85rem"
-                                            >
+                                            <div class="alert alert-warning alert-sm mt-3 mb-0 py-2 small-alert">
                                                 <i class="bi bi-lightning-charge me-1"></i>
                                                 <strong>Bayesian:</strong> Smart search using TPE sampler.
                                                 <strong>Genetic:</strong> Evolution-based optimization. Both find
@@ -1299,7 +1335,7 @@
         <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
         <!-- TradingView-style Equity Chart Component -->
-        <script src="./js/components/TradingViewEquityChart.js?v=20260213b"></script>
+        <script src="./js/components/TradingViewEquityChart.js?v=20260217"></script>
 
         <!-- Custom plugin for donut center text -->
         <script>
@@ -1363,7 +1399,7 @@
                 .catch((e) => console.error('API error:', e));
         </script>
 
-        <script type="module" src="./js/pages/backtest_results.js?v=20260213b"></script>
+        <script type="module" src="./js/pages/backtest_results.js?v=20260217j"></script>
 
         <!-- Fallback: if module fails, load data manually after 2 seconds -->
         <script>

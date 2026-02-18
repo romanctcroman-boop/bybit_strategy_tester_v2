@@ -40,6 +40,14 @@ let winLossDonutChart = null;
 // Dynamics Charts
 let waterfallChart = null;
 let benchmarkingChart = null;
+// Price Chart (LightweightCharts candlestick)
+let btPriceChart = null;
+let btCandleSeries = null;
+let btPriceChartMarkers = [];
+let btTradeLineSeries = []; // eslint-disable-line no-unused-vars -- entry→exit price lines (cleaned on chart destroy)
+let btPriceChartPending = false; // true when chart needs (re-)creation on tab show
+let _priceChartGeneration = 0; // generation counter to cancel stale async renders
+let _priceChartResizeObserver = null; // stored so we can disconnect on chart rebuild
 
 // ============================
 // Equity trade markers (TradingView-like)
@@ -147,6 +155,8 @@ const tradeExcursionBarsPlugin = {
     try {
       if (!pluginOptions?.enabled) return;
       if (!chart || chart.canvas?.id !== 'equityChart') return;
+      // Respect the Trades excursions toggle checkbox
+      if (chart._showTradeExcursions === false) return;
 
       const tradeRanges = chart._tradeRanges;
       const tradeMap = chart._tradeMap;
@@ -168,6 +178,42 @@ const tradeExcursionBarsPlugin = {
 
       // Get y=0 pixel position
       const y0 = yScale.getPixelForValue(0);
+
+      // ===== ADAPTIVE EXCURSION SCALING =====
+      // When MFE/MAE values are tiny compared to Y-axis range,
+      // scale them up so P75 bar occupies ~20% of visible chart height.
+      // This ensures bars are readable for 14 trades AND 418 trades.
+      const yAxisRange = Math.abs(
+        (yScale.max || 0) - (yScale.min || 0)
+      );
+      const targetBarFraction = 0.08; // P75 bar = 8% of Y-axis range
+      const targetBarValue = yAxisRange * targetBarFraction;
+
+      // Calculate P75 of MFE and MAE
+      const mfeVals = tradeRanges
+        .map((r) => Math.abs(r.mfe || 0))
+        .filter((v) => v > 0)
+        .sort((a, b) => a - b);
+      const maeVals = tradeRanges
+        .map((r) => Math.abs(r.mae || 0))
+        .filter((v) => v > 0)
+        .sort((a, b) => a - b);
+      const getP75 = (arr) =>
+        arr.length > 0
+          ? arr[Math.min(Math.floor(arr.length * 0.75), arr.length - 1)]
+          : 0;
+      const maxP75 = Math.max(getP75(mfeVals), getP75(maeVals));
+
+      // Scale factor: only scale UP (never shrink), cap at 1x if bars already big enough
+      let excursionScale = 1;
+      if (maxP75 > 0 && targetBarValue > 0) {
+        const rawScale = targetBarValue / maxP75;
+        // Only apply scaling if bars would be less than target size
+        // Use smooth scaling: 1x when bars are big, up to rawScale when tiny
+        excursionScale = Math.max(1, rawScale);
+        // Cap at 2.5x to avoid oversized bars
+        excursionScale = Math.min(excursionScale, 2.5);
+      }
 
       // Adaptive gap: 5px for few trades → 1px for many trades (linear interpolation)
       const numTrades = tradeRanges.length;
@@ -201,17 +247,22 @@ const tradeExcursionBarsPlugin = {
 
       // Process each trade
       tradeRanges.forEach((range, idx) => {
-        const mfe = Math.abs(range.mfe || 0);
-        const mae = Math.abs(range.mae || 0);
+        const mfe = Math.abs(range.mfe || 0) * excursionScale;
+        const mae = Math.abs(range.mae || 0) * excursionScale;
 
-        // Get trade P&L for realized portion
+        // Get trade P&L for realized portion (also scaled)
         const tradeInfo = Object.values(tradeMap || {}).find(
           (ti) => ti.tradeNum === idx + 1
         );
         const tradePnL = tradeInfo?.pnl || 0;
-        const realizedProfit = tradePnL > 0 ? Math.min(tradePnL, mfe) : 0;
+        const realizedProfit =
+          tradePnL > 0
+            ? Math.min(Math.abs(tradePnL) * excursionScale, mfe)
+            : 0;
         const realizedLoss =
-          tradePnL < 0 ? Math.min(Math.abs(tradePnL), mae) : 0;
+          tradePnL < 0
+            ? Math.min(Math.abs(tradePnL) * excursionScale, mae)
+            : 0;
 
         // Calculate X position SEQUENTIALLY by trade index (not by time)
         // This ensures all bars are evenly distributed and visible
@@ -512,6 +563,7 @@ function initCharts() {
         ...chartOptions,
         responsive: true,
         maintainAspectRatio: false,
+        onClick: handleEquityChartClick,
         interaction: {
           mode: 'index',
           intersect: false
@@ -744,6 +796,10 @@ function initCharts() {
         }
       }
     });
+
+    // Add pointer cursor to indicate equity chart is clickable (navigates to price chart)
+    equityCanvas.style.cursor = 'pointer';
+    equityCanvas.title = 'Click to navigate to price chart at this point';
   }
 
   // Drawdown Chart
@@ -1066,6 +1122,16 @@ function initTradingViewTabs() {
       if (content) {
         content.classList.add('active');
       }
+
+      // Lazy-init price chart when its tab becomes visible (needs non-zero container dimensions)
+      if (targetTab === 'price-chart') {
+        console.log('[TabClick] price-chart tab clicked, pending=', btPriceChartPending,
+          'currentBacktest=', currentBacktest?.config?.symbol, currentBacktest?.config?.interval);
+        if (btPriceChartPending && currentBacktest) {
+          btPriceChartPending = false;
+          updatePriceChart(currentBacktest);
+        }
+      }
     });
   });
 
@@ -1088,6 +1154,7 @@ function initChartLegendControls() {
       if (equityChart) {
         // Dataset 1 is "Покупка и удержание"
         equityChart.data.datasets[1].hidden = !legendBuyHold.checked;
+        recalcEquityYAxis();
         equityChart.update('none');
       }
     });
@@ -1109,6 +1176,7 @@ function initChartLegendControls() {
         window.tvEquityChart.options.showTradeExcursions =
           legendTradesExcursions.checked;
       }
+      recalcEquityYAxis();
       equityChart.update('none');
     }
 
@@ -1124,6 +1192,7 @@ function initChartLegendControls() {
           window.tvEquityChart.options.showTradeExcursions =
             legendTradesExcursions.checked;
         }
+        recalcEquityYAxis();
         equityChart.update('none');
       }
     });
@@ -3137,6 +3206,69 @@ function findClosestIndex(sortedData, targetTime, getTime) {
   return left;
 }
 
+/**
+ * Adaptive Y-axis recalculation for equity chart.
+ * Considers only currently VISIBLE layers (strategy P&L, B&H, MFE/MAE bars).
+ * Called on initial render AND on every toggle change.
+ */
+function recalcEquityYAxis() {
+  if (!equityChart) return;
+
+  let yMin = Infinity;
+  let yMax = -Infinity;
+
+  const addRange = (arr) => {
+    if (!arr) return;
+    arr.forEach((v) => {
+      if (v !== null && v !== undefined && Number.isFinite(v)) {
+        yMin = Math.min(yMin, v);
+        yMax = Math.max(yMax, v);
+      }
+    });
+  };
+
+  // Always include strategy P&L (dataset 0 — always visible)
+  addRange(equityChart.data.datasets[0]?.data);
+
+  // Include Buy & Hold only if visible
+  const bhDataset = equityChart.data.datasets[1];
+  if (bhDataset && !bhDataset.hidden) {
+    addRange(bhDataset.data);
+  }
+
+  // Include MFE/MAE excursion bars only if visible
+  const tradeRanges = equityChart._tradeRanges;
+  if (equityChart._showTradeExcursions !== false && tradeRanges?.length > 0) {
+    const mfeValues = tradeRanges
+      .map((r) => Math.abs(r.mfe || 0))
+      .filter((v) => v > 0)
+      .sort((a, b) => a - b);
+    const maeValues = tradeRanges
+      .map((r) => Math.abs(r.mae || 0))
+      .filter((v) => v > 0)
+      .sort((a, b) => a - b);
+
+    // P75 (75th percentile) — soft cap so outliers don't blow up the scale
+    const getP75 = (arr) =>
+      arr.length > 0
+        ? arr[Math.min(Math.floor(arr.length * 0.75), arr.length - 1)]
+        : 0;
+
+    const mfeP75 = getP75(mfeValues);
+    const maeP75 = getP75(maeValues);
+
+    if (mfeP75 > 0) yMax = Math.max(yMax, mfeP75 * 1.15);
+    if (maeP75 > 0) yMin = Math.min(yMin, -maeP75 * 1.15);
+  }
+
+  // Apply 5% padding for visual comfort
+  if (Number.isFinite(yMin) && Number.isFinite(yMax) && yMax > yMin) {
+    const padding = (yMax - yMin) * 0.05;
+    equityChart.options.scales.y.min = yMin - padding;
+    equityChart.options.scales.y.max = yMax + padding;
+  }
+}
+
 function updateCharts(backtest) {
   console.log(
     '[updateCharts] called with backtest:',
@@ -3333,40 +3465,8 @@ function updateCharts(backtest) {
         originalEquityData = [...pnlValues];
         originalBuyHoldData = [...buyHoldPnL];
 
-        // ===== VERTICAL SCALE STABILITY (Anti-Rescaling Pattern) =====
-        // Calculate fixed Y-axis range based on ALL data (equity + buy&hold)
-        // This prevents the Y-axis from rescaling when toggling the B&H dataset,
-        // which would cause the MFE/MAE excursion bars to change visual height.
-        let yMin = Infinity;
-        let yMax = -Infinity;
-
-        // Include strategy P&L data
-        pnlValues.forEach((v) => {
-          if (v !== null && v !== undefined && Number.isFinite(v)) {
-            yMin = Math.min(yMin, v);
-            yMax = Math.max(yMax, v);
-          }
-        });
-
-        // Include Buy & Hold data (always, even when hidden)
-        buyHoldPnL.forEach((v) => {
-          if (v !== null && v !== undefined && Number.isFinite(v)) {
-            yMin = Math.min(yMin, v);
-            yMax = Math.max(yMax, v);
-          }
-        });
-
-        // Apply 5% padding to the range for visual comfort
-        if (Number.isFinite(yMin) && Number.isFinite(yMax) && yMax > yMin) {
-          const padding = (yMax - yMin) * 0.05;
-          yMin -= padding;
-          yMax += padding;
-
-          // Apply fixed min/max to Y-axis
-          equityChart.options.scales.y.min = yMin;
-          equityChart.options.scales.y.max = yMax;
-        }
-        // ===== END VERTICAL SCALE STABILITY =====
+        // Calculate adaptive Y-axis and apply
+        recalcEquityYAxis();
 
         // Trade Excursion Bars are now drawn by tradeExcursionBarsPlugin
         // using _tradeRanges and _tradeMap stored above
@@ -3987,6 +4087,18 @@ function updateCharts(backtest) {
       console.warn('[updateCharts] benchmarkingChart error:', e.message);
     }
   }
+
+  // Price Chart (LightweightCharts candlestick with trade markers)
+  // Always mark as pending so a tab switch will trigger a refresh.
+  // If the tab is already active, also kick off an immediate render.
+  btPriceChartPending = true;
+  const priceTab = document.getElementById('tab-price-chart');
+  const priceTabActive = priceTab && priceTab.classList.contains('active');
+  console.log('[updateCharts] Price chart: pending=true, tabActive=', priceTabActive,
+    'symbol=', backtest.config?.symbol, 'interval=', backtest.config?.interval);
+  if (priceTabActive) {
+    updatePriceChart(backtest);
+  }
 }
 
 // eslint-disable-next-line no-unused-vars
@@ -4157,7 +4269,7 @@ function toggleMtfSettings() {
   const checkbox = document.getElementById('btMtfEnabled');
   const panel = document.getElementById('mtfSettingsPanel');
   if (panel) {
-    panel.style.display = checkbox?.checked ? 'block' : 'none';
+    panel.classList.toggle('d-none', !checkbox?.checked);
   }
 }
 
@@ -4168,7 +4280,7 @@ function toggleOptimizeSettings() {
   const checkbox = document.getElementById('btOptimizeEnabled');
   const panel = document.getElementById('optimizeSettingsPanel');
   if (panel) {
-    panel.style.display = checkbox?.checked ? 'block' : 'none';
+    panel.classList.toggle('d-none', !checkbox?.checked);
   }
 }
 
@@ -4236,8 +4348,14 @@ async function runBacktest() {
 async function requestAIAnalysis() {
   if (!currentBacktest) return;
 
+  const btn = document.querySelector('[onclick="requestAIAnalysis()"]');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Анализируем...';
+  }
+
   try {
-    showToast('Generating AI analysis...', 'info');
+    showToast('Generating AI analysis (3 agents)...', 'info');
 
     const response = await fetch(`${API_BASE}/agents/backtest/ai-analyze`, {
       method: 'POST',
@@ -4247,15 +4365,79 @@ async function requestAIAnalysis() {
 
     const analysis = await response.json();
 
-    document.getElementById('aiAnalysisContent').innerHTML = `
-                    <strong>AI Recommendation:</strong><br>
-                    ${analysis.recommendation || analysis.analysis || 'No detailed analysis available.'}
-                `;
+    // Build rich HTML from AI analysis
+    const summary = analysis.summary || analysis.recommendation || analysis.analysis || 'No summary available';
+    const risk = analysis.risk_assessment || '';
+    const strengths = analysis.strengths || [];
+    const weaknesses = analysis.weaknesses || [];
+    const recs = analysis.recommendations || [];
+    const grade = analysis.grade || '';
+    const confidence = analysis.confidence ? (analysis.confidence * 100).toFixed(0) : '';
+    const overfitRisk = analysis.overfitting_risk || '';
+    const regime = analysis.market_regime || '';
+    const agents = analysis.agents_used || [];
+
+    const overfitClass = { low: 'success', medium: 'warning', high: 'danger' }[overfitRisk] || 'secondary';
+
+    let html = '<div class="ai-result-card">';
+
+    // Grade & confidence badge row
+    if (grade || confidence) {
+      html += '<div class="d-flex gap-2 mb-2 flex-wrap">';
+      if (grade) html += `<span class="badge bg-primary fs-6">Оценка: ${grade}</span>`;
+      if (confidence) html += `<span class="badge bg-info fs-6">Уверенность: ${confidence}%</span>`;
+      if (overfitRisk) html += `<span class="badge bg-${overfitClass} fs-6">Переобучение: ${overfitRisk}</span>`;
+      if (regime) html += `<span class="badge bg-secondary fs-6">Режим: ${regime}</span>`;
+      html += '</div>';
+    }
+
+    // Summary
+    html += `<div class="mb-2"><strong>📊 Резюме:</strong><br>${summary}</div>`;
+
+    // Risk assessment
+    if (risk) {
+      html += `<div class="mb-2"><strong>⚠️ Оценка рисков:</strong><br>${risk}</div>`;
+    }
+
+    // Strengths
+    if (strengths.length > 0) {
+      html += '<div class="mb-2"><strong>✅ Сильные стороны:</strong><ul>';
+      strengths.forEach(s => { html += `<li>${s}</li>`; });
+      html += '</ul></div>';
+    }
+
+    // Weaknesses
+    if (weaknesses.length > 0) {
+      html += '<div class="mb-2"><strong>❌ Слабые стороны:</strong><ul>';
+      weaknesses.forEach(w => { html += `<li>${w}</li>`; });
+      html += '</ul></div>';
+    }
+
+    // Recommendations
+    if (recs.length > 0) {
+      html += '<div class="mb-2"><strong>💡 Рекомендации:</strong><ol>';
+      recs.forEach(r => { html += `<li>${r}</li>`; });
+      html += '</ol></div>';
+    }
+
+    // Agents footer
+    if (agents.length > 0) {
+      html += `<div class="text-muted small mt-2">🤖 Агенты: ${agents.join(', ')}</div>`;
+    }
+
+    html += '</div>';
+
+    document.getElementById('aiAnalysisContent').innerHTML = html;
 
     showToast('AI analysis complete', 'success');
   } catch (error) {
     console.error('AI analysis failed:', error);
-    showToast('AI analysis failed', 'error');
+    showToast('AI analysis failed: ' + error.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-robot"></i> Сгенерировать анализ';
+    }
   }
 }
 
@@ -4409,6 +4591,612 @@ function showToast(message, type = 'info') {
             `;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
+}
+
+// ============================================
+// PRICE CHART — LightweightCharts Candlestick
+// ============================================
+
+/**
+ * Fire-and-forget: trigger background kline sync for a symbol.
+ * Ensures all timeframes are downloaded from Bybit API into the DB
+ * so the chart has candles available for the full backtest range.
+ * Uses the existing POST /symbols/sync-all-tf endpoint.
+ */
+const _syncTriggeredSymbols = new Set();
+function triggerBackgroundKlineSync(symbol) {
+  // Only trigger once per symbol per page session
+  if (_syncTriggeredSymbols.has(symbol)) return;
+  _syncTriggeredSymbols.add(symbol);
+
+  const syncUrl = `${API_BASE}/marketdata/symbols/sync-all-tf?symbol=${encodeURIComponent(symbol)}`;
+  fetch(syncUrl, { method: 'POST' })
+    .then(res => {
+      if (res.ok) {
+        console.log(`[KlineSync] Background sync started for ${symbol}`);
+      } else {
+        console.warn(`[KlineSync] Sync request failed for ${symbol}: ${res.status}`);
+      }
+    })
+    .catch(err => {
+      console.warn(`[KlineSync] Sync request error for ${symbol}:`, err.message);
+    });
+}
+
+// ============================
+// Equity → Price Chart Navigation
+// ============================
+
+/**
+ * Handle click on equity chart: extract timestamp from clicked data point
+ * and navigate the price chart to that candle.
+ */
+function handleEquityChartClick(_event, elements, chart) {
+  if (!elements || elements.length === 0) return;
+
+  const idx = elements[0].index;
+  const equityData = chart._equityData;
+  if (!equityData || !equityData[idx]) return;
+
+  // Get timestamp from equity data point
+  const timestamp = equityData[idx].timestamp;
+  if (!timestamp) return;
+
+  // Check if this point corresponds to a trade exit (for richer context)
+  const tradeInfo = chart._tradeMap?.[idx];
+
+  const timeSec = Math.floor(new Date(timestamp).getTime() / 1000);
+  console.log('[EquityClick] Navigating to price chart at', timestamp,
+    tradeInfo ? `(Trade #${tradeInfo.tradeNum})` : '');
+
+  navigatePriceChartToTime(timeSec, tradeInfo);
+}
+
+/**
+ * Switch to the Price Chart tab and scroll/zoom to a specific candle timestamp.
+ * Optionally highlights the trade if tradeInfo is provided.
+ * @param {number} targetTimeSec - Unix timestamp in seconds to navigate to
+ * @param {object|null} tradeInfo - Trade info from _tradeMap (optional)
+ */
+function navigatePriceChartToTime(targetTimeSec, tradeInfo = null) {
+  if (!currentBacktest) return;
+
+  // 1. Switch to price-chart tab
+  const tabs = document.querySelectorAll('.tv-report-tab');
+  const contents = document.querySelectorAll('.tv-report-tab-content');
+
+  tabs.forEach((t) => t.classList.remove('active'));
+  contents.forEach((c) => c.classList.remove('active'));
+
+  const priceTab = document.querySelector('.tv-report-tab[data-tab="price-chart"]');
+  const priceContent = document.getElementById('tab-price-chart');
+  if (priceTab) priceTab.classList.add('active');
+  if (priceContent) priceContent.classList.add('active');
+
+  // 2. If price chart already exists, scroll to time directly
+  if (btPriceChart && btCandleSeries) {
+    scrollPriceChartToCandle(targetTimeSec, tradeInfo);
+    return;
+  }
+
+  // 3. Price chart not yet created — build it, then scroll after render
+  btPriceChartPending = false;
+  const originalUpdatePriceChart = updatePriceChart;
+
+  // Wrap updatePriceChart to scroll after it completes
+  const scrollAfterRender = async () => {
+    await originalUpdatePriceChart(currentBacktest);
+    // Small delay to let LightweightCharts finish layout
+    requestAnimationFrame(() => {
+      scrollPriceChartToCandle(targetTimeSec, tradeInfo);
+    });
+  };
+
+  scrollAfterRender();
+}
+
+/**
+ * Scroll and zoom the LightweightCharts price chart to center on a target candle.
+ * Adds a temporary highlight marker at the target candle.
+ * @param {number} targetTimeSec - Target candle time (Unix seconds)
+ * @param {object|null} tradeInfo - Optional trade info for label
+ */
+function scrollPriceChartToCandle(targetTimeSec, tradeInfo = null) {
+  if (!btPriceChart || !btCandleSeries) return;
+
+  const timeScale = btPriceChart.timeScale();
+
+  // Calculate a visible range of ~60 bars centered on the target
+  // Use the backtest interval to compute bar width in seconds
+  const interval = currentBacktest?.config?.interval || '60';
+  const barWidthSec = getIntervalSeconds(interval);
+  const barsVisible = 60; // Show ~60 bars around the target
+  const halfRange = Math.floor(barsVisible / 2) * barWidthSec;
+
+  const from = targetTimeSec - halfRange;
+  const to = targetTimeSec + halfRange;
+
+  timeScale.setVisibleRange({ from, to });
+
+  // Add a temporary highlight marker on the target candle
+  addNavigationHighlight(targetTimeSec, tradeInfo);
+
+  console.log('[PriceChartNav] Scrolled to', new Date(targetTimeSec * 1000).toISOString(),
+    'range:', new Date(from * 1000).toISOString(), '-', new Date(to * 1000).toISOString());
+}
+
+/**
+ * Add a temporary visual highlight marker on the price chart at the target candle.
+ * The marker auto-removes after 5 seconds.
+ * @param {number} targetTimeSec - Candle time to highlight
+ * @param {object|null} tradeInfo - Optional trade info for marker label
+ */
+function addNavigationHighlight(targetTimeSec, tradeInfo = null) {
+  if (!btCandleSeries) return;
+
+  // Build the highlight marker
+  const label = tradeInfo
+    ? `► Trade #${tradeInfo.tradeNum} (${tradeInfo.side === 'short' ? 'Short' : 'Long'})`
+    : '► Navigate here';
+
+  const highlightMarker = {
+    time: targetTimeSec,
+    position: 'aboveBar',
+    color: '#58a6ff',
+    shape: 'arrowDown',
+    text: label
+  };
+
+  // Merge with existing trade markers, adding highlight
+  const markersWithHighlight = [
+    ...btPriceChartMarkers,
+    highlightMarker
+  ].sort((a, b) => a.time - b.time);
+
+  btCandleSeries.setMarkers(markersWithHighlight);
+
+  // Auto-remove highlight after 5 seconds, restore original markers
+  setTimeout(() => {
+    if (btCandleSeries) {
+      btCandleSeries.setMarkers(btPriceChartMarkers);
+    }
+  }, 5000);
+}
+
+/**
+ * Convert interval string to seconds (e.g., '15' → 900, '60' → 3600, 'D' → 86400).
+ * @param {string} interval - Bybit interval code
+ * @returns {number} Interval duration in seconds
+ */
+function getIntervalSeconds(interval) {
+  const map = {
+    '1': 60, '5': 300, '15': 900, '30': 1800,
+    '60': 3600, '240': 14400,
+    'D': 86400, 'W': 604800, 'M': 2592000
+  };
+  return map[interval] || 3600;
+}
+
+/**
+ * Initialize or update the candlestick price chart for the selected backtest.
+ * Fetches kline data from the DB via /klines/range endpoint, renders candles,
+ * and overlays trade entry/exit markers like TradingView.
+ */
+async function updatePriceChart(backtest) {
+  if (!backtest || !backtest.config) return;
+
+  // Race-condition guard: bump generation so any in-flight render aborts
+  const myGen = ++_priceChartGeneration;
+
+  const container = document.getElementById('btCandlestickChart');
+  const loadingEl = document.getElementById('btPriceChartLoading');
+  const titleEl = document.getElementById('priceChartTitle');
+
+  if (!container) return;
+
+  // Show loading
+  if (loadingEl) loadingEl.classList.remove('hidden');
+
+  const symbol = backtest.config.symbol || 'BTCUSDT';
+  const interval = backtest.config.interval || '60';
+
+  // Update title
+  if (titleEl) {
+    titleEl.innerHTML = `<i class="bi bi-graph-up-arrow me-1"></i>${symbol} — ${formatInterval(interval)}`;
+  }
+
+  try {
+    // Determine time range from backtest config
+    let startMs = null;
+    let endMs = null;
+
+    if (backtest.config.start_date) {
+      startMs = new Date(backtest.config.start_date).getTime();
+    }
+    if (backtest.config.end_date) {
+      endMs = new Date(backtest.config.end_date).getTime();
+    }
+
+    if (!startMs || !endMs) {
+      console.warn('[PriceChart] No start_date / end_date in backtest config');
+      if (loadingEl) loadingEl.classList.add('hidden');
+      return;
+    }
+
+    // Fire-and-forget: trigger background kline sync for this symbol
+    // so that future chart loads will have candles ready in DB
+    triggerBackgroundKlineSync(symbol);
+
+    // Fetch ALL candles from DB for the exact backtest date range (no limit)
+    const url = `${API_BASE}/marketdata/bybit/klines/range?symbol=${symbol}&interval=${interval}&start=${startMs}&end=${endMs}`;
+    const response = await fetch(url);
+
+    // Abort if a newer render was triggered while we were fetching
+    if (myGen !== _priceChartGeneration) {
+      console.log('[PriceChart] Stale render aborted (gen', myGen, 'vs', _priceChartGeneration, ')');
+      return;
+    }
+
+    if (!response.ok) {
+      console.warn('[PriceChart] API error:', response.status);
+      if (loadingEl) loadingEl.classList.add('hidden');
+      return;
+    }
+
+    const data = await response.json();
+
+    // Abort if a newer render was triggered while we were parsing
+    if (myGen !== _priceChartGeneration) {
+      console.log('[PriceChart] Stale render aborted after parse (gen', myGen, 'vs', _priceChartGeneration, ')');
+      return;
+    }
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      console.warn('[PriceChart] No kline data in DB for this range. Background sync may still be in progress — try again shortly.');
+      if (loadingEl) loadingEl.classList.add('hidden');
+      return;
+    }
+
+    // Data is already sorted asc and filtered to date range by the API
+    const candles = data.map(k => ({
+      time: Math.floor(k.open_time / 1000),
+      open: parseFloat(k.open),
+      high: parseFloat(k.high),
+      low: parseFloat(k.low),
+      close: parseFloat(k.close)
+    }));
+
+    // Destroy existing chart and clean up observers
+    if (_priceChartResizeObserver) {
+      _priceChartResizeObserver.disconnect();
+      _priceChartResizeObserver = null;
+    }
+    if (btPriceChart) {
+      btPriceChart.remove();
+      btPriceChart = null;
+      btCandleSeries = null;
+    }
+
+    // Create candlestick chart
+    btPriceChart = LightweightCharts.createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight || 480,
+      layout: {
+        background: { type: 'solid', color: '#0d1117' },
+        textColor: '#8b949e'
+      },
+      grid: {
+        vertLines: { color: '#21262d' },
+        horzLines: { color: '#21262d' }
+      },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal,
+        vertLine: { color: '#58a6ff', width: 1, style: LightweightCharts.LineStyle.Dashed },
+        horzLine: { color: '#58a6ff', width: 1, style: LightweightCharts.LineStyle.Dashed }
+      },
+      rightPriceScale: {
+        borderColor: '#30363d',
+        width: 80
+      },
+      timeScale: {
+        borderColor: '#30363d',
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 5
+      }
+    });
+
+    btCandleSeries = btPriceChart.addCandlestickSeries({
+      upColor: '#00c853',
+      downColor: '#ff1744',
+      borderDownColor: '#ff1744',
+      borderUpColor: '#00c853',
+      wickDownColor: '#ff1744',
+      wickUpColor: '#00c853'
+    });
+
+    btCandleSeries.setData(candles);
+
+    // Add crosshair OHLC display
+    btPriceChart.subscribeCrosshairMove((param) => {
+      const ohlcEl = document.getElementById('btChartOHLC');
+      if (!ohlcEl) return;
+      if (!param || !param.time || !param.seriesData) {
+        ohlcEl.textContent = 'O: -- H: -- L: -- C: --';
+        return;
+      }
+      const candleData = param.seriesData.get(btCandleSeries);
+      if (candleData) {
+        ohlcEl.textContent = `O: ${candleData.open?.toFixed(2)} H: ${candleData.high?.toFixed(2)} L: ${candleData.low?.toFixed(2)} C: ${candleData.close?.toFixed(2)}`;
+      }
+    });
+
+    // Add trade markers
+    btPriceChartMarkers = [];
+    btTradeLineSeries = [];
+    if (backtest.trades && backtest.trades.length > 0) {
+      btPriceChartMarkers = buildTradeMarkers(backtest.trades, candles);
+      if (btPriceChartMarkers.length > 0) {
+        btCandleSeries.setMarkers(btPriceChartMarkers);
+      }
+      // Add entry→exit price connection lines (TradingView style)
+      btTradeLineSeries = buildTradePriceLines(backtest.trades, candles, btPriceChart);
+    }
+
+    // Fit chart to data
+    btPriceChart.timeScale().fitContent();
+
+    // Handle resize — store observer so it can be disconnected on rebuild
+    _priceChartResizeObserver = new ResizeObserver(() => {
+      if (btPriceChart) {
+        btPriceChart.applyOptions({
+          width: container.clientWidth,
+          height: container.clientHeight || 480
+        });
+      }
+    });
+    _priceChartResizeObserver.observe(container);
+
+    console.log(`[PriceChart] Rendered ${candles.length} candles, ${btPriceChartMarkers.length} trade markers for ${symbol}/${interval}`);
+
+  } catch (error) {
+    console.error('[PriceChart] Error:', error);
+  } finally {
+    if (loadingEl) loadingEl.classList.add('hidden');
+  }
+}
+
+/**
+ * Build LightweightCharts markers from backtest trades (TradingView exact style).
+ *
+ * TradingView convention (from user's reference screenshot):
+ *
+ * ENTRY:
+ *   Long  → blue ↑ arrow BELOW the wick, text: "buy\n+0.002939"
+ *   Short → red  ↓ arrow ABOVE the wick, text: "sell\n-0.001234"
+ *   Grid/DCA → "G1"..."G15" instead of "buy"
+ *
+ * EXIT:
+ *   Long exit  → purple ↓ arrow ABOVE the wick, text: "-0.002939\nTP" or "SL"
+ *   Short exit → purple ↑ arrow BELOW the wick, text: "+0.001234\nTP" or "SL"
+ *   Multi-TP   → "TP1"..."TP4" instead of "TP"
+ *
+ * Colors: Entry Long=#2196F3 (blue), Entry Short=#ef5350 (red), Exit=#AB47BC (purple)
+ */
+function buildTradeMarkers(trades, candles) {
+  if (!trades || trades.length === 0 || !candles || candles.length === 0) return [];
+
+  const markers = [];
+  const firstCandleTime = candles[0].time;
+  const lastCandleTime = candles[candles.length - 1].time;
+
+  // Colors matching TradingView
+  const ENTRY_LONG_COLOR = '#2196F3';   // Blue
+  const ENTRY_SHORT_COLOR = '#ef5350';  // Red
+  const EXIT_COLOR = '#AB47BC';         // Purple (сиреневый)
+
+  trades.forEach((trade) => {
+    // Parse entry/exit times to seconds
+    let entryTimeSec = parseTradeTime(trade.entry_time);
+    let exitTimeSec = parseTradeTime(trade.exit_time);
+
+    if (!entryTimeSec || !exitTimeSec) return;
+
+    // Snap to nearest candle time
+    entryTimeSec = snapToCandle(entryTimeSec, candles);
+    exitTimeSec = snapToCandle(exitTimeSec, candles);
+
+    // Skip markers outside visible range
+    if (entryTimeSec < firstCandleTime || entryTimeSec > lastCandleTime) return;
+
+    const isLong = (trade.side || 'long').toLowerCase() === 'long';
+    const pnl = trade.pnl || 0;
+    const pnlStr = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
+
+    // --- Determine entry label ---
+    // Grid/DCA: "G1"..."G15", normal: "buy"
+    const entryLabel = trade.grid_level
+      ? `G${trade.grid_level}`
+      : 'buy';
+
+    // --- ENTRY MARKER ---
+    // Long: blue ↑ below bar | Short: red ↓ above bar
+    markers.push({
+      time: entryTimeSec,
+      position: isLong ? 'belowBar' : 'aboveBar',
+      color: isLong ? ENTRY_LONG_COLOR : ENTRY_SHORT_COLOR,
+      shape: isLong ? 'arrowUp' : 'arrowDown',
+      text: `${entryLabel}\n${pnlStr}`
+    });
+
+    // --- EXIT MARKER ---
+    if (exitTimeSec >= firstCandleTime && exitTimeSec <= lastCandleTime) {
+      const exitReason = (trade.exit_reason || '').toLowerCase();
+
+      // Determine exit label: TP, SL, TP1-TP4, trailing, signal, etc.
+      let exitLabel;
+      if (/^tp\d+$/.test(exitReason)) {
+        // Multi-TP: "tp1" → "TP1", "tp2" → "TP2", etc.
+        exitLabel = exitReason.toUpperCase();
+      } else if (exitReason.includes('take_profit') || exitReason === 'take_profit') {
+        exitLabel = 'TP';
+      } else if (exitReason.includes('stop_loss') || exitReason === 'stop_loss') {
+        exitLabel = 'SL';
+      } else if (exitReason.includes('trailing')) {
+        exitLabel = 'TSL';
+      } else if (exitReason.includes('signal')) {
+        exitLabel = 'Signal';
+      } else if (exitReason.includes('time_exit') || exitReason.includes('session') || exitReason.includes('weekend')) {
+        exitLabel = 'Time';
+      } else if (exitReason.includes('end_of_data')) {
+        exitLabel = 'EOD';
+      } else {
+        exitLabel = 'Close';
+      }
+
+      // Long exit: purple ↓ above bar | Short exit: purple ↑ below bar
+      markers.push({
+        time: exitTimeSec,
+        position: isLong ? 'aboveBar' : 'belowBar',
+        color: EXIT_COLOR,
+        shape: isLong ? 'arrowDown' : 'arrowUp',
+        text: `${pnlStr}\n${exitLabel}`
+      });
+    }
+  });
+
+  // Sort markers by time (required by LightweightCharts)
+  markers.sort((a, b) => a.time - b.time);
+  return markers;
+}
+
+/**
+ * Build trade price connection lines on the price chart.
+ * For each trade, draws a dashed horizontal line from entry candle to exit candle
+ * at the entry_price level. Color: green if profitable, red if loss.
+ * Also optionally draws exit_price line (TP/SL level).
+ *
+ * Uses LightweightCharts lineSeries with sparse data (only 2 points per trade).
+ */
+function buildTradePriceLines(trades, candles, chart) {
+  if (!trades || trades.length === 0 || !candles || candles.length === 0 || !chart) return [];
+
+  const firstCandleTime = candles[0].time;
+  const lastCandleTime = candles[candles.length - 1].time;
+  const seriesList = [];
+
+  trades.forEach((trade) => {
+    let entryTimeSec = parseTradeTime(trade.entry_time);
+    let exitTimeSec = parseTradeTime(trade.exit_time);
+    if (!entryTimeSec || !exitTimeSec) return;
+
+    entryTimeSec = snapToCandle(entryTimeSec, candles);
+    exitTimeSec = snapToCandle(exitTimeSec, candles);
+
+    if (entryTimeSec < firstCandleTime || entryTimeSec > lastCandleTime) return;
+    if (exitTimeSec < firstCandleTime) return;
+    // Clamp exit to visible range
+    if (exitTimeSec > lastCandleTime) exitTimeSec = lastCandleTime;
+
+    const entryPrice = trade.entry_price || 0;
+    const exitPrice = trade.exit_price || 0;
+    const pnl = trade.pnl || 0;
+    const isProfitable = pnl >= 0;
+
+    // Don't draw line if entry and exit are on same candle
+    if (entryTimeSec === exitTimeSec) return;
+
+    // --- Entry price line (dashed, from entry to exit) ---
+    const entryLine = chart.addLineSeries({
+      color: isProfitable ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,80,0.5)',
+      lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dashed,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false
+    });
+    entryLine.setData([
+      { time: entryTimeSec, value: entryPrice },
+      { time: exitTimeSec, value: entryPrice }
+    ]);
+    seriesList.push(entryLine);
+
+    // --- Exit price line (dotted, from entry to exit) for TP/SL visualization ---
+    if (Math.abs(exitPrice - entryPrice) > 0.01) {
+      const exitLine = chart.addLineSeries({
+        color: isProfitable ? 'rgba(38,166,154,0.3)' : 'rgba(239,83,80,0.3)',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dotted,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false
+      });
+      exitLine.setData([
+        { time: entryTimeSec, value: exitPrice },
+        { time: exitTimeSec, value: exitPrice }
+      ]);
+      seriesList.push(exitLine);
+    }
+  });
+
+  return seriesList;
+}
+
+/**
+ * Parse trade time (ms timestamp or ISO string) to Unix seconds.
+ */
+function parseTradeTime(time) {
+  if (!time) return null;
+  if (typeof time === 'number') {
+    // If > 1e12, it's in milliseconds
+    return time > 1e12 ? Math.floor(time / 1000) : time;
+  }
+  if (typeof time === 'string') {
+    const d = new Date(time);
+    return isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000);
+  }
+  return null;
+}
+
+/**
+ * Snap a timestamp to the nearest candle time using binary search.
+ */
+function snapToCandle(timeSec, candles) {
+  if (!candles || candles.length === 0) return timeSec;
+
+  let lo = 0;
+  let hi = candles.length - 1;
+
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (candles[mid].time < timeSec) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+
+  // Check lo and lo-1 for closest match
+  if (lo > 0) {
+    const diffLo = Math.abs(candles[lo].time - timeSec);
+    const diffPrev = Math.abs(candles[lo - 1].time - timeSec);
+    return diffPrev < diffLo ? candles[lo - 1].time : candles[lo].time;
+  }
+
+  return candles[lo].time;
+}
+
+/**
+ * Format interval code to human-readable label.
+ */
+function formatInterval(interval) {
+  const map = {
+    '1': '1m', '5': '5m', '15': '15m', '30': '30m',
+    '60': '1H', '240': '4H', 'D': '1D', 'W': '1W', 'M': '1M',
+    '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+    '1h': '1H', '4h': '4H', '1d': '1D', '1w': '1W'
+  };
+  return map[interval] || interval;
 }
 
 // ============================================

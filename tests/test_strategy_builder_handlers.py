@@ -8,7 +8,7 @@ Tests for:
          multi_tp_exit, break_even_exit
 - Price Action: hammer_hangman, doji_patterns, shooting_star, marubozu,
                 tweezer, three_methods, piercing_darkcloud, harami
-- Divergence: stoch_divergence, mfi_divergence
+- Divergence: unified multi-indicator divergence (RSI, Stochastic, Momentum, CMF, OBV, MFI)
 """
 
 import numpy as np
@@ -512,35 +512,101 @@ class TestPriceActionHandlers:
 
 
 class TestDivergenceHandlers:
-    """Tests for divergence detection handlers."""
+    """Tests for unified divergence detection block."""
 
-    def test_stoch_divergence(self, sample_ohlcv_data):
-        """Test stochastic divergence detection."""
+    def test_divergence_rsi_enabled(self, sample_ohlcv_data):
+        """Test divergence detection with RSI enabled."""
         blocks = [
             {
                 "id": "b1",
-                "type": "stoch_divergence",
+                "type": "divergence",
                 "category": "divergence",
-                "params": {"k_period": 14, "d_period": 3, "lookback": 5},
+                "params": {
+                    "pivot_interval": 5,
+                    "use_divergence_rsi": True,
+                    "rsi_period": 14,
+                    "act_without_confirmation": True,
+                },
             },
         ]
-        connections = []
-
-        adapter = create_adapter(blocks, connections)
+        adapter = create_adapter(blocks)
         result = adapter.generate_signals(sample_ohlcv_data)
-
         assert result is not None
 
-    def test_mfi_divergence(self, sample_ohlcv_data):
-        """Test MFI divergence detection."""
+    def test_divergence_stochastic_enabled(self, sample_ohlcv_data):
+        """Test divergence detection with Stochastic enabled."""
         blocks = [
-            {"id": "b1", "type": "mfi_divergence", "category": "divergence", "params": {"period": 14, "lookback": 5}},
+            {
+                "id": "b1",
+                "type": "divergence",
+                "category": "divergence",
+                "params": {
+                    "pivot_interval": 5,
+                    "use_divergence_stochastic": True,
+                    "stoch_length": 14,
+                    "act_without_confirmation": True,
+                },
+            },
         ]
-        connections = []
-
-        adapter = create_adapter(blocks, connections)
+        adapter = create_adapter(blocks)
         result = adapter.generate_signals(sample_ohlcv_data)
+        assert result is not None
 
+    def test_divergence_no_indicators_enabled(self, sample_ohlcv_data):
+        """Test divergence with no indicators enabled returns empty signals."""
+        blocks = [
+            {
+                "id": "b1",
+                "type": "divergence",
+                "category": "divergence",
+                "params": {"pivot_interval": 9},
+            },
+        ]
+        adapter = create_adapter(blocks)
+        result = adapter.generate_signals(sample_ohlcv_data)
+        assert result is not None
+
+    def test_divergence_multiple_indicators(self, sample_ohlcv_data):
+        """Test divergence with multiple indicators enabled simultaneously."""
+        blocks = [
+            {
+                "id": "b1",
+                "type": "divergence",
+                "category": "divergence",
+                "params": {
+                    "pivot_interval": 3,
+                    "use_divergence_rsi": True,
+                    "rsi_period": 14,
+                    "use_divergence_momentum": True,
+                    "momentum_length": 10,
+                    "use_obv": True,
+                    "act_without_confirmation": True,
+                },
+            },
+        ]
+        adapter = create_adapter(blocks)
+        result = adapter.generate_signals(sample_ohlcv_data)
+        assert result is not None
+
+    def test_divergence_signal_memory(self, sample_ohlcv_data):
+        """Test divergence with signal memory enabled."""
+        blocks = [
+            {
+                "id": "b1",
+                "type": "divergence",
+                "category": "divergence",
+                "params": {
+                    "pivot_interval": 3,
+                    "use_divergence_rsi": True,
+                    "rsi_period": 14,
+                    "activate_diver_signal_memory": True,
+                    "keep_diver_signal_memory_bars": 5,
+                    "act_without_confirmation": True,
+                },
+            },
+        ]
+        adapter = create_adapter(blocks)
+        result = adapter.generate_signals(sample_ohlcv_data)
         assert result is not None
 
 
@@ -595,7 +661,17 @@ class TestIntegration:
     def test_divergence_strategy(self, sample_ohlcv_data):
         """Test divergence-based strategy."""
         blocks = [
-            {"id": "b1", "type": "rsi_divergence", "category": "divergence", "params": {"period": 14, "lookback": 5}},
+            {
+                "id": "b1",
+                "type": "divergence",
+                "category": "divergence",
+                "params": {
+                    "pivot_interval": 5,
+                    "use_divergence_rsi": True,
+                    "rsi_period": 14,
+                    "act_without_confirmation": True,
+                },
+            },
             {"id": "b2", "type": "buy", "category": "action", "params": {}},
             {
                 "id": "b3",

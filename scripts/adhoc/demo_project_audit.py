@@ -605,7 +605,7 @@ async def main():
     print(f"  Date:      {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"  Architect: DeepSeek {DS_MODEL} (gap analysis)")
     print(f"  Engineer:  Qwen {QW_MODEL} (implementation plan)")
-    print(f"  Focus:     Agent autonomy readiness")
+    print("  Focus:     Agent autonomy readiness")
     print(f"  Project:   {PROJECT_ROOT.name}")
     print()
 
@@ -820,7 +820,7 @@ async def main():
     results_file = PROJECT_ROOT / "docs" / "AGENT_ECOSYSTEM_AUDIT.md"
     results_file.parent.mkdir(exist_ok=True)
     with open(results_file, "w", encoding="utf-8") as f:
-        f.write(f"# Agent Ecosystem Audit Results\n\n")
+        f.write("# Agent Ecosystem Audit Results\n\n")
         f.write(f"> Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"> Architect: DeepSeek {DS_MODEL} | Engineer: Qwen {QW_MODEL}\n")
         f.write(f"> Duration: {elapsed:.1f}s | API calls: {total_api_calls}\n\n")

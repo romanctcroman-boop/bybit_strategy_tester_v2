@@ -181,11 +181,7 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
         "period": {"type": "integer", "min": 2, "max": 500, "default": 14},
         "level": {"type": "number", "min": 0, "max": 100, "default": 70},
     },
-    "rsi_divergence": {
-        "period": {"type": "integer", "min": 2, "max": 500, "default": 14},
-        "lookback": {"type": "integer", "min": 5, "max": 200, "default": 20},
-        "divergence_type": {"type": "select", "options": ["bullish", "bearish", "both"], "default": "both"},
-    },
+    # (rsi_divergence removed — old divergence blocks cleared)
     # MACD
     "macd_cross": {
         "fast_period": {"type": "integer", "min": 2, "max": 200, "default": 12},
@@ -198,12 +194,7 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
         "signal_period": {"type": "integer", "min": 2, "max": 100, "default": 9},
         "threshold": {"type": "number", "min": 0, "default": 0},
     },
-    "macd_divergence": {
-        "fast_period": {"type": "integer", "min": 2, "max": 200, "default": 12},
-        "slow_period": {"type": "integer", "min": 2, "max": 200, "default": 26},
-        "signal_period": {"type": "integer", "min": 2, "max": 100, "default": 9},
-        "lookback": {"type": "integer", "min": 5, "max": 200, "default": 20},
-    },
+    # (macd_divergence removed — old divergence blocks cleared)
     # Moving Averages
     "ma_cross": {
         "fast_period": {"type": "integer", "min": 2, "max": 500, "default": 9},
@@ -354,43 +345,45 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
     # ==========================================================================
     # DCA CLOSE CONDITIONS (Session 5.5)
     # ==========================================================================
-    "rsi_close": {
-        "rsi_close_length": {"type": "integer", "min": 2, "max": 200, "default": 14},
-        "rsi_close_min_profit": {"type": "number", "min": 0, "max": 100, "default": 0.5},
-        "rsi_close_reach_long_more": {"type": "number", "min": 0, "max": 100, "default": 70},
-        "rsi_close_reach_long_less": {"type": "number", "min": 0, "max": 100, "default": 0},
-        "rsi_close_reach_short_more": {"type": "number", "min": 0, "max": 100, "default": 100},
-        "rsi_close_reach_short_less": {"type": "number", "min": 0, "max": 100, "default": 30},
-        "rsi_close_cross_long_level": {"type": "number", "min": 0, "max": 100, "default": 70},
-        "rsi_close_cross_short_level": {"type": "number", "min": 0, "max": 100, "default": 30},
+    "close_channel": {
+        "keltner_length": {"type": "integer", "min": 1, "max": 100, "default": 14},
+        "keltner_mult": {"type": "number", "min": 0.1, "max": 100, "default": 1.5},
+        "bb_length": {"type": "integer", "min": 1, "max": 100, "default": 20},
+        "bb_deviation": {"type": "number", "min": 0.1, "max": 100, "default": 2.0},
     },
-    "stoch_close": {
+    "close_ma_cross": {
+        "min_profit_percent": {"type": "number", "min": 0.1, "max": 50, "default": 1.0},
+        "ma1_length": {"type": "integer", "min": 1, "max": 500, "default": 10},
+        "ma2_length": {"type": "integer", "min": 1, "max": 500, "default": 30},
+    },
+    "close_rsi": {
+        "rsi_close_length": {"type": "integer", "min": 1, "max": 200, "default": 14},
+        "rsi_close_min_profit": {"type": "number", "min": 0.1, "max": 100, "default": 1.0},
+        "rsi_long_more": {"type": "integer", "min": 1, "max": 100, "default": 70},
+        "rsi_long_less": {"type": "integer", "min": 1, "max": 100, "default": 100},
+        "rsi_short_less": {"type": "integer", "min": 1, "max": 100, "default": 30},
+        "rsi_short_more": {"type": "integer", "min": 1, "max": 100, "default": 1},
+        "rsi_cross_long_level": {"type": "integer", "min": 1, "max": 100, "default": 70},
+        "rsi_cross_short_level": {"type": "integer", "min": 1, "max": 100, "default": 30},
+    },
+    "close_stochastic": {
         "stoch_close_k_length": {"type": "integer", "min": 1, "max": 200, "default": 14},
-        "stoch_close_k_smooth": {"type": "integer", "min": 1, "max": 50, "default": 1},
-        "stoch_close_d_smooth": {"type": "integer", "min": 1, "max": 50, "default": 3},
-        "stoch_close_min_profit": {"type": "number", "min": 0, "max": 100, "default": 0.5},
-        "stoch_close_reach_long_more": {"type": "number", "min": 0, "max": 100, "default": 80},
-        "stoch_close_reach_long_less": {"type": "number", "min": 0, "max": 100, "default": 0},
-        "stoch_close_reach_short_more": {"type": "number", "min": 0, "max": 100, "default": 100},
-        "stoch_close_reach_short_less": {"type": "number", "min": 0, "max": 100, "default": 20},
+        "stoch_close_k_smoothing": {"type": "integer", "min": 1, "max": 50, "default": 3},
+        "stoch_close_d_smoothing": {"type": "integer", "min": 1, "max": 50, "default": 3},
+        "stoch_close_min_profit": {"type": "number", "min": 0.1, "max": 100, "default": 1.0},
+        "stoch_long_more": {"type": "integer", "min": 1, "max": 100, "default": 80},
+        "stoch_long_less": {"type": "integer", "min": 1, "max": 100, "default": 100},
+        "stoch_short_less": {"type": "integer", "min": 1, "max": 100, "default": 20},
+        "stoch_short_more": {"type": "integer", "min": 1, "max": 100, "default": 1},
+        "stoch_cross_long_level": {"type": "integer", "min": 1, "max": 100, "default": 80},
+        "stoch_cross_short_level": {"type": "integer", "min": 1, "max": 100, "default": 20},
     },
-    "channel_close": {
-        "channel_close_keltner_length": {"type": "integer", "min": 1, "max": 200, "default": 20},
-        "channel_close_keltner_mult": {"type": "number", "min": 0.1, "max": 10, "default": 2.0},
-        "channel_close_bb_length": {"type": "integer", "min": 1, "max": 200, "default": 20},
-        "channel_close_bb_deviation": {"type": "number", "min": 0.1, "max": 10, "default": 2.0},
-    },
-    "ma_close": {
-        "ma_close_min_profit": {"type": "number", "min": 0, "max": 100, "default": 0.5},
-        "ma_close_ma1_length": {"type": "integer", "min": 1, "max": 500, "default": 9},
-        "ma_close_ma2_length": {"type": "integer", "min": 1, "max": 500, "default": 21},
-    },
-    "psar_close": {
-        "psar_close_min_profit": {"type": "number", "min": 0, "max": 100, "default": 0.5},
-        "psar_close_start": {"type": "number", "min": 0.001, "max": 1, "default": 0.02},
-        "psar_close_increment": {"type": "number", "min": 0.001, "max": 1, "default": 0.02},
-        "psar_close_maximum": {"type": "number", "min": 0.01, "max": 1, "default": 0.2},
-        "psar_close_nth_bar": {"type": "integer", "min": 0, "max": 100, "default": 0},
+    "close_psar": {
+        "psar_close_min_profit": {"type": "number", "min": 0.1, "max": 100, "default": 1.0},
+        "psar_start": {"type": "number", "min": 0.001, "max": 1, "default": 0.02},
+        "psar_increment": {"type": "number", "min": 0.001, "max": 1, "default": 0.02},
+        "psar_maximum": {"type": "number", "min": 0.01, "max": 5, "default": 0.2},
+        "psar_close_nth_bar": {"type": "integer", "min": 1, "max": 100, "default": 1},
     },
     "time_bars_close": {
         "close_after_bars": {"type": "integer", "min": 1, "max": 1000, "default": 20},
@@ -400,14 +393,6 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
     # ==========================================================================
     # NEW FILTERS (Session 5.5)
     # ==========================================================================
-    "rvi_filter": {
-        "rvi_length": {"type": "integer", "min": 1, "max": 200, "default": 10},
-        "rvi_ma_length": {"type": "integer", "min": 1, "max": 200, "default": 14},
-        "rvi_long_more": {"type": "number", "min": 0, "max": 100, "default": 50},
-        "rvi_long_less": {"type": "number", "min": 0, "max": 100, "default": 100},
-        "rvi_short_more": {"type": "number", "min": 0, "max": 100, "default": 0},
-        "rvi_short_less": {"type": "number", "min": 0, "max": 100, "default": 50},
-    },
     "indent_order": {
         "indent_percent": {"type": "number", "min": 0.01, "max": 10, "default": 0.1},
         "indent_cancel_bars": {"type": "integer", "min": 1, "max": 100, "default": 10},
@@ -418,6 +403,140 @@ BLOCK_VALIDATION_RULES: dict[str, dict[str, dict[str, Any]]] = {
         "atr_sl_multiplier": {"type": "number", "min": 0.1, "max": 20, "default": 2.0},
         "atr_tp_period": {"type": "integer", "min": 1, "max": 200, "default": 14},
         "atr_tp_multiplier": {"type": "number", "min": 0.1, "max": 20, "default": 3.0},
+    },
+    # Divergence detection (unified multi-indicator block)
+    "divergence": {
+        "pivot_interval": {"type": "integer", "min": 1, "max": 9, "default": 9, "required": True},
+        "keep_diver_signal_memory_bars": {"type": "integer", "min": 1, "max": 100, "default": 5},
+        "rsi_period": {"type": "integer", "min": 1, "max": 200, "default": 14},
+        "stoch_length": {"type": "integer", "min": 1, "max": 200, "default": 14},
+        "momentum_length": {"type": "integer", "min": 1, "max": 200, "default": 10},
+        "cmf_period": {"type": "integer", "min": 1, "max": 200, "default": 21},
+        "mfi_length": {"type": "integer", "min": 1, "max": 200, "default": 14},
+    },
+    # ==========================================================================
+    # UNIVERSAL FILTERS (new instruments in Технические Индикаторы)
+    # ==========================================================================
+    "atr_volatility": {
+        "atr_diff_percent": {"type": "number", "min": 0.1, "max": 50, "default": 10},
+        "atr_length1": {"type": "integer", "min": 5, "max": 20, "default": 20},
+        "atr_length2": {"type": "integer", "min": 20, "max": 100, "default": 100},
+        "atr_smoothing": {
+            "type": "select",
+            "options": ["WMA", "RMA", "SMA", "EMA"],
+            "default": "WMA",
+        },
+    },
+    "volume_filter": {
+        "vol_diff_percent": {"type": "number", "min": 0.1, "max": 50, "default": 10},
+        "vol_length1": {"type": "integer", "min": 5, "max": 20, "default": 20},
+        "vol_length2": {"type": "integer", "min": 20, "max": 100, "default": 100},
+        "vol_smoothing": {
+            "type": "select",
+            "options": ["WMA", "RMA", "SMA", "EMA"],
+            "default": "WMA",
+        },
+    },
+    "highest_lowest_bar": {
+        "hl_lookback_bars": {"type": "integer", "min": 1, "max": 100, "default": 10},
+        "hl_price_percent": {"type": "number", "min": 0, "max": 30, "default": 0},
+        "hl_atr_percent": {"type": "number", "min": 0, "max": 30, "default": 0},
+        "atr_hl_length": {"type": "integer", "min": 1, "max": 50, "default": 50},
+        "block_worse_percent": {"type": "number", "min": 0.1, "max": 30, "default": 1.1},
+    },
+    "two_mas": {
+        "ma1_length": {"type": "integer", "min": 1, "max": 500, "default": 50},
+        "ma1_smoothing": {
+            "type": "select",
+            "options": ["SMA", "EMA", "WMA", "RMA"],
+            "default": "SMA",
+        },
+        "ma1_source": {
+            "type": "select",
+            "options": ["close", "open", "high", "low", "hl2", "hlc3", "ohlc4", "hlcc4"],
+            "default": "close",
+        },
+        "ma2_length": {"type": "integer", "min": 1, "max": 500, "default": 100},
+        "ma2_smoothing": {
+            "type": "select",
+            "options": ["SMA", "EMA", "WMA", "RMA"],
+            "default": "EMA",
+        },
+        "ma2_source": {
+            "type": "select",
+            "options": ["close", "open", "high", "low", "hl2", "hlc3", "ohlc4", "hlcc4"],
+            "default": "close",
+        },
+        "ma_cross_memory_bars": {"type": "integer", "min": 1, "max": 100, "default": 5},
+    },
+    "accumulation_areas": {
+        "backtracking_interval": {"type": "integer", "min": 1, "max": 100, "default": 30},
+        "min_bars_to_execute": {"type": "integer", "min": 1, "max": 100, "default": 5},
+    },
+    "keltner_bollinger": {
+        "keltner_length": {"type": "number", "min": 0.1, "max": 100, "default": 14},
+        "keltner_mult": {"type": "number", "min": 0.1, "max": 100, "default": 1.5},
+        "bb_length": {"type": "number", "min": 0.1, "max": 100, "default": 20},
+        "bb_deviation": {"type": "number", "min": 0.1, "max": 100, "default": 2},
+        "channel_mode": {
+            "type": "select",
+            "options": ["Rebound", "Breackout"],
+            "default": "Rebound",
+        },
+        "channel_type": {
+            "type": "select",
+            "options": ["Bollinger Bands", "Keltner Channel"],
+            "default": "Keltner Channel",
+        },
+        "enter_conditions": {
+            "type": "select",
+            "options": [
+                "Out-of-band closure",
+                "Wick out of band",
+                "Wick out of the band then close in",
+                "Close out of the band then close in",
+            ],
+            "default": "Wick out of band",
+        },
+    },
+    "rvi_filter": {
+        "rvi_length": {"type": "integer", "min": 1, "max": 100, "default": 10},
+        "rvi_ma_type": {
+            "type": "select",
+            "options": ["WMA", "RMA", "SMA", "EMA"],
+            "default": "WMA",
+        },
+        "rvi_ma_length": {"type": "integer", "min": 1, "max": 100, "default": 2},
+        "rvi_long_more": {"type": "number", "min": 1, "max": 100, "default": 1},
+        "rvi_long_less": {"type": "number", "min": 1, "max": 100, "default": 50},
+        "rvi_short_less": {"type": "number", "min": 1, "max": 100, "default": 100},
+        "rvi_short_more": {"type": "number", "min": 1, "max": 100, "default": 50},
+    },
+    "mfi_filter": {
+        "mfi_length": {"type": "integer", "min": 1, "max": 100, "default": 14},
+        "mfi_long_more": {"type": "number", "min": 1, "max": 100, "default": 1},
+        "mfi_long_less": {"type": "number", "min": 1, "max": 100, "default": 60},
+        "mfi_short_less": {"type": "number", "min": 1, "max": 100, "default": 100},
+        "mfi_short_more": {"type": "number", "min": 1, "max": 100, "default": 50},
+    },
+    "cci_filter": {
+        "cci_length": {"type": "integer", "min": 1, "max": 100, "default": 14},
+        "cci_long_more": {"type": "number", "min": -400, "max": 400, "default": -400},
+        "cci_long_less": {"type": "number", "min": -400, "max": 400, "default": 400},
+        "cci_short_less": {"type": "number", "min": -400, "max": 400, "default": 400},
+        "cci_short_more": {"type": "number", "min": -400, "max": 400, "default": 10},
+    },
+    "momentum_filter": {
+        "momentum_length": {"type": "integer", "min": 1, "max": 100, "default": 14},
+        "momentum_source": {
+            "type": "select",
+            "options": ["close", "open", "high", "low", "hl2", "hlc3", "ohlc4", "hlcc4"],
+            "default": "close",
+        },
+        "momentum_long_more": {"type": "number", "min": -100, "max": 100, "default": -100},
+        "momentum_long_less": {"type": "number", "min": -100, "max": 100, "default": 10},
+        "momentum_short_less": {"type": "number", "min": -100, "max": 100, "default": 95},
+        "momentum_short_more": {"type": "number", "min": -100, "max": 100, "default": -30},
     },
 }
 
@@ -436,11 +555,9 @@ CONNECTION_RULES: dict[str, list[str]] = {
         "rsi",
         "rsi_cross_above",
         "rsi_cross_below",
-        "rsi_divergence",
         # MACD family
         "macd_cross",
         "macd_histogram",
-        "macd_divergence",
         # Moving averages
         "ma_cross",
         "price_above_ma",
@@ -480,6 +597,19 @@ CONNECTION_RULES: dict[str, list[str]] = {
         "stick_sandwich",
         "homing_pigeon",
         "matching_low_high",
+        # Divergence
+        "divergence",
+        # Universal filters
+        "atr_volatility",
+        "volume_filter",
+        "highest_lowest_bar",
+        "two_mas",
+        "accumulation_areas",
+        "keltner_bollinger",
+        "rvi_filter",
+        "mfi_filter",
+        "cci_filter",
+        "momentum_filter",
     ],
     "entry_short": [
         # Logic gates
@@ -492,11 +622,9 @@ CONNECTION_RULES: dict[str, list[str]] = {
         "rsi",
         "rsi_cross_above",
         "rsi_cross_below",
-        "rsi_divergence",
         # MACD family
         "macd_cross",
         "macd_histogram",
-        "macd_divergence",
         # Moving averages
         "ma_cross",
         "price_above_ma",
@@ -536,6 +664,19 @@ CONNECTION_RULES: dict[str, list[str]] = {
         "stick_sandwich",
         "homing_pigeon",
         "matching_low_high",
+        # Divergence
+        "divergence",
+        # Universal filters
+        "atr_volatility",
+        "volume_filter",
+        "highest_lowest_bar",
+        "two_mas",
+        "accumulation_areas",
+        "keltner_bollinger",
+        "rvi_filter",
+        "mfi_filter",
+        "cci_filter",
+        "momentum_filter",
     ],
     # Logic gates accept any signal
     "and": ["*"],
@@ -652,7 +793,10 @@ def validate_param_value(
 
     elif param_type == "select":
         options = rule.get("options", [])
-        if param_value not in options:
+        # Case-insensitive comparison for select options (frontend may send lowercase)
+        options_lower = [o.lower() for o in options]
+        val_lower = str(param_value).lower() if param_value is not None else ""
+        if val_lower not in options_lower:
             messages.append(
                 ValidationMessage(
                     severity=ValidationSeverity.ERROR,
@@ -724,7 +868,7 @@ def _cross_validate_block(block_type: str, params: dict[str, Any]) -> list[Valid
     messages: list[ValidationMessage] = []
 
     # MACD: fast < slow (universal block + legacy variants)
-    if block_type in ["macd", "macd_cross", "macd_histogram", "macd_divergence"]:
+    if block_type in ["macd", "macd_cross", "macd_histogram"]:
         fast = params.get("fast_period", 12)
         slow = params.get("slow_period", 26)
         if fast >= slow:

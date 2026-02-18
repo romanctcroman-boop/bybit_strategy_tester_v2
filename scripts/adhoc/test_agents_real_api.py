@@ -94,7 +94,7 @@ async def test_1_api_connectivity() -> dict:
             response = await client.chat(
                 [
                     LLMMessage(role="system", content="You are a helpful assistant. Answer briefly."),
-                    LLMMessage(role="user", content="Say 'Hello from {name}!' and nothing else.".format(name=name)),
+                    LLMMessage(role="user", content=f"Say 'Hello from {name}!' and nothing else."),
                 ]
             )
             elapsed = time.time() - start
@@ -103,7 +103,7 @@ async def test_1_api_connectivity() -> dict:
             print(f"  Модель: {response.model}")
             print(f"  Токены: {response.total_tokens} (in={response.prompt_tokens}, out={response.completion_tokens})")
             print(f"  Время: {elapsed:.1f}с")
-            print(f"  Статус: OK")
+            print("  Статус: OK")
 
             results[name.lower()] = {
                 "status": "ok",
@@ -216,7 +216,7 @@ async def test_2_individual_agents() -> dict:
 
         api_key = os.getenv(task["key"], "")
         if not api_key or api_key.startswith("YOUR_"):
-            print(f"  ПРОПУСК: ключ не задан")
+            print("  ПРОПУСК: ключ не задан")
             results[agent_name] = {"status": "skipped"}
             continue
 
@@ -284,7 +284,7 @@ async def test_3_multi_agent_deliberation() -> dict:
         "The strategy must maintain Sharpe ratio > 1.0 and max drawdown < 15%."
     )
 
-    print(f"  Вопрос для обсуждения:")
+    print("  Вопрос для обсуждения:")
     print(f"    {question[:120]}...")
     print()
 
@@ -435,13 +435,13 @@ async def test_4_perplexity_enrichment() -> dict:
 
         news = market_ctx.get("key_news", [])
         if news:
-            print(f"  Новости:")
+            print("  Новости:")
             for n in news[:3]:
                 print(f"    - {n[:100]}")
 
         risks = market_ctx.get("risk_factors", [])
         if risks:
-            print(f"  Факторы риска:")
+            print("  Факторы риска:")
             for r in risks[:3]:
                 print(f"    - {r[:100]}")
 

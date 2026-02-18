@@ -1454,3 +1454,122 @@ body {
     font-size: 0.75rem;
     opacity: 0.8;
 }
+
+/* ============================================
+   PRICE CHART (Candlestick) — TradingView Style
+   ============================================ */
+
+/* Remove padding for price chart tab — chart fills the full area */
+#tab-price-chart {
+    padding: 0;
+}
+
+.bt-price-chart-section {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    border-radius: 0;
+    overflow: hidden;
+}
+
+.bt-price-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.bt-price-chart-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.bt-price-chart-legend {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.bt-legend-entry {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.bt-legend-marker {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+}
+
+.bt-marker-long {
+    background: #2196f3;
+}
+
+.bt-marker-short {
+    background: #ef5350;
+}
+
+.bt-marker-exit {
+    background: #ab47bc;
+}
+
+.bt-marker-tp {
+    background: #ab47bc;
+    border: 1px solid #9c27b0;
+}
+
+.bt-marker-sl {
+    background: #ab47bc;
+    border: 1px solid #9c27b0;
+}
+
+.bt-price-chart-container {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 170px);
+    min-height: 400px;
+    background: #0d1117;
+}
+
+.bt-price-chart-container #btCandlestickChart {
+    width: 100%;
+    height: 100%;
+}
+
+.bt-price-chart-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    z-index: 10;
+    background: rgba(13, 17, 23, 0.85);
+    padding: 12px 20px;
+    border-radius: 8px;
+}
+
+.bt-price-chart-loading.hidden {
+    display: none;
+}
+
+.bt-price-chart-info {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 12px;
+}
+
+/* Small alert text used in MTF/Optimizer settings panels */
+.small-alert {
+    font-size: 0.85rem;
+}

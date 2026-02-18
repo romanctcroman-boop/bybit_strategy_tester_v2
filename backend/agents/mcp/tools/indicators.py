@@ -23,7 +23,13 @@ registry = get_tool_registry()
 
 @registry.register(
     name="calculate_rsi",
-    description="Calculate Relative Strength Index (RSI)",
+    description=(
+        "Calculate Relative Strength Index (RSI). "
+        "NOTE: For strategy building, use the universal 'rsi' block in Strategy Builder instead. "
+        "The universal RSI block supports Range filter, Cross level, and Legacy modes with "
+        "combinable signals (AND logic), optimization ranges, and BTC source option. "
+        "This tool is for ad-hoc RSI value calculation only."
+    ),
     category="indicators",
 )
 async def calculate_rsi(

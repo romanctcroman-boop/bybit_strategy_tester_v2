@@ -115,8 +115,8 @@ async def main():
     print("\n" * 2)
     header("🎭  LIVE DIALOGUE: DeepSeek (Agent-Q) vs Qwen (Agent-T)")
     print(f"  Дата: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"  DeepSeek: deepseek-chat | Qwen: qwen-flash (Singapore)")
-    print(f"  Тема: Стоп-лосс стратегия для BTCUSDT 15m RSI+MACD")
+    print("  DeepSeek: deepseek-chat | Qwen: qwen-flash (Singapore)")
+    print("  Тема: Стоп-лосс стратегия для BTCUSDT 15m RSI+MACD")
     total_start = time.time()
 
     timeout = aiohttp.ClientTimeout(total=60)
@@ -260,8 +260,8 @@ async def main():
 
         header("📊  СТАТИСТИКА ДИАЛОГА")
         print(f"  Время:         {total_time:.1f}s")
-        print(f"  Раунды:        3 + синтез")
-        print(f"  API вызовов:   7 (4× DeepSeek, 3× Qwen)")
+        print("  Раунды:        3 + синтез")
+        print("  API вызовов:   7 (4× DeepSeek, 3× Qwen)")
         print(f"  Всего токенов: {total_tokens:,}")
         print(f"  🔵 DeepSeek:   {ds_total:,} токенов")
         print(f"  🟢 Qwen:       {qw_total:,} токенов")

@@ -33,7 +33,6 @@ from backend.backtesting.interfaces import (
     BaseBacktestEngine,
     ExitReason,
     TradeDirection,
-    TradeRecord,
 )
 
 
@@ -55,7 +54,7 @@ class DCAGridConfig:
 
     # Manual Grid (custom orders) - list of {offset: %, volume: %}
     # When custom_orders is set, use these instead of calculated orders
-    custom_orders: list = None  # [{"offset": 0.5, "volume": 25}, ...]
+    custom_orders: list[dict[str, Any]] | None = None  # [{"offset": 0.5, "volume": 25}, ...]
     grid_trailing_percent: float = 0.0  # Grid trailing/cancel percent (0 = disabled)
 
     # Martingale
@@ -238,6 +237,31 @@ class DCAPosition:
     last_order_bar: int = 0
 
 
+@dataclass
+class DCATradeRecord:
+    """Internal trade record for DCA engine with DCA-specific fields.
+
+    This is separate from interfaces.TradeRecord which has a different field set.
+    Converted to models.TradeRecord in _convert_trades_to_model().
+    """
+
+    entry_bar_idx: int = 0
+    exit_bar_idx: int = 0
+    entry_price: float = 0.0
+    exit_price: float = 0.0
+    direction: TradeDirection = TradeDirection.LONG
+    position_size: float = 0.0  # in coins
+    pnl: float = 0.0
+    pnl_pct: float = 0.0
+    commission: float = 0.0
+    exit_reason: ExitReason = ExitReason.UNKNOWN
+    mfe: float = 0.0  # Maximum Favorable Excursion ($)
+    mae: float = 0.0  # Maximum Adverse Excursion ($)
+    mfe_pct: float = 0.0  # MFE as percent
+    mae_pct: float = 0.0  # MAE as percent
+    bars_held: int = 0
+
+
 class DCAGridCalculator:
     """Calculator for DCA grid order placement."""
 
@@ -261,7 +285,7 @@ class DCAGridCalculator:
             return DCAGridCalculator._calculate_custom_orders(config, base_price, direction)
 
         # Calculate step distances
-        total_grid_size = base_price * (config.grid_size_percent / 100)
+        _total_grid_size = base_price * (config.grid_size_percent / 100)
 
         if config.use_log_steps:
             steps = DCAGridCalculator._calculate_log_steps(config.order_count, config.log_coefficient)
@@ -330,8 +354,9 @@ class DCAGridCalculator:
             List of DCAOrder objects
         """
         orders = []
+        custom_orders = config.custom_orders if config.custom_orders is not None else []
 
-        for i, order_config in enumerate(config.custom_orders):
+        for i, order_config in enumerate(custom_orders):
             offset_percent = order_config.get("offset", 0)
             volume_percent = order_config.get("volume", 0)
 
@@ -414,14 +439,14 @@ class DCAGridCalculator:
 
         if mode == "multiply_each":
             current = first_order_percent
-            for i in range(order_count):
+            for _ in range(order_count):
                 sizes.append(current)
                 current *= martingale_coef
 
         elif mode == "multiply_total":
             current = first_order_percent
             total = 0.0
-            for i in range(order_count):
+            for _ in range(order_count):
                 sizes.append(current)
                 total += current
                 current = total * (martingale_coef - 1)
@@ -467,7 +492,7 @@ class DCAEngine(BaseBacktestEngine):
         # State
         self.position = DCAPosition()
         self.equity_curve: list[float] = []
-        self.trades: list[TradeRecord] = []
+        self.trades: list[DCATradeRecord] = []
 
         # Indicator caches for close conditions
         self._rsi_cache: np.ndarray | None = None
@@ -530,15 +555,14 @@ class DCAEngine(BaseBacktestEngine):
         param_values = list(param_ranges.values())
 
         for combo in itertools.product(*param_values):
-            params = dict(zip(param_names, combo))
+            params = dict(zip(param_names, combo, strict=False))
 
             # Update input_data with new params
             test_input = BacktestInput(
-                market_data=input_data.market_data,
+                candles=input_data.candles,
                 initial_capital=input_data.initial_capital,
                 leverage=input_data.leverage,
-                commission=input_data.commission,
-                strategy_params={**input_data.strategy_params, **params},
+                taker_fee=input_data.taker_fee,
             )
 
             # Run backtest
@@ -592,7 +616,6 @@ class DCAEngine(BaseBacktestEngine):
         # Main loop
         for i in range(1, len(df)):
             current_bar = df.iloc[i]
-            prev_bar = df.iloc[i - 1]
 
             high = float(current_bar.get("high", current_bar.get("close", 0)))
             low = float(current_bar.get("low", current_bar.get("close", 0)))
@@ -631,17 +654,16 @@ class DCAEngine(BaseBacktestEngine):
         metrics = self._calculate_metrics(initial_capital, equity)
 
         return BacktestOutput(
-            trades=self.trades,
+            trades=self.trades,  # type: ignore[arg-type]  # DCATradeRecord → TradeRecord
             metrics=metrics,
-            equity_curve=self.equity_curve,
-            execution_time_ms=execution_time * 1000,
-            engine_used=self.name,
-            parameters_used=input_data.strategy_params,
+            equity_curve=np.array(self.equity_curve),
+            execution_time=execution_time,
+            engine_name=self.name,
         )
 
     def _configure_from_input(self, input_data: BacktestInput) -> None:
         """Configure engine from input parameters."""
-        params = input_data.strategy_params or {}
+        params: dict[str, Any] = getattr(input_data, "strategy_params", None) or {}
 
         # Grid settings
         grid = params.get("dca_grid", {})
@@ -819,8 +841,8 @@ class DCAEngine(BaseBacktestEngine):
         if self.position.is_open:
             equity = self._close_position(len(ohlcv) - 1, float(ohlcv.iloc[-1]["close"]), ExitReason.END_OF_DATA)
 
-        # Calculate metrics
-        execution_time = time.time() - start_time
+        # Calculate metrics (execution_time kept for future use)
+        _ = time.time() - start_time
 
         # Convert trades to model format
         model_trades = self._convert_trades_to_model(ohlcv)
@@ -845,8 +867,6 @@ class DCAEngine(BaseBacktestEngine):
             final_equity=equity,
             final_pnl=equity - initial_capital,
             final_pnl_pct=(equity - initial_capital) / initial_capital * 100,
-            execution_time_ms=execution_time * 1000,
-            engine_used=self.name,
         )
 
     def _generate_signals_from_config(self, config: Any, df: pd.DataFrame) -> np.ndarray:
@@ -877,7 +897,11 @@ class DCAEngine(BaseBacktestEngine):
                         for i in range(len(df)):
                             if i < len(result.entries) and result.entries.iloc[i]:
                                 signals[i] = 1
-                            elif i < len(result.short_entries) and result.short_entries.iloc[i]:
+                            elif (
+                                result.short_entries is not None
+                                and i < len(result.short_entries)
+                                and result.short_entries.iloc[i]
+                            ):
                                 signals[i] = -1
                         return signals
                     elif isinstance(result, np.ndarray):
@@ -906,7 +930,7 @@ class DCAEngine(BaseBacktestEngine):
                 for i in range(len(df)):
                     if result.entries.iloc[i]:
                         signals[i] = 1
-                    elif result.short_entries.iloc[i]:
+                    elif result.short_entries is not None and result.short_entries.iloc[i]:
                         signals[i] = -1
                 return signals
             elif isinstance(result, np.ndarray):
@@ -1000,9 +1024,9 @@ class DCAEngine(BaseBacktestEngine):
             gross_profit=gross_profit,
             gross_loss=gross_loss,
             max_drawdown=max_dd,
-            avg_trade_pnl=net_profit / total_trades if total_trades > 0 else 0,
-            avg_winning_trade=gross_profit / len(winning_trades) if winning_trades else 0,
-            avg_losing_trade=gross_loss / len(losing_trades) if losing_trades else 0,
+            avg_trade_value=net_profit / total_trades if total_trades > 0 else 0,
+            avg_win_value=gross_profit / len(winning_trades) if winning_trades else 0,
+            avg_loss_value=gross_loss / len(losing_trades) if losing_trades else 0,
         )
 
     def _generate_signals(self, input_data: BacktestInput, df: pd.DataFrame) -> np.ndarray:
@@ -1014,7 +1038,7 @@ class DCAEngine(BaseBacktestEngine):
             return input_data.signals
 
         # Default: Simple RSI strategy for demonstration
-        params = input_data.strategy_params or {}
+        params: dict[str, Any] = getattr(input_data, "strategy_params", None) or {}
         strategy_type = params.get("strategy_type", "rsi")
 
         if strategy_type == "rsi":
@@ -1091,9 +1115,8 @@ class DCAEngine(BaseBacktestEngine):
 
         # Check for new DCA order fills
         for order in self.position.orders:
-            if not order.filled:
-                if self._should_fill_order(order, high, low):
-                    self._fill_dca_order(order, bar_index)
+            if not order.filled and self._should_fill_order(order, high, low):
+                self._fill_dca_order(order, bar_index)
 
         # Update position state
         self._update_position_state(close)
@@ -1134,9 +1157,6 @@ class DCAEngine(BaseBacktestEngine):
         order.fill_price = order.price
 
         # Update position
-        old_cost = self.position.total_cost_usd
-        old_coins = self.position.total_size_coins
-
         self.position.total_cost_usd += order.size_usd
         self.position.total_size_coins += order.size_coins
         self.position.active_orders_count += 1
@@ -1184,11 +1204,7 @@ class DCAEngine(BaseBacktestEngine):
                 return True
 
         # Check absolute threshold
-        if self.grid_config.drawdown_threshold_amount > 0:
-            if drawdown >= self.grid_config.drawdown_threshold_amount:
-                return True
-
-        return False
+        return self.grid_config.drawdown_threshold_amount > 0 and drawdown >= self.grid_config.drawdown_threshold_amount
 
     def _check_single_tp(self, high: float, low: float) -> bool:
         """Check single take profit (default 2%)."""
@@ -1224,42 +1240,52 @@ class DCAEngine(BaseBacktestEngine):
         # Time/Bars Close
         if cc.time_bars_close_enable:
             bars_in_trade = bar_index - self.position.entry_bar
-            if bars_in_trade >= cc.close_after_bars:
-                if not cc.close_only_profit or profit_percent >= cc.close_min_profit:
-                    return ExitReason.TIME_EXIT
+            if bars_in_trade >= cc.close_after_bars and (
+                not cc.close_only_profit or profit_percent >= cc.close_min_profit
+            ):
+                return ExitReason.TIME_EXIT
             # Force close at max bars
             if bars_in_trade >= cc.close_max_bars:
                 return ExitReason.TIME_EXIT
 
         # RSI Close
-        if cc.rsi_close_enable and self._rsi_cache is not None:
-            if self._check_rsi_close(bar_index, profit_percent):
-                return ExitReason.SIGNAL_EXIT
+        if cc.rsi_close_enable and self._rsi_cache is not None and self._check_rsi_close(bar_index, profit_percent):
+            return ExitReason.SIGNAL
 
         # Stochastic Close
-        if cc.stoch_close_enable and self._stoch_k_cache is not None:
-            if self._check_stoch_close(bar_index, profit_percent):
-                return ExitReason.SIGNAL_EXIT
+        if (
+            cc.stoch_close_enable
+            and self._stoch_k_cache is not None
+            and self._check_stoch_close(bar_index, profit_percent)
+        ):
+            return ExitReason.SIGNAL
 
         # Channel Close
-        if cc.channel_close_enable:
-            if self._check_channel_close(bar_index, close, profit_percent):
-                return ExitReason.SIGNAL_EXIT
+        if cc.channel_close_enable and self._check_channel_close(bar_index, close, profit_percent):
+            return ExitReason.SIGNAL
 
         # MA Close
-        if cc.ma_close_enable and self._ma1_cache is not None and self._ma2_cache is not None:
-            if self._check_ma_close(bar_index, profit_percent):
-                return ExitReason.SIGNAL_EXIT
+        if (
+            cc.ma_close_enable
+            and self._ma1_cache is not None
+            and self._ma2_cache is not None
+            and self._check_ma_close(bar_index, profit_percent)
+        ):
+            return ExitReason.SIGNAL
 
         # PSAR Close
-        if cc.psar_close_enable and self._psar_cache is not None:
-            if self._check_psar_close(bar_index, close, profit_percent):
-                return ExitReason.SIGNAL_EXIT
+        if (
+            cc.psar_close_enable
+            and self._psar_cache is not None
+            and self._check_psar_close(bar_index, close, profit_percent)
+        ):
+            return ExitReason.SIGNAL
 
         return None
 
     def _check_rsi_close(self, bar_index: int, profit_percent: float) -> bool:
         """Check RSI close conditions."""
+        assert self._rsi_cache is not None  # Caller guarantees this
         cc = self.close_conditions
 
         # Profit filter
@@ -1271,25 +1297,32 @@ class DCAEngine(BaseBacktestEngine):
 
         if self.position.direction == "long":
             # Reach mode
-            if cc.rsi_close_reach_enable:
-                if rsi > cc.rsi_close_reach_long_more or rsi < cc.rsi_close_reach_long_less:
-                    return True
+            if cc.rsi_close_reach_enable and (rsi > cc.rsi_close_reach_long_more or rsi < cc.rsi_close_reach_long_less):
+                return True
             # Cross mode
-            if cc.rsi_close_cross_enable:
-                if prev_rsi >= cc.rsi_close_cross_long_level and rsi < cc.rsi_close_cross_long_level:
-                    return True
+            if (
+                cc.rsi_close_cross_enable
+                and prev_rsi >= cc.rsi_close_cross_long_level
+                and rsi < cc.rsi_close_cross_long_level
+            ):
+                return True
         else:  # short
-            if cc.rsi_close_reach_enable:
-                if rsi > cc.rsi_close_reach_short_more or rsi < cc.rsi_close_reach_short_less:
-                    return True
-            if cc.rsi_close_cross_enable:
-                if prev_rsi <= cc.rsi_close_cross_short_level and rsi > cc.rsi_close_cross_short_level:
-                    return True
+            if cc.rsi_close_reach_enable and (
+                rsi > cc.rsi_close_reach_short_more or rsi < cc.rsi_close_reach_short_less
+            ):
+                return True
+            if (
+                cc.rsi_close_cross_enable
+                and prev_rsi <= cc.rsi_close_cross_short_level
+                and rsi > cc.rsi_close_cross_short_level
+            ):
+                return True
 
         return False
 
     def _check_stoch_close(self, bar_index: int, profit_percent: float) -> bool:
         """Check Stochastic close conditions."""
+        assert self._stoch_k_cache is not None  # Caller guarantees this
         cc = self.close_conditions
 
         if cc.stoch_close_only_profit and profit_percent < cc.stoch_close_min_profit:
@@ -1346,6 +1379,8 @@ class DCAEngine(BaseBacktestEngine):
 
     def _check_ma_close(self, bar_index: int, profit_percent: float) -> bool:
         """Check Two MAs cross close conditions."""
+        assert self._ma1_cache is not None  # Caller guarantees this
+        assert self._ma2_cache is not None  # Caller guarantees this
         cc = self.close_conditions
 
         if cc.ma_close_only_profit and profit_percent < cc.ma_close_min_profit:
@@ -1369,6 +1404,7 @@ class DCAEngine(BaseBacktestEngine):
 
     def _check_psar_close(self, bar_index: int, close: float, profit_percent: float) -> bool:
         """Check Parabolic SAR close conditions."""
+        assert self._psar_cache is not None  # Caller guarantees this
         cc = self.close_conditions
 
         if cc.psar_close_only_profit and profit_percent < cc.psar_close_min_profit:
@@ -1583,13 +1619,7 @@ class DCAEngine(BaseBacktestEngine):
             direction: "long" or "short"
         """
         indent_pct = self.indent_order.indent_percent / 100
-
-        if direction == "long":
-            # For long: indent below current price
-            entry_price = price * (1 - indent_pct)
-        else:
-            # For short: indent above current price
-            entry_price = price * (1 + indent_pct)
+        entry_price = price * (1 - indent_pct) if direction == "long" else price * (1 + indent_pct)
 
         self.pending_indent = PendingIndentOrder(
             direction=direction,
@@ -1646,18 +1676,19 @@ class DCAEngine(BaseBacktestEngine):
             pnl = (self.position.average_entry_price - close_price) * self.position.total_size_coins
 
         # Record trade
-        trade = TradeRecord(
-            entry_time=self.position.entry_bar,
-            exit_time=bar_index,
+        trade = DCATradeRecord(
+            entry_bar_idx=self.position.entry_bar,
+            exit_bar_idx=bar_index,
             entry_price=self.position.average_entry_price,
             exit_price=close_price,
             direction=TradeDirection.LONG if self.position.direction == "long" else TradeDirection.SHORT,
             position_size=self.position.total_size_coins,
             pnl=pnl,
-            pnl_percent=(pnl / self.position.total_cost_usd * 100) if self.position.total_cost_usd > 0 else 0,
+            pnl_pct=(pnl / self.position.total_cost_usd * 100) if self.position.total_cost_usd > 0 else 0,
             exit_reason=reason,
             mfe=self.position.max_favorable_excursion,
             mae=self.position.max_adverse_excursion,
+            bars_held=bar_index - self.position.entry_bar,
         )
         self.trades.append(trade)
 
@@ -1677,8 +1708,7 @@ class DCAEngine(BaseBacktestEngine):
                 total_return=0.0,
                 max_drawdown=0.0,
                 sharpe_ratio=0.0,
-                avg_trade_pnl=0.0,
-                avg_trade_pnl_percent=0.0,
+                avg_trade=0.0,
             )
 
         # Calculate basic metrics
@@ -1711,7 +1741,6 @@ class DCAEngine(BaseBacktestEngine):
             sharpe = 0.0
 
         avg_pnl = np.mean([t.pnl for t in self.trades])
-        avg_pnl_pct = np.mean([t.pnl_percent for t in self.trades])
 
         return BacktestMetrics(
             total_trades=total_trades,
@@ -1720,8 +1749,7 @@ class DCAEngine(BaseBacktestEngine):
             total_return=total_return,
             max_drawdown=max_drawdown,
             sharpe_ratio=sharpe,
-            avg_trade_pnl=avg_pnl,
-            avg_trade_pnl_percent=avg_pnl_pct,
+            avg_trade=float(avg_pnl),
         )
 
     def _empty_result(self, reason: str) -> BacktestOutput:
@@ -1735,12 +1763,11 @@ class DCAEngine(BaseBacktestEngine):
                 total_return=0.0,
                 max_drawdown=0.0,
                 sharpe_ratio=0.0,
-                avg_trade_pnl=0.0,
-                avg_trade_pnl_percent=0.0,
+                avg_trade=0.0,
             ),
-            equity_curve=[],
-            execution_time_ms=0,
-            engine_used=self.name,
-            parameters_used={},
-            error=reason,
+            equity_curve=np.array([]),
+            execution_time=0.0,
+            engine_name=self.name,
+            is_valid=False,
+            validation_errors=[reason],
         )

@@ -101,7 +101,9 @@
         "norecursedirs",
         "asyncio",
         "pytest",
-        "doesnt"
+        "doesnt",
+        "delib",
+        "adjs"
     ],
     "ignorePaths": [
         ".gitignore",

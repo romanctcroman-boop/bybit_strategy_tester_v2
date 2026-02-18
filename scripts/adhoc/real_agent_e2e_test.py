@@ -347,7 +347,7 @@ async def test_deliberation() -> dict:
 
         # Показать финальные голоса агентов
         if result.final_votes:
-            print(f"    👥 Финальные голоса:")
+            print("    👥 Финальные голоса:")
             for vote in result.final_votes:
                 agent_name = getattr(vote, "agent", "unknown")
                 position = getattr(vote, "position", "")[:80]

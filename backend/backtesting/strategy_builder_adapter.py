@@ -45,10 +45,10 @@ from backend.core.indicators import (
     calculate_parabolic_sar,
     calculate_pivot_points_array,
     calculate_pvt,
-    calculate_qqe,
     calculate_qqe_cross,
     calculate_roc,
     calculate_rsi,
+    calculate_rvi,
     calculate_sma,
     calculate_stddev,
     calculate_stoch_rsi,
@@ -98,10 +98,15 @@ class StrategyBuilderAdapter(BaseStrategy):
                 - name: Strategy name
                 - description: Strategy description (optional)
                 - main_strategy: (optional) The main strategy node with isMain: True
+                - interval: (optional) Main chart timeframe from Properties panel
+                  Used to resolve "Chart" timeframe in block params.
         """
         self.graph = strategy_graph
         self.name = strategy_graph.get("name", "Builder Strategy")
         self.description = strategy_graph.get("description", "")
+        # Main chart interval from Properties panel (e.g. "15", "60", "D")
+        # When a block's timeframe is "Chart", it resolves to this value.
+        self.main_interval = strategy_graph.get("interval", "")
         self.blocks = {block["id"]: block for block in strategy_graph.get("blocks", [])}
         self.connections = strategy_graph.get("connections", [])
 
@@ -119,6 +124,10 @@ class StrategyBuilderAdapter(BaseStrategy):
                 else:
                     # Update existing block with isMain flag
                     self.blocks[main_id]["isMain"] = True
+
+        # Resolve "Chart" timeframe in block params → main_interval from Properties panel
+        if self.main_interval:
+            self._resolve_chart_timeframes()
 
         self.params = self._extract_params()
 
@@ -145,6 +154,48 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         if not main_node:
             logger.warning("No main strategy node found. Entry/exit signals may not be connected.")
+
+    # ── "Chart" timeframe resolution ──────────────────────────────────
+    # All param keys ending in "timeframe" that hold "Chart"/"chart"
+    # are replaced with the main chart interval from the Properties panel.
+    _TIMEFRAME_PARAM_KEYS = frozenset(
+        {
+            "timeframe",
+            "two_mas_timeframe",
+            "channel_timeframe",
+            "rvi_timeframe",
+            "mfi_timeframe",
+            "cci_timeframe",
+            "momentum_timeframe",
+            "channel_close_timeframe",
+            "rsi_close_timeframe",
+            "stoch_close_timeframe",
+        }
+    )
+
+    def _resolve_chart_timeframes(self) -> None:
+        """Replace "Chart" timeframe values in all block params with main_interval.
+
+        When a user selects "Chart" in a node's timeframe dropdown, it means
+        "use the timeframe from the Properties panel" (the main chart TF).
+        This method walks all blocks and substitutes "Chart"/"chart" with
+        the actual main interval (e.g. "15", "60", "D").
+        """
+        resolved_count = 0
+        for _block_id, block in self.blocks.items():
+            params = block.get("params") or block.get("config")
+            if not params or not isinstance(params, dict):
+                continue
+            for key in self._TIMEFRAME_PARAM_KEYS:
+                if key in params and isinstance(params[key], str) and params[key].lower() == "chart":
+                    params[key] = self.main_interval
+                    resolved_count += 1
+        if resolved_count:
+            logger.debug(
+                "[ChartTF] Resolved {} 'Chart' timeframe param(s) → '{}' (main interval)",
+                resolved_count,
+                self.main_interval,
+            )
 
     def _extract_params(self) -> dict[str, Any]:
         """Extract parameters from blocks (supports both 'params' and 'config' keys)"""
@@ -272,7 +323,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         "stddev": "indicator",
         "atrp": "indicator",
         "qqe": "indicator",
-        "qqe_cross": "indicator",
+        # (qqe_cross removed — consolidated into universal QQE indicator block)
         "momentum": "indicator",
         # Condition blocks
         "crossover": "condition",
@@ -313,9 +364,8 @@ class StrategyBuilderAdapter(BaseStrategy):
         "static_sltp": "action",
         # Filter blocks
         "rsi_filter": "filter",
-        "supertrend_filter": "filter",
+        # (supertrend_filter removed — consolidated into universal supertrend indicator)
         "two_ma_filter": "filter",
-        "volume_filter": "filter",
         "time_filter": "filter",
         "volatility_filter": "filter",
         "adx_filter": "filter",
@@ -335,12 +385,9 @@ class StrategyBuilderAdapter(BaseStrategy):
         "short_exit": "signal",
         "buy_signal": "signal",
         "sell_signal": "signal",
-        # Smart signals
-        "smart_rsi": "smart_signals",
-        "smart_macd": "smart_signals",
-        "smart_bollinger": "smart_signals",
-        "smart_stochastic": "smart_signals",
-        "smart_supertrend": "smart_signals",
+        # (smart_rsi, smart_macd, smart_bollinger removed — Smart Signals category deprecated)
+        # (smart_stochastic removed — consolidated into universal stochastic indicator)
+        # (smart_supertrend removed — consolidated into universal supertrend indicator)
         # Strategy aggregator
         "strategy": "strategy",
         # DCA/Grid
@@ -351,9 +398,19 @@ class StrategyBuilderAdapter(BaseStrategy):
         "hammer": "price_action",
         "doji": "price_action",
         "pinbar": "price_action",
-        # Divergence
+        # Divergence — unified multi-indicator divergence signal block
         "divergence": "divergence",
-        "rsi_divergence": "divergence",
+        # Universal filters (new instruments in Технические Индикаторы)
+        "atr_volatility": "indicator",
+        "volume_filter": "indicator",
+        "highest_lowest_bar": "indicator",
+        "two_mas": "indicator",
+        "accumulation_areas": "indicator",
+        "keltner_bollinger": "indicator",
+        "rvi_filter": "indicator",
+        "mfi_filter": "indicator",
+        "cci_filter": "indicator",
+        "momentum_filter": "indicator",
     }
 
     @classmethod
@@ -367,7 +424,6 @@ class StrategyBuilderAdapter(BaseStrategy):
             ("condition_", "condition"),
             ("action_", "action"),
             ("filter_", "filter"),
-            ("smart_", "smart_signals"),
         ]:
             if block_type.startswith(prefix):
                 return cat
@@ -418,7 +474,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif category in ("sizing", "position_sizing"):
             # Position sizing blocks - config-only, processed by engine
             return self._execute_position_sizing(block_type, params)
-        elif category in ("entry", "entry_refinement"):
+        elif category in ("entry", "entry_refinement", "entry_mgmt"):
             # Entry refinement blocks (DCA, grid, martingale, etc.) - config-only
             return {}
         elif category in ("risk", "risk_controls"):
@@ -460,9 +516,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif category == "visualization":
             # Visualization blocks - config-only, no signals
             return {}
-        elif category == "smart_signals":
-            # Smart signal blocks — composite nodes (indicator + condition in one block)
-            return self._execute_smart_signal(block_type, params, ohlcv)
+        # (smart_signals category removed — entire Smart Signals category deprecated)
         elif category == "signal":
             # Signal blocks (long_entry, short_entry, long_exit, short_exit)
             # These pass through condition input to output
@@ -683,7 +737,8 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             macd_line = macd_result.macd
             signal_line = macd_result.signal
-            histogram = macd_result.histogram
+            # vectorbt uses 'hist' not 'histogram'
+            histogram = macd_result.hist
 
             # --- Universal MACD signal generation ---
             use_cross_zero = params.get("use_macd_cross_zero", False)
@@ -785,12 +840,108 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"value": atr}
 
         elif indicator_type == "stochastic":
-            k_period = _param(params, 14, "k_period", "k")
-            d_period = _param(params, 3, "d_period", "d")
+            k_period = _param(params, 14, "stoch_k_length", "k_period", "k")
+            k_smooth = _param(params, 3, "stoch_k_smoothing", "smooth_k")
+            d_smooth = _param(params, 3, "stoch_d_smoothing", "d_period", "d")
             high = ohlcv["high"]
             low = ohlcv["low"]
-            stoch = vbt.STOCH.run(high, low, close, k_window=k_period, d_window=d_period)
-            return {"k": stoch.k, "d": stoch.d}
+            stoch = vbt.STOCH.run(high, low, close, k_window=k_period, d_window=d_smooth, d_ewm=False)
+            stoch_k = stoch.percent_k
+            stoch_d = stoch.percent_d
+
+            # --- Universal Stochastic signal generation ---
+            use_range = params.get("use_stoch_range_filter", False)
+            use_cross_level = params.get("use_stoch_cross_level", False)
+            use_kd_cross = params.get("use_stoch_kd_cross", False)
+
+            logger.debug(
+                "STOCH node | k_period={} k_smooth={} d_smooth={} | modes: range={}, cross_level={}, kd_cross={}",
+                k_period,
+                k_smooth,
+                d_smooth,
+                use_range,
+                use_cross_level,
+                use_kd_cross,
+            )
+
+            # --- Range filter: continuous condition on %D ---
+            if use_range:
+                long_more = params.get("long_stoch_d_more", 1)
+                long_less = params.get("long_stoch_d_less", 50)
+                long_range_cond = (stoch_d > long_more) & (stoch_d < long_less)
+                short_less = params.get("short_stoch_d_less", 100)
+                short_more = params.get("short_stoch_d_more", 50)
+                short_range_cond = (stoch_d < short_less) & (stoch_d > short_more)
+            else:
+                long_range_cond = pd.Series(True, index=ohlcv.index)
+                short_range_cond = pd.Series(True, index=ohlcv.index)
+
+            # --- Cross Level: event-based signal on %D crossing a threshold ---
+            if use_cross_level:
+                cross_long_level = params.get("stoch_cross_level_long", 20)
+                cross_short_level = params.get("stoch_cross_level_short", 80)
+                d_prev = stoch_d.shift(1)
+                cross_long = (d_prev <= cross_long_level) & (stoch_d > cross_long_level)
+                cross_short = (d_prev >= cross_short_level) & (stoch_d < cross_short_level)
+                # Cross memory
+                if params.get("activate_stoch_cross_memory", False):
+                    mem_bars = int(params.get("stoch_cross_memory_bars", 5))
+                    cross_long = self._apply_signal_memory(cross_long, mem_bars)
+                    cross_short = self._apply_signal_memory(cross_short, mem_bars)
+                long_cross_cond = cross_long
+                short_cross_cond = cross_short
+            else:
+                long_cross_cond = pd.Series(True, index=ohlcv.index)
+                short_cross_cond = pd.Series(True, index=ohlcv.index)
+
+            # --- K/D Cross: event-based signal on %K crossing %D ---
+            if use_kd_cross:
+                k_prev = stoch_k.shift(1)
+                d_prev_kd = stoch_d.shift(1)
+                kd_long = (k_prev <= d_prev_kd) & (stoch_k > stoch_d)
+                kd_short = (k_prev >= d_prev_kd) & (stoch_k < stoch_d)
+                if params.get("opposite_stoch_kd", False):
+                    kd_long, kd_short = kd_short, kd_long
+                if params.get("activate_stoch_kd_memory", False):
+                    kd_mem_bars = int(params.get("stoch_kd_memory_bars", 5))
+                    kd_long = self._apply_signal_memory(kd_long, kd_mem_bars)
+                    kd_short = self._apply_signal_memory(kd_short, kd_mem_bars)
+                long_kd_cond = kd_long
+                short_kd_cond = kd_short
+            else:
+                long_kd_cond = pd.Series(True, index=ohlcv.index)
+                short_kd_cond = pd.Series(True, index=ohlcv.index)
+
+            # --- Combine: Range AND Cross Level AND K/D Cross ---
+            long_signal = long_range_cond & long_cross_cond & long_kd_cond
+            short_signal = short_range_cond & short_cross_cond & short_kd_cond
+
+            has_new_mode = use_range or use_cross_level or use_kd_cross
+            if not has_new_mode and ("overbought" in params or "oversold" in params):
+                # Legacy mode: simple threshold
+                overbought = params.get("overbought", 80)
+                oversold = params.get("oversold", 20)
+                long_signal = pd.Series(stoch_d < oversold, index=ohlcv.index)
+                short_signal = pd.Series(stoch_d > overbought, index=ohlcv.index)
+                logger.debug("STOCH node | LEGACY mode | overbought={}, oversold={}", overbought, oversold)
+            elif not has_new_mode:
+                # Passthrough: no mode enabled → always True (data source only)
+                long_signal = pd.Series(True, index=ohlcv.index)
+                short_signal = pd.Series(True, index=ohlcv.index)
+                logger.debug("STOCH node | PASSTHROUGH mode (no mode enabled)")
+            else:
+                logger.debug(
+                    "STOCH node | UNIVERSAL mode | long_signals={}, short_signals={} (range AND cross_level AND kd_cross)",
+                    long_signal.sum(),
+                    short_signal.sum(),
+                )
+
+            return {
+                "k": stoch_k,
+                "d": stoch_d,
+                "long": long_signal,
+                "short": short_signal,
+            }
 
         elif indicator_type == "adx":
             period = params.get("period", 14)
@@ -799,21 +950,60 @@ class StrategyBuilderAdapter(BaseStrategy):
             adx = vbt.ADX.run(high, low, close, window=period).adx
             return {"value": adx}
 
-        # ========== QQE Indicator ==========
+        # ========== QQE Universal Indicator ==========
         elif indicator_type == "qqe":
-            rsi_period = _param(params, 14, "rsi_period", "rsiPeriod")
-            smoothing = _param(params, 5, "smoothing_period", "smoothing")
-            qqe_factor = _param(params, 4.236, "qqe_factor", "qqeFactor")
-            qqe_result = calculate_qqe(
+            rsi_period = _param(params, 14, "rsi_period", "rsiPeriod", "qqe_rsi_length")
+            smoothing = _param(params, 5, "smoothing_period", "smoothing", "qqe_rsi_smoothing")
+            qqe_factor = _param(params, 4.236, "qqe_factor", "qqeFactor", "qqe_delta_multiplier")
+
+            # Compute QQE with cross signals
+            qqe_result = calculate_qqe_cross(
                 close.values, rsi_period=rsi_period, smoothing_factor=smoothing, qqe_factor=qqe_factor
             )
+
+            qqe_line = pd.Series(qqe_result["qqe_line"], index=ohlcv.index)
+            rsi_ma = pd.Series(qqe_result["rsi_ma"], index=ohlcv.index)
+            upper_band = pd.Series(qqe_result["upper_band"], index=ohlcv.index)
+            lower_band = pd.Series(qqe_result["lower_band"], index=ohlcv.index)
+            histogram = pd.Series(qqe_result["histogram"], index=ohlcv.index)
+            trend = pd.Series(qqe_result["trend"], index=ohlcv.index)
+
+            use_qqe = params.get("use_qqe", False)
+
+            if not use_qqe:
+                # Passthrough — data only, long/short always True
+                n = len(ohlcv)
+                long_sig = pd.Series(np.ones(n, dtype=bool), index=ohlcv.index)
+                short_sig = pd.Series(np.ones(n, dtype=bool), index=ohlcv.index)
+            else:
+                # Cross mode: long on RSI-MA cross above QQE line, short on cross below
+                buy_raw = pd.Series(qqe_result["buy_signal"], index=ohlcv.index)
+                sell_raw = pd.Series(qqe_result["sell_signal"], index=ohlcv.index)
+
+                # Signal memory
+                disable_memory = params.get("disable_qqe_signal_memory", False)
+                if not disable_memory:
+                    memory_bars = int(params.get("qqe_signal_memory_bars", 5))
+                    long_sig = self._apply_signal_memory(buy_raw, memory_bars)
+                    short_sig = self._apply_signal_memory(sell_raw, memory_bars)
+                else:
+                    long_sig = buy_raw.astype(bool)
+                    short_sig = sell_raw.astype(bool)
+
+                # Opposite signal
+                opposite = params.get("opposite_qqe", params.get("opposite_signal", False))
+                if opposite:
+                    long_sig, short_sig = short_sig, long_sig
+
             return {
-                "qqe_line": pd.Series(qqe_result["qqe_line"], index=ohlcv.index),
-                "rsi_ma": pd.Series(qqe_result["rsi_ma"], index=ohlcv.index),
-                "upper_band": pd.Series(qqe_result["upper_band"], index=ohlcv.index),
-                "lower_band": pd.Series(qqe_result["lower_band"], index=ohlcv.index),
-                "histogram": pd.Series(qqe_result["histogram"], index=ohlcv.index),
-                "trend": pd.Series(qqe_result["trend"], index=ohlcv.index),
+                "qqe_line": qqe_line,
+                "rsi_ma": rsi_ma,
+                "upper_band": upper_band,
+                "lower_band": lower_band,
+                "histogram": histogram,
+                "trend": trend,
+                "long": long_sig,
+                "short": short_sig,
             }
 
         # ========== Momentum Indicators ==========
@@ -884,19 +1074,53 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "supertrend":
-            period = params.get("period", 10)
-            multiplier = params.get("multiplier", 3.0)
+            # ── SUPERTREND UNIVERSAL NODE ──
+            # Supports 2 signal modes:
+            #   1) FILTER mode (default): long when uptrend (dir==1), short when downtrend (dir==-1)
+            #   2) SIGNAL mode (generate_on_trend_change): long/short only on direction flip
+            # Additional options: use_btc_source, opposite_signal, timeframe
+            period = _param(params, 10, "period", "atr_period")
+            multiplier = _param(params, 3.0, "multiplier", "atr_multiplier")
+            use_supertrend = params.get("use_supertrend", False)
+            generate_on_trend_change = params.get("generate_on_trend_change", False)
+            opposite_signal = params.get("opposite_signal", False)
+
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             st_line, st_direction = calculate_supertrend(high, low, close.values, period, multiplier)
+
+            direction = pd.Series(st_direction, index=ohlcv.index)
+
             # Derive upper/lower bands from supertrend line based on direction
             st_upper = np.where(st_direction == -1, st_line, np.nan)
             st_lower = np.where(st_direction == 1, st_line, np.nan)
+
+            if not use_supertrend:
+                # Passthrough — no filtering, SuperTrend used as data source only
+                long_signal = pd.Series(True, index=ohlcv.index)
+                short_signal = pd.Series(True, index=ohlcv.index)
+            elif generate_on_trend_change:
+                # SIGNAL mode: fire only on direction flip (like smart signal)
+                long_signal = (direction == 1) & (direction.shift(1) == -1)
+                short_signal = (direction == -1) & (direction.shift(1) == 1)
+                long_signal = long_signal.fillna(False)
+                short_signal = short_signal.fillna(False)
+            else:
+                # FILTER mode: continuous — long while uptrend, short while downtrend
+                long_signal = direction == 1
+                short_signal = direction == -1
+
+            # Apply opposite signal if requested
+            if opposite_signal:
+                long_signal, short_signal = short_signal, long_signal
+
             return {
                 "supertrend": pd.Series(st_line, index=ohlcv.index),
-                "direction": pd.Series(st_direction, index=ohlcv.index),
+                "direction": direction,
                 "upper": pd.Series(st_upper, index=ohlcv.index),
                 "lower": pd.Series(st_lower, index=ohlcv.index),
+                "long": long_signal,
+                "short": short_signal,
             }
 
         elif indicator_type == "ichimoku":
@@ -1100,6 +1324,539 @@ class StrategyBuilderAdapter(BaseStrategy):
                 else:
                     fallback = src.rolling(period).mean()
                 return {"value": fallback}
+
+        # ========== Universal Filters (new instruments) ==========
+        elif indicator_type == "atr_volatility":
+            use = params.get("use_atr_volatility", False)
+            if not use:
+                return {
+                    "long_signal": pd.Series(True, index=ohlcv.index),
+                    "short_signal": pd.Series(True, index=ohlcv.index),
+                }
+            length1 = int(params.get("atr_length1", 20))
+            length2 = int(params.get("atr_length2", 100))
+            smoothing = str(params.get("atr_smoothing", "WMA")).upper()
+            diff_pct = float(params.get("atr_diff_percent", 10))
+            mode = params.get("atr1_to_atr2", "ATR1 < ATR2")
+
+            high_arr = ohlcv["high"].values
+            low_arr = ohlcv["low"].values
+            close_arr = close.values
+            atr1 = pd.Series(
+                calculate_atr_smoothed(high_arr, low_arr, close_arr, period=length1, method=smoothing),
+                index=ohlcv.index,
+            )
+            atr2 = pd.Series(
+                calculate_atr_smoothed(high_arr, low_arr, close_arr, period=length2, method=smoothing),
+                index=ohlcv.index,
+            )
+            # Percentage difference: |ATR1 - ATR2| / ATR2 * 100 >= diff_pct
+            pct_diff = ((atr1 - atr2).abs() / atr2.replace(0, np.nan)) * 100
+            if "< ATR2" in mode:
+                # Low volatility: ATR1 < ATR2 by at least diff_pct%
+                condition = (atr1 < atr2) & (pct_diff >= diff_pct)
+            else:
+                # High volatility: ATR1 > ATR2 by at least diff_pct%
+                condition = (atr1 > atr2) & (pct_diff >= diff_pct)
+            condition = condition.fillna(False)
+            logger.debug(
+                "ATR Volatility filter | mode={} | diff>={}% | atr1_len={} atr2_len={} | pass={}",
+                mode,
+                diff_pct,
+                length1,
+                length2,
+                condition.sum(),
+            )
+            return {"long_signal": condition, "short_signal": condition}
+
+        elif indicator_type == "volume_filter":
+            use = params.get("use_volume_filter", False)
+            if not use:
+                return {
+                    "long_signal": pd.Series(True, index=ohlcv.index),
+                    "short_signal": pd.Series(True, index=ohlcv.index),
+                }
+            length1 = int(params.get("vol_length1", 20))
+            length2 = int(params.get("vol_length2", 100))
+            smoothing = str(params.get("vol_smoothing", "WMA")).upper()
+            diff_pct = float(params.get("vol_diff_percent", 10))
+            mode = params.get("vol1_to_vol2", "VOL1 < VOL2")
+
+            volume = ohlcv["volume"].astype(float)
+            # Apply smoothing to volume
+            if smoothing == "EMA":
+                vol1 = volume.ewm(span=length1, adjust=False).mean()
+                vol2 = volume.ewm(span=length2, adjust=False).mean()
+            elif smoothing == "SMA":
+                vol1 = volume.rolling(length1).mean()
+                vol2 = volume.rolling(length2).mean()
+            elif smoothing == "WMA":
+                w1 = np.arange(1, length1 + 1, dtype=float)
+                vol1 = volume.rolling(length1).apply(lambda x: np.dot(x, w1) / w1.sum(), raw=True)
+                w2 = np.arange(1, length2 + 1, dtype=float)
+                vol2 = volume.rolling(length2).apply(lambda x: np.dot(x, w2) / w2.sum(), raw=True)
+            else:  # RMA (Wilder's)
+                vol1 = volume.ewm(alpha=1 / length1, adjust=False).mean()
+                vol2 = volume.ewm(alpha=1 / length2, adjust=False).mean()
+
+            pct_diff = ((vol1 - vol2).abs() / vol2.replace(0, np.nan)) * 100
+            if "< VOL2" in mode:
+                condition = (vol1 < vol2) & (pct_diff >= diff_pct)
+            else:
+                condition = (vol1 > vol2) & (pct_diff >= diff_pct)
+            condition = condition.fillna(False)
+            logger.debug(
+                "Volume filter | mode={} | diff>={}% | vol1_len={} vol2_len={} | pass={}",
+                mode,
+                diff_pct,
+                length1,
+                length2,
+                condition.sum(),
+            )
+            return {"long_signal": condition, "short_signal": condition}
+
+        elif indicator_type == "highest_lowest_bar":
+            long_signal = pd.Series(True, index=ohlcv.index)
+            short_signal = pd.Series(True, index=ohlcv.index)
+
+            # --- Highest/Lowest Bar signal ---
+            if params.get("use_highest_lowest", False):
+                lookback = int(params.get("hl_lookback_bars", 10))
+                price_pct = float(params.get("hl_price_percent", 0))
+                atr_pct = float(params.get("hl_atr_percent", 0))
+                atr_len = int(params.get("atr_hl_length", 50))
+
+                high_arr = ohlcv["high"]
+                low_arr = ohlcv["low"]
+                rolling_high = high_arr.rolling(lookback).max()
+                rolling_low = low_arr.rolling(lookback).min()
+
+                is_highest = high_arr >= rolling_high
+                is_lowest = low_arr <= rolling_low
+
+                # Additional price percent condition
+                if price_pct > 0:
+                    close_shifted = close.shift(lookback)
+                    price_up = ((close - close_shifted) / close_shifted.replace(0, np.nan)) * 100 >= price_pct
+                    price_down = ((close_shifted - close) / close_shifted.replace(0, np.nan)) * 100 >= price_pct
+                    is_highest = is_highest & price_up.fillna(False)
+                    is_lowest = is_lowest & price_down.fillna(False)
+
+                # Additional ATR condition
+                if atr_pct > 0:
+                    high_v = ohlcv["high"].values
+                    low_v = ohlcv["low"].values
+                    atr_full = pd.Series(
+                        calculate_atr(high_v, low_v, close.values, atr_len),
+                        index=ohlcv.index,
+                    )
+                    atr_short = pd.Series(
+                        calculate_atr(high_v, low_v, close.values, 2),
+                        index=ohlcv.index,
+                    )
+                    atr_ratio = ((atr_short - atr_full) / atr_full.replace(0, np.nan)) * 100
+                    atr_up = atr_ratio >= atr_pct
+                    atr_down = atr_ratio >= atr_pct
+                    is_highest = is_highest | atr_up.fillna(False)
+                    is_lowest = is_lowest | atr_down.fillna(False)
+
+                long_signal = is_highest.fillna(False)
+                short_signal = is_lowest.fillna(False)
+
+            # --- Block if Worse Than filter ---
+            if params.get("use_block_worse_than", False):
+                worse_pct = float(params.get("block_worse_percent", 1.1))
+                prev_close = close.shift(1)
+                price_change_pct = ((close - prev_close) / prev_close.replace(0, np.nan)) * 100
+                # Long: price higher than prev but not more than XX%
+                long_ok = (price_change_pct >= 0) & (price_change_pct <= worse_pct)
+                # Short: price lower than prev but not more than XX%
+                short_ok = (price_change_pct <= 0) & (price_change_pct.abs() <= worse_pct)
+                long_signal = long_signal & long_ok.fillna(False)
+                short_signal = short_signal & short_ok.fillna(False)
+
+            logger.debug(
+                "Highest/Lowest Bar | hl={} | worse={} | long_signals={} short_signals={}",
+                params.get("use_highest_lowest"),
+                params.get("use_block_worse_than"),
+                long_signal.sum(),
+                short_signal.sum(),
+            )
+            return {"long_signal": long_signal, "short_signal": short_signal}
+
+        elif indicator_type == "two_mas":
+            ma1_len = int(params.get("ma1_length", 50))
+            ma2_len = int(params.get("ma2_length", 100))
+            ma1_type = str(params.get("ma1_smoothing", "SMA")).upper()
+            ma2_type = str(params.get("ma2_smoothing", "EMA")).upper()
+            ma1_src = str(params.get("ma1_source", "close"))
+            ma2_src = str(params.get("ma2_source", "close"))
+
+            src1 = ohlcv[ma1_src] if ma1_src in ohlcv.columns else close
+            src2 = ohlcv[ma2_src] if ma2_src in ohlcv.columns else close
+
+            def _calc_ma(src: pd.Series, length: int, ma_type: str) -> pd.Series:
+                if ma_type == "EMA":
+                    return src.ewm(span=length, adjust=False).mean()
+                elif ma_type == "WMA":
+                    w = np.arange(1, length + 1, dtype=float)
+                    return src.rolling(length).apply(lambda x: np.dot(x, w) / w.sum(), raw=True)
+                elif ma_type == "RMA":
+                    return src.ewm(alpha=1 / length, adjust=False).mean()
+                else:  # SMA
+                    return src.rolling(length).mean()
+
+            ma1 = _calc_ma(src1, ma1_len, ma1_type)
+            ma2 = _calc_ma(src2, ma2_len, ma2_type)
+
+            long_signal = pd.Series(True, index=ohlcv.index)
+            short_signal = pd.Series(True, index=ohlcv.index)
+
+            # --- MA Cross signal ---
+            if params.get("use_ma_cross", False):
+                ma1_prev = ma1.shift(1)
+                ma2_prev = ma2.shift(1)
+                cross_long = (ma1_prev <= ma2_prev) & (ma1 > ma2)
+                cross_short = (ma1_prev >= ma2_prev) & (ma1 < ma2)
+
+                if params.get("opposite_ma_cross", False):
+                    cross_long, cross_short = cross_short, cross_long
+
+                if params.get("activate_ma_cross_memory", False):
+                    memory_bars = int(params.get("ma_cross_memory_bars", 5))
+                    cross_long = self._apply_signal_memory(cross_long, memory_bars)
+                    cross_short = self._apply_signal_memory(cross_short, memory_bars)
+
+                long_signal = long_signal & cross_long.fillna(False)
+                short_signal = short_signal & cross_short.fillna(False)
+
+            # --- MA1 as Filter ---
+            if params.get("use_ma1_filter", False):
+                if params.get("opposite_ma1_filter", False):
+                    long_filter = close < ma1
+                    short_filter = close > ma1
+                else:
+                    long_filter = close > ma1
+                    short_filter = close < ma1
+                long_signal = long_signal & long_filter.fillna(False)
+                short_signal = short_signal & short_filter.fillna(False)
+
+            logger.debug(
+                "TWO MAs | ma1={}({}) ma2={}({}) | cross={} filter={} | long={} short={}",
+                ma1_type,
+                ma1_len,
+                ma2_type,
+                ma2_len,
+                params.get("use_ma_cross"),
+                params.get("use_ma1_filter"),
+                long_signal.sum(),
+                short_signal.sum(),
+            )
+            return {
+                "long_signal": long_signal,
+                "short_signal": short_signal,
+                "ma1": ma1,
+                "ma2": ma2,
+            }
+
+        elif indicator_type == "accumulation_areas":
+            use = params.get("use_accumulation", False)
+            if not use:
+                return {
+                    "long_signal": pd.Series(True, index=ohlcv.index),
+                    "short_signal": pd.Series(True, index=ohlcv.index),
+                }
+            interval = int(params.get("backtracking_interval", 30))
+            min_bars = int(params.get("min_bars_to_execute", 5))
+            signal_breakout = params.get("signal_on_breakout", False)
+            signal_opposite = params.get("signal_on_opposite_breakout", False)
+
+            # Detect accumulation zones: price range < threshold for min_bars consecutive bars
+            high_arr = ohlcv["high"]
+            low_arr = ohlcv["low"]
+            rolling_high = high_arr.rolling(interval).max()
+            rolling_low = low_arr.rolling(interval).min()
+            price_range = ((rolling_high - rolling_low) / rolling_low.replace(0, np.nan)) * 100
+
+            # Accumulation = narrow range (low volatility zone)
+            median_range = price_range.rolling(interval * 2).median()
+            in_accumulation = price_range < median_range
+
+            # Count consecutive bars in accumulation
+            cumsum_reset = (~in_accumulation).cumsum()
+            consecutive = in_accumulation.groupby(cumsum_reset).cumsum()
+            accum_zone = consecutive >= min_bars
+
+            if signal_breakout or signal_opposite:
+                # Breakout: was in accumulation, now price breaks out
+                was_accum = accum_zone.shift(1).fillna(False)
+                breakout_up = was_accum & (close > rolling_high.shift(1))
+                breakout_down = was_accum & (close < rolling_low.shift(1))
+
+                if signal_opposite:
+                    breakout_up, breakout_down = breakout_down, breakout_up
+
+                long_signal = breakout_up.fillna(False)
+                short_signal = breakout_down.fillna(False)
+            else:
+                # Filter mode: allow orders only inside accumulation
+                long_signal = accum_zone.fillna(False)
+                short_signal = accum_zone.fillna(False)
+
+            logger.debug(
+                "Accumulation Areas | interval={} min_bars={} | breakout={} opposite={} | long={} short={}",
+                interval,
+                min_bars,
+                signal_breakout,
+                signal_opposite,
+                long_signal.sum(),
+                short_signal.sum(),
+            )
+            return {"long_signal": long_signal, "short_signal": short_signal}
+
+        # ========== Keltner/Bollinger Channel (filter) ==========
+        elif indicator_type == "keltner_bollinger":
+            use = params.get("use_channel", False)
+            if not use:
+                return {
+                    "long_signal": pd.Series(True, index=ohlcv.index),
+                    "short_signal": pd.Series(True, index=ohlcv.index),
+                }
+            channel_type = str(params.get("channel_type", "Keltner Channel"))
+            mode = str(params.get("channel_mode", "Rebound"))
+            enter_cond = str(params.get("enter_conditions", "Wick out of band"))
+
+            high_arr = ohlcv["high"].values
+            low_arr = ohlcv["low"].values
+            close_arr = close.values
+
+            if "Bollinger" in channel_type:
+                bb_len = int(params.get("bb_length", 20))
+                bb_dev = float(params.get("bb_deviation", 2.0))
+                _mid, upper_band, lower_band = calculate_bollinger(close_arr, period=bb_len, std_dev=bb_dev)
+            else:
+                kc_len = int(params.get("keltner_length", 14))
+                kc_mult = float(params.get("keltner_mult", 1.5))
+                _mid, upper_band, lower_band = calculate_keltner(
+                    high_arr,
+                    low_arr,
+                    close_arr,
+                    period=kc_len,
+                    multiplier=kc_mult,
+                )
+
+            upper_s = pd.Series(upper_band, index=ohlcv.index)
+            lower_s = pd.Series(lower_band, index=ohlcv.index)
+            high_s = ohlcv["high"]
+            low_s = ohlcv["low"]
+            prev_close = close.shift(1)
+
+            # Determine bar interaction with bands based on enter_conditions
+            if enter_cond == "Out-of-band closure":
+                # Close is outside the band
+                above_upper = close > upper_s
+                below_lower = close < lower_s
+            elif enter_cond == "Wick out of band":
+                # High/Low wick touches outside the band
+                above_upper = high_s > upper_s
+                below_lower = low_s < lower_s
+            elif enter_cond == "Wick out of the band then close in":
+                # Wick went outside but close came back inside
+                above_upper = (high_s > upper_s) & (close <= upper_s)
+                below_lower = (low_s < lower_s) & (close >= lower_s)
+            else:  # "Close out of the band then close in"
+                # Previous close was outside, current close is back inside
+                above_upper = (prev_close > upper_s.shift(1)) & (close <= upper_s)
+                below_lower = (prev_close < lower_s.shift(1)) & (close >= lower_s)
+
+            above_upper = above_upper.fillna(False)
+            below_lower = below_lower.fillna(False)
+
+            if mode == "Rebound":
+                # Rebound: expect price to bounce back from the band
+                # Long: price touches lower band (expect bounce up)
+                # Short: price touches upper band (expect bounce down)
+                long_signal = below_lower
+                short_signal = above_upper
+            else:
+                # Breakout: expect price to continue in the breakout direction
+                # Long: price breaks above upper band
+                # Short: price breaks below lower band
+                long_signal = above_upper
+                short_signal = below_lower
+
+            logger.debug(
+                "Keltner/Bollinger | type={} mode={} cond={} | long={} short={}",
+                channel_type,
+                mode,
+                enter_cond,
+                long_signal.sum(),
+                short_signal.sum(),
+            )
+            return {"long_signal": long_signal, "short_signal": short_signal}
+
+        # ========== RVI - Relative Volatility Index (filter) ==========
+        elif indicator_type == "rvi_filter":
+            rvi_len = int(params.get("rvi_length", 10))
+            ma_type = str(params.get("rvi_ma_type", "WMA")).upper()
+            ma_len = int(params.get("rvi_ma_length", 2))
+
+            high_arr = ohlcv["high"].values
+            low_arr = ohlcv["low"].values
+            close_arr = close.values
+
+            rvi_vals = pd.Series(
+                calculate_rvi(close_arr, high_arr, low_arr, length=rvi_len, ma_type=ma_type, ma_length=ma_len),
+                index=ohlcv.index,
+            )
+
+            long_signal = pd.Series(True, index=ohlcv.index)
+            short_signal = pd.Series(True, index=ohlcv.index)
+
+            # Long range filter
+            if params.get("use_rvi_long_range", False):
+                lo = float(params.get("rvi_long_more", 1))
+                hi = float(params.get("rvi_long_less", 50))
+                long_signal = long_signal & (rvi_vals >= lo) & (rvi_vals <= hi)
+                long_signal = long_signal.fillna(False)
+
+            # Short range filter
+            if params.get("use_rvi_short_range", False):
+                hi_s = float(params.get("rvi_short_less", 100))
+                lo_s = float(params.get("rvi_short_more", 50))
+                short_signal = short_signal & (rvi_vals <= hi_s) & (rvi_vals >= lo_s)
+                short_signal = short_signal.fillna(False)
+
+            logger.debug(
+                "RVI filter | len={} ma={}({}) | long_range={} short_range={} | long={} short={}",
+                rvi_len,
+                ma_type,
+                ma_len,
+                params.get("use_rvi_long_range"),
+                params.get("use_rvi_short_range"),
+                long_signal.sum(),
+                short_signal.sum(),
+            )
+            return {"long_signal": long_signal, "short_signal": short_signal, "rvi": rvi_vals}
+
+        # ========== MFI - Money Flow Index (filter) ==========
+        elif indicator_type == "mfi_filter":
+            mfi_len = int(params.get("mfi_length", 14))
+
+            high_arr = ohlcv["high"].values
+            low_arr = ohlcv["low"].values
+            close_arr = close.values
+            vol_arr = ohlcv["volume"].values.astype(float)
+
+            mfi_vals = pd.Series(
+                calculate_mfi(high_arr, low_arr, close_arr, vol_arr, period=mfi_len),
+                index=ohlcv.index,
+            )
+
+            long_signal = pd.Series(True, index=ohlcv.index)
+            short_signal = pd.Series(True, index=ohlcv.index)
+
+            # Long range filter
+            if params.get("use_mfi_long_range", False):
+                lo = float(params.get("mfi_long_more", 1))
+                hi = float(params.get("mfi_long_less", 60))
+                long_signal = long_signal & (mfi_vals >= lo) & (mfi_vals <= hi)
+                long_signal = long_signal.fillna(False)
+
+            # Short range filter
+            if params.get("use_mfi_short_range", False):
+                hi_s = float(params.get("mfi_short_less", 100))
+                lo_s = float(params.get("mfi_short_more", 50))
+                short_signal = short_signal & (mfi_vals <= hi_s) & (mfi_vals >= lo_s)
+                short_signal = short_signal.fillna(False)
+
+            logger.debug(
+                "MFI filter | len={} | long_range={} short_range={} | long={} short={}",
+                mfi_len,
+                params.get("use_mfi_long_range"),
+                params.get("use_mfi_short_range"),
+                long_signal.sum(),
+                short_signal.sum(),
+            )
+            return {"long_signal": long_signal, "short_signal": short_signal, "mfi": mfi_vals}
+
+        # ========== CCI - Commodity Channel Index (filter) ==========
+        elif indicator_type == "cci_filter":
+            cci_len = int(params.get("cci_length", 14))
+
+            high_arr = ohlcv["high"].values
+            low_arr = ohlcv["low"].values
+            close_arr = close.values
+
+            cci_vals = pd.Series(
+                calculate_cci(high_arr, low_arr, close_arr, period=cci_len),
+                index=ohlcv.index,
+            )
+
+            long_signal = pd.Series(True, index=ohlcv.index)
+            short_signal = pd.Series(True, index=ohlcv.index)
+
+            # Long range filter
+            if params.get("use_cci_long_range", False):
+                lo = float(params.get("cci_long_more", -400))
+                hi = float(params.get("cci_long_less", 400))
+                long_signal = long_signal & (cci_vals >= lo) & (cci_vals <= hi)
+                long_signal = long_signal.fillna(False)
+
+            # Short range filter
+            if params.get("use_cci_short_range", False):
+                hi_s = float(params.get("cci_short_less", 400))
+                lo_s = float(params.get("cci_short_more", 10))
+                short_signal = short_signal & (cci_vals <= hi_s) & (cci_vals >= lo_s)
+                short_signal = short_signal.fillna(False)
+
+            logger.debug(
+                "CCI filter | len={} | long_range={} short_range={} | long={} short={}",
+                cci_len,
+                params.get("use_cci_long_range"),
+                params.get("use_cci_short_range"),
+                long_signal.sum(),
+                short_signal.sum(),
+            )
+            return {"long_signal": long_signal, "short_signal": short_signal, "cci": cci_vals}
+
+        # ========== Momentum (filter) ==========
+        elif indicator_type == "momentum_filter":
+            mom_len = int(params.get("momentum_length", 14))
+            mom_src = str(params.get("momentum_source", "close"))
+
+            src = ohlcv[mom_src] if mom_src in ohlcv.columns else close
+
+            # Momentum = current source - source N bars ago
+            mom_vals = src - src.shift(mom_len)
+
+            long_signal = pd.Series(True, index=ohlcv.index)
+            short_signal = pd.Series(True, index=ohlcv.index)
+
+            # Long range filter
+            if params.get("use_momentum_long_range", False):
+                lo = float(params.get("momentum_long_more", -100))
+                hi = float(params.get("momentum_long_less", 10))
+                long_signal = long_signal & (mom_vals >= lo) & (mom_vals <= hi)
+                long_signal = long_signal.fillna(False)
+
+            # Short range filter
+            if params.get("use_momentum_short_range", False):
+                hi_s = float(params.get("momentum_short_less", 95))
+                lo_s = float(params.get("momentum_short_more", -30))
+                short_signal = short_signal & (mom_vals <= hi_s) & (mom_vals >= lo_s)
+                short_signal = short_signal.fillna(False)
+
+            logger.debug(
+                "Momentum filter | len={} src={} | long_range={} short_range={} | long={} short={}",
+                mom_len,
+                mom_src,
+                params.get("use_momentum_long_range"),
+                params.get("use_momentum_short_range"),
+                long_signal.sum(),
+                short_signal.sum(),
+            )
+            return {"long_signal": long_signal, "short_signal": short_signal, "momentum": mom_vals}
 
         else:
             logger.warning(f"Unknown indicator type: {indicator_type}")
@@ -1331,40 +2088,9 @@ class StrategyBuilderAdapter(BaseStrategy):
                 "value": pd.Series(rsi, index=ohlcv.index),
             }
 
-        # ========== QQE Filter ==========
-        elif filter_type == "qqe_filter":
-            rsi_period = _param(params, 14, "rsi_period", "rsiPeriod")
-            smoothing = _param(params, 5, "smoothing_period", "smoothing")
-            qqe_factor = _param(params, 4.236, "qqe_factor", "qqeFactor")
+        # (QQE Filter removed — consolidated into universal QQE indicator block)
 
-            qqe_result = calculate_qqe_cross(
-                close, rsi_period=rsi_period, smoothing_factor=smoothing, qqe_factor=qqe_factor
-            )
-
-            return {
-                "buy": pd.Series(qqe_result["buy_signal"], index=ohlcv.index),
-                "sell": pd.Series(qqe_result["sell_signal"], index=ohlcv.index),
-                "qqe_line": pd.Series(qqe_result["qqe_line"], index=ohlcv.index),
-                "trend": pd.Series(qqe_result["trend"], index=ohlcv.index),
-            }
-
-        # ========== SuperTrend Filter ==========
-        elif filter_type == "supertrend_filter":
-            period = params.get("period", 10)
-            multiplier = params.get("multiplier", 3.0)
-
-            st_line, st_dir = calculate_supertrend(high, low, close, period, multiplier)
-
-            # Buy when direction changes to 1 (uptrend), sell when -1 (downtrend)
-            buy = (st_dir == 1) & (np.roll(st_dir, 1) == -1)
-            sell = (st_dir == -1) & (np.roll(st_dir, 1) == 1)
-
-            return {
-                "buy": pd.Series(buy, index=ohlcv.index),
-                "sell": pd.Series(sell, index=ohlcv.index),
-                "supertrend": pd.Series(st_line, index=ohlcv.index),
-                "direction": pd.Series(st_dir, index=ohlcv.index),
-            }
+        # (SuperTrend Filter removed — consolidated into universal SuperTrend indicator block)
 
         # ========== Two MA Filter ==========
         elif filter_type == "two_ma_filter":
@@ -1393,40 +2119,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 "slow": pd.Series(slow, index=ohlcv.index),
             }
 
-        # ========== Stochastic Filter ==========
-        elif filter_type == "stochastic_filter":
-            k_period = _param(params, 14, "k_period", "kPeriod")
-            d_period = _param(params, 3, "d_period", "dPeriod")
-            oversold = params.get("oversold", 20)
-            overbought = params.get("overbought", 80)
-            mode = params.get("mode", "cross")  # range, cross, kd_cross
-
-            k, d = calculate_stochastic(high, low, close, k_period, d_period)
-
-            if mode == "range":
-                buy = k < oversold
-                sell = k > overbought
-            elif mode == "kd_cross":
-                buy = crossover(k, d) & (k < oversold)
-                sell = crossunder(k, d) & (k > overbought)
-            else:  # cross
-                buy = crossunder(k, np.full(n, oversold))
-                sell = crossover(k, np.full(n, overbought))
-
-            mem_bars = 0
-            if mode == "cross" and params.get("activate_stoch_cross_memory", False):
-                mem_bars = int(params.get("stoch_cross_memory_bars", 0))
-            elif mode == "kd_cross" and params.get("activate_stoch_kd_memory", False):
-                mem_bars = int(params.get("stoch_kd_memory_bars", 0))
-            if mem_bars > 0:
-                buy, sell = apply_signal_memory(np.asarray(buy, dtype=bool), np.asarray(sell, dtype=bool), mem_bars)
-
-            return {
-                "buy": pd.Series(buy, index=ohlcv.index),
-                "sell": pd.Series(sell, index=ohlcv.index),
-                "k": pd.Series(k, index=ohlcv.index),
-                "d": pd.Series(d, index=ohlcv.index),
-            }
+        # (Stochastic Filter removed — consolidated into universal Stochastic indicator block)
 
         # ========== MACD Filter ==========
         elif filter_type == "macd_filter":
@@ -1741,43 +2434,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 "lower": lower,
             }
 
-        # ========== Divergence Filter ==========
-        elif filter_type == "divergence_filter":
-            # Redirect to divergence category handler
-            indicator = params.get("indicator", "rsi")
-            period = params.get("period", 14)
-            lookback = params.get("lookback", 14)
-
-            close = ohlcv["close"]
-            high = ohlcv["high"]
-            low = ohlcv["low"]
-
-            if indicator == "rsi":
-                ind_val = pd.Series(calculate_rsi(close.values, period=period), index=ohlcv.index)
-            elif indicator == "macd":
-                macd_line, signal_line, histogram = calculate_macd(close.values, 12, 26, 9)
-                ind_val = pd.Series(histogram, index=ohlcv.index)
-            elif indicator == "obv":
-                ind_val = pd.Series(calculate_obv(close.values, ohlcv["volume"].values), index=ohlcv.index)
-            else:
-                ind_val = pd.Series(calculate_rsi(close.values, period=period), index=ohlcv.index)
-
-            # Bullish divergence: price lower low, indicator higher low
-            price_lower_low = low < low.shift(lookback)
-            ind_higher_low = ind_val > ind_val.shift(lookback)
-            bullish = price_lower_low & ind_higher_low
-
-            # Bearish divergence: price higher high, indicator lower high
-            price_higher_high = high > high.shift(lookback)
-            ind_lower_high = ind_val < ind_val.shift(lookback)
-            bearish = price_higher_high & ind_lower_high
-
-            return {
-                "buy": bullish.fillna(False),
-                "sell": bearish.fillna(False),
-                "bullish": bullish.fillna(False),
-                "bearish": bearish.fillna(False),
-            }
+        # (divergence_filter removed — old divergence blocks cleared)
 
         # ========== Balance of Power Filter ==========
         elif filter_type == "bop_filter":
@@ -2018,232 +2675,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         return result
 
-    # =========================================================================
-    # SMART SIGNALS — Composite nodes (indicator + condition in one block)
-    # =========================================================================
-    def _execute_smart_signal(
-        self, signal_type: str, params: dict[str, Any], ohlcv: pd.DataFrame
-    ) -> dict[str, pd.Series]:
-        """
-        Execute smart signal blocks — composite nodes that combine
-        an indicator calculation with a condition check in a single block.
-
-        Each smart signal computes an indicator internally and applies a
-        condition (crossover, threshold comparison, etc.) to produce a
-        boolean signal output.
-
-        Supported signal families:
-            - RSI: overbought/oversold/cross_up/cross_down
-            - Stochastic: overbought/oversold/K-D cross
-            - MACD: signal cross, zero cross
-            - Moving Average: golden/death cross, price above/below MA
-            - Bollinger: upper/lower touch, squeeze
-            - SuperTrend: buy/sell flip
-            - Volume: spike/dry
-
-        Args:
-            signal_type: Smart signal block type ID
-            params: Block parameters (period, threshold, etc.)
-            ohlcv: OHLCV DataFrame
-
-        Returns:
-            Dictionary with 'signal' (bool Series) and 'value' (indicator Series)
-        """
-        close = ohlcv["close"]
-        n = len(close)
-        empty = pd.Series([False] * n, index=ohlcv.index)
-
-        # ---- RSI-based smart signals ----
-        if signal_type in (
-            "rsi_overbought_signal",
-            "rsi_oversold_signal",
-            "rsi_cross_up_signal",
-            "rsi_cross_down_signal",
-        ):
-            period = params.get("period", 14)
-            threshold = params.get("threshold", 70)
-            rsi = vbt.RSI.run(close, window=period).rsi if vbt else empty
-
-            if signal_type == "rsi_overbought_signal":
-                signal = pd.Series(rsi > threshold, index=ohlcv.index)
-            elif signal_type == "rsi_oversold_signal":
-                signal = pd.Series(rsi < threshold, index=ohlcv.index)
-            elif signal_type == "rsi_cross_up_signal":
-                signal = pd.Series((rsi > threshold) & (rsi.shift(1) <= threshold), index=ohlcv.index)
-            else:  # rsi_cross_down_signal
-                signal = pd.Series((rsi < threshold) & (rsi.shift(1) >= threshold), index=ohlcv.index)
-            return {"signal": signal.fillna(False), "value": rsi}
-
-        # ---- Stochastic-based smart signals ----
-        if signal_type in (
-            "stoch_overbought_signal",
-            "stoch_oversold_signal",
-            "stoch_k_cross_d_up",
-            "stoch_k_cross_d_down",
-        ):
-            k_period = params.get("k_period", 14)
-            d_period = params.get("d_period", 3)
-            threshold = params.get("threshold", 80)
-            high, low = ohlcv["high"], ohlcv["low"]
-
-            if vbt:
-                stoch = vbt.STOCH.run(high, low, close, k_window=k_period, d_window=d_period)
-                k_line, d_line = stoch.k, stoch.d
-            else:
-                k_line = d_line = empty
-
-            if signal_type == "stoch_overbought_signal":
-                signal = pd.Series(k_line > threshold, index=ohlcv.index)
-            elif signal_type == "stoch_oversold_signal":
-                signal = pd.Series(k_line < threshold, index=ohlcv.index)
-            elif signal_type == "stoch_k_cross_d_up":
-                signal = pd.Series(
-                    (k_line > d_line) & (k_line.shift(1) <= d_line.shift(1)),
-                    index=ohlcv.index,
-                )
-            else:  # stoch_k_cross_d_down
-                signal = pd.Series(
-                    (k_line < d_line) & (k_line.shift(1) >= d_line.shift(1)),
-                    index=ohlcv.index,
-                )
-            return {"signal": signal.fillna(False), "value": k_line}
-
-        # ---- MACD-based smart signals ----
-        if signal_type in (
-            "macd_cross_signal_up",
-            "macd_cross_signal_down",
-            "macd_cross_zero_up",
-            "macd_cross_zero_down",
-        ):
-            fast = params.get("fast_period", 12)
-            slow = params.get("slow_period", 26)
-            sig_p = params.get("signal_period", 9)
-
-            if vbt:
-                macd_r = vbt.MACD.run(close, fast_window=fast, slow_window=slow, signal_window=sig_p)
-                macd_line, sig_line = macd_r.macd, macd_r.signal
-            else:
-                macd_line = sig_line = empty
-
-            if signal_type == "macd_cross_signal_up":
-                signal = pd.Series(
-                    (macd_line > sig_line) & (macd_line.shift(1) <= sig_line.shift(1)),
-                    index=ohlcv.index,
-                )
-            elif signal_type == "macd_cross_signal_down":
-                signal = pd.Series(
-                    (macd_line < sig_line) & (macd_line.shift(1) >= sig_line.shift(1)),
-                    index=ohlcv.index,
-                )
-            elif signal_type == "macd_cross_zero_up":
-                signal = pd.Series((macd_line > 0) & (macd_line.shift(1) <= 0), index=ohlcv.index)
-            else:  # macd_cross_zero_down
-                signal = pd.Series((macd_line < 0) & (macd_line.shift(1) >= 0), index=ohlcv.index)
-            return {"signal": signal.fillna(False), "value": macd_line}
-
-        # ---- Moving Average smart signals ----
-        if signal_type in (
-            "golden_cross_signal",
-            "death_cross_signal",
-            "price_above_ma_signal",
-            "price_below_ma_signal",
-        ):
-            fast_period = params.get("fast_period", 50)
-            slow_period = params.get("slow_period", 200)
-            period = params.get("period", 20)
-            ma_type = params.get("ma_type", "ema")
-
-            def _calc_ma(src: pd.Series, length: int, kind: str) -> pd.Series:
-                if kind == "sma":
-                    return src.rolling(length).mean()
-                return src.ewm(span=length, adjust=False).mean()
-
-            if signal_type == "golden_cross_signal":
-                fast_ma = _calc_ma(close, fast_period, ma_type)
-                slow_ma = _calc_ma(close, slow_period, ma_type)
-                signal = pd.Series(
-                    (fast_ma > slow_ma) & (fast_ma.shift(1) <= slow_ma.shift(1)),
-                    index=ohlcv.index,
-                )
-                return {"signal": signal.fillna(False), "value": fast_ma}
-
-            elif signal_type == "death_cross_signal":
-                fast_ma = _calc_ma(close, fast_period, ma_type)
-                slow_ma = _calc_ma(close, slow_period, ma_type)
-                signal = pd.Series(
-                    (fast_ma < slow_ma) & (fast_ma.shift(1) >= slow_ma.shift(1)),
-                    index=ohlcv.index,
-                )
-                return {"signal": signal.fillna(False), "value": fast_ma}
-
-            elif signal_type == "price_above_ma_signal":
-                ma = _calc_ma(close, period, ma_type)
-                signal = pd.Series(close > ma, index=ohlcv.index)
-                return {"signal": signal.fillna(False), "value": ma}
-
-            else:  # price_below_ma_signal
-                ma = _calc_ma(close, period, ma_type)
-                signal = pd.Series(close < ma, index=ohlcv.index)
-                return {"signal": signal.fillna(False), "value": ma}
-
-        # ---- Bollinger Bands smart signals ----
-        if signal_type in ("bb_upper_touch_signal", "bb_lower_touch_signal", "bb_squeeze_signal"):
-            period = params.get("period", 20)
-            std_dev = params.get("std_dev", 2.0)
-
-            if vbt:
-                bb = vbt.BBANDS.run(close, window=period, num_std=std_dev)
-                upper, lower, middle = bb.upper, bb.lower, bb.middle
-            else:
-                middle = close.rolling(period).mean()
-                std = close.rolling(period).std()
-                upper = middle + std_dev * std
-                lower = middle - std_dev * std
-
-            if signal_type == "bb_upper_touch_signal":
-                signal = pd.Series(close >= upper, index=ohlcv.index)
-            elif signal_type == "bb_lower_touch_signal":
-                signal = pd.Series(close <= lower, index=ohlcv.index)
-            else:  # bb_squeeze_signal
-                bb_width = (upper - lower) / middle
-                squeeze_threshold = params.get("squeeze_threshold", 0.02)
-                signal = pd.Series(bb_width < squeeze_threshold, index=ohlcv.index)
-            return {"signal": signal.fillna(False), "value": middle}
-
-        # ---- SuperTrend smart signals ----
-        if signal_type in ("supertrend_buy_signal", "supertrend_sell_signal"):
-            period = params.get("period", 10)
-            multiplier = params.get("multiplier", 3.0)
-            high, low = ohlcv["high"].values, ohlcv["low"].values
-            st_line, st_dir = calculate_supertrend(high, low, close.values, period, multiplier)
-            direction = pd.Series(st_dir, index=ohlcv.index)
-
-            if signal_type == "supertrend_buy_signal":
-                # Bullish flip: direction changes from -1 to 1
-                signal = pd.Series((direction == 1) & (direction.shift(1) == -1), index=ohlcv.index)
-            else:  # supertrend_sell_signal
-                signal = pd.Series((direction == -1) & (direction.shift(1) == 1), index=ohlcv.index)
-            return {
-                "signal": signal.fillna(False),
-                "value": pd.Series(st_line, index=ohlcv.index),
-            }
-
-        # ---- Volume smart signals ----
-        if signal_type in ("volume_spike_signal", "volume_dry_signal"):
-            vol = ohlcv["volume"]
-            ma_period = params.get("ma_period", 20)
-            multiplier = params.get("multiplier", 2.0)
-            vol_ma = vol.rolling(ma_period).mean()
-
-            if signal_type == "volume_spike_signal":
-                signal = pd.Series(vol > vol_ma * multiplier, index=ohlcv.index)
-            else:  # volume_dry_signal
-                signal = pd.Series(vol < vol_ma * multiplier, index=ohlcv.index)
-            return {"signal": signal.fillna(False), "value": vol}
-
-        # Fallback — unknown smart signal type
-        logger.warning(f"Unknown smart signal type: {signal_type}")
-        return {"signal": empty}
+    # (Smart Signals section removed — entire category deprecated in favor of universal indicator blocks)
 
     def _execute_action(
         self, action_type: str, params: dict[str, Any], inputs: dict[str, pd.Series]
@@ -2962,127 +3394,178 @@ class StrategyBuilderAdapter(BaseStrategy):
 
     def _execute_divergence(self, div_type: str, params: dict[str, Any], ohlcv: pd.DataFrame) -> dict[str, pd.Series]:
         """
-        Execute divergence detection blocks.
+        Execute unified divergence detection block.
 
-        Detects divergences between price and indicators.
+        Detects divergences between price and one or more indicators.
+        Supports RSI, Stochastic, Momentum (ROC), CMF, OBV, MFI.
 
-        Supported divergence types:
-            - rsi_divergence: RSI divergence
-            - macd_divergence: MACD divergence
-            - cci_divergence: CCI divergence
-            - obv_divergence: OBV divergence
+        Divergence logic:
+            - Bullish divergence: price makes lower low, indicator makes higher low
+            - Bearish divergence: price makes higher high, indicator makes lower high
+
+        Pivot detection uses pivot_interval to find swing highs/lows.
+
+        Parameters:
+            pivot_interval (int): Number of bars to left/right for pivot detection (1-9, default 9)
+            act_without_confirmation (bool): If True, fire signal immediately; if False, wait for
+                price confirmation (next bar closes in divergence direction)
+            activate_diver_signal_memory (bool): If True, divergence signals persist for N bars
+            keep_diver_signal_memory_bars (int): How many bars to keep signal in memory (1-100)
+            use_divergence_rsi (bool): Enable RSI divergence
+            rsi_period (int): RSI period
+            use_divergence_stochastic (bool): Enable Stochastic divergence
+            stoch_length (int): Stochastic %K period
+            use_divergence_momentum (bool): Enable Momentum (ROC) divergence
+            momentum_length (int): Momentum/ROC period
+            use_divergence_cmf (bool): Enable CMF divergence
+            cmf_period (int): CMF period
+            use_obv (bool): Enable OBV divergence
+            use_mfi (bool): Enable MFI divergence
+            mfi_length (int): MFI period
         """
         n = len(ohlcv)
         idx = ohlcv.index
-        result: dict[str, pd.Series] = {}
 
-        lookback = params.get("lookback", 14)
+        close = ohlcv["close"].values.astype(float)
+        high = ohlcv["high"].values.astype(float)
+        low = ohlcv["low"].values.astype(float)
+        volume = ohlcv["volume"].values.astype(float)
 
-        # Get price highs/lows as Series
-        close = ohlcv["close"]
-        high = ohlcv["high"]
-        low = ohlcv["low"]
+        pivot_interval = int(_param(params, 9, "pivot_interval"))
+        act_without_confirmation = bool(_param(params, False, "act_without_confirmation"))
+        activate_memory = bool(_param(params, False, "activate_diver_signal_memory"))
+        memory_bars = int(_param(params, 5, "keep_diver_signal_memory_bars"))
 
-        if div_type == "rsi_divergence":
-            period = params.get("period", 14)
-            rsi = pd.Series(calculate_rsi(close.values, period=period), index=idx)
+        # Collect all enabled indicator series
+        indicator_series: list[np.ndarray] = []
 
-            # Bullish divergence: price makes lower low, RSI makes higher low
-            price_lower_low = low < low.shift(lookback)
-            rsi_higher_low = rsi > rsi.shift(lookback)
-            bullish_div = price_lower_low & rsi_higher_low
+        if _param(params, False, "use_divergence_rsi"):
+            rsi_period = int(_param(params, 14, "rsi_period"))
+            indicator_series.append(calculate_rsi(close, rsi_period))
 
-            # Bearish divergence: price makes higher high, RSI makes lower high
-            price_higher_high = high > high.shift(lookback)
-            rsi_lower_high = rsi < rsi.shift(lookback)
-            bearish_div = price_higher_high & rsi_lower_high
+        if _param(params, False, "use_divergence_stochastic"):
+            stoch_length = int(_param(params, 14, "stoch_length"))
+            stoch_k, _ = calculate_stochastic(high, low, close, k_period=stoch_length)
+            indicator_series.append(stoch_k)
 
-            result["bullish"] = bullish_div.fillna(False)
-            result["bearish"] = bearish_div.fillna(False)
-            result["signal"] = bullish_div.fillna(False)
+        if _param(params, False, "use_divergence_momentum"):
+            momentum_length = int(_param(params, 10, "momentum_length"))
+            indicator_series.append(calculate_roc(close, momentum_length))
 
-        elif div_type == "macd_divergence":
-            fast = params.get("fast_period", 12)
-            slow = params.get("slow_period", 26)
-            signal_period = params.get("signal_period", 9)
+        if _param(params, False, "use_divergence_cmf"):
+            cmf_period = int(_param(params, 21, "cmf_period"))
+            indicator_series.append(calculate_cmf(high, low, close, volume, cmf_period))
 
-            _macd_line, _signal_line, hist = calculate_macd(close.values, fast, slow, signal_period)
-            histogram = pd.Series(hist, index=idx)
+        if _param(params, False, "use_obv"):
+            indicator_series.append(calculate_obv(close, volume))
 
-            price_lower_low = low < low.shift(lookback)
-            macd_higher_low = histogram > histogram.shift(lookback)
-            bullish_div = price_lower_low & macd_higher_low
+        if _param(params, False, "use_mfi"):
+            mfi_length = int(_param(params, 14, "mfi_length"))
+            indicator_series.append(calculate_mfi(high, low, close, volume, mfi_length))
 
-            price_higher_high = high > high.shift(lookback)
-            macd_lower_high = histogram < histogram.shift(lookback)
-            bearish_div = price_higher_high & macd_lower_high
+        # If no indicator enabled — return empty signals
+        if not indicator_series:
+            return {
+                "signal": pd.Series([False] * n, index=idx),
+                "bullish": pd.Series([False] * n, index=idx),
+                "bearish": pd.Series([False] * n, index=idx),
+            }
 
-            result["bullish"] = bullish_div.fillna(False)
-            result["bearish"] = bearish_div.fillna(False)
-            result["signal"] = bullish_div.fillna(False)
+        # Detect pivot highs and lows using pivot_interval
+        pivot_highs = np.full(n, np.nan)
+        pivot_lows = np.full(n, np.nan)
+        for i in range(pivot_interval, n - pivot_interval):
+            # Pivot high: high[i] is the highest in the window
+            window_high = high[i - pivot_interval : i + pivot_interval + 1]
+            if high[i] >= np.max(window_high):
+                pivot_highs[i] = high[i]
+            # Pivot low: low[i] is the lowest in the window
+            window_low = low[i - pivot_interval : i + pivot_interval + 1]
+            if low[i] <= np.min(window_low):
+                pivot_lows[i] = low[i]
 
-        elif div_type == "obv_divergence":
-            obv = pd.Series(calculate_obv(close.values, ohlcv["volume"].values), index=idx)
+        # For each indicator, detect divergence
+        bullish_raw = np.zeros(n, dtype=bool)
+        bearish_raw = np.zeros(n, dtype=bool)
 
-            price_lower_low = low < low.shift(lookback)
-            obv_higher_low = obv > obv.shift(lookback)
-            bullish_div = price_lower_low & obv_higher_low
+        for ind_values in indicator_series:
+            # Compute indicator pivot highs/lows at the same pivot bar locations
+            ind_pivot_highs = np.full(n, np.nan)
+            ind_pivot_lows = np.full(n, np.nan)
+            for i in range(pivot_interval, n - pivot_interval):
+                if not np.isnan(pivot_highs[i]) and not np.isnan(ind_values[i]):
+                    ind_pivot_highs[i] = ind_values[i]
+                if not np.isnan(pivot_lows[i]) and not np.isnan(ind_values[i]):
+                    ind_pivot_lows[i] = ind_values[i]
 
-            price_higher_high = high > high.shift(lookback)
-            obv_lower_high = obv < obv.shift(lookback)
-            bearish_div = price_higher_high & obv_lower_high
+            # Compare consecutive pivots to detect divergence
+            # Track the most recent valid pivot for comparison
+            last_pivot_high_idx = -1
+            last_pivot_low_idx = -1
 
-            result["bullish"] = bullish_div.fillna(False)
-            result["bearish"] = bearish_div.fillna(False)
-            result["signal"] = bullish_div.fillna(False)
+            for i in range(pivot_interval, n):
+                # Check bearish divergence at pivot highs
+                if not np.isnan(pivot_highs[i]) and not np.isnan(ind_pivot_highs[i]):
+                    if (
+                        last_pivot_high_idx >= 0
+                        and pivot_highs[i] > pivot_highs[last_pivot_high_idx]
+                        and ind_pivot_highs[i] < ind_pivot_highs[last_pivot_high_idx]
+                    ):
+                        # Price makes higher high, indicator makes lower high → bearish
+                        signal_bar = min(i + pivot_interval, n - 1)
+                        bearish_raw[signal_bar] = True
+                    last_pivot_high_idx = i
 
-        elif div_type == "stoch_divergence":
-            # Stochastic divergence
-            k_period = params.get("k_period", 14)
-            d_period = params.get("d_period", 3)
+                # Check bullish divergence at pivot lows
+                if not np.isnan(pivot_lows[i]) and not np.isnan(ind_pivot_lows[i]):
+                    if (
+                        last_pivot_low_idx >= 0
+                        and pivot_lows[i] < pivot_lows[last_pivot_low_idx]
+                        and ind_pivot_lows[i] > ind_pivot_lows[last_pivot_low_idx]
+                    ):
+                        # Price makes lower low, indicator makes higher low → bullish
+                        signal_bar = min(i + pivot_interval, n - 1)
+                        bullish_raw[signal_bar] = True
+                    last_pivot_low_idx = i
 
-            k_arr, _d_arr = calculate_stochastic(high.values, low.values, close.values, k_period, d_period)
-            stoch_k = pd.Series(k_arr, index=idx)
-
-            price_lower_low = low < low.shift(lookback)
-            stoch_higher_low = stoch_k > stoch_k.shift(lookback)
-            bullish_div = price_lower_low & stoch_higher_low
-
-            price_higher_high = high > high.shift(lookback)
-            stoch_lower_high = stoch_k < stoch_k.shift(lookback)
-            bearish_div = price_higher_high & stoch_lower_high
-
-            result["bullish"] = bullish_div.fillna(False)
-            result["bearish"] = bearish_div.fillna(False)
-            result["signal"] = bullish_div.fillna(False)
-
-        elif div_type == "mfi_divergence":
-            # Money Flow Index divergence
-            period = params.get("period", 14)
-
-            mfi = pd.Series(
-                calculate_mfi(high.values, low.values, close.values, ohlcv["volume"].values, period=period),
-                index=idx,
-            )
-
-            price_lower_low = low < low.shift(lookback)
-            mfi_higher_low = mfi > mfi.shift(lookback)
-            bullish_div = price_lower_low & mfi_higher_low
-
-            price_higher_high = high > high.shift(lookback)
-            mfi_lower_high = mfi < mfi.shift(lookback)
-            bearish_div = price_higher_high & mfi_lower_high
-
-            result["bullish"] = bullish_div.fillna(False)
-            result["bearish"] = bearish_div.fillna(False)
-            result["signal"] = bullish_div.fillna(False)
-
+        # Apply confirmation filter if act_without_confirmation is False
+        if not act_without_confirmation:
+            bullish_confirmed = np.zeros(n, dtype=bool)
+            bearish_confirmed = np.zeros(n, dtype=bool)
+            for i in range(1, n):
+                # Bullish confirmation: current close > previous close
+                if bullish_raw[i] and close[i] > close[i - 1]:
+                    bullish_confirmed[i] = True
+                # Bearish confirmation: current close < previous close
+                if bearish_raw[i] and close[i] < close[i - 1]:
+                    bearish_confirmed[i] = True
+            bullish = bullish_confirmed
+            bearish = bearish_confirmed
         else:
-            result["signal"] = pd.Series([False] * n, index=idx)
-            result["bullish"] = pd.Series([False] * n, index=idx)
-            result["bearish"] = pd.Series([False] * n, index=idx)
+            bullish = bullish_raw
+            bearish = bearish_raw
 
-        return result
+        # Apply signal memory: if enabled, signals persist for N bars
+        if activate_memory and memory_bars > 1:
+            bullish_mem = np.zeros(n, dtype=bool)
+            bearish_mem = np.zeros(n, dtype=bool)
+            for i in range(n):
+                if bullish[i]:
+                    for j in range(i, min(i + memory_bars, n)):
+                        bullish_mem[j] = True
+                if bearish[i]:
+                    for j in range(i, min(i + memory_bars, n)):
+                        bearish_mem[j] = True
+            bullish = bullish_mem
+            bearish = bearish_mem
+
+        signal = bullish | bearish
+
+        return {
+            "signal": pd.Series(signal, index=idx),
+            "bullish": pd.Series(bullish, index=idx),
+            "bearish": pd.Series(bearish, index=idx),
+        }
 
     def _execute_close_condition(
         self, close_type: str, params: dict[str, Any], ohlcv: pd.DataFrame, inputs: dict[str, pd.Series]
@@ -3094,14 +3577,11 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         Supported close types:
             - close_by_time: Close after N bars
-            - close_rsi_reach: Close when RSI reaches level
-            - close_rsi_cross: Close when RSI crosses level
-            - close_stoch_reach: Close when Stochastic reaches level
-            - close_stoch_cross: Close when Stochastic crosses level
-            - close_channel_break: Close on Keltner/BB breakout
+            - close_channel: Close on Keltner/Bollinger band touch
             - close_ma_cross: Close on MA1/MA2 cross
-            - close_psar: Close on Parabolic SAR signal
-            - close_profit_only: Require minimum profit to close
+            - close_rsi: Close on RSI reach/cross level
+            - close_stochastic: Close on Stochastic reach/cross level
+            - close_psar: Close on Parabolic SAR signal reversal
         """
         n = len(ohlcv)
         idx = ohlcv.index
@@ -3115,148 +3595,239 @@ class StrategyBuilderAdapter(BaseStrategy):
             result["exit"] = pd.Series([False] * n, index=idx)
             result["max_bars"] = pd.Series([bars] * n, index=idx)
 
-        elif close_type == "close_rsi_reach":
-            # Close when RSI reaches level
-            period = params.get("period", 14)
-            level = params.get("level", 70)
-            direction = params.get("direction", "above")  # above or below
+        elif close_type == "close_channel":
+            # Close on Keltner Channel or Bollinger Bands band touch
+            channel_type = params.get("channel_type", "Keltner Channel")
+            band_to_close = params.get("band_to_close", "Rebound")
+            close_condition = params.get("close_condition", "Wick out of band")
+            keltner_length = int(params.get("keltner_length", 14))
+            keltner_mult = float(params.get("keltner_mult", 1.5))
+            bb_length = int(params.get("bb_length", 20))
+            bb_deviation = float(params.get("bb_deviation", 2.0))
 
-            rsi = pd.Series(calculate_rsi(close.values, period=period), index=ohlcv.index)
+            high = ohlcv["high"]
+            low = ohlcv["low"]
 
-            if direction == "above":
-                result["exit"] = rsi >= level
-            else:
-                result["exit"] = rsi <= level
-            result["signal"] = result["exit"]
-
-        elif close_type == "close_rsi_cross":
-            # Close when RSI crosses level
-            period = params.get("period", 14)
-            level = params.get("level", 50)
-            cross_type = params.get("cross_type", "above")  # above or below
-
-            rsi = pd.Series(calculate_rsi(close.values, period=period), index=ohlcv.index)
-
-            if cross_type == "above":
-                # Cross above level
-                result["exit"] = (rsi > level) & (rsi.shift(1) <= level)
-            else:
-                # Cross below level
-                result["exit"] = (rsi < level) & (rsi.shift(1) >= level)
-            result["signal"] = result["exit"].fillna(False)
-
-        elif close_type == "close_stoch_reach":
-            # Close when Stochastic reaches level
-            k_period = params.get("k_period", 14)
-            d_period = params.get("d_period", 3)
-            level = params.get("level", 80)
-            direction = params.get("direction", "above")
-
-            stoch_k_arr, stoch_d_arr = calculate_stochastic(
-                ohlcv["high"].values, ohlcv["low"].values, close.values, k_period=k_period, d_period=d_period
-            )
-            stoch_k = pd.Series(stoch_k_arr, index=ohlcv.index)
-
-            if direction == "above":
-                result["exit"] = stoch_k >= level
-            else:
-                result["exit"] = stoch_k <= level
-            result["signal"] = result["exit"]
-
-        elif close_type == "close_stoch_cross":
-            # Close when Stochastic K crosses D
-            k_period = params.get("k_period", 14)
-            d_period = params.get("d_period", 3)
-            cross_type = params.get("cross_type", "k_above_d")
-
-            stoch_k_arr, stoch_d_arr = calculate_stochastic(
-                ohlcv["high"].values, ohlcv["low"].values, close.values, k_period=k_period, d_period=d_period
-            )
-            stoch_k = pd.Series(stoch_k_arr, index=ohlcv.index)
-            stoch_d = pd.Series(stoch_d_arr, index=ohlcv.index)
-
-            if cross_type == "k_above_d":
-                result["exit"] = (stoch_k > stoch_d) & (stoch_k.shift(1) <= stoch_d.shift(1))
-            else:
-                result["exit"] = (stoch_k < stoch_d) & (stoch_k.shift(1) >= stoch_d.shift(1))
-            result["signal"] = result["exit"].fillna(False)
-
-        elif close_type == "close_channel_break":
-            # Close on Keltner/BB breakout
-            channel = params.get("channel", "keltner")
-            period = params.get("period", 20)
-            multiplier = params.get("multiplier", 2.0)
-            break_type = params.get("break_type", "above")  # above or below
-
-            if channel == "keltner":
-                kc_mid, kc_upper, kc_lower = calculate_keltner(
-                    ohlcv["high"].values, ohlcv["low"].values, close.values, period, period, multiplier
+            if channel_type == "Keltner Channel":
+                _kc_mid, kc_upper, kc_lower = calculate_keltner(
+                    high.values,
+                    low.values,
+                    close.values,
+                    keltner_length,
+                    keltner_length,
+                    keltner_mult,
                 )
                 upper = pd.Series(kc_upper, index=idx)
-                middle = pd.Series(kc_mid, index=idx)
                 lower = pd.Series(kc_lower, index=idx)
             else:
-                # Bollinger bands - use stddev
-                middle = close.rolling(period).mean()
-                std = close.rolling(period).std()
-                upper = middle + multiplier * std
-                lower = middle - multiplier * std
+                # Bollinger Bands
+                middle = close.rolling(bb_length).mean()
+                std = close.rolling(bb_length).std()
+                upper = middle + bb_deviation * std
+                lower = middle - bb_deviation * std
 
-            if break_type == "above":
-                result["exit"] = close > upper
+            # Build exit signals based on band_to_close mode and close_condition
+            if close_condition == "Out-of-band closure":
+                # Bar closes outside the band
+                if band_to_close == "Rebound":
+                    exit_long = close >= upper
+                    exit_short = close <= lower
+                else:  # Breakout
+                    exit_long = close <= lower
+                    exit_short = close >= upper
+            elif close_condition == "Wick out of band":
+                # Wick (high/low) touches band
+                if band_to_close == "Rebound":
+                    exit_long = high >= upper
+                    exit_short = low <= lower
+                else:
+                    exit_long = low <= lower
+                    exit_short = high >= upper
+            elif close_condition == "Wick out of the band then close in":
+                # Previous wick outside, current close inside
+                if band_to_close == "Rebound":
+                    exit_long = (high.shift(1) >= upper.shift(1)) & (close < upper)
+                    exit_short = (low.shift(1) <= lower.shift(1)) & (close > lower)
+                else:
+                    exit_long = (low.shift(1) <= lower.shift(1)) & (close > lower)
+                    exit_short = (high.shift(1) >= upper.shift(1)) & (close < upper)
             else:
-                result["exit"] = close < lower
-            result["signal"] = result["exit"].fillna(False)
+                # "Close out of the band then close in"
+                if band_to_close == "Rebound":
+                    exit_long = (close.shift(1) >= upper.shift(1)) & (close < upper)
+                    exit_short = (close.shift(1) <= lower.shift(1)) & (close > lower)
+                else:
+                    exit_long = (close.shift(1) <= lower.shift(1)) & (close > lower)
+                    exit_short = (close.shift(1) >= upper.shift(1)) & (close < upper)
+
+            result["exit_long"] = exit_long.fillna(False)
+            result["exit_short"] = exit_short.fillna(False)
+            result["exit"] = (exit_long | exit_short).fillna(False)
+            result["signal"] = result["exit"]
 
         elif close_type == "close_ma_cross":
             # Close on MA1/MA2 cross
-            fast_period = params.get("fast_period", 9)
-            slow_period = params.get("slow_period", 21)
-            ma_type = params.get("ma_type", "ema")
-            cross_type = params.get("cross_type", "fast_below")
+            ma1_length = int(params.get("ma1_length", 10))
+            ma2_length = int(params.get("ma2_length", 30))
+            profit_only = params.get("profit_only", False)
+            min_profit = float(params.get("min_profit_percent", 1.0))
 
-            if ma_type == "ema":
-                fast_ma = close.ewm(span=fast_period, adjust=False).mean()
-                slow_ma = close.ewm(span=slow_period, adjust=False).mean()
-            else:
-                fast_ma = close.rolling(fast_period).mean()
-                slow_ma = close.rolling(slow_period).mean()
+            fast_ma = close.ewm(span=ma1_length, adjust=False).mean()
+            slow_ma = close.ewm(span=ma2_length, adjust=False).mean()
 
-            if cross_type == "fast_below":
-                # Fast MA crosses below slow MA
-                result["exit"] = (fast_ma < slow_ma) & (fast_ma.shift(1) >= slow_ma.shift(1))
-            else:
-                # Fast MA crosses above slow MA
-                result["exit"] = (fast_ma > slow_ma) & (fast_ma.shift(1) <= slow_ma.shift(1))
-            result["signal"] = result["exit"].fillna(False)
+            # Long exit: fast MA crosses below slow MA (bearish cross)
+            exit_long = (fast_ma < slow_ma) & (fast_ma.shift(1) >= slow_ma.shift(1))
+            # Short exit: fast MA crosses above slow MA (bullish cross)
+            exit_short = (fast_ma > slow_ma) & (fast_ma.shift(1) <= slow_ma.shift(1))
+
+            result["exit_long"] = exit_long.fillna(False)
+            result["exit_short"] = exit_short.fillna(False)
+            result["exit"] = (exit_long | exit_short).fillna(False)
+            result["signal"] = result["exit"]
+            # Pass profit_only config for engine-level filtering
+            if profit_only:
+                result["profit_only"] = pd.Series([True] * n, index=idx)
+                result["min_profit"] = pd.Series([min_profit] * n, index=idx)
+
+        elif close_type == "close_rsi":
+            # Close by RSI: reach or cross level modes
+            rsi_length = int(params.get("rsi_close_length", 14))
+            rsi_profit_only = params.get("rsi_close_profit_only", False)
+            rsi_min_profit = float(params.get("rsi_close_min_profit", 1.0))
+            activate_reach = params.get("activate_rsi_reach", False)
+            activate_cross = params.get("activate_rsi_cross", False)
+
+            rsi_values = pd.Series(calculate_rsi(close.values, rsi_length), index=idx)
+
+            exit_long = pd.Series([False] * n, index=idx)
+            exit_short = pd.Series([False] * n, index=idx)
+
+            if activate_reach:
+                # Reach mode: RSI in zone → exit
+                long_more = float(params.get("rsi_long_more", 70))
+                long_less = float(params.get("rsi_long_less", 100))
+                short_less = float(params.get("rsi_short_less", 30))
+                short_more = float(params.get("rsi_short_more", 1))
+                exit_long = exit_long | ((rsi_values >= long_more) & (rsi_values <= long_less))
+                exit_short = exit_short | ((rsi_values <= short_less) & (rsi_values >= short_more))
+
+            if activate_cross:
+                # Cross mode: RSI crosses level
+                # Long exit: RSI crosses down through level (from above to below)
+                cross_long_level = float(params.get("rsi_cross_long_level", 70))
+                cross_short_level = float(params.get("rsi_cross_short_level", 30))
+                exit_long = exit_long | ((rsi_values < cross_long_level) & (rsi_values.shift(1) >= cross_long_level))
+                # Short exit: RSI crosses up through level (from below to above)
+                exit_short = exit_short | (
+                    (rsi_values > cross_short_level) & (rsi_values.shift(1) <= cross_short_level)
+                )
+
+            result["exit_long"] = exit_long.fillna(False)
+            result["exit_short"] = exit_short.fillna(False)
+            result["exit"] = (exit_long | exit_short).fillna(False)
+            result["signal"] = result["exit"]
+            if rsi_profit_only:
+                result["profit_only"] = pd.Series([True] * n, index=idx)
+                result["min_profit"] = pd.Series([rsi_min_profit] * n, index=idx)
+
+        elif close_type == "close_stochastic":
+            # Close by Stochastic: reach or cross level modes
+            k_length = int(params.get("stoch_close_k_length", 14))
+            k_smooth = int(params.get("stoch_close_k_smoothing", 3))
+            d_smooth = int(params.get("stoch_close_d_smoothing", 3))
+            stoch_profit_only = params.get("stoch_close_profit_only", False)
+            stoch_min_profit = float(params.get("stoch_close_min_profit", 1.0))
+            activate_reach = params.get("activate_stoch_reach", False)
+            activate_cross = params.get("activate_stoch_cross", False)
+
+            high = ohlcv["high"]
+            low = ohlcv["low"]
+            stoch_k, _stoch_d = calculate_stochastic(
+                high.values, low.values, close.values, k_length, k_smooth, d_smooth
+            )
+            stoch_values = pd.Series(stoch_k, index=idx)
+
+            exit_long = pd.Series([False] * n, index=idx)
+            exit_short = pd.Series([False] * n, index=idx)
+
+            if activate_reach:
+                # Reach mode: Stoch %K in zone → exit
+                long_more = float(params.get("stoch_long_more", 80))
+                long_less = float(params.get("stoch_long_less", 100))
+                short_less = float(params.get("stoch_short_less", 20))
+                short_more = float(params.get("stoch_short_more", 1))
+                exit_long = exit_long | ((stoch_values >= long_more) & (stoch_values <= long_less))
+                exit_short = exit_short | ((stoch_values <= short_less) & (stoch_values >= short_more))
+
+            if activate_cross:
+                # Cross mode: Stoch %K crosses level
+                cross_long = float(params.get("stoch_cross_long_level", 80))
+                cross_short = float(params.get("stoch_cross_short_level", 20))
+                exit_long = exit_long | ((stoch_values < cross_long) & (stoch_values.shift(1) >= cross_long))
+                exit_short = exit_short | ((stoch_values > cross_short) & (stoch_values.shift(1) <= cross_short))
+
+            result["exit_long"] = exit_long.fillna(False)
+            result["exit_short"] = exit_short.fillna(False)
+            result["exit"] = (exit_long | exit_short).fillna(False)
+            result["signal"] = result["exit"]
+            if stoch_profit_only:
+                result["profit_only"] = pd.Series([True] * n, index=idx)
+                result["min_profit"] = pd.Series([stoch_min_profit] * n, index=idx)
 
         elif close_type == "close_psar":
-            # Close on Parabolic SAR signal
-            af_start = _param(params, 0.02, "af_start", "start", "afStart")
-            af_step = _param(params, 0.02, "af_step", "increment", "afStep")
-            af_max = _param(params, 0.2, "af_max", "max_value", "afMax")
+            # Close by Parabolic SAR signal
+            psar_start = float(params.get("psar_start", 0.02))
+            psar_increment = float(params.get("psar_increment", 0.02))
+            psar_maximum = float(params.get("psar_maximum", 0.2))
+            psar_opposite = params.get("psar_opposite", False)
+            psar_profit_only = params.get("psar_close_profit_only", False)
+            psar_min_profit = float(params.get("psar_close_min_profit", 1.0))
+            nth_bar = int(params.get("psar_close_nth_bar", 1))
 
-            sar_vals, _sar_dir = calculate_parabolic_sar(
-                ohlcv["high"].values, ohlcv["low"].values, af_start, af_step, af_max
+            high = ohlcv["high"]
+            low = ohlcv["low"]
+            psar_arr, psar_trend = calculate_parabolic_sar(
+                high.values, low.values, psar_start, psar_increment, psar_maximum
             )
-            psar = pd.Series(sar_vals, index=ohlcv.index)
+            _psar_values = pd.Series(psar_arr, index=idx)  # kept for future overlay
 
-            # Long exit: price crosses below PSAR
-            long_exit = (close < psar) & (close.shift(1) >= psar.shift(1))
-            # Short exit: price crosses above PSAR
-            short_exit = (close > psar) & (close.shift(1) <= psar.shift(1))
+            # Detect trend change using trend direction from PSAR
+            trend_series = pd.Series(psar_trend, index=idx)
+            trend_change_bull = (trend_series == 1) & (trend_series.shift(1) == -1)  # bearish→bullish
+            trend_change_bear = (trend_series == -1) & (trend_series.shift(1) == 1)  # bullish→bearish
 
-            result["exit_long"] = long_exit.fillna(False)
-            result["exit_short"] = short_exit.fillna(False)
-            result["exit"] = (long_exit | short_exit).fillna(False)
+            if nth_bar <= 1:
+                # Close on the bar of trend change
+                if psar_opposite:
+                    exit_long = trend_change_bull  # Close long on bullish signal (opposite)
+                    exit_short = trend_change_bear
+                else:
+                    exit_long = trend_change_bear  # Close long on bearish signal (normal)
+                    exit_short = trend_change_bull
+            else:
+                # Close on Nth bar of new trend
+                if psar_opposite:
+                    bull_counter = trend_change_bull.cumsum()
+                    bars_since_bull = bull_counter.groupby(bull_counter).cumcount() + 1
+                    bear_counter = trend_change_bear.cumsum()
+                    bars_since_bear = bear_counter.groupby(bear_counter).cumcount() + 1
+                    exit_long = bars_since_bull == nth_bar
+                    exit_short = bars_since_bear == nth_bar
+                else:
+                    bear_counter = trend_change_bear.cumsum()
+                    bars_since_bear = bear_counter.groupby(bear_counter).cumcount() + 1
+                    bull_counter = trend_change_bull.cumsum()
+                    bars_since_bull = bull_counter.groupby(bull_counter).cumcount() + 1
+                    exit_long = bars_since_bear == nth_bar
+                    exit_short = bars_since_bull == nth_bar
+
+            result["exit_long"] = exit_long.fillna(False)
+            result["exit_short"] = exit_short.fillna(False)
+            result["exit"] = (exit_long | exit_short).fillna(False)
             result["signal"] = result["exit"]
-
-        elif close_type == "close_profit_only":
-            # Require minimum profit to close - needs position tracking
-            min_profit = params.get("min_profit_percent", 0.5)
-            # This is config-only, actual logic in engine
-            result["exit"] = pd.Series([False] * n, index=idx)
-            result["min_profit"] = pd.Series([min_profit] * n, index=idx)
+            if psar_profit_only:
+                result["profit_only"] = pd.Series([True] * n, index=idx)
+                result["min_profit"] = pd.Series([psar_min_profit] * n, index=idx)
 
         else:
             result["exit"] = pd.Series([False] * n, index=idx)
@@ -3336,8 +3907,8 @@ class StrategyBuilderAdapter(BaseStrategy):
             block_type = block.get("type", "")
             params = block.get("params") or block.get("config") or {}
 
-            # Support for Manual Grid (grid_orders) block from entry_refinement category
-            if category == "entry_refinement" and block_type == "grid_orders":
+            # Support for Manual Grid (grid_orders) block from entry_mgmt/entry_refinement category
+            if category in ("entry_refinement", "entry_mgmt") and block_type == "grid_orders":
                 custom_orders = params.get("orders", [])
                 if custom_orders and len(custom_orders) > 0:
                     dca_config["dca_enabled"] = True
@@ -3352,8 +3923,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                     dca_config["grid_trailing_percent"] = grid_trailing
                     dca_config["grid_trailing"] = grid_trailing
 
-            # Support for unified 'dca' block from entry_refinement category (new format)
-            elif category == "entry_refinement" and block_type == "dca":
+            # Support for unified 'dca' block from entry_mgmt/entry_refinement category (new format)
+            elif category in ("entry_refinement", "entry_mgmt") and block_type == "dca":
                 dca_config["dca_enabled"] = True
                 dca_config["dca_grid_size_percent"] = params.get("grid_size_percent", 15.0)
                 dca_config["dca_order_count"] = params.get("order_count", 5)
@@ -3413,52 +3984,67 @@ class StrategyBuilderAdapter(BaseStrategy):
         for _block_id, block in self.blocks.items():
             block_type = block.get("type", "")
             params = block.get("params") or block.get("config") or {}
-            if block_type == "rsi_close":
+            if block_type in ("rsi_close", "stoch_close", "psar_close"):
+                pass  # Legacy block types — removed
+            elif block_type == "channel_close":
+                pass  # Legacy block type — use close_channel instead
+            elif block_type == "ma_close":
+                pass  # Legacy block type — use close_ma_cross instead
+            elif block_type == "close_channel":
+                close_conditions["channel_close_enable"] = True
+                close_conditions["channel_close_timeframe"] = params.get("channel_close_timeframe", "Chart")
+                close_conditions["channel_close_band_to_close"] = params.get("band_to_close", "Rebound")
+                close_conditions["channel_close_type"] = params.get("channel_type", "Keltner Channel")
+                close_conditions["channel_close_condition"] = params.get("close_condition", "Wick out of band")
+                close_conditions["channel_close_keltner_length"] = params.get("keltner_length", 14)
+                close_conditions["channel_close_keltner_mult"] = params.get("keltner_mult", 1.5)
+                close_conditions["channel_close_bb_length"] = params.get("bb_length", 20)
+                close_conditions["channel_close_bb_deviation"] = params.get("bb_deviation", 2.0)
+            elif block_type == "close_ma_cross":
+                close_conditions["ma_cross_close_enable"] = True
+                close_conditions["ma_cross_close_profit_only"] = params.get("profit_only", False)
+                close_conditions["ma_cross_close_min_profit"] = params.get("min_profit_percent", 1.0)
+                close_conditions["ma_cross_close_ma1_length"] = params.get("ma1_length", 10)
+                close_conditions["ma_cross_close_ma2_length"] = params.get("ma2_length", 30)
+            elif block_type == "close_rsi":
                 close_conditions["rsi_close_enable"] = True
                 close_conditions["rsi_close_length"] = params.get("rsi_close_length", 14)
-                close_conditions["rsi_close_only_profit"] = params.get("rsi_close_only_profit", True)
-                close_conditions["rsi_close_min_profit"] = params.get("rsi_close_min_profit", 0.5)
-                close_conditions["rsi_close_reach_enable"] = params.get("rsi_close_reach_enable", False)
-                close_conditions["rsi_close_reach_long_more"] = params.get("rsi_close_reach_long_more", 70)
-                close_conditions["rsi_close_reach_long_less"] = params.get("rsi_close_reach_long_less", 0)
-                close_conditions["rsi_close_reach_short_more"] = params.get("rsi_close_reach_short_more", 100)
-                close_conditions["rsi_close_reach_short_less"] = params.get("rsi_close_reach_short_less", 30)
-                close_conditions["rsi_close_cross_enable"] = params.get("rsi_close_cross_enable", False)
-                close_conditions["rsi_close_cross_long_level"] = params.get("rsi_close_cross_long_level", 70)
-                close_conditions["rsi_close_cross_short_level"] = params.get("rsi_close_cross_short_level", 30)
-            elif block_type == "stoch_close":
+                close_conditions["rsi_close_timeframe"] = params.get("rsi_close_timeframe", "Chart")
+                close_conditions["rsi_close_profit_only"] = params.get("rsi_close_profit_only", False)
+                close_conditions["rsi_close_min_profit"] = params.get("rsi_close_min_profit", 1.0)
+                close_conditions["rsi_close_activate_reach"] = params.get("activate_rsi_reach", False)
+                close_conditions["rsi_close_long_more"] = params.get("rsi_long_more", 70)
+                close_conditions["rsi_close_long_less"] = params.get("rsi_long_less", 100)
+                close_conditions["rsi_close_short_less"] = params.get("rsi_short_less", 30)
+                close_conditions["rsi_close_short_more"] = params.get("rsi_short_more", 1)
+                close_conditions["rsi_close_activate_cross"] = params.get("activate_rsi_cross", False)
+                close_conditions["rsi_close_cross_long_level"] = params.get("rsi_cross_long_level", 70)
+                close_conditions["rsi_close_cross_short_level"] = params.get("rsi_cross_short_level", 30)
+            elif block_type == "close_stochastic":
                 close_conditions["stoch_close_enable"] = True
                 close_conditions["stoch_close_k_length"] = params.get("stoch_close_k_length", 14)
-                close_conditions["stoch_close_k_smooth"] = params.get("stoch_close_k_smooth", 1)
-                close_conditions["stoch_close_d_smooth"] = params.get("stoch_close_d_smooth", 3)
-                close_conditions["stoch_close_only_profit"] = params.get("stoch_close_only_profit", True)
-                close_conditions["stoch_close_min_profit"] = params.get("stoch_close_min_profit", 0.5)
-                close_conditions["stoch_close_reach_enable"] = params.get("stoch_close_reach_enable", False)
-                close_conditions["stoch_close_reach_long_more"] = params.get("stoch_close_reach_long_more", 80)
-                close_conditions["stoch_close_reach_short_less"] = params.get("stoch_close_reach_short_less", 20)
-            elif block_type == "channel_close":
-                close_conditions["channel_close_enable"] = True
-                close_conditions["channel_close_type"] = params.get("channel_close_type", "Keltner")
-                close_conditions["channel_close_band"] = params.get("channel_close_band", "Breakout")
-                close_conditions["channel_close_keltner_length"] = params.get("channel_close_keltner_length", 20)
-                close_conditions["channel_close_keltner_mult"] = params.get("channel_close_keltner_mult", 2.0)
-                close_conditions["channel_close_bb_length"] = params.get("channel_close_bb_length", 20)
-                close_conditions["channel_close_bb_deviation"] = params.get("channel_close_bb_deviation", 2.0)
-            elif block_type == "ma_close":
-                close_conditions["ma_close_enable"] = True
-                close_conditions["ma_close_only_profit"] = params.get("ma_close_only_profit", True)
-                close_conditions["ma_close_min_profit"] = params.get("ma_close_min_profit", 0.5)
-                close_conditions["ma_close_ma1_length"] = params.get("ma_close_ma1_length", 9)
-                close_conditions["ma_close_ma1_type"] = params.get("ma_close_ma1_type", "EMA")
-                close_conditions["ma_close_ma2_length"] = params.get("ma_close_ma2_length", 21)
-                close_conditions["ma_close_ma2_type"] = params.get("ma_close_ma2_type", "EMA")
-            elif block_type == "psar_close":
+                close_conditions["stoch_close_k_smoothing"] = params.get("stoch_close_k_smoothing", 3)
+                close_conditions["stoch_close_d_smoothing"] = params.get("stoch_close_d_smoothing", 3)
+                close_conditions["stoch_close_timeframe"] = params.get("stoch_close_timeframe", "Chart")
+                close_conditions["stoch_close_profit_only"] = params.get("stoch_close_profit_only", False)
+                close_conditions["stoch_close_min_profit"] = params.get("stoch_close_min_profit", 1.0)
+                close_conditions["stoch_close_activate_reach"] = params.get("activate_stoch_reach", False)
+                close_conditions["stoch_close_long_more"] = params.get("stoch_long_more", 80)
+                close_conditions["stoch_close_long_less"] = params.get("stoch_long_less", 100)
+                close_conditions["stoch_close_short_less"] = params.get("stoch_short_less", 20)
+                close_conditions["stoch_close_short_more"] = params.get("stoch_short_more", 1)
+                close_conditions["stoch_close_activate_cross"] = params.get("activate_stoch_cross", False)
+                close_conditions["stoch_close_cross_long_level"] = params.get("stoch_cross_long_level", 80)
+                close_conditions["stoch_close_cross_short_level"] = params.get("stoch_cross_short_level", 20)
+            elif block_type == "close_psar":
                 close_conditions["psar_close_enable"] = True
-                close_conditions["psar_close_only_profit"] = params.get("psar_close_only_profit", True)
-                close_conditions["psar_close_min_profit"] = params.get("psar_close_min_profit", 0.5)
-                close_conditions["psar_close_start"] = params.get("psar_close_start", 0.02)
-                close_conditions["psar_close_increment"] = params.get("psar_close_increment", 0.02)
-                close_conditions["psar_close_maximum"] = params.get("psar_close_maximum", 0.2)
+                close_conditions["psar_close_opposite"] = params.get("psar_opposite", False)
+                close_conditions["psar_close_profit_only"] = params.get("psar_close_profit_only", False)
+                close_conditions["psar_close_min_profit"] = params.get("psar_close_min_profit", 1.0)
+                close_conditions["psar_close_start"] = params.get("psar_start", 0.02)
+                close_conditions["psar_close_increment"] = params.get("psar_increment", 0.02)
+                close_conditions["psar_close_maximum"] = params.get("psar_maximum", 0.2)
+                close_conditions["psar_close_nth_bar"] = params.get("psar_close_nth_bar", 1)
             elif block_type == "time_bars_close":
                 close_conditions["time_bars_close_enable"] = True
                 close_conditions["close_after_bars"] = params.get("close_after_bars", 20)
@@ -3486,14 +4072,14 @@ class StrategyBuilderAdapter(BaseStrategy):
         Check if strategy contains any DCA grid blocks.
 
         Returns:
-            True if any block has category="dca_grid" or is 'dca' type from entry_refinement
+            True if any block has category="dca_grid" or is 'dca' type from entry_mgmt/entry_refinement
         """
         for block in self.blocks.values():
             category = block.get("category", "")
             block_type = block.get("type", "")
 
-            # New format: 'dca' block from entry_refinement category
-            if category == "entry_refinement" and block_type == "dca":
+            # New format: 'dca' block from entry_mgmt/entry_refinement category
+            if category in ("entry_refinement", "entry_mgmt") and block_type == "dca":
                 return True
 
             # Old format: dca_grid category

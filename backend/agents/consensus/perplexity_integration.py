@@ -150,7 +150,7 @@ class PerplexityIntegration:
         # Enrich context before sending to DeepSeek/Qwen
         enriched = await integration.enrich_context(
             symbol="BTCUSDT",
-            strategy_type="rsi_momentum",
+            strategy_type="rsi",  # Universal RSI block type
             base_context={"timeframe": "15m", "direction": "long"}
         )
 

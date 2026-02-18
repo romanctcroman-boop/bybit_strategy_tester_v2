@@ -14,14 +14,17 @@ try:
 
     from backend.database import get_db
 except Exception:
+    from collections.abc import Generator
+    from typing import Any
 
-    def get_db():
+    def get_db() -> Generator[Any]:  # type: ignore[misc]
         raise HTTPException(status_code=500, detail="Database not configured")
 
-    class Session: ...
+    Session = Any  # type: ignore[assignment,misc]
 
 
 import asyncio
+import contextlib
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -110,7 +113,7 @@ def get_local_symbols(
         )
 
         # Organize by symbol
-        symbols_data = {}
+        symbols_data: dict[str, dict] = {}
         for row in results:
             symbol = row.symbol
             if symbol not in symbols_data:
@@ -166,6 +169,7 @@ def get_db_groups(db: Session = Depends(get_db)):
         from sqlalchemy import func
         from sqlalchemy.exc import OperationalError
 
+        results: list  # type varies based on DB schema version
         try:
             results = (
                 db.query(
@@ -332,6 +336,47 @@ def get_bybit_klines(
     ]
 
 
+@router.get("/bybit/klines/range")
+def get_bybit_klines_range(
+    symbol: str = Query(..., description="Trading pair symbol, e.g. BTCUSDT"),
+    interval: str = Query(..., description="Timeframe: 1,5,15,30,60,240,D,W,M"),
+    start: int = Query(..., description="Start timestamp in milliseconds (inclusive)"),
+    end: int = Query(..., description="End timestamp in milliseconds (inclusive)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Return ALL kline rows from database for a specific date range.
+
+    Used by the price chart on backtest-results page to show candles
+    that cover the entire backtest period.  No artificial limit —
+    the backtest may span 13+ months on 15m (≈37 000 candles).
+    """
+    rows = (
+        db.query(BybitKlineAudit)
+        .filter(
+            BybitKlineAudit.symbol == symbol.upper(),
+            BybitKlineAudit.interval == interval,
+            BybitKlineAudit.open_time >= start,
+            BybitKlineAudit.open_time <= end,
+        )
+        .order_by(BybitKlineAudit.open_time.asc())
+        .all()
+    )
+
+    return [
+        {
+            "open_time": r.open_time,
+            "open": float(r.open_price),
+            "high": float(r.high_price),
+            "low": float(r.low_price),
+            "close": float(r.close_price),
+            "volume": float(r.volume) if r.volume else 0,
+            "turnover": float(r.turnover) if r.turnover else 0,
+        }
+        for r in rows
+    ]
+
+
 @router.get("/bybit/volatility")
 def get_volatility(
     symbol: str = Query(..., description="Instrument symbol, e.g. BTCUSDT"),
@@ -407,7 +452,7 @@ def get_volatility(
         prev_close = close
 
     # Calculate max drawdown
-    max_drawdown = 0
+    max_drawdown: float = 0.0
     peak = closes[0] if closes else 0
     for close in closes:
         if close > peak:
@@ -460,11 +505,14 @@ async def refresh_all_daily_data(
         return {"status": "no_symbols", "message": "No symbols found in database"}
 
     adapter = get_bybit_adapter()
-    results = {
+    symbols_updated: list[dict] = []
+    symbols_skipped: list[str] = []
+    errors: list[dict] = []
+    results: dict = {
         "total_symbols": len(symbols),
-        "symbols_updated": [],
-        "symbols_skipped": [],
-        "errors": [],
+        "symbols_updated": symbols_updated,
+        "symbols_skipped": symbols_skipped,
+        "errors": errors,
     }
 
     # Calculate required time range
@@ -486,7 +534,7 @@ async def refresh_all_daily_data(
 
             # If latest is less than 1 day old, skip
             if latest and (now_ms - latest) < one_day_ms:
-                results["symbols_skipped"].append(symbol)
+                symbols_skipped.append(symbol)
                 continue
 
             # Fetch daily candles from Bybit
@@ -495,14 +543,14 @@ async def refresh_all_daily_data(
                 if rows:
                     rows_with_interval = [{**r, "interval": "D"} for r in rows]
                     adapter._persist_klines_to_db(symbol, rows_with_interval)
-                    results["symbols_updated"].append({"symbol": symbol, "candles": len(rows)})
+                    symbols_updated.append({"symbol": symbol, "candles": len(rows)})
                     logger.info(f"[VOLATILITY] Refreshed {len(rows)} daily candles for {symbol}")
             except Exception as e:
-                results["errors"].append({"symbol": symbol, "error": str(e)})
+                errors.append({"symbol": symbol, "error": str(e)})
                 logger.warning(f"[VOLATILITY] Failed to refresh {symbol}: {e}")
 
         except Exception as e:
-            results["errors"].append({"symbol": symbol, "error": str(e)})
+            errors.append({"symbol": symbol, "error": str(e)})
 
     results["status"] = "completed"
     return results
@@ -663,7 +711,7 @@ async def fetch_recent_trades(
 
     def _fetch():
         try:
-            return adapter.get_recent_trades(symbol=symbol, limit=limit)
+            return adapter.get_recent_trades(symbol=symbol, limit=limit)  # type: ignore[attr-defined]
         except Exception as exc:
             logger.exception(f"Bybit trades fetch failed: {exc}")
             raise HTTPException(status_code=502, detail=f"Bybit trades fetch failed: {exc}")
@@ -1028,8 +1076,8 @@ async def get_orderbook(
 @router.post("/symbols/cache-refresh")
 async def refresh_symbols_cache(request: Request):
     """
-    Принудительно загрузить тикеры с Bybit (Futures + Spot) и обновить кэш.
-    Вызов после старта или по кнопке «Обновить список» в Properties.
+    Force-refresh tickers from Bybit (Futures + Spot) and update cache.
+    Call after startup or via the 'Refresh list' button in Properties.
     """
     try:
         adapter = get_bybit_adapter()
@@ -1158,7 +1206,7 @@ async def check_symbol_data(
         if latest:
             # latest is in milliseconds
 
-            latest_dt = datetime.fromtimestamp(latest / 1000, tz=UTC)
+            latest_dt = datetime.fromtimestamp(float(latest) / 1000, tz=UTC)
             latest_datetime = latest_dt.isoformat()
             now = datetime.now(UTC)
             delta = now - latest_dt
@@ -1205,7 +1253,7 @@ async def check_symbol_data(
             )
             if earliest_row:
                 earliest = earliest_row.open_time
-                earliest_dt = datetime.utcfromtimestamp(earliest / 1000)
+                earliest_dt = datetime.fromtimestamp(float(earliest) / 1000, tz=UTC)
                 earliest_datetime = earliest_dt.isoformat() + "Z"
 
         return {
@@ -1284,8 +1332,8 @@ async def refresh_symbol_data(
             .first()
         )
 
-        earliest_in_db = earliest_row.open_time if earliest_row else None
-        latest_in_db = latest_row.open_time if latest_row else None
+        earliest_in_db: int | None = int(earliest_row.open_time) if earliest_row else None
+        latest_in_db: int | None = int(latest_row.open_time) if latest_row else None
         now_ts = int(datetime.now(UTC).timestamp() * 1000)
 
         # Count current records before any updates
@@ -1393,9 +1441,9 @@ async def refresh_symbol_data(
         earliest_dt = None
         latest_dt = None
         if new_earliest:
-            earliest_dt = datetime.utcfromtimestamp(new_earliest.open_time / 1000).isoformat() + "Z"
+            earliest_dt = datetime.fromtimestamp(float(new_earliest.open_time) / 1000, tz=UTC).isoformat()
         if new_latest:
-            latest_dt = datetime.utcfromtimestamp(new_latest.open_time / 1000).isoformat() + "Z"
+            latest_dt = datetime.fromtimestamp(float(new_latest.open_time) / 1000, tz=UTC).isoformat()
 
         # Calculate actual new candles by comparing counts (most accurate)
         actual_new = max(0, total_in_db - initial_count)
@@ -1433,7 +1481,7 @@ async def refresh_symbol_data(
                             .first()
                         )
 
-                        m1_latest_ts = m1_latest.open_time if m1_latest else None
+                        m1_latest_ts: int | None = int(m1_latest.open_time) if m1_latest else None
 
                         # Only update if no data or stale (>1 hour old)
                         should_update = m1_count == 0 or (m1_latest_ts and (now_ts - m1_latest_ts) > 3600000)
@@ -1465,7 +1513,8 @@ async def refresh_symbol_data(
                     logger.warning(f"[BAR_MAGNIFIER] Background 1m refresh failed: {e}")
 
             # Schedule background task (non-blocking)
-            asyncio.create_task(refresh_1m_background())
+            _task = asyncio.create_task(refresh_1m_background())
+            _task.add_done_callback(lambda t: t.result() if not t.cancelled() and not t.exception() else None)
 
         # ========== BACKGROUND: Refresh 1h data for Volatility and "Precha" protection ==========
         # Only if the requested interval is not already 1h
@@ -1499,7 +1548,7 @@ async def refresh_symbol_data(
                             .first()
                         )
 
-                        h1_latest_ts = h1_latest.open_time if h1_latest else None
+                        h1_latest_ts: int | None = int(h1_latest.open_time) if h1_latest else None
 
                         # Only update if no data or stale (>2 hours old)
                         should_update = h1_count == 0 or (h1_latest_ts and (now_ts - h1_latest_ts) > 2 * 3600000)
@@ -1531,7 +1580,8 @@ async def refresh_symbol_data(
                     logger.warning(f"[VOLATILITY] Background 1h refresh failed: {e}")
 
             # Schedule background task (non-blocking)
-            asyncio.create_task(refresh_1h_background())
+            _task_1h = asyncio.create_task(refresh_1h_background())
+            _task_1h.add_done_callback(lambda t: t.result() if not t.cancelled() and not t.exception() else None)
 
         return {
             "symbol": symbol.upper(),
@@ -1718,7 +1768,7 @@ async def sync_all_timeframes(
                         new_candles += len(rows)
 
                 if needs_update:
-                    # Update to current (с нахлёстом свечей — 5 для малых TF, меньше для D/W/M)
+                    # Update to current (with candle overlap — 5 for small TF, less for D/W/M)
                     interval_ms = interval_ms_map.get(interval, 3600000)
                     overlap = OVERLAP_CANDLES.get(interval, 3)
                     start_ts = latest_ts - (interval_ms * overlap)
@@ -1753,7 +1803,7 @@ async def sync_all_timeframes(
                 logger.warning(f"[SYNC] Timeout syncing {symbol}/{tf} after {timeout_sec}s")
                 return {"status": "timeout", "error": f"Timeout after {timeout_sec}s"}
 
-        # Timeouts per TF — 1m ограничен 45 с, чтобы не блокировать сервер 180 с при переключении тикера
+        # Timeouts per TF — 1m limited to 45s to avoid blocking server 180s on ticker switch
         tf_timeouts = {
             "1": 45,
             "5": 45,
@@ -1771,13 +1821,13 @@ async def sync_all_timeframes(
         _elapsed_ms = (datetime.now(UTC) - _sync_start).total_seconds() * 1000
         logger.info(f"[SYNC] Tasks started for {symbol}, elapsed since request: {_elapsed_ms:.0f} ms")
 
-        done, pending = await asyncio.wait(
-            sync_tasks + [disconnect_task],
+        done, _pending = await asyncio.wait(
+            [*sync_tasks, disconnect_task],
             return_when=asyncio.FIRST_COMPLETED,
         )
 
         if disconnect_task in done:
-            # Клиент отключился — отменяем синхронизацию, чтобы не блокировать следующий запрос
+            # Client disconnected — cancel sync to unblock next request
             for t in sync_tasks:
                 if not t.done():
                     t.cancel()
@@ -1790,12 +1840,10 @@ async def sync_all_timeframes(
                 else:
                     tf_results.append(r)
         else:
-            # Ждём завершения всех TF; отменяем фоновую проверку отключения
+            # Wait for all TFs to finish; cancel the background disconnect check
             disconnect_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await disconnect_task
-            except asyncio.CancelledError:
-                pass
             pending_sync = [t for t in sync_tasks if t not in done]
             if pending_sync:
                 await asyncio.gather(*pending_sync)
@@ -1809,8 +1857,11 @@ async def sync_all_timeframes(
         for tf, result in zip(ALL_TIMEFRAMES, tf_results, strict=False):
             results[tf] = result
 
-        total_new = sum(r.get("new_candles", 0) for r in tf_results)
-        statuses = [r.get("status") for r in tf_results]
+        total_new: int = 0
+        for r in tf_results:
+            nc = r.get("new_candles", 0)
+            total_new += nc if isinstance(nc, int) else 0
+        statuses = [str(r.get("status", "")) for r in tf_results]
         cancelled = sum(1 for s in statuses if s == "cancelled")
         _total_ms = (datetime.now(UTC) - _sync_start).total_seconds() * 1000
         logger.info(f"[SYNC] Complete for {symbol}, total elapsed: {_total_ms:.0f} ms, +{total_new} candles")
@@ -1908,7 +1959,7 @@ async def sync_all_timeframes_stream(
         """
         from backend.database import SessionLocal
 
-        results = {}
+        results: dict[str, dict] = {}
         total_new = 0
 
         logger.info(f"[SYNC-STREAM] Starting sync for {symbol}")
@@ -1962,8 +2013,8 @@ async def sync_all_timeframes_stream(
                             .first()
                         )
 
-                        latest_ts = latest_row.open_time if latest_row else None
-                        earliest_ts = earliest_row.open_time if earliest_row else None
+                        latest_ts: int | None = int(latest_row.open_time) if latest_row else None
+                        earliest_ts: int | None = int(earliest_row.open_time) if earliest_row else None
 
                         needs_full_load = latest_ts is None
                         needs_backfill = earliest_ts and earliest_ts > data_start_ts + 86400000
@@ -1973,10 +2024,10 @@ async def sync_all_timeframes_stream(
                         new_candles = 0
 
                         # Cancellation flag (set by drain loop on disconnect)
-                        client_disconnected = False
+                        _cancel_flags: dict[str, bool] = {"disconnected": False}
 
-                        def sync_cancel_check():
-                            return client_disconnected
+                        def sync_cancel_check(_flags=_cancel_flags):
+                            return _flags["disconnected"]
 
                         if needs_full_load:
                             logger.info(f"[SYNC-STREAM] Full load {symbol}/{tf} from {data_start_ts}")
@@ -2005,7 +2056,7 @@ async def sync_all_timeframes_stream(
                             # Stream progress while task runs
                             while not task.done():
                                 if await request.is_disconnected():
-                                    client_disconnected = True
+                                    _cancel_flags["disconnected"] = True
                                 # Drain all progress events from queue
                                 while not progress_queue.empty():
                                     item = progress_queue.get_nowait()
@@ -2024,6 +2075,7 @@ async def sync_all_timeframes_stream(
                             results[tf] = {"status": "loaded", "new_candles": new_candles}
 
                         elif needs_backfill:
+                            assert earliest_ts is not None  # guarded by needs_backfill check
                             backfill_start = data_start_ts
                             logger.info(f"[SYNC-STREAM] Backfill {symbol}/{tf} from {backfill_start} to {earliest_ts}")
 
@@ -2040,7 +2092,8 @@ async def sync_all_timeframes_stream(
                             new_candles += backfill_candles
 
                             # Also update to latest if needed
-                            if needs_update and not client_disconnected:
+                            if needs_update and not _cancel_flags["disconnected"]:
+                                assert latest_ts is not None  # guarded by needs_update check
                                 interval_ms = interval_ms_map.get(tf, 3600000)
                                 overlap = OVERLAP_CANDLES.get(tf, 3)
                                 start_ts = latest_ts - (interval_ms * overlap)
@@ -2059,6 +2112,7 @@ async def sync_all_timeframes_stream(
                             results[tf] = {"status": "backfilled", "new_candles": new_candles}
 
                         elif needs_update:
+                            assert latest_ts is not None  # guarded by needs_update check
                             interval_ms = interval_ms_map.get(tf, 3600000)
                             overlap = OVERLAP_CANDLES.get(tf, 3)
                             start_ts = latest_ts - (interval_ms * overlap)
@@ -2077,7 +2131,7 @@ async def sync_all_timeframes_stream(
                         else:
                             results[tf] = {"status": "fresh", "new_candles": 0}
 
-                        if client_disconnected:
+                        if _cancel_flags["disconnected"]:
                             logger.info(f"[SYNC-STREAM] Client disconnected during {symbol}/{tf}")
                             yield f"data: {json.dumps({'event': 'complete', 'totalNew': total_new + new_candles, 'results': results, 'message': 'Синхронизация прервана (клиент отключился)', 'cancelled': True})}\n\n"
                             return
@@ -2226,8 +2280,8 @@ async def refresh_symbol_data_stream(
                     .count()
                 )
 
-                earliest_in_db = earliest_row.open_time if earliest_row else None
-                latest_in_db = latest_row.open_time if latest_row else None
+                earliest_in_db: int | None = int(earliest_row.open_time) if earliest_row else None
+                latest_in_db: int | None = int(latest_row.open_time) if latest_row else None
 
             finally:
                 db.close()
@@ -2237,7 +2291,7 @@ async def refresh_symbol_data_stream(
             # Determine what needs to be fetched
             if not earliest_in_db:
                 # No data - full historical load
-                yield f"data: {json.dumps({'event': 'progress', 'percent': 5, 'loaded': 0, 'total': expected_candles, 'message': 'Загрузка истории с 01.01.2025...'})}\n\n"
+                yield f"data: {json.dumps({'event': 'progress', 'percent': 5, 'loaded': 0, 'total': expected_candles, 'message': 'Loading history from 01.01.2025...'})}\n\n"
 
                 # Fetch in batches with progress updates
                 current_start = data_start_ts
@@ -2282,7 +2336,7 @@ async def refresh_symbol_data_stream(
 
             else:
                 # Data exists - check if backfill needed
-                if earliest_in_db > data_start_ts + 86400000:
+                if earliest_in_db and earliest_in_db > data_start_ts + 86400000:
                     yield f"data: {json.dumps({'event': 'progress', 'percent': 10, 'loaded': current_count, 'total': expected_candles, 'message': 'Догрузка старых данных...'})}\n\n"
 
                     try:
@@ -2290,7 +2344,7 @@ async def refresh_symbol_data_stream(
                             symbol=symbol.upper(),
                             interval=bybit_interval,
                             start_time=data_start_ts,
-                            end_time=earliest_in_db - 1,
+                            end_time=int(earliest_in_db) - 1,
                             limit=1000,
                         )
                         if rows:
@@ -2305,7 +2359,7 @@ async def refresh_symbol_data_stream(
 
                 if latest_in_db and latest_in_db < now_ts:
                     overlap = OVERLAP_CANDLES.get(bybit_interval, 5)
-                    update_start = latest_in_db - (interval_ms * overlap)
+                    update_start = int(latest_in_db) - (interval_ms * overlap)
 
                     try:
                         rows = await adapter.get_historical_klines(

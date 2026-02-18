@@ -5682,25 +5682,31 @@ function calculateSuperTrend(data, period = 10, multiplier = 3) {
 // ============================================
 if (typeof window !== 'undefined') {
     // onclick handlers
-    window.openSymbolSearch = openSymbolSearch;
-    window.toggleCompareDropdown = toggleCompareDropdown;
-    window.toggleCompareMode = toggleCompareMode;
     window.openIndicatorsModal = openIndicatorsModal;
     window.closeIndicatorsModal = closeIndicatorsModal;
     window.toggleIndicator = toggleIndicator;
     window.openAlertsModal = openAlertsModal;
     window.closeAlertsModal = closeAlertsModal;
     window.createAlert = createAlert;
-    window.exportChart = exportChart;
+    window.deleteAlert = deleteAlert;
     window.openShortcutsModal = openShortcutsModal;
     window.closeShortcutsModal = closeShortcutsModal;
-    window.toggleFullscreen = toggleFullscreen;
-    window.clearDrawings = clearDrawings;
-    window.closeSettingsModal = closeSettingsModal;
     window.openSettingsModal = openSettingsModal;
+    window.closeSettingsModal = closeSettingsModal;
     window.switchSettingsTab = switchSettingsTab;
     window.resetSettings = resetSettings;
-    // onchange handlers (settings toggles)
+    window.openSymbolSearch = openSymbolSearch;
+    window.selectSymbol = selectSymbol;
+    window.closeSymbolSearch = closeSymbolSearch;
+    window.toggleCompareDropdown = toggleCompareDropdown;
+    window.toggleCompareMode = toggleCompareMode;
+    window.addToCompare = addToCompare;
+    window.removeFromCompare = removeFromCompare;
+    window.exportChart = exportChart;
+    window.toggleFullscreen = toggleFullscreen;
+    window.clearDrawings = clearDrawings;
     window.updateSetting = updateSetting;
     window.updateVolumeSetting = updateVolumeSetting;
+    window.loadAlerts = loadAlerts;
+
 }

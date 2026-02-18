@@ -31,6 +31,9 @@ from backend.core.indicators.advanced import (
     calculate_pivot_points,
     calculate_pivot_points_array,
 )
+from backend.core.indicators.extended_indicators import (
+    calculate_rvi,
+)
 from backend.core.indicators.momentum import (
     calculate_cmo,
     calculate_mfi,
@@ -151,6 +154,7 @@ __all__ = [
     "calculate_roc",
     "calculate_rsi",
     "calculate_rsi_fast",
+    "calculate_rvi",
     "calculate_sma",
     "calculate_stddev",
     "calculate_stoch_rsi",

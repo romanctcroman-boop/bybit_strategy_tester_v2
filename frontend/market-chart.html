@@ -1,54 +1,60 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Security Headers -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
-    />
-    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
-    <meta name="referrer" content="strict-origin-when-cross-origin" />
+      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
 
     <title>Advanced Market Chart - Bybit Strategy Tester v2</title>
-    <link rel="icon" href="/frontend/favicon.ico" type="image/x-icon" />
+    <link rel="icon" href="/frontend/favicon.ico" type="image/x-icon">
     <!-- TradingView Lightweight Charts (local) -->
     <script src="libs/lightweight-charts.js"></script>
     <!-- Bootstrap 5.3.2 (local) -->
-    <link href="libs/bootstrap.min.css" rel="stylesheet" />
-    <link href="libs/bootstrap-icons.css" rel="stylesheet" />
+    <link href="libs/bootstrap.min.css" rel="stylesheet">
+    <link href="libs/bootstrap-icons.css" rel="stylesheet">
     <!-- External CSS (Phase 1) -->
-    <link rel="stylesheet" href="./css/variables.css" />
-    <link rel="stylesheet" href="./css/components.css" />
-    <link rel="stylesheet" href="./css/common.css" />
-    <link rel="stylesheet" href="./css/market_chart.css" />
+    <link rel="stylesheet" href="./css/variables.css">
+    <link rel="stylesheet" href="./css/components.css">
+    <link rel="stylesheet" href="./css/common.css">
+    <link rel="stylesheet" href="./css/market_chart.css">
 
     <script src="js/core/auto-event-binding.js"></script>
   </head>
   <body>
     <div class="app-container">
       <!-- Header -->
-      <header class="header">
+      <header class="header" role="banner">
         <div class="header-left">
           <div class="logo">
-            <a href="dashboard.html"
-              ><i class="bi bi-graph-up-arrow"></i> Charts</a
-            >
+            <a href="dashboard.html" aria-label="Navigate to Dashboard">
+              <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
+              <span class="visually-hidden">Charts</span>
+            </a>
           </div>
 
-          <div class="symbol-selector">
+          <div class="symbol-selector" role="group" aria-labelledby="symbolSelectorLabel">
+            <span id="symbolSelectorLabel" class="visually-hidden">Symbol Selection</span>
+            
             <div
               class="symbol-dropdown"
               id="symbolDropdown"
               onclick="openSymbolSearch(false)"
+              role="button"
+              tabindex="0"
+              aria-haspopup="true"
+              aria-expanded="false"
             >
-              <span id="currentSymbol">BTCUSDT</span>
-              <i class="bi bi-chevron-down"></i>
+              <span id="currentSymbol" aria-label="Current trading symbol">BTCUSDT</span>
+              <i class="bi bi-chevron-down" aria-hidden="true"></i>
             </div>
 
-            <div class="price-info">
+            <div class="price-info" aria-live="polite" aria-atomic="true">
               <span class="current-price up" id="currentPrice">$97,234.50</span>
               <span class="price-change positive" id="priceChange">
                 <span>+2.34%</span>
@@ -57,46 +63,52 @@
             </div>
           </div>
 
-          <div class="timeframe-selector">
-            <button class="tf-btn" data-tf="1">1m</button>
-            <button class="tf-btn" data-tf="5">5m</button>
-            <button class="tf-btn" data-tf="15">15m</button>
-            <button class="tf-btn" data-tf="30">30m</button>
-            <button class="tf-btn" data-tf="60">1H</button>
-            <button class="tf-btn" data-tf="240">4H</button>
-            <button class="tf-btn" data-tf="D">1D</button>
-            <button class="tf-btn" data-tf="W">1W</button>
+          <div class="timeframe-selector" role="group" aria-label="Timeframe selection">
+            <button type="button" class="tf-btn" data-tf="1" aria-label="1 minute timeframe">1m</button>
+            <button type="button" class="tf-btn" data-tf="5" aria-label="5 minute timeframe">5m</button>
+            <button type="button" class="tf-btn" data-tf="15" aria-label="15 minute timeframe">15m</button>
+            <button type="button" class="tf-btn" data-tf="30" aria-label="30 minute timeframe">30m</button>
+            <button type="button" class="tf-btn" data-tf="60" aria-label="1 hour timeframe">1H</button>
+            <button type="button" class="tf-btn" data-tf="240" aria-label="4 hour timeframe">4H</button>
+            <button type="button" class="tf-btn" data-tf="D" aria-label="Daily timeframe">1D</button>
+            <button type="button" class="tf-btn" data-tf="W" aria-label="Weekly timeframe">1W</button>
           </div>
         </div>
 
         <div class="header-right">
           <div class="compare-wrapper">
             <button
+              type="button"
               class="header-btn"
               id="compareBtn"
               onclick="toggleCompareDropdown()"
               title="Compare symbols (C)"
+              aria-haspopup="true"
+              aria-expanded="false"
             >
-              <i class="bi bi-layers"></i> Compare
+              <i class="bi bi-layers" aria-hidden="true"></i> Compare
             </button>
             <!-- Compare Dropdown Panel -->
-            <div class="compare-panel" id="comparePanel">
+            <div class="compare-panel" id="comparePanel" role="region" aria-labelledby="compareBtn" aria-hidden="true">
               <div class="compare-header">
                 <span class="compare-header-title">Compare Symbols</span>
                 <button
+                  type="button"
                   class="btn-icon"
                   onclick="toggleCompareMode()"
                   id="compareModeToggle"
                   title="Toggle compare mode"
+                  aria-label="Toggle compare mode"
                 >
-                  <i class="bi bi-toggle-off" id="compareModeIcon"></i>
+                  <i class="bi bi-toggle-off" id="compareModeIcon" aria-hidden="true"></i>
+                  <span class="visually-hidden">Toggle compare mode</span>
                 </button>
               </div>
-              <div class="compare-chips" id="compareChips">
+              <div class="compare-chips" id="compareChips" role="list" aria-label="Compared symbols">
                 <!-- Dynamically populated -->
               </div>
-              <button class="compare-add-btn" onclick="openSymbolSearch(true)">
-                <i class="bi bi-plus"></i> Add Symbol
+              <button type="button" class="compare-add-btn" onclick="openSymbolSearch(true)" aria-label="Add symbol to comparison">
+                <i class="bi bi-plus" aria-hidden="true"></i> Add Symbol
               </button>
               <div class="compare-hint">
                 Add symbols to compare their performance
@@ -104,149 +116,170 @@
             </div>
           </div>
           <button
+            type="button"
             class="header-btn"
             onclick="location.href = 'tick-chart.html'"
             title="Tick Chart (T)"
+            aria-label="Go to Tick Chart"
           >
-            <i class="bi bi-activity"></i> Tick
+            <i class="bi bi-activity" aria-hidden="true"></i> Tick
           </button>
           <button
+            type="button"
             class="header-btn"
             onclick="openIndicatorsModal()"
             title="Indicators (I)"
+            aria-label="Open Indicators Modal"
           >
-            <i class="bi bi-graph-up"></i> Indicators
+            <i class="bi bi-graph-up" aria-hidden="true"></i> Indicators
           </button>
           <button
+            type="button"
             class="header-btn"
             onclick="openAlertsModal()"
             title="Price Alerts (A)"
+            aria-label="Open Price Alerts"
           >
-            <i class="bi bi-bell"></i> Alerts
-            <span class="alert-badge hidden" id="alertBadge">0</span>
+            <i class="bi bi-bell" aria-hidden="true"></i> Alerts
+            <span class="alert-badge hidden" id="alertBadge" aria-label="Number of alerts">0</span>
           </button>
           <button
+            type="button"
             class="header-btn"
             id="settingsBtn"
             onclick="openSettingsModal()"
             title="Chart Settings (,)"
+            aria-label="Open Chart Settings"
           >
-            <i class="bi bi-gear"></i> Settings
+            <i class="bi bi-gear" aria-hidden="true"></i> Settings
           </button>
-          <button class="header-btn" onclick="exportChart()" title="Export (E)">
-            <i class="bi bi-download"></i> Export
+          <button type="button" class="header-btn" onclick="exportChart()" title="Export (E)" aria-label="Export Chart">
+            <i class="bi bi-download" aria-hidden="true"></i> Export
           </button>
           <button
+            type="button"
             class="header-btn"
             onclick="openShortcutsModal()"
             title="Keyboard Shortcuts (?)"
+            aria-label="Open Keyboard Shortcuts"
           >
-            <i class="bi bi-keyboard"></i>
+            <i class="bi bi-keyboard" aria-hidden="true"></i>
+            <span class="visually-hidden">Keyboard Shortcuts</span>
           </button>
           <button
+            type="button"
             class="header-btn"
             onclick="toggleFullscreen()"
             title="Toggle Fullscreen (F)"
             aria-label="Toggle fullscreen mode"
           >
-            <i class="bi bi-fullscreen"></i>
+            <i class="bi bi-fullscreen" aria-hidden="true"></i>
           </button>
         </div>
       </header>
 
       <!-- Compare Legend (shows current values) -->
-      <div class="compare-legend hidden" id="compareLegend">
+      <div class="compare-legend hidden" id="compareLegend" aria-live="polite">
         <!-- Dynamically populated with current % values -->
       </div>
 
       <!-- Main Content -->
       <div class="main-content">
         <!-- Left Toolbar -->
-        <div class="sidebar">
-          <button class="tool-btn active" data-tool="cursor" title="Cursor">
-            <i class="bi bi-cursor"></i>
+        <nav class="sidebar" role="navigation" aria-label="Chart drawing tools">
+          <button type="button" class="tool-btn active" data-tool="cursor" title="Cursor" aria-label="Select Cursor Tool">
+            <i class="bi bi-cursor" aria-hidden="true"></i>
+            <span class="visually-hidden">Cursor</span>
           </button>
-          <button class="tool-btn" data-tool="crosshair" title="Crosshair">
-            <i class="bi bi-plus-lg"></i>
+          <button type="button" class="tool-btn" data-tool="crosshair" title="Crosshair" aria-label="Select Crosshair Tool">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i>
+            <span class="visually-hidden">Crosshair</span>
           </button>
-          <div class="tool-separator"></div>
-          <button class="tool-btn" data-tool="trendline" title="Trend Line">
-            <i class="bi bi-slash-lg"></i>
+          <div class="tool-separator" aria-hidden="true"></div>
+          <button type="button" class="tool-btn" data-tool="trendline" title="Trend Line" aria-label="Select Trend Line Tool">
+            <i class="bi bi-slash-lg" aria-hidden="true"></i>
+            <span class="visually-hidden">Trend Line</span>
           </button>
-          <button class="tool-btn" data-tool="hline" title="Horizontal Line">
-            <i class="bi bi-dash-lg"></i>
+          <button type="button" class="tool-btn" data-tool="hline" title="Horizontal Line" aria-label="Select Horizontal Line Tool">
+            <i class="bi bi-dash-lg" aria-hidden="true"></i>
+            <span class="visually-hidden">Horizontal Line</span>
           </button>
-          <button class="tool-btn" data-tool="rectangle" title="Rectangle">
-            <i class="bi bi-square"></i>
+          <button type="button" class="tool-btn" data-tool="rectangle" title="Rectangle" aria-label="Select Rectangle Tool">
+            <i class="bi bi-square" aria-hidden="true"></i>
+            <span class="visually-hidden">Rectangle</span>
           </button>
-          <button class="tool-btn" data-tool="fibonacci" title="Fibonacci">
-            <i class="bi bi-rulers"></i>
+          <button type="button" class="tool-btn" data-tool="fibonacci" title="Fibonacci" aria-label="Select Fibonacci Tool">
+            <i class="bi bi-rulers" aria-hidden="true"></i>
+            <span class="visually-hidden">Fibonacci</span>
           </button>
-          <div class="tool-separator"></div>
-          <button class="tool-btn" data-tool="text" title="Text">
-            <i class="bi bi-fonts"></i>
+          <div class="tool-separator" aria-hidden="true"></div>
+          <button type="button" class="tool-btn" data-tool="text" title="Text" aria-label="Select Text Tool">
+            <i class="bi bi-fonts" aria-hidden="true"></i>
+            <span class="visually-hidden">Text</span>
           </button>
-          <button class="tool-btn" data-tool="arrow" title="Arrow">
-            <i class="bi bi-arrow-right"></i>
+          <button type="button" class="tool-btn" data-tool="arrow" title="Arrow" aria-label="Select Arrow Tool">
+            <i class="bi bi-arrow-right" aria-hidden="true"></i>
+            <span class="visually-hidden">Arrow</span>
           </button>
-          <div class="tool-separator"></div>
-          <button class="tool-btn" data-tool="measure" title="Measure">
-            <i class="bi bi-rulers"></i>
+          <div class="tool-separator" aria-hidden="true"></div>
+          <button type="button" class="tool-btn" data-tool="measure" title="Measure" aria-label="Select Measure Tool">
+            <i class="bi bi-rulers" aria-hidden="true"></i>
+            <span class="visually-hidden">Measure</span>
           </button>
-          <button class="tool-btn" data-tool="zoom" title="Zoom">
-            <i class="bi bi-zoom-in"></i>
+          <button type="button" class="tool-btn" data-tool="zoom" title="Zoom" aria-label="Select Zoom Tool">
+            <i class="bi bi-zoom-in" aria-hidden="true"></i>
+            <span class="visually-hidden">Zoom</span>
           </button>
-          <div class="tool-separator"></div>
-          <button class="tool-btn" onclick="clearDrawings()" title="Clear All">
-            <i class="bi bi-trash"></i>
+          <div class="tool-separator" aria-hidden="true"></div>
+          <button type="button" class="tool-btn" onclick="clearDrawings()" title="Clear All" aria-label="Clear All Drawings">
+            <i class="bi bi-trash" aria-hidden="true"></i>
+            <span class="visually-hidden">Clear All</span>
           </button>
-        </div>
+        </nav>
 
         <!-- Chart Area -->
-        <div class="chart-area">
+        <main class="chart-area">
           <div class="chart-container" id="chartContainer">
             <div id="chart"></div>
             <!-- Countdown Timer -->
-            <div id="candleCountdown" class="candle-countdown">00:00</div>
+            <div id="candleCountdown" class="candle-countdown" aria-label="Time until next candle">00:00</div>
             <!-- Pulse Animation Container -->
-            <div id="pricePulse" class="pulse-container">
+            <div id="pricePulse" class="pulse-container" aria-hidden="true">
               <div class="pulse-ring"></div>
               <div class="pulse-dot"></div>
             </div>
-            <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-overlay" id="loadingOverlay" aria-live="polite" aria-label="Loading status">
               <div class="spinner"></div>
             </div>
           </div>
           <!-- Resizable divider -->
-          <div class="chart-resizer" id="chartResizer"></div>
-          <div class="indicators-panel" id="indicatorsPanel">
+          <div class="chart-resizer" id="chartResizer" role="separator" aria-label="Resize chart panel" aria-orientation="horizontal"></div>
+          <section class="indicators-panel" id="indicatorsPanel" aria-labelledby="volumeSmaLabel">
             <div class="volume-label">
-              Объём SMA <span id="volumeSmaValue">9</span>
+              <span id="volumeSmaLabel">Volume SMA</span> <span id="volumeSmaValue">9</span>
             </div>
             <div id="volumeChart"></div>
-          </div>
-        </div>
+          </section>
+        </main>
 
         <!-- Right Panel -->
-        <div class="right-panel">
-          <div class="panel-tabs">
-            <button class="panel-tab active" data-panel="orderbook">
-              Order Book
-            </button>
-            <button class="panel-tab" data-panel="trades">Trades</button>
-            <button class="panel-tab" data-panel="stats">Stats</button>
+        <aside class="right-panel" role="complementary">
+          <div class="panel-tabs" role="tablist" aria-label="Panel navigation">
+            <button type="button" class="panel-tab active" data-panel="orderbook" role="tab" aria-selected="true" aria-controls="orderbookPanel">Order Book</button>
+            <button type="button" class="panel-tab" data-panel="trades" role="tab" aria-selected="false" aria-controls="tradesPanel" id="tradesTab">Trades</button>
+            <button type="button" class="panel-tab" data-panel="stats" role="tab" aria-selected="false" aria-controls="statsPanel" id="statsTab">Stats</button>
           </div>
           <div class="panel-content">
             <!-- Order Book (default) -->
-            <div id="orderbookPanel" class="orderbook">
+            <section id="orderbookPanel" class="orderbook" role="tabpanel" aria-labelledby="orderbookPanel">
               <div class="orderbook-header">
-                <span>Price</span>
-                <span class="text-right">Size</span>
-                <span class="text-right">Total</span>
+                <div class="header-cell">Price</div>
+                <div class="header-cell text-right">Size</div>
+                <div class="header-cell text-right">Total</div>
               </div>
               <div id="asks"></div>
-              <!-- Depth Scale Bar - визуальный разделитель -->
-              <div class="depth-scale">
+              <!-- Depth Scale Bar - visual separator -->
+              <div class="depth-scale" aria-label="Depth scale visualization">
                 <div class="depth-scale-bar">
                   <div class="depth-scale-sell" id="depthSellBar"></div>
                   <div class="depth-scale-buy" id="depthBuyBar"></div>
@@ -265,22 +298,22 @@
               </div>
               <div id="bids"></div>
               <!-- Buy/Sell Pressure Indicator - single price with dynamic color -->
-              <div class="pressure-indicator">
+              <div class="pressure-indicator" aria-label="Market pressure indicator">
                 <span class="pressure-arrow" id="pressureArrow">↑</span>
                 <span class="pressure-price" id="pressurePrice">86,426.90</span>
               </div>
-            </div>
+            </section>
             <!-- Trades Panel (hidden) -->
-            <div id="tradesPanel" class="trades-list hidden-panel">
+            <section id="tradesPanel" class="trades-list hidden-panel" role="tabpanel" aria-labelledby="tradesTab">
               <div class="trades-header">
-                <span>Price</span>
-                <span class="text-right">Size</span>
-                <span class="text-right">Time</span>
+                <div class="header-cell">Price</div>
+                <div class="header-cell text-right">Size</div>
+                <div class="header-cell text-right">Time</div>
               </div>
-              <div id="tradesList"></div>
-            </div>
+              <div id="tradesList" role="list" aria-label="Recent trades"></div>
+            </section>
             <!-- Stats Panel (hidden) -->
-            <div id="statsPanel" class="stats-grid hidden-panel">
+            <section id="statsPanel" class="stats-grid hidden-panel" role="tabpanel" aria-labelledby="statsTab">
               <div class="stat-item">
                 <div class="stat-label">24h High</div>
                 <div class="stat-value" id="stat24hHigh">$98,500.00</div>
@@ -305,15 +338,15 @@
                 <div class="stat-label">Funding Rate</div>
                 <div class="stat-value" id="statFunding">0.01%</div>
               </div>
-            </div>
+            </section>
           </div>
-        </div>
+        </aside>
       </div>
 
       <!-- Status Bar -->
-      <footer class="status-bar">
-        <div class="status-item">
-          <span class="status-dot" id="connectionDot"></span>
+      <footer class="status-bar" role="contentinfo">
+        <div class="status-item" aria-live="polite">
+          <span class="status-dot" id="connectionDot" aria-label="Connection status"></span>
           <span id="connectionStatus">Connecting...</span>
         </div>
         <div class="status-item">
@@ -329,119 +362,112 @@
     </div>
 
     <!-- Symbol Search Modal -->
-    <div class="symbol-search-modal" id="symbolSearchModal">
+    <div class="symbol-search-modal" id="symbolSearchModal" role="dialog" aria-modal="true" aria-labelledby="symbolSearchTitle" aria-hidden="true">
       <div class="symbol-search-container">
         <div class="symbol-search-header">
+          <h2 id="symbolSearchTitle" class="visually-hidden">Symbol Search</h2>
           <input
             type="text"
             class="symbol-search-input"
             id="symbolSearchInput"
             placeholder="Search symbols... (e.g., BTC, ETH, SOL)"
             autocomplete="off"
-          />
+            aria-label="Search trading symbols">
         </div>
-        <div class="symbol-categories" id="symbolCategories">
-          <button class="symbol-category active" data-category="all">
-            All
-          </button>
-          <button class="symbol-category" data-category="popular">
-            Popular
-          </button>
-          <button class="symbol-category" data-category="btc">BTC Pairs</button>
-          <button class="symbol-category" data-category="eth">ETH Pairs</button>
-          <button class="symbol-category" data-category="defi">DeFi</button>
-          <button class="symbol-category" data-category="meme">Meme</button>
-          <button class="symbol-category" data-category="layer1">
-            Layer 1
-          </button>
+        <div class="symbol-categories" id="symbolCategories" role="tablist" aria-label="Symbol categories">
+          <button type="button" class="symbol-category active" data-category="all" role="tab" aria-selected="true">All</button>
+          <button type="button" class="symbol-category" data-category="popular" role="tab" aria-selected="false">Popular</button>
+          <button type="button" class="symbol-category" data-category="btc" role="tab" aria-selected="false">BTC Pairs</button>
+          <button type="button" class="symbol-category" data-category="eth" role="tab" aria-selected="false">ETH Pairs</button>
+          <button type="button" class="symbol-category" data-category="defi" role="tab" aria-selected="false">DeFi</button>
+          <button type="button" class="symbol-category" data-category="meme" role="tab" aria-selected="false">Meme</button>
+          <button type="button" class="symbol-category" data-category="layer1" role="tab" aria-selected="false">Layer 1</button>
         </div>
-        <div class="symbol-list" id="symbolList">
+        <div class="symbol-list" id="symbolList" role="listbox" aria-label="Available symbols">
           <!-- Dynamically populated -->
         </div>
       </div>
     </div>
 
     <!-- Indicators Modal -->
-    <div class="modal-overlay hidden" id="indicatorsModal">
+    <div class="modal-overlay hidden" id="indicatorsModal" role="dialog" aria-modal="true" aria-labelledby="indicatorsModalTitle" aria-hidden="true">
       <div class="modal" id="indicatorsModalContent">
         <div class="modal-header">
-          <h3><i class="bi bi-graph-up"></i> Technical Indicators</h3>
-          <button class="modal-close" onclick="closeIndicatorsModal()">
-            ×
-          </button>
+          <h3 id="indicatorsModalTitle"><i class="bi bi-graph-up" aria-hidden="true"></i> Technical Indicators</h3>
+          <button type="button" class="modal-close" aria-label="Close" onclick="closeIndicatorsModal()">×</button>
         </div>
         <div class="modal-body">
-          <div class="indicator-item" onclick="toggleIndicator('sma')">
+          <div class="indicator-item" onclick="toggleIndicator('sma')" role="button" tabindex="0" aria-label="Simple Moving Average Indicator">
             <div class="indicator-info">
               <h4>SMA (Simple Moving Average)</h4>
               <p>20, 50, 200 periods</p>
             </div>
             <div class="indicator-toggle" id="toggle-sma"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('ema')">
+          <div class="indicator-item" onclick="toggleIndicator('ema')" role="button" tabindex="0" aria-label="Exponential Moving Average Indicator">
             <div class="indicator-info">
               <h4>EMA (Exponential Moving Average)</h4>
               <p>12, 26 periods</p>
             </div>
             <div class="indicator-toggle" id="toggle-ema"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('bb')">
+          <div class="indicator-item" onclick="toggleIndicator('bb')" role="button" tabindex="0" aria-label="Bollinger Bands Indicator">
             <div class="indicator-info">
               <h4>Bollinger Bands</h4>
               <p>20 period, 2 std dev</p>
             </div>
             <div class="indicator-toggle" id="toggle-bb"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('rsi')">
+          <div class="indicator-item" onclick="toggleIndicator('rsi')" role="button" tabindex="0" aria-label="RSI Indicator">
             <div class="indicator-info">
               <h4>RSI (Relative Strength Index)</h4>
               <p>14 period</p>
             </div>
             <div class="indicator-toggle" id="toggle-rsi"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('macd')">
+          <div class="indicator-item" onclick="toggleIndicator('macd')" role="button" tabindex="0" aria-label="MACD Indicator">
             <div class="indicator-info">
               <h4>MACD</h4>
               <p>12, 26, 9 periods</p>
             </div>
             <div class="indicator-toggle" id="toggle-macd"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('vwap')">
+          <div class="indicator-item" onclick="toggleIndicator('vwap')" role="button" tabindex="0" aria-label="VWAP Indicator">
             <div class="indicator-info">
               <h4>VWAP</h4>
               <p>Volume Weighted Average Price</p>
             </div>
             <div class="indicator-toggle" id="toggle-vwap"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('stoch')">
+          <div class="indicator-item" onclick="toggleIndicator('stoch')" role="button" tabindex="0" aria-label="Stochastic Oscillator Indicator">
             <div class="indicator-info">
               <h4>Stochastic Oscillator</h4>
               <p>14, 3, 3 periods (K, D, Smooth)</p>
             </div>
             <div class="indicator-toggle" id="toggle-stoch"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('atr')">
+          <div class="indicator-item" onclick="toggleIndicator('atr')" role="button" tabindex="0" aria-label="ATR Indicator">
             <div class="indicator-info">
               <h4>ATR (Average True Range)</h4>
               <p>14 period volatility indicator</p>
             </div>
             <div class="indicator-toggle" id="toggle-atr"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('ichimoku')">
+          <div class="indicator-item" onclick="toggleIndicator('ichimoku')" role="button" tabindex="0" aria-label="Ichimoku Cloud Indicator">
             <div class="indicator-info">
               <h4>Ichimoku Cloud</h4>
               <p>9, 26, 52 periods</p>
             </div>
             <div class="indicator-toggle" id="toggle-ichimoku"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('pivots')">
+          <div class="indicator-item" onclick="toggleIndicator('pivots')" role="button" tabindex="0" aria-label="Pivot Points Indicator">
             <div class="indicator-info">
               <h4>Pivot Points</h4>
               <p>Support/Resistance levels (S1-S3, R1-R3)</p>
             </div>
             <div class="indicator-toggle" id="toggle-pivots"></div>
           </div>
-          <div class="indicator-item" onclick="toggleIndicator('supertrend')">
+          <div class="indicator-item" onclick="toggleIndicator('supertrend')" role="button" tabindex="0" aria-label="SuperTrend Indicator">
             <div class="indicator-info">
               <h4>SuperTrend</h4>
               <p>ATR-based trend following (10, 3)</p>
@@ -453,11 +479,11 @@
     </div>
 
     <!-- Price Alerts Modal -->
-    <div class="modal-overlay hidden" id="alertsModal">
+    <div class="modal-overlay hidden" id="alertsModal" role="dialog" aria-modal="true" aria-labelledby="alertsModalTitle" aria-hidden="true">
       <div class="modal modal-wide">
         <div class="modal-header">
-          <h3><i class="bi bi-bell"></i> Price Alerts</h3>
-          <button class="modal-close" onclick="closeAlertsModal()">×</button>
+          <h3 id="alertsModalTitle"><i class="bi bi-bell" aria-hidden="true"></i> Price Alerts</h3>
+          <button type="button" class="modal-close" aria-label="Close" onclick="closeAlertsModal()">×</button>
         </div>
         <div class="modal-body">
           <div class="alert-form">
@@ -477,7 +503,7 @@
                 id="alertPrice"
                 placeholder="Price"
                 class="form-input"
-              />
+                aria-label="Alert price threshold">
             </div>
             <div class="alert-form-row">
               <input
@@ -485,13 +511,13 @@
                 id="alertMessage"
                 placeholder="Alert message (optional)"
                 class="form-input"
-              />
-              <button onclick="createAlert()" class="btn-primary">
-                <i class="bi bi-plus-lg"></i> Add
+                aria-label="Alert message">
+              <button type="button" onclick="createAlert()" class="btn-primary" aria-label="Create alert">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i> Add
               </button>
             </div>
           </div>
-          <div id="alertsList" class="alerts-list">
+          <div id="alertsList" class="alerts-list" role="list" aria-label="Created alerts">
             <!-- Alerts will be populated here -->
           </div>
         </div>
@@ -499,11 +525,11 @@
     </div>
 
     <!-- Keyboard Shortcuts Modal -->
-    <div class="modal-overlay hidden" id="shortcutsModal">
+    <div class="modal-overlay hidden" id="shortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsModalTitle" aria-hidden="true">
       <div class="modal modal-medium">
         <div class="modal-header">
-          <h3><i class="bi bi-keyboard"></i> Keyboard Shortcuts</h3>
-          <button class="modal-close" onclick="closeShortcutsModal()">×</button>
+          <h3 id="shortcutsModalTitle"><i class="bi bi-keyboard" aria-hidden="true"></i> Keyboard Shortcuts</h3>
+          <button type="button" class="modal-close" aria-label="Close" onclick="closeShortcutsModal()">×</button>
         </div>
         <div class="modal-body">
           <div class="shortcuts-grid">
@@ -565,54 +591,79 @@
     </div>
 
     <!-- Settings Modal -->
-    <div class="modal-overlay settings-modal hidden" id="settingsModal">
+    <div class="modal-overlay settings-modal hidden" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle" aria-hidden="true">
       <div class="modal modal-wide">
         <div class="modal-header">
-          <h3><i class="bi bi-gear"></i> Chart Settings</h3>
-          <button class="modal-close" onclick="closeSettingsModal()">×</button>
+          <h3 id="settingsModalTitle"><i class="bi bi-gear" aria-hidden="true"></i> Chart Settings</h3>
+          <button type="button" class="modal-close" aria-label="Close" onclick="closeSettingsModal()">×</button>
         </div>
         <div class="modal-body">
           <!-- Settings Tabs -->
-          <div class="settings-tabs">
+          <div class="settings-tabs" role="tablist" aria-label="Settings categories">
             <button
+              type="button"
               class="settings-tab active"
               data-tab="display"
               onclick="switchSettingsTab('display')"
+              role="tab"
+              aria-selected="true"
+              aria-controls="settings-display"
             >
-              <i class="bi bi-display"></i> Display
+              <i class="bi bi-display" aria-hidden="true"></i>
+              <span class="visually-hidden">Display</span>
             </button>
             <button
+              type="button"
               class="settings-tab"
               data-tab="volume"
               onclick="switchSettingsTab('volume')"
+              role="tab"
+              aria-selected="false"
+              aria-controls="settings-volume"
             >
-              <i class="bi bi-bar-chart-fill"></i> Volume
+              <i class="bi bi-bar-chart-fill" aria-hidden="true"></i>
+              <span class="visually-hidden">Volume</span>
             </button>
             <button
+              type="button"
               class="settings-tab"
               data-tab="trading"
               onclick="switchSettingsTab('trading')"
+              role="tab"
+              aria-selected="false"
+              aria-controls="settings-trading"
             >
-              <i class="bi bi-graph-up-arrow"></i> Trading
+              <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
+              <span class="visually-hidden">Trading</span>
             </button>
             <button
+              type="button"
               class="settings-tab"
               data-tab="patterns"
               onclick="switchSettingsTab('patterns')"
+              role="tab"
+              aria-selected="false"
+              aria-controls="settings-patterns"
             >
-              <i class="bi bi-diagram-3"></i> Patterns
+              <i class="bi bi-diagram-3" aria-hidden="true"></i>
+              <span class="visually-hidden">Patterns</span>
             </button>
             <button
+              type="button"
               class="settings-tab"
               data-tab="advanced"
               onclick="switchSettingsTab('advanced')"
+              role="tab"
+              aria-selected="false"
+              aria-controls="settings-advanced"
             >
-              <i class="bi bi-sliders"></i> Advanced
+              <i class="bi bi-sliders" aria-hidden="true"></i>
+              <span class="visually-hidden">Advanced</span>
             </button>
           </div>
 
           <!-- Display Settings -->
-          <div class="settings-panel active" id="settings-display">
+          <div class="settings-panel active" id="settings-display" role="tabpanel" aria-labelledby="settings-display">
             <div class="settings-section">
               <h4>Chart Appearance</h4>
               <div class="settings-grid">
@@ -628,8 +679,7 @@
                       type="checkbox"
                       id="setting-customScrollbar"
                       aria-label="Custom Scrollbar"
-                      onchange="updateSetting('customScrollbar', this.checked)"
-                    />
+                      onchange="updateSetting('customScrollbar', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -637,16 +687,14 @@
                   <div class="setting-info">
                     <span class="setting-label">Price Pulse</span>
                     <span class="setting-desc"
-                      >Animating pulse at current price</span
-                    >
+                      >Animating pulse at current price</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-pulse"
                       aria-label="Price Pulse"
-                      onchange="updateSetting('pulse', this.checked)"
-                    />
+                      onchange="updateSetting('pulse', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -660,8 +708,7 @@
                       type="checkbox"
                       id="setting-countdown"
                       aria-label="Countdown Timer"
-                      onchange="updateSetting('countdown', this.checked)"
-                    />
+                      onchange="updateSetting('countdown', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -675,20 +722,18 @@
                       type="checkbox"
                       id="setting-tradeMarkers"
                       aria-label="Trade Markers"
-                      onchange="updateSetting('tradeMarkers', this.checked)"
-                    />
+                      onchange="updateSetting('tradeMarkers', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
 
-                <hr class="settings-separator" />
+                <hr class="settings-separator">
 
                 <div class="setting-item">
                   <div class="setting-info">
                     <span class="setting-label">Show Grid Lines</span>
                     <span class="setting-desc"
-                      >Display horizontal and vertical grid</span
-                    >
+                      >Display horizontal and vertical grid</span>
                   </div>
                   <label class="toggle-switch">
                     <input
@@ -696,8 +741,7 @@
                       id="setting-gridLines"
                       aria-label="Grid Lines"
                       checked
-                      onchange="updateSetting('gridLines', this.checked)"
-                    />
+                      onchange="updateSetting('gridLines', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -705,8 +749,7 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Volume Chart</span>
                     <span class="setting-desc"
-                      >Display volume histogram below candles</span
-                    >
+                      >Display volume histogram below candles</span>
                   </div>
                   <label class="toggle-switch">
                     <input
@@ -714,8 +757,7 @@
                       id="setting-volumeChart"
                       aria-label="Volume Chart"
                       checked
-                      onchange="updateSetting('volumeChart', this.checked)"
-                    />
+                      onchange="updateSetting('volumeChart', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -723,16 +765,14 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Watermark</span>
                     <span class="setting-desc"
-                      >Display symbol name as watermark</span
-                    >
+                      >Display symbol name as watermark</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-watermark"
                       aria-label="Watermark"
-                      onchange="updateSetting('watermark', this.checked)"
-                    />
+                      onchange="updateSetting('watermark', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -740,8 +780,7 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Last Price Line</span>
                     <span class="setting-desc"
-                      >Horizontal line at current price</span
-                    >
+                      >Horizontal line at current price</span>
                   </div>
                   <label class="toggle-switch">
                     <input
@@ -749,8 +788,7 @@
                       id="setting-lastPriceLine"
                       aria-label="Last Price Line"
                       checked
-                      onchange="updateSetting('lastPriceLine', this.checked)"
-                    />
+                      onchange="updateSetting('lastPriceLine', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -758,8 +796,7 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Crosshair</span>
                     <span class="setting-desc"
-                      >Display crosshair on mouse hover</span
-                    >
+                      >Display crosshair on mouse hover</span>
                   </div>
                   <label class="toggle-switch">
                     <input
@@ -767,8 +804,7 @@
                       id="setting-crosshair"
                       aria-label="Crosshair"
                       checked
-                      onchange="updateSetting('crosshair', this.checked)"
-                    />
+                      onchange="updateSetting('crosshair', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -777,7 +813,7 @@
           </div>
 
           <!-- Volume Settings -->
-          <div class="settings-panel" id="settings-volume">
+          <div class="settings-panel" id="settings-volume" role="tabpanel" aria-labelledby="settings-volume">
             <div class="settings-section">
               <h4>Volume Indicators</h4>
               <div class="settings-grid">
@@ -785,8 +821,7 @@
                   <div class="setting-info">
                     <span class="setting-label">Volume SMA</span>
                     <span class="setting-desc"
-                      >Simple Moving Average of Volume</span
-                    >
+                      >Simple Moving Average of Volume</span>
                   </div>
                   <div class="setting-controls">
                     <label class="toggle-switch">
@@ -795,8 +830,7 @@
                         id="setting-volumeSma"
                         aria-label="Volume SMA"
                         checked
-                        onchange="updateVolumeSetting('sma', this.checked)"
-                      />
+                        onchange="updateVolumeSetting('sma', this.checked)">
                       <span class="toggle-slider"></span>
                     </label>
                     <input
@@ -807,16 +841,14 @@
                       min="2"
                       max="50"
                       class="setting-input-small"
-                      onchange="updateVolumeSetting('smaPeriod', this.value)"
-                    />
+                      onchange="updateVolumeSetting('smaPeriod', this.value)">
                   </div>
                 </div>
                 <div class="setting-item">
                   <div class="setting-info">
                     <span class="setting-label">Volume EMA</span>
                     <span class="setting-desc"
-                      >Exponential Moving Average of Volume</span
-                    >
+                      >Exponential Moving Average of Volume</span>
                   </div>
                   <div class="setting-controls">
                     <label class="toggle-switch">
@@ -824,8 +856,7 @@
                         type="checkbox"
                         id="setting-volumeEma"
                         aria-label="Volume EMA"
-                        onchange="updateVolumeSetting('ema', this.checked)"
-                      />
+                        onchange="updateVolumeSetting('ema', this.checked)">
                       <span class="toggle-slider"></span>
                     </label>
                     <input
@@ -836,24 +867,21 @@
                       min="2"
                       max="50"
                       class="setting-input-small"
-                      onchange="updateVolumeSetting('emaPeriod', this.value)"
-                    />
+                      onchange="updateVolumeSetting('emaPeriod', this.value)">
                   </div>
                 </div>
                 <div class="setting-item">
                   <div class="setting-info">
                     <span class="setting-label">VWAP</span>
                     <span class="setting-desc"
-                      >Volume Weighted Average Price (on main chart)</span
-                    >
+                      >Volume Weighted Average Price (on main chart)</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-vwap"
                       aria-label="VWAP"
-                      onchange="updateVolumeSetting('vwap', this.checked)"
-                    />
+                      onchange="updateVolumeSetting('vwap', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -861,8 +889,7 @@
                   <div class="setting-info">
                     <span class="setting-label">Volume Bollinger Bands</span>
                     <span class="setting-desc"
-                      >Detect abnormal volume spikes</span
-                    >
+                      >Detect abnormal volume spikes</span>
                   </div>
                   <div class="setting-controls">
                     <label class="toggle-switch">
@@ -870,8 +897,7 @@
                         type="checkbox"
                         id="setting-volumeBB"
                         aria-label="Volume Bollinger Bands"
-                        onchange="updateVolumeSetting('bb', this.checked)"
-                      />
+                        onchange="updateVolumeSetting('bb', this.checked)">
                       <span class="toggle-slider"></span>
                     </label>
                     <input
@@ -882,24 +908,21 @@
                       min="5"
                       max="50"
                       class="setting-input-small"
-                      onchange="updateVolumeSetting('bbPeriod', this.value)"
-                    />
+                      onchange="updateVolumeSetting('bbPeriod', this.value)">
                   </div>
                 </div>
                 <div class="setting-item">
                   <div class="setting-info">
                     <span class="setting-label">OBV (On-Balance Volume)</span>
                     <span class="setting-desc"
-                      >Cumulative volume indicator</span
-                    >
+                      >Cumulative volume indicator</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-obv"
                       aria-label="On-Balance Volume"
-                      onchange="updateVolumeSetting('obv', this.checked)"
-                    />
+                      onchange="updateVolumeSetting('obv', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -907,16 +930,14 @@
                   <div class="setting-info">
                     <span class="setting-label">Volume Delta</span>
                     <span class="setting-desc"
-                      >Buy vs Sell volume difference</span
-                    >
+                      >Buy vs Sell volume difference</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-volumeDelta"
                       aria-label="Volume Delta"
-                      onchange="updateVolumeSetting('delta', this.checked)"
-                    />
+                      onchange="updateVolumeSetting('delta', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -924,8 +945,7 @@
                   <div class="setting-info">
                     <span class="setting-label">Highlight High Volume</span>
                     <span class="setting-desc"
-                      >Highlight bars with above-average volume</span
-                    >
+                      >Highlight bars with above-average volume</span>
                   </div>
                   <label class="toggle-switch">
                     <input
@@ -933,8 +953,7 @@
                       id="setting-highlightVolume"
                       aria-label="Highlight Volume"
                       checked
-                      onchange="updateVolumeSetting('highlight', this.checked)"
-                    />
+                      onchange="updateVolumeSetting('highlight', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -956,15 +975,14 @@
                     max="100"
                     value="80"
                     class="setting-range"
-                    onchange="updateVolumeSetting('opacity', this.value)"
-                  />
+                    onchange="updateVolumeSetting('opacity', this.value)">
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Trading Settings -->
-          <div class="settings-panel" id="settings-trading">
+          <div class="settings-panel" id="settings-trading" role="tabpanel" aria-labelledby="settings-trading">
             <div class="settings-section">
               <h4>Price Levels</h4>
               <div class="settings-grid">
@@ -972,18 +990,14 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Support/Resistance</span>
                     <span class="setting-desc"
-                      >Auto-detect and display S/R levels</span
-                    >
+                      >Auto-detect and display S/R levels</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-supportResistance"
                       aria-label="Support Resistance"
-                      onchange="
-                        updateSetting('supportResistance', this.checked)
-                      "
-                    />
+                      onchange="updateSetting('supportResistance', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -991,16 +1005,14 @@
                   <div class="setting-info">
                     <span class="setting-label">Show 24h High/Low</span>
                     <span class="setting-desc"
-                      >Display 24h price range lines</span
-                    >
+                      >Display 24h price range lines</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-highLowLines"
                       aria-label="High Low Lines"
-                      onchange="updateSetting('highLowLines', this.checked)"
-                    />
+                      onchange="updateSetting('highLowLines', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1008,16 +1020,14 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Open Price</span>
                     <span class="setting-desc"
-                      >Display daily open price line</span
-                    >
+                      >Display daily open price line</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-openPriceLine"
                       aria-label="Open Price Line"
-                      onchange="updateSetting('openPriceLine', this.checked)"
-                    />
+                      onchange="updateSetting('openPriceLine', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1030,16 +1040,14 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Buy/Sell Markers</span>
                     <span class="setting-desc"
-                      >Display strategy signals on chart</span
-                    >
+                      >Display strategy signals on chart</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-buySellMarkers"
                       aria-label="Buy Sell Markers"
-                      onchange="updateSetting('buySellMarkers', this.checked)"
-                    />
+                      onchange="updateSetting('buySellMarkers', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1047,16 +1055,14 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Liquidations</span>
                     <span class="setting-desc"
-                      >Display large liquidation events</span
-                    >
+                      >Display large liquidation events</span>
                   </div>
                   <label class="toggle-switch">
                     <input
                       type="checkbox"
                       id="setting-liquidations"
                       aria-label="Liquidations"
-                      onchange="updateSetting('liquidations', this.checked)"
-                    />
+                      onchange="updateSetting('liquidations', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1065,7 +1071,7 @@
           </div>
 
           <!-- Pattern Detection Settings -->
-          <div class="settings-panel" id="settings-patterns">
+          <div class="settings-panel" id="settings-patterns" role="tabpanel" aria-labelledby="settings-patterns">
             <div class="settings-section">
               <h4>Candlestick Patterns</h4>
               <div class="settings-grid">
@@ -1079,8 +1085,7 @@
                       type="checkbox"
                       id="setting-pattern-doji"
                       aria-label="Doji Pattern"
-                      onchange="updateSetting('patternDoji', this.checked)"
-                    />
+                      onchange="updateSetting('patternDoji', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1094,8 +1099,7 @@
                       type="checkbox"
                       id="setting-pattern-hammer"
                       aria-label="Hammer Pattern"
-                      onchange="updateSetting('patternHammer', this.checked)"
-                    />
+                      onchange="updateSetting('patternHammer', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1109,16 +1113,14 @@
                       type="checkbox"
                       id="setting-pattern-engulfing"
                       aria-label="Engulfing Pattern"
-                      onchange="updateSetting('patternEngulfing', this.checked)"
-                    />
+                      onchange="updateSetting('patternEngulfing', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="setting-item">
                   <div class="setting-info">
                     <span class="setting-label"
-                      >Detect Morning/Evening Star</span
-                    >
+                      >Detect Morning/Evening Star</span>
                     <span class="setting-desc">3-candle reversal patterns</span>
                   </div>
                   <label class="toggle-switch">
@@ -1126,16 +1128,14 @@
                       type="checkbox"
                       id="setting-pattern-star"
                       aria-label="Star Pattern"
-                      onchange="updateSetting('patternStar', this.checked)"
-                    />
+                      onchange="updateSetting('patternStar', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="setting-item">
                   <div class="setting-info">
                     <span class="setting-label"
-                      >Detect Three Soldiers/Crows</span
-                    >
+                      >Detect Three Soldiers/Crows</span>
                     <span class="setting-desc">Strong trend continuation</span>
                   </div>
                   <label class="toggle-switch">
@@ -1143,8 +1143,7 @@
                       type="checkbox"
                       id="setting-pattern-soldiers"
                       aria-label="Three Soldiers Pattern"
-                      onchange="updateSetting('patternSoldiers', this.checked)"
-                    />
+                      onchange="updateSetting('patternSoldiers', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1153,16 +1152,15 @@
           </div>
 
           <!-- Advanced Settings -->
-          <div class="settings-panel" id="settings-advanced">
+          <div class="settings-panel" id="settings-advanced" role="tabpanel" aria-labelledby="settings-advanced">
             <div class="settings-section">
-              <h4>Data & Performance</h4>
+              <h4>Data &amp; Performance</h4>
               <div class="settings-grid">
                 <div class="setting-item">
                   <div class="setting-info">
                     <span class="setting-label">Auto-Load History</span>
                     <span class="setting-desc"
-                      >Load more data when scrolling left</span
-                    >
+                      >Load more data when scrolling left</span>
                   </div>
                   <label class="toggle-switch">
                     <input
@@ -1170,16 +1168,14 @@
                       id="setting-infiniteHistory"
                       aria-label="Infinite History"
                       checked
-                      onchange="updateSetting('infiniteHistory', this.checked)"
-                    />
+                      onchange="updateSetting('infiniteHistory', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
                 <div class="setting-item">
                   <div class="setting-info">
                     <span class="setting-label"
-                      >Auto-Scroll to New Candles</span
-                    >
+                      >Auto-Scroll to New Candles</span>
                     <span class="setting-desc">Keep latest candle visible</span>
                   </div>
                   <label class="toggle-switch">
@@ -1188,8 +1184,7 @@
                       id="setting-autoScroll"
                       aria-label="Auto Scroll"
                       checked
-                      onchange="updateSetting('autoScroll', this.checked)"
-                    />
+                      onchange="updateSetting('autoScroll', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1197,8 +1192,7 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Connection Status</span>
                     <span class="setting-desc"
-                      >Display WebSocket status indicator</span
-                    >
+                      >Display WebSocket status indicator</span>
                   </div>
                   <label class="toggle-switch">
                     <input
@@ -1206,8 +1200,7 @@
                       id="setting-connectionStatus"
                       aria-label="Connection Status"
                       checked
-                      onchange="updateSetting('connectionStatus', this.checked)"
-                    />
+                      onchange="updateSetting('connectionStatus', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1220,8 +1213,7 @@
                   <div class="setting-info">
                     <span class="setting-label">Show Order Book</span>
                     <span class="setting-desc"
-                      >Display real-time order book</span
-                    >
+                      >Display real-time order book</span>
                   </div>
                   <label class="toggle-switch">
                     <input
@@ -1229,8 +1221,7 @@
                       id="setting-orderBook"
                       aria-label="Order Book"
                       checked
-                      onchange="updateSetting('orderBook', this.checked)"
-                    />
+                      onchange="updateSetting('orderBook', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
@@ -1245,16 +1236,15 @@
                       id="setting-recentTrades"
                       aria-label="Recent Trades"
                       checked
-                      onchange="updateSetting('recentTrades', this.checked)"
-                    />
+                      onchange="updateSetting('recentTrades', this.checked)">
                     <span class="toggle-slider"></span>
                   </label>
                 </div>
               </div>
             </div>
             <div class="settings-actions">
-              <button class="btn-secondary" onclick="resetSettings()">
-                <i class="bi bi-arrow-counterclockwise"></i> Reset to Defaults
+              <button type="button" class="btn-secondary" onclick="resetSettings()" aria-label="Reset all settings to defaults">
+                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reset to Defaults
               </button>
             </div>
           </div>

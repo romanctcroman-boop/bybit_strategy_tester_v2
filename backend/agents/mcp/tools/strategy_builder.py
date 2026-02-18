@@ -87,7 +87,8 @@ _BLOCK_CATEGORY_MAP: dict[str, str] = {
     "bollinger": "indicator",
     "atr": "indicator",
     "stochastic": "indicator",
-    "stoch_rsi": "indicator",
+    # (stoch_rsi removed — consolidated into universal stochastic indicator)
+    "stoch_rsi": "indicator",  # DEPRECATED: use universal "stochastic" block instead
     "adx": "indicator",
     "cci": "indicator",
     "mfi": "indicator",
@@ -109,7 +110,7 @@ _BLOCK_CATEGORY_MAP: dict[str, str] = {
     "stddev": "indicator",
     "atrp": "indicator",
     "qqe": "indicator",
-    "qqe_cross": "indicator",
+    # (qqe_cross removed — consolidated into universal qqe indicator)
     # Condition blocks
     "crossover": "condition",
     "crossunder": "condition",
@@ -146,20 +147,41 @@ _BLOCK_CATEGORY_MAP: dict[str, str] = {
     "multi_tp": "action",
     "atr_stop": "action",
     "chandelier_stop": "action",
-    "static_sltp": "action",
-    # Filter blocks
-    "rsi_filter": "filter",
-    "supertrend_filter": "filter",
+    # (static_sltp moved to exit blocks below)
+    # Universal filter/indicator blocks (Library)
+    "atr_volatility": "indicator",
+    "volume_filter": "indicator",
+    "highest_lowest_bar": "indicator",
+    "two_mas": "indicator",
+    "accumulation_areas": "indicator",
+    "keltner_bollinger": "indicator",
+    "rvi_filter": "indicator",
+    "mfi_filter": "indicator",
+    "cci_filter": "indicator",
+    "momentum_filter": "indicator",
+    # Legacy filter blocks
+    # (rsi_filter removed — consolidated into universal rsi indicator with Range/Cross modes)
+    "rsi_filter": "filter",  # DEPRECATED: use universal "rsi" block with use_long_range/use_cross_level instead
+    # (supertrend_filter removed — consolidated into universal supertrend indicator)
     "two_ma_filter": "filter",
-    "volume_filter": "filter",
     "time_filter": "filter",
     "volatility_filter": "filter",
     "adx_filter": "filter",
     "session_filter": "filter",
-    # Exit blocks
+    # Exit SL/TP blocks
+    "static_sltp": "exit",
     "trailing_stop_exit": "exit",
-    "atr_exit": "atr_exit",
-    "multi_tp_exit": "multiple_tp",
+    "atr_exit": "exit",
+    "multi_tp_exit": "exit",
+    # Close-by-Indicator exit blocks
+    "close_by_time": "exit",
+    "close_channel": "exit",
+    "close_ma_cross": "exit",
+    "close_rsi": "exit",
+    "close_stochastic": "exit",
+    "close_psar": "exit",
+    # Manual Grid
+    "grid_orders": "dca_grid",
     # Position sizing
     "fixed_size": "sizing",
     "percent_balance": "sizing",
@@ -171,12 +193,9 @@ _BLOCK_CATEGORY_MAP: dict[str, str] = {
     "short_exit": "signal",
     "buy_signal": "signal",
     "sell_signal": "signal",
-    # Smart signals
-    "smart_rsi": "smart_signals",
-    "smart_macd": "smart_signals",
-    "smart_bollinger": "smart_signals",
-    "smart_stochastic": "smart_signals",
-    "smart_supertrend": "smart_signals",
+    # (smart_rsi, smart_macd, smart_bollinger removed — Smart Signals category deprecated)
+    # (smart_stochastic removed — consolidated into universal stochastic indicator)
+    # (smart_supertrend removed — consolidated into universal supertrend indicator)
     # Strategy node (aggregator)
     "strategy": "strategy",
     # DCA/Grid
@@ -189,7 +208,8 @@ _BLOCK_CATEGORY_MAP: dict[str, str] = {
     "pinbar": "price_action",
     # Divergence
     "divergence": "divergence",
-    "rsi_divergence": "divergence",
+    # (rsi_divergence removed — consolidated into universal divergence block)
+    "rsi_divergence": "divergence",  # DEPRECATED: use universal "divergence" block instead
 }
 
 
@@ -207,7 +227,6 @@ def _infer_block_category(block_type: str) -> str:
         ("condition_", "condition"),
         ("action_", "action"),
         ("filter_", "filter"),
-        ("smart_", "smart_signals"),
     ]:
         if block_type.startswith(prefix):
             return cat
@@ -455,12 +474,17 @@ async def builder_delete_strategy(strategy_id: str) -> dict[str, Any]:
         "Block types include: rsi, ema, sma, macd, bollinger, atr, stochastic, adx, supertrend, "
         "crossover, crossunder, greater_than, less_than, between, "
         "buy, sell, close, stop_loss, take_profit, trailing_stop, "
-        "rsi_filter, supertrend_filter, two_ma_filter, volume_filter, time_filter, "
+        "two_ma_filter, volume_filter, time_filter, "
         "static_sltp, trailing_stop_exit, atr_exit, multi_tp_exit, "
         "fixed_size, percent_balance, risk_percent, "
         "and many more (use builder_get_block_library to see all). "
-        "\n\n"
+        "IMPORTANT: Do NOT use deprecated block types (rsi_filter, stoch_rsi, rsi_divergence). "
+        "Use the universal 'rsi' block with its modes (Range/Cross/Legacy) instead of rsi_filter. "
+        "Use the universal 'stochastic' block instead of stoch_rsi. "
+        "Use the universal 'divergence' block instead of rsi_divergence.\n\n"
         "RSI UNIVERSAL NODE — supports 3 signal modes that combine with AND logic:\n"
+        "  Base params: period(14, 2-500), timeframe('Chart', options: 1/5/15/30/60/240/D/W/M/Chart), "
+        "use_btc_source(false) — if true, calculates RSI on BTCUSDT price instead of current symbol.\n"
         "  1) RANGE filter (continuous): use_long_range=True → long when RSI > long_rsi_more "
         "AND RSI < long_rsi_less. long_rsi_more=LOWER bound (min), long_rsi_less=UPPER bound (max). "
         "MUST have more < less. Example: long_rsi_more=0, long_rsi_less=30 → oversold zone 0..30.\n"
@@ -474,7 +498,8 @@ async def builder_delete_strategy(strategy_id: str) -> dict[str, Any]:
         "  3) LEGACY (auto-fallback): if no mode enabled and overbought/oversold params exist, "
         "uses classic RSI < oversold = long, RSI > overbought = short.\n"
         "  No mode enabled + no legacy params → passthrough (always True).\n"
-        "RSI params: period(14, 2-500), use_long_range(false), long_rsi_more(30, 0.1-100), "
+        "RSI params: period(14, 2-500), timeframe('Chart'), use_btc_source(false), "
+        "use_long_range(false), long_rsi_more(30, 0.1-100), "
         "long_rsi_less(70, 0.1-100), use_short_range(false), short_rsi_less(70, 0.1-100), "
         "short_rsi_more(30, 0.1-100), use_cross_level(false), cross_long_level(30, 0.1-100), "
         "cross_short_level(70, 0.1-100), opposite_signal(false), use_cross_memory(false), "
@@ -489,6 +514,12 @@ async def builder_delete_strategy(strategy_id: str) -> dict[str, Any]:
         "short_rsi_less {55,90,5}, short_rsi_more {10,45,5}, cross_long_level {15,45,5}, "
         "cross_short_level {55,85,5}, cross_memory_bars {1,20,1}.\n\n"
         "MACD UNIVERSAL NODE — supports 2 signal modes combined with OR logic:\n"
+        "  Base params: fast_period(12), slow_period(26), signal_period(9). "
+        "fast_period MUST be < slow_period.\n"
+        "  source('close', options: close/open/high/low/hl2/hlc3/ohlc4) — price source.\n"
+        "  timeframe('Chart', options: 1/5/15/30/60/240/D/W/M/Chart) — timeframe for MACD.\n"
+        "  use_btc_source(false) — if true, uses BTCUSDT price for calculation.\n"
+        "  enable_visualization(false) — shows MACD histogram on the chart.\n"
         "  1) CROSS ZERO: use_macd_cross_zero=True → long when MACD crosses above level "
         "(default 0), short when below. opposite_macd_cross_zero swaps signals.\n"
         "  2) CROSS SIGNAL: use_macd_cross_signal=True → long when MACD crosses above "
@@ -498,6 +529,7 @@ async def builder_delete_strategy(strategy_id: str) -> dict[str, Any]:
         "  Signal Memory: enabled by default, disable_signal_memory=True to turn off. "
         "signal_memory_bars(5) controls how many bars cross signals persist.\n"
         "MACD params: fast_period(12), slow_period(26), signal_period(9), source(close), "
+        "timeframe('Chart'), use_btc_source(false), enable_visualization(false), "
         "use_macd_cross_zero(false), opposite_macd_cross_zero(false), macd_cross_zero_level(0), "
         "use_macd_cross_signal(false), signal_only_if_macd_positive(false), "
         "opposite_macd_cross_signal(false), disable_signal_memory(false), signal_memory_bars(5).\n"
@@ -507,7 +539,155 @@ async def builder_delete_strategy(strategy_id: str) -> dict[str, Any]:
         "{enabled: true/false, min: <low>, max: <high>, step: <step>}. "
         "Stored in block.optimizationParams. Default ranges: "
         "fast_period {8,16,1}, slow_period {20,30,1}, signal_period {6,12,1}, "
-        "macd_cross_zero_level {-50,50,1}, signal_memory_bars {1,20,1}."
+        "macd_cross_zero_level {-50,50,1}, signal_memory_bars {1,20,1}.\n\n"
+        "STOCHASTIC UNIVERSAL NODE — supports 3 signal modes that combine with AND logic:\n"
+        "  Base params: stoch_k_length(14, 1-200), stoch_k_smoothing(3, 1-50), "
+        "stoch_d_smoothing(3, 1-50), timeframe('Chart'), use_btc_source(false).\n"
+        "  1) RANGE filter: use_stoch_range_filter=True → long when %D > long_stoch_d_more "
+        "AND %D < long_stoch_d_less. MUST have more < less. "
+        "short when %D > short_stoch_d_more AND %D < short_stoch_d_less.\n"
+        "  2) CROSS level: use_stoch_cross_level=True → long when %D crosses UP through "
+        "stoch_cross_level_long(20), short when %D crosses DOWN through "
+        "stoch_cross_level_short(80). activate_stoch_cross_memory + stoch_cross_memory_bars(5) "
+        "extends signal for N bars.\n"
+        "  3) K/D CROSS: use_stoch_kd_cross=True → long when %K crosses above %D, "
+        "short when %K crosses below %D. opposite_stoch_kd swaps long/short. "
+        "activate_stoch_kd_memory + stoch_kd_memory_bars(5) extends signal for N bars.\n"
+        "  No mode enabled → passthrough (always True).\n"
+        "Stochastic params: stoch_k_length(14), stoch_k_smoothing(3), stoch_d_smoothing(3), "
+        "timeframe('Chart'), use_btc_source(false), "
+        "use_stoch_range_filter(false), long_stoch_d_more(1), long_stoch_d_less(50), "
+        "short_stoch_d_less(100), short_stoch_d_more(50), "
+        "use_stoch_cross_level(false), stoch_cross_level_long(20), stoch_cross_level_short(80), "
+        "activate_stoch_cross_memory(false), stoch_cross_memory_bars(5), "
+        "use_stoch_kd_cross(false), opposite_stoch_kd(false), "
+        "activate_stoch_kd_memory(false), stoch_kd_memory_bars(5).\n"
+        "Outputs: k (%K series), d (%D series), long (bool), short (bool).\n"
+        "Optimizable params: stoch_k_length, stoch_k_smoothing, stoch_d_smoothing, "
+        "long_stoch_d_more/less, short_stoch_d_less/more, "
+        "stoch_cross_level_long, stoch_cross_level_short, stoch_cross_memory_bars, stoch_kd_memory_bars.\n"
+        "OPTIMIZATION RANGES (STOCHASTIC): Default ranges: "
+        "stoch_k_length {5,21,1}, stoch_k_smoothing {1,5,1}, stoch_d_smoothing {1,5,1}, "
+        "long_stoch_d_more {0,30,5}, long_stoch_d_less {20,60,5}, "
+        "short_stoch_d_less {60,100,5}, short_stoch_d_more {40,80,5}, "
+        "stoch_cross_level_long {10,40,5}, stoch_cross_level_short {60,90,5}, "
+        "stoch_cross_memory_bars {1,20,1}, stoch_kd_memory_bars {1,20,1}.\n\n"
+        "SUPERTREND UNIVERSAL NODE — supports 2 signal modes (Filter vs Signal):\n"
+        "  Base params: period(10, 1-100) — ATR period, multiplier(3.0, 0.1-50) — ATR multiplier, "
+        "source('hl2', options: hl2/hlc3/close), "
+        "timeframe('Chart', options: 1/5/15/30/60/240/D/W/M/Chart), "
+        "use_btc_source(false) — if true, calculates SuperTrend on BTCUSDT price.\n"
+        "  use_supertrend(false) — enable filter/signal mode. If false → passthrough (always True).\n"
+        "  1) FILTER mode (default when use_supertrend=true): "
+        "long while uptrend (direction==1), short while downtrend (direction==-1). "
+        "Continuous signal — stays active entire trend.\n"
+        "  2) SIGNAL mode: generate_on_trend_change=true → "
+        "long only on direction flip from -1 to 1, short only on flip from 1 to -1. "
+        "One-bar event signal (fires once per flip).\n"
+        "  opposite_signal(false) — swaps long/short.\n"
+        "  show_supertrend(false) — display on chart.\n"
+        "SuperTrend params: period(10), multiplier(3.0), source('hl2'), "
+        "timeframe('Chart'), use_btc_source(false), "
+        "use_supertrend(false), generate_on_trend_change(false), "
+        "opposite_signal(false), show_supertrend(false).\n"
+        "Outputs: supertrend (line series), direction (1/-1), upper, lower, long (bool), short (bool).\n"
+        "Optimizable params: period, multiplier.\n"
+        "OPTIMIZATION RANGES (SUPERTREND): Default ranges: "
+        "period {5,20,1}, multiplier {1.0,5.0,0.5}.\n\n"
+        "ATR VOLATILITY NODE — compares two ATR values to detect volatility changes:\n"
+        "  use_atr_volatility(false), atr1_to_atr2('ATR1 < ATR2'|'ATR1 > ATR2'), "
+        "atr_diff_percent(10), atr_length1(20), atr_length2(100), "
+        "atr_smoothing('WMA', opts: SMA/EMA/WMA/DEMA/TEMA/HMA). "
+        "'ATR1 < ATR2'→ low-vol (mean reversion); 'ATR1 > ATR2'→ high-vol (breakout).\n\n"
+        "VOLUME FILTER NODE — compares two Volume MAs:\n"
+        "  use_volume_filter(false), vol1_to_vol2('VOL1 < VOL2'|'VOL1 > VOL2'), "
+        "vol_diff_percent(10), vol_length1(20), vol_length2(100), "
+        "vol_smoothing('WMA', opts: SMA/EMA/WMA/DEMA/TEMA/HMA).\n\n"
+        "HIGHEST/LOWEST BAR NODE — detects price near recent highs/lows:\n"
+        "  use_highest_lowest(false), hl_lookback_bars(10), hl_price_percent(0), "
+        "hl_atr_percent(0), atr_hl_length(50), use_block_worse_than(false), "
+        "block_worse_percent(1.1).\n\n"
+        "TWO MAs NODE — two configurable MAs with cross and filter modes:\n"
+        "  ma1_length(50), ma1_smoothing('SMA'), ma1_source('close'), "
+        "ma2_length(100), ma2_smoothing('EMA'), ma2_source('close'), "
+        "two_mas_timeframe('Chart'). Modes: "
+        "1) MA CROSS: use_ma_cross=true → long when MA1>MA2, short when MA1<MA2. "
+        "opposite_ma_cross swaps. activate_ma_cross_memory + ma_cross_memory_bars(5). "
+        "2) MA1 FILTER: use_ma1_filter=true → long when price>MA1, short when price<MA1. "
+        "opposite_ma1_filter swaps. Both modes combine with AND logic.\n\n"
+        "ACCUMULATION AREAS NODE — detects tight consolidation zones:\n"
+        "  use_accumulation(false), backtracking_interval(30), min_bars_to_execute(5), "
+        "signal_on_breakout(false), signal_on_opposite_breakout(false).\n\n"
+        "KELTNER/BOLLINGER CHANNEL NODE — channel-based entry signals:\n"
+        "  use_channel(false), channel_timeframe('Chart'), "
+        "channel_mode('Rebound'|'Breakout'), channel_type('Keltner Channel'|'Bollinger Bands'), "
+        "enter_conditions('Wick out of band'|'Body out of band'|'Full candle out of band'), "
+        "keltner_length(14), keltner_mult(1.5), bb_length(20), bb_deviation(2).\n\n"
+        "RVI NODE — Relative Vigor Index range filter:\n"
+        "  rvi_length(10), rvi_timeframe('Chart'), rvi_ma_type('WMA'), rvi_ma_length(2), "
+        "use_rvi_long_range(false), rvi_long_more(1), rvi_long_less(50), "
+        "use_rvi_short_range(false), rvi_short_less(100), rvi_short_more(50).\n\n"
+        "MFI NODE — Money Flow Index range filter (volume-weighted RSI):\n"
+        "  mfi_length(14), mfi_timeframe('Chart'), use_btcusdt_mfi(false), "
+        "use_mfi_long_range(false), mfi_long_more(1), mfi_long_less(60), "
+        "use_mfi_short_range(false), mfi_short_less(100), mfi_short_more(50).\n\n"
+        "CCI NODE — Commodity Channel Index range filter:\n"
+        "  cci_length(14), cci_timeframe('Chart'), "
+        "use_cci_long_range(false), cci_long_more(-400), cci_long_less(400), "
+        "use_cci_short_range(false), cci_short_less(400), cci_short_more(10).\n\n"
+        "MOMENTUM NODE — rate-of-change range filter:\n"
+        "  momentum_length(14), momentum_timeframe('Chart'), use_btcusdt_momentum(false), "
+        "momentum_source('close'), use_momentum_long_range(false), "
+        "momentum_long_more(-100), momentum_long_less(10), "
+        "use_momentum_short_range(false), momentum_short_less(95), momentum_short_more(-30).\n\n"
+        "CONDITIONS — logical signal combinators:\n"
+        "  crossover: source_a, source_b — fires when A crosses above B.\n"
+        "  crossunder: source_a, source_b — fires when A crosses below B.\n"
+        "  greater_than: value(0), use_input(true) — input > value.\n"
+        "  less_than: value(0), use_input(true) — input < value.\n"
+        "  equals: value(0), tolerance(0.001) — input ≈ value.\n"
+        "  between: min_value(0), max_value(100) — min ≤ input ≤ max.\n\n"
+        "DIVERGENCE NODE — multi-oscillator divergence detection:\n"
+        "  pivot_interval(9), act_without_confirmation(false), "
+        "show_divergence_lines(false), activate_diver_signal_memory(false), "
+        "keep_diver_signal_memory_bars(5). Sources: "
+        "use_divergence_rsi(false)+rsi_period(14), use_divergence_stochastic(false)+stoch_length(14), "
+        "use_divergence_momentum(false)+momentum_length(10), use_divergence_cmf(false)+cmf_period(21), "
+        "use_obv(false), use_mfi(false)+mfi_length(14).\n\n"
+        "DCA NODE — dollar-cost averaging grid:\n"
+        "  grid_size_percent(15), order_count(5), martingale_coefficient(1.0), "
+        "log_steps_coefficient(1.0), first_order_offset(0), grid_trailing(0).\n\n"
+        "MANUAL GRID NODE (grid_orders) — custom orders with exact offsets:\n"
+        "  orders: [{offset:0.1, volume:25}, ...] (max 40, total volume MUST=100%), "
+        "grid_trailing(0).\n\n"
+        "EXIT BLOCKS:\n"
+        "  static_sltp: take_profit_percent(1.5), stop_loss_percent(1.5), "
+        "sl_type('average_price'|'last_price'), close_only_in_profit(false), "
+        "activate_breakeven(false), breakeven_activation_percent(0.5), new_breakeven_sl_percent(0.1).\n"
+        "  trailing_stop_exit: activation_percent(1.0), trailing_percent(0.5), "
+        "trail_type('percent'|'atr').\n"
+        "  atr_exit: use_atr_sl(false), atr_sl_smoothing('WMA'), atr_sl_period(140), "
+        "atr_sl_multiplier(4.0), use_atr_tp(false), atr_tp_smoothing('WMA'), "
+        "atr_tp_period(140), atr_tp_multiplier(4.0).\n"
+        "  multi_tp_exit: tp1_percent(1.0), tp1_close_percent(33), "
+        "tp2_percent(2.0), tp2_close_percent(33), tp3_percent(3.0), "
+        "tp3_close_percent(34), use_tp2(true), use_tp3(true). Sum MUST=100%.\n\n"
+        "CLOSE-BY-INDICATOR EXITS:\n"
+        "  close_by_time: enabled(false), bars_since_entry(10), profit_only(false), min_profit_percent(0).\n"
+        "  close_channel: enabled(false), channel_close_timeframe('Chart'), "
+        "band_to_close('Rebound'|'Breakout'), channel_type, close_condition, "
+        "keltner_length(14), keltner_mult(1.5), bb_length(20), bb_deviation(2).\n"
+        "  close_ma_cross: enabled(false), profit_only(false), min_profit_percent(1), "
+        "ma1_length(10), ma2_length(30).\n"
+        "  close_rsi: enabled(false), rsi_close_length(14), rsi_close_timeframe('Chart'), "
+        "activate_rsi_reach(false) + rsi_long_more(70)/rsi_long_less(100)/rsi_short_less(30)/rsi_short_more(1), "
+        "activate_rsi_cross(false) + rsi_cross_long_level(70)/rsi_cross_short_level(30).\n"
+        "  close_stochastic: enabled(false), stoch_close_k_length(14), stoch_close_k_smoothing(3), "
+        "stoch_close_d_smoothing(3), activate_stoch_reach(false) + stoch_long_more(80)/stoch_long_less(100)/"
+        "stoch_short_less(20)/stoch_short_more(1), activate_stoch_cross(false) + "
+        "stoch_cross_long_level(80)/stoch_cross_short_level(20).\n"
+        "  close_psar: enabled(false), psar_start(0.02), psar_increment(0.02), "
+        "psar_maximum(0.2), psar_close_nth_bar(1), psar_opposite(false)."
     ),
     category="strategy_builder",
 )
@@ -596,15 +776,52 @@ async def builder_add_block(
     name="builder_update_block_params",
     description=(
         "Update parameters of an existing block on the canvas. "
-        "For RSI: use params like period, use_long_range, long_rsi_more, long_rsi_less, "
+        "For RSI: use params like period, timeframe, use_btc_source, "
+        "use_long_range, long_rsi_more, long_rsi_less, "
         "use_short_range, short_rsi_less, short_rsi_more, use_cross_level, "
         "cross_long_level, cross_short_level, opposite_signal, use_cross_memory, "
         "cross_memory_bars. Example: {use_cross_level: true, cross_long_level: 25}. "
         "For MACD: use params like fast_period, slow_period, signal_period, source, "
+        "timeframe, use_btc_source, enable_visualization, "
         "use_macd_cross_zero, opposite_macd_cross_zero, macd_cross_zero_level, "
         "use_macd_cross_signal, signal_only_if_macd_positive, opposite_macd_cross_signal, "
         "disable_signal_memory, signal_memory_bars. "
-        "Example: {use_macd_cross_signal: true, signal_only_if_macd_positive: true}."
+        "Example: {use_macd_cross_signal: true, signal_only_if_macd_positive: true}. "
+        "For Stochastic: stoch_k_length, stoch_k_smoothing, stoch_d_smoothing, "
+        "use_stoch_range_filter, long_stoch_d_more, long_stoch_d_less, "
+        "use_stoch_cross_level, use_stoch_kd_cross, opposite_stoch_kd. "
+        "For SuperTrend: period, multiplier, source, use_supertrend, generate_on_trend_change. "
+        "For QQE: rsi_period, qqe_factor, smoothing_period, use_qqe, opposite_qqe. "
+        "For ATR Volatility: use_atr_volatility, atr1_to_atr2, atr_diff_percent, "
+        "atr_length1, atr_length2, atr_smoothing. "
+        "For Volume Filter: use_volume_filter, vol1_to_vol2, vol_diff_percent, "
+        "vol_length1, vol_length2, vol_smoothing. "
+        "For Highest/Lowest Bar: use_highest_lowest, hl_lookback_bars, hl_price_percent, "
+        "hl_atr_percent, atr_hl_length, use_block_worse_than, block_worse_percent. "
+        "For Two MAs: ma1_length, ma1_smoothing, ma2_length, ma2_smoothing, "
+        "use_ma_cross, opposite_ma_cross, use_ma1_filter, opposite_ma1_filter. "
+        "For Accumulation Areas: use_accumulation, backtracking_interval, "
+        "min_bars_to_execute, signal_on_breakout, signal_on_opposite_breakout. "
+        "For Keltner/Bollinger Channel: use_channel, channel_mode, channel_type, "
+        "enter_conditions, keltner_length, keltner_mult, bb_length, bb_deviation. "
+        "For RVI: rvi_length, rvi_ma_type, use_rvi_long_range, rvi_long_more, rvi_long_less. "
+        "For MFI: mfi_length, use_btcusdt_mfi, use_mfi_long_range, mfi_long_more, mfi_long_less. "
+        "For CCI: cci_length, use_cci_long_range, cci_long_more, cci_long_less. "
+        "For Momentum: momentum_length, use_momentum_long_range, momentum_long_more, momentum_long_less. "
+        "For Divergence: pivot_interval, use_divergence_rsi, rsi_period, "
+        "use_divergence_stochastic, stoch_length, use_divergence_momentum. "
+        "For DCA: grid_size_percent, order_count, martingale_coefficient, log_steps_coefficient. "
+        "For Grid Orders: orders (array of {offset, volume}), grid_trailing. "
+        "For Static SL/TP: take_profit_percent, stop_loss_percent, sl_type, activate_breakeven. "
+        "For Trailing Stop Exit: activation_percent, trailing_percent, trail_type. "
+        "For ATR Exit: use_atr_sl, atr_sl_period, atr_sl_multiplier, use_atr_tp, atr_tp_period. "
+        "For Multi TP: tp1_percent, tp1_close_percent, tp2_percent, tp3_percent. "
+        "For Close by Time: enabled, bars_since_entry, profit_only. "
+        "For Close Channel: enabled, channel_type, band_to_close, close_condition. "
+        "For Close MA Cross: enabled, ma1_length, ma2_length, profit_only. "
+        "For Close RSI: enabled, rsi_close_length, activate_rsi_reach, activate_rsi_cross. "
+        "For Close Stochastic: enabled, stoch_close_k_length, activate_stoch_reach, activate_stoch_cross. "
+        "For Close PSAR: enabled, psar_start, psar_increment, psar_maximum, psar_close_nth_bar."
     ),
     category="strategy_builder",
 )
@@ -1149,6 +1366,101 @@ async def builder_get_optimizable_params(
         return await _api_get(f"/strategies/{strategy_id}/optimizable-params")
     except Exception as e:
         logger.error(f"builder_get_optimizable_params error: {e}")
+        return {"error": str(e)}
+
+
+@registry.register(
+    name="builder_run_optimization",
+    description=(
+        "Run parameter optimization on a Strategy Builder strategy. "
+        "Supports 3 methods: grid_search (exhaustive), random_search (sampled subset), "
+        "bayesian (Optuna TPE/CMA-ES). The optimizer extracts all optimizable numeric "
+        "params from strategy blocks, generates combinations within ranges, runs backtest "
+        "for each combination, and returns ranked results sorted by optimize_metric. "
+        "Use builder_get_optimizable_params first to see available params and default ranges. "
+        "You can override ranges via parameter_ranges list. "
+        "Returns top results with full metrics (Sharpe, win rate, drawdown, PnL, etc.). "
+        "WARNING: grid_search with many params can produce millions of combinations — "
+        "use max_iterations to limit, or prefer bayesian for large search spaces."
+    ),
+    category="strategy_builder",
+)
+async def builder_run_optimization(
+    strategy_id: str,
+    symbol: str = "BTCUSDT",
+    interval: str = "15",
+    start_date: str = "2025-01-01",
+    end_date: str = "2025-06-01",
+    initial_capital: float = 10000.0,
+    leverage: int = 10,
+    direction: str = "both",
+    commission: float = 0.0007,
+    method: str = "grid_search",
+    optimize_metric: str = "sharpe_ratio",
+    parameter_ranges: list[dict[str, Any]] | None = None,
+    max_iterations: int = 0,
+    n_trials: int = 100,
+    timeout_seconds: int = 3600,
+    max_results: int = 20,
+    early_stopping: bool = False,
+    early_stopping_patience: int = 20,
+) -> dict[str, Any]:
+    """
+    Run parameter optimization on a Strategy Builder strategy.
+
+    Args:
+        strategy_id: Strategy UUID
+        symbol: Trading pair (e.g. BTCUSDT)
+        interval: Timeframe (1,5,15,30,60,240,D,W,M)
+        start_date: Start date YYYY-MM-DD
+        end_date: End date YYYY-MM-DD
+        initial_capital: Starting capital
+        leverage: Leverage (1-125)
+        direction: Trade direction (long/short/both)
+        commission: Commission rate (0.0007 = 0.07%)
+        method: Optimization method — grid_search|random_search|bayesian
+        optimize_metric: Metric to maximize (sharpe_ratio, net_profit, win_rate, etc.)
+        parameter_ranges: Custom param ranges overriding defaults.
+            Each item: {"param_path": "blockId.paramKey", "low": X, "high": Y, "step": Z, "enabled": true}
+        max_iterations: Max iterations (0 = all for grid_search)
+        n_trials: Optuna trials for bayesian method (10-500)
+        timeout_seconds: Timeout in seconds (60-86400)
+        max_results: Max results to return (1-100)
+        early_stopping: Enable early stopping
+        early_stopping_patience: Early stopping patience (iterations without improvement)
+
+    Returns:
+        Optimization results with ranked parameter combinations and metrics.
+        Includes: best_params, results_count, results list with full metrics per combo.
+    """
+    try:
+        payload: dict[str, Any] = {
+            "symbol": symbol,
+            "interval": interval,
+            "start_date": start_date,
+            "end_date": end_date,
+            "initial_capital": initial_capital,
+            "leverage": leverage,
+            "direction": direction,
+            "commission": commission,
+            "method": method,
+            "optimize_metric": optimize_metric,
+            "max_iterations": max_iterations,
+            "n_trials": n_trials,
+            "timeout_seconds": timeout_seconds,
+            "max_results": max_results,
+            "early_stopping": early_stopping,
+            "early_stopping_patience": early_stopping_patience,
+        }
+        if parameter_ranges:
+            payload["parameter_ranges"] = parameter_ranges
+
+        return await _api_post(f"/strategies/{strategy_id}/optimize", json_data=payload)
+    except httpx.HTTPStatusError as e:
+        logger.error(f"builder_run_optimization HTTP error: {e.response.status_code} - {e.response.text}")
+        return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+    except Exception as e:
+        logger.error(f"builder_run_optimization error: {e}")
         return {"error": str(e)}
 
 

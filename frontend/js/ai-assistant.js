@@ -228,16 +228,30 @@ class AIBacktestAnalyzer {
                 net_pnl: metrics.net_pnl || metrics.netPnl || 0,
                 total_return_pct: metrics.total_return_pct || metrics.totalReturnPct || 0,
                 sharpe_ratio: metrics.sharpe_ratio || metrics.sharpeRatio || 0,
+                sortino_ratio: metrics.sortino_ratio || metrics.sortinoRatio || 0,
                 max_drawdown_pct: metrics.max_drawdown_pct || metrics.maxDrawdownPct || 0,
                 win_rate: metrics.win_rate || metrics.winRate || 0,
                 profit_factor: metrics.profit_factor || metrics.profitFactor || 1,
-                total_trades: metrics.total_trades || metrics.totalTrades || 0
+                total_trades: metrics.total_trades || metrics.totalTrades || 0,
+                calmar_ratio: metrics.calmar_ratio || metrics.calmarRatio || 0,
+                avg_win: metrics.avg_win || metrics.avgWin || 0,
+                avg_loss: metrics.avg_loss || metrics.avgLoss || 0,
+                max_consecutive_wins: metrics.max_consecutive_wins || metrics.maxConsecutiveWins || 0,
+                max_consecutive_losses: metrics.max_consecutive_losses || metrics.maxConsecutiveLosses || 0,
+                recovery_factor: metrics.recovery_factor || metrics.recoveryFactor || 0,
+                payoff_ratio: metrics.payoff_ratio || metrics.payoffRatio || 0,
+                avg_trade_duration: metrics.avg_trade_duration || metrics.avgTradeDuration || 'N/A',
+                best_trade: metrics.best_trade || metrics.bestTrade || 0,
+                worst_trade: metrics.worst_trade || metrics.worstTrade || 0,
+                avg_trade_pnl: metrics.avg_trade_pnl || metrics.avgTradePnl || 0,
+                winning_trades: metrics.winning_trades || metrics.winningTrades || 0,
+                losing_trades: metrics.losing_trades || metrics.losingTrades || 0
             },
             strategy_name: config.strategyName || config.strategy_name || 'Unknown',
             symbol: config.symbol || 'BTCUSDT',
             timeframe: config.timeframe || config.interval || '1h',
             period: config.period || 'Unknown',
-            agents: ['deepseek']
+            agents: ['deepseek', 'qwen', 'perplexity']
         };
 
         try {
@@ -307,6 +321,10 @@ class AIBacktestAnalyzer {
             'high': 'danger'
         }[result.overfittingRisk] || 'info';
 
+        const strengths = result.ai_analysis.strengths || [];
+        const weaknesses = result.ai_analysis.weaknesses || [];
+        const grade = result.ai_analysis.grade || '';
+
         const modal = document.createElement('div');
         modal.id = 'aiAnalysisModal';
         modal.className = 'ai-modal';
@@ -327,14 +345,31 @@ class AIBacktestAnalyzer {
                         <p>${result.riskAssessment || 'No risk assessment available'}</p>
                     </div>
 
+                    ${strengths.length > 0 ? `
+                    <div class="ai-section">
+                        <h3>✅ Strengths</h3>
+                        <ul>${strengths.map(s => '<li>' + s + '</li>').join('')}</ul>
+                    </div>` : ''}
+
+                    ${weaknesses.length > 0 ? `
+                    <div class="ai-section">
+                        <h3>❌ Weaknesses</h3>
+                        <ul>${weaknesses.map(w => '<li>' + w + '</li>').join('')}</ul>
+                    </div>` : ''}
+
                     <div class="ai-section">
                         <h3>💡 Recommendations</h3>
                         <ul>
-                            ${result.recommendations.map(r => `<li>${r}</li>`).join('') || '<li>No recommendations</li>'}
+                            ${result.recommendations.map(r => '<li>' + r + '</li>').join('') || '<li>No recommendations</li>'}
                         </ul>
                     </div>
 
                     <div class="ai-metrics-grid">
+                        ${grade ? `
+                        <div class="ai-metric">
+                            <span class="ai-metric-label">Grade</span>
+                            <span class="ai-metric-value badge bg-primary">${grade}</span>
+                        </div>` : ''}
                         <div class="ai-metric">
                             <span class="ai-metric-label">Overfitting Risk</span>
                             <span class="ai-metric-value badge ${overfitClass}">${result.overfittingRisk}</span>

@@ -4,6 +4,17 @@ Mean Reversion Strategies.
 Strategies that trade price returning to average/mean:
 - RSI Mean Reversion: Trade oversold/overbought RSI levels
 - Bollinger Bands: Trade price touching bands
+
+DEPRECATION NOTE (2026-02-16):
+    RSIMeanReversionStrategy is part of the OLD Library system.
+    For new strategies, use the UNIVERSAL RSI block in Strategy Builder instead.
+    The universal RSI block (type='rsi') supports:
+      - Range filter mode (use_long_range/use_short_range)
+      - Cross level mode (use_cross_level)
+      - Legacy fallback mode
+      - BTC source, optimization ranges, cross signal memory
+    AI agents (DeepSeek, Qwen, Perplexity) MUST use the universal RSI block.
+    This file is kept for backward compatibility with existing saved strategies.
 """
 
 import logging
@@ -228,48 +239,46 @@ class RSIMeanReversionStrategy(LibraryStrategy):
                     )
                     self._in_position = "long"
 
-            # Sell on overbought
-            elif self._prev_rsi < overbought and current_rsi >= overbought:
-                # Trend filter check
-                if not use_trend or (trend_ema and close < trend_ema):
-                    stop_loss = calculate_stop_loss(
-                        close, "sell", current_atr, atr_mult
-                    )
-                    take_profit = calculate_take_profit(close, stop_loss, rr)
+            # Sell on overbought (with trend filter check)
+            elif (
+                self._prev_rsi < overbought
+                and current_rsi >= overbought
+                and (not use_trend or (trend_ema and close < trend_ema))
+            ):
+                stop_loss = calculate_stop_loss(close, "sell", current_atr, atr_mult)
+                take_profit = calculate_take_profit(close, stop_loss, rr)
 
-                    signal = self.create_signal(
-                        signal_type=SignalType.SELL,
-                        price=close,
-                        stop_loss=stop_loss,
-                        take_profit=take_profit,
-                        reason=f"RSI overbought ({current_rsi:.1f} >= {overbought})",
-                        confidence=0.65,
-                        rsi=current_rsi,
-                    )
-                    self._in_position = "short"
+                signal = self.create_signal(
+                    signal_type=SignalType.SELL,
+                    price=close,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    reason=f"RSI overbought ({current_rsi:.1f} >= {overbought})",
+                    confidence=0.65,
+                    rsi=current_rsi,
+                )
+                self._in_position = "short"
 
         # Exit signals
-        elif self._in_position == "long":
-            if current_rsi >= exit_level:
-                signal = self.create_signal(
-                    signal_type=SignalType.CLOSE_LONG,
-                    price=close,
-                    reason=f"RSI reached neutral ({current_rsi:.1f} >= {exit_level})",
-                    confidence=0.6,
-                    rsi=current_rsi,
-                )
-                self._in_position = ""
+        elif self._in_position == "long" and current_rsi >= exit_level:
+            signal = self.create_signal(
+                signal_type=SignalType.CLOSE_LONG,
+                price=close,
+                reason=f"RSI reached neutral ({current_rsi:.1f} >= {exit_level})",
+                confidence=0.6,
+                rsi=current_rsi,
+            )
+            self._in_position = ""
 
-        elif self._in_position == "short":
-            if current_rsi <= exit_level:
-                signal = self.create_signal(
-                    signal_type=SignalType.CLOSE_SHORT,
-                    price=close,
-                    reason=f"RSI reached neutral ({current_rsi:.1f} <= {exit_level})",
-                    confidence=0.6,
-                    rsi=current_rsi,
-                )
-                self._in_position = ""
+        elif self._in_position == "short" and current_rsi <= exit_level:
+            signal = self.create_signal(
+                signal_type=SignalType.CLOSE_SHORT,
+                price=close,
+                reason=f"RSI reached neutral ({current_rsi:.1f} <= {exit_level})",
+                confidence=0.6,
+                rsi=current_rsi,
+            )
+            self._in_position = ""
 
         self._prev_rsi = current_rsi
         return signal
@@ -523,54 +532,48 @@ class BollingerBandsStrategy(LibraryStrategy):
                     self._in_position = "long"
                     self._entry_price = close
 
-            # Sell at upper band
-            elif high >= upper:
-                # RSI confirmation
-                if not use_rsi or current_rsi >= rsi_overbought:
-                    stop_loss = calculate_stop_loss(
-                        close, "sell", current_atr, atr_mult
-                    )
-                    take_profit = middle  # Target middle band
+            # Sell at upper band (with RSI confirmation)
+            elif high >= upper and (not use_rsi or current_rsi >= rsi_overbought):
+                stop_loss = calculate_stop_loss(close, "sell", current_atr, atr_mult)
+                take_profit = middle  # Target middle band
 
-                    signal = self.create_signal(
-                        signal_type=SignalType.SELL,
-                        price=close,
-                        stop_loss=stop_loss,
-                        take_profit=take_profit,
-                        reason=f"Price touched upper Bollinger Band ({upper:.2f})",
-                        confidence=0.7 if use_rsi else 0.6,
-                        bb_upper=upper,
-                        bb_middle=middle,
-                        bb_lower=lower,
-                        rsi=current_rsi,
-                    )
-                    self._in_position = "short"
-                    self._entry_price = close
+                signal = self.create_signal(
+                    signal_type=SignalType.SELL,
+                    price=close,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    reason=f"Price touched upper Bollinger Band ({upper:.2f})",
+                    confidence=0.7 if use_rsi else 0.6,
+                    bb_upper=upper,
+                    bb_middle=middle,
+                    bb_lower=lower,
+                    rsi=current_rsi,
+                )
+                self._in_position = "short"
+                self._entry_price = close
 
         # Exit at middle band
-        elif self._in_position == "long":
-            if close >= middle:
-                signal = self.create_signal(
-                    signal_type=SignalType.CLOSE_LONG,
-                    price=close,
-                    reason=f"Price reached middle band ({middle:.2f})",
-                    confidence=0.7,
-                    bb_middle=middle,
-                )
-                self._in_position = ""
-                self._entry_price = None
+        elif self._in_position == "long" and close >= middle:
+            signal = self.create_signal(
+                signal_type=SignalType.CLOSE_LONG,
+                price=close,
+                reason=f"Price reached middle band ({middle:.2f})",
+                confidence=0.7,
+                bb_middle=middle,
+            )
+            self._in_position = ""
+            self._entry_price = None
 
-        elif self._in_position == "short":
-            if close <= middle:
-                signal = self.create_signal(
-                    signal_type=SignalType.CLOSE_SHORT,
-                    price=close,
-                    reason=f"Price reached middle band ({middle:.2f})",
-                    confidence=0.7,
-                    bb_middle=middle,
-                )
-                self._in_position = ""
-                self._entry_price = None
+        elif self._in_position == "short" and close <= middle:
+            signal = self.create_signal(
+                signal_type=SignalType.CLOSE_SHORT,
+                price=close,
+                reason=f"Price reached middle band ({middle:.2f})",
+                confidence=0.7,
+                bb_middle=middle,
+            )
+            self._in_position = ""
+            self._entry_price = None
 
         return signal
 

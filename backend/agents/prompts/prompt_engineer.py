@@ -33,7 +33,10 @@ from backend.agents.prompts.templates import (
     MARKET_ANALYSIS_TEMPLATE,
     OPTIMIZATION_SUGGESTIONS_TEMPLATE,
     STRATEGY_EXAMPLE_MACD_TREND,
+    STRATEGY_EXAMPLE_QQE_MOMENTUM,
     STRATEGY_EXAMPLE_RSI_MEAN_REVERSION,
+    STRATEGY_EXAMPLE_STOCH_MEAN_REVERSION,
+    STRATEGY_EXAMPLE_SUPERTREND_FOLLOW,
     STRATEGY_GENERATION_TEMPLATE,
     STRATEGY_VALIDATION_TEMPLATE,
 )
@@ -108,6 +111,12 @@ class PromptEngineer:
             # Choose example based on market regime
             if context.market_regime in ("trending_up", "trending_down"):
                 prompt += STRATEGY_EXAMPLE_MACD_TREND
+                prompt += "\n\n"
+                prompt += STRATEGY_EXAMPLE_SUPERTREND_FOLLOW
+            elif context.market_regime in ("ranging", "consolidating"):
+                prompt += STRATEGY_EXAMPLE_STOCH_MEAN_REVERSION
+                prompt += "\n\n"
+                prompt += STRATEGY_EXAMPLE_QQE_MOMENTUM
             else:
                 prompt += STRATEGY_EXAMPLE_RSI_MEAN_REVERSION
 

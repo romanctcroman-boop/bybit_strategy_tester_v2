@@ -38,15 +38,11 @@ class Backtest(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 
     # Strategy reference
-    strategy_id = Column(
-        String(36), ForeignKey("strategies.id"), nullable=True, index=True
-    )
+    strategy_id = Column(String(36), ForeignKey("strategies.id"), nullable=True, index=True)
     strategy_type = Column(String(50), nullable=False)  # Strategy type used
 
     # Execution status
-    status = Column(
-        SQLEnum(BacktestStatus), nullable=False, default=BacktestStatus.PENDING
-    )
+    status: Column[BacktestStatus] = Column(SQLEnum(BacktestStatus), nullable=False, default=BacktestStatus.PENDING)
     error_message = Column(Text, nullable=True)
 
     # Configuration
@@ -135,9 +131,7 @@ class Backtest(Base):
     execution_time_ms = Column(Integer, nullable=True)
 
     # Timestamps
-    created_at = Column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
-    )
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     updated_at = Column(
         DateTime,
         nullable=False,
@@ -152,12 +146,8 @@ class Backtest(Base):
     notes = Column(Text, nullable=True)
 
     # Relationships
-    strategy = relationship(
-        "Strategy", back_populates="backtests", foreign_keys=[strategy_id]
-    )
-    trade_records = relationship(
-        "Trade", back_populates="backtest", cascade="all, delete-orphan"
-    )
+    strategy = relationship("Strategy", back_populates="backtests", foreign_keys=[strategy_id])
+    trade_records = relationship("Trade", back_populates="backtest", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Backtest(id={self.id}, strategy_type='{self.strategy_type}', status={self.status})>"
@@ -219,9 +209,7 @@ class Backtest(Base):
             "exposure_time": self.exposure_time,
             # Timestamps
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "execution_time_ms": self.execution_time_ms,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

@@ -77,7 +77,7 @@ class MCPMessage:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
-        data = {"jsonrpc": self.jsonrpc}
+        data: dict[str, Any] = {"jsonrpc": self.jsonrpc}
         if self.id:
             data["id"] = self.id
         if self.method:
@@ -175,7 +175,7 @@ class MCPPrompt:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to MCP format"""
-        data = {"name": self.name}
+        data: dict[str, Any] = {"name": self.name}
         if self.description:
             data["description"] = self.description
         if self.arguments:
@@ -195,7 +195,7 @@ class MCPCapabilities:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
-        caps = {}
+        caps: dict[str, Any] = {}
         if self.tools:
             caps["tools"] = {}
         if self.resources:
@@ -291,6 +291,7 @@ class MCPServer:
         self.transport: MCPTransport | None = None
         self._running = False
         self._handlers: dict[str, Callable] = {}
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
         # Register standard handlers
         self._register_standard_handlers()
@@ -387,7 +388,9 @@ class MCPServer:
         logger.info(f"🚀 MCPServer '{self.name}' started")
 
         # Start message handler loop
-        asyncio.create_task(self._message_loop())
+        task = asyncio.create_task(self._message_loop())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     async def stop(self) -> None:
         """Stop the server"""
@@ -400,6 +403,8 @@ class MCPServer:
         """Main message processing loop"""
         while self._running:
             try:
+                if not self.transport:
+                    break
                 message = await asyncio.wait_for(self.transport.receive(), timeout=1.0)
                 await self._handle_message(message)
             except TimeoutError:
@@ -412,25 +417,27 @@ class MCPServer:
         if not message.method:
             return
 
+        msg_id = message.id or ""
         handler = self._handlers.get(message.method)
         if handler:
             try:
                 result = await handler(message.params or {})
-                response = MCPMessage.response(message.id, result)
+                response = MCPMessage.response(msg_id, result)
             except Exception as e:
                 response = MCPMessage.error_response(
-                    message.id,
+                    msg_id,
                     -32603,
                     str(e),
                 )
         else:
             response = MCPMessage.error_response(
-                message.id,
+                msg_id,
                 -32601,
                 f"Method not found: {message.method}",
             )
 
-        await self.transport.send(response)
+        if self.transport:
+            await self.transport.send(response)
 
     async def _handle_initialize(self, params: dict[str, Any]) -> dict[str, Any]:
         """Handle initialize request"""
@@ -540,8 +547,9 @@ class MCPClient:
         self.transport: MCPTransport | None = None
         self.server_info: dict[str, Any] | None = None
         self.capabilities: dict[str, Any] | None = None
-        self._pending_requests: dict[str, asyncio.Future] = {}
+        self._pending_requests: dict[str, asyncio.Future[Any]] = {}
         self._running = False
+        self._background_tasks: set[asyncio.Task[None]] = set()
 
         logger.info("🔌 MCPClient initialized")
 
@@ -551,7 +559,9 @@ class MCPClient:
         self._running = True
 
         # Start response handler
-        asyncio.create_task(self._response_loop())
+        task = asyncio.create_task(self._response_loop())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
         # Send initialize request
         result = await self._send_request(
@@ -583,6 +593,8 @@ class MCPClient:
         """Handle incoming responses"""
         while self._running:
             try:
+                if not self.transport:
+                    break
                 message = await asyncio.wait_for(self.transport.receive(), timeout=1.0)
 
                 if message.id and message.id in self._pending_requests:
@@ -603,10 +615,14 @@ class MCPClient:
         params: dict[str, Any] | None = None,
     ) -> Any:
         """Send request and wait for response"""
-        message = MCPMessage.request(method, params)
+        if not self.transport:
+            raise RuntimeError("Not connected to server")
 
-        future = asyncio.get_event_loop().create_future()
-        self._pending_requests[message.id] = future
+        message = MCPMessage.request(method, params)
+        msg_id = message.id or ""
+
+        future: asyncio.Future[Any] = asyncio.get_event_loop().create_future()
+        self._pending_requests[msg_id] = future
 
         await self.transport.send(message)
 
@@ -614,7 +630,7 @@ class MCPClient:
             result = await asyncio.wait_for(future, timeout=30.0)
             return result
         except TimeoutError:
-            self._pending_requests.pop(message.id, None)
+            self._pending_requests.pop(msg_id, None)
             raise TimeoutError(f"Request timed out: {method}")
 
     async def list_tools(self) -> list[dict[str, Any]]:
@@ -684,14 +700,19 @@ def create_trading_mcp_server() -> MCPServer:
 
     @server.tool("calculate_rsi")
     async def calculate_rsi(prices: list, period: int = 14) -> dict[str, Any]:
-        """Calculate RSI (Relative Strength Index)"""
+        """Calculate RSI (Relative Strength Index).
+
+        NOTE: For strategy building, use the universal 'rsi' block in Strategy Builder.
+        The universal RSI supports Range filter, Cross level, and Legacy modes.
+        This tool is for ad-hoc RSI value calculation only.
+        """
         import numpy as np
 
         if len(prices) < period + 1:
             return {"error": "Not enough data"}
 
-        prices = np.array(prices)
-        deltas = np.diff(prices)
+        price_arr = np.array(prices)
+        deltas = np.diff(price_arr)
 
         gains = np.where(deltas > 0, deltas, 0)
         losses = np.where(deltas < 0, -deltas, 0)
@@ -720,7 +741,7 @@ def create_trading_mcp_server() -> MCPServer:
         if len(prices) < slow_period:
             return {"error": "Not enough data"}
 
-        prices = np.array(prices)
+        price_arr = np.array(prices)
 
         def ema(data, period):
             alpha = 2 / (period + 1)
@@ -730,8 +751,8 @@ def create_trading_mcp_server() -> MCPServer:
                 result[i] = alpha * data[i] + (1 - alpha) * result[i - 1]
             return result
 
-        ema_fast = ema(prices, fast_period)
-        ema_slow = ema(prices, slow_period)
+        ema_fast = ema(price_arr, fast_period)
+        ema_slow = ema(price_arr, slow_period)
         macd_line = ema_fast - ema_slow
         signal_line = ema(macd_line, signal_period)
         histogram = macd_line - signal_line
