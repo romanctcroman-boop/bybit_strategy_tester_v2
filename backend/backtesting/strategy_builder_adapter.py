@@ -594,10 +594,27 @@ class StrategyBuilderAdapter(BaseStrategy):
                             if alias in source_outputs:
                                 inputs[target_port] = source_outputs[alias]
                                 resolved = True
+                                logger.warning(
+                                    f"[PortResolver] Port alias fallback: '{source_port}' → '{alias}' "
+                                    f"for block {source_id} → {block_id}. "
+                                    f"Available outputs: {list(source_outputs.keys())}"
+                                )
                                 break
                         if not resolved and len(source_outputs) == 1:
                             # Last resort: if block has only one output, use it
-                            inputs[target_port] = next(iter(source_outputs.values()))
+                            only_key = next(iter(source_outputs.keys()))
+                            inputs[target_port] = source_outputs[only_key]
+                            logger.warning(
+                                f"[PortResolver] Single-output fallback: port '{source_port}' not found "
+                                f"in block '{source_id}' (outputs: {list(source_outputs.keys())}), "
+                                f"using only output '{only_key}' → target '{target_port}' on block '{block_id}'"
+                            )
+                        elif not resolved:
+                            logger.warning(
+                                f"[PortResolver] Port '{source_port}' not found in block '{source_id}' "
+                                f"outputs {list(source_outputs.keys())} and no fallback available. "
+                                f"Input '{target_port}' on block '{block_id}' will be missing!"
+                            )
         return inputs
 
     @staticmethod

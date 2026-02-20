@@ -351,9 +351,38 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
         block_name = block.get("name", block_type)
         block_params = block.get("params") or block.get("config") or {}
 
+        # User-provided optimization overrides from the UI (block.optimizationParams)
+        user_opt_params: dict[str, dict[str, Any]] = block.get("optimizationParams") or {}
+
+        # Validate user-provided optimizationParams format
+        if user_opt_params:
+            _validated: dict[str, dict[str, Any]] = {}
+            for pk, pv in user_opt_params.items():
+                if not isinstance(pv, dict):
+                    logger.warning(
+                        f"[OptExtract] Invalid optimizationParams format for block '{block_id}' "
+                        f"param '{pk}': expected dict with {{low, high, step}}, got {type(pv).__name__}. Skipping."
+                    )
+                    continue
+                required_keys = {"low", "high"}
+                if not required_keys.issubset(pv.keys()):
+                    logger.warning(
+                        f"[OptExtract] optimizationParams for block '{block_id}' param '{pk}' "
+                        f"missing required keys {required_keys - pv.keys()}. Skipping."
+                    )
+                    continue
+                if pv["low"] > pv["high"]:
+                    logger.warning(
+                        f"[OptExtract] optimizationParams for block '{block_id}' param '{pk}': "
+                        f"low ({pv['low']}) > high ({pv['high']}). Swapping."
+                    )
+                    pv["low"], pv["high"] = pv["high"], pv["low"]
+                _validated[pk] = pv
+            user_opt_params = _validated
+
         # Check if this block type has known optimizable params
         type_ranges = DEFAULT_PARAM_RANGES.get(block_type, {})
-        if not type_ranges:
+        if not type_ranges and not user_opt_params:
             continue
 
         for param_key, range_spec in type_ranges.items():
@@ -393,6 +422,13 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                 if param_key == "signal_memory_bars" and not has_signal_mode:
                     continue
 
+            # Merge user-provided optimizationParams over defaults
+            user_override = user_opt_params.get(param_key, {})
+            effective_low = user_override.get("low", range_spec["low"])
+            effective_high = user_override.get("high", range_spec["high"])
+            effective_step = user_override.get("step", range_spec["step"])
+            effective_type = user_override.get("type", range_spec["type"])
+
             params.append(
                 {
                     "block_id": block_id,
@@ -400,10 +436,10 @@ def extract_optimizable_params(graph: dict[str, Any]) -> list[dict[str, Any]]:
                     "block_name": block_name,
                     "param_key": param_key,
                     "param_path": f"{block_id}.{param_key}",
-                    "type": range_spec["type"],
-                    "low": range_spec["low"],
-                    "high": range_spec["high"],
-                    "step": range_spec["step"],
+                    "type": effective_type,
+                    "low": effective_low,
+                    "high": effective_high,
+                    "step": effective_step,
                     "default": range_spec["default"],
                     "current_value": current_value,
                 }

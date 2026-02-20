@@ -51,8 +51,8 @@ STATUS: Formulas verified to match MetricsCalculator (2026-01-25)
 - Win Rate, Profit Factor, Calmar - standard formulas
 """
 
-import sqlite3
 import math
+import sqlite3
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -1106,9 +1106,21 @@ class FastGridOptimizer:
             dummy_close = np.random.randn(100).astype(np.float64) + 100
             calculate_rsi_fast(dummy_close, 14)
 
-            # Warm up simulate_trades_fast
+            # Warm up simulate_trades_fast (all 11 args required)
             dummy_rsi = calculate_rsi_fast(dummy_close, 14)
-            simulate_trades_fast(dummy_close, dummy_rsi, 30.0, 70.0, 5.0, 2.0, 10000.0, 10.0, 0.001, 0)
+            simulate_trades_fast(
+                dummy_close,  # close
+                dummy_rsi,  # rsi
+                30.0,  # oversold
+                70.0,  # overbought
+                5.0,  # stop_loss_pct
+                2.0,  # take_profit_pct
+                10000.0,  # initial_capital
+                1.0,  # leverage
+                0.001,  # commission
+                0.0005,  # slippage
+                0,  # direction (0=long)
+            )
             logger.debug("Numba JIT warmup completed")
         except Exception as e:
             logger.warning(f"Numba warmup failed: {e}")
@@ -1147,7 +1159,9 @@ class FastGridOptimizer:
 
         # Direction mapping
         dir_map = {"long": 0, "short": 1, "both": 2}
-        dir_int = dir_map.get(direction, 0)
+        if direction not in dir_map:
+            raise ValueError(f"Invalid direction '{direction}'. Must be one of: {list(dir_map.keys())}")
+        dir_int = dir_map[direction]
 
         total_combinations = len(periods) * len(overbought) * len(oversold) * len(stop_losses) * len(take_profits)
 

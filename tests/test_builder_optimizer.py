@@ -259,18 +259,18 @@ class TestExtractOptimizableParams:
         assert keys == {"period", "overbought", "oversold"}
 
     def test_extract_sltp_params(self, sample_rsi_graph):
-        """Extract params from static_sltp block returns 2 params."""
+        """Extract params from static_sltp block returns 4 params (SL, TP, breakeven_activation, new_breakeven_sl)."""
         params = extract_optimizable_params(sample_rsi_graph)
         sltp_params = [p for p in params if p["block_type"] == "static_sltp"]
-        assert len(sltp_params) == 2
+        assert len(sltp_params) == 4
         keys = {p["param_key"] for p in sltp_params}
-        assert keys == {"stop_loss_percent", "take_profit_percent"}
+        assert keys == {"stop_loss_percent", "take_profit_percent", "breakeven_activation_percent", "new_breakeven_sl_percent"}
 
     def test_extract_multi_indicator_params(self, multi_indicator_graph):
         """Multi-indicator graph returns params from all block types."""
         params = extract_optimizable_params(multi_indicator_graph)
-        # RSI: 3, MACD: 3, Bollinger: 2, SLTP: 2 = 10
-        assert len(params) == 10
+        # RSI: 3, MACD: 3, Bollinger: 2, SLTP: 4 = 12
+        assert len(params) == 12
         block_types = {p["block_type"] for p in params}
         assert block_types == {"rsi", "macd", "bollinger", "static_sltp"}
 
