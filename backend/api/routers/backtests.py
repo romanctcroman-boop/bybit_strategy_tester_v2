@@ -141,15 +141,24 @@ def build_equity_curve_response(
             "runup": [float(runup[0]), float(runup[-1])] if runup else [],
         }
 
-    # Create timestamp -> index mapping for fast lookup
-    ts_to_idx = {}
+    # Create timestamp -> index mapping for fast lookup (epoch-based, avoids TZ string fragility)
+    def _to_epoch_ms(ts: Any) -> int | None:
+        """Convert timestamp to epoch milliseconds for reliable matching."""
+        if isinstance(ts, (int, float)):
+            return int(ts)
+        if hasattr(ts, "timestamp"):
+            return int(ts.timestamp() * 1000)
+        try:
+            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+            return int(dt.timestamp() * 1000)
+        except (ValueError, TypeError):
+            return None
+
+    ts_to_idx: dict[int, int] = {}
     for i, ts in enumerate(timestamps):
-        ts_str = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
-        # Normalize: remove timezone suffix variations
-        ts_str = ts_str.replace("+00:00", "Z").rstrip("Z") + "Z"
-        ts_to_idx[ts_str] = i
-        # Also add without Z for matching
-        ts_to_idx[ts_str.rstrip("Z")] = i
+        epoch = _to_epoch_ms(ts)
+        if epoch is not None:
+            ts_to_idx[epoch] = i
 
     # Collect indices for trade EXIT times only (one point per closed trade)
     exit_indices = []
@@ -157,14 +166,11 @@ def build_equity_curve_response(
         exit_time = trade.exit_time if hasattr(trade, "exit_time") else trade.get("exit_time")
 
         if exit_time:
-            exit_str = exit_time.isoformat() if hasattr(exit_time, "isoformat") else str(exit_time)
-            # Normalize
-            exit_str_z = exit_str.replace("+00:00", "Z").rstrip("Z") + "Z"
-            exit_str_no_z = exit_str.rstrip("Z").replace("+00:00", "")
-
-            idx = ts_to_idx.get(exit_str_z) or ts_to_idx.get(exit_str_no_z)
-            if idx is not None:
-                exit_indices.append(idx)
+            epoch = _to_epoch_ms(exit_time)
+            if epoch is not None:
+                idx = ts_to_idx.get(epoch)
+                if idx is not None:
+                    exit_indices.append(idx)
 
     # If we couldn't match any trades, fallback to first/last
     if not exit_indices:
@@ -665,10 +671,7 @@ async def list_backtests(
 
     # Accurate total: memory items + DB records not already cached in memory
     db_total_count = (
-        db.query(func.count(BacktestModel.id))
-        .filter(BacktestModel.id.notin_(list(memory_ids)))
-        .scalar()
-        or 0
+        db.query(func.count(BacktestModel.id)).filter(BacktestModel.id.notin_(list(memory_ids))).scalar() or 0
     )
     total = memory_count + db_total_count
 

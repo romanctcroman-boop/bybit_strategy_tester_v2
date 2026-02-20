@@ -3282,27 +3282,43 @@ function updateMetrics(metrics) {
 function downsampleData(data, targetLength) {
   if (!data || data.length <= targetLength) return data;
 
-  const step = data.length / targetLength;
+  // Min-max bucket sampling: keeps both the minimum and maximum point
+  // from each bucket (in chronological order) to preserve peaks AND valleys.
+  // Output length ≈ targetLength (may be slightly larger due to 2 points/bucket).
+  const buckets = Math.floor(targetLength / 2);
+  const step = data.length / buckets;
   const sampled = [];
 
   // Always keep first point
   sampled.push(data[0]);
 
-  for (let i = 1; i < targetLength - 1; i++) {
+  for (let i = 1; i < buckets - 1; i++) {
     const start = Math.floor(i * step);
-    const end = Math.floor((i + 1) * step);
+    const end = Math.min(Math.floor((i + 1) * step), data.length);
 
-    // Find point with max value in this bucket (preserves peaks/valleys)
+    if (start >= end) continue;
+
+    let minIdx = start;
     let maxIdx = start;
-    let maxVal = Math.abs(data[start]?.equity ?? data[start] ?? 0);
-    for (let j = start + 1; j < end && j < data.length; j++) {
-      const val = Math.abs(data[j]?.equity ?? data[j] ?? 0);
-      if (val > maxVal) {
-        maxVal = val;
-        maxIdx = j;
-      }
+    let minVal = data[start]?.equity ?? data[start] ?? 0;
+    let maxVal = minVal;
+
+    for (let j = start + 1; j < end; j++) {
+      const val = data[j]?.equity ?? data[j] ?? 0;
+      if (val < minVal) { minVal = val; minIdx = j; }
+      if (val > maxVal) { maxVal = val; maxIdx = j; }
     }
-    sampled.push(data[maxIdx]);
+
+    // Add both min and max in chronological order (skip duplicates)
+    if (minIdx === maxIdx) {
+      sampled.push(data[minIdx]);
+    } else if (minIdx < maxIdx) {
+      sampled.push(data[minIdx]);
+      sampled.push(data[maxIdx]);
+    } else {
+      sampled.push(data[maxIdx]);
+      sampled.push(data[minIdx]);
+    }
   }
 
   // Always keep last point
