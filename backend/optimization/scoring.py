@@ -172,15 +172,23 @@ def rank_by_multi_criteria(results: list[dict], selection_criteria: list[str]) -
             results[idx]["_ranks"][criterion] = rank
 
     # Calculate average rank
-    for r in results:
+    for i, r in enumerate(results):
         ranks = r.get("_ranks", {})
         if ranks:
             r["_avg_rank"] = sum(ranks.values()) / len(ranks)
         else:
             r["_avg_rank"] = float("inf")
+        # Store original index for stable tie-breaking
+        r["_orig_idx"] = i
 
-    # Sort by average rank (lower = better)
-    results.sort(key=lambda x: x.get("_avg_rank", float("inf")))
+    # Sort by average rank (lower = better), tie-break by total_return desc then original index
+    results.sort(
+        key=lambda x: (
+            x.get("_avg_rank", float("inf")),
+            -(x.get("total_return", 0) or 0),
+            x.get("_orig_idx", 0),
+        )
+    )
 
     # Set score as negative average rank (for compatibility with existing sort)
     for r in results:
@@ -190,6 +198,7 @@ def rank_by_multi_criteria(results: list[dict], selection_criteria: list[str]) -
     for r in results:
         r.pop("_ranks", None)
         r.pop("_avg_rank", None)
+        r.pop("_orig_idx", None)
 
     return results
 

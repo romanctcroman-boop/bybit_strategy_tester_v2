@@ -105,7 +105,17 @@ def flex_order_func_nb(
     max_drawdown_pct,  # NEW: Max drawdown limit (0 = disabled)
     fill_mode,  # NEW: 0 = bar_close, 1 = next_bar_open
 ):
-    """Flexible order function with SL/TP, max drawdown limit, and fill mode support."""
+    """Flexible order function with SL/TP, max drawdown limit, and fill mode support.
+
+    Args:
+        direction_mode: Direction filter (int, required by Numba JIT):
+            0 = long only (disables short entries/exits)
+            1 = short only (disables long entries/exits)
+            2 = both directions (default)
+        fill_mode: Execution fill mode:
+            0 = bar_close (fill at current bar close)
+            1 = next_bar_open (fill at next bar open price)
+    """
     col = c.from_col
     i = c.i
 
@@ -359,6 +369,7 @@ def run_vectorbt_with_sltp(ohlcv, signals, config):
         fill_mode_str = config.fill_mode
     fill_mode = 1 if fill_mode_str in ("next_bar_open", "on_next_bar") else 0
 
+    # Direction mode: 0=long_only, 1=short_only, 2=both (int for Numba JIT compatibility)
     direction_mode = {"long": 0, "short": 1, "both": 2}.get(direction, 2)
 
     close_df = pd.DataFrame({"close": ohlcv["close"].values}, index=ohlcv.index)

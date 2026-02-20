@@ -845,6 +845,14 @@ class StrategyBuilderAdapter(BaseStrategy):
             d_smooth = _param(params, 3, "stoch_d_smoothing", "d_period", "d")
             high = ohlcv["high"]
             low = ohlcv["low"]
+            # Note: k_smooth is accepted but NOT used by vbt.STOCH.run()
+            # VectorBT only supports k_window and d_window. See docs/architecture/STRATEGY_BUILDER_KNOWN_LIMITATIONS.md
+            if k_smooth != 3:
+                logger.warning(
+                    "STOCH k_smooth={} ignored — vectorbt does not support K-smoothing. "
+                    "Use a separate SMA/EMA block on %%K for smoothing.",
+                    k_smooth,
+                )
             stoch = vbt.STOCH.run(high, low, close, k_window=k_period, d_window=d_smooth, d_ewm=False)
             stoch_k = stoch.percent_k
             stoch_d = stoch.percent_d

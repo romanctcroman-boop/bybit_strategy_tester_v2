@@ -97,6 +97,8 @@ export async function updateLeverageLimits() {
         const positionSizeType = positionSizeTypeEl?.value || 'percent';
         const positionSize = parseFloat(positionSizeEl?.value) || 100;
 
+        if (!symbol || capital <= 0) return;
+
         // Fetch instrument info, current price, and volatility in parallel
         const [info, currentPrice, volatility] = await Promise.all([
             fetchInstrumentInfo(symbol),
@@ -180,7 +182,7 @@ export async function updateLeverageLimits() {
         updateLeverageDisplay(currentLeverage);
 
         // Update scale labels
-        if (leverageScale) {
+        if (leverageScale && effectiveMaxLeverage > 0) {
             const max = effectiveMaxLeverage;
             leverageScale.innerHTML = `
                 <span>1x</span>

@@ -212,7 +212,7 @@ class TestPerplexityClient:
         config = LLMConfig(provider=LLMProvider.PERPLEXITY, api_key="test-key")
         client = PerplexityClient(config)
         assert client.base_url == "https://api.perplexity.ai"
-        assert client.model == "llama-3.1-sonar-small-128k-online"
+        assert client.model == "sonar-pro"
         assert client.PROVIDER == LLMProvider.PERPLEXITY
 
 

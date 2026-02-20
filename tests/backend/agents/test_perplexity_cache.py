@@ -20,7 +20,6 @@ import pytest
 
 from backend.agents.consensus.perplexity_integration import (
     PerplexityIntegration,
-    PerplexityRelevance,
 )
 
 # =============================================================================
@@ -31,7 +30,8 @@ from backend.agents.consensus.perplexity_integration import (
 @pytest.fixture
 def integration() -> PerplexityIntegration:
     """Fresh PerplexityIntegration with short TTL for testing."""
-    pi = PerplexityIntegration(relevance_mode=PerplexityRelevance.ALWAYS)
+    config = {"perplexity_relevance": "ALWAYS", "perplexity_cache_ttl": 2}
+    pi = PerplexityIntegration(config=config)
     pi.cache_ttl_seconds = 2.0  # Short TTL for tests
     return pi
 
