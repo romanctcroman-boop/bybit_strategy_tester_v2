@@ -1,221 +1,210 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Security Headers -->
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
-    />
-    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
-    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!-- Security Headers -->
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://cdn.jsdelivr.net https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+        />
+        <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
 
-    <title>Analytics Dashboard - Bybit Strategy Tester v2</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="./css/analytics.css" />
-      <script src="js/core/auto-event-binding.js"></script>
-</head>
-  <body>
-    <div class="container">
-      <header>
-        <div class="header-row">
-          <a href="dashboard.html" class="home-link">🏠 Dashboard</a>
-          <a
-            href="analytics-advanced.html"
-            class="home-link"
-            style="margin-left: 15px"
-            >📈 Advanced Analytics</a
-          >
-        </div>
-        <h1>
-          📊 Analytics Dashboard
-          <span class="status-badge connected" id="connectionStatus">
-            <span class="status-dot"></span>
-            Connected
-          </span>
-        </h1>
-        <div>
-          <span id="lastUpdate" class="text-secondary-sm">
-            Last update: --
-          </span>
-        </div>
-      </header>
+        <title>Analytics Dashboard - Bybit Strategy Tester v2</title>
+        <!-- Production Init (must load before all other scripts) -->
+        <script src="js/init-production.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <link rel="stylesheet" href="./css/analytics.css" />
+        <script src="js/core/auto-event-binding.js"></script>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <div class="header-row">
+                    <a href="dashboard.html" class="home-link">🏠 Dashboard</a>
+                    <a href="analytics-advanced.html" class="home-link ms-15">📈 Advanced Analytics</a>
+                </div>
+                <h1>
+                    📊 Analytics Dashboard
+                    <span class="status-badge connected" id="connectionStatus">
+                        <span class="status-dot"></span>
+                        Connected
+                    </span>
+                </h1>
+                <div>
+                    <span id="lastUpdate" class="text-secondary-sm"> Last update: -- </span>
+                </div>
+            </header>
 
-      <!-- Risk Level Overview -->
-      <div class="risk-level-container">
-        <div class="risk-level-info">
-          <div class="risk-gauge">
-            <div class="risk-gauge-circle">
-              <div class="risk-gauge-inner">
-                <span class="risk-score" id="riskScore">--</span>
-                <span class="risk-label">Risk Score</span>
-              </div>
+            <!-- Risk Level Overview -->
+            <div class="risk-level-container">
+                <div class="risk-level-info">
+                    <div class="risk-gauge">
+                        <div class="risk-gauge-circle">
+                            <div class="risk-gauge-inner">
+                                <span class="risk-score" id="riskScore">--</span>
+                                <span class="risk-label">Risk Score</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="risk-details">
+                        <h2 id="riskLevel">Loading...</h2>
+                        <p id="riskDescription">Analyzing portfolio risk metrics...</p>
+                    </div>
+                </div>
+                <div class="risk-actions">
+                    <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
+                    <button class="btn btn-secondary" onclick="exportReport()">📥 Export Report</button>
+                </div>
             </div>
-          </div>
-          <div class="risk-details">
-            <h2 id="riskLevel">Loading...</h2>
-            <p id="riskDescription">Analyzing portfolio risk metrics...</p>
-          </div>
-        </div>
-        <div class="risk-actions">
-          <button class="btn btn-primary" onclick="refreshData()">
-            🔄 Refresh
-          </button>
-          <button class="btn btn-secondary" onclick="exportReport()">
-            📥 Export Report
-          </button>
-        </div>
-      </div>
 
-      <!-- Key Metrics Grid -->
-      <div class="metrics-grid">
-        <div class="metric-card">
-          <h3>Value at Risk (95%)</h3>
-          <div class="metric-value negative" id="var95">$--</div>
-          <div class="metric-change negative" id="var95Change">
-            <span>--</span>
-          </div>
-        </div>
-        <div class="metric-card">
-          <h3>Value at Risk (99%)</h3>
-          <div class="metric-value negative" id="var99">$--</div>
-          <div class="metric-change negative" id="var99Change">
-            <span>--</span>
-          </div>
-        </div>
-        <div class="metric-card">
-          <h3>Sharpe Ratio</h3>
-          <div class="metric-value" id="sharpeRatio">--</div>
-          <div class="metric-change" id="sharpeChange">
-            <span>Risk-adjusted return</span>
-          </div>
-        </div>
-        <div class="metric-card">
-          <h3>Sortino Ratio</h3>
-          <div class="metric-value" id="sortinoRatio">--</div>
-          <div class="metric-change" id="sortinoChange">
-            <span>Downside deviation</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Charts Section -->
-      <div class="charts-grid">
-        <div class="chart-card">
-          <div class="chart-header">
-            <h3>📈 Equity Curve & Drawdown</h3>
-            <div class="chart-controls">
-              <button class="chart-btn active" data-period="7d">7D</button>
-              <button class="chart-btn" data-period="30d">30D</button>
-              <button class="chart-btn" data-period="90d">90D</button>
-              <button class="chart-btn" data-period="all">All</button>
+            <!-- Key Metrics Grid -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h3>Value at Risk (95%)</h3>
+                    <div class="metric-value negative" id="var95">$--</div>
+                    <div class="metric-change negative" id="var95Change">
+                        <span>--</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <h3>Value at Risk (99%)</h3>
+                    <div class="metric-value negative" id="var99">$--</div>
+                    <div class="metric-change negative" id="var99Change">
+                        <span>--</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <h3>Sharpe Ratio</h3>
+                    <div class="metric-value" id="sharpeRatio">--</div>
+                    <div class="metric-change" id="sharpeChange">
+                        <span>Risk-adjusted return</span>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <h3>Sortino Ratio</h3>
+                    <div class="metric-value" id="sortinoRatio">--</div>
+                    <div class="metric-change" id="sortinoChange">
+                        <span>Downside deviation</span>
+                    </div>
+                </div>
             </div>
-          </div>
-          <div class="chart-container">
-            <canvas id="equityChart"></canvas>
-          </div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-header">
-            <h3>🎯 Risk Distribution</h3>
-          </div>
-          <div class="chart-container">
-            <canvas id="riskDistributionChart"></canvas>
-          </div>
-        </div>
-      </div>
 
-      <!-- Risk Metrics Tables -->
-      <div class="risk-metrics-section">
-        <div class="metrics-table">
-          <div class="table-header">📊 Portfolio Metrics</div>
-          <div class="table-row">
-            <span class="table-label">💰 Total Equity</span>
-            <span class="table-value" id="totalEquity">$--</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">📈 Total Exposure</span>
-            <span class="table-value" id="totalExposure">$--</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">💵 Unrealized P&L</span>
-            <span class="table-value" id="unrealizedPnl">$--</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">📉 Max Drawdown</span>
-            <span class="table-value" id="maxDrawdown">--%</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">🎯 Current Drawdown</span>
-            <span class="table-value" id="currentDrawdown">--%</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">✅ Win Rate</span>
-            <span class="table-value" id="winRate">--%</span>
-          </div>
-        </div>
-        <div class="metrics-table">
-          <div class="table-header">⚙️ Risk Thresholds</div>
-          <div class="table-row">
-            <span class="table-label">🔴 Max Drawdown</span>
-            <span class="table-value" id="thresholdMaxDrawdown">20%</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">📊 Max Exposure</span>
-            <span class="table-value" id="thresholdMaxExposure">200%</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">📐 Max Position Size</span>
-            <span class="table-value" id="thresholdMaxPosition">25%</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">📉 Max Daily Loss</span>
-            <span class="table-value" id="thresholdDailyLoss">5%</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">🔗 Max Correlation</span>
-            <span class="table-value" id="thresholdCorrelation">0.7</span>
-          </div>
-          <div class="table-row">
-            <span class="table-label">💧 Min Liquidity</span>
-            <span class="table-value" id="thresholdLiquidity">0.5</span>
-          </div>
-        </div>
-      </div>
+            <!-- Charts Section -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>📈 Equity Curve & Drawdown</h3>
+                        <div class="chart-controls">
+                            <button class="chart-btn active" data-period="7d">7D</button>
+                            <button class="chart-btn" data-period="30d">30D</button>
+                            <button class="chart-btn" data-period="90d">90D</button>
+                            <button class="chart-btn" data-period="all">All</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="equityChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>🎯 Risk Distribution</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="riskDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
 
-      <!-- Position Risk Heatmap -->
-      <div class="chart-card chart-card-mb">
-        <div class="chart-header">
-          <h3>🔥 Position Risk Heatmap</h3>
-          <div class="chart-controls">
-            <span class="legend-small">
-              <span class="legend-low">● Low</span> |
-              <span class="legend-medium">● Medium</span> |
-              <span class="legend-high">● High</span>
-            </span>
-          </div>
-        </div>
-        <div class="heatmap-container" id="positionHeatmap">
-          <!-- Dynamically populated -->
-        </div>
-      </div>
+            <!-- Risk Metrics Tables -->
+            <div class="risk-metrics-section">
+                <div class="metrics-table">
+                    <div class="table-header">📊 Portfolio Metrics</div>
+                    <div class="table-row">
+                        <span class="table-label">💰 Total Equity</span>
+                        <span class="table-value" id="totalEquity">$--</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">📈 Total Exposure</span>
+                        <span class="table-value" id="totalExposure">$--</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">💵 Unrealized P&L</span>
+                        <span class="table-value" id="unrealizedPnl">$--</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">📉 Max Drawdown</span>
+                        <span class="table-value" id="maxDrawdown">--%</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">🎯 Current Drawdown</span>
+                        <span class="table-value" id="currentDrawdown">--%</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">✅ Win Rate</span>
+                        <span class="table-value" id="winRate">--%</span>
+                    </div>
+                </div>
+                <div class="metrics-table">
+                    <div class="table-header">⚙️ Risk Thresholds</div>
+                    <div class="table-row">
+                        <span class="table-label">🔴 Max Drawdown</span>
+                        <span class="table-value" id="thresholdMaxDrawdown">20%</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">📊 Max Exposure</span>
+                        <span class="table-value" id="thresholdMaxExposure">200%</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">📐 Max Position Size</span>
+                        <span class="table-value" id="thresholdMaxPosition">25%</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">📉 Max Daily Loss</span>
+                        <span class="table-value" id="thresholdDailyLoss">5%</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">🔗 Max Correlation</span>
+                        <span class="table-value" id="thresholdCorrelation">0.7</span>
+                    </div>
+                    <div class="table-row">
+                        <span class="table-label">💧 Min Liquidity</span>
+                        <span class="table-value" id="thresholdLiquidity">0.5</span>
+                    </div>
+                </div>
+            </div>
 
-      <!-- Active Alerts -->
-      <div class="alerts-section">
-        <div class="alerts-header">
-          <h3>🚨 Active Alerts</h3>
-          <span class="alert-badge critical" id="alertCount">0 Critical</span>
-        </div>
-        <div id="alertsList">
-          <div class="loading">
-            <div class="spinner"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+            <!-- Position Risk Heatmap -->
+            <div class="chart-card chart-card-mb">
+                <div class="chart-header">
+                    <h3>🔥 Position Risk Heatmap</h3>
+                    <div class="chart-controls">
+                        <span class="legend-small">
+                            <span class="legend-low">● Low</span> | <span class="legend-medium">● Medium</span> |
+                            <span class="legend-high">● High</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="heatmap-container" id="positionHeatmap">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
 
-    <script type="module" src="./js/pages/analytics.js"></script>
-  </body>
+            <!-- Active Alerts -->
+            <div class="alerts-section">
+                <div class="alerts-header">
+                    <h3>🚨 Active Alerts</h3>
+                    <span class="alert-badge critical" id="alertCount">0 Critical</span>
+                </div>
+                <div id="alertsList">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script type="module" src="./js/pages/analytics.js"></script>
+    </body>
 </html>
