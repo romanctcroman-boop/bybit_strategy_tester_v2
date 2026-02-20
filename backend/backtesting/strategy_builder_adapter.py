@@ -712,7 +712,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                 if long_more > long_less:
                     logger.warning(
                         "RSI range inversion: long_more={} > long_less={} — swapping to prevent always-False condition",
-                        long_more, long_less,
+                        long_more,
+                        long_less,
                     )
                     long_more, long_less = long_less, long_more
                 long_range_condition = (rsi >= long_more) & (rsi <= long_less)
@@ -725,7 +726,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                 if short_more > short_less:
                     logger.warning(
                         "RSI range inversion: short_more={} > short_less={} — swapping to prevent always-False condition",
-                        short_more, short_less,
+                        short_more,
+                        short_less,
                     )
                     short_more, short_less = short_less, short_more
                 short_range_condition = (rsi <= short_less) & (rsi >= short_more)
@@ -953,7 +955,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                 if long_more > long_less:
                     logger.warning(
                         "Stochastic range inversion: long_more={} > long_less={} — swapping to prevent always-False condition",
-                        long_more, long_less,
+                        long_more,
+                        long_less,
                     )
                     long_more, long_less = long_less, long_more
                 long_range_cond = (stoch_d >= long_more) & (stoch_d <= long_less)
@@ -962,7 +965,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                 if short_more > short_less:
                     logger.warning(
                         "Stochastic range inversion: short_more={} > short_less={} — swapping to prevent always-False condition",
-                        short_more, short_less,
+                        short_more,
+                        short_less,
                     )
                     short_more, short_less = short_less, short_more
                 short_range_cond = (stoch_d <= short_less) & (stoch_d >= short_more)
@@ -1430,7 +1434,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 }
             length1 = int(params.get("atr_length1", 20))
             length2 = int(params.get("atr_length2", 100))
-            smoothing = str(params.get("atr_smoothing", "WMA")).upper()
+            smoothing_method = str(params.get("atr_smoothing", "WMA")).upper()
             diff_pct = float(params.get("atr_diff_percent", 10))
             mode = params.get("atr1_to_atr2", "ATR1 < ATR2")
 
@@ -1438,11 +1442,11 @@ class StrategyBuilderAdapter(BaseStrategy):
             low_arr = ohlcv["low"].values
             close_arr = close.values
             atr1 = pd.Series(
-                calculate_atr_smoothed(high_arr, low_arr, close_arr, period=length1, method=smoothing),
+                calculate_atr_smoothed(high_arr, low_arr, close_arr, period=length1, method=smoothing_method),
                 index=ohlcv.index,
             )
             atr2 = pd.Series(
-                calculate_atr_smoothed(high_arr, low_arr, close_arr, period=length2, method=smoothing),
+                calculate_atr_smoothed(high_arr, low_arr, close_arr, period=length2, method=smoothing_method),
                 index=ohlcv.index,
             )
             # Percentage difference: |ATR1 - ATR2| / ATR2 * 100 >= diff_pct
@@ -1473,19 +1477,19 @@ class StrategyBuilderAdapter(BaseStrategy):
                 }
             length1 = int(params.get("vol_length1", 20))
             length2 = int(params.get("vol_length2", 100))
-            smoothing = str(params.get("vol_smoothing", "WMA")).upper()
+            smoothing_method = str(params.get("vol_smoothing", "WMA")).upper()
             diff_pct = float(params.get("vol_diff_percent", 10))
             mode = params.get("vol1_to_vol2", "VOL1 < VOL2")
 
             volume = ohlcv["volume"].astype(float)
             # Apply smoothing to volume
-            if smoothing == "EMA":
+            if smoothing_method == "EMA":
                 vol1 = volume.ewm(span=length1, adjust=False).mean()
                 vol2 = volume.ewm(span=length2, adjust=False).mean()
-            elif smoothing == "SMA":
+            elif smoothing_method == "SMA":
                 vol1 = volume.rolling(length1).mean()
                 vol2 = volume.rolling(length2).mean()
-            elif smoothing == "WMA":
+            elif smoothing_method == "WMA":
                 w1 = np.arange(1, length1 + 1, dtype=float)
                 vol1 = volume.rolling(length1).apply(lambda x: np.dot(x, w1) / w1.sum(), raw=True)
                 w2 = np.arange(1, length2 + 1, dtype=float)
@@ -3863,7 +3867,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                 if long_more > long_less:
                     logger.warning(
                         "Close RSI range inversion: long_more={} > long_less={} — swapping to prevent always-False exit",
-                        long_more, long_less,
+                        long_more,
+                        long_less,
                     )
                     long_more, long_less = long_less, long_more
                 short_less = float(params.get("rsi_short_less", 30))
@@ -3871,7 +3876,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                 if short_more > short_less:
                     logger.warning(
                         "Close RSI range inversion: short_more={} > short_less={} — swapping to prevent always-False exit",
-                        short_more, short_less,
+                        short_more,
+                        short_less,
                     )
                     short_more, short_less = short_less, short_more
                 exit_long = exit_long | ((rsi_values >= long_more) & (rsi_values <= long_less))
@@ -3923,7 +3929,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                 if long_more > long_less:
                     logger.warning(
                         "Close Stochastic range inversion: long_more={} > long_less={} — swapping to prevent always-False exit",
-                        long_more, long_less,
+                        long_more,
+                        long_less,
                     )
                     long_more, long_less = long_less, long_more
                 short_less = float(params.get("stoch_short_less", 20))
@@ -3931,7 +3938,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                 if short_more > short_less:
                     logger.warning(
                         "Close Stochastic range inversion: short_more={} > short_less={} — swapping to prevent always-False exit",
-                        short_more, short_less,
+                        short_more,
+                        short_less,
                     )
                     short_more, short_less = short_less, short_more
                 exit_long = exit_long | ((stoch_values >= long_more) & (stoch_values <= long_less))

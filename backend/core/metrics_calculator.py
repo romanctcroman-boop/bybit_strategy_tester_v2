@@ -438,11 +438,7 @@ def calculate_calmar(
     if years > 1.0:
         # CAGR = ((1 + total_return_fraction) ^ (1/years) - 1) * 100
         total_return_frac = total_return_pct / 100
-        if total_return_frac <= -1.0:
-            # Total loss — CAGR is -100%
-            cagr = -100.0
-        else:
-            cagr = (pow(1 + total_return_frac, 1 / years) - 1) * 100
+        cagr = -100.0 if total_return_frac <= -1.0 else (pow(1 + total_return_frac, 1 / years) - 1) * 100
     else:
         cagr = total_return_pct
 
