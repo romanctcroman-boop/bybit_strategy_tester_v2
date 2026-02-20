@@ -96,6 +96,8 @@ class AgentMemoryManager:
     @contextmanager
     def _get_sqlite(self):
         """Yield a SQLite connection with proper cleanup."""
+        if self._db_path is None:
+            raise RuntimeError("SQLite backend not initialized: _db_path is None")
         conn = sqlite3.connect(self._db_path, timeout=10)
         conn.row_factory = sqlite3.Row
         try:

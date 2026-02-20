@@ -46,6 +46,10 @@
     "words": [
         "Bybit",
         "bybit",
+        "dones",
+        "pmessage",
+        "psubscribe",
+        "savez",
         "venv",
         "Venv",
         "uvicorn",
@@ -195,6 +199,7 @@
         "onchange",
         "xlink",
         "samp",
+        "XYZNONEXISTENT",
         "XYZUSDT",
         "NONEUSDT",
         "fastmcp",

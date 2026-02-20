@@ -99,7 +99,7 @@ class WSBroadcaster:
     """
 
     def __init__(self, redis_url: str | None = None) -> None:
-        self._redis_url: str = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379")
+        self._redis_url: str = redis_url or os.getenv("REDIS_URL") or "redis://localhost:6379"
         self._redis: Any = None
         self._pubsub: Any = None
         self._local_queues: dict[str, list[asyncio.Queue]] = {}

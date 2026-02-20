@@ -119,7 +119,7 @@ if STRAWBERRY_AVAILABLE:
 
         @strawberry.field(description="System health check")
         async def health(self) -> HealthType:
-            return HealthType(status="healthy", version="2.0.0")
+            return HealthType(status="healthy", version="2.0.0")  # type: ignore[call-arg]
 
         @strawberry.field(description="List available strategy types")
         async def strategies(self) -> list[StrategyType]:
@@ -129,7 +129,7 @@ if STRAWBERRY_AVAILABLE:
 
                 registry = get_strategy_registry()
                 return [
-                    StrategyType(
+                    StrategyType(  # type: ignore[call-arg]
                         name=name,
                         strategy_type=name,
                         description=meta.get("description", ""),
@@ -139,10 +139,10 @@ if STRAWBERRY_AVAILABLE:
             except ImportError:
                 # Fallback: return common strategies
                 return [
-                    StrategyType(name="rsi", strategy_type="rsi", description="RSI Overbought/Oversold"),
-                    StrategyType(name="macd", strategy_type="macd", description="MACD Crossover"),
-                    StrategyType(name="bollinger", strategy_type="bollinger", description="Bollinger Bands"),
-                    StrategyType(name="ema_cross", strategy_type="ema_cross", description="EMA Crossover"),
+                    StrategyType(name="rsi", strategy_type="rsi", description="RSI Overbought/Oversold"),  # type: ignore[call-arg]
+                    StrategyType(name="macd", strategy_type="macd", description="MACD Crossover"),  # type: ignore[call-arg]
+                    StrategyType(name="bollinger", strategy_type="bollinger", description="Bollinger Bands"),  # type: ignore[call-arg]
+                    StrategyType(name="ema_cross", strategy_type="ema_cross", description="EMA Crossover"),  # type: ignore[call-arg]
                 ]
 
         @strawberry.field(description="Get available symbols")
@@ -160,7 +160,7 @@ if STRAWBERRY_AVAILABLE:
                 "ADAUSDT",
             ]
             return [
-                SymbolInfoType(
+                SymbolInfoType(  # type: ignore[call-arg]
                     symbol=s,
                     base_asset=s.replace("USDT", ""),
                     quote_asset="USDT",
@@ -203,7 +203,7 @@ if STRAWBERRY_AVAILABLE:
                 initial_capital,
             )
 
-            return BacktestResultType(
+            return BacktestResultType(  # type: ignore[call-arg]
                 backtest_id=backtest_id,
                 symbol=symbol,
                 timeframe=timeframe,

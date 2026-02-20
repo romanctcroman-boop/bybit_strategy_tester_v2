@@ -46,7 +46,7 @@ function Get-CanaryStatus {
     Select-String "weight"
 }
 
-function Deploy-Canary {
+function Start-CanaryDeployment {
     Write-Host "Deploying canary at Stage 1 (10% traffic)..." -ForegroundColor Yellow
 
     # Apply canary deployment
@@ -79,7 +79,7 @@ function Deploy-Canary {
     }
 }
 
-function Rollback-Canary {
+function Undo-CanaryDeployment {
     Write-Host "Rolling back canary deployment..." -ForegroundColor Red
 
     # Scale canary to 0
@@ -92,7 +92,7 @@ function Rollback-Canary {
 }
 
 switch ($Action) {
-    "deploy" { Deploy-Canary }
+    "deploy" { Start-CanaryDeployment }
     "promote" {
         Write-Host "Promote: update canary-virtualservice.yaml weights and re-apply." -ForegroundColor Yellow
         Write-Host "Stages: 10% → 25% → 50% → 100%"
@@ -100,6 +100,6 @@ switch ($Action) {
             Write-Host "  $($s.Name): canary=$($s.Canary)%, stable=$($s.Stable)%"
         }
     }
-    "rollback" { Rollback-Canary }
+    "rollback" { Undo-CanaryDeployment }
     "status" { Get-CanaryStatus }
 }

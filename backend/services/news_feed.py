@@ -312,14 +312,14 @@ class NewsFeedService:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for i, result in enumerate(results):
-                if isinstance(result, Exception):
+                if isinstance(result, BaseException):
                     logger.warning(
                         "Source %s failed: %s",
                         self.sources[i].name,
                         result,
                     )
                     continue
-                all_articles.extend(result)
+                all_articles.extend(result)  # type: ignore[arg-type]
 
             logger.info(
                 "Fetched %d articles from %d sources",
@@ -445,7 +445,7 @@ class NewsFeedService:
             label = "neutral"
 
         # Top categories by frequency
-        top_cats = sorted(categories, key=categories.get, reverse=True)[:3]
+        top_cats = sorted(categories, key=lambda c: categories[c], reverse=True)[:3]
 
         return SentimentSummary(
             symbol=symbol,
