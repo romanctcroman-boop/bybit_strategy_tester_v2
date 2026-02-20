@@ -67,8 +67,8 @@ class Trade(Base):
     symbol = Column(String(32), nullable=False, index=True)
 
     # Trade direction and status
-    side = Column(Enum(TradeSide), nullable=False)
-    status = Column(Enum(TradeStatus), default=TradeStatus.CLOSED, nullable=False)
+    side = Column(Enum(TradeSide), nullable=False)  # type: ignore[var-annotated]
+    status = Column(Enum(TradeStatus), default=TradeStatus.CLOSED, nullable=False)  # type: ignore[var-annotated]
 
     # Entry details
     entry_price = Column(Float, nullable=False)
@@ -161,35 +161,35 @@ class Trade(Base):
         """Calculate trade duration in seconds."""
         if self.entry_time and self.exit_time:
             delta = self.exit_time - self.entry_time
-            self.duration_seconds = int(delta.total_seconds())
-            return self.duration_seconds
+            self.duration_seconds = int(delta.total_seconds())  # type: ignore[assignment]
+            return self.duration_seconds  # type: ignore[return-value]
         return None
 
     def calculate_pnl(self) -> float | None:
         """Calculate PnL based on entry/exit prices."""
         if self.entry_price and self.exit_price and self.entry_size:
             if self.side in (TradeSide.BUY, TradeSide.LONG):
-                self.pnl = (self.exit_price - self.entry_price) * self.entry_size
+                self.pnl = (self.exit_price - self.entry_price) * self.entry_size  # type: ignore[assignment]
             else:
-                self.pnl = (self.entry_price - self.exit_price) * self.entry_size
+                self.pnl = (self.entry_price - self.exit_price) * self.entry_size  # type: ignore[assignment]
 
             # Subtract fees
-            self.realized_pnl = self.pnl - (self.fees or 0) - (self.commission or 0)
+            self.realized_pnl = self.pnl - (self.fees or 0) - (self.commission or 0)  # type: ignore[assignment]
 
             # Calculate percentage
             if self.entry_value and self.entry_value > 0:
-                self.pnl_percent = (self.pnl / self.entry_value) * 100
+                self.pnl_percent = (self.pnl / self.entry_value) * 100  # type: ignore[assignment]
 
-            return self.pnl
+            return self.pnl  # type: ignore[return-value]
         return None
 
     def close(self, exit_price: float, exit_time: datetime, exit_signal: str | None = None) -> None:
         """Close the trade."""
-        self.exit_price = exit_price
-        self.exit_time = exit_time
+        self.exit_price = exit_price  # type: ignore[assignment]
+        self.exit_time = exit_time  # type: ignore[assignment]
         self.exit_size = self.entry_size
-        self.exit_value = exit_price * self.entry_size
-        self.exit_signal = exit_signal
-        self.status = TradeStatus.CLOSED
+        self.exit_value = exit_price * self.entry_size  # type: ignore[assignment]
+        self.exit_signal = exit_signal  # type: ignore[assignment]
+        self.status = TradeStatus.CLOSED  # type: ignore[assignment]
         self.calculate_pnl()
         self.calculate_duration()

@@ -66,4 +66,4 @@ class BybitKlineAudit(Base):
     )
 
     def set_raw(self, raw_obj):
-        self.raw = json.dumps(raw_obj, ensure_ascii=False)
+        self.raw = json.dumps(raw_obj, ensure_ascii=False)  # type: ignore[assignment]

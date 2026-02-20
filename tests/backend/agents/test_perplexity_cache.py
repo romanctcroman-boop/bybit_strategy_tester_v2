@@ -32,7 +32,7 @@ def integration() -> PerplexityIntegration:
     """Fresh PerplexityIntegration with short TTL for testing."""
     config = {"perplexity_relevance": "ALWAYS", "perplexity_cache_ttl": 2}
     pi = PerplexityIntegration(config=config)
-    pi.cache_ttl_seconds = 2.0  # Short TTL for tests
+    pi.cache_ttl_seconds = 2  # Short TTL for tests
     return pi
 
 
