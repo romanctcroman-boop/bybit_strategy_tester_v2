@@ -2353,6 +2353,26 @@ function setupEventListeners() {
   const builderDirectionEl = document.getElementById('builderDirection');
   if (builderDirectionEl) {
     builderDirectionEl.addEventListener('change', () => {
+      // Remove connections to ports that are no longer valid for the new direction
+      const direction = builderDirectionEl.value;
+      if (direction !== 'both') {
+        const hiddenPorts = direction === 'long'
+          ? ['entry_short', 'exit_short']
+          : ['entry_long', 'exit_long'];
+        const before = connections.length;
+        for (let i = connections.length - 1; i >= 0; i--) {
+          const c = connections[i];
+          if (hiddenPorts.includes(c.target?.portId) || hiddenPorts.includes(c.source?.portId)) {
+            connections.splice(i, 1);
+          }
+        }
+        if (connections.length < before) {
+          showNotification(
+            `Удалено ${before - connections.length} соединений к скрытым портам`,
+            'info'
+          );
+        }
+      }
       // Re-render blocks to update Strategy node ports based on direction
       renderBlocks();
       // Re-render connections to update direction mismatch highlighting
@@ -5252,14 +5272,14 @@ function renderBlocks() {
                 <div class="block-header-icon">
                     <i class="bi bi-${block.icon}"></i>
                 </div>
-                <span class="block-header-title">${block.name}</span>
+                <span class="block-header-title">${escapeHtml(block.name)}</span>
                 <div class="block-header-actions">
                     <button class="block-action-btn" data-action="duplicate" title="Duplicate"><i class="bi bi-copy"></i></button>
                     <button class="block-action-btn" data-action="delete" title="Delete"><i class="bi bi-trash"></i></button>
                     <button class="block-header-menu" title="Settings"><i class="bi bi-three-dots"></i></button>
                 </div>
             </div>
-            ${paramHint ? `<div class="block-param-hint">${paramHint}</div>` : ''}
+            ${paramHint ? `<div class="block-param-hint">${escapeHtml(paramHint)}</div>` : ''}
             ${renderPorts(ports.outputs, 'output', block.id)}
         </div>
       `;
@@ -7276,6 +7296,14 @@ function initConnectionSystem() {
     }
   });
 
+  // Left-click on connection line — delete (event delegation, avoids listener leak)
+  container.addEventListener('click', (e) => {
+    const connLine = e.target.closest('.connection-line:not(.temp)');
+    if (connLine && connLine.dataset.connectionId) {
+      deleteConnection(connLine.dataset.connectionId);
+    }
+  });
+
   // Listen for mouse move during connection
   container.addEventListener('mousemove', (e) => {
     if (isConnecting) {
@@ -7834,17 +7862,7 @@ function renderConnections() {
     path.setAttribute('d', createBezierPath(startX, startY, endX, endY, true));
     path.dataset.connectionId = conn.id;
 
-    // Delete on click
-    path.addEventListener('click', () => {
-      deleteConnection(conn.id);
-    });
-
-    // Delete on right-click
-    path.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      deleteConnection(conn.id);
-    });
+    // Event listeners handled by delegation in initConnectionSystem()
 
     svg.appendChild(path);
 
@@ -9295,10 +9313,17 @@ function restoreStateSnapshot(snapshot) {
   if (selectedBlockId && !strategyBlocks.some((b) => b.id === selectedBlockId)) {
     selectedBlockId = null;
   }
+  // Reset autosave payload so the restored state gets saved to localStorage
+  lastAutoSavePayload = null;
   renderBlocks();
   renderConnections();
   renderBlockProperties();
   dispatchBlocksChanged();
+  // Re-validate if the validation panel is currently visible (BUG#11)
+  const vp = document.querySelector('.validation-panel');
+  if (vp && vp.classList.contains('visible')) {
+    validateStrategy();
+  }
 }
 
 function pushUndo() {
@@ -9991,6 +10016,14 @@ function showNotification(message, type = 'info') {
 
 async function saveStrategy() {
   console.log('[Strategy Builder] saveStrategy called');
+
+  // Offline guard: fall back to localStorage draft instead of failing silently
+  if (!navigator.onLine) {
+    showNotification('Нет подключения к сети. Стратегия сохранена в черновик (localStorage).', 'warning');
+    autoSaveStrategy();
+    return;
+  }
+
   const strategy = buildStrategyPayload();
   console.log('[Strategy Builder] Strategy payload:', strategy);
 
@@ -11363,8 +11396,12 @@ function renderEquityChart(equityCurve) {
   ctx.beginPath();
 
   values.forEach((val, idx) => {
-    const x = padding + (idx / (values.length - 1)) * width;
-    const y = padding + height - ((val - minVal) / range) * height;
+    const x = values.length <= 1
+      ? padding + width / 2
+      : padding + (idx / (values.length - 1)) * width;
+    const y = range > 0
+      ? padding + height - ((val - minVal) / range) * height
+      : padding + height / 2;
 
     if (idx === 0) {
       ctx.moveTo(x, y);

@@ -275,10 +275,23 @@ class StrategyBuilderAdapter(BaseStrategy):
                         if in_degree[target_id] == 0:
                             queue.append(target_id)
 
-        # Add any remaining blocks (disconnected)
-        for block_id in self.blocks:
-            if block_id not in result:
-                result.append(block_id)
+        # Add any remaining blocks — distinguish disconnected from cyclic
+        remaining = [bid for bid in self.blocks if bid not in result]
+        if remaining:
+            # Blocks with in_degree > 0 after Kahn's are part of a cycle
+            connected_block_ids = {self._get_connection_source_id(c) for c in self.connections} | {
+                self._get_connection_target_id(c) for c in self.connections
+            }
+            cyclic = [bid for bid in remaining if bid in connected_block_ids and in_degree.get(bid, 0) > 0]
+            if cyclic:
+                logger.warning(
+                    "Cycle detected in strategy graph — blocks {} have "
+                    "unsatisfied dependencies and may produce incorrect signals. "
+                    "Break the cycle by removing a connection.",
+                    cyclic,
+                )
+
+            result.extend(remaining)
 
         return result
 
@@ -1962,9 +1975,23 @@ class StrategyBuilderAdapter(BaseStrategy):
         self, logic_type: str, params: dict[str, Any], inputs: dict[str, pd.Series]
     ) -> dict[str, pd.Series]:
         """Execute a logic block"""
+
+        # Infer series length from inputs (avoids hardcoded sizes)
+        def _default_bool(n: int, fill: bool = False) -> pd.Series:
+            ref = next(iter(inputs.values()), None) if inputs else None
+            if ref is not None:
+                return pd.Series([fill] * len(ref), index=ref.index)
+            return pd.Series([fill] * n)
+
+        def _default_numeric(n: int, fill: float = 0.0) -> pd.Series:
+            ref = next(iter(inputs.values()), None) if inputs else None
+            if ref is not None:
+                return pd.Series([fill] * len(ref), index=ref.index)
+            return pd.Series([fill] * n)
+
         if logic_type == "and":
-            a = inputs.get("a", pd.Series([False] * 100))
-            b = inputs.get("b", pd.Series([False] * 100))
+            a = inputs.get("a", _default_bool(0))
+            b = inputs.get("b", _default_bool(0))
             result = a & b
             # Support optional 3rd input (C port)
             if "c" in inputs:
@@ -1972,8 +1999,8 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"result": result}
 
         elif logic_type == "or":
-            a = inputs.get("a", pd.Series([False] * 100))
-            b = inputs.get("b", pd.Series([False] * 100))
+            a = inputs.get("a", _default_bool(0))
+            b = inputs.get("b", _default_bool(0))
             result = a | b
             # Support optional 3rd input (C port)
             if "c" in inputs:
@@ -1981,17 +2008,17 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"result": result}
 
         elif logic_type == "not":
-            input_val = inputs.get("input", pd.Series([False] * 100))
+            input_val = inputs.get("input", _default_bool(0))
             return {"result": ~input_val}
 
         elif logic_type == "delay":
             bars = params.get("bars", 1)
-            input_val = inputs.get("input", pd.Series([False] * 100))
+            input_val = inputs.get("input", _default_bool(0))
             return {"result": input_val.shift(bars).fillna(False).astype(bool)}
 
         elif logic_type == "filter":
-            signal = inputs.get("signal", pd.Series([False] * 100))
-            filter_val = inputs.get("filter", pd.Series([True] * 100))
+            signal = inputs.get("signal", _default_bool(0))
+            filter_val = inputs.get("filter", _default_bool(0, fill=True))
             return {"result": signal & filter_val}
 
         elif logic_type == "comparison":
@@ -1999,8 +2026,8 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Inputs: value_a, value_b (numeric series)
             # Params: operator (>, <, >=, <=, ==, !=, crosses_above, crosses_below)
             # Output: result (boolean series)
-            a = inputs.get("value_a", inputs.get("a", pd.Series([0.0] * 100)))
-            b = inputs.get("value_b", inputs.get("b", pd.Series([0.0] * 100)))
+            a = inputs.get("value_a", inputs.get("a", _default_numeric(0)))
+            b = inputs.get("value_b", inputs.get("b", _default_numeric(0)))
             op = params.get("operator", "==")
 
             # Ensure series are aligned
@@ -2043,7 +2070,7 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         else:
             logger.warning(f"Unknown logic type: {logic_type}")
-            return {"result": pd.Series([False] * 100)}
+            return {"result": _default_bool(0)}
 
     def _execute_filter(
         self, filter_type: str, params: dict[str, Any], ohlcv: pd.DataFrame, inputs: dict[str, pd.Series]
