@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
@@ -190,6 +190,12 @@ class DataPeriod(BaseModel):
         default=None, description="Walk-forward settings (train_size, test_size, step_size)"
     )
 
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "DataPeriod":
+        if self.start_date >= self.end_date:
+            raise ValueError(f"end_date ({self.end_date}) must be after start_date ({self.start_date})")
+        return self
+
 
 class OptimizationLimits(BaseModel):
     """Computational limits for optimization"""
@@ -288,6 +294,12 @@ class BuilderOptimizationRequest(BaseModel):
         if v not in supported:
             raise ValueError(f"Unsupported interval '{v}'. Use: {sorted(supported)}")
         return v
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "BuilderOptimizationRequest":
+        if self.start_date >= self.end_date:
+            raise ValueError(f"end_date ({self.end_date}) must be after start_date ({self.start_date})")
+        return self
 
 
 class InstantiateTemplateRequest(BaseModel):
@@ -2468,6 +2480,15 @@ class BacktestRequest(BaseModel):
         le=100.0,
         description="TP4 - percentage of position to close (0-100%).",
     )
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "BacktestRequest":
+        """Ensure start_date is before end_date."""
+        if self.start_date and self.end_date and self.start_date >= self.end_date:
+            raise ValueError(
+                f"start_date ({self.start_date.isoformat()}) must be before end_date ({self.end_date.isoformat()})"
+            )
+        return self
 
 
 @router.post("/strategies/{strategy_id}/backtest")

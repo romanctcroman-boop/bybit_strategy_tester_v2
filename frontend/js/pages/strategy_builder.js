@@ -9470,6 +9470,17 @@ function validateStrategyCompleteness() {
   const capital = parseFloat(document.getElementById('backtestCapital')?.value);
   if (!symbol) { result.valid = false; result.errors.push('⚙️ Параметры: не выбран Symbol'); }
   if (!startDate || !endDate) { result.valid = false; result.errors.push('⚙️ Параметры: не заданы даты'); }
+  if (startDate && endDate && startDate >= endDate) {
+    result.valid = false;
+    result.errors.push('⚙️ Параметры: Start Date должна быть раньше End Date');
+  }
+  if (startDate && endDate && startDate < endDate) {
+    const diffMs = new Date(endDate) - new Date(startDate);
+    const diffYears = diffMs / (365.25 * 24 * 60 * 60 * 1000);
+    if (diffYears > 10) {
+      result.warnings.push('⚙️ Параметры: диапазон дат > 10 лет — бэктест может быть очень долгим');
+    }
+  }
   if (!capital || capital <= 0) { result.valid = false; result.errors.push('⚙️ Параметры: Capital должен быть > 0'); }
 
   // Part 2: Entry conditions
