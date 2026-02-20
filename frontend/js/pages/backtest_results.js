@@ -2720,8 +2720,25 @@ function clearAllDisplayData() {
   btPriceChartMarkers = [];
   btTradeLineSeries = [];
   _btCachedCandles = [];
+  btPriceChartPending = false;
+  _priceChartGeneration++;
   const priceContainer = document.getElementById('btPriceChartContainer');
-  if (priceContainer) priceContainer.innerHTML = '';
+  if (priceContainer) {
+    // Restore default inner structure with empty candlestick chart + hidden loading
+    priceContainer.innerHTML = `
+      <div id="btCandlestickChart"></div>
+      <div class="bt-price-chart-loading hidden" id="btPriceChartLoading">
+        <div class="spinner-border spinner-border-sm text-secondary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <span class="ms-2 text-secondary">Загрузка свечных данных...</span>
+      </div>`;
+  }
+  // Reset price chart title
+  const priceTitle = document.getElementById('priceChartTitle');
+  if (priceTitle) {
+    priceTitle.innerHTML = '<i class="bi bi-graph-up-arrow me-1"></i>График цены';
+  }
 
   // --- TradingView Equity Chart (custom component) ---
   if (window.tvEquityChart) {

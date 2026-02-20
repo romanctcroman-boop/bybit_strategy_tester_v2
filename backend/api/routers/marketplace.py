@@ -534,9 +534,7 @@ async def get_marketplace_stats(
         .group_by(MarketplaceStrategy.strategy_type)
         .all()
     )
-    categories: dict[str, int] = {
-        row[0]: int(row[1]) for row in category_rows
-    }
+    categories: dict[str, int] = {row[0]: int(row[1]) for row in category_rows}
 
     return MarketplaceStatsResponse(
         total_strategies=total_strategies,
