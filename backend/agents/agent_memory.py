@@ -7,6 +7,8 @@ Provides storage and retrieval of agent interactions.
 
 import json
 import logging
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +20,7 @@ class AgentMemoryManager:
     Manages memory storage for agents.
 
     Stores conversation history and context for agent-to-agent communication.
+    Uses per-conversation locks to prevent data corruption from concurrent writes.
     """
 
     def __init__(self, project_root: Path | str):
@@ -31,21 +34,34 @@ class AgentMemoryManager:
         self.memory_dir = self.project_root / "agent_memory"
         self.memory_dir.mkdir(exist_ok=True)
         self.conversations: dict[str, list[dict[str, Any]]] = {}
+        self._locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()  # Protects _locks dict itself
         logger.info(f"AgentMemoryManager initialized at {self.memory_dir}")
+
+    def _get_lock(self, conversation_id: str) -> threading.Lock:
+        """Get or create a lock for the given conversation_id (thread-safe)."""
+        with self._locks_guard:
+            if conversation_id not in self._locks:
+                self._locks[conversation_id] = threading.Lock()
+            return self._locks[conversation_id]
 
     def store_message(self, conversation_id: str, message: dict[str, Any]) -> None:
         """
         Store a message in the conversation history.
 
+        Thread-safe: uses per-conversation locking to prevent data corruption.
+
         Args:
             conversation_id: Unique identifier for the conversation
             message: Message dictionary containing message data
         """
-        if conversation_id not in self.conversations:
-            self.conversations[conversation_id] = []
+        lock = self._get_lock(conversation_id)
+        with lock:
+            if conversation_id not in self.conversations:
+                self.conversations[conversation_id] = []
 
-        self.conversations[conversation_id].append(message)
-        self._persist_conversation(conversation_id)
+            self.conversations[conversation_id].append(message)
+            self._persist_conversation(conversation_id)
 
     def get_conversation(self, conversation_id: str) -> list[dict[str, Any]]:
         """
@@ -67,15 +83,19 @@ class AgentMemoryManager:
         """
         Clear all messages in a conversation.
 
+        Thread-safe: uses per-conversation locking.
+
         Args:
             conversation_id: Unique identifier for the conversation
         """
-        if conversation_id in self.conversations:
-            del self.conversations[conversation_id]
+        lock = self._get_lock(conversation_id)
+        with lock:
+            if conversation_id in self.conversations:
+                del self.conversations[conversation_id]
 
-        conv_file = self.memory_dir / f"{conversation_id}.json"
-        if conv_file.exists():
-            conv_file.unlink()
+            conv_file = self.memory_dir / f"{conversation_id}.json"
+            if conv_file.exists():
+                conv_file.unlink()
 
     def _persist_conversation(self, conversation_id: str) -> None:
         """
@@ -86,9 +106,7 @@ class AgentMemoryManager:
         """
         try:
             conv_file = self.memory_dir / f"{conversation_id}.json"
-            conv_file.write_text(
-                json.dumps(self.conversations[conversation_id], indent=2)
-            )
+            conv_file.write_text(json.dumps(self.conversations[conversation_id], indent=2))
         except Exception as e:
             logger.warning(f"Failed to persist conversation {conversation_id}: {e}")
 
@@ -127,14 +145,14 @@ class AgentMemory:
         project_root = Path(__file__).parent.parent.parent
         self.manager = AgentMemoryManager(project_root)
         self.session_id = session_id
-        self._context = []
+        self._context: list[dict[str, Any]] = []
 
     def add_context(self, role: str, content: str) -> None:
         """Add context message to memory"""
         message = {
             "role": role,
             "content": content,
-            "timestamp": __import__("time").time(),
+            "timestamp": time.time(),
         }
         self._context.append(message)
         self.manager.store_message(self.session_id, message)

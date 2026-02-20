@@ -56,16 +56,16 @@ class Optimization(Base):
     # Primary key
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    # Foreign key to strategy
+    # Foreign key to strategy (must match strategies.id type = String(36) UUID)
     strategy_id = Column(
-        Integer,
+        String(36),
         ForeignKey("strategies.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
 
     # Optimization configuration
-    optimization_type = Column(
+    optimization_type: Column[str] = Column(
         Enum(OptimizationType),
         default=OptimizationType.GRID_SEARCH,
         nullable=False,
@@ -87,7 +87,7 @@ class Optimization(Base):
     evaluated_combinations = Column(Integer, default=0)
 
     # Status
-    status = Column(
+    status: Column[str] = Column(
         Enum(OptimizationStatus),
         default=OptimizationStatus.QUEUED,
         nullable=False,
@@ -150,11 +150,7 @@ class Optimization(Base):
             "initial_capital": self.initial_capital,
             "total_combinations": self.total_combinations,
             "evaluated_combinations": self.evaluated_combinations,
-            "status": (
-                self.status.value
-                if isinstance(self.status, OptimizationStatus)
-                else self.status
-            ),
+            "status": (self.status.value if isinstance(self.status, OptimizationStatus) else self.status),
             "progress": self.progress,
             "best_params": self.best_params,
             "best_score": self.best_score,
@@ -164,40 +160,36 @@ class Optimization(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": (
-                self.completed_at.isoformat() if self.completed_at else None
-            ),
+            "completed_at": (self.completed_at.isoformat() if self.completed_at else None),
         }
 
     def update_progress(self, evaluated: int) -> None:
         """Update optimization progress."""
-        self.evaluated_combinations = evaluated
+        self.evaluated_combinations = evaluated  # type: ignore[assignment]
         if self.total_combinations > 0:
-            self.progress = min(1.0, evaluated / self.total_combinations)
-        self.updated_at = datetime.now(UTC)
+            self.progress = min(1.0, float(evaluated) / float(self.total_combinations))  # type: ignore[assignment]
+        self.updated_at = datetime.now(UTC)  # type: ignore[assignment]
 
     def mark_started(self) -> None:
         """Mark optimization as started."""
-        self.status = OptimizationStatus.RUNNING
-        self.started_at = datetime.now(UTC)
-        self.updated_at = datetime.now(UTC)
+        self.status = OptimizationStatus.RUNNING  # type: ignore[assignment]
+        self.started_at = datetime.now(UTC)  # type: ignore[assignment]
+        self.updated_at = datetime.now(UTC)  # type: ignore[assignment]
 
-    def mark_completed(
-        self, best_params: dict[str, Any], best_score: float, results: dict[str, Any]
-    ) -> None:
+    def mark_completed(self, best_params: dict[str, Any], best_score: float, results: dict[str, Any]) -> None:
         """Mark optimization as completed with results."""
-        self.status = OptimizationStatus.COMPLETED
-        self.best_params = best_params
-        self.best_score = best_score
-        self.results = results
-        self.progress = 1.0
-        self.completed_at = datetime.now(UTC)
-        self.updated_at = datetime.now(UTC)
+        self.status = OptimizationStatus.COMPLETED  # type: ignore[assignment]
+        self.best_params = best_params  # type: ignore[assignment]
+        self.best_score = best_score  # type: ignore[assignment]
+        self.results = results  # type: ignore[assignment]
+        self.progress = 1.0  # type: ignore[assignment]
+        self.completed_at = datetime.now(UTC)  # type: ignore[assignment]
+        self.updated_at = datetime.now(UTC)  # type: ignore[assignment]
 
     def mark_failed(self, error: str, traceback: str | None = None) -> None:
         """Mark optimization as failed."""
-        self.status = OptimizationStatus.FAILED
-        self.error_message = error
-        self.error_traceback = traceback
-        self.completed_at = datetime.now(UTC)
-        self.updated_at = datetime.now(UTC)
+        self.status = OptimizationStatus.FAILED  # type: ignore[assignment]
+        self.error_message = error  # type: ignore[assignment]
+        self.error_traceback = traceback  # type: ignore[assignment]
+        self.completed_at = datetime.now(UTC)  # type: ignore[assignment]
+        self.updated_at = datetime.now(UTC)  # type: ignore[assignment]

@@ -1312,9 +1312,10 @@ class StrategyBuilderAdapter(BaseStrategy):
                     htf_values = src_htf.rolling(period).mean()
 
                 # Forward fill to match original timeframe
-                htf_reindexed = htf_values.reindex(ohlcv.index, method="ffill")
+                # Note: reindex(method=) and fillna(method=) are deprecated in pandas 2.1+
+                htf_reindexed = htf_values.reindex(ohlcv.index).ffill()
 
-                return {"value": htf_reindexed.fillna(method="bfill")}
+                return {"value": htf_reindexed.bfill()}
 
             except Exception as e:
                 logger.warning(f"MTF calculation error: {e}")
@@ -1330,8 +1331,8 @@ class StrategyBuilderAdapter(BaseStrategy):
             use = params.get("use_atr_volatility", False)
             if not use:
                 return {
-                    "long_signal": pd.Series(True, index=ohlcv.index),
-                    "short_signal": pd.Series(True, index=ohlcv.index),
+                    "long": pd.Series(True, index=ohlcv.index),
+                    "short": pd.Series(True, index=ohlcv.index),
                 }
             length1 = int(params.get("atr_length1", 20))
             length2 = int(params.get("atr_length2", 100))
@@ -1367,14 +1368,14 @@ class StrategyBuilderAdapter(BaseStrategy):
                 length2,
                 condition.sum(),
             )
-            return {"long_signal": condition, "short_signal": condition}
+            return {"long": condition, "short": condition}
 
         elif indicator_type == "volume_filter":
             use = params.get("use_volume_filter", False)
             if not use:
                 return {
-                    "long_signal": pd.Series(True, index=ohlcv.index),
-                    "short_signal": pd.Series(True, index=ohlcv.index),
+                    "long": pd.Series(True, index=ohlcv.index),
+                    "short": pd.Series(True, index=ohlcv.index),
                 }
             length1 = int(params.get("vol_length1", 20))
             length2 = int(params.get("vol_length2", 100))
@@ -1413,7 +1414,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 length2,
                 condition.sum(),
             )
-            return {"long_signal": condition, "short_signal": condition}
+            return {"long": condition, "short": condition}
 
         elif indicator_type == "highest_lowest_bar":
             long_signal = pd.Series(True, index=ohlcv.index)
@@ -1482,7 +1483,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 long_signal.sum(),
                 short_signal.sum(),
             )
-            return {"long_signal": long_signal, "short_signal": short_signal}
+            return {"long": long_signal, "short": short_signal}
 
         elif indicator_type == "two_mas":
             ma1_len = int(params.get("ma1_length", 50))
@@ -1553,8 +1554,8 @@ class StrategyBuilderAdapter(BaseStrategy):
                 short_signal.sum(),
             )
             return {
-                "long_signal": long_signal,
-                "short_signal": short_signal,
+                "long": long_signal,
+                "short": short_signal,
                 "ma1": ma1,
                 "ma2": ma2,
             }
@@ -1563,8 +1564,8 @@ class StrategyBuilderAdapter(BaseStrategy):
             use = params.get("use_accumulation", False)
             if not use:
                 return {
-                    "long_signal": pd.Series(True, index=ohlcv.index),
-                    "short_signal": pd.Series(True, index=ohlcv.index),
+                    "long": pd.Series(True, index=ohlcv.index),
+                    "short": pd.Series(True, index=ohlcv.index),
                 }
             interval = int(params.get("backtracking_interval", 30))
             min_bars = int(params.get("min_bars_to_execute", 5))
@@ -1612,15 +1613,15 @@ class StrategyBuilderAdapter(BaseStrategy):
                 long_signal.sum(),
                 short_signal.sum(),
             )
-            return {"long_signal": long_signal, "short_signal": short_signal}
+            return {"long": long_signal, "short": short_signal}
 
         # ========== Keltner/Bollinger Channel (filter) ==========
         elif indicator_type == "keltner_bollinger":
             use = params.get("use_channel", False)
             if not use:
                 return {
-                    "long_signal": pd.Series(True, index=ohlcv.index),
-                    "short_signal": pd.Series(True, index=ohlcv.index),
+                    "long": pd.Series(True, index=ohlcv.index),
+                    "short": pd.Series(True, index=ohlcv.index),
                 }
             channel_type = str(params.get("channel_type", "Keltner Channel"))
             mode = str(params.get("channel_mode", "Rebound"))
@@ -1693,7 +1694,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 long_signal.sum(),
                 short_signal.sum(),
             )
-            return {"long_signal": long_signal, "short_signal": short_signal}
+            return {"long": long_signal, "short": short_signal}
 
         # ========== RVI - Relative Volatility Index (filter) ==========
         elif indicator_type == "rvi_filter":
@@ -1737,7 +1738,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 long_signal.sum(),
                 short_signal.sum(),
             )
-            return {"long_signal": long_signal, "short_signal": short_signal, "rvi": rvi_vals}
+            return {"long": long_signal, "short": short_signal, "rvi": rvi_vals}
 
         # ========== MFI - Money Flow Index (filter) ==========
         elif indicator_type == "mfi_filter":
@@ -1778,7 +1779,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 long_signal.sum(),
                 short_signal.sum(),
             )
-            return {"long_signal": long_signal, "short_signal": short_signal, "mfi": mfi_vals}
+            return {"long": long_signal, "short": short_signal, "mfi": mfi_vals}
 
         # ========== CCI - Commodity Channel Index (filter) ==========
         elif indicator_type == "cci_filter":
@@ -1818,7 +1819,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 long_signal.sum(),
                 short_signal.sum(),
             )
-            return {"long_signal": long_signal, "short_signal": short_signal, "cci": cci_vals}
+            return {"long": long_signal, "short": short_signal, "cci": cci_vals}
 
         # ========== Momentum (filter) ==========
         elif indicator_type == "momentum_filter":
@@ -1856,7 +1857,7 @@ class StrategyBuilderAdapter(BaseStrategy):
                 long_signal.sum(),
                 short_signal.sum(),
             )
-            return {"long_signal": long_signal, "short_signal": short_signal, "momentum": mom_vals}
+            return {"long": long_signal, "short": short_signal, "momentum": mom_vals}
 
         else:
             logger.warning(f"Unknown indicator type: {indicator_type}")
@@ -1939,12 +1940,20 @@ class StrategyBuilderAdapter(BaseStrategy):
         if logic_type == "and":
             a = inputs.get("a", pd.Series([False] * 100))
             b = inputs.get("b", pd.Series([False] * 100))
-            return {"result": a & b}
+            result = a & b
+            # Support optional 3rd input (C port)
+            if "c" in inputs:
+                result = result & inputs["c"]
+            return {"result": result}
 
         elif logic_type == "or":
             a = inputs.get("a", pd.Series([False] * 100))
             b = inputs.get("b", pd.Series([False] * 100))
-            return {"result": a | b}
+            result = a | b
+            # Support optional 3rd input (C port)
+            if "c" in inputs:
+                result = result | inputs["c"]
+            return {"result": result}
 
         elif logic_type == "not":
             input_val = inputs.get("input", pd.Series([False] * 100))
@@ -3561,8 +3570,12 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         signal = bullish | bearish
 
+        # Return with port IDs matching frontend: "long" (bullish) and "short" (bearish)
         return {
             "signal": pd.Series(signal, index=idx),
+            "long": pd.Series(bullish, index=idx),
+            "short": pd.Series(bearish, index=idx),
+            # Keep aliases for backward compatibility with tests/API consumers
             "bullish": pd.Series(bullish, index=idx),
             "bearish": pd.Series(bearish, index=idx),
         }
@@ -4197,6 +4210,20 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Case 2: Main node is a pure strategy aggregator — collect from
             # connections ONLY when Case 1 didn't produce signals (avoid
             # double-counting if main node is both cached and wired to).
+            # Port alias map for Case 2 signal routing.
+            # When source_port is not found in source_outputs, try aliases.
+            # e.g. frontend sends "long" but backend might return "bullish".
+            _SIGNAL_PORT_ALIASES: dict[str, list[str]] = {
+                "long": ["bullish", "entry_long", "signal"],
+                "short": ["bearish", "entry_short", "signal"],
+                "bullish": ["long", "entry_long", "signal"],
+                "bearish": ["short", "entry_short", "signal"],
+                "output": ["value", "result", "signal"],
+                "value": ["output", "result", "signal"],
+                "result": ["signal", "output", "value"],
+                "signal": ["result", "output", "value"],
+            }
+
             if not case1_found:
                 for conn in self.connections:
                     target_id = self._get_connection_target_id(conn)
@@ -4208,28 +4235,56 @@ class StrategyBuilderAdapter(BaseStrategy):
 
                         if source_id in self._value_cache:
                             source_outputs = self._value_cache[source_id]
+
+                            # Resolve source port: direct match, then aliases, then single-output fallback
+                            signal = None
                             if source_port in source_outputs:
                                 signal = source_outputs[source_port]
+                            else:
+                                # Try port aliases (e.g. "long" → "bullish")
+                                for alias in _SIGNAL_PORT_ALIASES.get(source_port, []):
+                                    if alias in source_outputs:
+                                        signal = source_outputs[alias]
+                                        logger.debug(
+                                            f"[SignalRouting] Port alias: '{source_port}' → '{alias}' "
+                                            f"for block {source_id}"
+                                        )
+                                        break
+                                # Last resort: single-output block → use that output
+                                if signal is None and len(source_outputs) == 1:
+                                    signal = next(iter(source_outputs.values()))
+                                    logger.debug(
+                                        f"[SignalRouting] Single-output fallback for block {source_id}, "
+                                        f"port '{source_port}' not found, using only output"
+                                    )
 
-                                # Map to appropriate signal series
-                                # Support old format (entry_long/entry_short),
-                                # new (entry/exit), and action aliases (buy/sell)
-                                if target_port in ("entry_long", "buy"):
-                                    entries = entries | signal
-                                elif target_port in ("exit_long", "close_long"):
-                                    exits = exits | signal
-                                elif target_port in ("entry_short", "sell"):
-                                    short_entries = short_entries | signal
-                                elif target_port in ("exit_short", "close_short"):
-                                    short_exits = short_exits | signal
-                                elif target_port == "entry":
-                                    # Universal entry - applies to both long and short based on direction
-                                    entries = entries | signal
-                                    short_entries = short_entries | signal
-                                elif target_port == "exit":
-                                    # Universal exit - applies to both long and short
-                                    exits = exits | signal
-                                    short_exits = short_exits | signal
+                            if signal is None:
+                                logger.warning(
+                                    f"[SignalRouting] Port '{source_port}' not found in block "
+                                    f"'{source_id}' outputs {list(source_outputs.keys())}. "
+                                    f"Signal dropped! Check block output port names."
+                                )
+                                continue
+
+                            # Map to appropriate signal series
+                            # Support old format (entry_long/entry_short),
+                            # new (entry/exit), and action aliases (buy/sell)
+                            if target_port in ("entry_long", "buy"):
+                                entries = entries | signal
+                            elif target_port in ("exit_long", "close_long"):
+                                exits = exits | signal
+                            elif target_port in ("entry_short", "sell"):
+                                short_entries = short_entries | signal
+                            elif target_port in ("exit_short", "close_short"):
+                                short_exits = short_exits | signal
+                            elif target_port == "entry":
+                                # Universal entry - applies to both long and short based on direction
+                                entries = entries | signal
+                                short_entries = short_entries | signal
+                            elif target_port == "exit":
+                                # Universal exit - applies to both long and short
+                                exits = exits | signal
+                                short_exits = short_exits | signal
 
         # Fallback: Look for signal blocks by category ONLY when:
         # 1. No main node exists at all, OR

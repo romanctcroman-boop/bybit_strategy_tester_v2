@@ -1,10 +1,10 @@
 """
-🎯 Centralized Metrics Calculator
+Centralized Metrics Calculator
 
-ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ для всех метрик бэктестинга.
-Все расчёты метрик ДОЛЖНЫ использовать этот модуль.
+Single source of truth for all backtesting metrics.
+All metric calculations MUST use this module.
 
-Использование:
+Usage:
     from backend.core.metrics_calculator import MetricsCalculator, calculate_sharpe
 
     # Полный расчёт всех метрик
@@ -197,7 +197,6 @@ class LongShortMetrics:
     long_largest_loss: float = 0.0
     long_largest_win_pct: float = 0.0
     long_largest_loss_pct: float = 0.0
-    long_largest_loss: float = 0.0
     long_payoff_ratio: float = 0.0
 
     long_max_consec_wins: int = 0
@@ -230,7 +229,6 @@ class LongShortMetrics:
     short_largest_loss: float = 0.0
     short_largest_win_pct: float = 0.0
     short_largest_loss_pct: float = 0.0
-    short_largest_loss: float = 0.0
     short_payoff_ratio: float = 0.0
 
     short_max_consec_wins: int = 0
@@ -402,7 +400,9 @@ def calculate_sortino(
     downside_dev = np.sqrt(downside_variance)
 
     if downside_dev <= 1e-10:
-        return 10.0 if mean_return > mar else 0.0
+        # No downside deviation = perfect one-sided returns.
+        # Return clip-cap (100) so this strategy ranks above all finite Sortino values.
+        return 100.0 if mean_return > mar else 0.0
 
     periods_per_year = ANNUALIZATION_FACTORS.get(frequency, 365.25)
 
@@ -425,15 +425,10 @@ def calculate_calmar(
         return 10.0 if total_return_pct > 0 else 0.0
 
     # Annualize return if needed
-    if years > 0 and years != 1.0:
-        # Simple annualization or CAGR? Calmar usually uses CAGR.
-        # Assuming total_return_pct is effectively carrying the CAGR info if yrs=1,
-        # but if we pass total raw return, we need to convert.
-        # Let's assume input is CAGR if years=1, else we adjust.
-        # Ideally caller handles this, but here is a safeguard:
-        cagr = total_return_pct / years
-    else:
-        cagr = total_return_pct
+    # Simple annualization or CAGR? Calmar usually uses CAGR.
+    # Assuming total_return_pct is effectively carrying the CAGR info if yrs=1,
+    # but if we pass total raw return, we need to convert.
+    cagr = total_return_pct / years if years > 0 and years != 1.0 else total_return_pct
 
     return float(np.clip(cagr / abs(max_drawdown_pct), -100, 100))
 
@@ -473,7 +468,7 @@ def calculate_max_drawdown(equity: np.ndarray) -> tuple[float, float, int]:
 
     duration = max_dd_idx - peak_idx
 
-    return max_dd_pct, max_dd_value, duration
+    return max_dd_pct, max_dd_value, int(duration)
 
 
 def calculate_cagr(
@@ -525,7 +520,7 @@ def calculate_expectancy(
     """
     Calculate Mathematical Expectancy.
 
-    Formula: Expectancy = (Win% × Avg_Win) - (Loss% × |Avg_Loss|)
+    Formula: Expectancy = (Win% * Avg_Win) - (Loss% * |Avg_Loss|)
 
     Returns: (expectancy, expectancy_ratio)
     """
@@ -674,10 +669,7 @@ def calculate_metrics_numba(
     win_rate = wins / n_trades if n_trades > 0 else 0.0
 
     # Profit factor
-    if gross_loss > 0:
-        profit_factor = gross_profit / gross_loss
-    else:
-        profit_factor = 100.0 if gross_profit > 0 else 0.0
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else (100.0 if gross_profit > 0 else 0.0)
 
     # Max drawdown
     max_dd = 0.0
@@ -705,19 +697,13 @@ def calculate_metrics_numba(
             variance += (daily_returns[i] - mean_return) ** 2
         std_return = np.sqrt(variance / n_returns)
 
-        if std_return > 1e-10:
-            # Annualize: sqrt(8766) for hourly data ≈ 93.6
-            sharpe = (mean_return / std_return) * 93.6
-        else:
-            sharpe = 0.0
+        # Annualize: sqrt(8766) for hourly data ~= 93.6
+        sharpe = (mean_return / std_return) * 93.6 if std_return > 1e-10 else 0.0
     else:
         sharpe = 0.0
 
     # Calmar ratio
-    if max_dd > 0.01:
-        calmar = total_return / max_dd
-    else:
-        calmar = total_return * 10 if total_return > 0 else 0.0
+    calmar = total_return / max_dd if max_dd > 0.01 else (total_return * 10 if total_return > 0 else 0.0)
 
     return total_return, sharpe, max_dd, win_rate, n_trades, profit_factor, calmar
 
@@ -993,9 +979,9 @@ class MetricsCalculator:
             return metrics
 
         # Separate by side
-        long_trades = []
-        short_trades = []
-        unknown_sides = set()  # Track unknown values for single log
+        long_trades: list[dict] = []
+        short_trades: list[dict] = []
+        unknown_sides: set[str] = set()  # Track unknown values for single log
 
         for t in trades:
             try:

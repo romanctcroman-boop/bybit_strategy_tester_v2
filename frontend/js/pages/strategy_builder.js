@@ -12,7 +12,7 @@
 
 // Import shared utilities
 import { formatCurrency, formatDate, debounce } from '../utils.js';
-import { updateLeverageRiskForElements } from './strategies/leverageManager.js';
+import { updateLeverageRiskForElements } from '../shared/leverageManager.js';
 
 // Import WebSocket validation module
 import * as wsValidation from './strategy_builder_ws.js';
@@ -240,6 +240,27 @@ const blockLibrary = {
       name: 'Divergence',
       desc: 'Multi-indicator divergence detection (RSI, Stochastic, Momentum, CMF, OBV, MFI)',
       icon: 'arrow-left-right'
+    }
+  ],
+  // Logic Gates — combine multiple condition signals
+  logic: [
+    {
+      id: 'and',
+      name: 'AND',
+      desc: 'All inputs must be true (combine signals)',
+      icon: 'diagram-3'
+    },
+    {
+      id: 'or',
+      name: 'OR',
+      desc: 'Any input must be true (alternative signals)',
+      icon: 'diagram-2'
+    },
+    {
+      id: 'not',
+      name: 'NOT',
+      desc: 'Invert signal (true → false)',
+      icon: 'x-circle'
     }
   ]
 
@@ -931,7 +952,7 @@ function showBackendConnectionBanner(message) {
   banner.id = 'strategy-builder-backend-banner';
   banner.setAttribute('role', 'alert');
   banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#dc3545;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
-  banner.innerHTML = `<span>${message}</span><a href="http://localhost:8000/frontend/strategy-builder.html" style="color:#fff;text-decoration:underline;white-space:nowrap;">Открыть с сервера</a><button type="button" aria-label="Закрыть" style="background:transparent;border:none;color:#fff;cursor:pointer;padding:4px;font-size:18px;">&times;</button>`;
+  banner.innerHTML = `<span>${escapeHtml(message)}</span><a href="http://localhost:8000/frontend/strategy-builder.html" style="color:#fff;text-decoration:underline;white-space:nowrap;">Открыть с сервера</a><button type="button" aria-label="Закрыть" style="background:transparent;border:none;color:#fff;cursor:pointer;padding:4px;font-size:18px;">&times;</button>`;
   banner.querySelector('button').addEventListener('click', () => banner.remove());
   document.body.prepend(banner);
 }
@@ -1076,6 +1097,7 @@ function renderBlockLibrary() {
       categories: [
         { key: 'indicators', name: 'Технические индикаторы', iconType: 'indicator' },
         { key: 'conditions', name: 'Условия', iconType: 'condition' },
+        { key: 'logic', name: 'Логика (AND/OR/NOT)', iconType: 'logic' },
         { key: 'divergence', name: 'Дивергенции', iconType: 'filter' },
         { key: 'entry_mgmt', name: 'DCA/Grid', iconType: 'entry' }
       ]
@@ -1859,7 +1881,7 @@ function initDunnahBasePanel() {
     } catch (e) {
       console.error('[База данных]', e);
       const msg = e.name === 'AbortError' ? 'Таймаут запроса (15 с)' : e.message;
-      container.innerHTML = `<p class="text-danger text-sm">Ошибка: ${msg}</p><p class="text-muted text-sm" style="font-size:12px">Проверьте, что сервер запущен. Нажмите «Обновить» для повтора.</p>`;
+      container.innerHTML = `<p class="text-danger text-sm">Ошибка: ${escapeHtml(msg)}</p><p class="text-muted text-sm" style="font-size:12px">Проверьте, что сервер запущен. Нажмите «Обновить» для повтора.</p>`;
     }
   }
 
@@ -1910,15 +1932,15 @@ function renderPropertiesDataStatus(state, data = {}) {
 
   if (state === 'checking') {
     statusIndicator.className = 'data-status checking';
-    statusIndicator.innerHTML = `<span class="status-icon">🔍</span><span class="status-text">Проверка ${symbol}...</span>`;
+    statusIndicator.innerHTML = `<span class="status-icon">🔍</span><span class="status-text">Проверка ${escapeHtml(symbol)}...</span>`;
   } else if (state === 'syncing') {
     const progressText = totalSteps > 0 ? ` (${step}/${totalSteps})` : '';
     const newText = totalNew > 0 ? `<br><small>Загружено: +${totalNew} свечей</small>` : '';
     statusIndicator.className = 'data-status loading';
-    statusIndicator.innerHTML = `<span class="status-icon">📥</span><span class="status-text">${message || 'Синхронизация...'}${progressText}${newText}</span>`;
+    statusIndicator.innerHTML = `<span class="status-icon">📥</span><span class="status-text">${escapeHtml(message) || 'Синхронизация...'}${progressText}${newText}</span>`;
   } else if (state === 'syncing_background') {
     statusIndicator.className = 'data-status loading';
-    statusIndicator.innerHTML = `<span class="status-icon">⏳</span><span class="status-text">${message || 'Синхронизация в фоне...'}<br><small>Загрузка исторических данных может занять время</small></span>`;
+    statusIndicator.innerHTML = `<span class="status-icon">⏳</span><span class="status-text">${escapeHtml(message) || 'Синхронизация в фоне...'}<br><small>Загрузка исторических данных может занять время</small></span>`;
   } else if (state === 'synced') {
     const icon = totalNew > 0 ? '✅' : '✓';
     const text = totalNew > 0 ? `Синхронизировано, +${totalNew} свечей` : 'Данные актуальны';
@@ -1926,11 +1948,11 @@ function renderPropertiesDataStatus(state, data = {}) {
     statusIndicator.innerHTML = `<span class="status-icon">${icon}</span><span class="status-text">${text}<br><small>TF: 1m, 5m, 15m, 30m, 1h, 4h, 1D, 1W, 1M</small></span>`;
   } else if (state === 'blocked') {
     statusIndicator.className = 'data-status';
-    statusIndicator.innerHTML = `<span class="status-icon">🔒</span><span class="status-text">${message || 'Тикер заблокирован для догрузки'}<br><small>Разблокируйте в «База данных»</small></span>`;
+    statusIndicator.innerHTML = `<span class="status-icon">🔒</span><span class="status-text">${escapeHtml(message) || 'Тикер заблокирован для догрузки'}<br><small>Разблокируйте в «База данных»</small></span>`;
   } else if (state === 'error') {
     statusIndicator.className = 'data-status error';
     statusIndicator.style.cursor = 'pointer';
-    statusIndicator.innerHTML = `<span class="status-icon">⚠️</span><span class="status-text">Ошибка синхронизации<br><small>${message || 'Проверьте соединение'}. Кликните для повтора.</small></span>`;
+    statusIndicator.innerHTML = `<span class="status-icon">⚠️</span><span class="status-text">Ошибка синхронизации<br><small>${escapeHtml(message) || 'Проверьте соединение'}. Кликните для повтора.</small></span>`;
     // Add click-to-retry handler
     statusIndicator.onclick = function () {
       statusIndicator.onclick = null;
@@ -2319,12 +2341,14 @@ function setupEventListeners() {
   });
   if (builderMarketTypeEl) builderMarketTypeEl.addEventListener('change', checkSymbolDataForProperties);
 
-  // Direction change - update Strategy node ports
+  // Direction change - update Strategy node ports and connection mismatch highlighting
   const builderDirectionEl = document.getElementById('builderDirection');
   if (builderDirectionEl) {
     builderDirectionEl.addEventListener('change', () => {
       // Re-render blocks to update Strategy node ports based on direction
       renderBlocks();
+      // Re-render connections to update direction mismatch highlighting
+      renderConnections();
     });
   }
 
@@ -3681,7 +3705,14 @@ function getDefaultParams(blockType) {
       use_obv: false,
       use_mfi: false,
       mfi_length: 14
-    }
+    },
+
+    // =============================================
+    // LOGIC GATES
+    // =============================================
+    and: {},
+    or: {},
+    not: {}
 
     // (Smart Signals defaults removed — entire category deprecated in favor of universal indicator blocks)
   };
@@ -4120,7 +4151,7 @@ function renderGroupedParams(block, optimizationMode = false, showHeader = true)
             { key: 'hl_atr_percent', label: 'ATR on (%)', type: 'number', width: '80px', min: 0, max: 30, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'ATR for last 2 bars is Higher/Lower on X% than ATR for last 50 bars. If = 0 — this condition is disabled.' }
           ]
         },
-        { key: 'atr_hl_length', label: 'ATR_HL Lenght (50)', type: 'number', min: 1, max: 50, step: 1, optimizable: true },
+        { key: 'atr_hl_length', label: 'ATR_HL Length (50)', type: 'number', min: 1, max: 50, step: 1, optimizable: true },
         { type: 'separator', label: '======= BLOCK IF WORSE THAN [FILTER] =======' },
         { key: 'use_block_worse_than', label: 'Use Block if Worse Than ?', type: 'checkbox', hasTooltip: true, tooltip: 'Does not permit the order if Current Price is worse by more than XX% compared to Previous bar close. Long: order if current price higher than prev bar but not higher than XX%. Short: order if current price lower than prev bar but not lower than XX%.' },
         { key: 'block_worse_percent', label: 'Block if worse than XX%', type: 'number', min: 0.1, max: 30, step: 0.1, optimizable: true, hasTooltip: true, tooltip: 'Maximum allowable percentage of price change in the adverse direction from the previous bar.' }
@@ -4656,8 +4687,8 @@ function getBlockPorts(blockId, _category) {
       inputs: [],
       outputs: [
         { id: 'value', label: 'Value', type: 'data' },
-        { id: 'long', label: 'Long', type: 'data' },
-        { id: 'short', label: 'Short', type: 'data' }
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
       ]
     },
     macd: {
@@ -4666,8 +4697,8 @@ function getBlockPorts(blockId, _category) {
         { id: 'macd', label: 'MACD', type: 'data' },
         { id: 'signal', label: 'Signal', type: 'data' },
         { id: 'hist', label: 'Hist', type: 'data' },
-        { id: 'long', label: 'Long', type: 'data' },
-        { id: 'short', label: 'Short', type: 'data' }
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
       ]
     },
     ema: {
@@ -4694,7 +4725,9 @@ function getBlockPorts(blockId, _category) {
       inputs: [],
       outputs: [
         { id: 'k', label: '%K', type: 'data' },
-        { id: 'd', label: '%D', type: 'data' }
+        { id: 'd', label: '%D', type: 'data' },
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
       ]
     },
     adx: { inputs: [], outputs: [{ id: 'value', label: 'ADX', type: 'data' }] },
@@ -4703,8 +4736,8 @@ function getBlockPorts(blockId, _category) {
       outputs: [
         { id: 'supertrend', label: 'ST', type: 'data' },
         { id: 'direction', label: 'Dir', type: 'data' },
-        { id: 'upper', label: 'Up', type: 'data' },
-        { id: 'lower', label: 'Lo', type: 'data' }
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
       ]
     },
     ichimoku: {
@@ -4837,20 +4870,22 @@ function getBlockPorts(blockId, _category) {
     and: {
       inputs: [
         { id: 'a', label: 'A', type: 'condition' },
-        { id: 'b', label: 'B', type: 'condition' }
+        { id: 'b', label: 'B', type: 'condition' },
+        { id: 'c', label: 'C', type: 'condition' }
       ],
-      outputs: [{ id: 'result', label: '', type: 'condition' }]
+      outputs: [{ id: 'result', label: 'Result', type: 'condition' }]
     },
     or: {
       inputs: [
         { id: 'a', label: 'A', type: 'condition' },
-        { id: 'b', label: 'B', type: 'condition' }
+        { id: 'b', label: 'B', type: 'condition' },
+        { id: 'c', label: 'C', type: 'condition' }
       ],
-      outputs: [{ id: 'result', label: '', type: 'condition' }]
+      outputs: [{ id: 'result', label: 'Result', type: 'condition' }]
     },
     not: {
-      inputs: [{ id: 'input', label: '', type: 'condition' }],
-      outputs: [{ id: 'result', label: '', type: 'condition' }]
+      inputs: [{ id: 'input', label: 'In', type: 'condition' }],
+      outputs: [{ id: 'result', label: 'Result', type: 'condition' }]
     },
     delay: {
       inputs: [{ id: 'input', label: '', type: 'condition' }],
@@ -4903,13 +4938,135 @@ function getBlockPorts(blockId, _category) {
     dca: {
       inputs: [],
       outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    grid_orders: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    multi_tp_exit: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+
+    // ── Universal Indicators (all output long/short boolean signals) ──
+    qqe: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    atr_volatility: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    volume_filter: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    highest_lowest_bar: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    two_mas: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    accumulation_areas: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    keltner_bollinger: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    rvi_filter: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    mfi_filter: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    cci_filter: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+    momentum_filter: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+
+    // ── Divergence (outputs long/short signals) ──
+    divergence: {
+      inputs: [],
+      outputs: [
+        { id: 'long', label: 'Long', type: 'condition' },
+        { id: 'short', label: 'Short', type: 'condition' }
+      ]
+    },
+
+    // ── Close Condition blocks (config → Strategy SL/TP port) ──
+    close_by_time: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    close_channel: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    close_ma_cross: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    close_rsi: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    close_stochastic: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
+    },
+    close_psar: {
+      inputs: [],
+      outputs: [{ id: 'config', label: '', type: 'config' }]
     }
 
     // Note: 'strategy' ports are dynamic - handled below
   };
 
   // Special handling for main Strategy node
-  // 4 ports: entry_long, entry_short, exit_long, exit_short + sl_tp config
+  // Entry/Exit signal ports + config ports for SL/TP, Close conditions, DCA
   if (blockId === 'strategy') {
     return {
       inputs: [
@@ -4917,7 +5074,9 @@ function getBlockPorts(blockId, _category) {
         { id: 'entry_short', label: 'Entry S', type: 'condition' },
         { id: 'exit_long', label: 'Exit L', type: 'condition' },
         { id: 'exit_short', label: 'Exit S', type: 'condition' },
-        { id: 'sl_tp', label: 'SL/TP', type: 'config' }
+        { id: 'sl_tp', label: 'SL/TP', type: 'config' },
+        { id: 'close_cond', label: 'Close', type: 'config' },
+        { id: 'dca_grid', label: 'DCA', type: 'config' }
       ],
       outputs: []
     };
@@ -4980,9 +5139,9 @@ function renderMainStrategyNode(block, _ports) {
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
-             title="Entry Long"
-             style="top: 13%;"></div>
-        <span class="main-port-label entry-label" style="top: 13%; transform: translateY(-50%);">Entry L</span>
+             title="Entry Long — connect indicator Long signal or condition result"
+             style="top: 10%;"></div>
+        <span class="main-port-label entry-label" style="top: 10%; transform: translateY(-50%);"><i class="bi bi-arrow-up-circle"></i> Entry L</span>
         
         <!-- Entry Short port -->
         <div class="port condition-port main-port-left entry-port" 
@@ -4990,9 +5149,9 @@ function renderMainStrategyNode(block, _ports) {
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
-             title="Entry Short"
-             style="top: 30%;"></div>
-        <span class="main-port-label entry-label" style="top: 30%; transform: translateY(-50%);">Entry S</span>
+             title="Entry Short — connect indicator Short signal or condition result"
+             style="top: 23%;"></div>
+        <span class="main-port-label entry-label" style="top: 23%; transform: translateY(-50%);"><i class="bi bi-arrow-down-circle"></i> Entry S</span>
         
         <!-- Exit Long port -->
         <div class="port condition-port main-port-left exit-port" 
@@ -5000,9 +5159,9 @@ function renderMainStrategyNode(block, _ports) {
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
-             title="Exit Long"
-             style="top: 47%;"></div>
-        <span class="main-port-label exit-label" style="top: 47%; transform: translateY(-50%);">Exit L</span>
+             title="Exit Long — optional signal to close long positions"
+             style="top: 36%;"></div>
+        <span class="main-port-label exit-label" style="top: 36%; transform: translateY(-50%);"><i class="bi bi-x-circle"></i> Exit L</span>
         
         <!-- Exit Short port -->
         <div class="port condition-port main-port-left exit-port" 
@@ -5010,19 +5169,39 @@ function renderMainStrategyNode(block, _ports) {
              data-port-type="condition"
              data-block-id="${block.id}"
              data-direction="input"
-             title="Exit Short"
-             style="top: 64%;"></div>
-        <span class="main-port-label exit-label" style="top: 64%; transform: translateY(-50%);">Exit S</span>
+             title="Exit Short — optional signal to close short positions"
+             style="top: 49%;"></div>
+        <span class="main-port-label exit-label" style="top: 49%; transform: translateY(-50%);"><i class="bi bi-x-circle"></i> Exit S</span>
 
-        <!-- SL/TP config port -->
+        <!-- SL/TP config port — cyan -->
         <div class="port config-port main-port-left config-input-port" 
              data-port-id="sl_tp" 
              data-port-type="config"
              data-block-id="${block.id}"
              data-direction="input"
-             title="SL/TP Config"
-             style="top: 82%;"></div>
-        <span class="main-port-label config-label" style="top: 82%; transform: translateY(-50%);">SL/TP</span>
+             title="SL/TP — connect Static SL/TP, Trailing Stop, ATR Exit, or Multi TP"
+             style="top: 63%;"></div>
+        <span class="main-port-label config-label-sltp" style="top: 63%; transform: translateY(-50%);"><i class="bi bi-shield-check"></i> SL/TP</span>
+
+        <!-- Close Conditions config port — amber -->
+        <div class="port config-port main-port-left config-input-port" 
+             data-port-id="close_cond" 
+             data-port-type="config"
+             data-block-id="${block.id}"
+             data-direction="input"
+             title="Close Conditions — connect Close by RSI, Stochastic, PSAR, Channel, MA, Time"
+             style="top: 77%;"></div>
+        <span class="main-port-label config-label-close" style="top: 77%; transform: translateY(-50%);"><i class="bi bi-door-open"></i> Close</span>
+
+        <!-- DCA/Grid config port — purple -->
+        <div class="port config-port main-port-left config-input-port" 
+             data-port-id="dca_grid" 
+             data-port-type="config"
+             data-block-id="${block.id}"
+             data-direction="input"
+             title="DCA/Grid — connect DCA or Manual Grid block"
+             style="top: 91%;"></div>
+        <span class="main-port-label config-label-dca" style="top: 91%; transform: translateY(-50%);"><i class="bi bi-layers"></i> DCA</span>
         
         <!-- Center title -->
         <div class="main-block-title">${block.name}</div>
@@ -6055,6 +6234,7 @@ function resetBlockToDefaults(blockId) {
   if (Object.keys(defaultParams).length > 0) {
     block.params = { ...defaultParams };
     renderBlocks();
+    renderConnections(); // Re-check direction mismatch after param reset
     // Refresh popup if open
     closeBlockParamsPopup();
     showBlockParamsPopup(blockId);
@@ -6581,6 +6761,10 @@ function updateBlockParam(blockId, param, value) {
         hintEl.textContent = getCompactParamHint(block.params, block.type);
       }
     }
+
+    // Re-render connections to update direction mismatch highlighting
+    // (param changes in any block may affect wire validity)
+    renderConnections();
 
     // Local validation (immediate feedback)
     const validationResult = validateBlockParams(block);
@@ -7134,13 +7318,54 @@ function startConnection(portElement, _event) {
 }
 
 /**
- * Highlight ports that are compatible with the connection being made
+ * Map config block types to their preferred Strategy node target port.
+ * SL/TP blocks → sl_tp, Close conditions → close_cond, DCA/Grid → dca_grid.
+ */
+const CONFIG_BLOCK_TARGET_PORT = {
+  // SL/TP blocks → sl_tp port
+  static_sltp: 'sl_tp',
+  trailing_stop_exit: 'sl_tp',
+  atr_exit: 'sl_tp',
+  multi_tp_exit: 'sl_tp',
+  // Close condition blocks → close_cond port
+  close_by_time: 'close_cond',
+  close_channel: 'close_cond',
+  close_ma_cross: 'close_cond',
+  close_rsi: 'close_cond',
+  close_stochastic: 'close_cond',
+  close_psar: 'close_cond',
+  // DCA/Grid blocks → dca_grid port
+  dca: 'dca_grid',
+  grid_orders: 'dca_grid'
+};
+
+/**
+ * Get the preferred Strategy node target port ID for a given block type.
+ * Returns null if the block type has no specific preference (non-config).
+ */
+function getPreferredStrategyPort(blockType) {
+  return CONFIG_BLOCK_TARGET_PORT[blockType] || null;
+}
+
+/**
+ * Highlight ports that are compatible with the connection being made.
+ * For config ports: only highlight the CORRECT Strategy node port
+ * (e.g. DCA block → only DCA port, not SL/TP or Close).
  * @param {Object} startInfo - Connection start info with portType and direction
  */
 function highlightCompatiblePorts(startInfo) {
   const allPorts = document.querySelectorAll('.port');
   const compatibleType = startInfo.portType;
   const oppositeDirection = startInfo.direction === 'output' ? 'input' : 'output';
+
+  // For config blocks, determine preferred target port on Strategy node
+  let preferredTargetPortId = null;
+  if (compatibleType === 'config') {
+    const sourceBlock = strategyBlocks.find(b => b.id === startInfo.blockId);
+    if (sourceBlock) {
+      preferredTargetPortId = getPreferredStrategyPort(sourceBlock.type);
+    }
+  }
 
   allPorts.forEach(port => {
     // Skip the starting port itself
@@ -7149,15 +7374,23 @@ function highlightCompatiblePorts(startInfo) {
     const portType = port.dataset.portType;
     const portDirection = port.dataset.direction;
     const portBlockId = port.dataset.blockId;
+    const portId = port.dataset.portId;
 
-    // Check compatibility:
-    // 1. Same port type (data->data, condition->condition, flow->flow)
-    // 2. Opposite direction (output->input or input->output)
-    // 3. Different block
-    const isCompatible =
+    // Basic compatibility: same type, opposite direction, different block
+    let isCompatible =
       portType === compatibleType &&
       portDirection === oppositeDirection &&
       portBlockId !== startInfo.blockId;
+
+    // Smart config filtering: if dragging from a config block,
+    // only highlight the CORRECT port on the Strategy node
+    if (isCompatible && compatibleType === 'config' && preferredTargetPortId) {
+      const targetBlock = strategyBlocks.find(b => b.id === portBlockId);
+      if (targetBlock && targetBlock.isMain) {
+        // On Strategy node — only highlight the preferred port
+        isCompatible = (portId === preferredTargetPortId);
+      }
+    }
 
     if (isCompatible) {
       port.classList.add('port-compatible');
@@ -7213,6 +7446,16 @@ function tryAutoSnapConnection(droppedBlockId) {
       // Check compatibility: same type, opposite direction
       if (otherType !== droppedType || otherDirection === droppedDirection) {
         return;
+      }
+
+      // Smart config filtering: config blocks should only snap to correct port
+      if (droppedType === 'config') {
+        const droppedBlockData = strategyBlocks.find(b => b.id === droppedBlockId);
+        const otherBlockData = strategyBlocks.find(b => b.id === otherBlockId);
+        if (droppedBlockData && otherBlockData?.isMain) {
+          const preferred = getPreferredStrategyPort(droppedBlockData.type);
+          if (preferred && otherPortId !== preferred) return;
+        }
       }
 
       // Check if already connected
@@ -7360,6 +7603,19 @@ function completeConnection(endPortElement) {
       blockId: connectionStart.blockId,
       portId: connectionStart.portId
     };
+  }
+
+  // Smart config redirect: if a config block connects to the wrong
+  // Strategy port, silently redirect to the correct one
+  if (startType === 'config') {
+    const sourceBlock = strategyBlocks.find(b => b.id === source.blockId);
+    const targetBlock = strategyBlocks.find(b => b.id === target.blockId);
+    if (sourceBlock && targetBlock?.isMain) {
+      const preferred = getPreferredStrategyPort(sourceBlock.type);
+      if (preferred) {
+        target.portId = preferred;
+      }
+    }
   }
 
   // Check if connection already exists
@@ -7516,6 +7772,57 @@ function renderConnections() {
 
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.classList.add('connection-line', conn.type);
+
+    // Add per-config-port color class for differentiated connection lines
+    if (conn.type === 'config') {
+      const tPortId = conn.target.portId;
+      if (tPortId === 'sl_tp') path.classList.add('config-sltp');
+      else if (tPortId === 'close_cond') path.classList.add('config-close');
+      else if (tPortId === 'dca_grid') path.classList.add('config-dca');
+    }
+
+    // Direction mismatch detection:
+    // If user selected direction "short" but wire goes to entry_long/exit_long → mismatch
+    // If user selected direction "long" but wire goes to entry_short/exit_short → mismatch
+    // Also: source port "long" wired to entry_short (or vice versa) → signal/port mismatch
+    const direction = document.getElementById('builderDirection')?.value || 'both';
+    const targetPortId = conn.target.portId;
+    const sourcePortId = conn.source.portId;
+
+    const isLongTarget = targetPortId === 'entry_long' || targetPortId === 'exit_long';
+    const isShortTarget = targetPortId === 'entry_short' || targetPortId === 'exit_short';
+
+    let isMismatch = false;
+
+    // Case 1: Direction filter conflicts with target port
+    if (direction === 'long' && isShortTarget) {
+      isMismatch = true;
+    } else if (direction === 'short' && isLongTarget) {
+      isMismatch = true;
+    }
+
+    // Case 2: Source signal direction conflicts with target port
+    // e.g., divergence "long" output → entry_short (cross-wired)
+    if (sourcePortId === 'long' && isShortTarget) {
+      isMismatch = true;
+    } else if (sourcePortId === 'short' && isLongTarget) {
+      isMismatch = true;
+    }
+
+    if (isMismatch) {
+      path.classList.add('direction-mismatch');
+      // Add tooltip explaining the mismatch
+      const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      if (direction !== 'both' && (isLongTarget || isShortTarget)) {
+        const portDir = isLongTarget ? 'Long' : 'Short';
+        const selDir = direction === 'long' ? 'Long' : 'Short';
+        titleEl.textContent = `⚠ Несоответствие: направление "${selDir}", но провод подключён к "${portDir}" порту`;
+      } else {
+        titleEl.textContent = `⚠ Несоответствие: сигнал "${sourcePortId}" подключён к "${targetPortId}" порту`;
+      }
+      path.appendChild(titleEl);
+    }
+
     path.setAttribute('d', createBezierPath(startX, startY, endX, endY, true));
     path.dataset.connectionId = conn.id;
 
@@ -9258,24 +9565,32 @@ async function validateStrategy() {
         result.valid = false;
         result.errors.push('🟢 Entry: No entry conditions connected (connect signals to Entry Long or Entry Short)');
       } else {
-        // Check that connected sources are condition/logic blocks
+        // Check that connected sources are condition/logic blocks OR indicators with signal ports (long/short)
         const allEntryConns = [...entryLongConns, ...entryShortConns];
         const hasConditionSignals = allEntryConns.some((c) => {
           const sourceBlock = strategyBlocks.find((b) => b.id === c.source.blockId);
-          return sourceBlock && (
-            sourceBlock.category === 'condition' ||
-            sourceBlock.category === 'logic' ||
-            ['less_than', 'greater_than', 'crossover', 'crossunder', 'equals', 'between', 'and', 'or', 'not'].includes(sourceBlock.type)
-          );
+          if (!sourceBlock) return false;
+          // Direct condition/logic blocks
+          if (sourceBlock.category === 'condition' || sourceBlock.category === 'logic') return true;
+          if (['less_than', 'greater_than', 'crossover', 'crossunder', 'equals', 'between', 'and', 'or', 'not'].includes(sourceBlock.type)) return true;
+          // Indicator blocks with condition-type output ports (e.g. RSI long/short, MACD long/short)
+          const sourcePortId = c.source.portId;
+          const portDef = getBlockPorts(sourceBlock.type, sourceBlock.category);
+          if (portDef && portDef.outputs) {
+            const port = portDef.outputs.find((p) => p.id === sourcePortId);
+            if (port && port.type === 'condition') return true;
+          }
+          return false;
         });
         if (!hasConditionSignals) {
           result.warnings.push('🟢 Entry: Entry ports connected but no condition blocks detected');
         }
 
-        // Info about which entries are connected
-        if (hasEntryLong && !hasEntryShort) {
+        // Info about which entries are connected (only warn if direction is "both")
+        const direction = document.getElementById('builderDirection')?.value || 'both';
+        if (hasEntryLong && !hasEntryShort && direction === 'both') {
           result.warnings.push('🟢 Entry: Only Long entries — consider adding Short for "both" direction');
-        } else if (!hasEntryLong && hasEntryShort) {
+        } else if (!hasEntryLong && hasEntryShort && direction === 'both') {
           result.warnings.push('🟢 Entry: Only Short entries — consider adding Long for "both" direction');
         }
       }
@@ -10155,7 +10470,7 @@ async function openVersionsModal() {
       )
       .join('');
   } catch (err) {
-    listEl.innerHTML = `<p class="text-danger">Ошибка: ${err.message}</p>`;
+    listEl.innerHTML = `<p class="text-danger">Ошибка: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -10382,6 +10697,43 @@ function mapIndicatorParams(block) {
  * because BacktestRequest model doesn't define strategy_type/filters/exits/etc. fields.
  * See: Bug #1 fix (2026-02-15).
  */
+
+/**
+ * Extract stop_loss / take_profit from strategy exit blocks.
+ *
+ * Block types handled:
+ *   static_sltp  → stop_loss_percent & take_profit_percent (UI %)
+ *   sl_percent   → stop_loss_percent only
+ *   tp_percent   → take_profit_percent only
+ *
+ * Returns an object with `stop_loss` and/or `take_profit` as decimal fractions
+ * (e.g. 5% → 0.05), matching BacktestRequest model field format.
+ * Fields are omitted (not null) if no block provides them, so the backend
+ * falls back to its own block extraction logic.
+ */
+function extractSlTpFromBlocks() {
+  const result = {};
+  for (const block of strategyBlocks) {
+    const type = block.type;
+    const params = block.params || {};
+    if (type === 'static_sltp') {
+      if (params.stop_loss_percent != null && result.stop_loss == null) {
+        result.stop_loss = params.stop_loss_percent / 100;
+      }
+      if (params.take_profit_percent != null && result.take_profit == null) {
+        result.take_profit = params.take_profit_percent / 100;
+      }
+    } else if (type === 'sl_percent' && result.stop_loss == null) {
+      const sl = params.stop_loss_percent ?? params.percent;
+      if (sl != null) result.stop_loss = sl / 100;
+    } else if (type === 'tp_percent' && result.take_profit == null) {
+      const tp = params.take_profit_percent ?? params.percent;
+      if (tp != null) result.take_profit = tp / 100;
+    }
+  }
+  return result;
+}
+
 function buildBacktestRequest() {
   // Таймфрейм и направление — из общей секции (формат Bybit: 1,3,5,15,30,60,120,240,360,720,D,W,M)
   const timeframeRaw = document.getElementById('strategyTimeframe')?.value || '15';
@@ -10434,7 +10786,12 @@ function buildBacktestRequest() {
     })(),
 
     // Time filter: days to block (0=Mon … 6=Sun). Unchecked = trade that day.
-    no_trade_days: getNoTradeDaysFromUI()
+    no_trade_days: getNoTradeDaysFromUI(),
+
+    // SL/TP from exit blocks (static_sltp, sl_percent, tp_percent)
+    // Backend also extracts these from DB blocks as fallback, but sending
+    // them explicitly ensures the request is self-contained and debuggable.
+    ...extractSlTpFromBlocks()
   };
 
   return backtestConfig;
@@ -10578,6 +10935,14 @@ async function runBacktest() {
     if (response.ok) {
       const data = await response.json();
       console.log('[Strategy Builder] Backtest success:', data);
+
+      // Display warnings from backend (direction/signal mismatches)
+      if (data.warnings && data.warnings.length > 0) {
+        data.warnings.forEach(w => {
+          console.warn('[Strategy Builder] Backend warning:', w);
+          showNotification(`⚠️ ${w}`, 'warning');
+        });
+      }
 
       // Check if results are returned directly (for quick preview)
       if (data.metrics || data.trades || data.equity_curve) {
@@ -10784,7 +11149,8 @@ function renderTradesTable(trades) {
   }
 
   tbody.innerHTML = trades.map((trade, idx) => {
-    const isLong = trade.side === 'long' || trade.direction === 'long';
+    const sideNorm = (trade.side || trade.direction || 'long').toLowerCase();
+    const isLong = sideNorm === 'long' || sideNorm === 'buy';
     const pnl = trade.pnl || trade.profit || 0;
     const pnlPct = trade.pnl_pct || trade.profit_pct || 0;
     const mfe = trade.mfe || 0;
@@ -11371,7 +11737,7 @@ async function runAiBuild() {
     document.getElementById('aiBuildProgress').classList.add('hidden');
     document.getElementById('aiBuildResults').classList.remove('hidden');
     document.getElementById('aiBuildResultContent').innerHTML =
-      `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${err.message}</div>`;
+      `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -11781,38 +12147,12 @@ async function batchDeleteSelected() {
     console.log(`[SUCCESS] Deleted ${data.deleted_count} strategies`);
     showNotification(`Deleted ${data.deleted_count} strateg${data.deleted_count === 1 ? 'y' : 'ies'}`, 'success');
 
-    // Remove deleted cards from DOM instantly (no extra API call)
-    const deletedSet = new Set(data.deleted_ids || Array.from(_selectedStrategyIds));
-    deletedSet.forEach(id => {
-      const card = document.querySelector(`.strategy-card[data-strategy-id="${id}"]`);
-      if (card) card.remove();
-    });
-
-    // Update cache
-    if (_strategiesCache) {
-      _strategiesCache = _strategiesCache.filter(s => !deletedSet.has(s.id));
-    }
-
+    // Clear selection and reload list from server (ensures UI stays in sync)
     _selectedStrategyIds.clear();
+    _strategiesCache = null;
+    const strategies = await fetchStrategiesList();
+    renderStrategiesList(strategies);
     updateBatchDeleteUI();
-
-    // Update count label
-    const countEl = document.getElementById('strategiesCount');
-    const remaining = document.querySelectorAll('.strategy-card[data-strategy-id]').length;
-    if (countEl) countEl.textContent = `${remaining} strategies`;
-
-    // Show empty state if no strategies left
-    if (remaining === 0) {
-      const listEl = document.getElementById('strategiesList');
-      if (listEl) {
-        listEl.innerHTML = `
-          <div class="strategies-empty">
-            <i class="bi bi-folder2"></i>
-            <p>No saved strategies yet</p>
-            <p class="text-sm mt-1">Use the Save button to save your first strategy</p>
-          </div>`;
-      }
-    }
   } catch (err) {
     console.error('[My Strategies] Batch delete failed:', err);
     showNotification('Failed to delete strategies', 'error');
@@ -11853,34 +12193,11 @@ async function deleteStrategyById(strategyId, name) {
     showNotification(`Strategy "${name}" deleted`, 'success');
     _selectedStrategyIds.delete(strategyId);
 
-    // Remove card from DOM instantly (no extra API call)
-    const card = document.querySelector(`.strategy-card[data-strategy-id="${strategyId}"]`);
-    if (card) card.remove();
-
-    // Update cache
-    if (_strategiesCache) {
-      _strategiesCache = _strategiesCache.filter(s => s.id !== strategyId);
-    }
-
+    // Reload list from server to ensure UI stays in sync
+    _strategiesCache = null;
+    const strategies = await fetchStrategiesList();
+    renderStrategiesList(strategies);
     updateBatchDeleteUI();
-
-    // Update count label
-    const countEl = document.getElementById('strategiesCount');
-    const remaining = document.querySelectorAll('.strategy-card[data-strategy-id]').length;
-    if (countEl) countEl.textContent = `${remaining} strategies`;
-
-    // Show empty state if no strategies left
-    if (remaining === 0) {
-      const listEl = document.getElementById('strategiesList');
-      if (listEl) {
-        listEl.innerHTML = `
-          <div class="strategies-empty">
-            <i class="bi bi-folder2"></i>
-            <p>No saved strategies yet</p>
-            <p class="text-sm mt-1">Use the Save button to save your first strategy</p>
-          </div>`;
-      }
-    }
   } catch (err) {
     console.error('[My Strategies] Delete failed:', err);
     showNotification('Failed to delete strategy', 'error');
