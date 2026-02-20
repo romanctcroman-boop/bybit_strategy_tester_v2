@@ -76,9 +76,7 @@ class DistributedLock:
                 await self._redis.ping()
                 logger.info("DistributedLock connected to Redis: %s", self._redis_url)
             except Exception as e:
-                logger.warning(
-                    "DistributedLock Redis unavailable (%s), using local locks", e
-                )
+                logger.warning("DistributedLock Redis unavailable (%s), using local locks", e)
                 self._redis = None
         return self._redis
 
@@ -123,9 +121,7 @@ class DistributedLock:
             redis_error = False
             for attempt in range(max_retries):
                 try:
-                    result = await redis_client.set(
-                        lock_key, lock_value, nx=True, ex=ttl
-                    )
+                    result = await redis_client.set(lock_key, lock_value, nx=True, ex=ttl)
                     if result:
                         acquired = True
                         logger.debug("Lock acquired: %s (attempt %d)", lock_key, attempt + 1)
@@ -166,10 +162,7 @@ class DistributedLock:
         try:
             await asyncio.wait_for(local_lock.acquire(), timeout=max_retries * retry_interval)
         except TimeoutError:
-            raise TimeoutError(
-                f"Could not acquire local lock '{resource}' "
-                f"after {max_retries * retry_interval:.1f}s"
-            )
+            raise TimeoutError(f"Could not acquire local lock '{resource}' after {max_retries * retry_interval:.1f}s")
         try:
             yield False
         finally:

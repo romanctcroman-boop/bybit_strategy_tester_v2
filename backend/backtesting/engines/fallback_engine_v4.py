@@ -2034,7 +2034,11 @@ class FallbackEngineV4(BaseBacktestEngine):
                     market_conditions_allow = False  # Слишком высокая волатильность
 
             # Volume Filter
-            if volume_filter_enabled and volume_percentiles is not None and volume_percentiles[i] < min_volume_percentile:
+            if (
+                volume_filter_enabled
+                and volume_percentiles is not None
+                and volume_percentiles[i] < min_volume_percentile
+            ):
                 market_conditions_allow = False  # Слишком низкий объём
 
             # Range Filter (ADR)
@@ -2042,7 +2046,11 @@ class FallbackEngineV4(BaseBacktestEngine):
                 market_conditions_allow = False  # Боковик, слишком узкий диапазон
 
             # === MARKET REGIME FILTER ===
-            if market_regime_enabled and regime_detector is not None and not regime_detector.should_trade(market_regime_filter):
+            if (
+                market_regime_enabled
+                and regime_detector is not None
+                and not regime_detector.should_trade(market_regime_filter)
+            ):
                 market_conditions_allow = False  # Режим рынка не подходит
 
             # Trend Filter - применяется отдельно для long и short

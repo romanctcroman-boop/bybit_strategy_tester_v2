@@ -71,9 +71,7 @@ class TestDistributedLockFallback:
         async with lock.acquire("timeout:test", ttl=10, max_retries=1):
             # Try to acquire same lock with very short timeout
             with pytest.raises(TimeoutError, match="Could not acquire"):
-                async with lock.acquire(
-                    "timeout:test", ttl=10, max_retries=1, retry_interval=0.01
-                ):
+                async with lock.acquire("timeout:test", ttl=10, max_retries=1, retry_interval=0.01):
                     pass  # Should never reach here
 
     async def test_is_locked_false_when_not_acquired(self, lock: DistributedLock):

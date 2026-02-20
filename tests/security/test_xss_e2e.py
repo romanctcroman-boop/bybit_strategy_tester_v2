@@ -42,11 +42,11 @@ XSS_PAYLOADS = [
     "<embed src='javascript:alert(1)'>",
     "<details/open/ontoggle=alert(1)>",
     "'-alert(1)-'",
-    "\"><img src=x onerror=alert(1)>",
-    "<math><mi//xlink:href=\"data:x,<script>alert(1)</script>\">",
+    '"><img src=x onerror=alert(1)>',
+    '<math><mi//xlink:href="data:x,<script>alert(1)</script>">',
     "<input autofocus onfocus=alert(1)>",
     "<marquee onstart=alert(1)>",
-    "<a href=\"jaVaScRiPt:alert(1)\">click</a>",
+    '<a href="jaVaScRiPt:alert(1)">click</a>',
 ]
 
 
@@ -235,8 +235,10 @@ class TestAPIXSSReflection:
         body = resp.text
         # Even if the request fails (400/422), the response should not reflect raw XSS
         if "<script>" in payload.lower():
-            assert "<script>" not in body.lower() or "&lt;script&gt;" in body.lower() or resp.status_code in (
-                400, 404, 422, 500
+            assert (
+                "<script>" not in body.lower()
+                or "&lt;script&gt;" in body.lower()
+                or resp.status_code in (400, 404, 422, 500)
             )
 
     async def test_404_not_reflecting_path(self, client):
@@ -379,19 +381,65 @@ class TestSanitizerJSLogic:
 
     # Allowed tags from Sanitizer.js DEFAULT_ALLOWED_TAGS
     ALLOWED_TAGS = {
-        "p", "br", "hr", "span", "div", "strong", "b", "em", "i", "u",
-        "s", "strike", "del", "ins", "sub", "sup", "small", "mark",
-        "code", "pre", "kbd", "samp",
-        "h1", "h2", "h3", "h4", "h5", "h6",
-        "ul", "ol", "li", "dl", "dt", "dd",
-        "table", "thead", "tbody", "tfoot", "tr", "th", "td",
+        "p",
+        "br",
+        "hr",
+        "span",
+        "div",
+        "strong",
+        "b",
+        "em",
+        "i",
+        "u",
+        "s",
+        "strike",
+        "del",
+        "ins",
+        "sub",
+        "sup",
+        "small",
+        "mark",
+        "code",
+        "pre",
+        "kbd",
+        "samp",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "ul",
+        "ol",
+        "li",
+        "dl",
+        "dt",
+        "dd",
+        "table",
+        "thead",
+        "tbody",
+        "tfoot",
+        "tr",
+        "th",
+        "td",
     }
 
     # Dangerous tags that must NEVER be allowed
     DANGEROUS_TAGS = {
-        "script", "iframe", "object", "embed", "applet",
-        "form", "input", "textarea", "select", "button",
-        "link", "meta", "base", "style",
+        "script",
+        "iframe",
+        "object",
+        "embed",
+        "applet",
+        "form",
+        "input",
+        "textarea",
+        "select",
+        "button",
+        "link",
+        "meta",
+        "base",
+        "style",
     }
 
     def test_dangerous_tags_not_in_allowed(self):
@@ -407,8 +455,16 @@ class TestSanitizerJSLogic:
 
     # Dangerous attributes that should be stripped
     DANGEROUS_ATTRS = [
-        "onclick", "onerror", "onload", "onmouseover", "onfocus",
-        "onblur", "onsubmit", "onchange", "ontoggle", "onstart",
+        "onclick",
+        "onerror",
+        "onload",
+        "onmouseover",
+        "onfocus",
+        "onblur",
+        "onsubmit",
+        "onchange",
+        "ontoggle",
+        "onstart",
     ]
 
     @pytest.mark.parametrize("attr", DANGEROUS_ATTRS)
