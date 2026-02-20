@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI Agent Knowledge Test: Universal Filters Batch 2
 (Keltner/Bollinger Channel, RVI, MFI, CCI, Momentum)
 
@@ -6,15 +6,15 @@ Tests verify that AI agents correctly understand:
 
 == KELTNER/BOLLINGER CHANNEL (filter) ==
 - Block type: 'keltner_bollinger', category: 'indicator'
-- Toggle: use_channel (bool, default false → passthrough: all True)
+- Toggle: use_channel (bool, default false в†’ passthrough: all True)
 - Parameters: channel_timeframe (BYBIT_TF_OPTS), channel_mode (Rebound|Breackout),
   channel_type (Bollinger Bands|Keltner Channel),
   enter_conditions (Out-of-band closure|Wick out of band|Wick out of the band then close in|
                     Close out of the band then close in),
   keltner_length (0.1-100, default 14), keltner_mult (0.1-100, default 1.5),
   bb_length (0.1-100, default 20), bb_deviation (0.1-100, default 2)
-- Returns: {long_signal, short_signal} — asymmetric (Rebound: lower→long, upper→short;
-  Breakout: upper→long, lower→short)
+- Returns: {long_signal, short_signal} вЂ” asymmetric (Rebound: lowerв†’long, upperв†’short;
+  Breakout: upperв†’long, lowerв†’short)
 
 == RVI - RELATIVE VOLATILITY INDEX (filter) ==
 - Block type: 'rvi_filter', category: 'indicator'
@@ -121,7 +121,7 @@ def client():
 
 @pytest.fixture
 def adapter() -> StrategyBuilderAdapter:
-    """Bare adapter — no data loaded, used for unit-level calls."""
+    """Bare adapter вЂ” no data loaded, used for unit-level calls."""
     return StrategyBuilderAdapter.__new__(StrategyBuilderAdapter)
 
 
@@ -169,7 +169,7 @@ def _run(
     params: dict[str, Any],
     ohlcv: pd.DataFrame,
 ) -> dict:
-    """Helper — execute indicator block."""
+    """Helper вЂ” execute indicator block."""
     return adapter._execute_indicator(block_type, params, ohlcv, {})
 
 
@@ -206,15 +206,15 @@ class TestKeltnerBollingerPassthrough:
 
     def test_passthrough_default_params(self, adapter, ohlcv_data):
         result = _run(adapter, "keltner_bollinger", {}, ohlcv_data)
-        assert "long_signal" in result
-        assert "short_signal" in result
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert "long" in result
+        assert "short" in result
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_passthrough_explicit_false(self, adapter, ohlcv_data):
         result = _run(adapter, "keltner_bollinger", {"use_channel": False}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
 
 class TestKeltnerChannel:
@@ -223,22 +223,22 @@ class TestKeltnerChannel:
     def test_keltner_active_returns_boolean(self, adapter, ohlcv_data):
         params = {"use_channel": True, "channel_type": "Keltner Channel", "keltner_length": 14, "keltner_mult": 1.5}
         result = _run(adapter, "keltner_bollinger", params, ohlcv_data)
-        assert result["long_signal"].dtype == bool
-        assert result["short_signal"].dtype == bool
+        assert result["long"].dtype == bool
+        assert result["short"].dtype == bool
 
     def test_keltner_series_length(self, adapter, ohlcv_data):
         params = {"use_channel": True, "channel_type": "Keltner Channel"}
         result = _run(adapter, "keltner_bollinger", params, ohlcv_data)
-        assert len(result["long_signal"]) == len(ohlcv_data)
-        assert len(result["short_signal"]) == len(ohlcv_data)
+        assert len(result["long"]) == len(ohlcv_data)
+        assert len(result["short"]) == len(ohlcv_data)
 
     def test_keltner_rebound_asymmetric(self, adapter, ohlcv_data):
-        """Rebound mode: lower band → long, upper band → short — should differ."""
+        """Rebound mode: lower band в†’ long, upper band в†’ short вЂ” should differ."""
         params = {"use_channel": True, "channel_type": "Keltner Channel", "channel_mode": "Rebound"}
         result = _run(adapter, "keltner_bollinger", params, ohlcv_data)
         # In trending data, upper and lower touches differ
-        if result["long_signal"].any() or result["short_signal"].any():
-            assert not result["long_signal"].equals(result["short_signal"])
+        if result["long"].any() or result["short"].any():
+            assert not result["long"].equals(result["short"])
 
     def test_keltner_breakout_vs_rebound_differ(self, adapter, ohlcv_data):
         """Breakout and Rebound modes produce opposite long/short assignments."""
@@ -246,8 +246,8 @@ class TestKeltnerChannel:
         r_rebound = _run(adapter, "keltner_bollinger", {**base, "channel_mode": "Rebound"}, ohlcv_data)
         r_breakout = _run(adapter, "keltner_bollinger", {**base, "channel_mode": "Breackout"}, ohlcv_data)
         # Rebound long = Breakout short (lower band signal)
-        pd.testing.assert_series_equal(r_rebound["long_signal"], r_breakout["short_signal"])
-        pd.testing.assert_series_equal(r_rebound["short_signal"], r_breakout["long_signal"])
+        pd.testing.assert_series_equal(r_rebound["long"], r_breakout["short"])
+        pd.testing.assert_series_equal(r_rebound["short"], r_breakout["long"])
 
 
 class TestBollingerBands:
@@ -256,16 +256,16 @@ class TestBollingerBands:
     def test_bollinger_active_returns_boolean(self, adapter, ohlcv_data):
         params = {"use_channel": True, "channel_type": "Bollinger Bands", "bb_length": 20, "bb_deviation": 2}
         result = _run(adapter, "keltner_bollinger", params, ohlcv_data)
-        assert result["long_signal"].dtype == bool
-        assert result["short_signal"].dtype == bool
+        assert result["long"].dtype == bool
+        assert result["short"].dtype == bool
 
     def test_bollinger_narrower_bands_more_signals(self, adapter, ohlcv_data):
-        """Narrower bands (lower deviation) → more signals."""
+        """Narrower bands (lower deviation) в†’ more signals."""
         base = {"use_channel": True, "channel_type": "Bollinger Bands", "bb_length": 20}
         r_narrow = _run(adapter, "keltner_bollinger", {**base, "bb_deviation": 1.0}, ohlcv_data)
         r_wide = _run(adapter, "keltner_bollinger", {**base, "bb_deviation": 3.0}, ohlcv_data)
-        narrow_count = r_narrow["long_signal"].sum() + r_narrow["short_signal"].sum()
-        wide_count = r_wide["long_signal"].sum() + r_wide["short_signal"].sum()
+        narrow_count = r_narrow["long"].sum() + r_narrow["short"].sum()
+        wide_count = r_wide["long"].sum() + r_wide["short"].sum()
         assert narrow_count >= wide_count
 
     def test_bollinger_vs_keltner_differ(self, adapter, ohlcv_data):
@@ -273,9 +273,9 @@ class TestBollingerBands:
         base = {"use_channel": True, "channel_mode": "Rebound"}
         r_bb = _run(adapter, "keltner_bollinger", {**base, "channel_type": "Bollinger Bands"}, ohlcv_data)
         r_kc = _run(adapter, "keltner_bollinger", {**base, "channel_type": "Keltner Channel"}, ohlcv_data)
-        # Different calculation methods → different signals (unless all False)
-        assert (not r_bb["long_signal"].equals(r_kc["long_signal"])) or (
-            not r_bb["long_signal"].any() and not r_kc["long_signal"].any()
+        # Different calculation methods в†’ different signals (unless all False)
+        assert (not r_bb["long"].equals(r_kc["long"])) or (
+            not r_bb["long"].any() and not r_kc["long"].any()
         )
 
 
@@ -295,16 +295,16 @@ class TestChannelEnterConditions:
         """All enter conditions must execute without error."""
         params = {"use_channel": True, "channel_type": "Keltner Channel", "enter_conditions": cond}
         result = _run(adapter, "keltner_bollinger", params, ohlcv_data)
-        assert "long_signal" in result
-        assert "short_signal" in result
+        assert "long" in result
+        assert "short" in result
 
     def test_wick_produces_more_than_close(self, adapter, ohlcv_data):
         """Wick out of band should produce >= signals than close out of band."""
         base = {"use_channel": True, "channel_type": "Keltner Channel", "channel_mode": "Rebound"}
         r_wick = _run(adapter, "keltner_bollinger", {**base, "enter_conditions": "Wick out of band"}, ohlcv_data)
         r_close = _run(adapter, "keltner_bollinger", {**base, "enter_conditions": "Out-of-band closure"}, ohlcv_data)
-        wick_total = r_wick["long_signal"].sum() + r_wick["short_signal"].sum()
-        close_total = r_close["long_signal"].sum() + r_close["short_signal"].sum()
+        wick_total = r_wick["long"].sum() + r_wick["short"].sum()
+        close_total = r_close["long"].sum() + r_close["short"].sum()
         assert wick_total >= close_total
 
 
@@ -318,8 +318,8 @@ class TestRVIFilterPassthrough:
 
     def test_passthrough_default(self, adapter, ohlcv_data):
         result = _run(adapter, "rvi_filter", {}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_returns_rvi_series(self, adapter, ohlcv_data):
         """Must return rvi series in output."""
@@ -336,10 +336,10 @@ class TestRVILongRange:
         params = {"use_rvi_long_range": True, "rvi_long_more": 30, "rvi_long_less": 70}
         result = _run(adapter, "rvi_filter", params, ohlcv_data)
         # With a range filter, not all bars should pass
-        assert not result["long_signal"].all()
+        assert not result["long"].all()
 
     def test_long_range_narrows_signals(self, adapter, ohlcv_data):
-        """Narrower range → fewer signals."""
+        """Narrower range в†’ fewer signals."""
         r_wide = _run(
             adapter,
             "rvi_filter",
@@ -360,13 +360,13 @@ class TestRVILongRange:
             },
             ohlcv_data,
         )
-        assert r_wide["long_signal"].sum() >= r_narrow["long_signal"].sum()
+        assert r_wide["long"].sum() >= r_narrow["long"].sum()
 
     def test_long_range_only_affects_long(self, adapter, ohlcv_data):
         """Long range filter should only affect long signal, not short."""
         params = {"use_rvi_long_range": True, "rvi_long_more": 30, "rvi_long_less": 70}
         result = _run(adapter, "rvi_filter", params, ohlcv_data)
-        assert result["short_signal"].all()
+        assert result["short"].all()
 
 
 class TestRVIShortRange:
@@ -375,13 +375,13 @@ class TestRVIShortRange:
     def test_short_range_filters_signals(self, adapter, ohlcv_data):
         params = {"use_rvi_short_range": True, "rvi_short_less": 70, "rvi_short_more": 30}
         result = _run(adapter, "rvi_filter", params, ohlcv_data)
-        assert not result["short_signal"].all()
+        assert not result["short"].all()
 
     def test_short_range_only_affects_short(self, adapter, ohlcv_data):
         """Short range filter should only affect short signal, not long."""
         params = {"use_rvi_short_range": True, "rvi_short_less": 70, "rvi_short_more": 30}
         result = _run(adapter, "rvi_filter", params, ohlcv_data)
-        assert result["long_signal"].all()
+        assert result["long"].all()
 
     def test_both_ranges_combined(self, adapter, ohlcv_data):
         """Both ranges can be used together."""
@@ -394,8 +394,8 @@ class TestRVIShortRange:
             "rvi_short_more": 30,
         }
         result = _run(adapter, "rvi_filter", params, ohlcv_data)
-        assert not result["long_signal"].all()
-        assert not result["short_signal"].all()
+        assert not result["long"].all()
+        assert not result["short"].all()
 
     @pytest.mark.parametrize("ma_type", ["WMA", "RMA", "SMA", "EMA"])
     def test_rvi_ma_types_run_without_error(self, adapter, ohlcv_data, ma_type):
@@ -415,8 +415,8 @@ class TestMFIFilterPassthrough:
 
     def test_passthrough_default(self, adapter, ohlcv_data):
         result = _run(adapter, "mfi_filter", {}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_returns_mfi_series(self, adapter, ohlcv_data):
         result = _run(adapter, "mfi_filter", {}, ohlcv_data)
@@ -431,12 +431,12 @@ class TestMFILongRange:
     def test_long_range_filters_signals(self, adapter, ohlcv_data):
         params = {"use_mfi_long_range": True, "mfi_long_more": 20, "mfi_long_less": 80}
         result = _run(adapter, "mfi_filter", params, ohlcv_data)
-        assert not result["long_signal"].all()
+        assert not result["long"].all()
 
     def test_long_range_only_affects_long(self, adapter, ohlcv_data):
         params = {"use_mfi_long_range": True, "mfi_long_more": 20, "mfi_long_less": 80}
         result = _run(adapter, "mfi_filter", params, ohlcv_data)
-        assert result["short_signal"].all()
+        assert result["short"].all()
 
 
 class TestMFIShortRange:
@@ -445,12 +445,12 @@ class TestMFIShortRange:
     def test_short_range_filters_signals(self, adapter, ohlcv_data):
         params = {"use_mfi_short_range": True, "mfi_short_less": 80, "mfi_short_more": 20}
         result = _run(adapter, "mfi_filter", params, ohlcv_data)
-        assert not result["short_signal"].all()
+        assert not result["short"].all()
 
     def test_short_range_only_affects_short(self, adapter, ohlcv_data):
         params = {"use_mfi_short_range": True, "mfi_short_less": 80, "mfi_short_more": 20}
         result = _run(adapter, "mfi_filter", params, ohlcv_data)
-        assert result["long_signal"].all()
+        assert result["long"].all()
 
     def test_both_ranges_combined(self, adapter, ohlcv_data):
         params = {
@@ -462,8 +462,8 @@ class TestMFIShortRange:
             "mfi_short_more": 20,
         }
         result = _run(adapter, "mfi_filter", params, ohlcv_data)
-        assert not result["long_signal"].all()
-        assert not result["short_signal"].all()
+        assert not result["long"].all()
+        assert not result["short"].all()
 
     def test_different_periods_differ(self, adapter, ohlcv_data):
         """Different MFI periods produce different indicator values."""
@@ -482,8 +482,8 @@ class TestCCIFilterPassthrough:
 
     def test_passthrough_default(self, adapter, ohlcv_data):
         result = _run(adapter, "cci_filter", {}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_returns_cci_series(self, adapter, ohlcv_data):
         result = _run(adapter, "cci_filter", {}, ohlcv_data)
@@ -499,12 +499,12 @@ class TestCCILongRange:
         params = {"use_cci_long_range": True, "cci_long_more": -100, "cci_long_less": 100}
         result = _run(adapter, "cci_filter", params, ohlcv_data)
         # CCI oscillates widely, narrow range should filter
-        assert not result["long_signal"].all()
+        assert not result["long"].all()
 
     def test_long_range_only_affects_long(self, adapter, ohlcv_data):
         params = {"use_cci_long_range": True, "cci_long_more": -100, "cci_long_less": 100}
         result = _run(adapter, "cci_filter", params, ohlcv_data)
-        assert result["short_signal"].all()
+        assert result["short"].all()
 
     def test_wider_range_more_signals(self, adapter, ohlcv_data):
         r_narrow = _run(
@@ -527,7 +527,7 @@ class TestCCILongRange:
             },
             ohlcv_data,
         )
-        assert r_wide["long_signal"].sum() >= r_narrow["long_signal"].sum()
+        assert r_wide["long"].sum() >= r_narrow["long"].sum()
 
 
 class TestCCIShortRange:
@@ -536,12 +536,12 @@ class TestCCIShortRange:
     def test_short_range_filters_signals(self, adapter, ohlcv_data):
         params = {"use_cci_short_range": True, "cci_short_less": 100, "cci_short_more": -100}
         result = _run(adapter, "cci_filter", params, ohlcv_data)
-        assert not result["short_signal"].all()
+        assert not result["short"].all()
 
     def test_short_range_only_affects_short(self, adapter, ohlcv_data):
         params = {"use_cci_short_range": True, "cci_short_less": 100, "cci_short_more": -100}
         result = _run(adapter, "cci_filter", params, ohlcv_data)
-        assert result["long_signal"].all()
+        assert result["long"].all()
 
     def test_both_ranges_combined(self, adapter, ohlcv_data):
         params = {
@@ -553,8 +553,8 @@ class TestCCIShortRange:
             "cci_short_more": -100,
         }
         result = _run(adapter, "cci_filter", params, ohlcv_data)
-        assert not result["long_signal"].all()
-        assert not result["short_signal"].all()
+        assert not result["long"].all()
+        assert not result["short"].all()
 
 
 # ============================================================
@@ -567,8 +567,8 @@ class TestMomentumFilterPassthrough:
 
     def test_passthrough_default(self, adapter, ohlcv_data):
         result = _run(adapter, "momentum_filter", {}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_returns_momentum_series(self, adapter, ohlcv_data):
         result = _run(adapter, "momentum_filter", {}, ohlcv_data)
@@ -584,12 +584,12 @@ class TestMomentumLongRange:
         params = {"use_momentum_long_range": True, "momentum_long_more": -50, "momentum_long_less": 50}
         result = _run(adapter, "momentum_filter", params, ohlcv_data)
         # With range restriction, not all bars pass
-        assert not result["long_signal"].all() or result["long_signal"].isna().any()
+        assert not result["long"].all() or result["long"].isna().any()
 
     def test_long_range_only_affects_long(self, adapter, ohlcv_data):
         params = {"use_momentum_long_range": True, "momentum_long_more": -50, "momentum_long_less": 50}
         result = _run(adapter, "momentum_filter", params, ohlcv_data)
-        assert result["short_signal"].all()
+        assert result["short"].all()
 
 
 class TestMomentumShortRange:
@@ -598,12 +598,12 @@ class TestMomentumShortRange:
     def test_short_range_filters_signals(self, adapter, ohlcv_data):
         params = {"use_momentum_short_range": True, "momentum_short_less": 50, "momentum_short_more": -50}
         result = _run(adapter, "momentum_filter", params, ohlcv_data)
-        assert not result["short_signal"].all() or result["short_signal"].isna().any()
+        assert not result["short"].all() or result["short"].isna().any()
 
     def test_short_range_only_affects_short(self, adapter, ohlcv_data):
         params = {"use_momentum_short_range": True, "momentum_short_less": 50, "momentum_short_more": -50}
         result = _run(adapter, "momentum_filter", params, ohlcv_data)
-        assert result["long_signal"].all()
+        assert result["long"].all()
 
     def test_both_ranges_combined(self, adapter, ohlcv_data):
         params = {
@@ -616,7 +616,7 @@ class TestMomentumShortRange:
         }
         result = _run(adapter, "momentum_filter", params, ohlcv_data)
         # At least one direction should be filtered
-        assert not result["long_signal"].all() or not result["short_signal"].all()
+        assert not result["long"].all() or not result["short"].all()
 
     @pytest.mark.parametrize("source", ["close", "open", "high", "low"])
     def test_momentum_source_options(self, adapter, ohlcv_data, source):
@@ -653,7 +653,7 @@ class TestEdgeCases:
         )
         params = {"use_channel": True, "channel_type": "Keltner Channel", "keltner_length": 5}
         result = _run(adapter, "keltner_bollinger", params, ohlcv)
-        assert len(result["long_signal"]) == 10
+        assert len(result["long"]) == 10
 
     def test_small_data_rvi(self, adapter):
         """RVI on small data."""
@@ -752,7 +752,7 @@ class TestEdgeCases:
         )
         params = {"rvi_length": 5, "rvi_ma_type": "SMA", "rvi_ma_length": 3}
         result = _run(adapter, "rvi_filter", params, ohlcv)
-        assert len(result["long_signal"]) == 20
+        assert len(result["long"]) == 20
         assert "rvi" in result
 
     def test_small_data_mfi(self, adapter):
@@ -872,7 +872,7 @@ class TestEdgeCases:
             }
         )
         result = _run(adapter, "mfi_filter", {"mfi_length": 5}, ohlcv)
-        assert len(result["long_signal"]) == 20
+        assert len(result["long"]) == 20
 
     def test_small_data_cci(self, adapter):
         """CCI on small data."""
@@ -970,7 +970,7 @@ class TestEdgeCases:
             }
         )
         result = _run(adapter, "cci_filter", {"cci_length": 5}, ohlcv)
-        assert len(result["long_signal"]) == 20
+        assert len(result["long"]) == 20
 
     def test_small_data_momentum(self, adapter):
         """Momentum on small data."""
@@ -984,7 +984,7 @@ class TestEdgeCases:
             }
         )
         result = _run(adapter, "momentum_filter", {"momentum_length": 2}, ohlcv)
-        assert len(result["long_signal"]) == 5
+        assert len(result["long"]) == 5
         assert "momentum" in result
 
     def test_constant_price_data(self, adapter):
@@ -1007,8 +1007,8 @@ class TestEdgeCases:
             ("momentum_filter", "use_momentum_long_range", True),
         ]:
             result = _run(adapter, block_type, {toggle_key: toggle_val}, ohlcv)
-            assert "long_signal" in result
-            assert len(result["long_signal"]) == n
+            assert "long" in result
+            assert len(result["long"]) == n
 
 
 # ============================================================

@@ -251,19 +251,20 @@ class OptimizationCache:
         total = total_hits + total_misses
         hit_rate = total_hits / total if total > 0 else 0
 
-        print("\n📊 CACHE STATISTICS")
-        print("-" * 40)
-        print(f"Memory hits:  {self.stats['memory_hits']}")
-        print(f"Memory misses: {self.stats['memory_misses']}")
-        print(f"Disk hits:    {self.stats['disk_hits']}")
-        print(f"Disk misses:  {self.stats['disk_misses']}")
-        print(f"Hit rate:     {hit_rate:.1%}")
-        print(f"Memory items: {len(self._memory_cache)}")
-
-        # Disk size
+        disk_size_mb = 0.0
         if self.CACHE_DIR.exists():
-            disk_size = sum(f.stat().st_size for f in self.CACHE_DIR.glob("*.pkl"))
-            print(f"Disk size:    {disk_size / 1024 / 1024:.2f} MB")
+            disk_size_mb = sum(f.stat().st_size for f in self.CACHE_DIR.glob("*.pkl")) / 1024 / 1024
+
+        logger.info(
+            "Cache statistics",
+            memory_hits=self.stats["memory_hits"],
+            memory_misses=self.stats["memory_misses"],
+            disk_hits=self.stats["disk_hits"],
+            disk_misses=self.stats["disk_misses"],
+            hit_rate=f"{hit_rate:.1%}",
+            memory_items=len(self._memory_cache),
+            disk_size_mb=f"{disk_size_mb:.2f}",
+        )
 
 
 # =========================================================

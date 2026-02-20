@@ -16,7 +16,7 @@ class PerplexityClient(OpenAICompatibleClient):
     """Perplexity API client with circuit breaker protection."""
 
     DEFAULT_BASE_URL = "https://api.perplexity.ai"
-    DEFAULT_MODEL = "llama-3.1-sonar-small-128k-online"
+    DEFAULT_MODEL = "sonar-pro"
     PROVIDER = LLMProvider.PERPLEXITY
     BREAKER_NAME = "perplexity_llm_client"
     EMOJI = "🟣"

@@ -51,7 +51,6 @@ async def file_ops_status():
         "available_operations": [
             "GET /api/v1/file-ops/status - This endpoint",
             "GET /api/v1/file-ops/exports - List available exports",
-            # TODO: Add more when implemented
         ],
         "note": "Full file operations coming soon",
     }

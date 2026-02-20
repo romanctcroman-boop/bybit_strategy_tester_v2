@@ -157,7 +157,7 @@ class GenerateStrategiesNode(AgentNode):
         provider_map = {
             "deepseek": (LLMProvider.DEEPSEEK, "DEEPSEEK_API_KEY", "deepseek-chat", 0.7),
             "qwen": (LLMProvider.QWEN, "QWEN_API_KEY", "qwen-plus", 0.4),
-            "perplexity": (LLMProvider.PERPLEXITY, "PERPLEXITY_API_KEY", "llama-3.1-sonar-small-128k-online", 0.7),
+            "perplexity": (LLMProvider.PERPLEXITY, "PERPLEXITY_API_KEY", "sonar-pro", 0.7),
         }
 
         if agent_name not in provider_map:

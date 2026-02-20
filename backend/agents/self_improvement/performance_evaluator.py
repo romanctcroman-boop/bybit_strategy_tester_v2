@@ -439,7 +439,7 @@ class PerformanceEvaluator:
         duration = time.time() - start_time
 
         # Average scores by category
-        avg_scores = {cat: statistics.mean(vals) for cat, vals in scores.items()}
+        avg_scores = {cat: statistics.mean(vals) for cat, vals in scores.items() if vals}
 
         result = BenchmarkResult(
             suite_name=suite_name,

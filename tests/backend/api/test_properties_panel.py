@@ -7,7 +7,7 @@ BUG-3 (no symbol/interval validation) fixes from AUDIT_PROPERTIES_PANEL.md.
 Naming: test_[function]_[scenario]
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -273,8 +273,8 @@ class TestBacktestRequestToConfigPropagation:
         config = BacktestConfig(
             symbol="BTCUSDT",
             interval="15",
-            start_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2025, 1, 15, tzinfo=timezone.utc),
+            start_date=datetime(2025, 1, 1, tzinfo=UTC),
+            end_date=datetime(2025, 1, 15, tzinfo=UTC),
             strategy_type=StrategyType.CUSTOM,
             direction="long",
             position_size=0.5,
@@ -288,8 +288,8 @@ class TestBacktestRequestToConfigPropagation:
         config = BacktestConfig(
             symbol="BTCUSDT",
             interval="15",
-            start_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2025, 1, 15, tzinfo=timezone.utc),
+            start_date=datetime(2025, 1, 1, tzinfo=UTC),
+            end_date=datetime(2025, 1, 15, tzinfo=UTC),
             strategy_type=StrategyType.CUSTOM,
             position_size=0.75,
         )

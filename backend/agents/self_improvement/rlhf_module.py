@@ -20,6 +20,7 @@ References:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from dataclasses import dataclass, field
@@ -546,7 +547,13 @@ class RLHFModule:
                 # Get AI evaluation
                 if evaluator_fn:
                     try:
-                        preference, confidence, reasoning = await evaluator_fn(prompt, response_a, response_b)
+                        preference, confidence, reasoning = await asyncio.wait_for(
+                            evaluator_fn(prompt, response_a, response_b),
+                            timeout=60.0,
+                        )
+                    except asyncio.TimeoutError:
+                        logger.error(f"AI evaluation timed out for pair ({i}, {j})")
+                        continue
                     except Exception as e:
                         logger.error(f"AI evaluation failed: {e}")
                         continue

@@ -7,6 +7,165 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **P1 Critical Bug Fixes — 2026-02-20:**
+    - **M1: Duplicate dataclass fields** — `long_largest_loss` and `short_largest_loss` were each defined twice in `BacktestMetrics` dataclass (`backend/core/metrics_calculator.py`). Second definition silently overwrote the first, causing data loss during serialization. Removed duplicate lines.
+    - **M2: FK type mismatch** — `Optimization.strategy_id` was `Column(Integer)` but `strategies.id` is `Column(String(36))` (UUID). FK constraint never enforced, cascade delete broken. Changed to `Column(String(36))` in `backend/database/models/optimization.py`.
+    - **F1/F2/F5/F6: XSS in strategy_builder.js** — `e.message` and `err.message` from errors/API responses were inserted via `innerHTML` without escaping. Applied `escapeHtml()` (already available in file) to all vulnerable locations: backend connection banner, database panel error, data sync status error message, and version history error.
+    - **F4: Race condition in agent_memory.py** — Concurrent `store_message()` calls wrote to the same JSON file without locking, causing data corruption. Added per-conversation `threading.Lock` with a `_locks_guard` to protect the locks dict itself.
+    - **A1: Deprecated pandas API** — `reindex(ohlcv.index, method="ffill")` and `fillna(method="bfill")` in `strategy_builder_adapter.py` throw `TypeError` on pandas 2.1+. Replaced with `.reindex(ohlcv.index).ffill()` and `.bfill()`.
+
+- **Audit findings verified as false positives:**
+    - **V3: VectorBT direction_mode** — Audit claimed `mode==0` disables short (should disable long). Verified code is correct: `direction_mode=0` (long only) disables `short_entry/exit`, `direction_mode=1` (short only) disables `long_entry/exit`. Dict mapping `{"long": 0, "short": 1, "both": 2}` is consistent.
+    - **V1/V2: VectorBT SL/TP clamping** — Trigger conditions and price clamping logic are correct for both LONG and SHORT positions.
+
+### Removed
+
+- **`strategies.html` page removed — 2026-02-19:**
+    - **Deleted files:** `frontend/strategies.html` (1755 lines), `frontend/css/strategies.css`, `frontend/js/pages/strategies.js`, and `frontend/js/pages/strategies/` folder (6 sub-modules: `backtestManager.js`, `strategyCRUD.js`, `leverageManager.js`, `instrumentService.js`, `utils.js`, `index.js`)
+    - **Reason:** `strategy-builder.html` is a complete superset — visual block-based strategy composition replaces the old form-based approach. All functionality (backtest, optimization, strategy CRUD, templates, versions, AI build, evaluation, database management) is available on `strategy-builder.html`
+    - **Migrated shared utilities:** `leverageManager.js` and `instrumentService.js` moved to `frontend/js/shared/` since `strategy_builder.js` imports `updateLeverageRiskForElements`
+    - **Updated 13 navigation links** across 10 files: `analytics-advanced.html`, `settings.html`, `risk-management.html`, `portfolio.html`, `optimization-results.html`, `ml-models.html`, `notifications.html`, `marketplace.html`, `dashboard.html` (2 links), `backtest-results.html` (2 links)
+    - **Updated 3 JS references:** `marketplace.js`, `dashboard.js` (2 hotkeys: `s` and `n`)
+
+### Added
+
+- **Direction mismatch wire highlighting — 2026-02-19:**
+    - Wires (connections) that conflict with the selected direction now turn **red and dashed** with a pulsing animation:
+        - Direction = "Short" but wire goes to `entry_long`/`exit_long` → red dashed
+        - Direction = "Long" but wire goes to `entry_short`/`exit_short` → red dashed
+        - Source port `"long"` wired to `entry_short` (cross-wired signal) → red dashed
+        - Source port `"short"` wired to `entry_long` (cross-wired signal) → red dashed
+    - SVG `<title>` tooltip on hover explains the mismatch in Russian
+    - Wires update instantly when the direction dropdown changes
+    - **Wires also re-evaluate on ANY block param change** (`updateBlockParam()`) and on `resetBlockToDefaults()`
+    - CSS class: `.direction-mismatch` with `stroke: #ef4444`, `stroke-dasharray: 10 6`, pulse animation
+    - Files: `frontend/js/pages/strategy_builder.js` (`renderConnections()`, `updateBlockParam()`, `resetBlockToDefaults()`), `frontend/css/strategy_builder.css`
+
+- **Port alias fallback in Case 2 signal routing — 2026-02-19:**
+    - When a connection's `source_port` is not found in `source_outputs`, the adapter now tries alias mapping (`"long"↔"bullish"`, `"short"↔"bearish"`, `"output"↔"value"`, `"result"↔"signal"`) before falling back to single-output extraction.
+    - Prevents silent signal drops when backend output keys don't match frontend port IDs.
+    - Logs `logger.warning` for any connection where port cannot be resolved.
+    - File: `backend/backtesting/strategy_builder_adapter.py` (Case 2 in `generate_signals()`)
+
+- **Direction mismatch warning in backtest engine — 2026-02-19:**
+    - `_run_fallback()` now logs `[DIRECTION_MISMATCH]` warning when the direction filter would drop all available signals (e.g., `direction="long"` but only `short_entries` exist, or vice versa).
+    - Helps diagnose "Short gives nothing" scenarios before simulation even starts.
+    - File: `backend/backtesting/engine.py`
+
+- **Pre-backtest signal diagnostics in API — 2026-02-19:**
+    - `run_backtest_from_builder()` now generates a `warnings` list before running the backtest, checking for: no signals detected, direction/signal mismatch.
+    - Warnings are returned in the API response as `"warnings": [...]` field.
+    - File: `backend/api/routers/strategy_builder.py`
+
+- **Frontend warning display for backtest results — 2026-02-19:**
+    - `runBacktest()` in `strategy_builder.js` now checks for `warnings` array in backtest response and shows each as a notification with `warning` type.
+    - Users see actionable diagnostics like "Direction is 'long' but only short signals detected" immediately after backtest completes.
+    - File: `frontend/js/pages/strategy_builder.js`
+
+- **11 new divergence tests — 2026-02-19:**
+    - `TestDivergenceSignalRouting` (4 tests): long_only, short_only, both directions, no_connections
+    - `TestDivergencePortAlias` (3 tests): bullish→long alias, bearish→short alias, signal alias resolution
+    - `TestDivergenceWithEngine` (4 tests): direction filtering (long/short/both trades), open position at end-of-data
+    - Total: 56 divergence tests pass (6 handler + 50 AI agent).
+    - File: `tests/ai_agents/test_divergence_block_ai_agents.py`
+
+### Fixed
+
+- **🔴 CRITICAL: Divergence block signals silently dropped — 2026-02-19:**
+    - **Root cause**: Backend `_execute_divergence()` returned output keys `"bullish"` and `"bearish"`, but frontend divergence block ports are named `"long"` and `"short"`. The port alias system in `_get_block_inputs()` had no mapping between these names, so when connecting `divergence.long` → `strategy.entry_long`, the signal lookup failed silently — divergence signals were never delivered to the strategy node.
+    - **Fix** (`backend/backtesting/strategy_builder_adapter.py`): `_execute_divergence()` now returns **both** `"long"`/`"short"` (matching frontend port IDs) AND `"bullish"`/`"bearish"` (backward compatibility). The `"signal"` key remains as `long | short`.
+    - **Test coverage**: Added `test_returns_long_short_port_keys` to verify `"long"` and `"short"` keys exist and equal `"bullish"`/`"bearish"`. All 50 divergence tests pass (6 handler + 44 AI agent).
+
+- **Health check UnicodeEncodeError on Windows cp1251 terminals — 2026-02-19:**
+    - `main.py health` crashed with `UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f3e5'` because emoji characters in `print()` can't be encoded in cp1251.
+    - **Fix** (`main.py`): Added `io.TextIOWrapper` with `encoding="utf-8", errors="replace"` for stdout/stderr when terminal encoding is not UTF-8.
+
+- **SL/TP Request Explicitness & Investigation — 2026-02-18:**
+    - **Investigation**: User reported SL not triggering on 5 candles before actual exit in trade #272 (BTCUSDT, 15m, 10x leverage)
+    - **Finding**: SL **IS working correctly**. Exhaustive analysis proved:
+        - Entry=70103.73, SL price=66598.55 (5% below entry)
+        - Only 1 of 305 fifteen-minute bars had low (66556.6) below SL — the exit bar at 2026-02-17 15:30
+        - Bar Magnifier 1m data confirmed: candle at 15:33 had low=66556.6 breaching SL
+        - `exit_comment: "SL"` correctly recorded; PnL=-51% is correct (5.05% price drop × 10x leverage + fees)
+        - The 5 candles user circled had lows ABOVE the SL price — visual misread on compressed chart
+    - **Defensive JS fix** (`frontend/js/pages/strategy_builder.js`):
+        - Added `extractSlTpFromBlocks()` function — iterates `strategyBlocks` for `static_sltp`/`sl_percent`/`tp_percent` blocks
+        - Converts human % (e.g., 5) to decimal fraction (0.05) matching `BacktestRequest` model constraints
+        - Spread into `buildBacktestRequest()` so `stop_loss`/`take_profit` are sent explicitly in request body
+        - Backend already extracted SL/TP from DB blocks as fallback — this makes the request self-contained and debuggable
+
+- **🔴 CRITICAL: Margin/Equity/Fee Deep Audit Fixes — 2026-02-18:**
+    - **engine.py — Margin Reconstruction Error (Issue #1)**:
+        - Old code reconstructed margin at exit: `margin = entry_size * entry_price / leverage`
+        - This is mathematically WRONG because `entry_size = margin * leverage / (price * (1+fee))`, so `size * price / leverage ≠ margin` (fee term causes drift)
+        - Fix: Track `margin_allocated` at entry, use exact value at exit
+    - **engine.py — Equity Formula Inflation (Issue #2)**:
+        - Old: `equity = cash + entry_price * position + unrealized_pnl` — position includes leverage, inflating equity by `(leverage - 1) * margin`
+        - Fix: `equity = cash + margin_allocated + unrealized_pnl` — matches FallbackEngineV4 gold standard
+    - **engine.py — Fee Recording Approximation (Issue #3)**:
+        - Old: `total_trade_fees = fees * 2` — assumes entry fee == exit fee (wrong when entry_price ≠ exit_price)
+        - Fix: Track `entry_fees_paid` at entry, total = `entry_fees_paid + exit_fees`
+    - **engine.py — End-of-Data Close (Issue #4)**:
+        - Same margin reconstruction and fee doubling bugs existed in end-of-backtest close path
+        - Fixed with same `margin_allocated` / `entry_fees_paid` pattern
+    - **vectorbt_sltp.py — Margin State Tracking (Issue #5)**:
+        - State array expanded from 6 to 8 elements: added `margin_locked` (state[6]) and `entry_fees_paid` (state[7])
+        - All 5 exit paths (max_drawdown, SL/TP long, SL/TP short, signal exit) now use tracked margin instead of reconstructed
+        - Equity formula: `cash + margin_locked + unrealized_pnl` (was `cash + size * price + unrealized`)
+    - **Tests**: Added 19 new tests in `tests/backend/backtesting/test_margin_fee_parity.py`:
+        - Margin conservation (zero fees, across leverage levels, with fees)
+        - Equity formula not inflated by leverage
+        - Fee recording accuracy (exact entry+exit vs doubled)
+        - No margin leak across various fee rates
+        - End-of-data close margin and fee correctness
+    - **Total backtesting tests: 147/147 pass** (128 existing + 19 new)
+
+- **🔴 CRITICAL: Equity Double-Leverage Bug — 2026-02-18:**
+    - **Root cause**: `engine.py` multiplied `unrealized_pnl` by `leverage` despite `position` (entry_size) already including leverage. This caused equity curve to show `leverage²` amplified unrealized PnL.
+    - **Affected code**:
+        - `_build_equity_with_position_tracking()`: `unrealized = (price - entry) * size * leverage` → fixed to `* size` (no `* leverage`)
+        - `_run_fallback()` equity section: same double-leverage pattern, same fix
+    - **Gold standard reference**: `FallbackEngineV4` uses `unrealized = total_size * (close - avg_entry)` — no extra leverage, because `total_size = (margin * leverage) / price`
+
+- **🔴 CRITICAL: numba_engine.py Cash Model Overhaul — 2026-02-18:**
+    - **Root cause**: `numba_engine.py` used a fundamentally broken cash model:
+        1. `entry_size` had NO leverage: `size = margin / (price * (1+fee))` — missing `* leverage`
+        2. Cash deducted full `position_value` (not margin): `cash -= position_value + fees`
+        3. Long exit returned raw `position_value - fees` (no leveraged PnL in cash)
+        4. Short exit was inconsistent: `cash += position_value + pnl` (different formula from Long)
+        5. PnL/MFE/MAE had `* leverage` to compensate for missing leverage in size
+    - **Fix**: Rewrote to match FallbackEngineV4 margin-based model:
+        - Entry: `entry_size = (margin * leverage) / (price * (1+fee))` — leverage IN size
+        - Cash entry: `cash -= margin + entry_fees` — deduct margin only
+        - PnL: `(exit - entry) * entry_size - exit_fees` — no extra `* leverage`
+        - Cash exit: `cash += margin + pnl` — return margin + net PnL (symmetric Long/Short)
+        - Equity: `unrealized = (price - entry) * position` — no extra `* leverage`
+        - pnl_pct: `pnl / margin * 100` — % return on margin invested
+        - MFE/MAE: `(price_diff) * entry_size` — no extra `* leverage`
+    - **Tests**: Added 53 new tests in `tests/backend/backtesting/test_equity_pnl_parity.py`:
+        - Entry sizing formula validation (leverage scaling)
+        - PnL calculation without extra leverage
+        - Cash flow round-trip (profitable/losing, long/short symmetric)
+        - Unrealized PnL without double leverage
+        - Equity mid-trade correctness
+        - MFE/MAE with leverage in size
+        - Numba engine integration: entry_size, PnL scaling, equity, cash conservation
+    - **Verification**: 128 backtesting tests pass (28 engine + 53 equity + 22 SL/TP + 3 GPU + 21 MTF + 1 parity), 4485 total tests pass
+
+- **🔴 CRITICAL: SL/TP Leverage Bug — 2026-02-18:**
+    - **Root cause**: `engine.py`, `numba_engine.py`, `fast_optimizer.py`, `vectorbt_sltp.py` all divided SL/TP by leverage when calculating exit prices
+    - **Impact**: With SL=5% and leverage=10, SL triggered at 0.5% price movement instead of 5%. This made ALL trade PnL values uniform and incorrect.
+    - **Fix**: Removed `/leverage` from exit_price formulas and `*leverage` from pnl_pct trigger checks. SL/TP now correctly represent % of price movement (TradingView semantics), matching `FallbackEngineV4` (gold standard).
+    - **Files changed**:
+        - `backend/backtesting/engine.py` — `_run_fallback()`: worst/best_pnl_pct, bar magnifier SL/TP, standard SL/TP exit prices
+        - `backend/backtesting/numba_engine.py` — pnl_pct calculation, SL/TP exit prices
+        - `backend/backtesting/fast_optimizer.py` — pnl_pct calculation, SL/TP exit prices (both functions)
+        - `backend/backtesting/vectorbt_sltp.py` — removed `adjusted_sl/tp = sl_pct / leverage`, now passes raw sl_pct/tp_pct to `check_sl_tp_hit_nb()`
+    - **Tests**: Added 22 new tests in `tests/backend/backtesting/test_sltp_leverage_parity.py` covering exit price independence from leverage, trigger conditions, PnL scaling, and vectorbt parity
+    - **Verification**: All 92 existing engine tests pass (28 + 32 + 10 + 22 new)
+
 ### Removed
 
 - **Agent Skills Cleanup — 2026-02-14:**

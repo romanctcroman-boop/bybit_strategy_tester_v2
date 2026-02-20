@@ -329,7 +329,7 @@ class ConsensusEngine:
 
             lines = ["## Prior Consensus Results"]
             for i, item in enumerate(prior, 1):
-                tier = item.memory_type.value.upper()
+                tier = (item.memory_type.value if item.memory_type else "unknown").upper()
                 lines.append(f"{i}. [{tier}, importance={item.importance:.2f}] {item.content[:300]}")
 
             context = "\n".join(lines)
@@ -732,7 +732,8 @@ class ConsensusEngine:
                 from collections import Counter
 
                 counter = Counter(str(v) for v in values)
-                merged[key] = counter.most_common(1)[0][0]
+                top = counter.most_common(1)
+                merged[key] = top[0][0] if top else values[0] if values else None
 
         return merged
 

@@ -26,7 +26,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.13"
 
 # Prevent concurrent deployments
 concurrency:
@@ -73,9 +73,13 @@ jobs:
   # Unit & Integration Tests
   # ===========================================================================
   test:
-    name: Tests
+    name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     needs: lint
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+      fail-fast: false
 
     services:
       postgres:
@@ -106,10 +110,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
           cache: "pip"
 
       - name: Install dependencies
@@ -295,7 +299,11 @@ jobs:
 
       - name: Run smoke tests
         run: |
-          STAGING_URL="https://staging.yourdomain.com"
+          STAGING_URL="${{ secrets.STAGING_URL }}"
+          if [ -z "$STAGING_URL" ]; then
+            echo "STAGING_URL secret not configured — skipping smoke tests"
+            exit 0
+          fi
 
           # Health check
           curl -sf "$STAGING_URL/health" || exit 1
@@ -351,7 +359,11 @@ jobs:
 
       - name: Run smoke tests
         run: |
-          PROD_URL="https://api.yourdomain.com"
+          PROD_URL="${{ secrets.PRODUCTION_URL }}"
+          if [ -z "$PROD_URL" ]; then
+            echo "PRODUCTION_URL secret not configured — skipping smoke tests"
+            exit 0
+          fi
 
           # Health check
           curl -sf "$PROD_URL/health" || exit 1

@@ -2833,6 +2833,48 @@ async def run_backtest_from_builder(
                 detail=f"No data available for {backtest_config.symbol} {backtest_config.interval}",
             )
 
+        # Pre-backtest signal check: detect direction/signal mismatches
+        backtest_warnings: list[str] = []
+        try:
+            pre_signals = adapter.generate_signals(ohlcv)
+            long_count = int(pre_signals.entries.sum())
+            short_count = int(pre_signals.short_entries.sum()) if pre_signals.short_entries is not None else 0
+            exit_long_count = int(pre_signals.exits.sum())
+            exit_short_count = int(pre_signals.short_exits.sum()) if pre_signals.short_exits is not None else 0
+
+            if direction == "long" and long_count == 0 and short_count > 0:
+                backtest_warnings.append(
+                    f"Direction is 'Long' but no long entry signals found "
+                    f"({short_count} short signals detected). "
+                    "Check block connections or change direction to 'Short'/'Both'."
+                )
+            elif direction == "short" and short_count == 0 and long_count > 0:
+                backtest_warnings.append(
+                    f"Direction is 'Short' but no short entry signals found "
+                    f"({long_count} long signals detected). "
+                    "Check block connections or change direction to 'Long'/'Both'."
+                )
+            elif long_count == 0 and short_count == 0:
+                backtest_warnings.append(
+                    "No entry signals generated. Check that indicator/divergence blocks "
+                    "are connected to the Strategy node's Entry ports."
+                )
+
+            if direction in ("long", "both") and long_count > 0 and exit_long_count == 0:
+                backtest_warnings.append(
+                    "No long exit signals found. Trades will only close via SL/TP. Consider adding exit conditions."
+                )
+            if direction in ("short", "both") and short_count > 0 and exit_short_count == 0:
+                backtest_warnings.append(
+                    "No short exit signals found. Trades will only close via SL/TP. Consider adding exit conditions."
+                )
+
+            if backtest_warnings:
+                for w in backtest_warnings:
+                    logger.warning(f"[BacktestWarning] {w}")
+        except Exception as e:
+            logger.debug(f"Pre-backtest signal check failed (non-critical): {e}")
+
         # Run backtest with appropriate engine
         from backend.backtesting.models import BacktestStatus
 
@@ -2858,11 +2900,12 @@ async def run_backtest_from_builder(
         # Normalize trades into dicts suitable for DB storage
         trades_source = result.trades or []
         trades_list = []
-        for t in (trades_source or [])[:500]:
+        for t in trades_source:
             if hasattr(t, "__dict__") and not isinstance(t, dict):
                 entry_time = getattr(t, "entry_time", None)
                 exit_time = getattr(t, "exit_time", None)
                 side = getattr(t, "side", None)
+                trade_fees = float(getattr(t, "fees", 0) or 0)
                 trades_list.append(
                     {
                         "entry_time": entry_time.isoformat() if entry_time else None,
@@ -2873,13 +2916,22 @@ async def run_backtest_from_builder(
                         "size": float(getattr(t, "size", 1.0) or 1.0),
                         "pnl": float(getattr(t, "pnl", 0) or 0),
                         "pnl_pct": float(getattr(t, "pnl_pct", 0) or 0),
-                        "fees": float(getattr(t, "fees", 0) or 0),
-                        "duration_bars": int(getattr(t, "duration_bars", 0) or 0),
+                        "fees": trade_fees,
+                        "commission": trade_fees,
+                        "duration_bars": int(getattr(t, "bars_in_trade", 0) or getattr(t, "duration_bars", 0) or 0),
+                        "bars_in_trade": int(getattr(t, "bars_in_trade", 0) or 0),
+                        "duration_hours": float(getattr(t, "duration_hours", 0) or 0),
+                        "entry_bar_index": int(getattr(t, "entry_bar_index", 0) or 0),
+                        "exit_bar_index": int(getattr(t, "exit_bar_index", 0) or 0),
+                        "exit_comment": str(getattr(t, "exit_comment", "") or ""),
                         "mfe": float(getattr(t, "mfe", 0) or 0),
                         "mae": float(getattr(t, "mae", 0) or 0),
+                        "mfe_pct": float(getattr(t, "mfe_pct", 0) or 0),
+                        "mae_pct": float(getattr(t, "mae_pct", 0) or 0),
                     }
                 )
             elif isinstance(t, dict):
+                trade_fees = float(t.get("fees", 0) or t.get("commission", 0) or 0)
                 trades_list.append(
                     {
                         "entry_time": t.get("entry_time"),
@@ -2890,10 +2942,18 @@ async def run_backtest_from_builder(
                         "size": float(t.get("size", 1.0) or 1.0),
                         "pnl": float(t.get("pnl", 0) or 0),
                         "pnl_pct": float(t.get("pnl_pct", 0) or 0),
-                        "fees": float(t.get("fees", 0) or 0),
-                        "duration_bars": int(t.get("duration_bars", 0) or 0),
+                        "fees": trade_fees,
+                        "commission": trade_fees,
+                        "duration_bars": int(t.get("duration_bars", t.get("bars_in_trade", 0)) or 0),
+                        "bars_in_trade": int(t.get("bars_in_trade", 0) or 0),
+                        "duration_hours": float(t.get("duration_hours", 0) or 0),
+                        "entry_bar_index": int(t.get("entry_bar_index", 0) or 0),
+                        "exit_bar_index": int(t.get("exit_bar_index", 0) or 0),
+                        "exit_comment": str(t.get("exit_comment", t.get("exit_reason", "")) or ""),
                         "mfe": float(t.get("mfe", 0) or 0),
                         "mae": float(t.get("mae", 0) or 0),
+                        "mfe_pct": float(t.get("mfe_pct", 0) or 0),
+                        "mae_pct": float(t.get("mae_pct", 0) or 0),
                     }
                 )
 
@@ -2913,6 +2973,24 @@ async def run_backtest_from_builder(
             initial_capital=backtest_config.initial_capital,
             parameters={
                 "strategy_params": {"strategy_type": "builder", "strategy_id": strategy_id},
+                # Preserve full backtest config for accurate reconstruction on GET
+                "stop_loss_pct": block_stop_loss,
+                "take_profit_pct": block_take_profit,
+                "leverage": request.leverage,
+                "_direction": direction,
+                "_position_size": position_size,
+                "_position_size_type": request.position_size_type,
+                "_commission": request.commission,
+                "_slippage": request.slippage,
+                "_pyramiding": request.pyramiding,
+                "_market_type": market_type,
+                "breakeven_enabled": block_breakeven_enabled,
+                "breakeven_activation_pct": block_breakeven_activation_pct,
+                "breakeven_offset": block_breakeven_offset,
+                "close_only_in_profit": block_close_only_in_profit,
+                "sl_type": block_sl_type,
+                "trailing_stop_activation": block_trailing_activation,
+                "trailing_stop_offset": block_trailing_offset,
             },
             status=DBBacktestStatus.COMPLETED if result.status == BacktestStatus.COMPLETED else DBBacktestStatus.FAILED,
             # Full metrics JSON — Single Source of Truth for all detailed metrics
@@ -2963,7 +3041,7 @@ async def run_backtest_from_builder(
         db.refresh(db_backtest)
 
         # Return response with redirect URL
-        return {
+        response_data: dict[str, Any] = {
             "backtest_id": str(db_backtest.id),
             "strategy_id": strategy_id,
             "status": "completed",
@@ -2979,6 +3057,9 @@ async def run_backtest_from_builder(
             },
             "redirect_url": f"/frontend/backtest-results.html?backtest_id={db_backtest.id}",
         }
+        if backtest_warnings:
+            response_data["warnings"] = backtest_warnings
+        return response_data
 
     except Exception as e:
         logger.error(f"Error running backtest from Strategy Builder: {e}", exc_info=True)

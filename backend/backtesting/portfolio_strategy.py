@@ -287,8 +287,8 @@ class StrategyPortfolioBacktester:
         short_entries = np.zeros(n, dtype=bool)
         short_exits = np.zeros(n, dtype=bool)
 
-        # Default: simple RSI strategy
-        # TODO: Use proper strategy classes based on config
+        # Default: simple RSI(14) strategy. Extend by wiring strategy_config
+        # to the registered strategy registry when multi-strategy support is added.
         period = 14
         overbought = 70
         oversold = 30

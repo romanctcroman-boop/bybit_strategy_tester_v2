@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_core import ValidationError as PydanticCoreValidationError
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.backtesting.engine import get_engine
@@ -490,6 +491,7 @@ async def create_backtest(request: BacktestCreateRequest):
                     entry_time = getattr(t, "entry_time", None)
                     exit_time = getattr(t, "exit_time", None)
                     side = getattr(t, "side", None)
+                    trade_fees = float(getattr(t, "fees", 0) or 0)
                     trades_list.append(
                         {
                             "entry_time": entry_time.isoformat() if entry_time else None,
@@ -500,13 +502,22 @@ async def create_backtest(request: BacktestCreateRequest):
                             "size": float(getattr(t, "size", 1.0) or 1.0),
                             "pnl": float(getattr(t, "pnl", 0) or 0),
                             "pnl_pct": float(getattr(t, "pnl_pct", 0) or 0),
-                            "fees": float(getattr(t, "fees", 0) or 0),
-                            "duration_bars": int(getattr(t, "duration_bars", 0) or 0),
+                            "fees": trade_fees,
+                            "commission": trade_fees,
+                            "duration_bars": int(getattr(t, "bars_in_trade", 0) or getattr(t, "duration_bars", 0) or 0),
+                            "bars_in_trade": int(getattr(t, "bars_in_trade", 0) or 0),
+                            "duration_hours": float(getattr(t, "duration_hours", 0) or 0),
+                            "entry_bar_index": int(getattr(t, "entry_bar_index", 0) or 0),
+                            "exit_bar_index": int(getattr(t, "exit_bar_index", 0) or 0),
+                            "exit_comment": str(getattr(t, "exit_comment", "") or ""),
                             "mfe": float(getattr(t, "mfe", 0) or 0),
                             "mae": float(getattr(t, "mae", 0) or 0),
+                            "mfe_pct": float(getattr(t, "mfe_pct", 0) or 0),
+                            "mae_pct": float(getattr(t, "mae_pct", 0) or 0),
                         }
                     )
                 elif isinstance(t, dict):
+                    trade_fees = float(t.get("fees", 0) or t.get("commission", 0) or 0)
                     trades_list.append(
                         {
                             "entry_time": t.get("entry_time"),
@@ -517,10 +528,18 @@ async def create_backtest(request: BacktestCreateRequest):
                             "size": float(t.get("size", 1.0) or 1.0),
                             "pnl": float(t.get("pnl", 0) or 0),
                             "pnl_pct": float(t.get("pnl_pct", 0) or 0),
-                            "fees": float(t.get("fees", 0) or 0),
-                            "duration_bars": int(t.get("duration_bars", 0) or 0),
+                            "fees": trade_fees,
+                            "commission": trade_fees,
+                            "duration_bars": int(t.get("duration_bars", t.get("bars_in_trade", 0)) or 0),
+                            "bars_in_trade": int(t.get("bars_in_trade", 0) or 0),
+                            "duration_hours": float(t.get("duration_hours", 0) or 0),
+                            "entry_bar_index": int(t.get("entry_bar_index", 0) or 0),
+                            "exit_bar_index": int(t.get("exit_bar_index", 0) or 0),
+                            "exit_comment": str(t.get("exit_comment", t.get("exit_reason", "")) or ""),
                             "mfe": float(t.get("mfe", 0) or 0),
                             "mae": float(t.get("mae", 0) or 0),
+                            "mfe_pct": float(t.get("mfe_pct", 0) or 0),
+                            "mae_pct": float(t.get("mae_pct", 0) or 0),
                         }
                     )
 
@@ -599,11 +618,17 @@ async def create_backtest(request: BacktestCreateRequest):
             # Create a copy of equity curve with downsampled data
             from backend.backtesting.models import EquityCurve
 
+            def _parse_ts(ts):
+                if not isinstance(ts, str):
+                    return ts
+                try:
+                    return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                except ValueError:
+                    logger.warning(f"Invalid timestamp format: {ts!r}")
+                    return None
+
             result.equity_curve = EquityCurve(
-                timestamps=[
-                    datetime.fromisoformat(ts.replace("Z", "+00:00")) if isinstance(ts, str) else ts
-                    for ts in downsampled_ec["timestamps"]
-                ],
+                timestamps=[t for t in (_parse_ts(ts) for ts in downsampled_ec["timestamps"]) if t is not None],
                 equity=downsampled_ec["equity"],
                 drawdown=downsampled_ec["drawdown"],
                 bh_equity=downsampled_ec.get("bh_equity", []),
@@ -624,17 +649,46 @@ async def list_backtests(
 
     Combines in-memory cached results with persisted database records.
     """
-    # Get in-memory results
+    # Get in-memory results sorted newest-first (same order as DB query below)
     service = get_backtest_service()
-    memory_results = service.list_results(limit=1000)
+    memory_results = sorted(
+        service.list_results(limit=1000),
+        key=lambda x: _ensure_utc(x.created_at),
+        reverse=True,
+    )
     memory_ids = {r.id for r in memory_results}
+    memory_count = len(memory_results)
 
     # Expire all cached objects to ensure fresh data after deletions
     # This prevents returning "ghost" records that were deleted in other requests
     db.expire_all()
 
-    # Get database results (includes optimization results)
-    db_backtests = db.query(BacktestModel).order_by(BacktestModel.created_at.desc()).limit(1000).all()
+    # Accurate total: memory items + DB records not already cached in memory
+    db_total_count = (
+        db.query(func.count(BacktestModel.id))
+        .filter(BacktestModel.id.notin_(list(memory_ids)))
+        .scalar()
+        or 0
+    )
+    total = memory_count + db_total_count
+
+    # Compute this page's slice from memory, then fill remainder from DB
+    page_start = (page - 1) * limit
+    memory_page = memory_results[page_start : page_start + limit]
+    remaining = limit - len(memory_page)
+
+    # DB query: skip cached IDs, apply proper offset + limit for this page
+    db_offset = max(0, page_start - memory_count)
+    db_backtests = (
+        db.query(BacktestModel)
+        .filter(BacktestModel.id.notin_(list(memory_ids)))
+        .order_by(BacktestModel.created_at.desc())
+        .offset(db_offset)
+        .limit(remaining)
+        .all()
+        if remaining > 0
+        else []
+    )
 
     # Convert DB records to BacktestResult format
     db_results = []
@@ -899,19 +953,11 @@ async def list_backtests(
             logger.warning(f"Failed to convert DB backtest {bt.id}: {e}")
             continue
 
-    # Combine and sort by created_at
-    all_results = memory_results + db_results
-
-    # Use _ensure_utc to normalize tz-naive/aware mix before comparison
-    all_results.sort(key=lambda x: _ensure_utc(x.created_at), reverse=True)
-
-    # Paginate
-    start_idx = (page - 1) * limit
-    end_idx = start_idx + limit
-    items = all_results[start_idx:end_idx]
+    # memory_page is already sorted (newest-first); db_results are ordered by DB query
+    items = memory_page + db_results
 
     return BacktestListResponse(
-        total=len(all_results),
+        total=total,
         items=items,
         page=page,
         page_size=limit,
@@ -1227,6 +1273,8 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                 elif isinstance(exit_time, str):
                     exit_time = datetime.fromisoformat(exit_time.replace("Z", "+00:00"))
 
+                # Resolve fees: try "fees" first, then "commission" (legacy)
+                trade_fees = t.get("fees", 0) or t.get("commission", 0) or 0
                 trades_data.append(
                     TradeRecord(
                         entry_time=entry_time,
@@ -1237,10 +1285,13 @@ async def get_backtest(backtest_id: str, db: Session = Depends(get_db)):
                         size=t.get("size", 1.0),
                         pnl=t.get("pnl", 0),
                         pnl_pct=t.get("pnl_pct", 0),
-                        bars_in_trade=t.get("duration_bars", 0),
-                        exit_comment=t.get("exit_reason", ""),
-                        commission=t.get("commission", 0),
-                        fees=t.get("commission", 0),
+                        bars_in_trade=t.get("duration_bars", t.get("bars_in_trade", 0)),
+                        entry_bar_index=t.get("entry_bar_index", 0),
+                        exit_bar_index=t.get("exit_bar_index", 0),
+                        exit_comment=t.get("exit_comment", t.get("exit_reason", "")),
+                        commission=trade_fees,
+                        fees=trade_fees,
+                        duration_hours=t.get("duration_hours", 0),
                         # MFE/MAE (TradingView Favorable/Adverse Excursion)
                         mfe=t.get("mfe", 0),
                         mae=t.get("mae", 0),
@@ -2615,7 +2666,9 @@ async def run_mtf_backtest(request: MTFBacktestRequest):
             status="completed" if result.is_valid else "failed",
             is_valid=result.is_valid,
             total_trades=m.total_trades,
-            filtered_trades=0,  # TODO: calculate from baseline comparison
+            # Approximate: signals that did not become trades (includes engine
+            # filtering + MTF filtering). Exact MTF-only count needs baseline run.
+            filtered_trades=max(0, (n_long_entries + n_short_entries) - m.total_trades),
             net_profit=float(m.net_profit),
             total_return_pct=float(m.total_return),
             win_rate=float(m.win_rate),
@@ -2627,8 +2680,9 @@ async def run_mtf_backtest(request: MTFBacktestRequest):
             htf_interval=request.htf_interval,
             long_signals_allowed=n_long_entries,
             short_signals_allowed=n_short_entries,
-            long_signals_filtered=0,  # TODO
-            short_signals_filtered=0,  # TODO
+            # Per-direction filtered counts require a separate baseline run.
+            long_signals_filtered=0,
+            short_signals_filtered=0,
             trades=trades_list,
         )
 

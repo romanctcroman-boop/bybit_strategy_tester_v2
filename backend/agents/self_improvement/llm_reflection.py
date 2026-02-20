@@ -143,7 +143,7 @@ class LLMReflectionProvider:
             "specialization": "technical analysis and pattern recognition",
         },
         "perplexity": {
-            "model": "llama-3.1-sonar-small-128k-online",
+            "model": "sonar-pro",
             "temperature": 0.5,
             "max_tokens": 1024,
             "system_prompt": REFLECTION_SYSTEM_PROMPT,
@@ -272,7 +272,7 @@ class LLMReflectionProvider:
                 return response.content.strip()
             except Exception as e:
                 self._error_count += 1
-                logger.warning(f"LLM reflection failed ({self.provider_name}): {e}")
+                logger.warning(f"LLM reflection failed ({self.provider_name}): {e}", exc_info=True)
                 return f"[Fallback] Reflection unavailable: {e}"
 
         return llm_reflect

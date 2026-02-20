@@ -216,7 +216,7 @@ def build_equity_from_trades(
     for i in range(n_bars):
         # Check for exit first (if same bar as next entry, process exit)
         if i in exit_map:
-            exiting_trade, realized_pnl = exit_map[i]
+            _exiting_trade, realized_pnl = exit_map[i]
             # Only close if this is actually our current position
             if current_position is not None:
                 cumulative_realized_pnl += realized_pnl
@@ -242,10 +242,9 @@ def build_equity_from_trades(
                 "ordersidelong",
             )
 
-            if is_long:
-                unrealized_pnl = (current_price - entry_price) * size * leverage
-            else:
-                unrealized_pnl = (entry_price - current_price) * size * leverage
+            # size already includes leverage (entry_size = margin * leverage / price)
+            # No extra leverage multiplication needed — matches FallbackEngineV4
+            unrealized_pnl = (current_price - entry_price) * size if is_long else (entry_price - current_price) * size
 
         current_equity = initial_capital + cumulative_realized_pnl + unrealized_pnl
         equity.append(current_equity)
@@ -1385,8 +1384,30 @@ class BacktestEngine:
         entry_time = None
         entry_size = 0.0
         entry_idx = 0
+        margin_allocated = 0.0  # Track exact margin for correct cash return
+        entry_fees_paid = 0.0  # Track entry fees for accurate trade recording
         max_favorable_price = 0.0
         max_adverse_price = 0.0
+
+        # Diagnostic: check if direction filtering will drop all signals
+        long_signal_count = int(long_entries.sum())
+        short_signal_count = int(short_entries.sum()) if short_entries is not None else 0
+        if direction == "long" and long_signal_count == 0 and short_signal_count > 0:
+            logger.warning(
+                f"[DirectionFilter] direction='long' but only short signals found "
+                f"({short_signal_count} short, 0 long). No trades will be generated. "
+                f"Check strategy connections or change direction to 'short' or 'both'."
+            )
+        elif direction == "short" and short_signal_count == 0 and long_signal_count > 0:
+            logger.warning(
+                f"[DirectionFilter] direction='short' but only long signals found "
+                f"({long_signal_count} long, 0 short). No trades will be generated. "
+                f"Check strategy connections or change direction to 'long' or 'both'."
+            )
+        elif direction == "short" and short_signal_count == 0 and long_signal_count == 0:
+            logger.warning(
+                "[DirectionFilter] direction='short' but no signals found at all. Check strategy block connections."
+            )
 
         timestamps = ohlcv.index.tolist()
 
@@ -1397,8 +1418,15 @@ class BacktestEngine:
 
             # Check for entry (when not in position)
             if position == 0:
+                # Skip entries when account has no cash (blown account protection)
+                if cash <= 0:
+                    logger.warning(
+                        f"Bar {i}: cash={cash:.4f} ≤ 0, skipping new entry to prevent "
+                        "negative-balance trading"
+                    )
+
                 # Long entry
-                if direction in ("long", "both") and long_entries[i]:
+                elif direction in ("long", "both") and long_entries[i]:
                     entry_price = price * (1 + slippage)
                     last_entry_price = entry_price  # Track last fill for sl_type=last_order
 
@@ -1414,6 +1442,8 @@ class BacktestEngine:
                     fees = position_value * config.taker_fee
 
                     cash -= allocated_capital + fees  # Only deduct margin, not full position
+                    margin_allocated = allocated_capital  # Save exact margin for exit
+                    entry_fees_paid = fees  # Save entry fees for accurate recording
                     position = entry_size
                     is_long = True
                     entry_time = timestamps[i]
@@ -1446,6 +1476,8 @@ class BacktestEngine:
                     fees = position_value * config.taker_fee
 
                     cash -= allocated_capital + fees  # Only deduct margin, not full position
+                    margin_allocated = allocated_capital  # Save exact margin for exit
+                    entry_fees_paid = fees  # Save entry fees for accurate recording
                     position = entry_size
                     is_long = False
                     entry_time = timestamps[i]
@@ -1514,12 +1546,15 @@ class BacktestEngine:
                 # - average_price (default): uses entry_price (average across DCA fills)
                 # - last_order: uses last_entry_price (most recent fill)
                 sl_ref_price = last_entry_price if sl_type == "last_order" and last_entry_price > 0 else entry_price
+                # SL/TP percentages represent price movement (TradingView parity)
+                # e.g. stop_loss=0.05 means 5% price drop triggers SL
+                # Leverage only affects PnL amount, NOT trigger price
                 if is_long:
-                    worst_pnl_pct = (worst_price_in_bar - sl_ref_price) / sl_ref_price * leverage
-                    best_pnl_pct = (best_price_in_bar - entry_price) / entry_price * leverage
+                    worst_pnl_pct = (worst_price_in_bar - sl_ref_price) / sl_ref_price
+                    best_pnl_pct = (best_price_in_bar - entry_price) / entry_price
                 else:
-                    worst_pnl_pct = (sl_ref_price - worst_price_in_bar) / sl_ref_price * leverage
-                    best_pnl_pct = (entry_price - best_price_in_bar) / entry_price * leverage
+                    worst_pnl_pct = (sl_ref_price - worst_price_in_bar) / sl_ref_price
+                    best_pnl_pct = (entry_price - best_price_in_bar) / entry_price
 
                 should_exit = False
                 exit_reason = ""
@@ -1535,13 +1570,15 @@ class BacktestEngine:
                         interval_ms = self._get_interval_ms(config.interval)
                         bar_end_ms = bar_start_ms + interval_ms
 
-                        # Calculate SL/TP prices (SL uses sl_ref_price for sl_type support)
+                        # Calculate SL/TP prices (% of price, NOT % of margin)
+                        # SL uses sl_ref_price for sl_type support (average vs last_order)
+                        # Matches FallbackEngineV4: entry * (1 ± stop_loss)
                         if is_long:
-                            sl_price = sl_ref_price * (1 - stop_loss / leverage) if stop_loss else None
-                            tp_price = entry_price * (1 + take_profit / leverage) if take_profit else None
+                            sl_price = sl_ref_price * (1 - stop_loss) if stop_loss else None
+                            tp_price = entry_price * (1 + take_profit) if take_profit else None
                         else:
-                            sl_price = sl_ref_price * (1 + stop_loss / leverage) if stop_loss else None
-                            tp_price = entry_price * (1 - take_profit / leverage) if take_profit else None
+                            sl_price = sl_ref_price * (1 + stop_loss) if stop_loss else None
+                            tp_price = entry_price * (1 - take_profit) if take_profit else None
 
                         # Check SL/TP on each tick - find which triggers FIRST
                         sl_triggered_at = None  # (tick_index, fill_price)
@@ -1551,14 +1588,20 @@ class BacktestEngine:
                             tick_price = tick.price
 
                             # Check SL trigger
-                            if sl_price is not None and sl_triggered_at is None:
-                                if (is_long and tick_price <= sl_price) or (not is_long and tick_price >= sl_price):
-                                    sl_triggered_at = (tick_idx, sl_price)
+                            if (
+                                sl_price is not None
+                                and sl_triggered_at is None
+                                and ((is_long and tick_price <= sl_price) or (not is_long and tick_price >= sl_price))
+                            ):
+                                sl_triggered_at = (tick_idx, sl_price)
 
                             # Check TP trigger
-                            if tp_price is not None and tp_triggered_at is None:
-                                if (is_long and tick_price >= tp_price) or (not is_long and tick_price <= tp_price):
-                                    tp_triggered_at = (tick_idx, tp_price)
+                            if (
+                                tp_price is not None
+                                and tp_triggered_at is None
+                                and ((is_long and tick_price >= tp_price) or (not is_long and tick_price <= tp_price))
+                            ):
+                                tp_triggered_at = (tick_idx, tp_price)
 
                             # If both found, no need to continue
                             if sl_triggered_at and tp_triggered_at:
@@ -1623,25 +1666,26 @@ class BacktestEngine:
 
                     # === BREAKEVEN SL CHECK ===
                     # If breakeven is active, check breakeven SL before regular SL
-                    if breakeven_active and breakeven_sl_price is not None:
-                        if (is_long and current_low <= breakeven_sl_price) or (
-                            not is_long and current_high >= breakeven_sl_price
-                        ):
-                            should_exit = True
-                            exit_reason = "stop_loss"
-                            exit_price = breakeven_sl_price
-                            exit_price = max(current_low, min(current_high, exit_price))
-                            apply_slippage = True
+                    if (
+                        breakeven_active
+                        and breakeven_sl_price is not None
+                        and (
+                            (is_long and current_low <= breakeven_sl_price)
+                            or (not is_long and current_high >= breakeven_sl_price)
+                        )
+                    ):
+                        should_exit = True
+                        exit_reason = "stop_loss"
+                        exit_price = breakeven_sl_price
+                        exit_price = max(current_low, min(current_high, exit_price))
+                        apply_slippage = True
 
                     # === ATR-BASED DYNAMIC SL CHECK ===
                     # ATR SL: price-based level set at entry (entry_price ± ATR*mult)
                     # on_wicks=True: check high/low (default behavior)
                     # on_wicks=False: check close price only
                     if not should_exit and atr_sl_price is not None:
-                        if atr_sl_on_wicks:
-                            sl_check_price = current_low if is_long else current_high
-                        else:
-                            sl_check_price = price  # close price
+                        sl_check_price = (current_low if is_long else current_high) if atr_sl_on_wicks else price
                         if (is_long and sl_check_price <= atr_sl_price) or (
                             not is_long and sl_check_price >= atr_sl_price
                         ):
@@ -1652,10 +1696,7 @@ class BacktestEngine:
 
                     # === ATR-BASED DYNAMIC TP CHECK ===
                     if not should_exit and atr_tp_price is not None:
-                        if atr_tp_on_wicks:
-                            tp_check_price = current_high if is_long else current_low
-                        else:
-                            tp_check_price = price  # close price
+                        tp_check_price = (current_high if is_long else current_low) if atr_tp_on_wicks else price
                         if (is_long and tp_check_price >= atr_tp_price) or (
                             not is_long and tp_check_price <= atr_tp_price
                         ):
@@ -1679,7 +1720,8 @@ class BacktestEngine:
                             trailing_peak_price = current_high if is_long else current_low
 
                         if trailing_active:
-                            # Update peak
+                            # Update peak (trailing_offset guaranteed not None by use_trailing guard)
+                            assert trailing_offset is not None  # narrowing for type checker
                             if is_long:
                                 if current_high > trailing_peak_price:
                                     trailing_peak_price = current_high
@@ -1704,14 +1746,12 @@ class BacktestEngine:
                                     apply_slippage = True
 
                     # Check Stop Loss using worst price within bar (TradingView style)
+                    # SL/TP = % price movement, matches FallbackEngineV4
                     if not should_exit and stop_loss and worst_pnl_pct <= -stop_loss:
                         should_exit = True
                         exit_reason = "stop_loss"
                         # Calculate exact SL price using sl_ref_price (average or last order)
-                        if is_long:
-                            exit_price = sl_ref_price * (1 - stop_loss / leverage)
-                        else:
-                            exit_price = sl_ref_price * (1 + stop_loss / leverage)
+                        exit_price = sl_ref_price * (1 - stop_loss) if is_long else sl_ref_price * (1 + stop_loss)
                         # Ensure exit price is within bar range
                         exit_price = max(current_low, min(current_high, exit_price))
                         apply_slippage = True  # SL is market order
@@ -1722,10 +1762,7 @@ class BacktestEngine:
                         exit_reason = "take_profit"
                         apply_slippage = False  # TP is limit order -> no slippage
                         # Calculate exact TP price
-                        if is_long:
-                            exit_price = entry_price * (1 + take_profit / leverage)
-                        else:
-                            exit_price = entry_price * (1 - take_profit / leverage)
+                        exit_price = entry_price * (1 + take_profit) if is_long else entry_price * (1 - take_profit)
                         # Ensure exit price is within bar range
                         exit_price = max(current_low, min(current_high, exit_price))
 
@@ -1739,10 +1776,7 @@ class BacktestEngine:
                     if signal_exit_triggered:
                         if close_only_in_profit:
                             # Only exit if current price is profitable vs entry
-                            if is_long:
-                                is_profitable = price > entry_price
-                            else:
-                                is_profitable = price < entry_price
+                            is_profitable = price > entry_price if is_long else price < entry_price
                             if is_profitable:
                                 should_exit = True
                                 exit_reason = "signal"
@@ -1755,10 +1789,7 @@ class BacktestEngine:
                 if should_exit:
                     # Apply slippage if applicable
                     if apply_slippage:
-                        if is_long:
-                            exit_price = exit_price * (1 - slippage)
-                        else:
-                            exit_price = exit_price * (1 + slippage)
+                        exit_price = exit_price * (1 - slippage) if is_long else exit_price * (1 + slippage)
 
                     # Close position at calculated exit price
                     # position (entry_size) already includes leverage effect on quantity
@@ -1773,10 +1804,8 @@ class BacktestEngine:
                     else:
                         pnl = (entry_price - exit_price) * entry_size - fees
 
-                    # Calculate margin that was originally allocated
-                    # margin = position_value_at_entry / leverage
-                    entry_position_value = entry_size * entry_price
-                    margin_used = entry_position_value / leverage if leverage > 0 else entry_position_value
+                    # Use exact margin saved at entry (no reconstruction error)
+                    margin_used = margin_allocated
 
                     # Return margin + PnL (this is what trader gets back)
                     cash += margin_used + pnl
@@ -1785,16 +1814,17 @@ class BacktestEngine:
                     pnl_pct = pnl / margin_used if margin_used > 0 else 0
 
                     # Calculate MFE/MAE in % and absolute values (TradingView style)
-                    # Note: entry_size already reflects leveraged quantity
+                    # Note: MFE/MAE % = raw price move %, not leveraged return.
+                    # Leveraged PnL is reflected in pnl_pct; MFE/MAE show price excursion only.
                     if is_long:
-                        mfe_pct = (max_favorable_price - entry_price) / entry_price * 100 * leverage
-                        mae_pct = (entry_price - max_adverse_price) / entry_price * 100 * leverage
+                        mfe_pct = (max_favorable_price - entry_price) / entry_price * 100
+                        mae_pct = (entry_price - max_adverse_price) / entry_price * 100
                         # Absolute values (USDT) = price difference x size (already leveraged)
                         mfe_value = (max_favorable_price - entry_price) * entry_size
                         mae_value = (entry_price - max_adverse_price) * entry_size
                     else:
-                        mfe_pct = (entry_price - max_favorable_price) / entry_price * 100 * leverage
-                        mae_pct = (max_adverse_price - entry_price) / entry_price * 100 * leverage
+                        mfe_pct = (entry_price - max_favorable_price) / entry_price * 100
+                        mae_pct = (max_adverse_price - entry_price) / entry_price * 100
                         # Absolute values (USDT) = price difference x size (already leveraged)
                         mfe_value = (entry_price - max_favorable_price) * entry_size
                         mae_value = (max_adverse_price - entry_price) * entry_size
@@ -1806,11 +1836,8 @@ class BacktestEngine:
                         f"MFE={mfe_pct:.2f}% (${mfe_value:.2f}), MAE={mae_pct:.2f}% (${mae_value:.2f})"
                     )
 
-                    # Record trade
-                    # Fees for the record: entry_fee (already deducted from cash) + exit_fee
-                    # Since we don't store entry_fee separately, we estimate total as fees * 2
-                    # (where fees is the current exit_fee, which is roughly equal to entry_fee)
-                    total_trade_fees = fees * 2
+                    # Record trade - use exact entry + exit fees (not approximation)
+                    total_trade_fees = entry_fees_paid + fees
 
                     # Map exit_reason to exit_comment format
                     exit_comment_map = {
@@ -1860,14 +1887,20 @@ class BacktestEngine:
                     trailing_active = False
                     trailing_peak_price = 0.0
                     trailing_stop_price = None
+                    # Reset margin/fee tracking
+                    margin_allocated = 0.0
+                    entry_fees_paid = 0.0
 
             # Update equity
             if position > 0:
-                if is_long:
-                    unrealized_pnl = (price - entry_price) * position * leverage
-                else:
-                    unrealized_pnl = (entry_price - price) * position * leverage
-                current_equity = cash + entry_price * position + unrealized_pnl
+                # position (entry_size) already includes leverage in its quantity
+                # e.g. entry_size = (margin * leverage) / entry_price
+                # So unrealized PnL = price_diff * size (no extra leverage needed)
+                # Matches FallbackEngineV4: unrealized = total_size * (close - avg_entry)
+                unrealized_pnl = (price - entry_price) * position if is_long else (entry_price - price) * position
+                # Equity = cash + margin (not notional) + unrealized PnL
+                # Matches V4: equity = cash + allocated + unrealized
+                current_equity = cash + margin_allocated + unrealized_pnl
             else:
                 current_equity = cash
             equity.append(current_equity)
@@ -1879,10 +1912,7 @@ class BacktestEngine:
             exit_time = timestamps[-1]
 
             # Apply slippage for market close
-            if is_long:
-                exit_price = exit_price * (1 - slippage)
-            else:
-                exit_price = exit_price * (1 + slippage)
+            exit_price = exit_price * (1 - slippage) if is_long else exit_price * (1 + slippage)
 
             # Calculate position value and fees
             position_value = position * exit_price
@@ -1894,9 +1924,8 @@ class BacktestEngine:
             else:
                 pnl = (entry_price - exit_price) * entry_size - fees
 
-            # Calculate margin that was originally allocated
-            entry_position_value = entry_size * entry_price
-            margin_used = entry_position_value / leverage if leverage > 0 else entry_position_value
+            # Use exact margin saved at entry (no reconstruction error)
+            margin_used = margin_allocated
 
             # Return margin + PnL
             cash += margin_used + pnl
@@ -1904,19 +1933,19 @@ class BacktestEngine:
             # Calculate P&L percentage
             pnl_pct = pnl / margin_used if margin_used > 0 else 0
 
-            # Calculate MFE/MAE
+            # Calculate MFE/MAE in % = raw price excursion (not leveraged return)
             if is_long:
-                mfe_pct = (max_favorable_price - entry_price) / entry_price * 100 * leverage
-                mae_pct = (entry_price - max_adverse_price) / entry_price * 100 * leverage
+                mfe_pct = (max_favorable_price - entry_price) / entry_price * 100
+                mae_pct = (entry_price - max_adverse_price) / entry_price * 100
                 mfe_value = (max_favorable_price - entry_price) * entry_size
                 mae_value = (entry_price - max_adverse_price) * entry_size
             else:
-                mfe_pct = (entry_price - max_favorable_price) / entry_price * 100 * leverage
-                mae_pct = (max_adverse_price - entry_price) / entry_price * 100 * leverage
+                mfe_pct = (entry_price - max_favorable_price) / entry_price * 100
+                mae_pct = (max_adverse_price - entry_price) / entry_price * 100
                 mfe_value = (entry_price - max_favorable_price) * entry_size
                 mae_value = (max_adverse_price - entry_price) * entry_size
 
-            total_trade_fees = fees * 2  # Approximate entry + exit fees
+            total_trade_fees = entry_fees_paid + fees  # Exact entry + exit fees
 
             logger.debug(
                 f"Position closed at end of backtest: is_long={is_long}, entry={entry_price:.2f}, "
@@ -2002,7 +2031,7 @@ class BacktestEngine:
         )
 
         # Update equity and drawdown with rebuilt values
-        equity = [config.initial_capital] + equity_values
+        equity = [config.initial_capital, *equity_values]
         drawdown = pd.Series(drawdown_values)
 
         # Use centralized MetricsCalculator for all metrics
@@ -2080,24 +2109,24 @@ class BacktestEngine:
             order_value = margin * leverage  # Full position value with leverage
             # VectorBT needs init_cash >= position value to open the trade
             effective_cash = float(config.initial_capital) * leverage
-            pf_kwargs = dict(
-                close=close,
-                entries=signals.entries,
-                exits=signals.exits,
-                init_cash=effective_cash,  # Simulates buying power with leverage
-                size=order_value,
-                size_type="value",
-                fees=config.taker_fee,
-                slippage=config.slippage,
-                freq="1H",
+            pf_kwargs = {
+                "close": close,
+                "entries": signals.entries,
+                "exits": signals.exits,
+                "init_cash": effective_cash,  # Simulates buying power with leverage
+                "size": order_value,
+                "size_type": "value",
+                "fees": config.taker_fee,
+                "slippage": config.slippage,
+                "freq": "1H",
                 # QUICK REVERSALS FIX: Prevent opening new position on same bar as close
                 # Without delay, VectorBT generates +25% more trades than Fallback engine
                 # delay=1 means entry happens on the bar AFTER signal appears
-                upon_long_conflict="ignore",  # Ignore entry if already in long
-                upon_short_conflict="ignore",  # Ignore entry if already in short
-                upon_dir_conflict="ignore",  # Ignore conflicting direction signals
-                upon_opposite_entry="ignore",  # Don't use opposite entry as exit
-            )
+                "upon_long_conflict": "ignore",  # Ignore entry if already in long
+                "upon_short_conflict": "ignore",  # Ignore entry if already in short
+                "upon_dir_conflict": "ignore",  # Ignore conflicting direction signals
+                "upon_opposite_entry": "ignore",  # Don't use opposite entry as exit
+            }
 
             # INTRABAR SL/TP FIX: Add high/low for proper stop detection
             if "high" in ohlcv.columns:
@@ -2142,13 +2171,13 @@ class BacktestEngine:
             equity_arr = np.array(equity_values)
             with np.errstate(divide="ignore", invalid="ignore"):
                 returns_values = list(np.diff(equity_arr) / equity_arr[:-1])
-            returns_values = [0.0] + returns_values  # First bar has no return
+            returns_values = [0.0, *returns_values]  # First bar has no return
         else:
             returns_values = [0.0] * len(equity_values)
 
         # Ensure returns has same length as equity (pad with 0 if needed)
         if len(returns_values) < len(equity_values):
-            returns_values = [0.0] + returns_values  # First bar has no return
+            returns_values = [0.0, *returns_values]  # First bar has no return
 
         # Use centralized MetricsCalculator for all metrics
         metrics = _build_performance_metrics(

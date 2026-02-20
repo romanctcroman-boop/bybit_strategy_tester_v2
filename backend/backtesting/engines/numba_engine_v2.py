@@ -2887,7 +2887,8 @@ class NumbaEngineV2(BaseBacktestEngine):
             # Build bar magnifier index
             m1_highs, m1_lows, m1_starts, m1_ends = self._build_bar_magnifier_arrays(candles, input_data.candles_1m)
 
-            # TODO: Add bar magnifier + pyramiding support
+            # Pyramiding inside bar-magnifier path is not yet supported;
+            # add a _simulate_with_bar_magnifier_pyramiding() variant when needed.
             result = _simulate_with_bar_magnifier(
                 open_prices,
                 high_prices,

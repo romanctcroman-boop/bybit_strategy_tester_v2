@@ -153,6 +153,15 @@ class TokenAwareRateLimiter:
                 )
                 return False
 
+            # Check daily cost budget
+            if self._day_window.cost_usd > self.budget.max_cost_per_day_usd:
+                self._throttled_count += 1
+                logger.warning(
+                    f"🛑 {self.provider} daily cost budget exhausted "
+                    f"(${self._day_window.cost_usd:.4f}/${self.budget.max_cost_per_day_usd})"
+                )
+                return False
+
             return True
 
     def record_usage(self, tokens: int, cost_usd: float = 0.0) -> None:

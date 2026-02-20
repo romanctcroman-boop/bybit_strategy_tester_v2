@@ -68,7 +68,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r backend/requirements.txt
           pip install pytest pytest-cov pytest-asyncio
 
       - name: Run unit tests
@@ -267,8 +267,13 @@ jobs:
 
       - name: Run smoke tests
         run: |
+          STAGING_URL="${{ secrets.STAGING_URL }}"
+          if [ -z "$STAGING_URL" ]; then
+            echo "STAGING_URL secret not configured — skipping smoke tests"
+            exit 0
+          fi
           sleep 30
-          curl -f https://staging.yourdomain.com/api/v1/health || exit 1
+          curl -f "$STAGING_URL/api/v1/health" || exit 1
 
   # ============================================================================
   # JOB 6: Deploy to Production
@@ -325,9 +330,14 @@ jobs:
       - name: Run smoke tests
         if: ${{ !contains(github.ref_name, '-test') }}
         run: |
+          PROD_URL="${{ secrets.PRODUCTION_URL }}"
+          if [ -z "$PROD_URL" ]; then
+            echo "PRODUCTION_URL secret not configured — skipping smoke tests"
+            exit 0
+          fi
           sleep 60
-          curl -f https://yourdomain.com/api/v1/health || exit 1
-          curl -f https://yourdomain.com/ || exit 1
+          curl -f "$PROD_URL/api/v1/health" || exit 1
+          curl -f "$PROD_URL/" || exit 1
 
       - name: Set up Python for load tests
         if: ${{ !contains(github.ref_name, '-test') }}
@@ -340,7 +350,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install locust
-          python -m locust -f tests/load/locustfile.py --headless --users 100 --spawn-rate 10 --run-time 2m --host https://yourdomain.com
+          python -m locust -f tests/load/locustfile.py --headless --users 100 --spawn-rate 10 --run-time 2m --host "${{ secrets.PRODUCTION_URL }}"
         env:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
 

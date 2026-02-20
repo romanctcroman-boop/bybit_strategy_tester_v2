@@ -85,7 +85,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
                 "img-src 'self' data: https:; "
                 "connect-src 'self' https: wss: ws: data:; "
-                "frame-ancestors 'self'; "
+                "frame-ancestors 'none'; "
                 "object-src 'none'; "
                 "base-uri 'self'; "
                 "form-action 'self'"
@@ -99,7 +99,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
             "connect-src 'self' https: wss: ws: data:; "
-            "frame-ancestors 'self'; "
+            "frame-ancestors 'none'; "
             "object-src 'none'"
         )
 

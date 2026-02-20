@@ -8,10 +8,22 @@ Addresses audit finding: "Configuration fragmented, no validation at startup" (D
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    _Converter = Callable[[str], Any]
 
 from loguru import logger
 from pydantic import BaseModel, Field, field_validator
+
+try:
+    from backend.agents.mcp_config import MCPConfig, get_mcp_config, validate_mcp_startup
+except ImportError:
+    MCPConfig = None  # type: ignore
+    get_mcp_config = None  # type: ignore
+    validate_mcp_startup = None  # type: ignore
 
 
 class PromptConfig(BaseModel):
@@ -65,6 +77,7 @@ class AgentConfig(BaseModel):
     )
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    mcp: MCPConfig | None = None  # Optional MCP configuration
 
     # API endpoints
     deepseek_base_url: str = "https://api.deepseek.com/v1"
@@ -102,7 +115,7 @@ def _load_config() -> AgentConfig:
     config_data: dict[str, Any] = {}
 
     # Override from env vars
-    env_mappings = {
+    env_mappings: dict[str, tuple[str, str | None, _Converter]] = {
         "AGENT_PROMPT_MAX_LENGTH": ("prompt", "max_length", int),
         "AGENT_MAX_DRAWDOWN_PCT": ("prompt", "max_drawdown_pct", float),
         "AGENT_MEMORY_BACKEND": ("memory", "backend", str),
@@ -117,7 +130,7 @@ def _load_config() -> AgentConfig:
         value = os.getenv(env_key)
         if value is not None:
             try:
-                converted = converter(value)
+                converted = converter(value)  # type: ignore[operator]
                 if field is not None:
                     config_data.setdefault(section, {})[field] = converted
                 else:
@@ -125,11 +138,19 @@ def _load_config() -> AgentConfig:
             except (ValueError, TypeError) as e:
                 logger.warning(f"Invalid env var {env_key}={value}: {e}")
 
+    # Load MCP config if available
+    if get_mcp_config is not None:
+        try:
+            config_data["mcp"] = get_mcp_config()
+        except Exception as e:
+            logger.warning(f"Failed to load MCP config: {e}")
+
     config = AgentConfig(**config_data)
     logger.info(
         f"✅ Agent config validated: memory={config.memory.backend}, "
         f"prompt_max={config.prompt.max_length}, "
-        f"semantic_guard={config.security.enable_semantic_guard}"
+        f"semantic_guard={config.security.enable_semantic_guard}, "
+        f"mcp={config.mcp is not None}"
     )
     return config
 
@@ -161,6 +182,14 @@ def validate_startup_config() -> list[str]:
                 logger.info(f"Created memory database directory: {db_dir}")
     except Exception as e:
         errors.append(f"Configuration validation failed: {e}")
+
+    # Validate MCP configuration if available
+    if validate_mcp_startup is not None:
+        try:
+            mcp_errors = validate_mcp_startup()
+            errors.extend(mcp_errors)
+        except Exception as e:
+            errors.append(f"MCP validation failed: {e}")
 
     if errors:
         for err in errors:

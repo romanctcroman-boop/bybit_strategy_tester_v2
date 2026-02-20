@@ -143,14 +143,12 @@ class MarketplaceStatsResponse(BaseModel):
 
 
 def get_current_user_id() -> int:
-    """Get current user ID (placeholder - implement with auth)."""
-    # TODO: Implement proper authentication
+    """Get current user ID. Single-user mode — no multi-user auth implemented."""
     return 1
 
 
 def get_current_username() -> str:
-    """Get current username (placeholder - implement with auth)."""
-    # TODO: Implement proper authentication
+    """Get current username. Single-user mode — no multi-user auth implemented."""
     return "demo_user"
 
 

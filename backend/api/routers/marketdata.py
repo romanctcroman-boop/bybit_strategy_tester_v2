@@ -61,7 +61,7 @@ _db_groups_cache_time: float = 0
 _DB_GROUPS_CACHE_TTL: float = 5.0  # seconds
 
 
-def invalidate_db_groups_cache():
+def invalidate_db_groups_cache() -> None:
     """Invalidate db-groups cache (call after delete/block/unblock operations)."""
     global _db_groups_cache, _db_groups_cache_time
     _db_groups_cache = None
@@ -149,7 +149,7 @@ def get_local_symbols(
 
 
 @router.get("/symbols/db-groups")
-def get_db_groups(db: Session = Depends(get_db)):
+def get_db_groups(db: Session = Depends(get_db)) -> dict:
     """
     Группы тикеров в БД: (symbol, market_type) → интервалы и счётчики.
     Для секции «База Даннах». Кэшируется на 5 секунд.

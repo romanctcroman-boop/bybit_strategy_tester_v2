@@ -9,6 +9,10 @@ Key architecture:
 - state[1] = entry_price (for PnL calculation)
 - state[2] = entry_size (for exit PnL calculation)
 - state[3] = is_long (1.0 for long, 0.0 for short)
+- state[4] = peak_equity (for max drawdown tracking)
+- state[5] = is_stopped (trading halted due to max drawdown)
+- state[6] = margin_locked (exact margin saved at entry for correct cash return)
+- state[7] = entry_fees_paid (exact entry fees for accurate recording)
 
 Author: AI Assistant
 Date: January 2026
@@ -117,6 +121,8 @@ def flex_order_func_nb(
     current_is_long = state[3] > 0.5  # noqa: F841
     peak_equity = state[4]
     is_stopped = state[5] > 0.5  # Trading stopped due to max drawdown
+    current_margin_locked = state[6]  # Exact margin saved at entry
+    current_entry_fees = state[7]  # Exact entry fees saved at entry  # noqa: F841
 
     close_now = c.close[i, col]
     high_now = high_arr[i, 0]
@@ -132,7 +138,8 @@ def flex_order_func_nb(
             unrealized_pnl = (close_now - current_entry_price) * current_entry_size
         else:  # Short
             unrealized_pnl = (current_entry_price - close_now) * current_entry_size
-        current_equity = tracked_cash + current_entry_size * close_now + unrealized_pnl
+        # Equity = cash + margin_locked + unrealized (matches V4 pattern)
+        current_equity = tracked_cash + current_margin_locked + unrealized_pnl
 
     # Update peak equity
     if current_equity > peak_equity:
@@ -153,27 +160,17 @@ def flex_order_func_nb(
 
                 if position_now > 0:
                     # Long exit: return margin + PnL
-                    # PnL = size * price_diff (size already includes leverage)
                     pnl = (exit_price - current_entry_price) * current_entry_size
-                    # Margin was locked, now returned with PnL
-                    margin = (
-                        current_entry_size * current_entry_price / leverage
-                        if leverage > 0
-                        else current_entry_size * current_entry_price
-                    )
-                    state[0] = tracked_cash + margin + pnl - exit_fees
+                    state[0] = tracked_cash + current_margin_locked + pnl - exit_fees
                 else:
                     # Short exit: return margin + PnL
                     pnl = (current_entry_price - exit_price) * current_entry_size
-                    margin = (
-                        current_entry_size * current_entry_price / leverage
-                        if leverage > 0
-                        else current_entry_size * current_entry_price
-                    )
-                    state[0] = tracked_cash + margin + pnl - exit_fees
+                    state[0] = tracked_cash + current_margin_locked + pnl - exit_fees
 
                 state[1] = 0.0
                 state[2] = 0.0
+                state[6] = 0.0  # Reset margin_locked
+                state[7] = 0.0  # Reset entry_fees
 
                 return col, order_nb(
                     size=-position_now,
@@ -207,12 +204,9 @@ def flex_order_func_nb(
 
     # PHASE 1a: Check SL/TP for LONG positions
     if c.call_idx == 0 and position_now > 0:
-        adjusted_sl = sl_pct / leverage if leverage > 0 else sl_pct
-        adjusted_tp = tp_pct / leverage if leverage > 0 else tp_pct
-
-        hit_sl, hit_tp, exit_price = check_sl_tp_hit_nb(
-            current_entry_price, high_now, low_now, adjusted_sl, adjusted_tp, True
-        )
+        # SL/TP = % price movement (TradingView parity with FallbackEngineV4)
+        # Leverage affects PnL amount, NOT trigger price
+        hit_sl, hit_tp, exit_price = check_sl_tp_hit_nb(current_entry_price, high_now, low_now, sl_pct, tp_pct, True)
 
         if hit_sl or hit_tp:
             # Apply slippage for SL (market order)
@@ -224,11 +218,12 @@ def flex_order_func_nb(
             exit_fees = position_value * fees
             pnl = (exit_price - current_entry_price) * current_entry_size - exit_fees
 
-            # Margin trading: return margin + PnL
-            margin = current_entry_size * current_entry_price / leverage if leverage > 0 else position_value
-            state[0] = tracked_cash + margin + pnl
+            # Margin trading: return margin_locked + PnL (exact, no reconstruction)
+            state[0] = tracked_cash + current_margin_locked + pnl
             state[1] = 0.0
             state[2] = 0.0
+            state[6] = 0.0  # Reset margin_locked
+            state[7] = 0.0  # Reset entry_fees
 
             return col, order_nb(
                 size=-position_now,
@@ -238,12 +233,9 @@ def flex_order_func_nb(
 
     # PHASE 1b: Check SL/TP for SHORT positions
     if c.call_idx == 0 and position_now < 0:
-        adjusted_sl = sl_pct / leverage if leverage > 0 else sl_pct
-        adjusted_tp = tp_pct / leverage if leverage > 0 else tp_pct
-
-        hit_sl, hit_tp, exit_price = check_sl_tp_hit_nb(
-            current_entry_price, high_now, low_now, adjusted_sl, adjusted_tp, False
-        )
+        # SL/TP = % price movement (TradingView parity with FallbackEngineV4)
+        # Leverage affects PnL amount, NOT trigger price
+        hit_sl, hit_tp, exit_price = check_sl_tp_hit_nb(current_entry_price, high_now, low_now, sl_pct, tp_pct, False)
 
         if hit_sl or hit_tp:
             # Apply slippage for SL (market order)
@@ -255,11 +247,12 @@ def flex_order_func_nb(
             exit_fees = position_value * fees
             pnl = (current_entry_price - exit_price) * current_entry_size - exit_fees
 
-            # Margin trading: return margin + PnL
-            margin = current_entry_size * current_entry_price / leverage if leverage > 0 else position_value
-            state[0] = tracked_cash + margin + pnl
+            # Margin trading: return margin_locked + PnL (exact, no reconstruction)
+            state[0] = tracked_cash + current_margin_locked + pnl
             state[1] = 0.0
             state[2] = 0.0
+            state[6] = 0.0  # Reset margin_locked
+            state[7] = 0.0  # Reset entry_fees
 
             return col, order_nb(
                 size=-position_now,
@@ -283,12 +276,13 @@ def flex_order_func_nb(
             else:  # Short exit
                 pnl = (current_entry_price - exit_price) * current_entry_size - exit_fees
 
-            # Margin trading: return margin + PnL
-            margin = current_entry_size * current_entry_price / leverage if leverage > 0 else position_value
-            state[0] = tracked_cash + margin + pnl
+            # Margin trading: return margin_locked + PnL (exact, no reconstruction)
+            state[0] = tracked_cash + current_margin_locked + pnl
 
             state[1] = 0.0
             state[2] = 0.0
+            state[6] = 0.0  # Reset margin_locked
+            state[7] = 0.0  # Reset entry_fees
 
             return col, order_nb(
                 size=-position_now,
@@ -313,14 +307,14 @@ def flex_order_func_nb(
             size = (allocated_capital * leverage) / (entry_px * (1.0 + fees))
 
             # For margin trading: only allocated_capital (margin) is locked
-            # position_value would be size * entry_px = margin * leverage
-            # But we only lock the margin, not full position value
             margin_locked = allocated_capital
             entry_fees = size * entry_px * fees
             state[0] = tracked_cash - margin_locked - entry_fees
             state[1] = entry_px
             state[2] = size
             state[3] = 1.0  # is_long
+            state[6] = margin_locked  # Save exact margin for exit
+            state[7] = entry_fees  # Save exact entry fees for recording
 
             return col, order_nb(size=size, price=entry_px, fees=fees, direction=Direction.LongOnly)
 
@@ -336,6 +330,8 @@ def flex_order_func_nb(
             state[1] = entry_px
             state[2] = size
             state[3] = 0.0  # is_short
+            state[6] = margin_locked  # Save exact margin for exit
+            state[7] = entry_fees  # Save exact entry fees for recording
 
             return col, order_nb(size=size, price=entry_px, fees=fees, direction=Direction.ShortOnly)
 
@@ -395,9 +391,9 @@ def run_vectorbt_with_sltp(ohlcv, signals, config):
     else:
         short_exits_2d = np.zeros_like(exits_2d, dtype=np.bool_)
 
-    # State array for custom cash tracking (EXPANDED for max_drawdown)
-    # [tracked_cash, entry_price, entry_size, is_long, peak_equity, is_stopped]
-    state = np.array([initial_capital, 0.0, 0.0, 1.0, initial_capital, 0.0], dtype=np.float64)
+    # State array for custom cash tracking (EXPANDED for max_drawdown + margin tracking)
+    # [tracked_cash, entry_price, entry_size, is_long, peak_equity, is_stopped, margin_locked, entry_fees_paid]
+    state = np.array([initial_capital, 0.0, 0.0, 1.0, initial_capital, 0.0, 0.0, 0.0], dtype=np.float64)
 
     pf = vbt.Portfolio.from_order_func(
         close_df,

@@ -321,10 +321,15 @@ class OpenAICompatibleClient(LLMClient):
                     json=payload,
                 ) as resp:
                     if resp.status == 429:
-                        retry_after = float(resp.headers.get("Retry-After", 5))
-                        logger.warning(f"{self.EMOJI} Rate limited, waiting {retry_after}s")
-                        await asyncio.sleep(retry_after)
-                        continue
+                        try:
+                            retry_after = min(float(resp.headers.get("Retry-After", 5)), 30.0)
+                        except (ValueError, TypeError):
+                            retry_after = min(5.0 * (2**attempt), 30.0)
+                        logger.warning(f"{self.EMOJI} Rate limited, waiting {retry_after}s (attempt {attempt + 1}/{self.config.max_retries})")
+                        if attempt < self.config.max_retries - 1:
+                            await asyncio.sleep(retry_after)
+                            continue
+                        raise RuntimeError(f"{type(self).__name__}: rate limit exceeded after {self.config.max_retries} attempts")
 
                     resp.raise_for_status()
                     data = await resp.json()

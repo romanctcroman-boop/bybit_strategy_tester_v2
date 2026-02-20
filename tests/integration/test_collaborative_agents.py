@@ -22,15 +22,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import uuid
 from typing import Any
 
 import pytest
 
 from backend.agents.consensus.consensus_engine import ConsensusEngine, ConsensusResult
 from backend.agents.consensus.deliberation import (
-    AgentVote,
-    Critique,
     DeliberationResult,
     MultiAgentDeliberation,
     VotingStrategy,

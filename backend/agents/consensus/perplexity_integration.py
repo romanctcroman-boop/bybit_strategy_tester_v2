@@ -18,6 +18,7 @@ Created per agent infrastructure analysis recommendations (2026-02-11).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -388,7 +389,12 @@ Format your response as JSON:
                 LLMMessage(role="user", content=prompt),
             ]
 
-            response = await client.chat(messages)
+            try:
+                response = await asyncio.wait_for(client.chat(messages), timeout=30.0)
+            except asyncio.TimeoutError:
+                logger.error(f"🟣 Perplexity enrichment timeout for {symbol}/{strategy_type}")
+                context["market_context"] = {"status": "timeout", "error": "Perplexity request timed out"}
+                return context
             self._stats["calls_made"] += 1
             self._stats["enrichments"] += 1
 
@@ -664,7 +670,7 @@ Format your response as JSON:
             logger.info(f"🟣 Perplexity cache cleared ({count} entries)")
             return count
 
-        keys_to_remove = [key for key in self._context_cache if key[0] == symbol]
+        keys_to_remove = [key for key in self._context_cache if key.startswith(f"{symbol}:")]
         for key in keys_to_remove:
             del self._context_cache[key]
         if keys_to_remove:

@@ -10,6 +10,7 @@ Supports:
 - Indicator combination and transformation
 """
 
+import ast
 import logging
 import math
 from collections.abc import Callable
@@ -876,6 +877,56 @@ class IndicatorLibrary:
 
         return {"stddev": std}
 
+    # Dangerous builtins/names that must not appear in custom indicator code
+    _FORBIDDEN_CALL_NAMES: frozenset[str] = frozenset({
+        "__import__", "exec", "eval", "compile",
+        "open", "input", "__builtins__",
+        "globals", "locals", "vars", "dir",
+        "getattr", "setattr", "delattr",
+    })
+    _FORBIDDEN_ATTR_NAMES: frozenset[str] = frozenset({
+        "system", "popen", "Popen", "call", "check_call", "check_output",
+        "listdir", "remove", "rmdir", "makedirs", "unlink",
+        "__globals__", "__code__", "__class__", "__bases__", "__subclasses__",
+    })
+
+    @staticmethod
+    def _validate_indicator_code(code: str) -> None:
+        """Validate custom indicator code using AST analysis.
+
+        Raises ValueError if the code contains dangerous constructs such as
+        imports, subprocess calls, file I/O, or dunder attribute access.
+        """
+        try:
+            tree = ast.parse(code)
+        except SyntaxError as e:
+            raise ValueError(f"Syntax error in custom indicator code: {e}") from e
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                raise ValueError(
+                    "Custom indicator code must not contain import statements"
+                )
+            if isinstance(node, ast.Call):
+                if (
+                    isinstance(node.func, ast.Name)
+                    and node.func.id in IndicatorLibrary._FORBIDDEN_CALL_NAMES
+                ):
+                    raise ValueError(
+                        f"Custom indicator code must not call '{node.func.id}'"
+                    )
+                if (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr in IndicatorLibrary._FORBIDDEN_ATTR_NAMES
+                ):
+                    raise ValueError(
+                        f"Custom indicator code must not call '.{node.func.attr}'"
+                    )
+            if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+                raise ValueError(
+                    f"Custom indicator code must not access dunder attribute '{node.attr}'"
+                )
+
     def _calc_custom(
         self, data: dict[str, np.ndarray], params: dict[str, Any]
     ) -> dict[str, np.ndarray]:
@@ -886,7 +937,10 @@ class IndicatorLibrary:
 
         indicator = self.custom_indicators[indicator_id]
 
-        # Prepare namespace for code execution
+        # Validate code for dangerous constructs before execution
+        self._validate_indicator_code(indicator.code)
+
+        # Prepare namespace for code execution (restricted to numpy + data)
         namespace = {
             "np": np,
             "data": data,
@@ -895,7 +949,7 @@ class IndicatorLibrary:
 
         # Execute custom code
         try:
-            exec(indicator.code, namespace)
+            exec(indicator.code, namespace)  # noqa: S102
             if "calculate" in namespace:
                 result = namespace["calculate"](data, **params)
                 return result

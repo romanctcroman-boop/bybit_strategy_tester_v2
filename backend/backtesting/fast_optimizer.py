@@ -52,11 +52,12 @@ STATUS: Formulas verified to match MetricsCalculator (2026-01-25)
 """
 
 import sqlite3
+import math
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -274,30 +275,31 @@ def load_candles_fast(
         else:
             all_data = []
             conn = sqlite3.connect(db_path, timeout=30)
-            cursor = conn.cursor()
+            try:
+                cursor = conn.cursor()
 
-            for table in tables_to_query:
-                cursor.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                    (table,),
-                )
-                if not cursor.fetchone():
-                    continue
+                for table in tables_to_query:
+                    cursor.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                        (table,),
+                    )
+                    if not cursor.fetchone():
+                        continue
 
-                query = f"""
-                    SELECT open_time, open_price, high_price, low_price, close_price, volume
-                    FROM {table}
-                    WHERE symbol = ? AND interval = ?
-                      AND open_time >= ? AND open_time <= ?
-                    ORDER BY open_time ASC
-                """
-                cursor.execute(query, (symbol, interval, start_ts, end_ts))
-                rows = cursor.fetchall()
-                if rows:
-                    all_data.extend(rows)
-                    logger.debug(f"📊 Found {len(rows)} rows in {table}")
-
-            conn.close()
+                    query = f"""
+                        SELECT open_time, open_price, high_price, low_price, close_price, volume
+                        FROM {table}
+                        WHERE symbol = ? AND interval = ?
+                          AND open_time >= ? AND open_time <= ?
+                        ORDER BY open_time ASC
+                    """
+                    cursor.execute(query, (symbol, interval, start_ts, end_ts))
+                    rows = cursor.fetchall()
+                    if rows:
+                        all_data.extend(rows)
+                        logger.debug(f"📊 Found {len(rows)} rows in {table}")
+            finally:
+                conn.close()
 
             if not all_data:
                 logger.warning(f"⚠️ No data found for {symbol}/{interval} in date range")
@@ -439,28 +441,26 @@ def generate_detailed_trades(
         if not in_position:
             # Entry signals - check both long and short for direction=2 (both)
             # Long entry: RSI crosses below oversold (buy signal)
-            if direction != 1:  # Long allowed (direction=0 or direction=2)
-                if rsi[i - 1] >= rsi_oversold and rsi[i] < rsi_oversold:
-                    in_position = True
-                    is_long = True
-                    entry_price = close[i]
-                    entry_time = current_time
-                    entry_idx = i
-                    # Initialize MFE/MAE tracking
-                    max_favorable_price = entry_price
-                    max_adverse_price = entry_price
+            if direction != 1 and rsi[i - 1] >= rsi_oversold and rsi[i] < rsi_oversold:  # Long allowed
+                in_position = True
+                is_long = True
+                entry_price = close[i]
+                entry_time = current_time
+                entry_idx = i
+                # Initialize MFE/MAE tracking
+                max_favorable_price = entry_price
+                max_adverse_price = entry_price
 
             # Short entry: RSI crosses above overbought (sell signal)
-            if not in_position and direction != 0:  # Short allowed (direction=1 or direction=2)
-                if rsi[i - 1] <= rsi_overbought and rsi[i] > rsi_overbought:
-                    in_position = True
-                    is_long = False
-                    entry_price = close[i]
-                    entry_time = current_time
-                    entry_idx = i
-                    # Initialize MFE/MAE tracking
-                    max_favorable_price = entry_price
-                    max_adverse_price = entry_price
+            if not in_position and direction != 0 and rsi[i - 1] <= rsi_overbought and rsi[i] > rsi_overbought:
+                in_position = True
+                is_long = False
+                entry_price = close[i]
+                entry_time = current_time
+                entry_idx = i
+                # Initialize MFE/MAE tracking
+                max_favorable_price = entry_price
+                max_adverse_price = entry_price
         else:
             # Update MFE/MAE using High/Low of current bar (TradingView style)
             if is_long:
@@ -480,10 +480,12 @@ def generate_detailed_trades(
             should_exit = False
             exit_reason = ""
 
+            # Calculate unrealized P/L as % of price (TradingView parity)
+            # stop_loss_pct/take_profit_pct are in % (e.g. 1.5 = 1.5% price move)
             if is_long:
-                pnl_pct = (close[i] - entry_price) / entry_price * leverage * 100
+                pnl_pct = (close[i] - entry_price) / entry_price * 100
             else:
-                pnl_pct = (entry_price - close[i]) / entry_price * leverage * 100
+                pnl_pct = (entry_price - close[i]) / entry_price * 100
 
             # Stop Loss
             if stop_loss_pct > 0 and pnl_pct <= -stop_loss_pct:
@@ -496,10 +498,12 @@ def generate_detailed_trades(
                 exit_reason = "take_profit"
 
             # RSI reversal
-            if not should_exit:
-                if (is_long and rsi[i - 1] <= rsi_overbought and rsi[i] > rsi_overbought) or (not is_long and rsi[i - 1] >= rsi_oversold and rsi[i] < rsi_oversold):
-                    should_exit = True
-                    exit_reason = "signal"
+            if not should_exit and (
+                (is_long and rsi[i - 1] <= rsi_overbought and rsi[i] > rsi_overbought)
+                or (not is_long and rsi[i - 1] >= rsi_oversold and rsi[i] < rsi_oversold)
+            ):
+                should_exit = True
+                exit_reason = "signal"
 
             if should_exit:
                 exit_price = close[i]
@@ -699,47 +703,46 @@ if NUMBA_AVAILABLE:
             if not in_position:
                 # Check for entry signals - support direction=2 (both long and short)
                 # Long entry: RSI crosses below oversold
-                if direction != 1:  # Long allowed (direction=0 or direction=2)
-                    if rsi[i - 1] >= oversold and rsi[i] < oversold:
-                        in_position = True
-                        is_long = True
-                        entry_price = close[i]
+                if direction != 1 and rsi[i - 1] >= oversold and rsi[i] < oversold:  # Long allowed
+                    in_position = True
+                    is_long = True
+                    entry_price = close[i]
 
                 # Short entry: RSI crosses above overbought
-                if not in_position and direction != 0:  # Short allowed (direction=1 or direction=2)
-                    if rsi[i - 1] <= overbought and rsi[i] > overbought:
-                        in_position = True
-                        is_long = False
-                        entry_price = close[i]
+                if not in_position and direction != 0 and rsi[i - 1] <= overbought and rsi[i] > overbought:
+                    in_position = True
+                    is_long = False
+                    entry_price = close[i]
 
             else:
                 # Check for exit
                 should_exit = False
                 exit_price = close[i]
 
-                # Calculate unrealized PnL %
+                # Calculate unrealized PnL as % of price (TradingView parity)
+                # stop_loss_pct/take_profit_pct = % price move (e.g. 1.5 = 1.5%)
                 if is_long:
-                    pnl_pct = (close[i] - entry_price) / entry_price * leverage * 100
+                    pnl_pct = (close[i] - entry_price) / entry_price * 100
                 else:
-                    pnl_pct = (entry_price - close[i]) / entry_price * leverage * 100
+                    pnl_pct = (entry_price - close[i]) / entry_price * 100
 
                 # Stop Loss check
                 if stop_loss_pct > 0 and pnl_pct <= -stop_loss_pct:
                     should_exit = True
-                    # Use SL price
+                    # SL price = entry ± stop_loss% (price movement, TradingView parity)
                     if is_long:
-                        exit_price = entry_price * (1 - stop_loss_pct / 100 / leverage)
+                        exit_price = entry_price * (1 - stop_loss_pct / 100)
                     else:
-                        exit_price = entry_price * (1 + stop_loss_pct / 100 / leverage)
+                        exit_price = entry_price * (1 + stop_loss_pct / 100)
 
                 # Take Profit check
                 if take_profit_pct > 0 and pnl_pct >= take_profit_pct:
                     should_exit = True
-                    # Use TP price
+                    # TP price = entry ± take_profit% (price movement, TradingView parity)
                     if is_long:
-                        exit_price = entry_price * (1 + take_profit_pct / 100 / leverage)
+                        exit_price = entry_price * (1 + take_profit_pct / 100)
                     else:
-                        exit_price = entry_price * (1 - take_profit_pct / 100 / leverage)
+                        exit_price = entry_price * (1 - take_profit_pct / 100)
 
                 # RSI exit signal
                 if (is_long and rsi[i] > overbought) or (not is_long and rsi[i] < oversold):
@@ -1084,6 +1087,7 @@ class FastGridOptimizer:
 
     def __init__(self):
         import warnings
+
         warnings.warn(
             "FastGridOptimizer is deprecated. Use NumbaEngineV2 with standard optimization loop. "
             "This class is RSI-only and doesn't support pyramiding, ATR, multi-TP, trailing.",
@@ -1159,10 +1163,10 @@ class FastGridOptimizer:
         logger.info(f"   💧 Slippage: {slippage:.4f}")
         logger.info(f"   🎯 Optimize metric: {optimize_metric}")
         logger.info(f"   RSI periods: {list(periods)}")
-        logger.info(f"   Overbought: {min(overbought)}-{max(overbought)} ({len(overbought)} values)")
-        logger.info(f"   Oversold: {min(oversold)}-{max(oversold)} ({len(oversold)} values)")
-        logger.info(f"   Stop Loss: {min(stop_losses)}-{max(stop_losses)}% ({len(stop_losses)} values)")
-        logger.info(f"   Take Profit: {min(take_profits)}-{max(take_profits)}% ({len(take_profits)} values)")
+        logger.info(f"   Overbought: {overbought.min()}-{overbought.max()} ({len(overbought)} values)")
+        logger.info(f"   Oversold: {oversold.min()}-{oversold.max()} ({len(oversold)} values)")
+        logger.info(f"   Stop Loss: {stop_losses.min()}-{stop_losses.max()}% ({len(stop_losses)} values)")
+        logger.info(f"   Take Profit: {take_profits.min()}-{take_profits.max()}% ({len(take_profits)} values)")
 
         # Pre-compute RSI for all periods
         rsi_start = time.time()
@@ -1224,7 +1228,7 @@ class FastGridOptimizer:
         # Apply mask and convert to list of dicts (only for filtered results)
         filtered_results = results_array[valid_mask]
 
-        all_results = [
+        all_results: list[dict[str, Any]] = [
             {
                 "params": {
                     "rsi_period": int(row[0]),
@@ -1256,10 +1260,18 @@ class FastGridOptimizer:
         # Calculate scores
         score_start = time.time()
         logger.info("   [STEP 4/4] Calculating scores and sorting...")
-        all_results = self._calculate_scores(all_results, optimize_metric, weights)
+        all_results = cast(list[dict[str, Any]], self._calculate_scores(all_results, optimize_metric, weights))
 
         # Sort by score
-        all_results.sort(key=lambda x: x.get("score", 0), reverse=True)
+        def _safe_score(x: dict[str, Any]) -> float:
+            v = x.get("score", 0)
+            try:
+                f = float(v)  # type: ignore[arg-type]
+                return 0.0 if math.isnan(f) else f
+            except (TypeError, ValueError):
+                return 0.0
+
+        all_results.sort(key=_safe_score, reverse=True)
         score_time = time.time() - score_start
         logger.info(f"   [STEP 4/4] ✅ Scoring completed in {score_time:.2f}s")
 
@@ -1272,12 +1284,12 @@ class FastGridOptimizer:
         logger.info(f"   📊 Valid results: {len(all_results):,}")
         logger.info("=" * 60)
 
-        best = all_results[0] if all_results else {}
+        best: dict[str, Any] = all_results[0] if all_results else {}
 
         # Generate detailed trades and equity curve for best result
         if best and len(all_results) > 0:
             try:
-                best_params = best.get("params", {})
+                best_params: dict[str, Any] = best.get("params", {})
                 logger.info(f"   Generating trades for best params: {best_params}")
 
                 # Get timestamps from candles
@@ -1387,15 +1399,15 @@ class FastGridOptimizer:
                     logger.info(f"   🔍 avg_bars_in_losing calculated: {all_results[0]['avg_bars_in_losing']}")
 
                     # Expectancy
-                    avg_win = all_results[0]["avg_win"]
-                    avg_loss = abs(all_results[0]["avg_loss"])
-                    win_rate = all_results[0].get("win_rate", 0) / 100
+                    avg_win = float(all_results[0]["avg_win"])
+                    avg_loss = float(abs(float(all_results[0]["avg_loss"])))
+                    win_rate = float(all_results[0].get("win_rate", 0)) / 100
                     expectancy = (win_rate * avg_win) - ((1 - win_rate) * avg_loss) if avg_loss > 0 else avg_win
                     all_results[0]["expectancy"] = expectancy
 
                     # Recovery factor
                     net_profit = gross_profit - gross_loss
-                    max_dd = all_results[0].get("max_drawdown", 1)
+                    max_dd = float(all_results[0].get("max_drawdown", 1))
                     all_results[0]["recovery_factor"] = (
                         (net_profit / (initial_capital * max_dd / 100)) if max_dd > 0 else 0
                     )
@@ -1480,12 +1492,12 @@ class FastGridOptimizer:
                     # ===== Recovery Factor for Long/Short =====
                     # Recovery factor = Net Profit / Max Drawdown Value
                     # Using overall max_drawdown since separate L/S drawdown requires separate equity curves
-                    max_dd_value = initial_capital * max_dd / 100 if max_dd > 0 else 1
+                    max_dd_value = initial_capital * max_dd / 100 if max_dd > 0 else 1.0
                     all_results[0]["recovery_long"] = (
-                        all_results[0].get("long_net_profit", 0) / max_dd_value if max_dd_value > 0 else 0
+                        float(all_results[0].get("long_net_profit", 0)) / max_dd_value if max_dd_value > 0 else 0
                     )
                     all_results[0]["recovery_short"] = (
-                        all_results[0].get("short_net_profit", 0) / max_dd_value if max_dd_value > 0 else 0
+                        float(all_results[0].get("short_net_profit", 0)) / max_dd_value if max_dd_value > 0 else 0
                     )
 
                     # ===== Long/Short Consecutive Wins/Losses =====
@@ -1525,20 +1537,20 @@ class FastGridOptimizer:
 
                     # ===== Long/Short Payoff Ratio =====
                     # Payoff Ratio = Avg Win / |Avg Loss|
-                    long_avg_win = all_results[0].get("long_avg_win", 0)
-                    long_avg_loss = abs(all_results[0].get("long_avg_loss", 0))
+                    long_avg_win = float(all_results[0].get("long_avg_win", 0))
+                    long_avg_loss = float(abs(float(all_results[0].get("long_avg_loss", 0))))
                     all_results[0]["long_payoff_ratio"] = long_avg_win / long_avg_loss if long_avg_loss > 0 else 0
-                    short_avg_win = all_results[0].get("short_avg_win", 0)
-                    short_avg_loss = abs(all_results[0].get("short_avg_loss", 0))
+                    short_avg_win = float(all_results[0].get("short_avg_win", 0))
+                    short_avg_loss = float(abs(float(all_results[0].get("short_avg_loss", 0))))
                     all_results[0]["short_payoff_ratio"] = short_avg_win / short_avg_loss if short_avg_loss > 0 else 0
 
                     # ===== Long/Short Expectancy =====
                     # Expectancy = (WinRate * AvgWin) - (LossRate * AvgLoss)
-                    long_win_rate = all_results[0].get("long_win_rate", 0) / 100
+                    long_win_rate = float(all_results[0].get("long_win_rate", 0)) / 100
                     all_results[0]["long_expectancy"] = (
                         (long_win_rate * long_avg_win) - ((1 - long_win_rate) * long_avg_loss) if long_trades else 0
                     )
-                    short_win_rate = all_results[0].get("short_win_rate", 0) / 100
+                    short_win_rate = float(all_results[0].get("short_win_rate", 0)) / 100
                     all_results[0]["short_expectancy"] = (
                         (short_win_rate * short_avg_win) - ((1 - short_win_rate) * short_avg_loss)
                         if short_trades
@@ -1566,7 +1578,7 @@ class FastGridOptimizer:
                         all_results[0]["buy_hold_return"] = buy_hold_return
                         all_results[0]["buy_hold_return_pct"] = buy_hold_return_pct
                         # Strategy outperformance
-                        strategy_return_pct = all_results[0].get("total_return", 0)
+                        strategy_return_pct = float(all_results[0].get("total_return", 0))
                         all_results[0]["strategy_outperformance"] = strategy_return_pct - buy_hold_return_pct
                     else:
                         all_results[0]["buy_hold_return"] = 0
@@ -1598,7 +1610,7 @@ class FastGridOptimizer:
                                 cagr = ((final_capital / initial_capital) ** (1 / years) - 1) * 100
                                 all_results[0]["cagr"] = cagr
                                 # CAGR for Long trades
-                                long_final = initial_capital + all_results[0].get("long_net_profit", 0)
+                                long_final = initial_capital + float(all_results[0].get("long_net_profit", 0))
                                 if long_final > 0:
                                     all_results[0]["cagr_long"] = (
                                         (long_final / initial_capital) ** (1 / years) - 1
@@ -1606,7 +1618,7 @@ class FastGridOptimizer:
                                 else:
                                     all_results[0]["cagr_long"] = -100.0
                                 # CAGR for Short trades
-                                short_final = initial_capital + all_results[0].get("short_net_profit", 0)
+                                short_final = initial_capital + float(all_results[0].get("short_net_profit", 0))
                                 if short_final > 0:
                                     all_results[0]["cagr_short"] = (
                                         (short_final / initial_capital) ** (1 / years) - 1
@@ -1722,8 +1734,8 @@ class FastGridOptimizer:
             total_combinations=total_combinations,
             tested_combinations=len(all_results),
             execution_time_seconds=round(execution_time, 2),
-            best_params=best.get("params", {}),
-            best_score=best.get("score", 0),
+            best_params=dict(best.get("params", {})),
+            best_score=float(best.get("score", 0)),
             best_metrics={
                 "total_return": best.get("total_return", 0),
                 "sharpe_ratio": best.get("sharpe_ratio", 0),
@@ -1825,10 +1837,10 @@ class FastGridOptimizer:
 
     def _calculate_scores(
         self,
-        results: list[dict],
+        results: list[dict[str, Any]],
         metric: str,
         weights: dict[str, float] | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Calculate optimization scores"""
         for r in results:
             if metric == "sharpe_ratio":

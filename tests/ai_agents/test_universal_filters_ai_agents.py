@@ -1,23 +1,23 @@
-"""
-AI Agent Knowledge Test: Universal Filters (5 new instruments in "Технические Индикаторы")
+﻿"""
+AI Agent Knowledge Test: Universal Filters (5 new instruments in "РўРµС…РЅРёС‡РµСЃРєРёРµ РРЅРґРёРєР°С‚РѕСЂС‹")
 
 Tests verify that AI agents correctly understand:
 
 == ATR VOLATILITY (filter) ==
 - Block type: 'atr_volatility', category: 'indicator'
-- Toggle: use_atr_volatility (bool, default false → passthrough: all True)
+- Toggle: use_atr_volatility (bool, default false в†’ passthrough: all True)
 - Parameters: atr_length1 (int 5-20, default 20), atr_length2 (int 20-100, default 100),
   atr_smoothing (WMA|RMA|SMA|EMA, default WMA), atr_diff_percent (float 0.1-50, default 10),
   atr1_to_atr2 ("ATR1 < ATR2" | "ATR1 > ATR2")
-- Returns: {long_signal, short_signal} — symmetric (same condition)
+- Returns: {long_signal, short_signal} вЂ” symmetric (same condition)
 
 == VOLUME FILTER (filter) ==
 - Block type: 'volume_filter', category: 'indicator'
-- Toggle: use_volume_filter (bool, default false → passthrough)
+- Toggle: use_volume_filter (bool, default false в†’ passthrough)
 - Parameters: vol_length1 (int 5-20, default 20), vol_length2 (int 20-100, default 100),
   vol_smoothing (WMA|RMA|SMA|EMA, default WMA), vol_diff_percent (float 0.1-50, default 10),
   vol1_to_vol2 ("VOL1 < VOL2" | "VOL1 > VOL2")
-- Returns: {long_signal, short_signal} — symmetric
+- Returns: {long_signal, short_signal} вЂ” symmetric
 
 == HIGHEST/LOWEST BAR (signal + filter) ==
 - Block type: 'highest_lowest_bar', category: 'indicator'
@@ -25,7 +25,7 @@ Tests verify that AI agents correctly understand:
 - HL params: hl_lookback_bars (int 1-100, default 10), hl_price_percent (float 0-30),
   hl_atr_percent (float 0-30), atr_hl_length (int 1-50, default 50)
 - Worse params: block_worse_percent (float 0.1-30, default 1.1)
-- Returns: {long_signal, short_signal} — asymmetric (highest→long, lowest→short)
+- Returns: {long_signal, short_signal} вЂ” asymmetric (highestв†’long, lowestв†’short)
 
 == TWO MAs (signal + filter) ==
 - Block type: 'two_mas', category: 'indicator'
@@ -39,7 +39,7 @@ Tests verify that AI agents correctly understand:
 
 == ACCUMULATION AREAS (filter or signal) ==
 - Block type: 'accumulation_areas', category: 'indicator'
-- Toggle: use_accumulation (bool, default false → passthrough)
+- Toggle: use_accumulation (bool, default false в†’ passthrough)
 - Parameters: backtracking_interval (int 1-100, default 30),
   min_bars_to_execute (int 1-100, default 5),
   signal_on_breakout (bool), signal_on_opposite_breakout (bool)
@@ -118,7 +118,7 @@ def client():
 
 @pytest.fixture
 def adapter() -> StrategyBuilderAdapter:
-    """Bare adapter — no data loaded, used for unit-level calls."""
+    """Bare adapter вЂ” no data loaded, used for unit-level calls."""
     return StrategyBuilderAdapter.__new__(StrategyBuilderAdapter)
 
 
@@ -162,7 +162,7 @@ def ohlcv_data() -> pd.DataFrame:
 
 @pytest.fixture
 def flat_ohlcv() -> pd.DataFrame:
-    """Flat/ranging OHLCV data — narrow range, high volume variation."""
+    """Flat/ranging OHLCV data вЂ” narrow range, high volume variation."""
     np.random.seed(99)
     n = 150
     close = pd.Series(50000 + np.random.normal(0, 20.0, n), name="close")
@@ -189,7 +189,7 @@ def _run(
     params: dict[str, Any],
     ohlcv: pd.DataFrame,
 ) -> dict:
-    """Helper — execute indicator block."""
+    """Helper вЂ” execute indicator block."""
     return adapter._execute_indicator(block_type, params, ohlcv, {})
 
 
@@ -225,18 +225,18 @@ class TestATRVolatilityPassthrough:
     """When use_atr_volatility=False (default), long/short are all True."""
 
     def test_passthrough_default_params(self, adapter, ohlcv_data):
-        """Default params → passthrough mode."""
+        """Default params в†’ passthrough mode."""
         result = _run(adapter, "atr_volatility", {}, ohlcv_data)
-        assert "long_signal" in result
-        assert "short_signal" in result
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert "long" in result
+        assert "short" in result
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_passthrough_explicit_false(self, adapter, ohlcv_data):
-        """use_atr_volatility=False → passthrough."""
+        """use_atr_volatility=False в†’ passthrough."""
         result = _run(adapter, "atr_volatility", {"use_atr_volatility": False}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
 
 class TestATRVolatilityActive:
@@ -246,21 +246,21 @@ class TestATRVolatilityActive:
         """Activated ATR filter returns boolean long_signal/short_signal."""
         params = {"use_atr_volatility": True, "atr_length1": 10, "atr_length2": 50}
         result = _run(adapter, "atr_volatility", params, ohlcv_data)
-        assert result["long_signal"].dtype == bool
-        assert result["short_signal"].dtype == bool
+        assert result["long"].dtype == bool
+        assert result["short"].dtype == bool
 
     def test_series_length_matches_input(self, adapter, ohlcv_data):
         """Output series length matches input data."""
         params = {"use_atr_volatility": True}
         result = _run(adapter, "atr_volatility", params, ohlcv_data)
-        assert len(result["long_signal"]) == len(ohlcv_data)
-        assert len(result["short_signal"]) == len(ohlcv_data)
+        assert len(result["long"]) == len(ohlcv_data)
+        assert len(result["short"]) == len(ohlcv_data)
 
     def test_symmetric_signals(self, adapter, ohlcv_data):
         """ATR volatility filter is symmetric (same condition for long and short)."""
         params = {"use_atr_volatility": True, "atr_length1": 10, "atr_length2": 50}
         result = _run(adapter, "atr_volatility", params, ohlcv_data)
-        pd.testing.assert_series_equal(result["long_signal"], result["short_signal"])
+        pd.testing.assert_series_equal(result["long"], result["short"])
 
     def test_mode_atr1_less_than_atr2(self, adapter, ohlcv_data):
         """ATR1 < ATR2 mode: filters for low volatility."""
@@ -272,7 +272,7 @@ class TestATRVolatilityActive:
             "atr_diff_percent": 5,
         }
         result = _run(adapter, "atr_volatility", params, ohlcv_data)
-        assert isinstance(result["long_signal"], pd.Series)
+        assert isinstance(result["long"], pd.Series)
 
     def test_mode_atr1_greater_than_atr2(self, adapter, ohlcv_data):
         """ATR1 > ATR2 mode: filters for high volatility."""
@@ -284,7 +284,7 @@ class TestATRVolatilityActive:
             "atr_diff_percent": 5,
         }
         result = _run(adapter, "atr_volatility", params, ohlcv_data)
-        assert isinstance(result["long_signal"], pd.Series)
+        assert isinstance(result["long"], pd.Series)
 
     def test_opposite_modes_differ(self, adapter, ohlcv_data):
         """ATR1<ATR2 and ATR1>ATR2 produce different results."""
@@ -297,8 +297,8 @@ class TestATRVolatilityActive:
         r_less = _run(adapter, "atr_volatility", {**base, "atr1_to_atr2": "ATR1 < ATR2"}, ohlcv_data)
         r_greater = _run(adapter, "atr_volatility", {**base, "atr1_to_atr2": "ATR1 > ATR2"}, ohlcv_data)
         # They should not be identical (unless all bars fail both conditions)
-        assert not r_less["long_signal"].equals(r_greater["long_signal"]) or (
-            not r_less["long_signal"].any() and not r_greater["long_signal"].any()
+        assert not r_less["long"].equals(r_greater["long"]) or (
+            not r_less["long"].any() and not r_greater["long"].any()
         )
 
     @pytest.mark.parametrize("smoothing", ["WMA", "RMA", "SMA", "EMA"])
@@ -311,14 +311,14 @@ class TestATRVolatilityActive:
             "atr_smoothing": smoothing,
         }
         result = _run(adapter, "atr_volatility", params, ohlcv_data)
-        assert "long_signal" in result
+        assert "long" in result
 
     def test_high_diff_percent_reduces_signals(self, adapter, ohlcv_data):
         """Higher diff_percent threshold reduces number of passing bars."""
         base = {"use_atr_volatility": True, "atr_length1": 10, "atr_length2": 50}
         r5 = _run(adapter, "atr_volatility", {**base, "atr_diff_percent": 5}, ohlcv_data)
         r30 = _run(adapter, "atr_volatility", {**base, "atr_diff_percent": 30}, ohlcv_data)
-        assert r5["long_signal"].sum() >= r30["long_signal"].sum()
+        assert r5["long"].sum() >= r30["long"].sum()
 
 
 # ============================================================
@@ -331,13 +331,13 @@ class TestVolumeFilterPassthrough:
 
     def test_passthrough_default(self, adapter, ohlcv_data):
         result = _run(adapter, "volume_filter", {}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_passthrough_explicit_false(self, adapter, ohlcv_data):
         result = _run(adapter, "volume_filter", {"use_volume_filter": False}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
 
 class TestVolumeFilterActive:
@@ -346,19 +346,19 @@ class TestVolumeFilterActive:
     def test_active_returns_boolean_series(self, adapter, ohlcv_data):
         params = {"use_volume_filter": True, "vol_length1": 10, "vol_length2": 50}
         result = _run(adapter, "volume_filter", params, ohlcv_data)
-        assert result["long_signal"].dtype == bool
-        assert result["short_signal"].dtype == bool
+        assert result["long"].dtype == bool
+        assert result["short"].dtype == bool
 
     def test_series_length_matches_input(self, adapter, ohlcv_data):
         params = {"use_volume_filter": True}
         result = _run(adapter, "volume_filter", params, ohlcv_data)
-        assert len(result["long_signal"]) == len(ohlcv_data)
+        assert len(result["long"]) == len(ohlcv_data)
 
     def test_symmetric_signals(self, adapter, ohlcv_data):
         """Volume filter is symmetric (same condition for long and short)."""
         params = {"use_volume_filter": True, "vol_length1": 10, "vol_length2": 50}
         result = _run(adapter, "volume_filter", params, ohlcv_data)
-        pd.testing.assert_series_equal(result["long_signal"], result["short_signal"])
+        pd.testing.assert_series_equal(result["long"], result["short"])
 
     def test_mode_vol1_less_than_vol2(self, adapter, ohlcv_data):
         params = {
@@ -369,7 +369,7 @@ class TestVolumeFilterActive:
             "vol_diff_percent": 5,
         }
         result = _run(adapter, "volume_filter", params, ohlcv_data)
-        assert isinstance(result["long_signal"], pd.Series)
+        assert isinstance(result["long"], pd.Series)
 
     def test_mode_vol1_greater_than_vol2(self, adapter, ohlcv_data):
         params = {
@@ -380,7 +380,7 @@ class TestVolumeFilterActive:
             "vol_diff_percent": 5,
         }
         result = _run(adapter, "volume_filter", params, ohlcv_data)
-        assert isinstance(result["long_signal"], pd.Series)
+        assert isinstance(result["long"], pd.Series)
 
     @pytest.mark.parametrize("smoothing", ["WMA", "RMA", "SMA", "EMA"])
     def test_smoothing_methods_run_without_error(self, adapter, ohlcv_data, smoothing):
@@ -392,13 +392,13 @@ class TestVolumeFilterActive:
             "vol_smoothing": smoothing,
         }
         result = _run(adapter, "volume_filter", params, ohlcv_data)
-        assert "long_signal" in result
+        assert "long" in result
 
     def test_high_diff_percent_reduces_signals(self, adapter, ohlcv_data):
         base = {"use_volume_filter": True, "vol_length1": 10, "vol_length2": 50}
         r5 = _run(adapter, "volume_filter", {**base, "vol_diff_percent": 5}, ohlcv_data)
         r30 = _run(adapter, "volume_filter", {**base, "vol_diff_percent": 30}, ohlcv_data)
-        assert r5["long_signal"].sum() >= r30["long_signal"].sum()
+        assert r5["long"].sum() >= r30["long"].sum()
 
 
 # ============================================================
@@ -411,14 +411,14 @@ class TestHighestLowestBarPassthrough:
 
     def test_passthrough_default(self, adapter, ohlcv_data):
         result = _run(adapter, "highest_lowest_bar", {}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_passthrough_both_false(self, adapter, ohlcv_data):
         params = {"use_highest_lowest": False, "use_block_worse_than": False}
         result = _run(adapter, "highest_lowest_bar", params, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
 
 class TestHighestLowestBarSignal:
@@ -427,27 +427,27 @@ class TestHighestLowestBarSignal:
     def test_returns_boolean_series(self, adapter, ohlcv_data):
         params = {"use_highest_lowest": True, "hl_lookback_bars": 10}
         result = _run(adapter, "highest_lowest_bar", params, ohlcv_data)
-        assert result["long_signal"].dtype == bool
-        assert result["short_signal"].dtype == bool
+        assert result["long"].dtype == bool
+        assert result["short"].dtype == bool
 
     def test_series_length_matches(self, adapter, ohlcv_data):
         params = {"use_highest_lowest": True, "hl_lookback_bars": 10}
         result = _run(adapter, "highest_lowest_bar", params, ohlcv_data)
-        assert len(result["long_signal"]) == len(ohlcv_data)
-        assert len(result["short_signal"]) == len(ohlcv_data)
+        assert len(result["long"]) == len(ohlcv_data)
+        assert len(result["short"]) == len(ohlcv_data)
 
     def test_asymmetric_signals(self, adapter, ohlcv_data):
-        """Highest bar → long, lowest bar → short — should differ."""
+        """Highest bar в†’ long, lowest bar в†’ short вЂ” should differ."""
         params = {"use_highest_lowest": True, "hl_lookback_bars": 5}
         result = _run(adapter, "highest_lowest_bar", params, ohlcv_data)
         # In trending data, highest and lowest bar signals should differ
-        assert not result["long_signal"].equals(result["short_signal"])
+        assert not result["long"].equals(result["short"])
 
     def test_longer_lookback_fewer_signals(self, adapter, ohlcv_data):
-        """Longer lookback → fewer bars qualify as highest/lowest."""
+        """Longer lookback в†’ fewer bars qualify as highest/lowest."""
         r5 = _run(adapter, "highest_lowest_bar", {"use_highest_lowest": True, "hl_lookback_bars": 5}, ohlcv_data)
         r50 = _run(adapter, "highest_lowest_bar", {"use_highest_lowest": True, "hl_lookback_bars": 50}, ohlcv_data)
-        assert r5["long_signal"].sum() >= r50["long_signal"].sum()
+        assert r5["long"].sum() >= r50["long"].sum()
 
     def test_price_percent_condition(self, adapter, ohlcv_data):
         """Adding price_percent condition further filters signals."""
@@ -471,7 +471,7 @@ class TestHighestLowestBarSignal:
             },
             ohlcv_data,
         )
-        assert r0["long_signal"].sum() >= r5["long_signal"].sum()
+        assert r0["long"].sum() >= r5["long"].sum()
 
     def test_atr_percent_condition(self, adapter, ohlcv_data):
         """ATR percent condition filters differently."""
@@ -482,8 +482,8 @@ class TestHighestLowestBarSignal:
             "atr_hl_length": 20,
         }
         result = _run(adapter, "highest_lowest_bar", params, ohlcv_data)
-        assert isinstance(result["long_signal"], pd.Series)
-        assert isinstance(result["short_signal"], pd.Series)
+        assert isinstance(result["long"], pd.Series)
+        assert isinstance(result["short"], pd.Series)
 
 
 class TestBlockIfWorseThan:
@@ -498,11 +498,11 @@ class TestBlockIfWorseThan:
         }
         result = _run(adapter, "highest_lowest_bar", params, ohlcv_data)
         # With tight threshold, not all bars should pass
-        assert not result["long_signal"].all()
-        assert not result["short_signal"].all()
+        assert not result["long"].all()
+        assert not result["short"].all()
 
     def test_tighter_percent_fewer_signals(self, adapter, ohlcv_data):
-        """Lower block_worse_percent → fewer bars pass the filter."""
+        """Lower block_worse_percent в†’ fewer bars pass the filter."""
         r_wide = _run(
             adapter,
             "highest_lowest_bar",
@@ -521,7 +521,7 @@ class TestBlockIfWorseThan:
             },
             ohlcv_data,
         )
-        assert r_wide["long_signal"].sum() >= r_tight["long_signal"].sum()
+        assert r_wide["long"].sum() >= r_tight["long"].sum()
 
     def test_combined_hl_and_worse(self, adapter, ohlcv_data):
         """Both sub-toggles combined further reduce signals."""
@@ -545,7 +545,7 @@ class TestBlockIfWorseThan:
             },
             ohlcv_data,
         )
-        assert r_hl["long_signal"].sum() >= r_both["long_signal"].sum()
+        assert r_hl["long"].sum() >= r_both["long"].sum()
 
 
 # ============================================================
@@ -554,12 +554,12 @@ class TestBlockIfWorseThan:
 
 
 class TestTwoMAsPassthrough:
-    """When no sub-toggles (ma_cross, ma1_filter) are on → all True."""
+    """When no sub-toggles (ma_cross, ma1_filter) are on в†’ all True."""
 
     def test_passthrough_default(self, adapter, ohlcv_data):
         result = _run(adapter, "two_mas", {}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_returns_ma_series(self, adapter, ohlcv_data):
         """Must return ma1 and ma2 series in output."""
@@ -585,7 +585,7 @@ class TestTwoMAsCrossSignal:
         }
         result = _run(adapter, "two_mas", params, ohlcv_data)
         # On trending data, there should be some crossovers
-        assert result["long_signal"].any() or result["short_signal"].any()
+        assert result["long"].any() or result["short"].any()
 
     def test_cross_long_short_are_different(self, adapter, ohlcv_data):
         """Long cross (MA1 crosses above MA2) differs from short cross."""
@@ -596,15 +596,15 @@ class TestTwoMAsCrossSignal:
         }
         result = _run(adapter, "two_mas", params, ohlcv_data)
         # Cross signals should be directional
-        assert not result["long_signal"].equals(result["short_signal"])
+        assert not result["long"].equals(result["short"])
 
     def test_opposite_cross_reverses_signals(self, adapter, ohlcv_data):
         """opposite_ma_cross swaps long and short signals."""
         base = {"use_ma_cross": True, "ma1_length": 10, "ma2_length": 50}
         r_normal = _run(adapter, "two_mas", {**base, "opposite_ma_cross": False}, ohlcv_data)
         r_opposite = _run(adapter, "two_mas", {**base, "opposite_ma_cross": True}, ohlcv_data)
-        pd.testing.assert_series_equal(r_normal["long_signal"], r_opposite["short_signal"])
-        pd.testing.assert_series_equal(r_normal["short_signal"], r_opposite["long_signal"])
+        pd.testing.assert_series_equal(r_normal["long"], r_opposite["short"])
+        pd.testing.assert_series_equal(r_normal["short"], r_opposite["long"])
 
     def test_cross_memory_extends_signals(self, adapter, ohlcv_data):
         """Signal memory should keep cross signal active for N bars."""
@@ -629,7 +629,7 @@ class TestTwoMAsCrossSignal:
             ohlcv_data,
         )
         # Memory extends signal so sum should be >= without memory
-        assert r_mem["long_signal"].sum() >= r_no_mem["long_signal"].sum()
+        assert r_mem["long"].sum() >= r_no_mem["long"].sum()
 
     @pytest.mark.parametrize("ma_type", ["SMA", "EMA", "WMA", "RMA"])
     def test_ma_types_run_without_error(self, adapter, ohlcv_data, ma_type):
@@ -642,7 +642,7 @@ class TestTwoMAsCrossSignal:
             "ma2_smoothing": ma_type,
         }
         result = _run(adapter, "two_mas", params, ohlcv_data)
-        assert "long_signal" in result
+        assert "long" in result
         assert "ma1" in result
 
 
@@ -658,16 +658,16 @@ class TestTwoMAsFilter:
         }
         result = _run(adapter, "two_mas", params, ohlcv_data)
         # In trending data, filter should have mixed signals
-        assert not result["long_signal"].all()
-        assert not result["short_signal"].all()
+        assert not result["long"].all()
+        assert not result["short"].all()
 
     def test_opposite_filter_reverses(self, adapter, ohlcv_data):
         """opposite_ma1_filter swaps filter direction."""
         base = {"use_ma1_filter": True, "ma1_length": 50, "ma1_smoothing": "SMA"}
         r_normal = _run(adapter, "two_mas", {**base, "opposite_ma1_filter": False}, ohlcv_data)
         r_opposite = _run(adapter, "two_mas", {**base, "opposite_ma1_filter": True}, ohlcv_data)
-        pd.testing.assert_series_equal(r_normal["long_signal"], r_opposite["short_signal"])
-        pd.testing.assert_series_equal(r_normal["short_signal"], r_opposite["long_signal"])
+        pd.testing.assert_series_equal(r_normal["long"], r_opposite["short"])
+        pd.testing.assert_series_equal(r_normal["short"], r_opposite["long"])
 
     def test_combined_cross_and_filter(self, adapter, ohlcv_data):
         """Both MA cross and MA1 filter can be used together."""
@@ -689,7 +689,7 @@ class TestTwoMAsFilter:
             },
             ohlcv_data,
         )
-        assert result["long_signal"].sum() <= r_cross["long_signal"].sum()
+        assert result["long"].sum() <= r_cross["long"].sum()
 
     @pytest.mark.parametrize("source", ["close", "open", "high", "low"])
     def test_ma_source_options(self, adapter, ohlcv_data, source):
@@ -701,7 +701,7 @@ class TestTwoMAsFilter:
             "ma2_source": source,
         }
         result = _run(adapter, "two_mas", params, ohlcv_data)
-        assert "long_signal" in result
+        assert "long" in result
 
 
 # ============================================================
@@ -714,13 +714,13 @@ class TestAccumulationPassthrough:
 
     def test_passthrough_default(self, adapter, ohlcv_data):
         result = _run(adapter, "accumulation_areas", {}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
     def test_passthrough_explicit_false(self, adapter, ohlcv_data):
         result = _run(adapter, "accumulation_areas", {"use_accumulation": False}, ohlcv_data)
-        assert result["long_signal"].all()
-        assert result["short_signal"].all()
+        assert result["long"].all()
+        assert result["short"].all()
 
 
 class TestAccumulationFilterMode:
@@ -729,33 +729,33 @@ class TestAccumulationFilterMode:
     def test_filter_mode_returns_boolean(self, adapter, ohlcv_data):
         params = {"use_accumulation": True, "backtracking_interval": 20, "min_bars_to_execute": 3}
         result = _run(adapter, "accumulation_areas", params, ohlcv_data)
-        assert result["long_signal"].dtype == bool
-        assert result["short_signal"].dtype == bool
+        assert result["long"].dtype == bool
+        assert result["short"].dtype == bool
 
     def test_filter_mode_symmetric_signals(self, adapter, ohlcv_data):
         """In filter mode, long and short signals are identical."""
         params = {"use_accumulation": True, "backtracking_interval": 20, "min_bars_to_execute": 3}
         result = _run(adapter, "accumulation_areas", params, ohlcv_data)
-        pd.testing.assert_series_equal(result["long_signal"], result["short_signal"])
+        pd.testing.assert_series_equal(result["long"], result["short"])
 
     def test_series_length_matches(self, adapter, ohlcv_data):
         params = {"use_accumulation": True}
         result = _run(adapter, "accumulation_areas", params, ohlcv_data)
-        assert len(result["long_signal"]) == len(ohlcv_data)
+        assert len(result["long"]) == len(ohlcv_data)
 
     def test_flat_data_more_accumulation(self, adapter, flat_ohlcv):
         """Flat data should have more accumulation zone bars."""
         params = {"use_accumulation": True, "backtracking_interval": 15, "min_bars_to_execute": 3}
         r_flat = _run(adapter, "accumulation_areas", params, flat_ohlcv)
-        assert r_flat["long_signal"].any(), "Flat data should detect accumulation zones"
+        assert r_flat["long"].any(), "Flat data should detect accumulation zones"
 
     def test_higher_min_bars_fewer_zones(self, adapter, ohlcv_data):
-        """Higher min_bars_to_execute → fewer consecutive qualifying bars."""
+        """Higher min_bars_to_execute в†’ fewer consecutive qualifying bars."""
         params_lo = {"use_accumulation": True, "backtracking_interval": 20, "min_bars_to_execute": 3}
         params_hi = {"use_accumulation": True, "backtracking_interval": 20, "min_bars_to_execute": 15}
         r_lo = _run(adapter, "accumulation_areas", params_lo, ohlcv_data)
         r_hi = _run(adapter, "accumulation_areas", params_hi, ohlcv_data)
-        assert r_lo["long_signal"].sum() >= r_hi["long_signal"].sum()
+        assert r_lo["long"].sum() >= r_hi["long"].sum()
 
 
 class TestAccumulationBreakoutMode:
@@ -771,8 +771,8 @@ class TestAccumulationBreakoutMode:
         }
         result = _run(adapter, "accumulation_areas", params, ohlcv_data)
         # On 200 bars with trends, some breakout should occur
-        assert isinstance(result["long_signal"], pd.Series)
-        assert isinstance(result["short_signal"], pd.Series)
+        assert isinstance(result["long"], pd.Series)
+        assert isinstance(result["short"], pd.Series)
 
     def test_breakout_asymmetric(self, adapter, ohlcv_data):
         """Breakout up (long) and breakout down (short) are different directions."""
@@ -783,9 +783,9 @@ class TestAccumulationBreakoutMode:
             "signal_on_breakout": True,
         }
         result = _run(adapter, "accumulation_areas", params, ohlcv_data)
-        # Long is breakout UP, short is breakout DOWN — if any signals exist, they should differ
-        if result["long_signal"].any() or result["short_signal"].any():
-            assert not result["long_signal"].equals(result["short_signal"])
+        # Long is breakout UP, short is breakout DOWN вЂ” if any signals exist, they should differ
+        if result["long"].any() or result["short"].any():
+            assert not result["long"].equals(result["short"])
 
     def test_opposite_breakout_reverses(self, adapter, ohlcv_data):
         """signal_on_opposite_breakout swaps long and short."""
@@ -815,8 +815,8 @@ class TestAccumulationBreakoutMode:
             ohlcv_data,
         )
         # Opposite should swap long and short breakout directions
-        pd.testing.assert_series_equal(r_normal["long_signal"], r_opposite["short_signal"])
-        pd.testing.assert_series_equal(r_normal["short_signal"], r_opposite["long_signal"])
+        pd.testing.assert_series_equal(r_normal["long"], r_opposite["short"])
+        pd.testing.assert_series_equal(r_normal["short"], r_opposite["long"])
 
 
 # ============================================================
@@ -841,7 +841,7 @@ class TestEdgeCases:
         )
         params = {"use_atr_volatility": True, "atr_length1": 5, "atr_length2": 5}
         result = _run(adapter, "atr_volatility", params, ohlcv)
-        assert len(result["long_signal"]) == n
+        assert len(result["long"]) == n
 
     def test_small_data_volume_filter(self, adapter):
         """Volume filter on very small dataset."""
@@ -856,7 +856,7 @@ class TestEdgeCases:
         )
         params = {"use_volume_filter": True, "vol_length1": 5, "vol_length2": 5}
         result = _run(adapter, "volume_filter", params, ohlcv)
-        assert len(result["long_signal"]) == 5
+        assert len(result["long"]) == 5
 
     def test_small_data_highest_lowest(self, adapter):
         """Highest/lowest bar on small data."""
@@ -871,7 +871,7 @@ class TestEdgeCases:
         )
         params = {"use_highest_lowest": True, "hl_lookback_bars": 3}
         result = _run(adapter, "highest_lowest_bar", params, ohlcv)
-        assert len(result["long_signal"]) == 10
+        assert len(result["long"]) == 10
 
     def test_small_data_two_mas(self, adapter):
         """TWO MAs on small data."""
@@ -886,7 +886,7 @@ class TestEdgeCases:
         )
         params = {"use_ma_cross": True, "ma1_length": 3, "ma2_length": 5}
         result = _run(adapter, "two_mas", params, ohlcv)
-        assert len(result["long_signal"]) == 10
+        assert len(result["long"]) == 10
         assert "ma1" in result
 
     def test_small_data_accumulation(self, adapter):
@@ -902,7 +902,7 @@ class TestEdgeCases:
         )
         params = {"use_accumulation": True, "backtracking_interval": 5, "min_bars_to_execute": 2}
         result = _run(adapter, "accumulation_areas", params, ohlcv)
-        assert len(result["long_signal"]) == 10
+        assert len(result["long"]) == 10
 
     def test_constant_price_data(self, adapter):
         """Constant price data should not crash any block."""
@@ -924,8 +924,8 @@ class TestEdgeCases:
             ("accumulation_areas", "use_accumulation", True),
         ]:
             result = _run(adapter, block_type, {toggle_key: toggle_val}, ohlcv)
-            assert "long_signal" in result
-            assert len(result["long_signal"]) == n
+            assert "long" in result
+            assert len(result["long"]) == n
 
 
 # ============================================================
@@ -1050,5 +1050,5 @@ class TestAPIValidation:
             ],
         }
         response = client.post("/api/v1/strategy-builder/validate", json=payload)
-        # 200 or 422 — just ensure no 500 errors
+        # 200 or 422 вЂ” just ensure no 500 errors
         assert response.status_code != 500, f"Server error for {block_type}: {response.text}"

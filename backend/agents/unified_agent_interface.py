@@ -181,7 +181,14 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
         # Health check if needed
         if time.time() - self.last_health_check > self.health_check_interval:
             task = asyncio.create_task(self._health_check())
-            task.add_done_callback(lambda t: t.result() if not t.cancelled() and not t.exception() else None)
+            def _log_health_check_result(t: asyncio.Task) -> None:
+                if t.cancelled():
+                    return
+                exc = t.exception()
+                if exc:
+                    logger.warning(f"⚠️ Background health check failed: {exc}")
+
+            task.add_done_callback(_log_health_check_result)
 
         if (self.force_direct_api or self.mcp_disabled) and preferred_channel == AgentChannel.MCP_SERVER:
             reason = "MCP_DISABLED flag" if self.mcp_disabled else "FORCE_DIRECT_AGENT_API flag"
@@ -516,84 +523,87 @@ class UnifiedAgentInterface(HealthMixin, ToolMixin, APIMixin, QueryMixin):
                         response = await client.post(url, json=payload, headers=headers)
                         response.raise_for_status()
 
-                    data = response.json()
-                    logger.debug(f"   API response keys: {list(data.keys())}")
-                    logger.debug(f"   Response data: {json.dumps(data, indent=2)[:500]}...")
+                        data = response.json()
+                        logger.debug(f"   API response keys: {list(data.keys())}")
+                        logger.debug(f"   Response data: {json.dumps(data, indent=2)[:500]}...")
 
-                    # Check if agent wants to call tools (DeepSeek only)
-                    if request.agent_type == AgentType.DEEPSEEK:
-                        message = data.get("choices", [{}])[0].get("message", {})
-                        logger.debug(f"   Message keys: {list(message.keys())}")
-                        tool_calls = message.get("tool_calls")
-                        logger.debug(f"   Tool calls: {tool_calls}")
+                        # Check if agent wants to call tools (DeepSeek only)
+                        if request.agent_type == AgentType.DEEPSEEK:
+                            message = data.get("choices", [{}])[0].get("message", {})
+                            logger.debug(f"   Message keys: {list(message.keys())}")
+                            tool_calls = message.get("tool_calls")
+                            logger.debug(f"   Tool calls: {tool_calls}")
 
-                        if tool_calls:
-                            logger.info(f"🔧 Agent requested {len(tool_calls)} tool calls (iteration {iteration})")
+                            if tool_calls:
+                                logger.info(f"🔧 Agent requested {len(tool_calls)} tool calls (iteration {iteration})")
 
-                            # ✅ QUICK WIN #1: Check tool call budget
-                            # Protection against runaway loops and cascading timeouts
-                            if total_tool_calls + len(tool_calls) > tool_call_budget:
-                                budget_used = total_tool_calls + len(tool_calls)
-                                logger.warning(f"⚠️ Tool call budget exceeded: {budget_used} > {tool_call_budget}")
-                                # Graceful degradation: ask agent to provide final analysis without tools
-                                messages.append(
-                                    {
-                                        "role": "system",
-                                        "content": (
-                                            f"Tool call budget exceeded ({tool_call_budget} calls). "
-                                            "Please provide final analysis without additional tool calls."
-                                        ),
-                                    }
-                                )
-                                # Continue to get final response without executing tools
+                                # ✅ QUICK WIN #1: Check tool call budget
+                                # Protection against runaway loops and cascading timeouts
+                                if total_tool_calls + len(tool_calls) > tool_call_budget:
+                                    budget_used = total_tool_calls + len(tool_calls)
+                                    logger.warning(f"⚠️ Tool call budget exceeded: {budget_used} > {tool_call_budget}")
+                                    # Graceful degradation: ask agent to provide final analysis without tools
+                                    messages.append(
+                                        {
+                                            "role": "system",
+                                            "content": (
+                                                f"Tool call budget exceeded ({tool_call_budget} calls). "
+                                                "Please provide final analysis without additional tool calls."
+                                            ),
+                                        }
+                                    )
+                                    # Continue to get final response without executing tools
+                                    continue
+
+                                # Add assistant message with tool calls
+                                # V3.2: Clear reasoning_content from previous messages to save bandwidth
+                                self._clear_reasoning_in_messages(messages)
+                                messages.append(message)
+
+                                # Execute each tool call with retry
+                                for tool_call in tool_calls:
+                                    tool_result = await self._execute_tool_with_retry(tool_call, max_retries=3)
+
+                                    # ✅ QUICK WIN #1: Track total tool calls
+                                    total_tool_calls += 1
+                                    tool_name = tool_call.get("function", {}).get("name", "unknown")
+                                    logger.debug(
+                                        f"   Tool call #{total_tool_calls}/{tool_call_budget} completed: {tool_name}"
+                                    )
+
+                                    # Format tool result for DeepSeek
+                                    # If successful, return the actual content/data
+                                    # If failed, return error message
+                                    if tool_result.get("success"):
+                                        # Extract the actual data from the result
+                                        if "content" in tool_result:
+                                            result_content = str(tool_result["content"])
+                                        elif "structure" in tool_result:
+                                            result_content = json.dumps(tool_result["structure"], indent=2)
+                                        elif "report" in tool_result:
+                                            result_content = tool_result["report"]
+                                        else:
+                                            result_content = json.dumps(tool_result, indent=2)
+                                    else:
+                                        result_content = f"Error: {tool_result.get('error', 'Unknown error')}"
+
+                                    logger.debug(f"   Tool result length: {len(result_content)} chars")
+
+                                    # Add tool result to messages
+                                    messages.append(
+                                        {
+                                            "role": "tool",
+                                            "tool_call_id": tool_call.get("id"),
+                                            "name": tool_name,
+                                            "content": result_content,
+                                        }
+                                    )
+
+                                # Continue iteration loop to get agent's final response
                                 continue
 
-                            # Add assistant message with tool calls
-                            # V3.2: Clear reasoning_content from previous messages to save bandwidth
-                            self._clear_reasoning_in_messages(messages)
-                            messages.append(message)
-
-                            # Execute each tool call with retry
-                            for tool_call in tool_calls:
-                                tool_result = await self._execute_tool_with_retry(tool_call, max_retries=3)
-
-                                # ✅ QUICK WIN #1: Track total tool calls
-                                total_tool_calls += 1
-                                tool_name = tool_call.get("function", {}).get("name", "unknown")
-                                logger.debug(
-                                    f"   Tool call #{total_tool_calls}/{tool_call_budget} completed: {tool_name}"
-                                )
-
-                                # Format tool result for DeepSeek
-                                # If successful, return the actual content/data
-                                # If failed, return error message
-                                if tool_result.get("success"):
-                                    # Extract the actual data from the result
-                                    if "content" in tool_result:
-                                        result_content = str(tool_result["content"])
-                                    elif "structure" in tool_result:
-                                        result_content = json.dumps(tool_result["structure"], indent=2)
-                                    elif "report" in tool_result:
-                                        result_content = tool_result["report"]
-                                    else:
-                                        result_content = json.dumps(tool_result, indent=2)
-                                else:
-                                    result_content = f"Error: {tool_result.get('error', 'Unknown error')}"
-
-                                logger.debug(f"   Tool result length: {len(result_content)} chars")
-
-                                # Add tool result to messages
-                                messages.append(
-                                    {
-                                        "role": "tool",
-                                        "tool_call_id": tool_call.get("id"),
-                                        "name": tool_name,
-                                        "content": result_content,
-                                    }
-                                )
-
-                            # Continue loop to get agent's final response
-                            continue
+                        # No tool calls (or non-DeepSeek agent) — exit iteration loop
+                        break
 
                     # No more tool calls - extract final content
                     logger.debug(f"🔍 Extracting content from API response. Keys: {list(data.keys())}")

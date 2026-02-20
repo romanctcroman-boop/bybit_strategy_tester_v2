@@ -17,8 +17,10 @@ NOTE: Metric calculations (Sharpe, Sortino, Calmar, etc.) should use
 backend.core.metrics_calculator as the single source of truth.
 This ensures consistency across all optimizers and backtest engine.
 
-TODO: Refactor to use metrics_calculator.calculate_metrics_numba()
-for consistent formulas across the system.
+REFACTOR NEEDED: Replace inline metric formulas with
+`MetricsCalculator.calculate_metrics_numba()` calls to keep
+Sharpe/Sortino/Calmar consistent with FallbackEngineV4.
+Scope: ~200 lines in _run_cpu_grid_search() and _run_gpu_grid_search().
 """
 
 import atexit

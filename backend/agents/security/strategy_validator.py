@@ -19,11 +19,13 @@ References:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC
 from enum import Enum
 from typing import Any
 
 from loguru import logger
+
+from backend.config.database_policy import DATA_START_DATE
 
 
 class RiskLevel(str, Enum):
@@ -98,7 +100,6 @@ STRATEGY_CONSTRAINTS: dict[str, dict[str, dict[str, Any]]] = {
 
 # Global limits
 VALID_INTERVALS = {"1", "5", "15", "30", "60", "240", "D", "W", "M"}
-DATA_START_DATE = datetime(2025, 1, 1, tzinfo=UTC)
 MAX_DATE_RANGE_DAYS = 730  # 2 years
 MIN_CAPITAL = 100.0
 MAX_CAPITAL = 100_000_000.0

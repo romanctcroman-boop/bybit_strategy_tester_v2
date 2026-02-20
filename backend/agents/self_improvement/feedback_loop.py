@@ -20,6 +20,7 @@ Flow:
 
 from __future__ import annotations
 
+import asyncio
 import statistics
 import time
 import uuid
@@ -467,15 +468,21 @@ class FeedbackLoop:
 
             # === STEP 2: Backtest ===
             try:
-                metrics = await bridge.run_strategy(
-                    strategy=strategy_def,
-                    symbol=symbol,
-                    timeframe=timeframe,
-                    df=df,
-                    initial_capital=initial_capital,
-                    leverage=leverage,
-                    direction=direction,
+                metrics = await asyncio.wait_for(
+                    bridge.run_strategy(
+                        strategy=strategy_def,
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        df=df,
+                        initial_capital=initial_capital,
+                        leverage=leverage,
+                        direction=direction,
+                    ),
+                    timeout=300.0,
                 )
+            except asyncio.TimeoutError:
+                logger.warning(f"Iteration {iteration}: backtest timed out (300s)")
+                metrics = self._create_failed_metrics()
             except Exception as e:
                 logger.warning(f"Iteration {iteration}: backtest failed: {e}")
                 metrics = self._create_failed_metrics()
@@ -525,6 +532,7 @@ class FeedbackLoop:
                 prompt_adjustments=adjustments,
             )
             result.entries.append(entry)
+            self._entries.append(entry)
             result.fitness_history.append(fitness)
             result.total_iterations = iteration
 

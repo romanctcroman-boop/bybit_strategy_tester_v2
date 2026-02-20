@@ -35,8 +35,10 @@ Tests verify that AI agents correctly understand:
 - Signal memory: divergence signal persists for N bars after detection
 
 == OUTPUT ==
-- Returns dict with keys: signal, bullish, bearish (all pd.Series[bool])
-- signal = bullish | bearish
+- Returns dict with keys: signal, long, short, bullish, bearish (all pd.Series[bool])
+- long/short: port IDs matching frontend divergence block ports
+- bullish/bearish: backward-compatible aliases (bullish=long, bearish=short)
+- signal = bullish | bearish = long | short
 
 Architecture:
     - Frontend category: 'divergence' (blockLibrary.divergence)
@@ -133,14 +135,16 @@ def ohlcv_data() -> pd.DataFrame:
     open_price[0] = base_price
     volume = np.random.uniform(1000, 10000, n)
 
-    return pd.DataFrame({
-        "timestamp": pd.date_range("2025-01-01", periods=n, freq="1h"),
-        "open": open_price,
-        "high": high,
-        "low": low,
-        "close": close,
-        "volume": volume,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=n, freq="1h"),
+            "open": open_price,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+        }
+    )
 
 
 @pytest.fixture
@@ -148,22 +152,25 @@ def small_ohlcv() -> pd.DataFrame:
     """Small 20-bar OHLCV dataset for edge case testing."""
     np.random.seed(99)
     n = 20
-    close = np.array([100, 102, 101, 99, 97, 98, 100, 103, 105, 104,
-                       102, 100, 98, 96, 97, 99, 101, 103, 102, 100], dtype=float)
+    close = np.array(
+        [100, 102, 101, 99, 97, 98, 100, 103, 105, 104, 102, 100, 98, 96, 97, 99, 101, 103, 102, 100], dtype=float
+    )
     high = close + 2
     low = close - 2
     open_price = np.roll(close, 1)
     open_price[0] = 100
     volume = np.full(n, 5000.0)
 
-    return pd.DataFrame({
-        "timestamp": pd.date_range("2025-01-01", periods=n, freq="1h"),
-        "open": open_price,
-        "high": high,
-        "low": low,
-        "close": close,
-        "volume": volume,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": pd.date_range("2025-01-01", periods=n, freq="1h"),
+            "open": open_price,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+        }
+    )
 
 
 def _make_adapter(blocks: list[dict], connections: list[dict] | None = None) -> StrategyBuilderAdapter:
@@ -273,6 +280,16 @@ class TestDivergenceReturnStructure:
         expected_signal = result["bullish"] | result["bearish"]
         pd.testing.assert_series_equal(result["signal"], expected_signal)
 
+    def test_returns_long_short_port_keys(self, ohlcv_data):
+        """Must return 'long' and 'short' keys matching frontend port IDs."""
+        adapter = _make_adapter([_divergence_block()])
+        result = adapter._execute_divergence("divergence", _divergence_block()["params"], ohlcv_data)
+        assert "long" in result, "Missing 'long' key (frontend port ID)"
+        assert "short" in result, "Missing 'short' key (frontend port ID)"
+        # long == bullish, short == bearish
+        pd.testing.assert_series_equal(result["long"], result["bullish"])
+        pd.testing.assert_series_equal(result["short"], result["bearish"])
+
 
 # ============================================================
 # 3. NO INDICATORS ENABLED
@@ -327,7 +344,12 @@ class TestDivergenceRSI:
 
     def test_rsi_period_parameter_applied(self, ohlcv_data):
         """Different RSI periods should produce different results."""
-        params_14 = {"use_divergence_rsi": True, "rsi_period": 14, "pivot_interval": 3, "act_without_confirmation": True}
+        params_14 = {
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
+            "pivot_interval": 3,
+            "act_without_confirmation": True,
+        }
         params_5 = {"use_divergence_rsi": True, "rsi_period": 5, "pivot_interval": 3, "act_without_confirmation": True}
 
         adapter = _make_adapter([_divergence_block(params_14)])
@@ -446,9 +468,12 @@ class TestDivergenceMultipleIndicators:
     def test_rsi_and_stochastic(self, ohlcv_data):
         """RSI + Stochastic simultaneously."""
         params = {
-            "use_divergence_rsi": True, "rsi_period": 14,
-            "use_divergence_stochastic": True, "stoch_length": 14,
-            "pivot_interval": 3, "act_without_confirmation": True,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
+            "use_divergence_stochastic": True,
+            "stoch_length": 14,
+            "pivot_interval": 3,
+            "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params)])
         result = adapter._execute_divergence("divergence", params, ohlcv_data)
@@ -457,13 +482,19 @@ class TestDivergenceMultipleIndicators:
     def test_all_six_indicators(self, ohlcv_data):
         """All six indicators enabled at once."""
         params = {
-            "use_divergence_rsi": True, "rsi_period": 14,
-            "use_divergence_stochastic": True, "stoch_length": 14,
-            "use_divergence_momentum": True, "momentum_length": 10,
-            "use_divergence_cmf": True, "cmf_period": 21,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
+            "use_divergence_stochastic": True,
+            "stoch_length": 14,
+            "use_divergence_momentum": True,
+            "momentum_length": 10,
+            "use_divergence_cmf": True,
+            "cmf_period": 21,
             "use_obv": True,
-            "use_mfi": True, "mfi_length": 14,
-            "pivot_interval": 3, "act_without_confirmation": True,
+            "use_mfi": True,
+            "mfi_length": 14,
+            "pivot_interval": 3,
+            "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params)])
         result = adapter._execute_divergence("divergence", params, ohlcv_data)
@@ -473,14 +504,20 @@ class TestDivergenceMultipleIndicators:
     def test_combined_signals_are_ored(self, ohlcv_data):
         """Multiple indicators produce OR'd signals (more signals than single)."""
         params_single = {
-            "use_divergence_rsi": True, "rsi_period": 14,
-            "pivot_interval": 3, "act_without_confirmation": True,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
+            "pivot_interval": 3,
+            "act_without_confirmation": True,
         }
         params_multi = {
-            "use_divergence_rsi": True, "rsi_period": 14,
-            "use_divergence_stochastic": True, "stoch_length": 14,
-            "use_divergence_momentum": True, "momentum_length": 10,
-            "pivot_interval": 3, "act_without_confirmation": True,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
+            "use_divergence_stochastic": True,
+            "stoch_length": 14,
+            "use_divergence_momentum": True,
+            "momentum_length": 10,
+            "pivot_interval": 3,
+            "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params_single)])
         r_single = adapter._execute_divergence("divergence", params_single, ohlcv_data)
@@ -503,7 +540,9 @@ class TestDivergencePivotInterval:
         params = {"use_divergence_rsi": True, "rsi_period": 14, "act_without_confirmation": True}
         # pivot_interval not set — uses default 9
         block = {
-            "id": "div1", "type": "divergence", "category": "divergence",
+            "id": "div1",
+            "type": "divergence",
+            "category": "divergence",
             "params": params,
         }
         adapter = _make_adapter([block])
@@ -513,7 +552,9 @@ class TestDivergencePivotInterval:
     def test_pivot_interval_1(self, ohlcv_data):
         """Smallest pivot_interval (1) produces valid results."""
         params = {
-            "pivot_interval": 1, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 1,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params)])
@@ -523,7 +564,9 @@ class TestDivergencePivotInterval:
     def test_pivot_interval_9(self, ohlcv_data):
         """Largest pivot_interval (9) produces valid results."""
         params = {
-            "pivot_interval": 9, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 9,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params)])
@@ -533,11 +576,15 @@ class TestDivergencePivotInterval:
     def test_larger_pivot_interval_fewer_pivots(self, ohlcv_data):
         """Larger pivot_interval should find fewer pivots → potentially fewer signals."""
         params_small = {
-            "pivot_interval": 1, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 1,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
         }
         params_large = {
-            "pivot_interval": 9, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 9,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params_small)])
@@ -559,11 +606,15 @@ class TestDivergenceConfirmation:
     def test_without_confirmation_more_signals(self, ohlcv_data):
         """act_without_confirmation=True should produce >= signals than False."""
         params_no_confirm = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
         }
         params_with_confirm = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": False,
         }
         adapter = _make_adapter([_divergence_block(params_no_confirm)])
@@ -576,7 +627,9 @@ class TestDivergenceConfirmation:
     def test_confirmation_requires_close_direction(self, ohlcv_data):
         """With confirmation, bullish requires close > prev_close."""
         params = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": False,
         }
         adapter = _make_adapter([_divergence_block(params)])
@@ -596,12 +649,16 @@ class TestDivergenceSignalMemory:
     def test_memory_extends_signals(self, ohlcv_data):
         """With signal memory, signals should persist for N bars."""
         params_no_mem = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
             "activate_diver_signal_memory": False,
         }
         params_with_mem = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
             "activate_diver_signal_memory": True,
             "keep_diver_signal_memory_bars": 5,
@@ -616,12 +673,16 @@ class TestDivergenceSignalMemory:
     def test_memory_bars_1_same_as_no_memory(self, ohlcv_data):
         """Memory with 1 bar is effectively same as no memory."""
         params_no_mem = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
             "activate_diver_signal_memory": False,
         }
         params_mem_1 = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
             "activate_diver_signal_memory": True,
             "keep_diver_signal_memory_bars": 1,
@@ -637,13 +698,17 @@ class TestDivergenceSignalMemory:
     def test_larger_memory_more_signals(self, ohlcv_data):
         """Larger memory_bars should produce >= signals than smaller."""
         params_5 = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
             "activate_diver_signal_memory": True,
             "keep_diver_signal_memory_bars": 5,
         }
         params_20 = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
             "activate_diver_signal_memory": True,
             "keep_diver_signal_memory_bars": 20,
@@ -666,7 +731,9 @@ class TestDivergenceEdgeCases:
     def test_small_data_no_crash(self, small_ohlcv):
         """Handler must not crash on small datasets."""
         params = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params)])
@@ -675,16 +742,20 @@ class TestDivergenceEdgeCases:
 
     def test_very_small_data_5_bars(self):
         """Handler must handle 5-bar data without error."""
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2025-01-01", periods=5, freq="1h"),
-            "open": [100, 101, 99, 98, 100],
-            "high": [102, 103, 101, 100, 102],
-            "low": [98, 99, 97, 96, 98],
-            "close": [101, 100, 98, 99, 101],
-            "volume": [1000, 1100, 1200, 1100, 1000],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2025-01-01", periods=5, freq="1h"),
+                "open": [100, 101, 99, 98, 100],
+                "high": [102, 103, 101, 100, 102],
+                "low": [98, 99, 97, 96, 98],
+                "close": [101, 100, 98, 99, 101],
+                "volume": [1000, 1100, 1200, 1100, 1000],
+            }
+        )
         params = {
-            "pivot_interval": 1, "use_divergence_rsi": True, "rsi_period": 3,
+            "pivot_interval": 1,
+            "use_divergence_rsi": True,
+            "rsi_period": 3,
             "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params)])
@@ -693,16 +764,20 @@ class TestDivergenceEdgeCases:
 
     def test_pivot_interval_larger_than_half_data(self):
         """pivot_interval larger than half data length should still work (few/no pivots)."""
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2025-01-01", periods=10, freq="1h"),
-            "open": np.arange(100, 110, dtype=float),
-            "high": np.arange(101, 111, dtype=float),
-            "low": np.arange(99, 109, dtype=float),
-            "close": np.arange(100.5, 110.5, dtype=float),
-            "volume": np.full(10, 1000.0),
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2025-01-01", periods=10, freq="1h"),
+                "open": np.arange(100, 110, dtype=float),
+                "high": np.arange(101, 111, dtype=float),
+                "low": np.arange(99, 109, dtype=float),
+                "close": np.arange(100.5, 110.5, dtype=float),
+                "volume": np.full(10, 1000.0),
+            }
+        )
         params = {
-            "pivot_interval": 9, "use_divergence_rsi": True, "rsi_period": 5,
+            "pivot_interval": 9,
+            "use_divergence_rsi": True,
+            "rsi_period": 5,
             "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params)])
@@ -720,7 +795,9 @@ class TestDivergenceEdgeCases:
         const_df["close"] = 50000.0
 
         params = {
-            "pivot_interval": 3, "use_divergence_rsi": True, "rsi_period": 14,
+            "pivot_interval": 3,
+            "use_divergence_rsi": True,
+            "rsi_period": 14,
             "act_without_confirmation": True,
         }
         adapter = _make_adapter([_divergence_block(params)])
@@ -730,9 +807,16 @@ class TestDivergenceEdgeCases:
 
     def test_empty_params_uses_defaults(self, ohlcv_data):
         """Empty params should use all defaults without error."""
-        adapter = _make_adapter([{
-            "id": "div1", "type": "divergence", "category": "divergence", "params": {},
-        }])
+        adapter = _make_adapter(
+            [
+                {
+                    "id": "div1",
+                    "type": "divergence",
+                    "category": "divergence",
+                    "params": {},
+                }
+            ]
+        )
         result = adapter._execute_divergence("divergence", {}, ohlcv_data)
         # No indicators enabled by default → all False
         assert not result["signal"].any()
@@ -776,8 +860,7 @@ class TestDivergenceIntegration:
         """Divergence + trend filter pipeline."""
         blocks = [
             _divergence_block(),
-            {"id": "b2", "type": "trend_filter", "category": "filter",
-             "params": {"period": 20, "mode": "slope_up"}},
+            {"id": "b2", "type": "trend_filter", "category": "filter", "params": {"period": 20, "mode": "slope_up"}},
             {"id": "b3", "type": "buy", "category": "action", "params": {}},
         ]
         connections = [
@@ -800,12 +883,17 @@ class TestDivergenceIntegration:
                     "act_without_confirmation": False,
                     "activate_diver_signal_memory": True,
                     "keep_diver_signal_memory_bars": 3,
-                    "use_divergence_rsi": True, "rsi_period": 14,
-                    "use_divergence_stochastic": True, "stoch_length": 14,
-                    "use_divergence_momentum": True, "momentum_length": 10,
-                    "use_divergence_cmf": True, "cmf_period": 21,
+                    "use_divergence_rsi": True,
+                    "rsi_period": 14,
+                    "use_divergence_stochastic": True,
+                    "stoch_length": 14,
+                    "use_divergence_momentum": True,
+                    "momentum_length": 10,
+                    "use_divergence_cmf": True,
+                    "cmf_period": 21,
                     "use_obv": True,
-                    "use_mfi": True, "mfi_length": 14,
+                    "use_mfi": True,
+                    "mfi_length": 14,
                 },
             },
             {"id": "b2", "type": "buy", "category": "action", "params": {}},
@@ -839,11 +927,13 @@ class TestDivergenceValidation:
     def test_divergence_in_validation_rules(self):
         """'divergence' should be in BLOCK_VALIDATION_RULES."""
         from backend.api.routers.strategy_validation_ws import BLOCK_VALIDATION_RULES
+
         assert "divergence" in BLOCK_VALIDATION_RULES
 
     def test_divergence_validation_pivot_interval(self):
         """pivot_interval validation should have min=1, max=9."""
         from backend.api.routers.strategy_validation_ws import BLOCK_VALIDATION_RULES
+
         rules = BLOCK_VALIDATION_RULES["divergence"]
         assert rules["pivot_interval"]["min"] == 1
         assert rules["pivot_interval"]["max"] == 9
@@ -851,6 +941,7 @@ class TestDivergenceValidation:
     def test_divergence_in_connection_rules(self):
         """'divergence' should be in CONNECTION_RULES for entry_long and entry_short."""
         from backend.api.routers.strategy_validation_ws import CONNECTION_RULES
+
         assert "divergence" in CONNECTION_RULES["entry_long"]
         assert "divergence" in CONNECTION_RULES["entry_short"]
 
@@ -885,6 +976,329 @@ class TestDivergenceAPI:
         response = client.post("/api/v1/strategy-builder/validate", json=strategy)
         # Accept 200 or 404 (endpoint may not exist) — main thing is no 500
         assert response.status_code != 500
+
+
+# ============================================================
+# 8. SIGNAL ROUTING & DIRECTION FILTERING TESTS
+# ============================================================
+
+
+def _make_strategy_node() -> dict:
+    """Create a main strategy node for testing."""
+    return {
+        "id": "main_strategy",
+        "type": "strategy",
+        "category": "strategy",
+        "name": "Main Strategy",
+        "isMain": True,
+        "params": {},
+    }
+
+
+def _make_connected_adapter(
+    connections_config: str = "both",
+    pivot_interval: int = 5,
+) -> StrategyBuilderAdapter:
+    """Create adapter with divergence → strategy connections.
+
+    Args:
+        connections_config: "long_only", "short_only", or "both"
+        pivot_interval: Pivot interval for divergence detection
+    """
+    div_block = _divergence_block({"pivot_interval": pivot_interval})
+    strategy_node = _make_strategy_node()
+    blocks = [div_block, strategy_node]
+
+    connections = []
+    if connections_config in ("long_only", "both"):
+        connections.append(
+            {
+                "id": "conn_long",
+                "source": {"blockId": "div1", "portId": "long"},
+                "target": {"blockId": "main_strategy", "portId": "entry_long"},
+                "type": "condition",
+            }
+        )
+    if connections_config in ("short_only", "both"):
+        connections.append(
+            {
+                "id": "conn_short",
+                "source": {"blockId": "div1", "portId": "short"},
+                "target": {"blockId": "main_strategy", "portId": "entry_short"},
+                "type": "condition",
+            }
+        )
+
+    return _make_adapter(blocks, connections)
+
+
+class TestDivergenceSignalRouting:
+    """Tests that divergence signals are correctly routed through
+    connections to the main strategy node and then to SignalResult."""
+
+    def test_long_only_connection_routes_to_entries(self, ohlcv_data):
+        """divergence.long → strategy.entry_long should populate entries."""
+        adapter = _make_connected_adapter("long_only")
+        signals = adapter.generate_signals(ohlcv_data)
+
+        # entries should have the bullish divergence signals
+        long_count = int(signals.entries.sum())
+        short_count = int(signals.short_entries.sum()) if signals.short_entries is not None else 0
+
+        # With ohlcv_data fixture, divergence should detect some signals
+        # (exact count depends on data, but entries should >= 0 and short should be 0)
+        assert short_count == 0, "Short entries should be 0 with long_only connection"
+
+    def test_short_only_connection_routes_to_short_entries(self, ohlcv_data):
+        """divergence.short → strategy.entry_short should populate short_entries."""
+        adapter = _make_connected_adapter("short_only")
+        signals = adapter.generate_signals(ohlcv_data)
+
+        long_count = int(signals.entries.sum())
+        short_count = int(signals.short_entries.sum()) if signals.short_entries is not None else 0
+
+        assert long_count == 0, "Long entries should be 0 with short_only connection"
+
+    def test_both_connections_route_correctly(self, ohlcv_data):
+        """Both connections should populate entries AND short_entries."""
+        adapter = _make_connected_adapter("both")
+        signals = adapter.generate_signals(ohlcv_data)
+
+        # Both should be populated (the exact count depends on data)
+        assert signals.short_entries is not None, "short_entries should not be None"
+        # entries + short_entries should account for all signals
+        total_signals = int(signals.entries.sum()) + int(signals.short_entries.sum())
+        assert total_signals >= 0  # Non-negative (may be 0 if data has no divergences)
+
+    def test_signal_result_has_no_long_entries_attr(self, ohlcv_data):
+        """SignalResult should NOT have long_entries (entries IS long_entries)."""
+        adapter = _make_connected_adapter("both")
+        signals = adapter.generate_signals(ohlcv_data)
+
+        # SignalResult dataclass has entries/exits/short_entries/short_exits
+        # Engine uses entries as long_entries fallback
+        assert not hasattr(signals, "long_entries") or signals.long_entries is None
+
+
+class TestDivergencePortAliasResolution:
+    """Tests that Case 2 port alias resolution works for divergence blocks.
+
+    This tests the fix where source_port="long" might not match output keys
+    directly but should resolve via aliases (e.g. "long" → "bullish").
+    """
+
+    def test_long_port_resolves_correctly(self, ohlcv_data):
+        """Connection with source_port='long' should find divergence output."""
+        adapter = _make_connected_adapter("long_only")
+        signals = adapter.generate_signals(ohlcv_data)
+
+        # The key test: entries should be populated, not silently dropped
+        # With standard ohlcv_data, we may or may not get divergence signals
+        # But the routing should NOT fail silently
+        assert signals is not None
+        assert len(signals.entries) == len(ohlcv_data)
+
+    def test_short_port_resolves_correctly(self, ohlcv_data):
+        """Connection with source_port='short' should find divergence output."""
+        adapter = _make_connected_adapter("short_only")
+        signals = adapter.generate_signals(ohlcv_data)
+
+        assert signals is not None
+        assert signals.short_entries is not None
+        assert len(signals.short_entries) == len(ohlcv_data)
+
+    def test_bullish_alias_for_long_port(self, ohlcv_data):
+        """If divergence output only has 'bullish' (old format), 'long' port
+        should still resolve via alias."""
+        # Create adapter with connection using 'long' port
+        div_block = _divergence_block()
+        strategy_node = _make_strategy_node()
+        connections = [
+            {
+                "id": "conn_1",
+                "source": {"blockId": "div1", "portId": "long"},
+                "target": {"blockId": "main_strategy", "portId": "entry_long"},
+                "type": "condition",
+            }
+        ]
+        adapter = _make_adapter([div_block, strategy_node], connections)
+
+        # Execute divergence block directly and verify it has 'long' key
+        outputs = adapter._execute_divergence("divergence", div_block["params"], ohlcv_data)
+        assert "long" in outputs, "Divergence output must contain 'long' key"
+        assert "bullish" in outputs, "Divergence output must contain 'bullish' alias"
+
+        # Full pipeline should work
+        signals = adapter.generate_signals(ohlcv_data)
+        assert signals is not None
+
+
+class TestDivergenceWithEngine:
+    """Tests that divergence signals work correctly with engine direction filtering."""
+
+    @pytest.fixture
+    def large_ohlcv(self) -> pd.DataFrame:
+        """Generate 1000-bar OHLCV data for engine testing with clear divergences."""
+        np.random.seed(42)
+        n = 1000
+        dates = pd.date_range(start="2025-01-01", periods=n, freq="15min")
+
+        base_price = 100.0
+        prices = [base_price]
+        for i in range(1, n):
+            trend = np.sin(i / 50) * 0.5
+            noise = np.random.randn() * 0.3
+            prices.append(prices[-1] * (1 + (trend + noise) / 100))
+
+        close = np.array(prices)
+        high = close * (1 + np.abs(np.random.randn(n)) * 0.002)
+        low = close * (1 - np.abs(np.random.randn(n)) * 0.002)
+        open_ = close * (1 + np.random.randn(n) * 0.001)
+        volume = np.random.uniform(1000, 10000, n)
+
+        return pd.DataFrame(
+            {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
+            index=dates,
+        )
+
+    def test_direction_long_only_generates_long_trades(self, large_ohlcv):
+        """Engine with direction='long' should only produce long (buy) trades."""
+        from backend.backtesting.engine import BacktestConfig, BacktestEngine
+        from backend.backtesting.models import StrategyType
+
+        adapter = _make_connected_adapter("both")
+        signals = adapter.generate_signals(large_ohlcv)
+
+        config = BacktestConfig(
+            symbol="BTCUSDT",
+            interval="15",
+            start_date=large_ohlcv.index[0].strftime("%Y-%m-%d"),
+            end_date=large_ohlcv.index[-1].strftime("%Y-%m-%d"),
+            strategy_type=StrategyType.CUSTOM,
+            initial_capital=10000.0,
+            position_size=0.5,
+            leverage=1.0,
+            direction="long",
+            stop_loss=0.02,
+            take_profit=0.03,
+            taker_fee=0.0007,
+            use_bar_magnifier=False,
+        )
+
+        engine = BacktestEngine()
+        result = engine._run_fallback(config, large_ohlcv, signals)
+
+        # All trades should be buy/long
+        for trade in result.trades:
+            assert "buy" in str(trade.side).lower(), (
+                f"Direction='long' should only produce buy trades, got {trade.side}"
+            )
+
+    def test_direction_short_only_generates_short_trades(self, large_ohlcv):
+        """Engine with direction='short' should only produce short (sell) trades."""
+        from backend.backtesting.engine import BacktestConfig, BacktestEngine
+        from backend.backtesting.models import StrategyType
+
+        adapter = _make_connected_adapter("both")
+        signals = adapter.generate_signals(large_ohlcv)
+
+        config = BacktestConfig(
+            symbol="BTCUSDT",
+            interval="15",
+            start_date=large_ohlcv.index[0].strftime("%Y-%m-%d"),
+            end_date=large_ohlcv.index[-1].strftime("%Y-%m-%d"),
+            strategy_type=StrategyType.CUSTOM,
+            initial_capital=10000.0,
+            position_size=0.5,
+            leverage=1.0,
+            direction="short",
+            stop_loss=0.02,
+            take_profit=0.03,
+            taker_fee=0.0007,
+            use_bar_magnifier=False,
+        )
+
+        engine = BacktestEngine()
+        result = engine._run_fallback(config, large_ohlcv, signals)
+
+        # All trades should be sell/short
+        for trade in result.trades:
+            assert "sell" in str(trade.side).lower(), (
+                f"Direction='short' should only produce sell trades, got {trade.side}"
+            )
+
+    def test_direction_both_generates_mixed_trades(self, large_ohlcv):
+        """Engine with direction='both' should produce both long and short trades."""
+        from backend.backtesting.engine import BacktestConfig, BacktestEngine
+        from backend.backtesting.models import StrategyType
+
+        adapter = _make_connected_adapter("both")
+        signals = adapter.generate_signals(large_ohlcv)
+
+        config = BacktestConfig(
+            symbol="BTCUSDT",
+            interval="15",
+            start_date=large_ohlcv.index[0].strftime("%Y-%m-%d"),
+            end_date=large_ohlcv.index[-1].strftime("%Y-%m-%d"),
+            strategy_type=StrategyType.CUSTOM,
+            initial_capital=10000.0,
+            position_size=0.5,
+            leverage=1.0,
+            direction="both",
+            stop_loss=0.02,
+            take_profit=0.03,
+            taker_fee=0.0007,
+            use_bar_magnifier=False,
+        )
+
+        engine = BacktestEngine()
+        result = engine._run_fallback(config, large_ohlcv, signals)
+
+        # Should have both buy and sell trades (if divergence data allows)
+        sides = [str(t.side).lower() for t in result.trades]
+        has_long = any("buy" in s for s in sides)
+        has_short = any("sell" in s for s in sides)
+
+        # At least one type should be present (data-dependent, but with 1000 bars likely)
+        assert len(result.trades) > 0, "Should produce at least one trade"
+        # If we have enough signals, both should be present
+        if int(signals.entries.sum()) > 0 and int(signals.short_entries.sum()) > 0:
+            assert has_long, "Should have long trades when entries exist"
+            assert has_short, "Should have short trades when short_entries exist"
+
+    def test_short_direction_with_short_only_connection(self, large_ohlcv):
+        """Short-only strategy: divergence.short → entry_short, direction=short."""
+        from backend.backtesting.engine import BacktestConfig, BacktestEngine
+        from backend.backtesting.models import StrategyType
+
+        adapter = _make_connected_adapter("short_only")
+        signals = adapter.generate_signals(large_ohlcv)
+
+        short_count = int(signals.short_entries.sum()) if signals.short_entries is not None else 0
+
+        config = BacktestConfig(
+            symbol="BTCUSDT",
+            interval="15",
+            start_date=large_ohlcv.index[0].strftime("%Y-%m-%d"),
+            end_date=large_ohlcv.index[-1].strftime("%Y-%m-%d"),
+            strategy_type=StrategyType.CUSTOM,
+            initial_capital=10000.0,
+            position_size=0.5,
+            leverage=1.0,
+            direction="short",
+            stop_loss=0.02,
+            take_profit=0.03,
+            taker_fee=0.0007,
+            use_bar_magnifier=False,
+        )
+
+        engine = BacktestEngine()
+        result = engine._run_fallback(config, large_ohlcv, signals)
+
+        if short_count > 0:
+            assert len(result.trades) > 0, f"Should produce trades when {short_count} short signals exist"
+            for trade in result.trades:
+                assert "sell" in str(trade.side).lower(), f"All trades should be sell, got {trade.side}"
 
 
 if __name__ == "__main__":

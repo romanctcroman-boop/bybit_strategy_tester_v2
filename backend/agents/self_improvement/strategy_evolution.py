@@ -531,7 +531,7 @@ class StrategyEvolution:
             )
             return self.parser.parse_strategy(response.content, agent_name=agent_name)
         except Exception as e:
-            logger.error(f"Initial strategy generation failed: {e}")
+            logger.error(f"Initial strategy generation failed: {e}", exc_info=True)
             return None
 
     async def _evolve_strategy(
@@ -592,7 +592,7 @@ class StrategyEvolution:
             )
             return self.parser.parse_strategy(response.content, agent_name=f"{agent_name}_evolved")
         except Exception as e:
-            logger.error(f"Strategy evolution failed: {e}")
+            logger.error(f"Strategy evolution failed: {e}", exc_info=True)
             return None
 
     async def _run_backtest(
@@ -618,7 +618,7 @@ class StrategyEvolution:
                 direction=direction,
             )
         except Exception as e:
-            logger.error(f"Backtest failed: {e}")
+            logger.error(f"Backtest failed: {e}", exc_info=True)
             return None
 
     async def _reflect_on_results(
@@ -660,7 +660,7 @@ class StrategyEvolution:
                 outcome=outcome,
             )
         except Exception as e:
-            logger.error(f"Reflection failed: {e}")
+            logger.error(f"Reflection failed: {e}", exc_info=True)
             return None
 
     def _create_llm_reflection_fn(self, client):
@@ -689,7 +689,7 @@ class StrategyEvolution:
                 )
                 return response.content
             except Exception as e:
-                logger.warning(f"LLM reflection failed: {e}")
+                logger.warning(f"LLM reflection failed: {e}", exc_info=True)
                 return f"Reflection unavailable: {e}"
 
         return llm_reflect

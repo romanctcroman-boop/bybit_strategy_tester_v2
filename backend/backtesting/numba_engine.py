@@ -10,6 +10,7 @@ DeepSeek/Perplexity Recommendation:
 - Pre-allocate all output arrays
 """
 
+import contextlib
 
 import numpy as np
 from numba import njit, prange
@@ -72,7 +73,8 @@ def simulate_trades_numba(
     cash = initial_capital
     position = 0.0
     is_long = True
-    trade_count = 0
+    recorded_count = 0   # trades written into the array (capped at max_trades)
+    total_trade_count = 0  # true trade count — may exceed max_trades
 
     # Equity tracking (cumulative PnL approach - matches Fallback)
     cumulative_realized_pnl = 0.0
@@ -80,6 +82,7 @@ def simulate_trades_numba(
     entry_price = 0.0
     entry_size = 0.0
     entry_idx = 0
+    margin_used = 0.0
     max_favorable_price = 0.0
     max_adverse_price = 0.0
 
@@ -94,32 +97,39 @@ def simulate_trades_numba(
             # Long entry
             if (direction == 0 or direction == 2) and long_entries[i]:
                 entry_price = price * (1.0 + slippage)
-                allocated_capital = cash * position_size_frac
-                entry_size = allocated_capital / (entry_price * (1.0 + taker_fee))
+                allocated_capital = cash * position_size_frac  # margin
+                # Position Value = Margin * Leverage (Bybit formula)
+                # entry_size = quantity in base currency WITH leverage baked in
+                # Matches FallbackEngineV4: order_size = (order_capital * leverage) / entry_price
+                position_value = allocated_capital * leverage
+                entry_size = position_value / (entry_price * (1.0 + taker_fee))
 
-                position_value = entry_size * entry_price
-                fees = position_value * taker_fee
+                entry_fees = position_value * taker_fee
 
-                cash -= position_value + fees
+                # Only deduct margin + entry fees (NOT full position value)
+                # Matches FallbackEngineV4: cash -= allocated_capital + fees
+                cash -= allocated_capital + entry_fees
                 position = entry_size
                 is_long = True
                 entry_idx = i
+                margin_used = allocated_capital
                 max_favorable_price = current_high
                 max_adverse_price = current_low
 
             # Short entry
             elif (direction == 1 or direction == 2) and short_entries[i]:
                 entry_price = price * (1.0 - slippage)
-                allocated_capital = cash * position_size_frac
-                entry_size = allocated_capital / (entry_price * (1.0 + taker_fee))
+                allocated_capital = cash * position_size_frac  # margin
+                position_value = allocated_capital * leverage
+                entry_size = position_value / (entry_price * (1.0 + taker_fee))
 
-                position_value = entry_size * entry_price
-                fees = position_value * taker_fee
+                entry_fees = position_value * taker_fee
 
-                cash -= position_value + fees
+                cash -= allocated_capital + entry_fees
                 position = entry_size
                 is_long = False
                 entry_idx = i
+                margin_used = allocated_capital
                 max_favorable_price = current_low
                 max_adverse_price = current_high
 
@@ -137,31 +147,29 @@ def simulate_trades_numba(
                 if current_high > max_adverse_price:
                     max_adverse_price = current_high
 
-            # Calculate worst/best P/L within bar
+            # Calculate worst/best P/L within bar (% of price, NOT margin)
+            # SL/TP = % price movement (TradingView parity with FallbackEngineV4)
             if is_long:
                 worst_price = current_low
                 best_price = current_high
-                worst_pnl_pct = (worst_price - entry_price) / entry_price * leverage
-                best_pnl_pct = (best_price - entry_price) / entry_price * leverage
+                worst_pnl_pct = (worst_price - entry_price) / entry_price
+                best_pnl_pct = (best_price - entry_price) / entry_price
             else:
                 worst_price = current_high
                 best_price = current_low
-                worst_pnl_pct = (entry_price - worst_price) / entry_price * leverage
-                best_pnl_pct = (entry_price - best_price) / entry_price * leverage
+                worst_pnl_pct = (entry_price - worst_price) / entry_price
+                best_pnl_pct = (entry_price - best_price) / entry_price
 
             should_exit = False
             exit_reason = 0  # 0=signal, 1=stop_loss, 2=take_profit
             exit_price = price
             apply_slippage = True
 
-            # Check Stop Loss
+            # Check Stop Loss (SL = % price movement, TradingView parity)
             if stop_loss > 0.0 and worst_pnl_pct <= -stop_loss:
                 should_exit = True
                 exit_reason = 1  # stop_loss
-                if is_long:
-                    exit_price = entry_price * (1.0 - stop_loss / leverage)
-                else:
-                    exit_price = entry_price * (1.0 + stop_loss / leverage)
+                exit_price = entry_price * (1.0 - stop_loss) if is_long else entry_price * (1.0 + stop_loss)
                 # Clamp to bar range
                 if exit_price < current_low:
                     exit_price = current_low
@@ -169,14 +177,11 @@ def simulate_trades_numba(
                     exit_price = current_high
                 apply_slippage = True
 
-            # Check Take Profit
+            # Check Take Profit (TP = % price movement, TradingView parity)
             if not should_exit and take_profit > 0.0 and best_pnl_pct >= take_profit:
                 should_exit = True
                 exit_reason = 2  # take_profit
-                if is_long:
-                    exit_price = entry_price * (1.0 + take_profit / leverage)
-                else:
-                    exit_price = entry_price * (1.0 - take_profit / leverage)
+                exit_price = entry_price * (1.0 + take_profit) if is_long else entry_price * (1.0 - take_profit)
                 # Clamp to bar range
                 if exit_price < current_low:
                     exit_price = current_low
@@ -185,87 +190,78 @@ def simulate_trades_numba(
                 apply_slippage = False
 
             # Check signal exit
-            if not should_exit:
-                if (is_long and long_exits[i]) or (not is_long and short_exits[i]):
-                    should_exit = True
-                    exit_reason = 0  # signal
-                    exit_price = price
+            if not should_exit and ((is_long and long_exits[i]) or (not is_long and short_exits[i])):
+                should_exit = True
+                exit_reason = 0  # signal
+                exit_price = price
 
             if should_exit:
                 # Apply slippage
                 if apply_slippage:
-                    if is_long:
-                        exit_price = exit_price * (1.0 - slippage)
-                    else:
-                        exit_price = exit_price * (1.0 + slippage)
+                    exit_price = exit_price * (1.0 - slippage) if is_long else exit_price * (1.0 + slippage)
 
                 # Calculate P/L
-                position_value = position * exit_price
-                fees = position_value * taker_fee
+                # entry_size already includes leverage (entry_size = margin * leverage / price)
+                # So PnL = price_diff * size (no extra leverage multiplication)
+                # Matches FallbackEngineV4: gross_pnl = total_size * (exit_price - avg_price)
+                exit_value = position * exit_price
+                exit_fees = exit_value * taker_fee
 
                 if is_long:
-                    pnl = (exit_price - entry_price) * entry_size * leverage - fees
-                    pnl_pct = (
-                        (exit_price - entry_price) / entry_price * leverage * 100.0
-                    )
+                    pnl = (exit_price - entry_price) * entry_size - exit_fees
+                    # pnl_pct = % return on margin (allocated capital)
+                    pnl_pct = pnl / margin_used * 100.0 if margin_used > 0.0 else 0.0
                     mfe_pct = (max_favorable_price - entry_price) / entry_price * 100.0
                     mae_pct = (entry_price - max_adverse_price) / entry_price * 100.0
-                    mfe = (max_favorable_price - entry_price) * entry_size * leverage
-                    mae = (entry_price - max_adverse_price) * entry_size * leverage
+                    mfe = (max_favorable_price - entry_price) * entry_size
+                    mae = (entry_price - max_adverse_price) * entry_size
                 else:
-                    pnl = (entry_price - exit_price) * entry_size * leverage - fees
-                    pnl_pct = (
-                        (entry_price - exit_price) / entry_price * leverage * 100.0
-                    )
+                    pnl = (entry_price - exit_price) * entry_size - exit_fees
+                    pnl_pct = pnl / margin_used * 100.0 if margin_used > 0.0 else 0.0
                     mfe_pct = (entry_price - max_favorable_price) / entry_price * 100.0
                     mae_pct = (max_adverse_price - entry_price) / entry_price * 100.0
-                    mfe = (entry_price - max_favorable_price) * entry_size * leverage
-                    mae = (max_adverse_price - entry_price) * entry_size * leverage
+                    mfe = (entry_price - max_favorable_price) * entry_size
+                    mae = (max_adverse_price - entry_price) * entry_size
 
-                # Update cash (for position sizing)
-                if is_long:
-                    # Long: return position value minus exit fees
-                    cash += position_value - fees
-                else:
-                    # Short: return position value + P&L (pnl already includes -fees)
-                    cash += position_value + pnl
+                # Update cash: return margin + net PnL
+                # Matches FallbackEngineV4: cash += trade_data["allocated"] + trade_data["pnl"]
+                cash += margin_used + pnl
 
                 # Track cumulative realized PnL for equity
                 cumulative_realized_pnl += pnl
 
-                # Record trade
-                if trade_count < max_trades:
-                    trades[trade_count, 0] = entry_idx
-                    trades[trade_count, 1] = i  # exit_idx
-                    trades[trade_count, 2] = 1.0 if is_long else 0.0
-                    trades[trade_count, 3] = entry_price
-                    trades[trade_count, 4] = exit_price
-                    trades[trade_count, 5] = pnl
-                    trades[trade_count, 6] = pnl_pct
-                    trades[trade_count, 7] = entry_size
-                    trades[trade_count, 8] = mfe
-                    trades[trade_count, 9] = mae
-                    trades[trade_count, 10] = mfe_pct
-                    trades[trade_count, 11] = mae_pct
-                    trades[trade_count, 12] = exit_reason
-                    trade_count += 1
+                # Record trade (capped at max_trades; total_trade_count tracks true count)
+                if recorded_count < max_trades:
+                    trades[recorded_count, 0] = entry_idx
+                    trades[recorded_count, 1] = i  # exit_idx
+                    trades[recorded_count, 2] = 1.0 if is_long else 0.0
+                    trades[recorded_count, 3] = entry_price
+                    trades[recorded_count, 4] = exit_price
+                    trades[recorded_count, 5] = pnl
+                    trades[recorded_count, 6] = pnl_pct
+                    trades[recorded_count, 7] = entry_size
+                    trades[recorded_count, 8] = mfe
+                    trades[recorded_count, 9] = mae
+                    trades[recorded_count, 10] = mfe_pct
+                    trades[recorded_count, 11] = mae_pct
+                    trades[recorded_count, 12] = exit_reason
+                    recorded_count += 1
+                total_trade_count += 1  # always count every trade
 
                 position = 0.0
                 entry_price = 0.0
                 entry_size = 0.0
 
-        # Update equity using cumulative PnL approach (matches Fallback)
+        # Update equity using cumulative PnL approach (matches FallbackEngineV4)
         # Equity = initial_capital + cumulative_realized_pnl + unrealized_pnl
+        # position (entry_size) already includes leverage — no extra multiplication
         if position > 0.0:
-            if is_long:
-                unrealized_pnl = (price - entry_price) * position * leverage
-            else:
-                unrealized_pnl = (entry_price - price) * position * leverage
+            unrealized_pnl = (price - entry_price) * position if is_long else (entry_price - price) * position
             equity[i] = initial_capital + cumulative_realized_pnl + unrealized_pnl
         else:
             equity[i] = initial_capital + cumulative_realized_pnl
 
-    return trades, equity, trades[:trade_count], trade_count
+    return trades, equity, trades[:recorded_count], total_trade_count
 
 
 @njit(cache=True, fastmath=True, parallel=True)
@@ -327,17 +323,19 @@ def batch_simulate_numba(
             total_return = (final_equity - initial_capital) / initial_capital * 100.0
 
             # Approximate Sharpe (simplified)
-            if n_trades > 1:
+            # n_trades is the true total; clamp to array size (max_trades=1000)
+            recorded = min(n_trades, 1000)
+            if recorded > 1:
                 # Calculate returns
                 returns_sum = 0.0
                 returns_sq_sum = 0.0
-                for t in range(n_trades):
+                for t in range(recorded):
                     ret = trades[t, 6]  # pnl_pct
                     returns_sum += ret
                     returns_sq_sum += ret * ret
 
-                mean_ret = returns_sum / n_trades
-                variance = returns_sq_sum / n_trades - mean_ret * mean_ret
+                mean_ret = returns_sum / recorded
+                variance = returns_sq_sum / recorded - mean_ret * mean_ret
                 std_ret = np.sqrt(variance) if variance > 0 else 1.0
                 sharpe = mean_ret / std_ret if std_ret > 0 else 0.0
             else:
@@ -413,7 +411,5 @@ def warmup_numba():
 
 
 # Warm up on import if numba is available
-try:
+with contextlib.suppress(Exception):
     warmup_numba()
-except Exception:
-    pass

@@ -12,11 +12,8 @@ Covers:
 Naming: test_[function]_[scenario]
 """
 
-import os
-from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import ValidationError
 
 from backend.api.routers.optimizations import (
     SyncOptimizationRequest,
