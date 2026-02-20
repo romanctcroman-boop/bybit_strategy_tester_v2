@@ -678,14 +678,14 @@ class StrategyBuilderAdapter(BaseStrategy):
             if use_long_range:
                 long_more = params.get("long_rsi_more", 30)
                 long_less = params.get("long_rsi_less", 70)
-                long_range_condition = (rsi > long_more) & (rsi < long_less)
+                long_range_condition = (rsi >= long_more) & (rsi <= long_less)
             else:
                 long_range_condition = pd.Series(True, index=ohlcv.index)
 
             if use_short_range:
                 short_less = params.get("short_rsi_less", 70)
                 short_more = params.get("short_rsi_more", 30)
-                short_range_condition = (rsi < short_less) & (rsi > short_more)
+                short_range_condition = (rsi <= short_less) & (rsi >= short_more)
             else:
                 short_range_condition = pd.Series(True, index=ohlcv.index)
 
@@ -796,7 +796,11 @@ class StrategyBuilderAdapter(BaseStrategy):
             if use_cross_signal:
                 sig_long = (macd_line > signal_line) & (macd_line.shift(1) <= signal_line.shift(1))
                 sig_short = (macd_line < signal_line) & (macd_line.shift(1) >= signal_line.shift(1))
-                # Filter: only generate long when MACD < 0, short when MACD > 0
+                # Mean-reversion filter: only fire long when MACD is negative (buying dip),
+                # only fire short when MACD is positive (selling peak).
+                # NOTE: parameter name "signal_only_if_macd_positive" is misleading —
+                # it actually enables a MEAN REVERSION filter (cross into negative for long,
+                # cross into positive for short). See DECISIONS.md for rationale.
                 if params.get("signal_only_if_macd_positive", False):
                     sig_long = sig_long & (macd_line < 0)
                     sig_short = sig_short & (macd_line > 0)
@@ -875,17 +879,14 @@ class StrategyBuilderAdapter(BaseStrategy):
             d_smooth = _param(params, 3, "stoch_d_smoothing", "d_period", "d")
             high = ohlcv["high"]
             low = ohlcv["low"]
-            # Note: k_smooth is accepted but NOT used by vbt.STOCH.run()
-            # VectorBT only supports k_window and d_window. See docs/architecture/STRATEGY_BUILDER_KNOWN_LIMITATIONS.md
-            if k_smooth != 3:
-                logger.warning(
-                    "STOCH k_smooth={} ignored — vectorbt does not support K-smoothing. "
-                    "Use a separate SMA/EMA block on %%K for smoothing.",
-                    k_smooth,
-                )
             stoch = vbt.STOCH.run(high, low, close, k_window=k_period, d_window=d_smooth, d_ewm=False)
             stoch_k = stoch.percent_k
             stoch_d = stoch.percent_d
+
+            # Apply K-smoothing manually (vectorbt doesn't support it natively)
+            if k_smooth > 1:
+                stoch_k = stoch_k.rolling(window=k_smooth, min_periods=1).mean()
+                logger.debug("STOCH k_smooth={} applied via manual rolling mean", k_smooth)
 
             # --- Universal Stochastic signal generation ---
             use_range = params.get("use_stoch_range_filter", False)
@@ -906,10 +907,10 @@ class StrategyBuilderAdapter(BaseStrategy):
             if use_range:
                 long_more = params.get("long_stoch_d_more", 1)
                 long_less = params.get("long_stoch_d_less", 50)
-                long_range_cond = (stoch_d > long_more) & (stoch_d < long_less)
+                long_range_cond = (stoch_d >= long_more) & (stoch_d <= long_less)
                 short_less = params.get("short_stoch_d_less", 100)
                 short_more = params.get("short_stoch_d_more", 50)
-                short_range_cond = (stoch_d < short_less) & (stoch_d > short_more)
+                short_range_cond = (stoch_d <= short_less) & (stoch_d >= short_more)
             else:
                 long_range_cond = pd.Series(True, index=ohlcv.index)
                 short_range_cond = pd.Series(True, index=ohlcv.index)
@@ -1661,15 +1662,15 @@ class StrategyBuilderAdapter(BaseStrategy):
                     "long": pd.Series(True, index=ohlcv.index),
                     "short": pd.Series(True, index=ohlcv.index),
                 }
-            channel_type = str(params.get("channel_type", "Keltner Channel"))
-            mode = str(params.get("channel_mode", "Rebound"))
+            channel_type = str(params.get("channel_type", "Keltner Channel")).lower()
+            mode = str(params.get("channel_mode", "Rebound")).lower()
             enter_cond = str(params.get("enter_conditions", "Wick out of band"))
 
             high_arr = ohlcv["high"].values
             low_arr = ohlcv["low"].values
             close_arr = close.values
 
-            if "Bollinger" in channel_type:
+            if "bollinger" in channel_type:
                 bb_len = int(params.get("bb_length", 20))
                 bb_dev = float(params.get("bb_deviation", 2.0))
                 _mid, upper_band, lower_band = calculate_bollinger(close_arr, period=bb_len, std_dev=bb_dev)
@@ -1711,7 +1712,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             above_upper = above_upper.fillna(False)
             below_lower = below_lower.fillna(False)
 
-            if mode == "Rebound":
+            if mode == "rebound":
                 # Rebound: expect price to bounce back from the band
                 # Long: price touches lower band (expect bounce up)
                 # Short: price touches upper band (expect bounce down)
@@ -1837,8 +1838,8 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             # Long range filter
             if params.get("use_cci_long_range", False):
-                lo = float(params.get("cci_long_more", -400))
-                hi = float(params.get("cci_long_less", 400))
+                lo = float(params.get("cci_long_more", -100))
+                hi = float(params.get("cci_long_less", 100))
                 long_signal = long_signal & (cci_vals >= lo) & (cci_vals <= hi)
                 long_signal = long_signal.fillna(False)
 
@@ -1910,46 +1911,60 @@ class StrategyBuilderAdapter(BaseStrategy):
         - 'a'/'b' (legacy)
         - 'left'/'right' (current frontend port IDs for greater_than/less_than)
         """
+        # Infer series length from inputs (avoids hardcoded sizes)
+        ref = next(iter(inputs.values()), None) if inputs else None
+
+        def _empty_bool() -> pd.Series:
+            if ref is not None:
+                return pd.Series([False] * len(ref), index=ref.index)
+            return pd.Series([False], dtype=bool)
+
+        def _empty_numeric() -> pd.Series:
+            if ref is not None:
+                return pd.Series([0.0] * len(ref), index=ref.index)
+            return pd.Series([0.0])
+
         if condition_type == "crossover":
-            a = inputs.get("a", inputs.get("left", pd.Series([False] * 100)))
-            b = inputs.get("b", inputs.get("right", pd.Series([False] * 100)))
+            a = inputs.get("a", inputs.get("left", _empty_bool()))
+            b = inputs.get("b", inputs.get("right", _empty_bool()))
             result = (a > b) & (a.shift(1) <= b.shift(1))
             return {"result": result}
 
         elif condition_type == "crossunder":
-            a = inputs.get("a", inputs.get("left", pd.Series([False] * 100)))
-            b = inputs.get("b", inputs.get("right", pd.Series([False] * 100)))
+            a = inputs.get("a", inputs.get("left", _empty_bool()))
+            b = inputs.get("b", inputs.get("right", _empty_bool()))
             result = (a < b) & (a.shift(1) >= b.shift(1))
             return {"result": result}
 
         elif condition_type == "greater_than":
-            a = inputs.get("a", inputs.get("left", pd.Series([0] * 100)))
-            b = inputs.get("b", inputs.get("right", pd.Series([0] * 100)))
+            a = inputs.get("a", inputs.get("left", _empty_numeric()))
+            b = inputs.get("b", inputs.get("right", _empty_numeric()))
             result = a > b
             return {"result": result}
 
         elif condition_type == "less_than":
-            a = inputs.get("a", inputs.get("left", pd.Series([0] * 100)))
-            b = inputs.get("b", inputs.get("right", pd.Series([0] * 100)))
+            a = inputs.get("a", inputs.get("left", _empty_numeric()))
+            b = inputs.get("b", inputs.get("right", _empty_numeric()))
             result = a < b
             return {"result": result}
 
         elif condition_type == "equals":
-            a = inputs.get("a", inputs.get("left", pd.Series([0] * 100)))
-            b = inputs.get("b", inputs.get("right", pd.Series([0] * 100)))
-            result = a == b
+            a = inputs.get("a", inputs.get("left", _empty_numeric()))
+            b = inputs.get("b", inputs.get("right", _empty_numeric()))
+            tolerance = float(params.get("tolerance", 0.0001))
+            result = (a - b).abs() <= tolerance
             return {"result": result}
 
         elif condition_type == "between":
-            value = inputs.get("value", pd.Series([0] * 100))
-            min_val = inputs.get("min", pd.Series([0] * 100))
-            max_val = inputs.get("max", pd.Series([0] * 100))
+            value = inputs.get("value", _empty_numeric())
+            min_val = inputs.get("min", _empty_numeric())
+            max_val = inputs.get("max", _empty_numeric())
             result = (value >= min_val) & (value <= max_val)
             return {"result": result}
 
         else:
             logger.warning(f"Unknown condition type: {condition_type}")
-            return {"result": pd.Series([False] * 100)}
+            return {"result": _empty_bool()}
 
     def _execute_input(self, input_type: str, params: dict[str, Any], ohlcv: pd.DataFrame) -> dict[str, pd.Series]:
         """Execute an input block"""
@@ -3089,6 +3104,22 @@ class StrategyBuilderAdapter(BaseStrategy):
             tp2_alloc = params.get("tp2_allocation", 30)
             tp3 = params.get("tp3_percent", 3.0)
             tp3_alloc = params.get("tp3_allocation", 40)
+
+            # Validate allocations sum to ~100%
+            total_alloc = tp1_alloc + tp2_alloc + tp3_alloc
+            if not (99.0 <= total_alloc <= 101.0):
+                logger.warning(
+                    "Multi-TP allocations sum to {}%, expected 100%", total_alloc
+                )
+
+            # Warn if TP levels are not in ascending order
+            if tp1 >= tp2 or tp2 >= tp3:
+                logger.warning(
+                    "Multi-TP levels not ascending: TP1={}% TP2={}% TP3={}% — "
+                    "execution order may be incorrect",
+                    tp1, tp2, tp3,
+                )
+
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
             result["multi_tp_config"] = [
                 {"percent": tp1, "allocation": tp1_alloc},
