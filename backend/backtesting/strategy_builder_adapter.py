@@ -70,6 +70,37 @@ def _param(params: dict, default: Any, *keys: str) -> Any:
     return default
 
 
+def _clamp_period(val: Any, min_val: int = 1, max_val: int = 500) -> int:
+    """Convert indicator period to a safe integer, clamped to [min_val, max_val].
+
+    Protects against user-supplied values like 0, -5, or 999999 which would cause
+    vectorbt/NumPy errors. Logs a warning when clamping is applied.
+
+    Args:
+        val: Raw parameter value (int, float, str, or None).
+        min_val: Minimum allowed period (default 1).
+        max_val: Maximum allowed period (default 500).
+
+    Returns:
+        Clamped integer period.
+    """
+    try:
+        raw = int(val)
+    except (TypeError, ValueError):
+        logger.warning("_clamp_period: could not convert {!r} to int, using min_val={}", val, min_val)
+        return min_val
+    clamped = max(min_val, min(max_val, raw))
+    if clamped != raw:
+        logger.warning(
+            "_clamp_period: period={} out of range [{}, {}], clamped to {}",
+            raw,
+            min_val,
+            max_val,
+            clamped,
+        )
+    return clamped
+
+
 class StrategyBuilderAdapter(BaseStrategy):
     """
     Adapter for Strategy Builder generated strategies.
@@ -658,7 +689,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         close = ohlcv["close"]
 
         if indicator_type == "rsi":
-            period = params.get("period", 14)
+            period = _clamp_period(params.get("period", 14))
             rsi = vbt.RSI.run(close, window=period).rsi
 
             use_long_range = params.get("use_long_range", False)
@@ -676,15 +707,27 @@ class StrategyBuilderAdapter(BaseStrategy):
             # --- Range filter: continuous condition (True while RSI is in range) ---
             # When enabled acts as a FILTER; when disabled defaults to True (allow all)
             if use_long_range:
-                long_more = params.get("long_rsi_more", 30)
-                long_less = params.get("long_rsi_less", 70)
+                long_more = float(params.get("long_rsi_more", 30))
+                long_less = float(params.get("long_rsi_less", 70))
+                if long_more > long_less:
+                    logger.warning(
+                        "RSI range inversion: long_more={} > long_less={} — swapping to prevent always-False condition",
+                        long_more, long_less,
+                    )
+                    long_more, long_less = long_less, long_more
                 long_range_condition = (rsi >= long_more) & (rsi <= long_less)
             else:
                 long_range_condition = pd.Series(True, index=ohlcv.index)
 
             if use_short_range:
-                short_less = params.get("short_rsi_less", 70)
-                short_more = params.get("short_rsi_more", 30)
+                short_less = float(params.get("short_rsi_less", 70))
+                short_more = float(params.get("short_rsi_more", 30))
+                if short_more > short_less:
+                    logger.warning(
+                        "RSI range inversion: short_more={} > short_less={} — swapping to prevent always-False condition",
+                        short_more, short_less,
+                    )
+                    short_more, short_less = short_less, short_more
                 short_range_condition = (rsi <= short_less) & (rsi >= short_more)
             else:
                 short_range_condition = pd.Series(True, index=ohlcv.index)
@@ -760,9 +803,9 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "macd":
-            fast = _param(params, 12, "fast_period", "fast")
-            slow = _param(params, 26, "slow_period", "slow")
-            signal = _param(params, 9, "signal_period", "signal")
+            fast = _clamp_period(_param(params, 12, "fast_period", "fast"), min_val=1, max_val=200)
+            slow = _clamp_period(_param(params, 26, "slow_period", "slow"), min_val=1, max_val=200)
+            signal = _clamp_period(_param(params, 9, "signal_period", "signal"), min_val=1, max_val=200)
             macd_result = vbt.MACD.run(close, fast_window=fast, slow_window=slow, signal_window=signal)
 
             macd_line = macd_result.macd
@@ -847,17 +890,17 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "ema":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             ema = vbt.MA.run(close, window=period, ewm=True).ma
             return {"value": ema}
 
         elif indicator_type == "sma":
-            period = params.get("period", 50)
+            period = _clamp_period(params.get("period", 50))
             sma = vbt.MA.run(close, window=period).ma
             return {"value": sma}
 
         elif indicator_type == "bollinger":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             std_dev = _param(params, 2.0, "std_dev", "stdDev")
             bb = vbt.BBANDS.run(close, window=period, num_std=std_dev)
             return {
@@ -867,16 +910,16 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "atr":
-            period = params.get("period", 14)
+            period = _clamp_period(params.get("period", 14))
             high = ohlcv["high"]
             low = ohlcv["low"]
             atr = vbt.ATR.run(high, low, close, window=period).atr
             return {"value": atr}
 
         elif indicator_type == "stochastic":
-            k_period = _param(params, 14, "stoch_k_length", "k_period", "k")
-            k_smooth = _param(params, 3, "stoch_k_smoothing", "smooth_k")
-            d_smooth = _param(params, 3, "stoch_d_smoothing", "d_period", "d")
+            k_period = _clamp_period(_param(params, 14, "stoch_k_length", "k_period", "k"))
+            k_smooth = _clamp_period(_param(params, 3, "stoch_k_smoothing", "smooth_k"))
+            d_smooth = _clamp_period(_param(params, 3, "stoch_d_smoothing", "d_period", "d"))
             high = ohlcv["high"]
             low = ohlcv["low"]
             stoch = vbt.STOCH.run(high, low, close, k_window=k_period, d_window=d_smooth, d_ewm=False)
@@ -905,11 +948,23 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             # --- Range filter: continuous condition on %D ---
             if use_range:
-                long_more = params.get("long_stoch_d_more", 1)
-                long_less = params.get("long_stoch_d_less", 50)
+                long_more = float(params.get("long_stoch_d_more", 1))
+                long_less = float(params.get("long_stoch_d_less", 50))
+                if long_more > long_less:
+                    logger.warning(
+                        "Stochastic range inversion: long_more={} > long_less={} — swapping to prevent always-False condition",
+                        long_more, long_less,
+                    )
+                    long_more, long_less = long_less, long_more
                 long_range_cond = (stoch_d >= long_more) & (stoch_d <= long_less)
-                short_less = params.get("short_stoch_d_less", 100)
-                short_more = params.get("short_stoch_d_more", 50)
+                short_less = float(params.get("short_stoch_d_less", 100))
+                short_more = float(params.get("short_stoch_d_more", 50))
+                if short_more > short_less:
+                    logger.warning(
+                        "Stochastic range inversion: short_more={} > short_less={} — swapping to prevent always-False condition",
+                        short_more, short_less,
+                    )
+                    short_more, short_less = short_less, short_more
                 short_range_cond = (stoch_d <= short_less) & (stoch_d >= short_more)
             else:
                 long_range_cond = pd.Series(True, index=ohlcv.index)
@@ -983,7 +1038,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "adx":
-            period = params.get("period", 14)
+            period = _clamp_period(params.get("period", 14))
             high = ohlcv["high"]
             low = ohlcv["low"]
             adx = vbt.ADX.run(high, low, close, window=period).adx
@@ -991,8 +1046,8 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== QQE Universal Indicator ==========
         elif indicator_type == "qqe":
-            rsi_period = _param(params, 14, "rsi_period", "rsiPeriod", "qqe_rsi_length")
-            smoothing = _param(params, 5, "smoothing_period", "smoothing", "qqe_rsi_smoothing")
+            rsi_period = _clamp_period(_param(params, 14, "rsi_period", "rsiPeriod", "qqe_rsi_length"))
+            smoothing = _clamp_period(_param(params, 5, "smoothing_period", "smoothing", "qqe_rsi_smoothing"))
             qqe_factor = _param(params, 4.236, "qqe_factor", "qqeFactor", "qqe_delta_multiplier")
 
             # Compute QQE with cross signals
@@ -1047,10 +1102,10 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== Momentum Indicators ==========
         elif indicator_type == "stoch_rsi":
-            rsi_period = _param(params, 14, "rsi_period", "rsiPeriod")
-            stoch_period = _param(params, 14, "stoch_period", "stochPeriod")
-            k_period = _param(params, 3, "k_period", "kPeriod")
-            d_period = _param(params, 3, "d_period", "dPeriod")
+            rsi_period = _clamp_period(_param(params, 14, "rsi_period", "rsiPeriod"))
+            stoch_period = _clamp_period(_param(params, 14, "stoch_period", "stochPeriod"))
+            k_period = _clamp_period(_param(params, 3, "k_period", "kPeriod"))
+            d_period = _clamp_period(_param(params, 3, "d_period", "dPeriod"))
             _stoch_rsi_vals, k_vals, d_vals = calculate_stoch_rsi(
                 close.values, rsi_period, stoch_period, k_period, d_period
             )
@@ -1060,19 +1115,19 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "williams_r":
-            period = params.get("period", 14)
+            period = _clamp_period(params.get("period", 14))
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             result = calculate_williams_r(high, low, close.values, period)
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "roc":
-            period = params.get("period", 10)
+            period = _clamp_period(params.get("period", 10))
             result = calculate_roc(close.values, period)
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "mfi":
-            period = params.get("period", 14)
+            period = _clamp_period(params.get("period", 14))
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             volume = ohlcv["volume"].values
@@ -1080,12 +1135,12 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "cmo":
-            period = params.get("period", 14)
+            period = _clamp_period(params.get("period", 14))
             result = calculate_cmo(close.values, period)
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "cci":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             result = calculate_cci(high, low, close.values, period)
@@ -1093,22 +1148,22 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== Trend Indicators ==========
         elif indicator_type == "wma":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             result = calculate_wma(close.values, period)
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "dema":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             result = calculate_dema(close.values, period)
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "tema":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             result = calculate_tema(close.values, period)
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "hull_ma":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             result = calculate_hull_ma(close.values, period)
             return {"value": pd.Series(result, index=ohlcv.index)}
 
@@ -1118,7 +1173,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             #   1) FILTER mode (default): long when uptrend (dir==1), short when downtrend (dir==-1)
             #   2) SIGNAL mode (generate_on_trend_change): long/short only on direction flip
             # Additional options: use_btc_source, opposite_signal, timeframe
-            period = _param(params, 10, "period", "atr_period")
+            period = _clamp_period(_param(params, 10, "period", "atr_period"))
             multiplier = _param(params, 3.0, "multiplier", "atr_multiplier")
             use_supertrend = params.get("use_supertrend", False)
             generate_on_trend_change = params.get("generate_on_trend_change", False)
@@ -1163,9 +1218,9 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "ichimoku":
-            tenkan = _param(params, 9, "tenkan_period", "tenkan")
-            kijun = _param(params, 26, "kijun_period", "kijun")
-            senkou_b = _param(params, 52, "senkou_b_period", "senkouB")
+            tenkan = _clamp_period(_param(params, 9, "tenkan_period", "tenkan"))
+            kijun = _clamp_period(_param(params, 26, "kijun_period", "kijun"))
+            senkou_b = _clamp_period(_param(params, 52, "senkou_b_period", "senkouB"))
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             ichi = calculate_ichimoku(high, low, close.values, tenkan, kijun, senkou_b)
@@ -1187,7 +1242,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"value": pd.Series(sar_values, index=ohlcv.index)}
 
         elif indicator_type == "aroon":
-            period = params.get("period", 25)
+            period = _clamp_period(params.get("period", 25))
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             aroon_result = calculate_aroon(high, low, period)
@@ -1199,16 +1254,16 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         # ========== Volatility Indicators ==========
         elif indicator_type == "atrp":
-            period = params.get("period", 14)
+            period = _clamp_period(params.get("period", 14))
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             result = calculate_atrp(high, low, close.values, period)
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "keltner":
-            period = _param(params, 20, "ema_period", "period")
+            period = _clamp_period(_param(params, 20, "ema_period", "period"))
             multiplier = params.get("multiplier", 2.0)
-            atr_period = _param(params, 10, "atr_period", "atrPeriod")
+            atr_period = _clamp_period(_param(params, 10, "atr_period", "atrPeriod"))
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             kc_mid, kc_upper, kc_lower = calculate_keltner(high, low, close.values, period, atr_period, multiplier)
@@ -1219,7 +1274,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "donchian":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             dc_mid, dc_upper, dc_lower = calculate_donchian(high, low, period)
@@ -1230,7 +1285,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             }
 
         elif indicator_type == "stddev":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             result = calculate_stddev(close.values, period)
             return {"value": pd.Series(result, index=ohlcv.index)}
 
@@ -1248,7 +1303,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             return {"value": pd.Series(result, index=ohlcv.index)}
 
         elif indicator_type == "cmf":
-            period = params.get("period", 20)
+            period = _clamp_period(params.get("period", 20))
             high = ohlcv["high"].values
             low = ohlcv["low"].values
             volume = ohlcv["volume"].values
@@ -3108,16 +3163,15 @@ class StrategyBuilderAdapter(BaseStrategy):
             # Validate allocations sum to ~100%
             total_alloc = tp1_alloc + tp2_alloc + tp3_alloc
             if not (99.0 <= total_alloc <= 101.0):
-                logger.warning(
-                    "Multi-TP allocations sum to {}%, expected 100%", total_alloc
-                )
+                logger.warning("Multi-TP allocations sum to {}%, expected 100%", total_alloc)
 
             # Warn if TP levels are not in ascending order
             if tp1 >= tp2 or tp2 >= tp3:
                 logger.warning(
-                    "Multi-TP levels not ascending: TP1={}% TP2={}% TP3={}% — "
-                    "execution order may be incorrect",
-                    tp1, tp2, tp3,
+                    "Multi-TP levels not ascending: TP1={}% TP2={}% TP3={}% — execution order may be incorrect",
+                    tp1,
+                    tp2,
+                    tp3,
                 )
 
             result["exit"] = pd.Series([False] * n, index=ohlcv.index)
@@ -3806,8 +3860,20 @@ class StrategyBuilderAdapter(BaseStrategy):
                 # Reach mode: RSI in zone → exit
                 long_more = float(params.get("rsi_long_more", 70))
                 long_less = float(params.get("rsi_long_less", 100))
+                if long_more > long_less:
+                    logger.warning(
+                        "Close RSI range inversion: long_more={} > long_less={} — swapping to prevent always-False exit",
+                        long_more, long_less,
+                    )
+                    long_more, long_less = long_less, long_more
                 short_less = float(params.get("rsi_short_less", 30))
                 short_more = float(params.get("rsi_short_more", 1))
+                if short_more > short_less:
+                    logger.warning(
+                        "Close RSI range inversion: short_more={} > short_less={} — swapping to prevent always-False exit",
+                        short_more, short_less,
+                    )
+                    short_more, short_less = short_less, short_more
                 exit_long = exit_long | ((rsi_values >= long_more) & (rsi_values <= long_less))
                 exit_short = exit_short | ((rsi_values <= short_less) & (rsi_values >= short_more))
 
@@ -3854,8 +3920,20 @@ class StrategyBuilderAdapter(BaseStrategy):
                 # Reach mode: Stoch %K in zone → exit
                 long_more = float(params.get("stoch_long_more", 80))
                 long_less = float(params.get("stoch_long_less", 100))
+                if long_more > long_less:
+                    logger.warning(
+                        "Close Stochastic range inversion: long_more={} > long_less={} — swapping to prevent always-False exit",
+                        long_more, long_less,
+                    )
+                    long_more, long_less = long_less, long_more
                 short_less = float(params.get("stoch_short_less", 20))
                 short_more = float(params.get("stoch_short_more", 1))
+                if short_more > short_less:
+                    logger.warning(
+                        "Close Stochastic range inversion: short_more={} > short_less={} — swapping to prevent always-False exit",
+                        short_more, short_less,
+                    )
+                    short_more, short_less = short_less, short_more
                 exit_long = exit_long | ((stoch_values >= long_more) & (stoch_values <= long_less))
                 exit_short = exit_short | ((stoch_values <= short_less) & (stoch_values >= short_more))
 
