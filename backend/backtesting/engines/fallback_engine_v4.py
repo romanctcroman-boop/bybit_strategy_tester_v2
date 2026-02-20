@@ -567,10 +567,7 @@ class DirectionHandler:
     @staticmethod
     def check_trailing_activation(price: float, entry_price: float, activation_pct: float, direction: str) -> bool:
         """Проверить активацию trailing stop."""
-        if direction == "long":
-            profit_pct = (price - entry_price) / entry_price
-        else:
-            profit_pct = (entry_price - price) / entry_price
+        profit_pct = (price - entry_price) / entry_price if direction == "long" else (entry_price - price) / entry_price
         return profit_pct >= activation_pct
 
     @staticmethod
@@ -755,10 +752,7 @@ class FallbackEngineV4(BaseBacktestEngine):
 
         elif mode == "risk":
             # Риск-ориентированный: position_size = risk / stop_loss
-            if stop_loss_pct > 0:
-                size = risk_per_trade / stop_loss_pct
-            else:
-                size = risk_per_trade  # fallback
+            size = risk_per_trade / stop_loss_pct if stop_loss_pct > 0 else risk_per_trade
             return max(min_size, min(max_size, size))
 
         elif mode == "kelly":
@@ -1558,7 +1552,7 @@ class FallbackEngineV4(BaseBacktestEngine):
             # Исполняем pending scale-in ордера для лонга
             if scale_in_state_long is not None and pyramid_mgr.has_position("long"):
                 base_price = scale_in_state_long["base_price"]
-                for level_idx, (level, portion) in enumerate(zip(scale_in_levels, scale_in_portions)):
+                for level_idx, (level, portion) in enumerate(zip(scale_in_levels, scale_in_portions, strict=True)):
                     if scale_in_state_long["filled"][level_idx]:
                         continue  # Уже исполнен
 
@@ -1592,7 +1586,7 @@ class FallbackEngineV4(BaseBacktestEngine):
             # Исполняем pending scale-in ордера для шорта
             if scale_in_state_short is not None and pyramid_mgr.has_position("short"):
                 base_price = scale_in_state_short["base_price"]
-                for level_idx, (level, portion) in enumerate(zip(scale_in_levels, scale_in_portions)):
+                for level_idx, (level, portion) in enumerate(zip(scale_in_levels, scale_in_portions, strict=True)):
                     if scale_in_state_short["filled"][level_idx]:
                         continue  # Уже исполнен
 
@@ -1632,7 +1626,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                         # Сработал TP уровень - частичное закрытие
                         portion = long_tp_state.mark_hit(next_tp)
 
-                        trade_data = pyramid_mgr.close_partial(
+                        partial_result = pyramid_mgr.close_partial(
                             direction="long",
                             exit_price=tp_price,
                             portion=portion,
@@ -1642,21 +1636,21 @@ class FallbackEngineV4(BaseBacktestEngine):
                             taker_fee=taker_fee,
                         )
 
-                        if trade_data is not None:
-                            cash += trade_data["allocated"] + trade_data["pnl"]
+                        if partial_result is not None:
+                            cash += partial_result["allocated"] + partial_result["pnl"]
                             trades.append(
                                 TradeRecord(
-                                    entry_time=trade_data["entry_time"],
-                                    exit_time=trade_data["exit_time"],
+                                    entry_time=partial_result["entry_time"],
+                                    exit_time=partial_result["exit_time"],
                                     direction="long",
-                                    entry_price=trade_data["entry_price"],
-                                    exit_price=trade_data["exit_price"],
-                                    size=trade_data["size"],
-                                    pnl=trade_data["pnl"],
-                                    pnl_pct=trade_data["pnl_pct"],
-                                    fees=trade_data["fees"],
+                                    entry_price=partial_result["entry_price"],
+                                    exit_price=partial_result["exit_price"],
+                                    size=partial_result["size"],
+                                    pnl=partial_result["pnl"],
+                                    pnl_pct=partial_result["pnl_pct"],
+                                    fees=partial_result["fees"],
                                     exit_reason=ExitReason.TAKE_PROFIT,
-                                    duration_bars=trade_data["duration_bars"],
+                                    duration_bars=partial_result["duration_bars"],
                                     mfe=long_accumulated_mfe,
                                     mae=long_accumulated_mae,
                                 )
@@ -1688,7 +1682,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     if low_price <= tp_price > 0:
                         portion = short_tp_state.mark_hit(next_tp)
 
-                        trade_data = pyramid_mgr.close_partial(
+                        short_partial = pyramid_mgr.close_partial(
                             direction="short",
                             exit_price=tp_price,
                             portion=portion,
@@ -1698,21 +1692,21 @@ class FallbackEngineV4(BaseBacktestEngine):
                             taker_fee=taker_fee,
                         )
 
-                        if trade_data is not None:
-                            cash += trade_data["allocated"] + trade_data["pnl"]
+                        if short_partial is not None:
+                            cash += short_partial["allocated"] + short_partial["pnl"]
                             trades.append(
                                 TradeRecord(
-                                    entry_time=trade_data["entry_time"],
-                                    exit_time=trade_data["exit_time"],
+                                    entry_time=short_partial["entry_time"],
+                                    exit_time=short_partial["exit_time"],
                                     direction="short",
-                                    entry_price=trade_data["entry_price"],
-                                    exit_price=trade_data["exit_price"],
-                                    size=trade_data["size"],
-                                    pnl=trade_data["pnl"],
-                                    pnl_pct=trade_data["pnl_pct"],
-                                    fees=trade_data["fees"],
+                                    entry_price=short_partial["entry_price"],
+                                    exit_price=short_partial["exit_price"],
+                                    size=short_partial["size"],
+                                    pnl=short_partial["pnl"],
+                                    pnl_pct=short_partial["pnl_pct"],
+                                    fees=short_partial["fees"],
                                     exit_reason=ExitReason.TAKE_PROFIT,
-                                    duration_bars=trade_data["duration_bars"],
+                                    duration_bars=short_partial["duration_bars"],
                                     mfe=short_accumulated_mfe,
                                     mae=short_accumulated_mae,
                                 )
@@ -1904,7 +1898,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                 filled = dca_state["filled"]
                 dca_direction = dca_state["direction"]
 
-                for so_idx, (deviation, volume) in enumerate(zip(dca_levels, dca_volumes)):
+                for so_idx, (deviation, volume) in enumerate(zip(dca_levels, dca_volumes, strict=True)):
                     if filled[so_idx]:
                         continue
 
@@ -2040,19 +2034,16 @@ class FallbackEngineV4(BaseBacktestEngine):
                     market_conditions_allow = False  # Слишком высокая волатильность
 
             # Volume Filter
-            if volume_filter_enabled and volume_percentiles is not None:
-                if volume_percentiles[i] < min_volume_percentile:
-                    market_conditions_allow = False  # Слишком низкий объём
+            if volume_filter_enabled and volume_percentiles is not None and volume_percentiles[i] < min_volume_percentile:
+                market_conditions_allow = False  # Слишком низкий объём
 
             # Range Filter (ADR)
-            if range_filter_enabled and adr_values is not None:
-                if adr_values[i] < range_adr_min:
-                    market_conditions_allow = False  # Боковик, слишком узкий диапазон
+            if range_filter_enabled and adr_values is not None and adr_values[i] < range_adr_min:
+                market_conditions_allow = False  # Боковик, слишком узкий диапазон
 
             # === MARKET REGIME FILTER ===
-            if market_regime_enabled and regime_detector is not None:
-                if not regime_detector.should_trade(market_regime_filter):
-                    market_conditions_allow = False  # Режим рынка не подходит
+            if market_regime_enabled and regime_detector is not None and not regime_detector.should_trade(market_regime_filter):
+                market_conditions_allow = False  # Режим рынка не подходит
 
             # Trend Filter - применяется отдельно для long и short
             trend_allows_long = True
@@ -2195,7 +2186,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     can_short = False
 
             # LONG Entry
-            if (
+            if (  # noqa: SIM102
                 long_entries[i]
                 and can_long
                 and not pending_long_exit
@@ -2222,7 +2213,7 @@ class FallbackEngineV4(BaseBacktestEngine):
 
                     # === POSITION SIZING ===
                     if position_sizing_mode == "risk" and stop_loss > 0:
-                        # Размер = (капитал × риск) / (SL% × леверидж)
+                        # Размер = (капитал x риск) / (SL% x леверидж)
                         order_capital = (cash * risk_per_trade) / (stop_loss * leverage)
                         order_capital = min(order_capital, cash * max_position_size)
                         order_capital = max(order_capital, cash * min_position_size)
@@ -2332,7 +2323,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                             }
 
             # SHORT Entry
-            if (
+            if (  # noqa: SIM102
                 short_entries[i]
                 and can_short
                 and not pending_short_exit
@@ -2471,7 +2462,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                 prev_hour_ts = pd.Timestamp(timestamps[i - 1]) if i > 0 else current_hour_ts
 
                 # Check if we crossed a funding hour (0, 8, 16 for 8h intervals)
-                funding_hours = [h for h in range(0, 24, funding_interval_hours)]
+                funding_hours = list(range(0, 24, funding_interval_hours))
                 current_hour = current_hour_ts.hour
                 prev_hour = prev_hour_ts.hour
 
@@ -2522,10 +2513,10 @@ class FallbackEngineV4(BaseBacktestEngine):
         final_time = timestamps[-1]
         final_price = close_prices[-1]
 
-        for direction in ["long", "short"]:
-            if pyramid_mgr.has_position(direction):
+        for dir_str in ["long", "short"]:
+            if pyramid_mgr.has_position(dir_str):
                 closed = pyramid_mgr.close_position(
-                    direction=direction,
+                    direction=dir_str,
                     exit_price=final_price,
                     exit_bar_idx=n - 1,
                     exit_time=final_time,
@@ -2533,7 +2524,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                     taker_fee=taker_fee,
                 )
                 # Получаем накопленные MFE/MAE для позиции
-                if direction == "long":
+                if dir_str == "long":
                     final_mfe, final_mae = long_accumulated_mfe, long_accumulated_mae
                 else:
                     final_mfe, final_mae = short_accumulated_mfe, short_accumulated_mae
@@ -2544,7 +2535,7 @@ class FallbackEngineV4(BaseBacktestEngine):
                         TradeRecord(
                             entry_time=trade_data["entry_time"],
                             exit_time=trade_data["exit_time"],
-                            direction=direction,
+                            direction=dir_str,
                             entry_price=trade_data["entry_price"],
                             exit_price=trade_data["exit_price"],
                             size=trade_data["size"],

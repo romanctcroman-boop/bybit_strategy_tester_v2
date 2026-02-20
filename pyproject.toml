@@ -83,6 +83,9 @@ allowed-confusables = [
     "Р",
     "х",
     "Х",
+    "Н",
+    "В",
+    "б",
 ]
 select = [
     "E",   # pycodestyle errors
