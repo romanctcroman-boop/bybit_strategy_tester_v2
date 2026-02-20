@@ -1554,8 +1554,11 @@ class StrategyBuilderAdapter(BaseStrategy):
                         index=ohlcv.index,
                     )
                     atr_ratio = ((atr_short - atr_full) / atr_full.replace(0, np.nan)) * 100
+                    # Bullish ATR expansion: short-term ATR exceeds long-term by atr_pct%
                     atr_up = atr_ratio >= atr_pct
-                    atr_down = atr_ratio >= atr_pct
+                    # Bearish ATR expansion: short-term ATR falls below long-term by atr_pct%
+                    # (negative ratio indicates recent contraction / downward impulse)
+                    atr_down = atr_ratio <= -atr_pct
                     is_highest = is_highest | atr_up.fillna(False)
                     is_lowest = is_lowest | atr_down.fillna(False)
 
@@ -1904,8 +1907,8 @@ class StrategyBuilderAdapter(BaseStrategy):
 
             # Short range filter
             if params.get("use_cci_short_range", False):
-                hi_s = float(params.get("cci_short_less", 400))
-                lo_s = float(params.get("cci_short_more", 10))
+                hi_s = float(params.get("cci_short_less", -10))
+                lo_s = float(params.get("cci_short_more", -100))
                 short_signal = short_signal & (cci_vals <= hi_s) & (cci_vals >= lo_s)
                 short_signal = short_signal.fillna(False)
 

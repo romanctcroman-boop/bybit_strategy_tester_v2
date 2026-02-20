@@ -1175,8 +1175,8 @@ function renderBlockLibrary() {
                   <i class="bi bi-${block.icon}"></i>
                 </div>
                 <div class="block-info">
-                  <div class="block-name">${block.name}</div>
-                  <div class="block-desc">${block.desc}</div>
+                  <div class="block-name">${escapeHtml(block.name)}</div>
+                  <div class="block-desc">${escapeHtml(block.desc)}</div>
                 </div>
               </div>
             `
