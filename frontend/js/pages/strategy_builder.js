@@ -9996,13 +9996,22 @@ async function saveStrategy() {
   // WebSocket server-side validation before save
   if (wsValidation && wsValidation.isWsConnected()) {
     console.log('[Strategy Builder] Running server-side validation before save...');
+    let wsTimedOut = false;
     const wsValidationResult = await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        wsTimedOut = true;
+        resolve({ valid: true, fallback: true });
+      }, 3000);
       wsValidation.validateStrategy(strategy.blocks, strategy.connections, (result) => {
+        clearTimeout(timeoutId);
         resolve(result);
       });
-      // Timeout fallback
-      setTimeout(() => resolve({ valid: true, fallback: true }), 3000);
     });
+
+    if (wsTimedOut) {
+      console.warn('[Strategy Builder] WS validation timeout — saving without server validation');
+      showNotification('Серверная валидация недоступна (таймаут). Сохранение без проверки.', 'warning');
+    }
 
     if (!wsValidationResult.fallback && !wsValidationResult.valid) {
       const errorCount = wsValidationResult.messages?.filter(m => m.severity === 'error').length || 0;
@@ -10073,6 +10082,13 @@ async function saveStrategy() {
       console.log('[Strategy Builder] Save success:', data);
       updateLastSaved(data.updated_at || new Date().toISOString());
       showNotification('Стратегия успешно сохранена!', 'success');
+
+      // Clear localStorage draft — saved successfully, draft no longer needed
+      const savedId = finalStrategyId || data.id;
+      if (savedId) {
+        clearLocalStorageDraft(savedId);
+        console.log(`[Strategy Builder] Cleared localStorage draft for strategy ${savedId}`);
+      }
 
       // Обновить URL если новая стратегия
       if (!finalStrategyId && data.id) {
@@ -10217,6 +10233,12 @@ async function autoSaveStrategy() {
 
     // 2) Remote autosave only если есть реальный ID (стратегия уже сохранена)
     if (strategyId !== 'draft') {
+      // Pre-check: skip remote save if browser is offline
+      if (!navigator.onLine) {
+        console.warn('[Strategy Builder] Autosave skipped — browser is offline');
+        return;
+      }
+
       const url = `/api/v1/strategy-builder/strategies/${strategyId}`;
       const response = await fetch(url, {
         method: 'PUT',
@@ -10280,6 +10302,9 @@ function migrateLegacyBlocks(blocks) {
 }
 
 async function loadStrategy(strategyId) {
+  // Close any open block params popup before loading a new strategy
+  closeBlockParamsPopup();
+
   try {
     const url = `/api/v1/strategy-builder/strategies/${strategyId}`;
     console.log(`[Strategy Builder] Loading strategy: GET ${url}`);
