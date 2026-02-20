@@ -1,244 +1,252 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Security Headers -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="DENY">
-    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!-- Security Headers -->
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.jsdelivr.net https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; connect-src 'self' https://cdn.jsdelivr.net https://api.bybit.com wss://stream.bybit.com ws://localhost:* http://localhost:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+        />
+        <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
 
-    <title>Portfolio Manager - Bybit Strategy Tester v2</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
-        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4"
-        crossorigin="anonymous"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- External CSS (Phase 1) -->
-    <link rel="stylesheet" href="./css/variables.css">
-    <link rel="stylesheet" href="./css/components.css">
-    <link rel="stylesheet" href="./css/common.css">
-    <link rel="stylesheet" href="./css/portfolio.css">
+        <title>Portfolio Manager - Bybit Strategy Tester v2</title>
+        <!-- Production Init (must load before all other scripts) -->
+        <script src="js/init-production.js"></script>
+        <script
+            src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+            integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4"
+            crossorigin="anonymous"
+        ></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
+        <!-- External CSS (Phase 1) -->
+        <link rel="stylesheet" href="./css/variables.css" />
+        <link rel="stylesheet" href="./css/components.css" />
+        <link rel="stylesheet" href="./css/common.css" />
+        <link rel="stylesheet" href="./css/portfolio.css" />
 
         <script src="js/core/auto-event-binding.js"></script>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="d-flex align-items-center gap-4">
-            <a href="dashboard.html" class="navbar-brand">
-                <i class="bi bi-graph-up-arrow"></i> Bybit Strategy Tester
-            </a>
-            <div class="nav-links">
-                <a href="dashboard.html" class="nav-link">Dashboard</a>
-                <a href="strategies.html" class="nav-link">Strategies</a>
-                <a href="backtest-results.html" class="nav-link">Backtests</a>
-                <a href="market-chart.html" class="nav-link">Charts</a>
-                <a href="portfolio.html" class="nav-link active">Portfolio</a>
-                <a href="ml-models.html" class="nav-link">ML Models</a>
+    </head>
+    <body>
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="d-flex align-items-center gap-4">
+                <a href="dashboard.html" class="navbar-brand">
+                    <i class="bi bi-graph-up-arrow"></i> Bybit Strategy Tester
+                </a>
+                <div class="nav-links">
+                    <a href="dashboard.html" class="nav-link">Dashboard</a>
+                    <a href="strategy-builder.html" class="nav-link">Strategies</a>
+                    <a href="backtest-results.html" class="nav-link">Backtests</a>
+                    <a href="market-chart.html" class="nav-link">Charts</a>
+                    <a href="portfolio.html" class="nav-link active">Portfolio</a>
+                    <a href="ml-models.html" class="nav-link">ML Models</a>
+                </div>
             </div>
-        </div>
-        <div class="d-flex align-items-center gap-3">
-            <span class="text-secondary" id="lastUpdate">
-                <i class="bi bi-clock"></i> Updated: Just now
-            </span>
-        </div>
-    </nav>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-secondary" id="lastUpdate"> <i class="bi bi-clock"></i> Updated: Just now </span>
+            </div>
+        </nav>
 
-    <div class="container">
-        <!-- Page Header -->
-        <div class="page-header">
-            <h1 class="page-title">
-                <i class="bi bi-wallet2"></i> Portfolio Manager
-            </h1>
-            <div class="d-flex gap-2">
-                <button class="btn btn-secondary" onclick="refreshPortfolio()">
-                    <i class="bi bi-arrow-clockwise"></i> Refresh
-                </button>
-                <button class="btn btn-secondary" onclick="exportPortfolio()">
-                    <i class="bi bi-download"></i> Export
-                </button>
-                <button class="btn btn-primary" onclick="openTradeModal()">
-                    <i class="bi bi-plus-lg"></i> New Trade
-                </button>
+        <div class="container">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h1 class="page-title"><i class="bi bi-wallet2"></i> Portfolio Manager</h1>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-secondary" onclick="refreshPortfolio()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportPortfolio()">
+                        <i class="bi bi-download"></i> Export
+                    </button>
+                    <button class="btn btn-primary" onclick="openTradeModal()">
+                        <i class="bi bi-plus-lg"></i> New Trade
+                    </button>
+                </div>
             </div>
-        </div>
 
-        <!-- Portfolio Overview -->
-        <div class="portfolio-overview">
-            <div class="overview-card">
-                <div class="overview-label">Total Portfolio Value</div>
-                <div class="overview-value" id="totalValue">$125,432.50</div>
-                <div class="overview-change positive">
-                    <i class="bi bi-arrow-up"></i>
-                    <span>+$3,245.20 (2.66%) today</span>
-                </div>
-            </div>
-            <div class="overview-card">
-                <div class="overview-label">Total P&L</div>
-                <div class="overview-value positive" id="totalPnl">+$25,432.50</div>
-                <div class="overview-change positive">
-                    <i class="bi bi-arrow-up"></i>
-                    <span>+25.43% all time</span>
-                </div>
-            </div>
-            <div class="overview-card">
-                <div class="overview-label">Open Positions</div>
-                <div class="overview-value" id="openPositions">8</div>
-                <div class="overview-change">
-                    <span class="text-secondary">5 Long, 3 Short</span>
-                </div>
-            </div>
-            <div class="overview-card">
-                <div class="overview-label">Available Balance</div>
-                <div class="overview-value" id="availableBalance">$42,150.00</div>
-                <div class="overview-change">
-                    <span class="text-secondary">33.6% of portfolio</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Content Grid -->
-        <div class="main-grid">
-            <!-- Left Column -->
-            <div class="d-flex flex-column gap-4">
-                <!-- Performance Chart -->
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Portfolio Performance</span>
-                        <div class="tabs">
-                            <button class="tab-btn active" onclick="setTimeRange('1D')">1D</button>
-                            <button class="tab-btn" onclick="setTimeRange('1W')">1W</button>
-                            <button class="tab-btn" onclick="setTimeRange('1M')">1M</button>
-                            <button class="tab-btn" onclick="setTimeRange('3M')">3M</button>
-                            <button class="tab-btn" onclick="setTimeRange('1Y')">1Y</button>
-                            <button class="tab-btn" onclick="setTimeRange('ALL')">All</button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="performanceChart"></canvas>
-                        </div>
+            <!-- Portfolio Overview -->
+            <div class="portfolio-overview">
+                <div class="overview-card">
+                    <div class="overview-label">Total Portfolio Value</div>
+                    <div class="overview-value" id="totalValue">$125,432.50</div>
+                    <div class="overview-change positive">
+                        <i class="bi bi-arrow-up"></i>
+                        <span>+$3,245.20 (2.66%) today</span>
                     </div>
                 </div>
+                <div class="overview-card">
+                    <div class="overview-label">Total P&L</div>
+                    <div class="overview-value positive" id="totalPnl">+$25,432.50</div>
+                    <div class="overview-change positive">
+                        <i class="bi bi-arrow-up"></i>
+                        <span>+25.43% all time</span>
+                    </div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Open Positions</div>
+                    <div class="overview-value" id="openPositions">8</div>
+                    <div class="overview-change">
+                        <span class="text-secondary">5 Long, 3 Short</span>
+                    </div>
+                </div>
+                <div class="overview-card">
+                    <div class="overview-label">Available Balance</div>
+                    <div class="overview-value" id="availableBalance">$42,150.00</div>
+                    <div class="overview-change">
+                        <span class="text-secondary">33.6% of portfolio</span>
+                    </div>
+                </div>
+            </div>
 
-                <!-- Holdings Table -->
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Current Holdings</span>
-                        <div class="d-flex gap-2">
-                            <input type="text" class="form-control" placeholder="Search assets..." id="assetSearch" aria-label="Search assets">
+            <!-- Main Content Grid -->
+            <div class="main-grid">
+                <!-- Left Column -->
+                <div class="d-flex flex-column gap-4">
+                    <!-- Performance Chart -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Portfolio Performance</span>
+                            <div class="tabs">
+                                <button class="tab-btn active" onclick="setTimeRange('1D')">1D</button>
+                                <button class="tab-btn" onclick="setTimeRange('1W')">1W</button>
+                                <button class="tab-btn" onclick="setTimeRange('1M')">1M</button>
+                                <button class="tab-btn" onclick="setTimeRange('3M')">3M</button>
+                                <button class="tab-btn" onclick="setTimeRange('1Y')">1Y</button>
+                                <button class="tab-btn" onclick="setTimeRange('ALL')">All</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="performanceChart"></canvas>
+                            </div>
                         </div>
                     </div>
-                    <div class="card-body no-padding">
-                        <table class="holdings-table">
-                            <thead>
-                                <tr>
-                                    <th>Asset</th>
-                                    <th>Amount</th>
-                                    <th>Avg Price</th>
-                                    <th>Current Price</th>
-                                    <th>Value</th>
-                                    <th>P&L</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="holdingsTableBody">
+
+                    <!-- Holdings Table -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Current Holdings</span>
+                            <div class="d-flex gap-2">
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    placeholder="Search assets..."
+                                    id="assetSearch"
+                                    aria-label="Search assets"
+                                />
+                            </div>
+                        </div>
+                        <div class="card-body no-padding">
+                            <table class="holdings-table">
+                                <thead>
+                                    <tr>
+                                        <th>Asset</th>
+                                        <th>Amount</th>
+                                        <th>Avg Price</th>
+                                        <th>Current Price</th>
+                                        <th>Value</th>
+                                        <th>P&L</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="holdingsTableBody">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div class="d-flex flex-column gap-4">
+                    <!-- Asset Allocation -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Asset Allocation</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="allocation-chart">
+                                <canvas id="allocationChart"></canvas>
+                            </div>
+                            <div class="allocation-legend" id="allocationLegend">
                                 <!-- Populated by JavaScript -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Column -->
-            <div class="d-flex flex-column gap-4">
-                <!-- Asset Allocation -->
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Asset Allocation</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="allocation-chart">
-                            <canvas id="allocationChart"></canvas>
+                            </div>
                         </div>
-                        <div class="allocation-legend" id="allocationLegend">
+                    </div>
+
+                    <!-- Risk Metrics -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Risk Metrics</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="risk-metric">
+                                <span class="risk-label">
+                                    <i class="bi bi-shield-check"></i>
+                                    Sharpe Ratio
+                                </span>
+                                <span class="risk-value good">1.85</span>
+                            </div>
+                            <div class="risk-metric">
+                                <span class="risk-label">
+                                    <i class="bi bi-graph-down"></i>
+                                    Max Drawdown
+                                </span>
+                                <span class="risk-value warning">-12.5%</span>
+                            </div>
+                            <div class="risk-metric">
+                                <span class="risk-label">
+                                    <i class="bi bi-activity"></i>
+                                    Volatility (30D)
+                                </span>
+                                <span class="risk-value warning">24.3%</span>
+                            </div>
+                            <div class="risk-metric">
+                                <span class="risk-label">
+                                    <i class="bi bi-percent"></i>
+                                    Win Rate
+                                </span>
+                                <span class="risk-value good">67.5%</span>
+                            </div>
+                            <div class="risk-metric">
+                                <span class="risk-label">
+                                    <i class="bi bi-bar-chart"></i>
+                                    Profit Factor
+                                </span>
+                                <span class="risk-value good">2.34</span>
+                            </div>
+                            <div class="risk-metric">
+                                <span class="risk-label">
+                                    <i class="bi bi-speedometer2"></i>
+                                    Leverage Used
+                                </span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill yellow w-45"></div>
+                                    </div>
+                                    <span class="risk-value">2.3x</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Trades -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Recent Trades</span>
+                            <a href="backtest-results.html" class="view-all-link">View All</a>
+                        </div>
+                        <div class="card-body" id="recentTrades">
                             <!-- Populated by JavaScript -->
                         </div>
                     </div>
                 </div>
-
-                <!-- Risk Metrics -->
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Risk Metrics</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="risk-metric">
-                            <span class="risk-label">
-                                <i class="bi bi-shield-check"></i>
-                                Sharpe Ratio
-                            </span>
-                            <span class="risk-value good">1.85</span>
-                        </div>
-                        <div class="risk-metric">
-                            <span class="risk-label">
-                                <i class="bi bi-graph-down"></i>
-                                Max Drawdown
-                            </span>
-                            <span class="risk-value warning">-12.5%</span>
-                        </div>
-                        <div class="risk-metric">
-                            <span class="risk-label">
-                                <i class="bi bi-activity"></i>
-                                Volatility (30D)
-                            </span>
-                            <span class="risk-value warning">24.3%</span>
-                        </div>
-                        <div class="risk-metric">
-                            <span class="risk-label">
-                                <i class="bi bi-percent"></i>
-                                Win Rate
-                            </span>
-                            <span class="risk-value good">67.5%</span>
-                        </div>
-                        <div class="risk-metric">
-                            <span class="risk-label">
-                                <i class="bi bi-bar-chart"></i>
-                                Profit Factor
-                            </span>
-                            <span class="risk-value good">2.34</span>
-                        </div>
-                        <div class="risk-metric">
-                            <span class="risk-label">
-                                <i class="bi bi-speedometer2"></i>
-                                Leverage Used
-                            </span>
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="progress-bar">
-                                    <div class="progress-fill yellow w-45"></div>
-                                </div>
-                                <span class="risk-value">2.3x</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recent Trades -->
-                <div class="card">
-                    <div class="card-header">
-                        <span class="card-title">Recent Trades</span>
-                        <a href="backtest-results.html" class="view-all-link">View All</a>
-                    </div>
-                    <div class="card-body" id="recentTrades">
-                        <!-- Populated by JavaScript -->
-                    </div>
-                </div>
             </div>
         </div>
-    </div>
 
-    <script type="module" src="./js/pages/portfolio.js"></script>
-</body>
+        <script type="module" src="./js/pages/portfolio.js"></script>
+    </body>
 </html>

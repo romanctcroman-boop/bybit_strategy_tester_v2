@@ -1441,7 +1441,7 @@ function initKeyboardShortcuts() {
                 window.location.href = 'dashboard.html';
                 break;
             case 's':
-                window.location.href = 'strategies.html';
+                window.location.href = 'strategy-builder.html';
                 break;
             case 't':
                 window.location.href = 'trading.html';
@@ -1456,7 +1456,7 @@ function initKeyboardShortcuts() {
                 refreshDashboard();
                 break;
             case 'n':
-                window.location.href = 'strategies.html?action=new';
+                window.location.href = 'strategy-builder.html?action=new';
                 break;
             case 'l':
                 toggleTheme();

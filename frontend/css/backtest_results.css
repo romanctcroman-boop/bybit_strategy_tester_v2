@@ -1243,6 +1243,10 @@ body {
     background: linear-gradient(90deg, #26a69a 33%, #78909c 33% 66%, #ffa726 66%);
 }
 
+.tv-legend-item-regime-overlay {
+    display: none;
+}
+
 /* Mode Toggle Buttons (Absolute / Percentage) */
 .tv-chart-mode-toggle {
     display: flex;
@@ -1567,6 +1571,35 @@ body {
     border-top: 1px solid var(--border-color);
     display: flex;
     gap: 12px;
+}
+
+.bt-price-chart-controls {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.bt-price-chart-controls label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.bt-price-chart-controls label:hover {
+    color: var(--text-primary);
+}
+
+.bt-price-chart-controls input[type='checkbox'] {
+    accent-color: #58a6ff;
+    cursor: pointer;
 }
 
 /* Small alert text used in MTF/Optimizer settings panels */

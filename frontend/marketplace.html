@@ -1,507 +1,443 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Security Headers -->
-    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
-    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!-- Security Headers -->
+        <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
 
-    <title>Strategy Marketplace - Bybit Strategy Tester v2</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="./css/variables.css" />
-    <link rel="stylesheet" href="./css/components.css" />
-    <link rel="stylesheet" href="./css/common.css" />
-    <link rel="stylesheet" href="./css/marketplace.css" />
-      <script src="js/core/auto-event-binding.js"></script>
-</head>
-  <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-      <div class="d-flex align-items-center gap-4">
-        <a href="dashboard.html" class="navbar-brand">
-          <i class="bi bi-graph-up-arrow"></i> Bybit Strategy Tester
-        </a>
-        <div class="nav-links">
-          <a href="dashboard.html" class="nav-link">Dashboard</a>
-          <a href="strategies.html" class="nav-link">My Strategies</a>
-          <a href="marketplace.html" class="nav-link active">Marketplace</a>
-          <a href="backtest-results.html" class="nav-link">Backtests</a>
-        </div>
-      </div>
-      <div class="d-flex align-items-center gap-3">
-        <button class="btn btn-outline-success" onclick="openPublishModal()">
-          <i class="bi bi-upload"></i> Publish Strategy
-        </button>
-      </div>
-    </nav>
-
-    <div class="container-fluid py-4">
-      <!-- Page Header -->
-      <div class="page-header mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <h1 class="page-title">
-              <i class="bi bi-shop"></i> Strategy Marketplace
-            </h1>
-            <p class="text-muted">
-              Discover, share, and download trading strategies from the
-              community
-            </p>
-          </div>
-          <div class="marketplace-stats d-flex gap-4">
-            <div class="stat-item text-center">
-              <div class="stat-value" id="totalStrategies">0</div>
-              <div class="stat-label">Strategies</div>
+        <title>Strategy Marketplace - Bybit Strategy Tester v2</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
+        <link rel="stylesheet" href="./css/variables.css" />
+        <link rel="stylesheet" href="./css/components.css" />
+        <link rel="stylesheet" href="./css/common.css" />
+        <link rel="stylesheet" href="./css/marketplace.css" />
+        <!-- Production Init (must load before all other scripts) -->
+        <script src="js/init-production.js"></script>
+        <script src="js/core/auto-event-binding.js"></script>
+    </head>
+    <body>
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="d-flex align-items-center gap-4">
+                <a href="dashboard.html" class="navbar-brand">
+                    <i class="bi bi-graph-up-arrow"></i> Bybit Strategy Tester
+                </a>
+                <div class="nav-links">
+                    <a href="dashboard.html" class="nav-link">Dashboard</a>
+                    <a href="strategy-builder.html" class="nav-link">My Strategies</a>
+                    <a href="marketplace.html" class="nav-link active">Marketplace</a>
+                    <a href="backtest-results.html" class="nav-link">Backtests</a>
+                </div>
             </div>
-            <div class="stat-item text-center">
-              <div class="stat-value" id="totalDownloads">0</div>
-              <div class="stat-label">Downloads</div>
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn btn-outline-success" onclick="openPublishModal()">
+                    <i class="bi bi-upload"></i> Publish Strategy
+                </button>
             </div>
-            <div class="stat-item text-center">
-              <div class="stat-value" id="avgRating">0.0</div>
-              <div class="stat-label">Avg Rating</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Filters & Search -->
-      <div class="filters-bar mb-4">
-        <div class="row g-3 align-items-center">
-          <div class="col-md-4">
-            <div class="input-group">
-              <span class="input-group-text bg-dark border-secondary">
-                <i class="bi bi-search text-muted"></i>
-              </span>
-              <input
-                type="text"
-                class="form-control bg-dark text-light border-secondary"
-                id="searchInput"
-                placeholder="Search strategies..."
-              />
-            </div>
-          </div>
-          <div class="col-md-2">
-            <select
-              class="form-select bg-dark text-light border-secondary"
-              id="categoryFilter"
-              title="Filter by category"
-            >
-              <option value="">All Categories</option>
-              <option value="trend_following">Trend Following</option>
-              <option value="mean_reversion">Mean Reversion</option>
-              <option value="momentum">Momentum</option>
-              <option value="scalping">Scalping</option>
-              <option value="swing">Swing Trading</option>
-              <option value="grid">Grid Trading</option>
-              <option value="dca">DCA</option>
-            </select>
-          </div>
-          <div class="col-md-2">
-            <select
-              class="form-select bg-dark text-light border-secondary"
-              id="sortBy"
-              title="Sort strategies by"
-            >
-              <option value="popular">Most Popular</option>
-              <option value="rating">Highest Rated</option>
-              <option value="recent">Most Recent</option>
-              <option value="downloads">Most Downloads</option>
-            </select>
-          </div>
-          <div class="col-md-2">
-            <select
-              class="form-select bg-dark text-light border-secondary"
-              id="timeframeFilter"
-              title="Filter by timeframe"
-            >
-              <option value="">All Timeframes</option>
-              <option value="1m">1 Minute</option>
-              <option value="5m">5 Minutes</option>
-              <option value="15m">15 Minutes</option>
-              <option value="1h">1 Hour</option>
-              <option value="4h">4 Hours</option>
-              <option value="1d">Daily</option>
-            </select>
-          </div>
-          <div class="col-md-2">
-            <div class="form-check form-switch">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                id="verifiedOnly"
-              />
-              <label class="form-check-label text-light" for="verifiedOnly">
-                <i class="bi bi-patch-check-fill text-primary"></i> Verified
-                Only
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Featured Strategies -->
-      <div class="featured-section mb-4" id="featuredSection">
-        <h5 class="section-title mb-3">
-          <i class="bi bi-star-fill text-warning"></i> Featured Strategies
-        </h5>
-        <div class="row g-3" id="featuredStrategies">
-          <!-- Featured cards loaded dynamically -->
-        </div>
-      </div>
-
-      <!-- Strategy Grid -->
-      <div class="strategies-section">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="section-title mb-0">
-            <i class="bi bi-collection"></i> All Strategies
-            <span class="badge bg-secondary ms-2" id="resultsCount">0</span>
-          </h5>
-          <div class="view-toggle btn-group">
-            <button
-              class="btn btn-outline-secondary active"
-              data-view="grid"
-              title="Grid view"
-              aria-label="Grid view"
-            >
-              <i class="bi bi-grid-3x3-gap"></i>
-            </button>
-            <button
-              class="btn btn-outline-secondary"
-              data-view="list"
-              title="List view"
-              aria-label="List view"
-            >
-              <i class="bi bi-list"></i>
-            </button>
-          </div>
-        </div>
-
-        <div class="row g-3" id="strategiesGrid">
-          <!-- Strategy cards loaded dynamically -->
-          <div class="col-12 text-center py-5" id="loadingState">
-            <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="text-muted mt-2">Loading strategies...</p>
-          </div>
-        </div>
-
-        <!-- Pagination -->
-        <nav class="mt-4" id="pagination">
-          <ul class="pagination justify-content-center">
-            <!-- Pagination generated dynamically -->
-          </ul>
         </nav>
-      </div>
-    </div>
 
-    <!-- Strategy Detail Modal -->
-    <div class="modal fade" id="strategyDetailModal" tabindex="-1">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content bg-dark text-light">
-          <div class="modal-header border-secondary">
-            <h5 class="modal-title" id="detailModalTitle">Strategy Details</h5>
-            <button
-              type="button"
-              class="btn-close btn-close-white"
-              data-bs-dismiss="modal"
-              title="Close modal"
-              aria-label="Close"
-            ></button>
-          </div>
-          <div class="modal-body" id="detailModalBody">
-            <!-- Content loaded dynamically -->
-          </div>
-          <div class="modal-footer border-secondary">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              data-bs-dismiss="modal"
-            >
-              Close
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              id="btnDownloadStrategy"
-            >
-              <i class="bi bi-download"></i> Download
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Publish Strategy Modal -->
-    <div class="modal fade" id="publishModal" tabindex="-1">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content bg-dark text-light">
-          <div class="modal-header border-secondary">
-            <h5 class="modal-title">
-              <i class="bi bi-upload"></i> Publish Your Strategy
-            </h5>
-            <button
-              type="button"
-              class="btn-close btn-close-white"
-              data-bs-dismiss="modal"
-              title="Close modal"
-              aria-label="Close"
-            ></button>
-          </div>
-          <div class="modal-body">
-            <form id="publishForm">
-              <div class="row g-3">
-                <div class="col-md-8">
-                  <label class="form-label">Strategy Name *</label>
-                  <input
-                    type="text"
-                    class="form-control bg-dark text-light border-secondary"
-                    id="pubName"
-                    required
-                    placeholder="My Awesome Strategy"
-                  />
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">Category *</label>
-                  <select
-                    class="form-select bg-dark text-light border-secondary"
-                    id="pubCategory"
-                    required
-                    title="Select strategy category"
-                  >
-                    <option value="">Select...</option>
-                    <option value="trend_following">Trend Following</option>
-                    <option value="mean_reversion">Mean Reversion</option>
-                    <option value="momentum">Momentum</option>
-                    <option value="scalping">Scalping</option>
-                    <option value="swing">Swing Trading</option>
-                    <option value="grid">Grid Trading</option>
-                    <option value="dca">DCA</option>
-                  </select>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Description *</label>
-                  <textarea
-                    class="form-control bg-dark text-light border-secondary"
-                    id="pubDescription"
-                    rows="3"
-                    required
-                    placeholder="Describe your strategy, its logic, and ideal market conditions..."
-                  ></textarea>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Strategy Type *</label>
-                  <select
-                    class="form-select bg-dark text-light border-secondary"
-                    id="pubStrategyType"
-                    required
-                    title="Select strategy type"
-                  >
-                    <option value="rsi">RSI</option>
-                    <option value="sma_crossover">SMA Crossover</option>
-                    <option value="ema_crossover">EMA Crossover</option>
-                    <option value="macd">MACD</option>
-                    <option value="bollinger_bands">Bollinger Bands</option>
-                    <option value="custom">Custom</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Recommended Timeframe</label>
-                  <select
-                    class="form-select bg-dark text-light border-secondary"
-                    id="pubTimeframe"
-                    title="Select recommended timeframe"
-                  >
-                    <option value="any">Any</option>
-                    <option value="1m">1 Minute</option>
-                    <option value="5m">5 Minutes</option>
-                    <option value="15m">15 Minutes</option>
-                    <option value="1h">1 Hour</option>
-                    <option value="4h">4 Hours</option>
-                    <option value="1d">Daily</option>
-                  </select>
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Strategy Parameters (JSON)</label>
-                  <textarea
-                    class="form-control bg-dark text-light border-secondary font-monospace"
-                    id="pubParams"
-                    rows="4"
-                    placeholder='{"period": 14, "overbought": 70, "oversold": 30}'
-                  ></textarea>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Tags (comma-separated)</label>
-                  <input
-                    type="text"
-                    class="form-control bg-dark text-light border-secondary"
-                    id="pubTags"
-                    placeholder="bitcoin, swing, low-risk"
-                  />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Visibility</label>
-                  <select
-                    class="form-select bg-dark text-light border-secondary"
-                    id="pubVisibility"
-                    title="Select visibility"
-                  >
-                    <option value="public">Public - Anyone can see</option>
-                    <option value="unlisted">Unlisted - Only via link</option>
-                  </select>
-                </div>
-                <div class="col-12">
-                  <h6 class="mt-3 mb-2">Performance Metrics (Optional)</h6>
-                  <div class="row g-2">
-                    <div class="col-md-3">
-                      <label class="form-label small">Win Rate %</label>
-                      <input
-                        type="number"
-                        class="form-control form-control-sm bg-dark text-light border-secondary"
-                        id="pubWinRate"
-                        min="0"
-                        max="100"
-                        title="Win rate percentage"
-                        placeholder="0-100"
-                        step="0.1"
-                      />
+        <div class="container-fluid py-4">
+            <!-- Page Header -->
+            <div class="page-header mb-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="page-title"><i class="bi bi-shop"></i> Strategy Marketplace</h1>
+                        <p class="text-muted">Discover, share, and download trading strategies from the community</p>
                     </div>
-                    <div class="col-md-3">
-                      <label class="form-label small">Sharpe Ratio</label>
-                      <input
-                        type="number"
-                        class="form-control form-control-sm bg-dark text-light border-secondary"
-                        id="pubSharpe"
-                        step="0.01"
-                        title="Sharpe ratio"
-                        placeholder="e.g. 1.5"
-                      />
+                    <div class="marketplace-stats d-flex gap-4">
+                        <div class="stat-item text-center">
+                            <div class="stat-value" id="totalStrategies">0</div>
+                            <div class="stat-label">Strategies</div>
+                        </div>
+                        <div class="stat-item text-center">
+                            <div class="stat-value" id="totalDownloads">0</div>
+                            <div class="stat-label">Downloads</div>
+                        </div>
+                        <div class="stat-item text-center">
+                            <div class="stat-value" id="avgRating">0.0</div>
+                            <div class="stat-label">Avg Rating</div>
+                        </div>
                     </div>
-                    <div class="col-md-3">
-                      <label class="form-label small">Max Drawdown %</label>
-                      <input
-                        type="number"
-                        class="form-control form-control-sm bg-dark text-light border-secondary"
-                        id="pubDrawdown"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        title="Maximum drawdown percentage"
-                        placeholder="0-100"
-                      />
-                    </div>
-                    <div class="col-md-3">
-                      <label class="form-label small">Total Return %</label>
-                      <input
-                        type="number"
-                        class="form-control form-control-sm bg-dark text-light border-secondary"
-                        id="pubReturn"
-                        step="0.1"
-                        title="Total return percentage"
-                        placeholder="e.g. 25.5"
-                      />
-                    </div>
-                  </div>
                 </div>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer border-secondary">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              data-bs-dismiss="modal"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="btn btn-success"
-              onclick="publishStrategy()"
-            >
-              <i class="bi bi-upload"></i> Publish Strategy
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Review Modal -->
-    <div class="modal fade" id="reviewModal" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-dark text-light">
-          <div class="modal-header border-secondary">
-            <h5 class="modal-title">Write a Review</h5>
-            <button
-              type="button"
-              class="btn-close btn-close-white"
-              data-bs-dismiss="modal"
-              title="Close modal"
-              aria-label="Close"
-            ></button>
-          </div>
-          <div class="modal-body">
-            <div class="rating-input mb-3 text-center">
-              <span class="rating-star" data-value="1"
-                ><i class="bi bi-star"></i
-              ></span>
-              <span class="rating-star" data-value="2"
-                ><i class="bi bi-star"></i
-              ></span>
-              <span class="rating-star" data-value="3"
-                ><i class="bi bi-star"></i
-              ></span>
-              <span class="rating-star" data-value="4"
-                ><i class="bi bi-star"></i
-              ></span>
-              <span class="rating-star" data-value="5"
-                ><i class="bi bi-star"></i
-              ></span>
             </div>
-            <textarea
-              class="form-control bg-dark text-light border-secondary"
-              id="reviewText"
-              rows="3"
-              placeholder="Share your experience with this strategy..."
-            ></textarea>
-          </div>
-          <div class="modal-footer border-secondary">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              data-bs-dismiss="modal"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              onclick="submitReview()"
-            >
-              Submit Review
-            </button>
-          </div>
+
+            <!-- Filters & Search -->
+            <div class="filters-bar mb-4">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark border-secondary">
+                                <i class="bi bi-search text-muted"></i>
+                            </span>
+                            <input
+                                type="text"
+                                class="form-control bg-dark text-light border-secondary"
+                                id="searchInput"
+                                placeholder="Search strategies..."
+                            />
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <select
+                            class="form-select bg-dark text-light border-secondary"
+                            id="categoryFilter"
+                            title="Filter by category"
+                        >
+                            <option value="">All Categories</option>
+                            <option value="trend_following">Trend Following</option>
+                            <option value="mean_reversion">Mean Reversion</option>
+                            <option value="momentum">Momentum</option>
+                            <option value="scalping">Scalping</option>
+                            <option value="swing">Swing Trading</option>
+                            <option value="grid">Grid Trading</option>
+                            <option value="dca">DCA</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select
+                            class="form-select bg-dark text-light border-secondary"
+                            id="sortBy"
+                            title="Sort strategies by"
+                        >
+                            <option value="popular">Most Popular</option>
+                            <option value="rating">Highest Rated</option>
+                            <option value="recent">Most Recent</option>
+                            <option value="downloads">Most Downloads</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select
+                            class="form-select bg-dark text-light border-secondary"
+                            id="timeframeFilter"
+                            title="Filter by timeframe"
+                        >
+                            <option value="">All Timeframes</option>
+                            <option value="1m">1 Minute</option>
+                            <option value="5m">5 Minutes</option>
+                            <option value="15m">15 Minutes</option>
+                            <option value="1h">1 Hour</option>
+                            <option value="4h">4 Hours</option>
+                            <option value="1d">Daily</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="verifiedOnly" />
+                            <label class="form-check-label text-light" for="verifiedOnly">
+                                <i class="bi bi-patch-check-fill text-primary"></i> Verified Only
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Featured Strategies -->
+            <div class="featured-section mb-4" id="featuredSection">
+                <h5 class="section-title mb-3"><i class="bi bi-star-fill text-warning"></i> Featured Strategies</h5>
+                <div class="row g-3" id="featuredStrategies">
+                    <!-- Featured cards loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Strategy Grid -->
+            <div class="strategies-section">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="section-title mb-0">
+                        <i class="bi bi-collection"></i> All Strategies
+                        <span class="badge bg-secondary ms-2" id="resultsCount">0</span>
+                    </h5>
+                    <div class="view-toggle btn-group">
+                        <button
+                            class="btn btn-outline-secondary active"
+                            data-view="grid"
+                            title="Grid view"
+                            aria-label="Grid view"
+                        >
+                            <i class="bi bi-grid-3x3-gap"></i>
+                        </button>
+                        <button
+                            class="btn btn-outline-secondary"
+                            data-view="list"
+                            title="List view"
+                            aria-label="List view"
+                        >
+                            <i class="bi bi-list"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row g-3" id="strategiesGrid">
+                    <!-- Strategy cards loaded dynamically -->
+                    <div class="col-12 text-center py-5" id="loadingState">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="text-muted mt-2">Loading strategies...</p>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <nav class="mt-4" id="pagination">
+                    <ul class="pagination justify-content-center">
+                        <!-- Pagination generated dynamically -->
+                    </ul>
+                </nav>
+            </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Toast Container -->
-    <div
-      class="toast-container position-fixed bottom-0 end-0 p-3"
-      id="toastContainer"
-    ></div>
+        <!-- Strategy Detail Modal -->
+        <div class="modal fade" id="strategyDetailModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content bg-dark text-light">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title" id="detailModalTitle">Strategy Details</h5>
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"
+                            title="Close modal"
+                            aria-label="Close"
+                        ></button>
+                    </div>
+                    <div class="modal-body" id="detailModalBody">
+                        <!-- Content loaded dynamically -->
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" id="btnDownloadStrategy">
+                            <i class="bi bi-download"></i> Download
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="./js/pages/marketplace.js"></script>
-  </body>
+        <!-- Publish Strategy Modal -->
+        <div class="modal fade" id="publishModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content bg-dark text-light">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title"><i class="bi bi-upload"></i> Publish Your Strategy</h5>
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"
+                            title="Close modal"
+                            aria-label="Close"
+                        ></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="publishForm">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label">Strategy Name *</label>
+                                    <input
+                                        type="text"
+                                        class="form-control bg-dark text-light border-secondary"
+                                        id="pubName"
+                                        required
+                                        placeholder="My Awesome Strategy"
+                                    />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Category *</label>
+                                    <select
+                                        class="form-select bg-dark text-light border-secondary"
+                                        id="pubCategory"
+                                        required
+                                        title="Select strategy category"
+                                    >
+                                        <option value="">Select...</option>
+                                        <option value="trend_following">Trend Following</option>
+                                        <option value="mean_reversion">Mean Reversion</option>
+                                        <option value="momentum">Momentum</option>
+                                        <option value="scalping">Scalping</option>
+                                        <option value="swing">Swing Trading</option>
+                                        <option value="grid">Grid Trading</option>
+                                        <option value="dca">DCA</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Description *</label>
+                                    <textarea
+                                        class="form-control bg-dark text-light border-secondary"
+                                        id="pubDescription"
+                                        rows="3"
+                                        required
+                                        placeholder="Describe your strategy, its logic, and ideal market conditions..."
+                                    ></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Strategy Type *</label>
+                                    <select
+                                        class="form-select bg-dark text-light border-secondary"
+                                        id="pubStrategyType"
+                                        required
+                                        title="Select strategy type"
+                                    >
+                                        <option value="rsi">RSI</option>
+                                        <option value="sma_crossover">SMA Crossover</option>
+                                        <option value="ema_crossover">EMA Crossover</option>
+                                        <option value="macd">MACD</option>
+                                        <option value="bollinger_bands">Bollinger Bands</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Recommended Timeframe</label>
+                                    <select
+                                        class="form-select bg-dark text-light border-secondary"
+                                        id="pubTimeframe"
+                                        title="Select recommended timeframe"
+                                    >
+                                        <option value="any">Any</option>
+                                        <option value="1m">1 Minute</option>
+                                        <option value="5m">5 Minutes</option>
+                                        <option value="15m">15 Minutes</option>
+                                        <option value="1h">1 Hour</option>
+                                        <option value="4h">4 Hours</option>
+                                        <option value="1d">Daily</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Strategy Parameters (JSON)</label>
+                                    <textarea
+                                        class="form-control bg-dark text-light border-secondary font-monospace"
+                                        id="pubParams"
+                                        rows="4"
+                                        placeholder='{"period": 14, "overbought": 70, "oversold": 30}'
+                                    ></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Tags (comma-separated)</label>
+                                    <input
+                                        type="text"
+                                        class="form-control bg-dark text-light border-secondary"
+                                        id="pubTags"
+                                        placeholder="bitcoin, swing, low-risk"
+                                    />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Visibility</label>
+                                    <select
+                                        class="form-select bg-dark text-light border-secondary"
+                                        id="pubVisibility"
+                                        title="Select visibility"
+                                    >
+                                        <option value="public">Public - Anyone can see</option>
+                                        <option value="unlisted">Unlisted - Only via link</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <h6 class="mt-3 mb-2">Performance Metrics (Optional)</h6>
+                                    <div class="row g-2">
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Win Rate %</label>
+                                            <input
+                                                type="number"
+                                                class="form-control form-control-sm bg-dark text-light border-secondary"
+                                                id="pubWinRate"
+                                                min="0"
+                                                max="100"
+                                                title="Win rate percentage"
+                                                placeholder="0-100"
+                                                step="0.1"
+                                            />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Sharpe Ratio</label>
+                                            <input
+                                                type="number"
+                                                class="form-control form-control-sm bg-dark text-light border-secondary"
+                                                id="pubSharpe"
+                                                step="0.01"
+                                                title="Sharpe ratio"
+                                                placeholder="e.g. 1.5"
+                                            />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Max Drawdown %</label>
+                                            <input
+                                                type="number"
+                                                class="form-control form-control-sm bg-dark text-light border-secondary"
+                                                id="pubDrawdown"
+                                                min="0"
+                                                max="100"
+                                                step="0.1"
+                                                title="Maximum drawdown percentage"
+                                                placeholder="0-100"
+                                            />
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small">Total Return %</label>
+                                            <input
+                                                type="number"
+                                                class="form-control form-control-sm bg-dark text-light border-secondary"
+                                                id="pubReturn"
+                                                step="0.1"
+                                                title="Total return percentage"
+                                                placeholder="e.g. 25.5"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success" onclick="publishStrategy()">
+                            <i class="bi bi-upload"></i> Publish Strategy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Review Modal -->
+        <div class="modal fade" id="reviewModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark text-light">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title">Write a Review</h5>
+                        <button
+                            type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"
+                            title="Close modal"
+                            aria-label="Close"
+                        ></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="rating-input mb-3 text-center">
+                            <span class="rating-star" data-value="1"><i class="bi bi-star"></i></span>
+                            <span class="rating-star" data-value="2"><i class="bi bi-star"></i></span>
+                            <span class="rating-star" data-value="3"><i class="bi bi-star"></i></span>
+                            <span class="rating-star" data-value="4"><i class="bi bi-star"></i></span>
+                            <span class="rating-star" data-value="5"><i class="bi bi-star"></i></span>
+                        </div>
+                        <textarea
+                            class="form-control bg-dark text-light border-secondary"
+                            id="reviewText"
+                            rows="3"
+                            placeholder="Share your experience with this strategy..."
+                        ></textarea>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="submitReview()">Submit Review</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="./js/pages/marketplace.js"></script>
+    </body>
 </html>

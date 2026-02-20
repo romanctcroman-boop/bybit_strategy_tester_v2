@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="./css/variables.css?v=20260204d" />
   <link rel="stylesheet" href="./css/components.css?v=20260204d" />
   <link rel="stylesheet" href="./css/common.css?v=20260204d" />
-  <link rel="stylesheet" href="./css/strategy_builder.css?v=20260215d" />
+  <link rel="stylesheet" href="./css/strategy_builder.css?v=20260218b" />
 
   <!-- auto-event-binding.js removed - using native event listeners in strategy_builder.js -->
 </head>
@@ -695,9 +695,11 @@
         </div>
       </div>
 
+      <!-- Production Init (must load before all other scripts) -->
+      <script src="./js/init-production.js"></script>
       <script src="./js/sidebar-toggle.js"></script>
       <script src="./js/pages/strategy_builder_debug.js"></script>
-      <script type="module" src="./js/pages/strategy_builder.js?v=20260217c"></script>
+      <script type="module" src="./js/pages/strategy_builder.js?v=20260218d"></script>
       <script src="./js/pages/symbol_picker_debug.js" defer></script>
       <script src="./js/pages/optimization_panels.js?v=20260204"></script>
       <script src="./js/pages/optimization.js"></script>

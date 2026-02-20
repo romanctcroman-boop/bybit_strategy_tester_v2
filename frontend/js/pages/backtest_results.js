@@ -45,6 +45,7 @@ let btPriceChart = null;
 let btCandleSeries = null;
 let btPriceChartMarkers = [];
 let btTradeLineSeries = []; // eslint-disable-line no-unused-vars -- entry→exit price lines (cleaned on chart destroy)
+let _btCachedCandles = [];  // cached candles for marker rebuild on checkbox toggle
 let btPriceChartPending = false; // true when chart needs (re-)creation on tab show
 let _priceChartGeneration = 0; // generation counter to cancel stale async renders
 let _priceChartResizeObserver = null; // stored so we can disconnect on chart rebuild
@@ -105,7 +106,7 @@ const equityTradeMarkersPlugin = {
 
         const pnl = Number(info.pnl ?? 0);
         const side = (info.side || 'long').toLowerCase();
-        const isShort = side === 'short';
+        const isShort = side === 'short' || side === 'sell';
 
         const fill = pnl > 0 ? '#26a69a' : pnl < 0 ? '#ef5350' : '#78909c';
 
@@ -328,6 +329,12 @@ document.addEventListener('DOMContentLoaded', () => {
   setupChartResize();
   setupResultsListDelegation();
   setupBulkDeleteToolbar();
+
+  // Price-chart marker display checkboxes
+  const pnlCb = document.getElementById('markerShowPnl');
+  const priceCb = document.getElementById('markerShowEntryPrice');
+  if (pnlCb) pnlCb.addEventListener('change', rebuildTradeMarkers);
+  if (priceCb) priceCb.addEventListener('change', rebuildTradeMarkers);
 });
 
 // Handle URL changes (back/forward navigation or redirect with ?id=)
@@ -637,7 +644,8 @@ function initCharts() {
                 const idx = context[0].dataIndex;
                 const tradeInfo = equityChart._tradeMap?.[idx];
                 if (tradeInfo) {
-                  const side = tradeInfo.side === 'short' ? 'Short' : 'Long';
+                  const sideVal = (tradeInfo.side || 'long').toLowerCase();
+                  const side = (sideVal === 'short' || sideVal === 'sell') ? 'Short' : 'Long';
                   return `Trade #${tradeInfo.tradeNum} • ${side}`;
                 }
                 const data = equityChart._equityData;
@@ -4735,8 +4743,9 @@ function addNavigationHighlight(targetTimeSec, tradeInfo = null) {
   if (!btCandleSeries) return;
 
   // Build the highlight marker
+  const sideVal = tradeInfo ? (tradeInfo.side || 'long').toLowerCase() : '';
   const label = tradeInfo
-    ? `► Trade #${tradeInfo.tradeNum} (${tradeInfo.side === 'short' ? 'Short' : 'Long'})`
+    ? `► Trade #${tradeInfo.tradeNum} (${(sideVal === 'short' || sideVal === 'sell') ? 'Short' : 'Long'})`
     : '► Navigate here';
 
   const highlightMarker = {
@@ -4916,6 +4925,7 @@ async function updatePriceChart(backtest) {
     });
 
     btCandleSeries.setData(candles);
+    _btCachedCandles = candles; // cache for marker rebuild on checkbox toggle
 
     // Add crosshair OHLC display
     btPriceChart.subscribeCrosshairMove((param) => {
@@ -4983,8 +4993,12 @@ async function updatePriceChart(backtest) {
  *
  * Colors: Entry Long=#2196F3 (blue), Entry Short=#ef5350 (red), Exit=#AB47BC (purple)
  */
-function buildTradeMarkers(trades, candles) {
+function buildTradeMarkers(trades, candles, options = {}) {
   if (!trades || trades.length === 0 || !candles || candles.length === 0) return [];
+
+  // Read display options from checkboxes (with defaults)
+  const showPnl = options.showPnl ?? (document.getElementById('markerShowPnl')?.checked ?? true);
+  const showEntryPrice = options.showEntryPrice ?? (document.getElementById('markerShowEntryPrice')?.checked ?? true);
 
   const markers = [];
   const firstCandleTime = candles[0].time;
@@ -5009,58 +5023,72 @@ function buildTradeMarkers(trades, candles) {
     // Skip markers outside visible range
     if (entryTimeSec < firstCandleTime || entryTimeSec > lastCandleTime) return;
 
-    const isLong = (trade.side || 'long').toLowerCase() === 'long';
+    const sideNorm = (trade.side || 'long').toLowerCase();
+    const isLong = sideNorm === 'long' || sideNorm === 'buy';
     const pnl = trade.pnl || 0;
     const pnlStr = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
 
     // --- Determine entry label ---
-    // Grid/DCA: "G1"..."G15", normal: "buy"
+    // Grid/DCA: "G1"..."G15", normal: "buy"/"sell"
     const entryLabel = trade.grid_level
       ? `G${trade.grid_level}`
-      : 'buy';
+      : (isLong ? 'buy' : 'sell');
+
+    // --- Determine exit reason (try exit_comment first, then exit_reason) ---
+    const exitReason = (trade.exit_comment || trade.exit_reason || '').toLowerCase();
+
+    // Determine exit label: TP, SL, TP1-TP4, trailing, signal, etc.
+    let exitLabel;
+    if (/^tp\d+$/.test(exitReason)) {
+      exitLabel = exitReason.toUpperCase();
+    } else if (exitReason === 'tp' || exitReason.includes('take_profit')) {
+      exitLabel = 'TP';
+    } else if (exitReason === 'sl' || exitReason.includes('stop_loss')) {
+      exitLabel = 'SL';
+    } else if (exitReason.includes('trailing') || exitReason === 'tsl') {
+      exitLabel = 'TSL';
+    } else if (exitReason.includes('signal')) {
+      exitLabel = 'Signal';
+    } else if (exitReason.includes('time_exit') || exitReason.includes('session') || exitReason.includes('weekend')) {
+      exitLabel = 'Time';
+    } else if (exitReason.includes('end_of_data') || exitReason === 'eod') {
+      exitLabel = 'EOD';
+    } else if (exitReason.includes('breakeven') || exitReason === 'be') {
+      exitLabel = 'BE';
+    } else {
+      exitLabel = 'Close';
+    }
 
     // --- ENTRY MARKER ---
     // Long: blue ↑ below bar | Short: red ↓ above bar
+    // Build entry text: "buy" + optional entry price
+    let entryText = entryLabel;
+    if (showEntryPrice && trade.entry_price) {
+      entryText += ` ${trade.entry_price.toFixed(2)}`;
+    }
     markers.push({
       time: entryTimeSec,
       position: isLong ? 'belowBar' : 'aboveBar',
       color: isLong ? ENTRY_LONG_COLOR : ENTRY_SHORT_COLOR,
       shape: isLong ? 'arrowUp' : 'arrowDown',
-      text: `${entryLabel}\n${pnlStr}`
+      text: entryText,
+      size: 2
     });
 
     // --- EXIT MARKER ---
     if (exitTimeSec >= firstCandleTime && exitTimeSec <= lastCandleTime) {
-      const exitReason = (trade.exit_reason || '').toLowerCase();
-
-      // Determine exit label: TP, SL, TP1-TP4, trailing, signal, etc.
-      let exitLabel;
-      if (/^tp\d+$/.test(exitReason)) {
-        // Multi-TP: "tp1" → "TP1", "tp2" → "TP2", etc.
-        exitLabel = exitReason.toUpperCase();
-      } else if (exitReason.includes('take_profit') || exitReason === 'take_profit') {
-        exitLabel = 'TP';
-      } else if (exitReason.includes('stop_loss') || exitReason === 'stop_loss') {
-        exitLabel = 'SL';
-      } else if (exitReason.includes('trailing')) {
-        exitLabel = 'TSL';
-      } else if (exitReason.includes('signal')) {
-        exitLabel = 'Signal';
-      } else if (exitReason.includes('time_exit') || exitReason.includes('session') || exitReason.includes('weekend')) {
-        exitLabel = 'Time';
-      } else if (exitReason.includes('end_of_data')) {
-        exitLabel = 'EOD';
-      } else {
-        exitLabel = 'Close';
+      // Build exit text: "TP" + optional PnL
+      let exitText = exitLabel;
+      if (showPnl) {
+        exitText += ` ${pnlStr}`;
       }
-
-      // Long exit: purple ↓ above bar | Short exit: purple ↑ below bar
       markers.push({
         time: exitTimeSec,
         position: isLong ? 'aboveBar' : 'belowBar',
         color: EXIT_COLOR,
         shape: isLong ? 'arrowDown' : 'arrowUp',
-        text: `${pnlStr}\n${exitLabel}`
+        text: exitText,
+        size: 2
       });
     }
   });
@@ -5068,6 +5096,17 @@ function buildTradeMarkers(trades, candles) {
   // Sort markers by time (required by LightweightCharts)
   markers.sort((a, b) => a.time - b.time);
   return markers;
+}
+
+/**
+ * Rebuild trade markers on the price chart based on current checkbox states.
+ * Called when user toggles "Show PnL" or "Show Entry Price" checkboxes.
+ */
+function rebuildTradeMarkers() {
+  if (!btCandleSeries || !currentBacktest?.trades || _btCachedCandles.length === 0) return;
+  btPriceChartMarkers = buildTradeMarkers(currentBacktest.trades, _btCachedCandles);
+  btCandleSeries.setMarkers(btPriceChartMarkers);
+  console.log(`[PriceChart] Rebuilt ${btPriceChartMarkers.length} markers (PnL=${document.getElementById('markerShowPnl')?.checked}, Price=${document.getElementById('markerShowEntryPrice')?.checked})`);
 }
 
 /**

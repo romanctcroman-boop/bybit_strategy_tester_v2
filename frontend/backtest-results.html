@@ -20,6 +20,8 @@
         <!-- AI Assistant CSS -->
         <link rel="stylesheet" href="./css/ai-assistant.css" />
 
+        <!-- Production Init (must load before all other scripts) -->
+        <script src="js/init-production.js"></script>
         <!-- TradingView Lightweight Charts (for candlestick chart) -->
         <script src="libs/lightweight-charts.js"></script>
 
@@ -54,7 +56,7 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="strategies.html">
+                            <a class="nav-link" href="strategy-builder.html">
                                 <i class="bi bi-diagram-3 me-1"></i>Strategies
                             </a>
                         </li>
@@ -198,7 +200,7 @@
                                     <i class="bi bi-inbox"></i>
                                     <h5>No Backtest Results</h5>
                                     <p>Run a backtest from the Strategies page to see results here.</p>
-                                    <a href="strategies.html" class="btn btn-primary btn-sm">
+                                    <a href="strategy-builder.html" class="btn btn-primary btn-sm">
                                         <i class="bi bi-plus-lg me-1"></i>Create Strategy
                                     </a>
                                 </div>
@@ -319,9 +321,8 @@
                                                 Trades excursions
                                             </label>
                                             <label
-                                                class="tv-legend-item"
+                                                class="tv-legend-item tv-legend-item-regime-overlay"
                                                 title="Наложение режимов рынка (тренд/боковик/волатильность) на график"
-                                                style="display: none"
                                             >
                                                 <input type="checkbox" id="legendRegimeOverlay" />
                                                 <span class="tv-legend-color tv-legend-color-regime"></span>
@@ -370,6 +371,16 @@
                                 </div>
                                 <div class="bt-price-chart-info" id="btPriceChartInfo">
                                     <span id="btChartOHLC" class="text-secondary"> O: -- H: -- L: -- C: -- </span>
+                                </div>
+                                <div class="bt-price-chart-controls">
+                                    <label>
+                                        <input type="checkbox" id="markerShowPnl" checked />
+                                        Показать PnL
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="markerShowEntryPrice" checked />
+                                        Показать цену входа
+                                    </label>
                                 </div>
                             </div>
                         </div>
