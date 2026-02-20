@@ -12,8 +12,14 @@ Usage:
 """
 
 import argparse
+import io
 import sys
 from pathlib import Path
+
+# Fix Unicode output on Windows (cp1251 can't encode emoji characters)
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 # Add project root to path
 project_root = Path(__file__).parent
@@ -53,32 +59,18 @@ For more info: https://github.com/RomanCTC/bybit_strategy_tester_v2
 
     # ===== Server command =====
     server_parser = subparsers.add_parser("server", help="Start FastAPI server")
-    server_parser.add_argument(
-        "--host", default="0.0.0.0", help="Host to bind (default: 0.0.0.0)"
-    )
-    server_parser.add_argument(
-        "--port", type=int, default=8000, help="Port to bind (default: 8000)"
-    )
-    server_parser.add_argument(
-        "--reload", action="store_true", help="Enable auto-reload for development"
-    )
+    server_parser.add_argument("--host", default="0.0.0.0", help="Host to bind (default: 0.0.0.0)")
+    server_parser.add_argument("--port", type=int, default=8000, help="Port to bind (default: 8000)")
+    server_parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
 
     # ===== Migrate command =====
     migrate_parser = subparsers.add_parser("migrate", help="Run database migrations")
-    migrate_parser.add_argument(
-        "--revision", default="head", help="Target revision (default: head)"
-    )
+    migrate_parser.add_argument("--revision", default="head", help="Target revision (default: head)")
 
     # ===== Generate strategy command =====
-    gen_parser = subparsers.add_parser(
-        "generate-strategy", help="AI strategy generation"
-    )
-    gen_parser.add_argument(
-        "--prompt", required=True, help="Strategy description for AI"
-    )
-    gen_parser.add_argument(
-        "--symbol", default="BTCUSDT", help="Trading symbol (default: BTCUSDT)"
-    )
+    gen_parser = subparsers.add_parser("generate-strategy", help="AI strategy generation")
+    gen_parser.add_argument("--prompt", required=True, help="Strategy description for AI")
+    gen_parser.add_argument("--symbol", default="BTCUSDT", help="Trading symbol (default: BTCUSDT)")
     gen_parser.add_argument(
         "--agent",
         choices=["deepseek", "perplexity"],
@@ -88,18 +80,14 @@ For more info: https://github.com/RomanCTC/bybit_strategy_tester_v2
 
     # ===== Backtest command =====
     backtest_parser = subparsers.add_parser("backtest", help="Run strategy backtest")
-    backtest_parser.add_argument(
-        "--strategy-id", type=int, required=True, help="Strategy ID to test"
-    )
+    backtest_parser.add_argument("--strategy-id", type=int, required=True, help="Strategy ID to test")
     backtest_parser.add_argument("--symbol", default="BTCUSDT", help="Trading symbol")
     backtest_parser.add_argument("--start-date", help="Start date (YYYY-MM-DD)")
     backtest_parser.add_argument("--end-date", help="End date (YYYY-MM-DD)")
 
     # ===== Health command =====
     health_parser = subparsers.add_parser("health", help="Check system health")
-    health_parser.add_argument(
-        "--detailed", action="store_true", help="Show detailed component status"
-    )
+    health_parser.add_argument("--detailed", action="store_true", help="Show detailed component status")
 
     # ===== Audit command =====
     audit_parser = subparsers.add_parser("audit", help="Run code quality audit")
@@ -198,9 +186,7 @@ def cmd_generate_strategy(args):
         agent = UnifiedAgentInterface()
 
         # Map agent name to type
-        agent_type = (
-            AgentType.DEEPSEEK if args.agent == "deepseek" else AgentType.PERPLEXITY
-        )
+        agent_type = AgentType.DEEPSEEK if args.agent == "deepseek" else AgentType.PERPLEXITY
 
         request = AgentRequest(
             agent_type=agent_type,
@@ -235,9 +221,7 @@ def cmd_backtest(args):
     print("\n⚠️  Note: Full backtest integration coming soon")
     print("💡 Use API endpoint: POST /api/backtests/")
     print("   curl -X POST http://localhost:8000/api/backtests/ \\")
-    print(
-        f'     -d \'{{"strategy_id": {args.strategy_id}, "symbol": "{args.symbol}"}}\''
-    )
+    print(f'     -d \'{{"strategy_id": {args.strategy_id}, "symbol": "{args.symbol}"}}\'')
 
     return 0
 
@@ -258,9 +242,7 @@ def cmd_health(args):
 
         # Check detailed health if requested
         if args.detailed:
-            response = requests.get(
-                "http://localhost:8000/api/health/monitoring", timeout=5
-            )
+            response = requests.get("http://localhost:8000/api/health/monitoring", timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 print("\n📋 Component Status:")
@@ -286,9 +268,7 @@ def cmd_audit(args):
     if args.type == "quick":
         import subprocess
 
-        result = subprocess.run(
-            [sys.executable, "scripts/final_audit.py"], capture_output=False
-        )
+        result = subprocess.run([sys.executable, "scripts/final_audit.py"], capture_output=False)
         return result.returncode
     else:
         print("⚠️  Deep audit requires additional setup")

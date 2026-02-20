@@ -50,7 +50,11 @@ dev: install
 	pre-commit install
 
 run:
-	powershell -ExecutionPolicy Bypass -File start_all.ps1
+	@if command -v powershell >/dev/null 2>&1 && [ -f start_all.ps1 ]; then \
+		powershell -ExecutionPolicy Bypass -File start_all.ps1; \
+	else \
+		python main.py server; \
+	fi
 
 run-simple:
 	uvicorn backend.api.app:app --host 0.0.0.0 --port 8000 --reload

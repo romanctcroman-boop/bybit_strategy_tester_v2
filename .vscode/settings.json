@@ -154,6 +154,13 @@
   // Pylance / Pyright — Type Checking Configuration
   // ═══════════════════════════════════════════════════════════
   "python.analysis.typeCheckingMode": "basic",
+  // Suppress SQLAlchemy 1.x Column[] type mismatches (pervasive false positives)
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportArgumentType": "none",
+    "reportReturnType": "none",
+    "reportCallIssue": "warning",
+    "reportAssignmentType": "warning"
+  },
   // ═══════════════════════════════════════════════════════════
   // MyPy Type Checker — Disable (Pylance handles type checking)
   // ═══════════════════════════════════════════════════════════

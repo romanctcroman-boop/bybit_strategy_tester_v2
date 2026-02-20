@@ -517,3 +517,7 @@ validation_reports.json
 # Additional database files
 mlflow.db
 *.db
+
+# GSD workflow (temporary files)
+.gsd/CONTINUE-HERE.md
+.gsd/debug/

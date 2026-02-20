@@ -1,38 +1,34 @@
-# ML-библиотеки для автоматизированной оптимизации торговых стратегий
-# Рекомендации профессиональных трейдеров 2025 года
+# ML libraries for automated trading strategy optimization
+# Install with: pip install -r requirements-ml.txt
 
-# CatBoost (Яндекс) - преимущественная библиотека для временных рядов
-catboost>=1.2.5
+# Gradient Boosting
+catboost>=1.2.5              # Yandex - best for time series
+xgboost>=2.0.3               # Grid/Bayes hyperparameter search
+lightgbm>=4.3.0              # Microsoft - fast on large datasets
 
-# XGBoost - самая популярная библиотека для Grid/Bayes search
-xgboost>=2.0.3
+# Classic ML
+scikit-learn>=1.4.2          # Grid/Bayes search wrappers
 
-# LightGBM (Microsoft) - для больших данных и скоростных оптимизаций
-lightgbm>=4.3.0
+# Bayesian optimization
+optuna>=3.6.1                # Hyperparameter optimization framework
 
-# scikit-learn - классика ML, обертка для Grid/Bayes поиска
-scikit-learn>=1.4.2
-
-# Optuna - Bayesian optimization framework
-optuna>=3.6.1
-
-# Дополнительные зависимости
+# Data processing
 pandas>=2.2.2
 numpy>=1.26.4
 scipy>=1.13.0
 
-# Визуализация результатов
+# Visualization
 matplotlib>=3.8.4
 seaborn>=0.13.2
 plotly>=5.22.0
 
-# Логирование и мониторинг
+# Progress & monitoring
 tqdm>=4.66.4
 
 # Online learning / streaming models
 river>=0.22.0,<0.24.0
 
-# Сохранение моделей
+# Model persistence
 joblib>=1.4.2
 
 # Backtesting framework
