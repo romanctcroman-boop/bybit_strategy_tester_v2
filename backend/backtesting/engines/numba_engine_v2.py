@@ -2590,6 +2590,20 @@ class NumbaEngineV2(BaseBacktestEngine):
 
         start_time = time.time()
 
+        logger.info(
+            "Backtest started | engine={} bars={} capital={:.2f} leverage={:.1f} "
+            "direction={} sl={} tp={} fee={:.5f} pyramiding={}",
+            self.name,
+            len(input_data.candles),
+            input_data.initial_capital,
+            input_data.leverage,
+            input_data.direction,
+            input_data.stop_loss,
+            input_data.take_profit,
+            input_data.taker_fee,
+            input_data.pyramiding,
+        )
+
         # Validate
         is_valid, errors = self.validate_input(input_data)
         if not is_valid:
@@ -2679,18 +2693,28 @@ class NumbaEngineV2(BaseBacktestEngine):
 
         # V4 mode: ATR, Multi-TP, Trailing, DCA, Breakeven, Time-based, Re-entry
         needs_v4 = (
-            use_atr_sl or use_atr_tp or use_multi_tp or use_trailing or dca_enabled
-            or breakeven_enabled or max_bars_in_trade > 0
-            or re_entry_delay_bars > 0 or max_trades_per_day > 0
-            or cooldown_after_loss > 0 or max_consecutive_losses > 0
+            use_atr_sl
+            or use_atr_tp
+            or use_multi_tp
+            or use_trailing
+            or dca_enabled
+            or breakeven_enabled
+            or max_bars_in_trade > 0
+            or re_entry_delay_bars > 0
+            or max_trades_per_day > 0
+            or cooldown_after_loss > 0
+            or max_consecutive_losses > 0
         )
 
         if needs_v4:
             # === V4 MODE: Full-featured simulation ===
-            logger.info(f"NumbaEngine V4: atr_sl={use_atr_sl}, atr_tp={use_atr_tp}, multi_tp={use_multi_tp}, trailing={use_trailing}")
+            logger.info(
+                f"NumbaEngine V4: atr_sl={use_atr_sl}, atr_tp={use_atr_tp}, multi_tp={use_multi_tp}, trailing={use_trailing}"
+            )
 
             # Calculate ATR if needed
             from backend.backtesting.atr_calculator import calculate_atr_fast
+
             atr_period = getattr(input_data, "atr_period", 14)
             atr_values = calculate_atr_fast(high_prices, low_prices, close_prices, atr_period)
 
@@ -2973,6 +2997,20 @@ class NumbaEngineV2(BaseBacktestEngine):
             trade_fees,
         ) = result
 
+        # Alert if trade count is near max_trades buffer limit
+        max_trades = min(n // 2, 50000)
+        if max_trades < 100:
+            max_trades = 100
+        actual_trades = len(trade_pnls)
+        if actual_trades >= max_trades:
+            logger.warning(
+                "Trade count hit max_trades buffer limit (%d/%d) — "
+                "some trades may have been dropped. Consider increasing max_trades "
+                "or reducing signal frequency.",
+                actual_trades,
+                max_trades,
+            )
+
         # Build trade records
         trades = self._build_trade_records(
             timestamps,
@@ -2992,6 +3030,16 @@ class NumbaEngineV2(BaseBacktestEngine):
         metrics = self._calculate_metrics(trades, equity_curve, input_data.initial_capital)
 
         execution_time = time.time() - start_time
+
+        logger.info(
+            "Backtest completed | engine={} bars={} trades={} time={:.3f}s net_profit={:.2f} sharpe={}",
+            self.name,
+            n,
+            len(trades),
+            execution_time,
+            metrics.net_profit if metrics else 0.0,
+            f"{metrics.sharpe_ratio:.4f}" if metrics and metrics.sharpe_ratio else "N/A",
+        )
 
         return BacktestOutput(
             metrics=metrics,

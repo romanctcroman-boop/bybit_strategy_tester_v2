@@ -61,9 +61,7 @@ class StrategyStartRequest(BaseModel):
     name: str = Field(..., description="Strategy name")
     symbol: str = Field(..., description="Trading pair")
     timeframe: str = Field("1", description="Candle timeframe")
-    position_size_percent: float = Field(
-        5.0, ge=0.1, le=100, description="Position size %"
-    )
+    position_size_percent: float = Field(5.0, ge=0.1, le=100, description="Position size %")
     leverage: float = Field(1.0, ge=1, le=100, description="Leverage")
     stop_loss_percent: float | None = Field(2.0, description="Stop loss %")
     take_profit_percent: float | None = Field(4.0, description="Take profit %")
@@ -95,6 +93,7 @@ _executor: OrderExecutor | None = None
 _position_manager: PositionManager | None = None
 _strategy_runner: LiveStrategyRunner | None = None
 _ws_connections: list[WebSocket] = []
+_singleton_lock = asyncio.Lock()  # Protects lazy init of async singletons
 
 
 def get_api_credentials() -> tuple[str, str]:
@@ -117,47 +116,59 @@ def is_testnet() -> bool:
 
 
 async def get_executor() -> OrderExecutor:
-    """Get or create OrderExecutor instance."""
+    """Get or create OrderExecutor instance (async-safe via asyncio.Lock)."""
     global _executor
 
-    if _executor is None:
-        api_key, api_secret = get_api_credentials()
-        _executor = OrderExecutor(
-            api_key=api_key,
-            api_secret=api_secret,
-            testnet=is_testnet(),
-        )
+    if _executor is not None:
+        return _executor
+
+    async with _singleton_lock:
+        if _executor is None:
+            api_key, api_secret = get_api_credentials()
+            _executor = OrderExecutor(
+                api_key=api_key,
+                api_secret=api_secret,
+                testnet=is_testnet(),
+            )
 
     return _executor
 
 
 async def get_position_manager() -> PositionManager:
-    """Get or create PositionManager instance."""
+    """Get or create PositionManager instance (async-safe via asyncio.Lock)."""
     global _position_manager
 
-    if _position_manager is None:
-        api_key, api_secret = get_api_credentials()
-        _position_manager = PositionManager(
-            api_key=api_key,
-            api_secret=api_secret,
-            testnet=is_testnet(),
-        )
+    if _position_manager is not None:
+        return _position_manager
+
+    async with _singleton_lock:
+        if _position_manager is None:
+            api_key, api_secret = get_api_credentials()
+            _position_manager = PositionManager(
+                api_key=api_key,
+                api_secret=api_secret,
+                testnet=is_testnet(),
+            )
 
     return _position_manager
 
 
 async def get_strategy_runner() -> LiveStrategyRunner:
-    """Get or create LiveStrategyRunner instance."""
+    """Get or create LiveStrategyRunner instance (async-safe via asyncio.Lock)."""
     global _strategy_runner
 
-    if _strategy_runner is None:
-        api_key, api_secret = get_api_credentials()
-        _strategy_runner = LiveStrategyRunner(
-            api_key=api_key,
-            api_secret=api_secret,
-            testnet=is_testnet(),
-            paper_trading=True,  # Default to paper trading
-        )
+    if _strategy_runner is not None:
+        return _strategy_runner
+
+    async with _singleton_lock:
+        if _strategy_runner is None:
+            api_key, api_secret = get_api_credentials()
+            _strategy_runner = LiveStrategyRunner(
+                api_key=api_key,
+                api_secret=api_secret,
+                testnet=is_testnet(),
+                paper_trading=True,  # Default to paper trading
+            )
 
     return _strategy_runner
 
@@ -203,9 +214,7 @@ async def place_order(request: OrderRequest):
         )
     elif request.order_type.lower() == "limit":
         if not request.price:
-            raise HTTPException(
-                status_code=400, detail="Price required for limit order"
-            )
+            raise HTTPException(status_code=400, detail="Price required for limit order")
         result = await executor.place_limit_order(
             symbol=request.symbol,
             side=side,
@@ -218,9 +227,7 @@ async def place_order(request: OrderRequest):
         )
     elif request.order_type.lower() == "stop_market":
         if not request.trigger_price:
-            raise HTTPException(
-                status_code=400, detail="Trigger price required for stop order"
-            )
+            raise HTTPException(status_code=400, detail="Trigger price required for stop order")
         result = await executor.place_stop_market_order(
             symbol=request.symbol,
             side=side,
@@ -229,9 +236,7 @@ async def place_order(request: OrderRequest):
             reduce_only=request.reduce_only,
         )
     else:
-        raise HTTPException(
-            status_code=400, detail=f"Unknown order type: {request.order_type}"
-        )
+        raise HTTPException(status_code=400, detail=f"Unknown order type: {request.order_type}")
 
     if result.success:
         return {
@@ -263,9 +268,7 @@ async def cancel_order(
     if result.success:
         return {"success": True, "message": f"Order {order_id} cancelled"}
     else:
-        raise HTTPException(
-            status_code=400, detail=f"Cancel failed: {result.error_message}"
-        )
+        raise HTTPException(status_code=400, detail=f"Cancel failed: {result.error_message}")
 
 
 @router.delete("/orders")
@@ -351,9 +354,7 @@ async def close_position(
     if success:
         return {"success": True, "message": f"Position {symbol} close initiated"}
     else:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to close position {symbol}"
-        )
+        raise HTTPException(status_code=400, detail=f"Failed to close position {symbol}")
 
 
 @router.post("/positions/close-all")
@@ -610,17 +611,13 @@ async def handle_ws_command(
 
     elif action == "get_wallet":
         wallet = manager.get_wallet()
-        await websocket.send_json(
-            {"type": "wallet", "data": wallet.to_dict() if wallet else {}}
-        )
+        await websocket.send_json({"type": "wallet", "data": wallet.to_dict() if wallet else {}})
 
     elif action == "close_position":
         symbol = cmd.get("symbol")
         if symbol:
             success = await manager.close_position(symbol)
-            await websocket.send_json(
-                {"type": "close_result", "data": {"symbol": symbol, "success": success}}
-            )
+            await websocket.send_json({"type": "close_result", "data": {"symbol": symbol, "success": success}})
 
     elif action == "pong":
         pass  # Keepalive response

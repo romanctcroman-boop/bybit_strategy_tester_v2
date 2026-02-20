@@ -10,6 +10,7 @@
 Скорость: ~1x (базовая, эталон для верификации)
 """
 
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -28,6 +29,8 @@ from backend.backtesting.interfaces import (
     TradeRecord,
 )
 from backend.backtesting.pyramiding import PyramidingManager
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -785,6 +788,20 @@ class FallbackEngineV4(BaseBacktestEngine):
         Запуск бэктеста с расширенными функциями TP/SL.
         """
         start_time = time.time()
+
+        logger.info(
+            "Backtest started | engine=%s bars=%d capital=%.2f leverage=%.1f "
+            "direction=%s sl=%s tp=%s fee=%.5f pyramiding=%d",
+            self.name,
+            len(input_data.candles),
+            input_data.initial_capital,
+            input_data.leverage,
+            input_data.direction,
+            input_data.stop_loss,
+            input_data.take_profit,
+            input_data.taker_fee,
+            input_data.pyramiding,
+        )
 
         # Валидация
         is_valid, errors = self.validate_input(input_data)
@@ -2547,6 +2564,16 @@ class FallbackEngineV4(BaseBacktestEngine):
         metrics = self._calculate_metrics(trades, equity_curve, capital)
 
         execution_time = time.time() - start_time
+
+        logger.info(
+            "Backtest completed | engine=%s bars=%d trades=%d time=%.3fs net_profit=%.2f sharpe=%s",
+            self.name,
+            n,
+            len(trades),
+            execution_time,
+            metrics.net_profit if metrics else 0.0,
+            f"{metrics.sharpe_ratio:.4f}" if metrics and metrics.sharpe_ratio else "N/A",
+        )
 
         return BacktestOutput(
             is_valid=True,

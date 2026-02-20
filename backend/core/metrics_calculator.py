@@ -723,6 +723,39 @@ def calculate_metrics_numba(
 # MAIN CALCULATOR CLASS
 # =============================================================================
 
+# Cache for calculate_all() — avoids recomputation for identical inputs.
+# Key: hash of (trades_tuple, equity_bytes, capital, years, frequency, margin)
+# Max size: 32 entries (typical optimizer run produces ~10-20 results)
+_calculate_all_cache: dict[int, dict] = {}
+_CALCULATE_ALL_CACHE_MAX = 32
+
+
+def _build_cache_key(
+    trades: list[dict],
+    equity: np.ndarray,
+    initial_capital: float,
+    years: float,
+    frequency: "TimeFrequency",
+    margin_rate: float,
+) -> int:
+    """Build a fast hash key for calculate_all() cache."""
+    import hashlib
+
+    h = hashlib.md5(usedforsecurity=False)
+    # Hash equity bytes (fast for numpy arrays)
+    h.update(equity.tobytes())
+    # Hash scalar params
+    h.update(f"{initial_capital}:{years}:{frequency}:{margin_rate}".encode())
+    # Hash trade count + first/last trade PnL (avoids O(n) full hash for large lists)
+    h.update(f"n={len(trades)}".encode())
+    if trades:
+        first = trades[0]
+        last = trades[-1]
+        pnl_f = first.get("pnl", 0) if isinstance(first, dict) else getattr(first, "pnl", 0)
+        pnl_l = last.get("pnl", 0) if isinstance(last, dict) else getattr(last, "pnl", 0)
+        h.update(f"f={pnl_f}:l={pnl_l}".encode())
+    return int.from_bytes(h.digest()[:8], "little")
+
 
 class MetricsCalculator:
     """
@@ -1154,10 +1187,18 @@ class MetricsCalculator:
         """
         Calculate ALL metrics in one call.
 
+        Results are cached by content hash to avoid recomputation
+        for identical inputs (e.g. during optimizer result display).
+
         Returns a dictionary with all metrics ready for PerformanceMetrics model.
         """
-        # Calculate returns from equity
+        # Check cache first
         equity = np.asarray(equity)
+        cache_key = _build_cache_key(trades, equity, initial_capital, years, frequency, margin_rate)
+        if cache_key in _calculate_all_cache:
+            return _calculate_all_cache[cache_key].copy()
+
+        # Calculate returns from equity
         if len(equity) > 1:
             # Shift to get returns ensuring no nan/inf
             with np.errstate(divide="ignore", invalid="ignore"):
@@ -1366,6 +1407,13 @@ class MetricsCalculator:
             "short_largest_loss_pct": ls_m.short_largest_loss_pct,
             "cagr_short": ls_m.short_cagr,
         }
+
+        # Store in cache (evict oldest if full)
+        if len(_calculate_all_cache) >= _CALCULATE_ALL_CACHE_MAX:
+            # Remove oldest entry (first key in insertion order)
+            oldest = next(iter(_calculate_all_cache))
+            del _calculate_all_cache[oldest]
+        _calculate_all_cache[cache_key] = result.copy()
 
         return result
 
