@@ -137,7 +137,7 @@ async def get_agent_stats() -> AgentStatsResponse:
 
     except Exception as e:
         logger.error(f"Error getting agent stats: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get agent stats: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to get agent stats")
 
 
 @router.post("/query/deepseek", response_model=AgentQueryResponse)
@@ -174,7 +174,7 @@ async def query_deepseek(request: AgentQueryRequest) -> AgentQueryResponse:
 
     except Exception as e:
         logger.error(f"Error querying DeepSeek: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to query DeepSeek: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to query DeepSeek")
 
 
 @router.post("/query/perplexity", response_model=AgentQueryResponse)
@@ -211,7 +211,7 @@ async def query_perplexity(request: AgentQueryRequest) -> AgentQueryResponse:
 
     except Exception as e:
         logger.error(f"Error querying Perplexity: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to query Perplexity: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to query Perplexity")
 
 
 @router.post("/query/auto", response_model=AgentQueryResponse)
@@ -269,7 +269,7 @@ async def query_auto(request: AgentQueryRequest) -> AgentQueryResponse:
 
     except Exception as e:
         logger.error(f"Error in auto query: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"All agents failed: {e!s}")
+        raise HTTPException(status_code=500, detail="All agents failed")
 
 
 @router.get("/cache/stats", response_model=dict[str, Any])
@@ -295,7 +295,7 @@ async def get_cache_stats() -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error getting cache stats: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to get cache stats: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to get cache stats")
 
 
 @router.post("/cache/clear")
@@ -320,7 +320,7 @@ async def clear_cache() -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error clearing cache: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to clear cache")
 
 
 # ============================================================================
@@ -380,7 +380,7 @@ async def suggest_features(request: FeatureSuggestionRequest):
 
     except Exception as e:
         logger.error(f"Error suggesting features: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to suggest features: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to suggest features")
 
 
 @router.post("/ml/generate-code", summary="AI Code Generation")
@@ -405,7 +405,7 @@ async def generate_feature_code(request: FeatureCodeRequest):
 
     except Exception as e:
         logger.error(f"Error generating code: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate code: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to generate code")
 
 
 @router.post("/ml/design-strategy", summary="AI Strategy Design")
@@ -431,7 +431,7 @@ async def design_strategy(request: StrategyRequest):
 
     except Exception as e:
         logger.error(f"Error designing strategy: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to design strategy: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to design strategy")
 
 
 # ============================================================================
@@ -483,7 +483,7 @@ async def generate_backtest_strategy(request: StrategyRequest):
 
     except Exception as e:
         logger.error(f"Error generating backtest strategy: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate strategy: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to generate strategy")
 
 
 @router.post("/backtest/ai-execute-series", summary="AI Execute Backtest Series")
@@ -517,7 +517,7 @@ async def execute_backtest_series(request: BacktestExecutorRequest):
 
     except Exception as e:
         logger.error(f"Error executing backtest series: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to execute backtest series: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to execute backtest series")
 
 
 @router.post("/backtest/ai-analyze", summary="AI Analyze Backtest Results")
@@ -543,7 +543,7 @@ async def analyze_backtest_results_endpoint(results: list[dict[str, Any]] | None
 
     except Exception as e:
         logger.error(f"Error analyzing results: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to analyze results: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to analyze results")
 
 
 # ============================================================================
@@ -972,7 +972,7 @@ async def agent_run_backtest(request: AgentBacktestRequest) -> AgentBacktestResp
 
     except Exception as e:
         logger.error(f"Agent backtest failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Agent backtest failed: {e!s}")
+        raise HTTPException(status_code=500, detail="Agent backtest failed")
 
 
 @router.get(
@@ -1001,7 +1001,7 @@ async def agent_backtest_history(limit: int = 10) -> dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Error fetching backtest history: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch backtest history: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to fetch backtest history")
 
 
 @router.get(
@@ -1028,7 +1028,7 @@ async def agent_list_strategies() -> dict[str, Any]:
         raise
     except Exception as e:
         logger.error(f"Error listing strategies: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to list strategies: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to list strategies")
 
 
 @router.post(
@@ -1062,7 +1062,7 @@ async def agent_validate_strategy(
 
     except Exception as e:
         logger.error(f"Error validating strategy: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to validate strategy: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to validate strategy")
 
 
 @router.get(
@@ -1084,7 +1084,7 @@ async def agent_system_health() -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error checking system health: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to check system health: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to check system health")
 
 
 @router.get(
@@ -1129,4 +1129,4 @@ async def agent_list_tools() -> AgentToolListResponse:
 
     except Exception as e:
         logger.error(f"Error listing tools: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to list tools: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to list tools")

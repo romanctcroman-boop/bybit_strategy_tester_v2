@@ -296,9 +296,8 @@ def flex_order_func_nb(
 
             return col, order_nb(
                 size=-position_now,
-                price=close_now,
+                price=exit_price,
                 fees=fees,
-                slippage=slippage,
             )
 
     # PHASE 3: Entries

@@ -99,6 +99,7 @@ def get_local_symbols(
         from sqlalchemy import func
 
         # Get distinct symbols with their intervals and row counts
+        # Limit to 500 groups to prevent slow queries with many (symbol, interval) combinations
         results = (
             db.query(
                 BybitKlineAudit.symbol,
@@ -108,6 +109,7 @@ def get_local_symbols(
                 func.max(BybitKlineAudit.open_time).label("max_time"),
             )
             .group_by(BybitKlineAudit.symbol, BybitKlineAudit.interval)
+            .limit(500)
             .all()
         )
 
@@ -181,6 +183,7 @@ def get_db_groups(db: Session = Depends(get_db)) -> dict:
                     func.max(BybitKlineAudit.open_time).label("max_time"),
                 )
                 .group_by(BybitKlineAudit.symbol, BybitKlineAudit.market_type, BybitKlineAudit.interval)
+                .limit(500)
                 .all()
             )
         except OperationalError:
@@ -194,6 +197,7 @@ def get_db_groups(db: Session = Depends(get_db)) -> dict:
                     func.max(BybitKlineAudit.open_time).label("max_time"),
                 )
                 .group_by(BybitKlineAudit.symbol, BybitKlineAudit.interval)
+                .limit(500)
                 .all()
             )
             # Normalize to (symbol, market_type, interval, count, min_time, max_time)

@@ -7,7 +7,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from backend.api.schemas import (
@@ -63,7 +63,7 @@ async def list_strategies(
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     status: str | None = Query(None, description="Filter by status"),
     strategy_type: str | None = Query(None, description="Filter by strategy type"),
-    search: str | None = Query(None, description="Search by name"),
+    search: str | None = Query(None, max_length=100, description="Search by name"),
     db: Session = Depends(get_db),
 ):
     """
@@ -330,6 +330,7 @@ async def get_strategy(
 @router.post("/", response_model=StrategyResponse, status_code=status.HTTP_201_CREATED)
 async def create_strategy(
     strategy_data: StrategyCreate,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     """
@@ -389,6 +390,7 @@ async def create_strategy(
         db.refresh(strategy)
 
         logger.info(f"Created strategy: {strategy.id} - {strategy.name}")
+        response.headers["Location"] = f"/api/v1/strategies/{strategy.id}"
         return _strategy_to_response(strategy)
 
     except Exception as e:

@@ -295,9 +295,16 @@ def calculate_ulcer_index(drawdowns: np.ndarray) -> float:
     Formula: Sqrt(Mean(Drawdown^2)) * 100
 
     Args:
-        drawdowns: Array of drawdown values (fractional 0.1 etc, NOT percentage)
+        drawdowns: Array of drawdown values as fractions (e.g. 0.1 = 10% drawdown,
+                   NOT already multiplied by 100)
 
-    Returns: Ulcer Index as percentage
+    Returns:
+        Ulcer Index as percentage (already multiplied by 100).
+        Callers should NOT multiply the result again.
+
+    Example:
+        >>> calculate_ulcer_index(np.array([0.05, 0.10, 0.03]))
+        6.48...  # Already a percentage
     """
     if len(drawdowns) == 0:
         return 0.0

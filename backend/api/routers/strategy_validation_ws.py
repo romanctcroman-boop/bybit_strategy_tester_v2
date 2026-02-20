@@ -724,7 +724,27 @@ def validate_param_value(
         if not isinstance(param_value, int) or isinstance(param_value, bool):
             # Try to parse float as int
             if isinstance(param_value, float) and param_value.is_integer():
+                # Warn about implicit float→int conversion (e.g. 10.0 → 10)
+                messages.append(
+                    ValidationMessage(
+                        severity=ValidationSeverity.WARNING,
+                        message=f"'{param_name}' received float {param_value}, converted to int {int(param_value)}",
+                        field=param_name,
+                        code="TYPE_COERCION",
+                    )
+                )
                 param_value = int(param_value)
+            elif isinstance(param_value, float):
+                # Non-integer float (e.g. 10.5) — truncation would lose data
+                messages.append(
+                    ValidationMessage(
+                        severity=ValidationSeverity.ERROR,
+                        message=f"'{param_name}' must be an integer, got {param_value}",
+                        field=param_name,
+                        code="TYPE_ERROR",
+                    )
+                )
+                return messages
             else:
                 messages.append(
                     ValidationMessage(

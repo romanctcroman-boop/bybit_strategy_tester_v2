@@ -2313,7 +2313,15 @@ async function updateBacktestLeverageRisk() {
   });
 }
 
+let _eventListenersInitialized = false;
+
 function setupEventListeners() {
+  // Guard: prevent duplicate listener registration if called more than once
+  if (_eventListenersInitialized) {
+    console.warn('[Strategy Builder] setupEventListeners() already called — skipping');
+    return;
+  }
+  _eventListenersInitialized = true;
   console.log('[Strategy Builder] Setting up event listeners...');
 
   // Синхронизация названия стратегии: шапка <-> панель Properties

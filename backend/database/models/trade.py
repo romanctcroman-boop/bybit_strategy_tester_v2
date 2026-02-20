@@ -97,6 +97,7 @@ class Trade(Base):
     leverage = Column(Float, default=1.0)
 
     # Trade metrics
+    # duration_seconds: 0 = trade still open or instant fill; never NULL (default=0)
     duration_seconds = Column(Integer, nullable=False, default=0)  # Trade duration in seconds
     max_favorable_excursion = Column(Float, nullable=True)  # MFE
     max_adverse_excursion = Column(Float, nullable=True)  # MAE

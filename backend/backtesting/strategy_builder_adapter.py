@@ -3427,6 +3427,11 @@ class StrategyBuilderAdapter(BaseStrategy):
 
         Pivot detection uses pivot_interval to find swing highs/lows.
 
+        Note: The first and last `pivot_interval` bars of the data are excluded from
+        pivot detection (boundary effect). For default pivot_interval=9, this means
+        the first 9 and last 9 bars will never generate divergence signals. This is
+        inherent to the pivot algorithm (needs N bars on each side to confirm a swing).
+
         Parameters:
             pivot_interval (int): Number of bars to left/right for pivot detection (1-9, default 9)
             act_without_confirmation (bool): If True, fire signal immediately; if False, wait for
