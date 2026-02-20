@@ -1,11 +1,11 @@
 /**
- * 📄 Strategies Page - Instrument Service
+ * 📄 Shared - Instrument Service
  *
  * Handles fetching instrument info, prices, and volatility data
  * with caching to minimize API calls
  *
- * @version 1.0.0
- * @date 2025-12-23
+ * @version 1.1.0
+ * @date 2026-02-18
  */
 
 const API_BASE = '/api/v1';

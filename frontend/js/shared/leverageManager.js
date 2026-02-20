@@ -1,11 +1,11 @@
 /**
- * 📄 Strategies Page - Leverage Manager
+ * 📄 Shared - Leverage Manager
  *
  * Handles leverage slider, display, limits calculation,
  * and risk assessment based on volatility
  *
- * @version 1.0.0
- * @date 2025-12-23
+ * @version 1.1.0
+ * @date 2026-02-18
  */
 
 import { fetchInstrumentInfo, fetchCurrentPrice, fetchVolatility } from './instrumentService.js';
@@ -161,17 +161,17 @@ export async function updateLeverageLimits() {
             if (isPositionFixed) {
                 const minLeverageForCapital = Math.ceil(fixedPositionValue / capital);
                 if (minLeverageForCapital <= effectiveMaxLeverage) {
-                    warningMessage = `Требуемая маржа $${requiredMargin.toFixed(2)} превышает капитал $${capital}. Увеличьте плечо до ${minLeverageForCapital}x`;
+                    warningMessage = `╨в╤А╨╡╨▒╤Г╨╡╨╝╨░╤П ╨╝╨░╤А╨╢╨░ $${requiredMargin.toFixed(2)} ╨┐╤А╨╡╨▓╤Л╤И╨░╨╡╤В ╨║╨░╨┐╨╕╤В╨░╨╗ $${capital}. ╨г╨▓╨╡╨╗╨╕╤З╤М╤В╨╡ ╨┐╨╗╨╡╤З╨╛ ╨┤╨╛ ${minLeverageForCapital}x`;
                 } else {
-                    warningMessage = `Позиция $${fixedPositionValue.toFixed(2)} слишком большая. Даже с плечом ${effectiveMaxLeverage}x маржа ($${(fixedPositionValue / effectiveMaxLeverage).toFixed(2)}) превышает капитал $${capital}`;
+                    warningMessage = `╨Я╨╛╨╖╨╕╤Ж╨╕╤П $${fixedPositionValue.toFixed(2)} ╤Б╨╗╨╕╤И╨║╨╛╨╝ ╨▒╨╛╨╗╤М╤И╨░╤П. ╨Ф╨░╨╢╨╡ ╤Б ╨┐╨╗╨╡╤З╨╛╨╝ ${effectiveMaxLeverage}x ╨╝╨░╤А╨╢╨░ ($${(fixedPositionValue / effectiveMaxLeverage).toFixed(2)}) ╨┐╤А╨╡╨▓╤Л╤И╨░╨╡╤В ╨║╨░╨┐╨╕╤В╨░╨╗ $${capital}`;
                     isError = true;
                 }
             } else {
-                warningMessage = `Маржа $${margin.toFixed(2)} превышает капитал $${capital}`;
+                warningMessage = `╨Ь╨░╤А╨╢╨░ $${margin.toFixed(2)} ╨┐╤А╨╡╨▓╤Л╤И╨░╨╡╤В ╨║╨░╨┐╨╕╤В╨░╨╗ $${capital}`;
                 isError = true;
             }
         } else if (positionValue < minPositionValue) {
-            warningMessage = `Размер позиции $${positionValue.toFixed(2)} меньше минимума $${minPositionValue.toFixed(2)}`;
+            warningMessage = `╨а╨░╨╖╨╝╨╡╤А ╨┐╨╛╨╖╨╕╤Ж╨╕╨╕ $${positionValue.toFixed(2)} ╨╝╨╡╨╜╤М╤И╨╡ ╨╝╨╕╨╜╨╕╨╝╤Г╨╝╨░ $${minPositionValue.toFixed(2)}`;
         }
 
         // Update slider limits
@@ -283,43 +283,43 @@ function updateRiskIndicator(indicator, leverage, volatility, positionValue = 10
         const avgRange = volatility.avg_daily_range;
         const riskRatio = liquidationPercent / avgRange;
         const maxMoveWarning = maxMove > 0 && liquidationPercent < maxMove;
-        const maxSuffix = maxMove > 0 ? ` макс. ${maxMove.toFixed(0)}%` : '';
+        const maxSuffix = maxMove > 0 ? ` ╨╝╨░╨║╤Б. ${maxMove.toFixed(0)}%` : '';
 
         if (riskRatio < 2) {
             riskClass = 'risk-extreme';
-            riskText = `🔴 ОПАСНО! ликв. ${liquidationPercent.toFixed(1)}% | вол. ${avgRange.toFixed(1)}%/день${maxSuffix}`;
+            riskText = `ЁЯФ┤ ╨Ю╨Я╨Р╨б╨Э╨Ю! ╨╗╨╕╨║╨▓. ${liquidationPercent.toFixed(1)}% | ╨▓╨╛╨╗. ${avgRange.toFixed(1)}%/╨┤╨╡╨╜╤М${maxSuffix}`;
         } else if (riskRatio < 4 || maxMoveWarning) {
             riskClass = 'risk-high';
-            riskText = `🟠 Высокий риск: ликв. ${liquidationPercent.toFixed(1)}% | вол. ${avgRange.toFixed(1)}%/день${maxSuffix}`;
+            riskText = `ЁЯЯа ╨Т╤Л╤Б╨╛╨║╨╕╨╣ ╤А╨╕╤Б╨║: ╨╗╨╕╨║╨▓. ${liquidationPercent.toFixed(1)}% | ╨▓╨╛╨╗. ${avgRange.toFixed(1)}%/╨┤╨╡╨╜╤М${maxSuffix}`;
         } else if (riskRatio < 8) {
             riskClass = 'risk-medium';
-            riskText = `🟡 Средний риск: ликв. ${liquidationPercent.toFixed(1)}% | вол. ${avgRange.toFixed(1)}%/день${maxSuffix}`;
+            riskText = `ЁЯЯб ╨б╤А╨╡╨┤╨╜╨╕╨╣ ╤А╨╕╤Б╨║: ╨╗╨╕╨║╨▓. ${liquidationPercent.toFixed(1)}% | ╨▓╨╛╨╗. ${avgRange.toFixed(1)}%/╨┤╨╡╨╜╤М${maxSuffix}`;
         } else {
             riskClass = 'risk-low';
-            riskText = `🟢 Низкий риск: ликв. ${liquidationPercent.toFixed(1)}% | вол. ${avgRange.toFixed(1)}%/день${maxSuffix}`;
+            riskText = `ЁЯЯв ╨Э╨╕╨╖╨║╨╕╨╣ ╤А╨╕╤Б╨║: ╨╗╨╕╨║╨▓. ${liquidationPercent.toFixed(1)}% | ╨▓╨╛╨╗. ${avgRange.toFixed(1)}%/╨┤╨╡╨╜╤М${maxSuffix}`;
         }
     } else {
         // Fallback to simple leverage-based assessment
         if (leverage <= 5) {
             riskClass = 'risk-low';
-            riskText = `🟢 Низкий риск: ликв. при движении ${liquidationPercent.toFixed(2)}%`;
+            riskText = `ЁЯЯв ╨Э╨╕╨╖╨║╨╕╨╣ ╤А╨╕╤Б╨║: ╨╗╨╕╨║╨▓. ╨┐╤А╨╕ ╨┤╨▓╨╕╨╢╨╡╨╜╨╕╨╕ ${liquidationPercent.toFixed(2)}%`;
         } else if (leverage <= 20) {
             riskClass = 'risk-medium';
-            riskText = `🟡 Средний риск: ликв. при движении ${liquidationPercent.toFixed(2)}%`;
+            riskText = `ЁЯЯб ╨б╤А╨╡╨┤╨╜╨╕╨╣ ╤А╨╕╤Б╨║: ╨╗╨╕╨║╨▓. ╨┐╤А╨╕ ╨┤╨▓╨╕╨╢╨╡╨╜╨╕╨╕ ${liquidationPercent.toFixed(2)}%`;
         } else if (leverage <= 50) {
             riskClass = 'risk-high';
-            riskText = `🟠 Высокий риск: ликв. при движении ${liquidationPercent.toFixed(2)}%`;
+            riskText = `ЁЯЯа ╨Т╤Л╤Б╨╛╨║╨╕╨╣ ╤А╨╕╤Б╨║: ╨╗╨╕╨║╨▓. ╨┐╤А╨╕ ╨┤╨▓╨╕╨╢╨╡╨╜╨╕╨╕ ${liquidationPercent.toFixed(2)}%`;
         } else {
             riskClass = 'risk-extreme';
-            riskText = `🔴 Экстремальный риск: ликв. при движении ${liquidationPercent.toFixed(2)}%`;
+            riskText = `ЁЯФ┤ ╨н╨║╤Б╤В╤А╨╡╨╝╨░╨╗╤М╨╜╤Л╨╣ ╤А╨╕╤Б╨║: ╨╗╨╕╨║╨▓. ╨┐╤А╨╕ ╨┤╨▓╨╕╨╢╨╡╨╜╨╕╨╕ ${liquidationPercent.toFixed(2)}%`;
         }
     }
 
     indicator.textContent = riskText;
-    // Сохранить существующие классы (properties-leverage-risk и т.д.), обновить только risk level
+    // ╨б╨╛╤Е╤А╨░╨╜╨╕╤В╤М ╤Б╤Г╤Й╨╡╤Б╤В╨▓╤Г╤О╤Й╨╕╨╡ ╨║╨╗╨░╤Б╤Б╤Л (properties-leverage-risk ╨╕ ╤В.╨┤.), ╨╛╨▒╨╜╨╛╨▓╨╕╤В╤М ╤В╨╛╨╗╤М╨║╨╛ risk level
     indicator.classList.remove('risk-low', 'risk-medium', 'risk-high', 'risk-extreme');
     indicator.classList.add('leverage-risk-indicator', riskClass);
-    indicator.title = 'Ликв. = порог до ликвидации. Волатильность по дневным свечам (D).';
+    indicator.title = '╨Ы╨╕╨║╨▓. = ╨┐╨╛╤А╨╛╨│ ╨┤╨╛ ╨╗╨╕╨║╨▓╨╕╨┤╨░╤Ж╨╕╨╕. ╨Т╨╛╨╗╨░╤В╨╕╨╗╤М╨╜╨╛╤Б╤В╤М ╨┐╨╛ ╨┤╨╜╨╡╨▓╨╜╤Л╨╝ ╤Б╨▓╨╡╤З╨░╨╝ (D).';
 }
 
 /**
