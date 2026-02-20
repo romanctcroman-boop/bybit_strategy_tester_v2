@@ -1880,7 +1880,7 @@ class FastGridOptimizer:
                 norm_return = max(min(r["total_return"] / 100, 2), -2)
                 norm_dd = 1 / (1 + r["max_drawdown"] / 100)
                 norm_sharpe = max(min(r["sharpe_ratio"] / 2, 2), -2)
-                norm_wr = r["win_rate"]
+                norm_wr = r["win_rate"] / 100  # win_rate is 0-100%, normalize to 0-1
 
                 r["score"] = (
                     w.get("return", 0.4) * norm_return

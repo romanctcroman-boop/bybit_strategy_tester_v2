@@ -356,7 +356,18 @@ def _build_performance_metrics(
     largest_loss_pct_of_gross = (largest_loss_val / gross_loss * 100) if gross_loss > 0 else 0.0
 
     # Convert max_drawdown_duration_bars to days
-    bars_per_day = 96 if config.interval == "15" else 24  # 15m = 96 bars/day, 1h = 24
+    BARS_PER_DAY = {
+        "1": 1440,
+        "5": 288,
+        "15": 96,
+        "30": 48,
+        "60": 24,
+        "240": 6,
+        "D": 1,
+        "W": 1 / 7,
+        "M": 1 / 30,
+    }
+    bars_per_day = BARS_PER_DAY.get(config.interval, 24)
     max_dd_duration_bars = calc_metrics.get("max_drawdown_duration_bars", 0)
     max_dd_duration_days = max_dd_duration_bars / bars_per_day if bars_per_day > 0 else 0.0
 
@@ -565,7 +576,7 @@ def _build_performance_metrics(
         max_runup=calc_metrics["max_runup"],
         max_runup_value=calc_metrics["max_runup_value"],
         avg_runup=calc_metrics["avg_runup"],
-        avg_runup_value=calc_metrics.get("avg_runup_value", calc_metrics["avg_runup"] * initial_capital),
+        avg_runup_value=calc_metrics.get("avg_runup_value", calc_metrics["avg_runup"] * initial_capital / 100),
         # TradingView comparison metrics
         strategy_outperformance=(total_return * 100) - buy_hold_return_pct,
         net_profit_to_largest_loss=calc_metrics["net_profit"] / abs(calc_metrics["largest_loss_value"])
@@ -1421,8 +1432,7 @@ class BacktestEngine:
                 # Skip entries when account has no cash (blown account protection)
                 if cash <= 0:
                     logger.warning(
-                        f"Bar {i}: cash={cash:.4f} ≤ 0, skipping new entry to prevent "
-                        "negative-balance trading"
+                        f"Bar {i}: cash={cash:.4f} ≤ 0, skipping new entry to prevent negative-balance trading"
                     )
 
                 # Long entry

@@ -427,15 +427,24 @@ def calculate_calmar(
     """
     Calculate Calmar Ratio.
     Formula: CAGR / |Max_Drawdown|
+
+    Uses compound annual growth rate (CAGR) for multi-year periods.
+    For single year (years <= 1), total_return_pct is used directly as CAGR.
     """
     if abs(max_drawdown_pct) <= 0.01:
         return 10.0 if total_return_pct > 0 else 0.0
 
-    # Annualize return if needed
-    # Simple annualization or CAGR? Calmar usually uses CAGR.
-    # Assuming total_return_pct is effectively carrying the CAGR info if yrs=1,
-    # but if we pass total raw return, we need to convert.
-    cagr = total_return_pct / years if years > 0 and years != 1.0 else total_return_pct
+    # Use compound CAGR for multi-year periods
+    if years > 1.0:
+        # CAGR = ((1 + total_return_fraction) ^ (1/years) - 1) * 100
+        total_return_frac = total_return_pct / 100
+        if total_return_frac <= -1.0:
+            # Total loss — CAGR is -100%
+            cagr = -100.0
+        else:
+            cagr = (pow(1 + total_return_frac, 1 / years) - 1) * 100
+    else:
+        cagr = total_return_pct
 
     return float(np.clip(cagr / abs(max_drawdown_pct), -100, 100))
 

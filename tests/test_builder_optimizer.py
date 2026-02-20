@@ -264,7 +264,12 @@ class TestExtractOptimizableParams:
         sltp_params = [p for p in params if p["block_type"] == "static_sltp"]
         assert len(sltp_params) == 4
         keys = {p["param_key"] for p in sltp_params}
-        assert keys == {"stop_loss_percent", "take_profit_percent", "breakeven_activation_percent", "new_breakeven_sl_percent"}
+        assert keys == {
+            "stop_loss_percent",
+            "take_profit_percent",
+            "breakeven_activation_percent",
+            "new_breakeven_sl_percent",
+        }
 
     def test_extract_multi_indicator_params(self, multi_indicator_graph):
         """Multi-indicator graph returns params from all block types."""

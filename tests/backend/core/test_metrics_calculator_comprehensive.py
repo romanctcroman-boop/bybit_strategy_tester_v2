@@ -348,8 +348,10 @@ class TestCalculateCalmarKnown:
         assert calculate_calmar(50.0, 10.0, years=1.0) == 5.0
 
     def test_multi_year(self):
-        # total_return 100%, 2 years → annualized 50%, maxDD 25% → 50/25 = 2.0
-        assert calculate_calmar(100.0, 25.0, years=2.0) == 2.0
+        # total_return 100%, 2 years → compound CAGR = (2.0^(1/2) - 1)*100 = 41.42%
+        # Calmar = 41.42 / 25 = 1.657
+        result = calculate_calmar(100.0, 25.0, years=2.0)
+        assert abs(result - 1.657) < 0.01
 
     def test_zero_drawdown(self):
         # No drawdown → 10.0 if positive return

@@ -11075,9 +11075,9 @@ function renderResultsSummaryCards(results) {
   if (!container) return;
 
   const metrics = results.metrics || results;
-  const totalReturn = metrics.total_return_pct || metrics.net_profit_pct || 0;
+  const totalReturn = metrics.net_profit_pct || 0;
   const winRate = metrics.win_rate || 0;
-  const maxDrawdown = metrics.max_drawdown_pct || 0;
+  const maxDrawdown = metrics.max_drawdown || 0;
   const totalTrades = metrics.total_trades || 0;
   const profitFactor = metrics.profit_factor || 0;
   const sharpeRatio = metrics.sharpe_ratio || 0;
@@ -11145,10 +11145,10 @@ function renderOverviewMetrics(results) {
     { title: 'Gross Loss', value: formatCurrency(metrics.gross_loss || 0), icon: 'bi-dash-circle', positive: false },
     { title: 'Winning Trades', value: `${metrics.winning_trades || 0} / ${metrics.total_trades || 0}`, icon: 'bi-check-circle', positive: true },
     { title: 'Losing Trades', value: `${metrics.losing_trades || 0} / ${metrics.total_trades || 0}`, icon: 'bi-x-circle', positive: false },
-    { title: 'Avg Win', value: formatCurrency(metrics.avg_win || 0), icon: 'bi-arrow-up', positive: true },
-    { title: 'Avg Loss', value: formatCurrency(metrics.avg_loss || 0), icon: 'bi-arrow-down', positive: false },
-    { title: 'Largest Win', value: formatCurrency(metrics.largest_win || 0), icon: 'bi-star', positive: true },
-    { title: 'Largest Loss', value: formatCurrency(metrics.largest_loss || 0), icon: 'bi-exclamation-triangle', positive: false },
+    { title: 'Avg Win', value: formatPercent(metrics.avg_win || 0), icon: 'bi-arrow-up', positive: true },
+    { title: 'Avg Loss', value: formatPercent(metrics.avg_loss || 0), icon: 'bi-arrow-down', positive: false },
+    { title: 'Largest Win', value: formatPercent(metrics.largest_win || 0), icon: 'bi-star', positive: true },
+    { title: 'Largest Loss', value: formatPercent(metrics.largest_loss || 0), icon: 'bi-exclamation-triangle', positive: false },
     { title: 'Avg Trade Duration', value: formatDuration(metrics.avg_trade_duration || 0), icon: 'bi-clock', positive: null },
     { title: 'Max Consecutive Wins', value: metrics.max_consecutive_wins || 0, icon: 'bi-graph-up', positive: true },
     { title: 'Max Consecutive Losses', value: metrics.max_consecutive_losses || 0, icon: 'bi-graph-down', positive: false }
@@ -11221,7 +11221,7 @@ function renderAllMetrics(results) {
       title: 'Performance',
       icon: 'bi-speedometer2',
       items: [
-        { label: 'Total Return', value: formatPercent(metrics.total_return_pct) },
+        { label: 'Total Return', value: formatPercent(metrics.net_profit_pct) },
         { label: 'Net Profit', value: formatCurrency(metrics.net_profit) },
         { label: 'Gross Profit', value: formatCurrency(metrics.gross_profit) },
         { label: 'Gross Loss', value: formatCurrency(metrics.gross_loss) },
@@ -11232,8 +11232,8 @@ function renderAllMetrics(results) {
       title: 'Risk Metrics',
       icon: 'bi-shield-exclamation',
       items: [
-        { label: 'Max Drawdown', value: formatPercent(metrics.max_drawdown_pct) },
-        { label: 'Max Drawdown $', value: formatCurrency(metrics.max_drawdown) },
+        { label: 'Max Drawdown', value: formatPercent(metrics.max_drawdown) },
+        { label: 'Max Drawdown $', value: formatCurrency(metrics.max_drawdown_value) },
         { label: 'Sharpe Ratio', value: (metrics.sharpe_ratio || 0).toFixed(2) },
         { label: 'Sortino Ratio', value: (metrics.sortino_ratio || 0).toFixed(2) },
         { label: 'Calmar Ratio', value: (metrics.calmar_ratio || 0).toFixed(2) }
@@ -11254,11 +11254,16 @@ function renderAllMetrics(results) {
       title: 'Average Values',
       icon: 'bi-calculator',
       items: [
-        { label: 'Avg Trade', value: formatCurrency(metrics.avg_trade) },
-        { label: 'Avg Win', value: formatCurrency(metrics.avg_win) },
-        { label: 'Avg Loss', value: formatCurrency(metrics.avg_loss) },
-        { label: 'Largest Win', value: formatCurrency(metrics.largest_win) },
-        { label: 'Largest Loss', value: formatCurrency(metrics.largest_loss) }
+        { label: 'Avg Trade', value: formatPercent(metrics.avg_trade) },
+        { label: 'Avg Trade $', value: formatCurrency(metrics.avg_trade_value) },
+        { label: 'Avg Win', value: formatPercent(metrics.avg_win) },
+        { label: 'Avg Win $', value: formatCurrency(metrics.avg_win_value) },
+        { label: 'Avg Loss', value: formatPercent(metrics.avg_loss) },
+        { label: 'Avg Loss $', value: formatCurrency(metrics.avg_loss_value) },
+        { label: 'Largest Win', value: formatPercent(metrics.largest_win) },
+        { label: 'Largest Win $', value: formatCurrency(metrics.largest_win_value) },
+        { label: 'Largest Loss', value: formatPercent(metrics.largest_loss) },
+        { label: 'Largest Loss $', value: formatCurrency(metrics.largest_loss_value) }
       ]
     },
     {
