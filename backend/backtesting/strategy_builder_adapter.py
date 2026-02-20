@@ -1970,7 +1970,7 @@ class StrategyBuilderAdapter(BaseStrategy):
         elif logic_type == "delay":
             bars = params.get("bars", 1)
             input_val = inputs.get("input", pd.Series([False] * 100))
-            return {"result": input_val.shift(bars).fillna(False)}
+            return {"result": input_val.shift(bars).fillna(False).astype(bool)}
 
         elif logic_type == "filter":
             signal = inputs.get("signal", pd.Series([False] * 100))

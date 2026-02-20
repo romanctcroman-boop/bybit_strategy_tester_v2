@@ -1309,7 +1309,9 @@ class MetricsCalculator:
             "win_rate": trade_m.win_rate,
             "profit_factor": trade_m.profit_factor,
             "avg_win": trade_m.avg_win_pct,
+            "avg_win_pct": trade_m.avg_win_pct,  # Explicit alias — avg_win == avg_win_pct (percentage)
             "avg_loss": trade_m.avg_loss_pct,
+            "avg_loss_pct": trade_m.avg_loss_pct,  # Explicit alias
             "avg_trade": trade_m.avg_trade_pct,
             "avg_trade_pct": trade_m.avg_trade_pct,  # Alias for frontend compatibility
             "largest_win": trade_m.largest_win_pct,

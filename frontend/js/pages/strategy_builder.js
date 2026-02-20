@@ -2919,12 +2919,12 @@ function setupEventListeners() {
   // Save button
   const btnSave = document.getElementById('btnSave');
   if (btnSave) {
-    btnSave.addEventListener('click', function (e) {
+    btnSave.addEventListener('click', async function (e) {
       e.preventDefault();
       e.stopPropagation();
       console.log('[Strategy Builder] Save button clicked');
       try {
-        saveStrategy();
+        await saveStrategy();
       } catch (err) {
         console.error('[Strategy Builder] Save error:', err);
         alert(`Save error: ${err.message}`);

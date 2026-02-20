@@ -10,6 +10,7 @@ Provides endpoints to check:
 - Prometheus metrics
 """
 
+import inspect
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -260,7 +261,9 @@ async def readiness_check():
 
         manager = get_circuit_manager()
         if manager._persistence_enabled and manager._persistence_redis:
-            await manager._persistence_redis.ping()
+            result = manager._persistence_redis.ping()
+            if inspect.isawaitable(result):
+                await result
             checks["redis"] = True
         else:
             checks["redis"] = None  # type: ignore[assignment]  # Not enabled
