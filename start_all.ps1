@@ -207,7 +207,7 @@ if (Test-Path $agentScript) {
 if (-not $NoBrowser -and $serverReady) {
     Write-Host ""
     Write-Host "[INFO] Opening browser..." -ForegroundColor Cyan
-    Start-Process "http://localhost:8000"
+    Start-Process "http://localhost:8000/frontend/dashboard.html"
 }
 
 # =============================================================================

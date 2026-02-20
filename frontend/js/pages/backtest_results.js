@@ -2684,6 +2684,108 @@ function selectAllForDelete() {
 }
 
 /**
+ * Clear all display data (charts, metrics, trades list, price chart)
+ * when no backtests remain after deletion.
+ */
+function clearAllDisplayData() {
+  console.log('[clearAllDisplayData] Clearing all charts and metrics');
+  currentBacktest = null;
+
+  // --- Equity Chart (Chart.js) ---
+  if (equityChart && equityChart.canvas) {
+    equityChart.data.labels = [];
+    equityChart.data.datasets.forEach((ds) => (ds.data = []));
+    equityChart.update('none');
+  }
+
+  // --- Drawdown / Returns / Monthly / Trade Analysis Charts (Chart.js) ---
+  [drawdownChart, returnsChart, monthlyChart, tradeDistributionChart, winLossDonutChart, waterfallChart, benchmarkingChart].forEach((chart) => {
+    if (chart && chart.canvas) {
+      chart.data.labels = [];
+      chart.data.datasets.forEach((ds) => (ds.data = []));
+      chart.update('none');
+    }
+  });
+
+  // --- Price Chart (LightweightCharts) ---
+  if (_priceChartResizeObserver) {
+    _priceChartResizeObserver.disconnect();
+    _priceChartResizeObserver = null;
+  }
+  if (btPriceChart) {
+    btPriceChart.remove();
+    btPriceChart = null;
+    btCandleSeries = null;
+  }
+  btPriceChartMarkers = [];
+  btTradeLineSeries = [];
+  _btCachedCandles = [];
+  const priceContainer = document.getElementById('btPriceChartContainer');
+  if (priceContainer) priceContainer.innerHTML = '';
+
+  // --- TradingView Equity Chart (custom component) ---
+  if (window.tvEquityChart) {
+    window.tvEquityChart = null;
+  }
+
+  // --- Summary Cards ---
+  const cardIds = ['tvNetProfit', 'tvNetProfitPct', 'tvMaxDrawdown', 'tvMaxDrawdownPct', 'tvTotalTrades', 'tvWinningTrades', 'tvWinRate', 'tvProfitFactor'];
+  cardIds.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = '--';
+      el.className = 'tv-summary-card-value tv-value-neutral';
+    }
+  });
+  // Sub-values reset class
+  ['tvNetProfitPct', 'tvMaxDrawdownPct', 'tvWinRate'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'tv-summary-card-sub';
+  });
+
+  // --- Report Header ---
+  const dateRange = document.getElementById('tvReportDateRange');
+  if (dateRange) dateRange.textContent = '--';
+
+  // --- Dynamics Tab (all dyn-* elements) ---
+  document.querySelectorAll('[id^="dyn-"]').forEach((el) => {
+    el.textContent = '--';
+    el.className = 'tv-value-neutral';
+  });
+
+  // --- Trade Analysis Tab (all ta-* elements) ---
+  document.querySelectorAll('[id^="ta-"]').forEach((el) => {
+    el.textContent = '--';
+    el.className = 'tv-value-neutral';
+  });
+
+  // --- Risk-Return Tab (all rr-* elements) ---
+  document.querySelectorAll('[id^="rr-"]').forEach((el) => {
+    el.textContent = '--';
+    el.className = 'tv-value-neutral';
+  });
+
+  // --- Trades List Tab ---
+  const tbody = document.getElementById('tvTradesListBody');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#8b949e;padding:2rem;">Нет сделок для отображения</td></tr>';
+  }
+  const countEl = document.getElementById('tvTradesCount');
+  if (countEl) countEl.textContent = '0';
+
+  // --- Tabulator table (legacy) ---
+  if (tradesTable && typeof tradesTable.clearData === 'function') {
+    tradesTable.clearData();
+  }
+
+  // --- Open trades count in summary ---
+  const openTrades = document.getElementById('tvOpenTrades');
+  if (openTrades) openTrades.textContent = '0';
+
+  console.log('[clearAllDisplayData] All display data cleared');
+}
+
+/**
  * Delete all selected backtests in bulk.
  * Uses sequential API calls with optimistic UI updates.
  */
@@ -2750,6 +2852,7 @@ async function deleteSelectedBacktests() {
   if (allResults.length > 0 && !currentBacktest) {
     selectBacktest(allResults[0].backtest_id);
   } else if (allResults.length === 0) {
+    clearAllDisplayData();
     document.getElementById('emptyState').classList.remove('d-none');
   }
 
@@ -2841,6 +2944,8 @@ async function deleteBacktest(backtestId) {
       if (allResults.length > 0 && !currentBacktest) {
         selectBacktest(allResults[0].backtest_id);
       } else if (allResults.length === 0) {
+        // Clear all charts, metrics, and trade lists
+        clearAllDisplayData();
         // Show empty state
         document.getElementById('emptyState').classList.remove('d-none');
       }
