@@ -3,6 +3,7 @@ AI Agents Router
 Endpoints for interacting with AI agents (DeepSeek and Perplexity).
 """
 
+import functools
 import logging
 from typing import Any
 
@@ -15,25 +16,17 @@ from backend.agents.unified_agent_interface import UnifiedAgentInterface
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Initialize global instances
-_agent_interface: UnifiedAgentInterface | None = None
-_circuit_breaker_manager: CircuitBreakerManager | None = None
 
-
+@functools.lru_cache(maxsize=1)
 def get_agent_interface() -> UnifiedAgentInterface:
-    """Get or create UnifiedAgentInterface singleton"""
-    global _agent_interface
-    if _agent_interface is None:
-        _agent_interface = UnifiedAgentInterface()
-    return _agent_interface
+    """Get or create UnifiedAgentInterface singleton (thread-safe via lru_cache)."""
+    return UnifiedAgentInterface()
 
 
+@functools.lru_cache(maxsize=1)
 def get_circuit_breaker_manager() -> CircuitBreakerManager:
-    """Get or create CircuitBreakerManager singleton"""
-    global _circuit_breaker_manager
-    if _circuit_breaker_manager is None:
-        _circuit_breaker_manager = CircuitBreakerManager()
-    return _circuit_breaker_manager
+    """Get or create CircuitBreakerManager singleton (thread-safe via lru_cache)."""
+    return CircuitBreakerManager()
 
 
 # Request/Response Models
@@ -625,7 +618,7 @@ async def dashboard_start_workflow(request: WorkflowStartRequest) -> dict[str, A
 
     except Exception as e:
         logger.error(f"Failed to start workflow: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get(
@@ -688,7 +681,7 @@ async def dashboard_patterns(
 
     except Exception as e:
         logger.error(f"Pattern extraction failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get(
@@ -703,8 +696,8 @@ async def dashboard_scheduler_tasks() -> dict[str, Any]:
             "message": "Scheduler API ready — start scheduler via /dashboard/scheduler/start",
             "tasks": [],
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get(
@@ -721,8 +714,8 @@ async def dashboard_paper_sessions() -> dict[str, Any]:
             "sessions": AgentPaperTrader.list_sessions(),
             "active_count": len(AgentPaperTrader.list_active()),
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class PaperTradingStartRequest(BaseModel):
@@ -771,7 +764,7 @@ async def dashboard_start_paper_trading(
         }
     except Exception as e:
         logger.error(f"Failed to start paper trading: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post(
@@ -792,8 +785,8 @@ async def dashboard_stop_paper_trading(session_id: str) -> dict[str, Any]:
         return {"success": True, **session.to_dict()}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get(
@@ -847,8 +840,8 @@ async def dashboard_activity_log(
             "date": target_date,
         }
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================

@@ -2975,6 +2975,10 @@ async function selectBacktest(backtestId) {
 
     // Fetch full details
     const response = await fetch(`${API_BASE}/backtests/${backtestId}`);
+    if (!response.ok) {
+      currentBacktest = null;
+      throw new Error(`Failed to fetch backtest: ${response.status} ${response.statusText}`);
+    }
     currentBacktest = await response.json();
 
     // Update TradingView style tabs
@@ -3017,6 +3021,7 @@ async function selectBacktest(backtestId) {
       '[selectBacktest] Dispatched backtestLoaded event for AI Analysis'
     );
   } catch (error) {
+    currentBacktest = null;
     console.error('Failed to load backtest details:', error);
     showToast('Failed to load backtest details', 'error');
   }

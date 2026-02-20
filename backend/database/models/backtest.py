@@ -42,14 +42,16 @@ class Backtest(Base):
     strategy_type = Column(String(50), nullable=False)  # Strategy type used
 
     # Execution status
-    status: Column[BacktestStatus] = Column(SQLEnum(BacktestStatus), nullable=False, default=BacktestStatus.PENDING)
+    status: Column[BacktestStatus] = Column(
+        SQLEnum(BacktestStatus), nullable=False, default=BacktestStatus.PENDING, index=True
+    )
     error_message = Column(Text, nullable=True)
 
     # Configuration
-    symbol = Column(String(20), nullable=False)
-    timeframe = Column(String(10), nullable=False)
-    start_date = Column(DateTime, nullable=False)
-    end_date = Column(DateTime, nullable=False)
+    symbol = Column(String(20), nullable=False, index=True)
+    timeframe = Column(String(10), nullable=False, index=True)
+    start_date = Column(DateTime, nullable=False, index=True)
+    end_date = Column(DateTime, nullable=False, index=True)
     initial_capital = Column(Float, nullable=False, default=10000.0)
 
     # Strategy parameters used

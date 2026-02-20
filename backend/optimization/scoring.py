@@ -35,7 +35,7 @@ def calculate_composite_score(result: dict, metric: str, weights: dict | None = 
     max_drawdown_pct = abs(result.get("max_drawdown", 0) or 0)
     max_drawdown = max_drawdown_pct / 100.0
     win_rate_pct = result.get("win_rate", 0) or 0
-    profit_factor = result.get("profit_factor", 1) or 1
+    profit_factor = result.get("profit_factor", 0) or 0  # 0 for losers, not 1
 
     # Simple metrics (higher = better)
     if metric == "net_profit":

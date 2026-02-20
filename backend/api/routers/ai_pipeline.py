@@ -526,6 +526,7 @@ async def get_pipeline_status(pipeline_id: str) -> PipelineStatusResponse:
     Returns current stage, progress percentage, and timing information.
     Pipeline IDs are returned from the POST /generate endpoint.
     """
+    _evict_stale_jobs()
     job = _pipeline_jobs.get(pipeline_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Pipeline '{pipeline_id}' not found")
@@ -562,6 +563,7 @@ async def get_pipeline_result(pipeline_id: str) -> PipelineResultResponse:
     Returns the full pipeline result including strategy, backtest metrics,
     and walk-forward data. Only available for completed or failed jobs.
     """
+    _evict_stale_jobs()
     job = _pipeline_jobs.get(pipeline_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Pipeline '{pipeline_id}' not found")

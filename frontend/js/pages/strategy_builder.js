@@ -10860,7 +10860,7 @@ function convertIntervalToAPIFormat(value) {
 
 async function runBacktest() {
   console.log('[Strategy Builder] runBacktest called');
-  const strategyId = getStrategyIdFromURL();
+  let strategyId = getStrategyIdFromURL();
   console.log('[Strategy Builder] Strategy ID from URL:', strategyId);
 
   if (!strategyId) {
@@ -10868,16 +10868,16 @@ async function runBacktest() {
     // Предложить сохранить
     if (confirm('Strategy not saved. Save now?')) {
       await saveStrategy();
-      // После сохранения попробовать снова
-      const newId = getStrategyIdFromURL();
-      if (newId) {
-        console.log('[Strategy Builder] Retrying backtest with new ID:', newId);
-        await runBacktest();
-      } else {
+      // После сохранения получаем ID и продолжаем линейно (без рекурсии)
+      strategyId = getStrategyIdFromURL();
+      if (!strategyId) {
         showNotification('Не удалось получить ID стратегии после сохранения', 'error');
+        return;
       }
+      console.log('[Strategy Builder] Proceeding with saved strategy ID:', strategyId);
+    } else {
+      return;
     }
-    return;
   }
 
   if (strategyBlocks.length === 0) {

@@ -9,6 +9,7 @@ Extended endpoints for the AI Agent System:
 - MCP Tools
 """
 
+import functools
 import logging
 from typing import Any
 
@@ -177,7 +178,7 @@ async def deliberate(request: DeliberationRequest) -> DeliberationResponse:
 
     except Exception as e:
         logger.error(f"Deliberation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/domain-agents")
@@ -208,7 +209,7 @@ async def list_domain_agents():
 
     except Exception as e:
         logger.error(f"Error listing domain agents: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -216,17 +217,12 @@ async def list_domain_agents():
 # ============================================================================
 
 
-_memory_instance = None
-
-
+@functools.lru_cache(maxsize=1)
 def get_memory():
-    """Get or create memory singleton"""
-    global _memory_instance
-    if _memory_instance is None:
-        from backend.agents.memory.hierarchical_memory import HierarchicalMemory
+    """Get or create memory singleton (thread-safe via lru_cache)."""
+    from backend.agents.memory.hierarchical_memory import HierarchicalMemory
 
-        _memory_instance = HierarchicalMemory()
-    return _memory_instance
+    return HierarchicalMemory()
 
 
 @router.post("/memory/store")
@@ -265,7 +261,7 @@ async def store_memory(request: MemoryStoreRequest):
 
     except Exception as e:
         logger.error(f"Memory store error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/memory/recall")
@@ -300,7 +296,7 @@ async def recall_memory(request: MemoryRecallRequest):
 
     except Exception as e:
         logger.error(f"Memory recall error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/memory/stats")
@@ -314,7 +310,7 @@ async def get_memory_stats():
 
     except Exception as e:
         logger.error(f"Memory stats error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/memory/consolidate")
@@ -335,7 +331,7 @@ async def consolidate_memory():
 
     except Exception as e:
         logger.error(f"Memory consolidation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -377,7 +373,7 @@ async def submit_feedback(request: SelfImprovementFeedbackRequest):
 
     except Exception as e:
         logger.error(f"Feedback error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/improvement/evaluate")
@@ -408,7 +404,7 @@ async def evaluate_response(request: SelfImprovementFeedbackRequest):
 
     except Exception as e:
         logger.error(f"Evaluation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/improvement/stats")
@@ -426,7 +422,7 @@ async def get_improvement_stats():
 
     except Exception as e:
         logger.error(f"Improvement stats error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -451,7 +447,7 @@ async def list_mcp_tools():
 
     except Exception as e:
         logger.error(f"MCP tools error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/mcp/tools/call")
@@ -472,7 +468,7 @@ async def call_mcp_tool(request: ToolCallRequest):
 
     except Exception as e:
         logger.error(f"MCP tool call error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/mcp/resources")
@@ -491,7 +487,7 @@ async def list_mcp_resources():
 
     except Exception as e:
         logger.error(f"MCP resources error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -515,7 +511,7 @@ async def get_agent_metrics():
 
     except Exception as e:
         logger.error(f"Metrics error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/monitoring/traces")
@@ -544,7 +540,7 @@ async def get_agent_traces(limit: int = 50):
 
     except Exception as e:
         logger.error(f"Traces error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/monitoring/alerts")
@@ -572,7 +568,7 @@ async def get_agent_alerts():
 
     except Exception as e:
         logger.error(f"Alerts error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/monitoring/anomalies")
@@ -597,7 +593,7 @@ async def get_detected_anomalies(metric_name: str | None = None, limit: int = 10
 
     except Exception as e:
         logger.error(f"Anomalies error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -657,7 +653,7 @@ async def get_system_overview():
 
     except Exception as e:
         logger.error(f"System overview error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -742,7 +738,7 @@ async def analyze_backtest_with_ai(request: BacktestAnalysisRequest):
 
     except Exception as e:
         logger.error(f"Backtest analysis error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/analyze-optimization")
@@ -779,7 +775,7 @@ async def analyze_optimization_with_ai(request: OptimizationAnalysisRequest):
 
     except Exception as e:
         logger.error(f"Optimization analysis error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -815,7 +811,7 @@ async def preflight_key_validation():
 
     except Exception as e:
         logger.error(f"Pre-flight validation error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/keys/pool-metrics")
@@ -838,7 +834,7 @@ async def get_key_pool_metrics():
 
     except Exception as e:
         logger.error(f"Pool metrics error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -871,7 +867,7 @@ async def get_agent_accuracy():
 
     except Exception as e:
         logger.error(f"Agent accuracy error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/deliberation/audit-log")
@@ -899,7 +895,7 @@ async def get_deliberation_audit_log(last_n: int = 50):
 
     except Exception as e:
         logger.error(f"Audit log error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/deliberation/history")
@@ -940,7 +936,7 @@ async def get_deliberation_history(limit: int = 20):
 
     except Exception as e:
         logger.error(f"Deliberation history error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -1028,7 +1024,7 @@ async def run_builder_task(request: BuilderTaskRequest):
 
     except Exception as e:
         logger.error(f"Builder task error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/builder/block-library")
@@ -1045,7 +1041,7 @@ async def get_builder_block_library():
 
     except Exception as e:
         logger.error(f"Block library error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/builder/strategies")
@@ -1059,4 +1055,4 @@ async def list_builder_strategies(page: int = 1, page_size: int = 20):
 
     except Exception as e:
         logger.error(f"List strategies error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -72,13 +72,13 @@ class Trade(Base):
 
     # Entry details
     entry_price = Column(Float, nullable=False)
-    entry_time = Column(DateTime(timezone=True), nullable=False)
+    entry_time = Column(DateTime(timezone=True), nullable=False, index=True)
     entry_size = Column(Float, nullable=False)  # Position size in base currency
     entry_value = Column(Float, nullable=True)  # Position value in quote currency
 
     # Exit details
     exit_price = Column(Float, nullable=True)
-    exit_time = Column(DateTime(timezone=True), nullable=True)
+    exit_time = Column(DateTime(timezone=True), nullable=True, index=True)
     exit_size = Column(Float, nullable=True)
     exit_value = Column(Float, nullable=True)
 
@@ -120,10 +120,7 @@ class Trade(Base):
     backtest = relationship("Backtest", back_populates="trade_records")
 
     def __repr__(self) -> str:
-        return (
-            f"<Trade(id={self.id}, symbol={self.symbol}, side={self.side.value}, "
-            f"pnl={self.pnl})>"
-        )
+        return f"<Trade(id={self.id}, symbol={self.symbol}, side={self.side.value}, pnl={self.pnl})>"
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API responses."""
@@ -133,11 +130,7 @@ class Trade(Base):
             "trade_id": self.trade_id,
             "symbol": self.symbol,
             "side": self.side.value if isinstance(self.side, TradeSide) else self.side,
-            "status": (
-                self.status.value
-                if isinstance(self.status, TradeStatus)
-                else self.status
-            ),
+            "status": (self.status.value if isinstance(self.status, TradeStatus) else self.status),
             "entry_price": self.entry_price,
             "entry_time": self.entry_time.isoformat() if self.entry_time else None,
             "entry_size": self.entry_size,
@@ -190,9 +183,7 @@ class Trade(Base):
             return self.pnl
         return None
 
-    def close(
-        self, exit_price: float, exit_time: datetime, exit_signal: str | None = None
-    ) -> None:
+    def close(self, exit_price: float, exit_time: datetime, exit_signal: str | None = None) -> None:
         """Close the trade."""
         self.exit_price = exit_price
         self.exit_time = exit_time

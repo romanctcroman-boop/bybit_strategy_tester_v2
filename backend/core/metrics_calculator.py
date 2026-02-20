@@ -684,21 +684,32 @@ def calculate_metrics_numba(
 
     max_dd *= 100  # As percentage
 
-    # Sharpe ratio (using daily returns)
+    # Sharpe ratio (using daily returns, matching standard calculator: ddof=1 + RFR)
+    # Filter out NaN/inf values from daily_returns before computing stats
     n_returns = len(daily_returns)
-    if n_returns > 1:
-        mean_return = 0.0
-        for i in range(n_returns):
-            mean_return += daily_returns[i]
-        mean_return /= n_returns
+    valid_count = 0
+    mean_return = 0.0
+    for i in range(n_returns):
+        v = daily_returns[i]
+        if not (np.isnan(v) or np.isinf(v)):
+            mean_return += v
+            valid_count += 1
+
+    if valid_count > 1:
+        mean_return /= valid_count
 
         variance = 0.0
         for i in range(n_returns):
-            variance += (daily_returns[i] - mean_return) ** 2
-        std_return = np.sqrt(variance / n_returns)
+            v = daily_returns[i]
+            if not (np.isnan(v) or np.isinf(v)):
+                variance += (v - mean_return) ** 2
+        std_return = np.sqrt(variance / (valid_count - 1))  # Sample std (ddof=1)
+
+        # Risk-free rate per period (annual 2% / 8766 hours)
+        period_rfr = 0.02 / 8766.0
 
         # Annualize: sqrt(8766) for hourly data ~= 93.6
-        sharpe = (mean_return / std_return) * 93.6 if std_return > 1e-10 else 0.0
+        sharpe = ((mean_return - period_rfr) / std_return) * 93.6 if std_return > 1e-10 else 0.0
     else:
         sharpe = 0.0
 
@@ -808,8 +819,9 @@ class MetricsCalculator:
 
         metrics.net_profit = sum(pnl_list)
 
-        # Derived metrics
-        metrics.win_rate = calculate_win_rate(metrics.winning_trades, metrics.total_trades)
+        # Derived metrics (win rate excludes breakeven trades from denominator)
+        meaningful_trades = metrics.winning_trades + metrics.losing_trades
+        metrics.win_rate = calculate_win_rate(metrics.winning_trades, meaningful_trades)
         metrics.profit_factor = calculate_profit_factor(metrics.gross_profit, metrics.gross_loss)
 
         # Averages
@@ -958,10 +970,12 @@ class MetricsCalculator:
             net_profit = final_capital - initial_capital
             metrics.margin_efficiency = calculate_margin_efficiency(net_profit, margin_used)
 
-        # Volatility (annualized)
+        # Volatility (annualized) — filter NaN/inf before computing std
         if len(returns) > 1:
-            periods_per_year = ANNUALIZATION_FACTORS.get(frequency, 365.25)
-            metrics.volatility = float(np.std(returns, ddof=1) * np.sqrt(periods_per_year)) * 100
+            valid_returns = returns[np.isfinite(returns)]
+            if len(valid_returns) > 1:
+                periods_per_year = ANNUALIZATION_FACTORS.get(frequency, 365.25)
+                metrics.volatility = float(np.std(valid_returns, ddof=1) * np.sqrt(periods_per_year)) * 100
 
         return metrics
 

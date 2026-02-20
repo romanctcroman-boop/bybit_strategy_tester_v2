@@ -112,11 +112,14 @@ async def health_check():
 
         session = SessionLocal()
         try:
-            session.execute(text("SELECT 1"))  # ✅ Fixed: explicit text() for SQLAlchemy 2.0
+            session.execute(text("SELECT 1"))
             checks["database"] = {
                 "status": "ok",
                 "message": "Database connection successful",
             }
+        except Exception:
+            session.rollback()
+            raise
         finally:
             session.close()
 

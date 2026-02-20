@@ -2035,12 +2035,16 @@ class StrategyBuilderAdapter(BaseStrategy):
         low = ohlcv["low"].values
         volume = ohlcv["volume"].values
 
-        # Helper for crossover detection
+        # Helper for crossover detection (using shift to avoid np.roll wraparound)
         def crossover(a, b):
-            return (a > b) & (np.roll(a, 1) <= np.roll(b, 1))
+            a_prev = pd.Series(a).shift(1).fillna(a[0] if len(a) > 0 else 0).values
+            b_prev = pd.Series(b).shift(1).fillna(b[0] if len(b) > 0 else 0).values
+            return (a > b) & (a_prev <= b_prev)
 
         def crossunder(a, b):
-            return (a < b) & (np.roll(a, 1) >= np.roll(b, 1))
+            a_prev = pd.Series(a).shift(1).fillna(a[0] if len(a) > 0 else 0).values
+            b_prev = pd.Series(b).shift(1).fillna(b[0] if len(b) > 0 else 0).values
+            return (a < b) & (a_prev >= b_prev)
 
         def apply_signal_memory(
             buy_events: np.ndarray,
@@ -2143,8 +2147,9 @@ class StrategyBuilderAdapter(BaseStrategy):
                 buy = crossover(macd_line, np.zeros(n))
                 sell = crossunder(macd_line, np.zeros(n))
             elif mode == "histogram":
-                buy = (histogram > 0) & (np.roll(histogram, 1) <= 0)
-                sell = (histogram < 0) & (np.roll(histogram, 1) >= 0)
+                hist_prev = pd.Series(histogram).shift(1).fillna(0).values
+                buy = (histogram > 0) & (hist_prev <= 0)
+                sell = (histogram < 0) & (hist_prev >= 0)
             else:  # signal_cross
                 buy = crossover(macd_line, signal_line)
                 sell = crossunder(macd_line, signal_line)
@@ -2326,7 +2331,7 @@ class StrategyBuilderAdapter(BaseStrategy):
             period = params.get("period", 10)
             threshold = params.get("threshold", 0)
 
-            momentum = close - np.roll(close, period)
+            momentum = close - pd.Series(close).shift(period).fillna(0).values
 
             buy = momentum > threshold
             sell = momentum < -threshold
@@ -3554,19 +3559,13 @@ class StrategyBuilderAdapter(BaseStrategy):
             bullish = bullish_raw
             bearish = bearish_raw
 
-        # Apply signal memory: if enabled, signals persist for N bars
+        # Apply signal memory: if enabled, signals persist for N bars (vectorized)
         if activate_memory and memory_bars > 1:
-            bullish_mem = np.zeros(n, dtype=bool)
-            bearish_mem = np.zeros(n, dtype=bool)
-            for i in range(n):
-                if bullish[i]:
-                    for j in range(i, min(i + memory_bars, n)):
-                        bullish_mem[j] = True
-                if bearish[i]:
-                    for j in range(i, min(i + memory_bars, n)):
-                        bearish_mem[j] = True
-            bullish = bullish_mem
-            bearish = bearish_mem
+            bullish_s = pd.Series(bullish, index=idx)
+            bearish_s = pd.Series(bearish, index=idx)
+            # Rolling max over window=memory_bars propagates True forward
+            bullish = bullish_s.rolling(window=memory_bars, min_periods=1).max().fillna(0).astype(bool).values
+            bearish = bearish_s.rolling(window=memory_bars, min_periods=1).max().fillna(0).astype(bool).values
 
         signal = bullish | bearish
 

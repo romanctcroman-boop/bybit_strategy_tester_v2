@@ -25,8 +25,10 @@ except Exception:
 
 import asyncio
 import contextlib
+import functools
 import logging
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
@@ -52,30 +54,27 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 executor = ThreadPoolExecutor(max_workers=4)
 
-# Global cached BybitAdapter instance (avoid recreating on each request)
-_bybit_adapter: BybitAdapter | None = None
-
 # Cache for db-groups query (heavy GROUP BY - takes ~500ms on 2M+ rows)
 _db_groups_cache: dict | None = None
 _db_groups_cache_time: float = 0
 _DB_GROUPS_CACHE_TTL: float = 5.0  # seconds
+_db_groups_lock = threading.Lock()
 
 
 def invalidate_db_groups_cache() -> None:
     """Invalidate db-groups cache (call after delete/block/unblock operations)."""
     global _db_groups_cache, _db_groups_cache_time
-    _db_groups_cache = None
-    _db_groups_cache_time = 0
+    with _db_groups_lock:
+        _db_groups_cache = None
+        _db_groups_cache_time = 0
 
 
+@functools.lru_cache(maxsize=1)
 def get_bybit_adapter() -> BybitAdapter:
-    """Get or create cached BybitAdapter instance."""
-    global _bybit_adapter
-    if _bybit_adapter is None:
-        api_key = os.environ.get("BYBIT_API_KEY")
-        api_secret = os.environ.get("BYBIT_API_SECRET")
-        _bybit_adapter = BybitAdapter(api_key=api_key, api_secret=api_secret)
-    return _bybit_adapter
+    """Get or create cached BybitAdapter instance (thread-safe via lru_cache)."""
+    api_key = os.environ.get("BYBIT_API_KEY")
+    api_secret = os.environ.get("BYBIT_API_SECRET")
+    return BybitAdapter(api_key=api_key, api_secret=api_secret)
 
 
 # Include sub-routers
@@ -160,10 +159,11 @@ def get_db_groups(db: Session = Depends(get_db)) -> dict:
 
     # Return cached data if fresh (within TTL)
     now = time.time()
-    if _db_groups_cache is not None and (now - _db_groups_cache_time) < _DB_GROUPS_CACHE_TTL:
-        # Update blocked list (fast operation)
-        _db_groups_cache["blocked"] = list(_get_blocked())
-        return _db_groups_cache
+    with _db_groups_lock:
+        if _db_groups_cache is not None and (now - _db_groups_cache_time) < _DB_GROUPS_CACHE_TTL:
+            # Update blocked list (fast operation)
+            _db_groups_cache["blocked"] = list(_get_blocked())
+            return _db_groups_cache
 
     try:
         from sqlalchemy import func
@@ -210,9 +210,10 @@ def get_db_groups(db: Session = Depends(get_db)) -> dict:
 
         result = {"groups": list(groups.values()), "blocked": list(_get_blocked())}
 
-        # Cache the result
-        _db_groups_cache = result
-        _db_groups_cache_time = now
+        # Cache the result (thread-safe write)
+        with _db_groups_lock:
+            _db_groups_cache = result
+            _db_groups_cache_time = now
 
         return result
     except Exception as e:

@@ -1196,8 +1196,8 @@ class ValidationWebSocketManager:
         logger.info(f"Validation WS disconnected: {client_id}")
 
     def _evict_stale(self) -> None:
-        """Remove connections that have been idle > 1 hour (safety net)."""
-        cutoff = time.monotonic() - 3600
+        """Remove connections that have been idle > 5 minutes (safety net)."""
+        cutoff = time.monotonic() - 300
         stale = [cid for cid, ts in self._connected_at.items() if ts < cutoff]
         for cid in stale:
             self.active_connections.pop(cid, None)
